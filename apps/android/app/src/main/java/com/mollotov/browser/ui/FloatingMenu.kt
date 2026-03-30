@@ -49,6 +49,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 
 /** App icon background color — warm peach/orange */
 private val MollotovOrange = Color(244f / 255f, 176f / 255f, 120f / 255f)
+/** Richer menu item color — more red/saturated for contrast against the FAB */
+private val MenuItemOrange = Color(240f / 255f, 148f / 255f, 90f / 255f)
 
 /**
  * Floating action button that expands into a fan menu.
@@ -168,7 +170,7 @@ fun FloatingMenu(
                     .alpha(alpha)
                     .shadow(3.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(MollotovOrange)
+                    .background(MenuItemOrange)
                     .clickable {
                         item.action()
                         isOpen = false
@@ -194,6 +196,7 @@ fun FloatingMenu(
                 .size(fabSizeDp)
                 .offset { IntOffset(fabOffsetX, fabOffsetY) }
                 .shadow(4.dp, CircleShape)
+                .alpha(if (isOpen) 0.8f else 1f)
                 .clip(CircleShape)
                 .background(MollotovOrange)
                 .pointerInput(Unit) {

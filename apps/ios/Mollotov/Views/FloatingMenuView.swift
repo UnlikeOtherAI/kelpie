@@ -3,6 +3,8 @@ import UIKit
 
 /// App icon background color — warm peach/orange.
 private let mollotovOrange = Color(red: 244/255, green: 176/255, blue: 120/255)
+/// Richer menu item color — more red/saturated for contrast against the FAB.
+private let menuItemOrange = Color(red: 240/255, green: 148/255, blue: 90/255)
 
 /// UIKit blur that works over WKWebView content (SwiftUI materials cannot blur UIKit views).
 private struct NativeBlur: UIViewRepresentable {
@@ -85,6 +87,7 @@ struct FloatingMenuView: View {
                     .background(mollotovOrange)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .opacity(isOpen ? 0.8 : 1.0)
                     .contentShape(Circle())
                     .position(x: clampedX, y: midY)
                     .gesture(
@@ -147,7 +150,7 @@ struct FloatingMenuView: View {
                 .font(.system(size: 16))
                 .foregroundColor(.white)
                 .frame(width: menuItemSize, height: menuItemSize)
-                .background(mollotovOrange)
+                .background(menuItemOrange)
                 .clipShape(Circle())
                 .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
         }
