@@ -18,7 +18,7 @@ struct MollotovApp: App {
                 rendererState: rendererState
             )
             .onAppear { startServices() }
-            .frame(minWidth: 800, minHeight: 600)
+            .frame(minWidth: 320, minHeight: 480)
         }
         .commands {
             CommandGroup(after: .newItem) {
@@ -46,7 +46,7 @@ struct MollotovApp: App {
             serverState: newServerState,
             rendererState: newRendererState
         )
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(minWidth: 320, minHeight: 480)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
