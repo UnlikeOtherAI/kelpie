@@ -148,19 +148,46 @@
     font-size: 0.95em;
   }
 
-  /* Architecture diagram */
-  .arch {
+  /* Install copy button */
+  .install-wrap {
+    display: inline-flex;
+    align-items: center;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .install-wrap code {
+    padding: 14px 16px 14px 28px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    font-size: 1em;
+  }
+  .copy-btn {
+    background: none;
+    border: none;
+    border-left: 1px solid var(--border);
+    padding: 14px 16px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 1.1em;
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .copy-btn:hover { color: var(--text); }
+  .copy-btn svg { width: 18px; height: 18px; }
+
+  /* Mermaid chart */
+  .mermaid-container {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 32px;
     overflow-x: auto;
-  }
-  .arch pre {
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 0.85em;
-    line-height: 1.5;
-    color: var(--muted);
+    display: flex;
+    justify-content: center;
   }
 
   /* Sister projects */
@@ -211,7 +238,13 @@
 </div>
 
 <div class="install">
-  <pre>npm install -g @unlikeotherai/mollotov</pre>
+  <div class="install-wrap">
+    <code id="install-cmd">npm install -g @unlikeotherai/mollotov</code>
+    <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard" aria-label="Copy to clipboard">
+      <svg id="copy-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      <svg id="check-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none;color:#4ade80"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </button>
+  </div>
 </div>
 
 <section>
@@ -258,33 +291,47 @@
 
 <section>
   <h2>Architecture</h2>
-  <div class="arch">
-    <pre>
-                        Local Network
+  <div class="mermaid-container">
+    <pre class="mermaid">
+graph TD
+    subgraph net["Local Network"]
+        subgraph iphone["iPhone"]
+            ib["Mollotov Browser"]
+            is["HTTP + MCP Server"]
+            im["mDNS _mollotov._tcp"]
+        end
+        subgraph ipad["iPad"]
+            pb["Mollotov Browser"]
+            ps["HTTP + MCP Server"]
+            pm["mDNS _mollotov._tcp"]
+        end
+        subgraph android["Android"]
+            ab["Mollotov Browser"]
+            as["HTTP + MCP Server"]
+            am["mDNS _mollotov._tcp"]
+        end
+    end
 
-  +----------------+  +----------------+  +----------------+
-  |  Mollotov      |  |  Mollotov      |  |  Mollotov      |
-  |  Browser       |  |  Browser       |  |  Browser       |
-  |  (iPhone)      |  |  (iPad)        |  |  (Android)     |
-  |                |  |                |  |                |
-  |  HTTP + MCP    |  |  HTTP + MCP    |  |  HTTP + MCP    |
-  |  mDNS          |  |  mDNS          |  |  mDNS          |
-  +-------+--------+  +-------+--------+  +-------+--------+
-          |                    |                    |
-          +----------+---------+---------+----------+
-                     |                   |
-             +-------+-------------------+-------+
-             |       Mollotov CLI                |
-             |       (Node.js / MCP)             |
-             |                                   |
-             |  mDNS Discovery                   |
-             |  Individual + Group Commands      |
-             |  LLM Help System                  |
-             +----------------+------------------+
-                              |
-                         +----+----+
-                         |   LLM   |
-                         +---------+</pre>
+    subgraph cli["Mollotov CLI (Node.js)"]
+        disc["mDNS Discovery"]
+        ind["Individual Commands"]
+        grp["Group Commands"]
+        help["LLM Help System"]
+        mcp["MCP Server"]
+    end
+
+    is --> cli
+    ps --> cli
+    as --> cli
+    cli --> llm["LLM Agent"]
+
+    style net fill:transparent,stroke:#e0dcd6,stroke-width:1px
+    style iphone fill:transparent,stroke:#f4b078,stroke-width:2px
+    style ipad fill:transparent,stroke:#f4b078,stroke-width:2px
+    style android fill:transparent,stroke:#f4b078,stroke-width:2px
+    style cli fill:transparent,stroke:#e8944a,stroke-width:2px
+    style llm fill:#e8944a,color:#fff,stroke:#e8944a
+    </pre>
   </div>
 </section>
 
@@ -325,5 +372,23 @@
   <p>Built by <a href="https://github.com/UnlikeOtherAI">Unlike Other AI</a></p>
 </footer>
 
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'default' });
+</script>
+<script>
+  function copyInstall() {
+    const text = document.getElementById('install-cmd').textContent;
+    navigator.clipboard.writeText(text).then(function() {
+      document.getElementById('copy-icon').style.display = 'none';
+      document.getElementById('check-icon').style.display = 'block';
+      setTimeout(function() {
+        document.getElementById('copy-icon').style.display = 'block';
+        document.getElementById('check-icon').style.display = 'none';
+      }, 2000);
+    });
+  }
+</script>
 </body>
 </html>
