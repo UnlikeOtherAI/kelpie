@@ -34,6 +34,22 @@ final class ServerState: ObservableObject {
         let ctx = handlerContext
         router.handlerContext = ctx
 
+        // Safari auth — open current URL in Safari-backed auth session
+        router.register("safari-auth") { body in
+            let result: [String: Any] = await MainActor.run {
+                guard let webView = ctx.webView else {
+                    return errorResponse(code: "NO_WEBVIEW", message: "No WebView")
+                }
+                let urlStr = body["url"] as? String
+                guard let url = urlStr.flatMap({ URL(string: $0) }) ?? webView.url else {
+                    return errorResponse(code: "NO_URL", message: "No URL to authenticate")
+                }
+                ctx.safariAuth.authenticate(url: url, webView: webView, from: webView.window) {}
+                return successResponse(["started": true, "url": url.absoluteString])
+            }
+            return result
+        }
+
         // Toast endpoint — show a message overlay on the device
         router.register("toast") { body in
             guard let message = body["message"] as? String else {

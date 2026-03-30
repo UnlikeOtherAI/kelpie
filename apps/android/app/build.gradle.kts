@@ -69,6 +69,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.webkit:webkit:1.10.0")
+    implementation("androidx.browser:browser:1.8.0")
 
     // HTTP Server (Ktor)
     implementation("io.ktor:ktor-server-netty:2.3.8")

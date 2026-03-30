@@ -15,6 +15,7 @@ private val mainHandler = Handler(Looper.getMainLooper())
 
 class HandlerContext {
     var webView: WebView? = null
+    val chromeAuth = com.mollotov.browser.browser.ChromeAuthHelper()
 
     suspend fun evaluateJS(script: String): String = suspendCoroutine { cont ->
         val wv = webView

@@ -5,6 +5,7 @@ import WebKit
 final class HandlerContext: NSObject, WKScriptMessageHandler {
     weak var webView: WKWebView?
     var consoleMessages: [[String: Any]] = []
+    let safariAuth = SafariAuthHelper()
 
     nonisolated override init() { super.init() }
 

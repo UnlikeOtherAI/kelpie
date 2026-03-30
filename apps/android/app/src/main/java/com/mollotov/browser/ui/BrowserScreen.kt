@@ -1,5 +1,6 @@
 package com.mollotov.browser.ui
 
+import android.app.Activity
 import android.webkit.WebView
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ fun BrowserScreen(
     deviceInfo: DeviceInfo,
     router: Router,
     handlerContext: HandlerContext,
+    activity: Activity,
     isServerRunning: Boolean,
     isMDNSAdvertising: Boolean,
 ) {
@@ -57,6 +59,11 @@ fun BrowserScreen(
             onForward = { webView?.goForward() },
             onReload = { webView?.reload() },
             onStop = { webView?.stopLoading() },
+            onChromeAuth = {
+                webView?.let { wv ->
+                    handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
+                }
+            },
             onSettingsClick = { showSettings = true },
         )
 

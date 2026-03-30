@@ -35,6 +35,7 @@
 		A100000031 /* ShadowDOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031; };
 		A100000032 /* BrowserManagementHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032; };
 		A100000033 /* LLMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033; };
+		A100000034 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000034; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +68,7 @@
 		B100000031 /* ShadowDOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDOMHandler.swift; sourceTree = "<group>"; };
 		B100000032 /* BrowserManagementHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserManagementHandler.swift; sourceTree = "<group>"; };
 		B100000033 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
+		B100000034 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
 		B100000099 /* Mollotov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mollotov.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -121,6 +123,7 @@
 			children = (
 				B100000005 /* WebViewCoordinator.swift */,
 				B100000006 /* BrowserState.swift */,
+				B100000034 /* SafariAuthHelper.swift */,
 			);
 			path = Browser;
 			sourceTree = "<group>";
@@ -289,6 +292,7 @@
 				A100000031 /* ShadowDOMHandler.swift in Sources */,
 				A100000032 /* BrowserManagementHandler.swift in Sources */,
 				A100000033 /* LLMHandler.swift in Sources */,
+				A100000034 /* SafariAuthHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

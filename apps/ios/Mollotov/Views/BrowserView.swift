@@ -7,6 +7,7 @@ struct BrowserView: View {
     @ObservedObject var serverState: ServerState
     @State private var showSettings = false
     @State private var webView: WKWebView?
+    private let safariAuth = SafariAuthHelper()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +27,11 @@ struct BrowserView: View {
                 },
                 onBack: { webView?.goBack() },
                 onForward: { webView?.goForward() },
-                onReload: { webView?.reload() }
+                onReload: { webView?.reload() },
+                onSafariAuth: {
+                    guard let webView, let url = webView.url else { return }
+                    safariAuth.authenticate(url: url, webView: webView, from: webView.window) {}
+                }
             )
 
             // WebView

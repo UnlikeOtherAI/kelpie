@@ -185,6 +185,9 @@ export const browserTools: BrowserToolDef[] = [
   // Orientation
   { name: "mollotov_set_orientation", description: "Force the device into portrait, landscape, or auto orientation. Useful for testing responsive layouts and orientation-dependent features.", method: "setOrientation", schema: { device, orientation: z.enum(["portrait", "landscape", "auto"]).describe("Target orientation. 'auto' unlocks rotation.") }, bodyFromArgs: passthrough },
   { name: "mollotov_get_orientation", description: "Get the current device orientation and lock state", method: "getOrientation", schema: { device }, bodyFromArgs: passthrough },
+
+  // Safari Auth
+  { name: "mollotov_safari_auth", description: "Open the current page (or a specific URL) in a Safari-backed authentication session. This lets the user authenticate using Safari's saved passwords and cookies, then syncs the session back into the browser. Use this when a login page requires credentials the user has saved in Safari, or when OAuth providers block in-app browsers. The user will see a Safari sheet and must complete authentication manually — the tool returns once they finish or cancel.", method: "safariAuth", schema: { device, url: url.optional().describe("URL to authenticate. Defaults to the current page URL."), message }, bodyFromArgs: passthrough },
 ];
 
 // --- CLI tool definitions (20 tools) ---

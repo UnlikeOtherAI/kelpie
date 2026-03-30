@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
                     deviceInfo = deviceInfo,
                     router = router,
                     handlerContext = handlerContext,
+                    activity = this@MainActivity,
                     isServerRunning = httpServer?.isRunning == true,
                     isMDNSAdvertising = mdnsAdvertiser?.isRegistered == true,
                 )
@@ -74,6 +75,19 @@ class MainActivity : ComponentActivity() {
             mapOf("success" to true)
         }
 
+        router.register("safari-auth") { body ->
+            val wv = handlerContext.webView
+            if (wv == null) {
+                mapOf("success" to false, "error" to mapOf("code" to "NO_WEBVIEW", "message" to "No WebView"))
+            } else {
+                val url = (body["url"] as? String) ?: wv.url ?: ""
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    handlerContext.chromeAuth.authenticate(url, wv, this@MainActivity)
+                }
+                mapOf("success" to true, "started" to true, "url" to url)
+            }
+        }
+
         router.registerStubs() // Fill remaining unimplemented methods
     }
 
@@ -84,6 +98,11 @@ class MainActivity : ComponentActivity() {
             context = this,
             deviceInfo = deviceInfo,
         ).also { it.register() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handlerContext.chromeAuth.onResume(handlerContext.webView)
     }
 
     override fun onDestroy() {

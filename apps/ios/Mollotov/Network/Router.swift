@@ -56,7 +56,8 @@ final class Router: @unchecked Sendable {
             "get-intercepted-requests", "clear-request-interception",
             "show-keyboard", "hide-keyboard", "get-keyboard-state",
             "resize-viewport", "reset-viewport", "is-element-obscured",
-            "toast",
+            "toast", "safari-auth",
+            "set-orientation", "get-orientation",
         ]
         for method in methods {
             if routes[method] == nil {

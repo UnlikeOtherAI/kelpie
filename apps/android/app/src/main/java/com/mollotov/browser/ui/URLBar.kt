@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +38,7 @@ fun URLBar(
     onForward: () -> Unit,
     onReload: () -> Unit,
     onStop: () -> Unit,
+    onChromeAuth: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -82,6 +84,9 @@ fun URLBar(
             IconButton(onClick = onReload, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Reload")
             }
+        }
+        IconButton(onClick = onChromeAuth, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Filled.Lock, contentDescription = "Authenticate with Chrome")
         }
         IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
             Icon(Icons.Filled.Settings, contentDescription = "Settings")

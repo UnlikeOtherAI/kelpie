@@ -8,6 +8,7 @@ struct URLBarView: View {
     let onBack: () -> Void
     let onForward: () -> Void
     let onReload: () -> Void
+    let onSafariAuth: () -> Void
 
     @State private var urlText: String = ""
 
@@ -38,6 +39,10 @@ struct URLBarView: View {
                 Button(action: onReload) {
                     Image(systemName: "arrow.clockwise")
                 }
+            }
+
+            Button(action: onSafariAuth) {
+                Image(systemName: "safari")
             }
 
             Button(action: { showSettings = true }) {

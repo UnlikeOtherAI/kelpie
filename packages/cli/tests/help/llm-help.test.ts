@@ -6,7 +6,7 @@ describe("generateLlmHelp", () => {
     const output = generateLlmHelp();
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBe(102); // 80 browser + 20 CLI
+    expect(parsed.length).toBe(103); // 80 browser + 20 CLI
   });
 
   it("each command entry has required fields", () => {
