@@ -148,6 +148,7 @@ struct URLBarView: View {
             Image(systemName: preset.icon)
                 .font(.system(size: 11))
                 .frame(width: 30, height: 24)
+                .contentShape(Rectangle())
                 .foregroundColor(isActive ? .white : .primary)
                 .background(isActive ? Color(white: 0.25) : Color.clear)
                 .cornerRadius(5)
@@ -163,7 +164,9 @@ struct URLBarView: View {
             onSwitchRenderer(engine)
         } label: {
             FAIcon(icon: icon, size: 14)
+                .allowsHitTesting(false)
                 .frame(width: 36, height: 24)
+                .contentShape(Rectangle())
                 .background(isActive ? Color(white: 0.25) : Color.clear)
                 .cornerRadius(5)
         }
