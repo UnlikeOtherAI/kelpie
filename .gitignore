@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+*.log
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Build output
+build/
+.gradle/
+local.properties
+
+# Test
+coverage/
