@@ -1,7 +1,21 @@
 import SwiftUI
+import UIKit
 
 /// App icon background color — warm peach/orange.
 private let mollotovOrange = Color(red: 244/255, green: 176/255, blue: 120/255)
+
+/// UIKit blur that works over WKWebView content (SwiftUI materials cannot blur UIKit views).
+private struct NativeBlur: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemThinMaterial
+
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
+        uiView.effect = UIBlurEffect(style: style)
+    }
+}
 
 /// Floating action button that expands into a fan menu.
 /// - 44pt circular FAB with flame icon, vertically centered on the right edge.
@@ -36,11 +50,9 @@ struct FloatingMenuView: View {
             let clampedX = min(max(baseX + dragOffset, leftX), rightX)
 
             ZStack {
-                // Blur overlay when menu is open
+                // Blur overlay when menu is open — uses UIKit blur to work over WKWebView
                 if isOpen {
-                    Color.clear
-                        .background(.regularMaterial)
-                        .opacity(0.6)
+                    NativeBlur(style: .systemThinMaterial)
                         .ignoresSafeArea()
                         .onTapGesture {
                             withAnimation(.spring(response: 0.35)) { isOpen = false }
