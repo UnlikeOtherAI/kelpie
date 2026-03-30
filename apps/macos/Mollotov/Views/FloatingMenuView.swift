@@ -10,8 +10,8 @@ private let menuItemOrange = Color(red: 240/255, green: 148/255, blue: 90/255)
 private struct NativeBlur: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
+        view.material = .fullScreenUI
+        view.blendingMode = .withinWindow
         view.state = .active
         return view
     }
