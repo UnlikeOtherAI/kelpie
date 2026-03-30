@@ -31,6 +31,7 @@
 		A100000027 /* EvaluateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000027; };
 		A100000028 /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000028; };
 		A100000040 /* NetworkBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040; };
+		A100000050 /* AppReveal in Frameworks */ = {isa = PBXBuildFile; productRef = C400000001; };
 		A100000029 /* NetworkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000029; };
 		A100000030 /* MutationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030; };
 		A100000031 /* ShadowDOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031; };
@@ -99,6 +100,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A100000050 /* AppReveal in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,6 +244,7 @@
 			);
 			name = Mollotov;
 			packageProductDependencies = (
+				C400000001 /* AppReveal */,
 			);
 			productName = Mollotov;
 			productReference = B100000099 /* Mollotov.app */;
@@ -272,6 +275,7 @@
 			);
 			mainGroup = D100000001;
 			packageReferences = (
+				C300000001 /* XCRemoteSwiftPackageReference "AppReveal" */,
 			);
 			productRefGroup = D100000099 /* Products */;
 			projectDirPath = "";
@@ -365,7 +369,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG APPREVEAL_ENABLED";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -470,7 +474,19 @@
 		};
 /* End XCConfigurationList section */
 
-/* AppReveal: Add as local package from cloned iOS/ subdirectory */
+/* Begin XCLocalSwiftPackageReference section */
+		C300000001 /* XCLocalSwiftPackageReference "AppReveal" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../vendor/AppReveal/iOS;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C400000001 /* AppReveal */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppReveal;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 	};
 	rootObject = F100000001 /* Project object */;

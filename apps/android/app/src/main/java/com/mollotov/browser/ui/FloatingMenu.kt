@@ -120,11 +120,9 @@ fun FloatingMenu(
 
         fun fanAngle(index: Int): Double {
             val step = 30.0
-            return if (fanDirection < 0) {
-                150.0 + step * index
-            } else {
-                390.0 - step * index
-            }
+            val halfArc = step * 2.5 // 75 degrees
+            val center = if (fanDirection < 0) 180.0 else 0.0
+            return center - halfArc + step * index
         }
 
         val items = listOf(

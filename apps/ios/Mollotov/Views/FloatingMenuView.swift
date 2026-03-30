@@ -116,13 +116,14 @@ struct FloatingMenuView: View {
         }
     }
 
+    /// Distribute 6 items in a semicircle centered on the axis away from the docked edge.
+    /// Right-docked (direction=-1): centered at 180° (fan left), arc 105°..255°
+    /// Left-docked  (direction=+1): centered at   0° (fan right), arc -75°..75°
     private func fanAngle(direction: CGFloat, index: Int) -> Angle {
         let step: Double = 30
-        if direction < 0 {
-            return .degrees(150 + step * Double(index))
-        } else {
-            return .degrees(390 - step * Double(index))
-        }
+        let halfArc: Double = step * 2.5 // 75° — half of (5 gaps * 30°)
+        let center: Double = direction < 0 ? 180 : 0
+        return .degrees(center - halfArc + step * Double(index))
     }
 
     @ViewBuilder
