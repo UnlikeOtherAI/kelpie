@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import com.mollotov.browser.browser.BrowserState
 import com.mollotov.browser.browser.WebViewContainer
 import com.mollotov.browser.device.DeviceInfo
+import com.mollotov.browser.handlers.HandlerContext
 import com.mollotov.browser.network.Router
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +32,7 @@ import com.mollotov.browser.network.Router
 fun BrowserScreen(
     deviceInfo: DeviceInfo,
     router: Router,
+    handlerContext: HandlerContext,
     isServerRunning: Boolean,
     isMDNSAdvertising: Boolean,
 ) {
@@ -80,6 +82,7 @@ fun BrowserScreen(
                 onWebViewCreated = { wv ->
                     webView = wv
                     router.webView = wv
+                    handlerContext.webView = wv
                 },
             )
         }
