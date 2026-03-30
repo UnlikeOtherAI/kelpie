@@ -79,8 +79,5 @@ struct BrowserView: View {
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            safariAuth.onAppDidBecomeActive()
-        }
     }
 }
