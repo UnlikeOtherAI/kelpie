@@ -30,6 +30,7 @@ import { registerPageText } from "./page-text.js";
 import { registerFormState } from "./form-state.js";
 import { registerFind } from "./find.js";
 import { registerGroup } from "./group.js";
+import { registerMcp } from "./mcp.js";
 
 export function registerAllCommands(program: Command): void {
   // Discovery
@@ -76,4 +77,7 @@ export function registerAllCommands(program: Command): void {
 
   // Group Commands
   registerGroup(program);
+
+  // MCP Server
+  registerMcp(program);
 }
