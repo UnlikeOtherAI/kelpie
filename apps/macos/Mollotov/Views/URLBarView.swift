@@ -177,8 +177,10 @@ struct URLBarView: View {
             window.minSize = NSSize(width: 320, height: 480)
             window.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         } else if let size = preset.size {
-            // Lock to exact preset size
-            window.minSize = NSSize(width: min(size.width, 320), height: min(size.height, 480))
+            // Unlock first so the window can actually resize
+            window.minSize = NSSize(width: 1, height: 1)
+            window.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
             let origin = window.frame.origin
             let newFrame = NSRect(
                 x: origin.x,
@@ -187,8 +189,9 @@ struct URLBarView: View {
                 height: size.height
             )
             window.setFrame(newFrame, display: true, animate: true)
-            // Lock the size after animation
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+
+            // Lock to exact size after animation completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 guard let window = NSApplication.shared.keyWindow else { return }
                 window.minSize = size
                 window.maxSize = size
