@@ -10,10 +10,33 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     nonisolated override init() { super.init() }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "mollotovConsole",
-              let body = message.body as? [String: Any] else { return }
-        consoleMessages.append(body)
-        if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
+        guard let body = message.body as? [String: Any] else { return }
+
+        switch message.name {
+        case "mollotovConsole":
+            consoleMessages.append(body)
+            if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
+
+        case "mollotovNetwork":
+            let entry = NetworkTrafficStore.TrafficEntry(
+                id: UUID(),
+                method: (body["method"] as? String ?? "GET").uppercased(),
+                url: body["url"] as? String ?? "",
+                statusCode: body["statusCode"] as? Int ?? 0,
+                contentType: body["contentType"] as? String ?? "",
+                requestHeaders: body["requestHeaders"] as? [String: String] ?? [:],
+                responseHeaders: body["responseHeaders"] as? [String: String] ?? [:],
+                requestBody: body["requestBody"] as? String,
+                responseBody: body["responseBody"] as? String,
+                startTime: Date(),
+                duration: body["duration"] as? Int ?? 0,
+                size: body["size"] as? Int ?? 0
+            )
+            NetworkTrafficStore.shared.append(entry)
+
+        default:
+            break
+        }
     }
 
     func evaluateJS(_ script: String) async throws -> Any? {

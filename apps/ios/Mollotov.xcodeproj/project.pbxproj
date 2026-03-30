@@ -30,6 +30,7 @@
 		A100000026 /* DeviceHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026; };
 		A100000027 /* EvaluateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000027; };
 		A100000028 /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000028; };
+		A100000040 /* NetworkBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040; };
 		A100000029 /* NetworkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000029; };
 		A100000030 /* MutationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030; };
 		A100000031 /* ShadowDOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031; };
@@ -73,6 +74,7 @@
 		B100000026 /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
 		B100000027 /* EvaluateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluateHandler.swift; sourceTree = "<group>"; };
 		B100000028 /* ConsoleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleHandler.swift; sourceTree = "<group>"; };
+		B100000040 /* NetworkBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkBridge.swift; sourceTree = "<group>"; };
 		B100000029 /* NetworkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkHandler.swift; sourceTree = "<group>"; };
 		B100000030 /* MutationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutationHandler.swift; sourceTree = "<group>"; };
 		B100000031 /* ShadowDOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDOMHandler.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 				6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */,
 				2B6D15DFA38F44B4B6FAF87A /* HistoryHandler.swift */,
 				5DB2AF2F00F14EECB220A2EB /* NetworkInspectorHandler.swift */,
+				B100000040 /* NetworkBridge.swift */,
 			);
 			path = Handlers;
 			sourceTree = "<group>";
@@ -317,6 +320,7 @@
 				A100000026 /* DeviceHandler.swift in Sources */,
 				A100000027 /* EvaluateHandler.swift in Sources */,
 				A100000028 /* ConsoleHandler.swift in Sources */,
+				A100000040 /* NetworkBridge.swift in Sources */,
 				A100000029 /* NetworkHandler.swift in Sources */,
 				A100000030 /* MutationHandler.swift in Sources */,
 				A100000031 /* ShadowDOMHandler.swift in Sources */,

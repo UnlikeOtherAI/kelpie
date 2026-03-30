@@ -15,9 +15,11 @@ struct WebViewContainer: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
 
-        // Inject console capture bridge script
+        // Inject bridge scripts — network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)
         if let handlerContext {
             let ucc = config.userContentController
+            ucc.addUserScript(NetworkBridge.bridgeScript)
+            ucc.add(handlerContext, name: "mollotovNetwork")
             ucc.addUserScript(ConsoleHandler.bridgeScript)
             ucc.add(handlerContext, name: "mollotovConsole")
         }
