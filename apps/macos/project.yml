@@ -19,6 +19,7 @@ targets:
     dependencies:
       - framework: Frameworks/Chromium Embedded Framework.framework
         embed: false
+      - target: MollotovHelper
     preBuildScripts:
       - name: Fix CEF Framework Structure
         script: |
@@ -43,6 +44,20 @@ targets:
           ln -sf A "$CEF_DST/Versions/Current"
           ln -sf "Versions/Current/Chromium Embedded Framework" "$CEF_DST/Chromium Embedded Framework"
           ln -sf Versions/Current/Resources "$CEF_DST/Resources"
+        basedOnDependencyAnalysis: false
+      - name: Embed MollotovHelper
+        script: |
+          HELPER_EXE="${BUILT_PRODUCTS_DIR}/MollotovHelper"
+          HELPER_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/MollotovHelper.app/Contents/MacOS"
+          mkdir -p "$HELPER_DST"
+          cp "$HELPER_EXE" "$HELPER_DST/MollotovHelper"
+          cp "${PROJECT_DIR}/MollotovHelper/Info.plist" "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/MollotovHelper.app/Contents/Info.plist"
+          # Fix CEF framework path — helper is nested 4 levels deep from Frameworks/
+          install_name_tool -change \
+            "@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" \
+            "@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework" \
+            "$HELPER_DST/MollotovHelper" 2>/dev/null || true
+          codesign -fs - "$HELPER_DST/MollotovHelper" 2>/dev/null || true
         basedOnDependencyAnalysis: false
     settings:
       base:

@@ -15,6 +15,13 @@ final class RendererState: ObservableObject {
         }
     }
 
-    @Published var activeEngine: Engine = .webkit
+    @Published var activeEngine: Engine {
+        didSet { UserDefaults.standard.set(activeEngine.rawValue, forKey: "com.mollotov.renderer-engine") }
+    }
     @Published var isSwitching: Bool = false
+
+    init() {
+        let saved = UserDefaults.standard.string(forKey: "com.mollotov.renderer-engine") ?? ""
+        self.activeEngine = Engine(rawValue: saved) ?? .webkit
+    }
 }

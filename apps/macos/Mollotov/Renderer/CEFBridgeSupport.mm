@@ -13,10 +13,24 @@ static inline NSString *StringFromCEFString(const cef_string_t *value) {
     return [[NSString alloc] initWithCharacters:(const unichar *)value->str length:value->length];
 }
 
+static char **sAugmentedArgv = nullptr;
+static int sAugmentedArgc = 0;
+
 cef_main_args_t CEFBridgeMainArgs(void) {
+    if (sAugmentedArgv == nullptr) {
+        int origArgc = *_NSGetArgc();
+        char **origArgv = *_NSGetArgv();
+        // Inject --use-mock-keychain to prevent Keychain password prompts
+        sAugmentedArgc = origArgc + 1;
+        sAugmentedArgv = (char **)calloc(sAugmentedArgc + 1, sizeof(char *));
+        for (int i = 0; i < origArgc; i++) {
+            sAugmentedArgv[i] = origArgv[i];
+        }
+        sAugmentedArgv[origArgc] = (char *)"--use-mock-keychain";
+    }
     cef_main_args_t args = {};
-    args.argc = *_NSGetArgc();
-    args.argv = *_NSGetArgv();
+    args.argc = sAugmentedArgc;
+    args.argv = sAugmentedArgv;
     return args;
 }
 

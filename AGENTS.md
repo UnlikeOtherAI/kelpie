@@ -58,6 +58,10 @@ Do not patch around a failure before understanding the defect. Diagnose and docu
 
 Before patching, ask whether the right fix is to simplify. Every change must reduce or hold total system complexity — never increase it.
 
+### No Keychain (CRITICAL)
+
+Never use the macOS Keychain for storage. Use UserDefaults or file-based storage. CEF must use `--use-mock-keychain` to avoid Chromium Safe Storage prompts.
+
 ### No Manual Recovery (CRITICAL)
 
 Never manually fix state to work around a bug. Fix the code so the system self-heals.

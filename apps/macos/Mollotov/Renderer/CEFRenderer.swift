@@ -6,6 +6,9 @@ import AppKit
 final class CEFRenderer: RendererEngine {
     let engineName = "chromium"
 
+    private static var cefInitialized = false
+    private static var messageLoopTimer: Timer?
+
     private let bridge: CEFBridge
     private let containerView: NSView
 
@@ -20,6 +23,20 @@ final class CEFRenderer: RendererEngine {
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
 
     init() {
+        // Initialize CEF once before creating any browser
+        if !Self.cefInitialized {
+            let ok = CEFBridge.initializeCEF()
+            Self.cefInitialized = ok
+            if ok {
+                // Pump CEF message loop at ~60Hz since multi_threaded_message_loop is off
+                Self.messageLoopTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
+                    CEFBridge.doMessageLoopWork()
+                }
+            } else {
+                NSLog("[CEFRenderer] CEF initialization failed")
+            }
+        }
+
         containerView = NSView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800))
         bridge = CEFBridge(parentView: containerView, url: "about:blank", identifier: "main")
 

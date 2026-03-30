@@ -46,7 +46,10 @@ struct URLBarView: View {
     let onSwitchRenderer: (RendererState.Engine) -> Void
 
     @State private var urlText: String = ""
-    @State private var selectedPreset: DevicePreset = .laptop
+    @State private var selectedPreset: DevicePreset = {
+        let saved = UserDefaults.standard.string(forKey: "com.mollotov.device-preset") ?? ""
+        return DevicePreset(rawValue: saved) ?? .laptop
+    }()
     @State private var isNarrow = false
     @State private var windowResizeObserver: Any?
     @State private var isAnimatingResize = false
@@ -97,6 +100,12 @@ struct URLBarView: View {
         .onAppear {
             urlText = browserState.currentURL
             observeWindowResize()
+            // Apply persisted device preset on launch
+            if selectedPreset != .custom {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    applyPreset(selectedPreset)
+                }
+            }
         }
         .onChange(of: browserState.currentURL) { _, newURL in
             urlText = newURL
@@ -133,6 +142,7 @@ struct URLBarView: View {
         let isActive = selectedPreset == preset
         Button {
             selectedPreset = preset
+            UserDefaults.standard.set(preset.rawValue, forKey: "com.mollotov.device-preset")
             applyPreset(preset)
         } label: {
             Image(systemName: preset.icon)
@@ -216,6 +226,7 @@ struct URLBarView: View {
             if let expected = selectedPreset.size,
                abs(window.frame.width - expected.width) > 2 || abs(window.frame.height - expected.height) > 2 {
                 selectedPreset = .custom
+                UserDefaults.standard.set(DevicePreset.custom.rawValue, forKey: "com.mollotov.device-preset")
                 window.minSize = NSSize(width: 320, height: 480)
                 window.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
             }

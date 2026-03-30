@@ -41,10 +41,12 @@ final class ServerState: ObservableObject {
             self?.handlerContext.handleScriptMessage(name: name, body: body)
         }
 
-        // Start with WebKit and load home page
-        handlerContext.renderer = wk
+        // Start with persisted renderer (or WebKit by default)
+        let startEngine = rendererState?.activeEngine ?? .webkit
+        let activeRenderer: any RendererEngine = startEngine == .chromium ? cef : wk
+        handlerContext.renderer = activeRenderer
         let homeURL = URL(string: UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL)!
-        wk.load(url: homeURL)
+        activeRenderer.load(url: homeURL)
 
         registerHandlers()
         router.registerStubs()
