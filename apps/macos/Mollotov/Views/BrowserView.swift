@@ -16,7 +16,7 @@ struct BrowserView: View {
                         .progressViewStyle(.linear)
                 }
 
-                // URL bar with renderer toggle (no settings button — use floating menu)
+                // URL bar — fixed height, never compressed
                 URLBarView(
                     browserState: browserState,
                     rendererState: rendererState,
@@ -33,16 +33,20 @@ struct BrowserView: View {
                         }
                     }
                 )
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
 
-                // Renderer view — swaps between WKWebView and CEF
+                // Renderer view — fills remaining space
                 if rendererState.isSwitching {
                     VStack {
                         Spacer()
                         ProgressView("Switching renderer...")
                         Spacer()
                     }
+                    .frame(maxHeight: .infinity)
                 } else {
                     RendererContainerView(serverState: serverState, rendererState: rendererState)
+                        .frame(maxHeight: .infinity)
                 }
             }
 
