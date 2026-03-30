@@ -80,7 +80,7 @@ final class CEFRenderer: RendererEngine {
     func allCookies() async -> [HTTPCookie] {
         await withCheckedContinuation { continuation in
             bridge.getAllCookies { cookieDicts in
-                let cookies = cookieDicts.compactMap { dict -> HTTPCookie? in
+                let cookies = (cookieDicts ?? []).compactMap { dict -> HTTPCookie? in
                     guard let dict = dict as? [String: Any],
                           let name = dict["name"] as? String,
                           let value = dict["value"] as? String,

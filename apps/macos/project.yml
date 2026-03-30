@@ -13,15 +13,45 @@ targets:
       - path: Mollotov
         excludes:
           - "**/*.plist"
+    dependencies:
+      - framework: Frameworks/Chromium Embedded Framework.framework
+        embed: false
+    preBuildScripts:
+      - name: Fix CEF Framework Structure
+        script: |
+          CEF_FW="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+          if [ -d "$CEF_FW/Resources" ] && [ ! -e "$CEF_FW/Info.plist" ]; then
+            ln -sf Resources/Info.plist "$CEF_FW/Info.plist"
+          fi
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: Embed CEF Framework
+        script: |
+          CEF_SRC="${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework"
+          CEF_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Chromium Embedded Framework.framework"
+          rm -rf "$CEF_DST"
+          mkdir -p "$CEF_DST/Versions/A"
+          cp "$CEF_SRC/Chromium Embedded Framework" "$CEF_DST/Versions/A/"
+          rsync -a "$CEF_SRC/Resources/" "$CEF_DST/Versions/A/Resources/"
+          if [ -d "$CEF_SRC/Libraries" ]; then
+            rsync -a "$CEF_SRC/Libraries/" "$CEF_DST/Versions/A/Libraries/"
+            ln -sf Versions/Current/Libraries "$CEF_DST/Libraries"
+          fi
+          ln -sf A "$CEF_DST/Versions/Current"
+          ln -sf "Versions/Current/Chromium Embedded Framework" "$CEF_DST/Chromium Embedded Framework"
+          ln -sf Versions/Current/Resources "$CEF_DST/Resources"
+        basedOnDependencyAnalysis: false
     settings:
       base:
         SWIFT_OBJC_BRIDGING_HEADER: Mollotov/Mollotov-Bridging-Header.h
-        FRAMEWORK_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks
-        HEADER_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks/cef_include
+        FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks"
+        HEADER_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks/cef_include"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         CODE_SIGN_ENTITLEMENTS: Mollotov/Mollotov.entitlements
         INFOPLIST_FILE: Mollotov/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.mollotov.browser.macos
         ENABLE_APP_SANDBOX: false
+        VALIDATE_PRODUCT: false
     entitlements:
       path: Mollotov/Mollotov.entitlements
 
@@ -32,9 +62,13 @@ targets:
       - path: MollotovHelper
         excludes:
           - "**/*.plist"
+    dependencies:
+      - framework: Frameworks/Chromium Embedded Framework.framework
+        embed: false
     settings:
       base:
-        FRAMEWORK_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks
-        HEADER_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks/cef_include
+        FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks"
+        HEADER_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks/cef_include"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../../../../Frameworks"
         INFOPLIST_FILE: MollotovHelper/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.mollotov.browser.helper

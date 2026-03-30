@@ -26,6 +26,15 @@ fi
 cp -R "${EXTRACTED}/Release/Chromium Embedded Framework.framework" "${OUTDIR}/"
 cp -R "${EXTRACTED}/include" "${OUTDIR}/cef_include"
 
+# Create symlink so CEF internal #include "include/..." paths resolve
+ln -sfn "${OUTDIR}/cef_include" "${OUTDIR}/cef_include/include"
+
+# Create Info.plist symlink at framework root for Xcode validation
+CEF_FW="${OUTDIR}/Chromium Embedded Framework.framework"
+if [ -f "${CEF_FW}/Resources/Info.plist" ] && [ ! -e "${CEF_FW}/Info.plist" ]; then
+    ln -sf Resources/Info.plist "${CEF_FW}/Info.plist"
+fi
+
 rm -rf "${EXTRACTED}" "${TARBALL}"
 echo "CEF framework installed at ${OUTDIR}/Chromium Embedded Framework.framework"
 echo "CEF headers installed at ${OUTDIR}/cef_include/"

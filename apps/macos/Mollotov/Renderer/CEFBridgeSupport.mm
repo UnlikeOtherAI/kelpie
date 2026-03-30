@@ -191,7 +191,7 @@ static cef_display_handler_t *GetDisplayHandler(cef_client_t *self) {
     return &StructFromBase<BridgeClient>(&self->base, offsetof(BridgeClient, client))->display.handler;
 }
 
-static int OnBeforePopup(cef_life_span_handler_t *, cef_browser_t *, cef_frame_t *, const cef_string_t *, const cef_string_t *, cef_window_open_disposition_t, int, const cef_popup_features_t *, cef_window_info_t *, cef_client_t **, cef_browser_settings_t *, cef_dictionary_value_t **, int *) {
+static int OnBeforePopup(cef_life_span_handler_t *, cef_browser_t *, cef_frame_t *, int, const cef_string_t *, const cef_string_t *, cef_window_open_disposition_t, int, const cef_popup_features_t *, cef_window_info_t *, cef_client_t **, cef_browser_settings_t *, cef_dictionary_value_t **, int *) {
     return 1;
 }
 

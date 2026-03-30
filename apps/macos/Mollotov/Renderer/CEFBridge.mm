@@ -14,6 +14,10 @@ static NSString *const kEvalConsolePrefix = @"__mollotov_eval__:";
 
 static BOOL gCEFInitialized = NO;
 
+@interface CEFBridge ()
+- (void)_finishEvalWithIdentifier:(NSString *)identifier result:(NSString *)result error:(NSError *)error;
+@end
+
 @interface CEFBridge () {
     __weak NSView *_parentView;
     NSString *_identifier;
@@ -45,22 +49,24 @@ static void FinishEval(CEFBridge *owner, NSString *identifier, NSString *result,
     if (owner == nil || identifier.length == 0) {
         return;
     }
+    [owner _finishEvalWithIdentifier:identifier result:result error:error];
+}
 
+@implementation CEFBridge
+
+- (void)_finishEvalWithIdentifier:(NSString *)identifier result:(NSString *)result error:(NSError *)error {
     void (^completion)(NSString *, NSError *) = nil;
-    @synchronized (owner) {
-        completion = owner->_pendingEvalBlocks[identifier];
-        [owner->_pendingEvalBlocks removeObjectForKey:identifier];
+    @synchronized (self) {
+        completion = _pendingEvalBlocks[identifier];
+        [_pendingEvalBlocks removeObjectForKey:identifier];
     }
     if (completion == nil) {
         return;
     }
-
     dispatch_async(dispatch_get_main_queue(), ^{
         completion(result, error);
     });
 }
-
-@implementation CEFBridge
 
 + (BOOL)initializeCEF {
     if (gCEFInitialized) {

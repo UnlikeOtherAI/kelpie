@@ -27,7 +27,6 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     override init() {
         let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
 
         let ucc = config.userContentController
         // Inject network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)
