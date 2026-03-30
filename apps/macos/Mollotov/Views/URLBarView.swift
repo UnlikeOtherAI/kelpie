@@ -7,16 +7,18 @@ enum DevicePreset: String, CaseIterable, Identifiable {
     case tabletPortrait = "Tablet P"
     case tabletLandscape = "Tablet L"
     case laptop = "Laptop"
+    case custom = "Custom"
 
     var id: String { rawValue }
 
-    var size: NSSize {
+    var size: NSSize? {
         switch self {
         case .iphonePortrait:  return NSSize(width: 393, height: 852)
         case .iphoneLandscape: return NSSize(width: 852, height: 393)
         case .tabletPortrait:  return NSSize(width: 820, height: 1180)
         case .tabletLandscape: return NSSize(width: 1180, height: 820)
         case .laptop:          return NSSize(width: 1280, height: 800)
+        case .custom:          return nil
         }
     }
 
@@ -27,11 +29,8 @@ enum DevicePreset: String, CaseIterable, Identifiable {
         case .tabletPortrait:  return "ipad"
         case .tabletLandscape: return "ipad.landscape"
         case .laptop:          return "laptopcomputer"
+        case .custom:          return "arrow.up.left.and.arrow.down.right"
         }
-    }
-
-    var isNarrow: Bool {
-        size.width < 500
     }
 }
 
@@ -49,10 +48,10 @@ struct URLBarView: View {
     @State private var urlText: String = ""
     @State private var selectedPreset: DevicePreset = .laptop
     @State private var isNarrow = false
+    @State private var windowResizeObserver: Any?
 
     var body: some View {
         VStack(spacing: 4) {
-            // Row 1: nav buttons + URL field
             HStack(spacing: 8) {
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
@@ -75,13 +74,11 @@ struct URLBarView: View {
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { navigate() }
 
-                // Selectors inline when wide
                 if !isNarrow {
                     selectorsRow
                 }
             }
 
-            // Row 2: selectors stacked below when narrow
             if isNarrow {
                 selectorsRow
             }
@@ -96,7 +93,10 @@ struct URLBarView: View {
                 isNarrow = w < 600
             }
         })
-        .onAppear { urlText = browserState.currentURL }
+        .onAppear {
+            urlText = browserState.currentURL
+            observeWindowResize()
+        }
         .onChange(of: browserState.currentURL) { _, newURL in
             urlText = newURL
         }
@@ -105,7 +105,7 @@ struct URLBarView: View {
     @ViewBuilder
     private var selectorsRow: some View {
         HStack(spacing: 8) {
-            // Renderer toggle — Font Awesome brand icons
+            // Renderer toggle
             HStack(spacing: 0) {
                 rendererButton(engine: .webkit, icon: FontAwesome.safari)
                 rendererButton(engine: .chromium, icon: FontAwesome.chrome)
@@ -116,17 +116,33 @@ struct URLBarView: View {
             .disabled(rendererState.isSwitching)
 
             // Device size selector
-            Picker("", selection: $selectedPreset) {
+            HStack(spacing: 0) {
                 ForEach(DevicePreset.allCases) { preset in
-                    Image(systemName: preset.icon).tag(preset)
+                    presetButton(preset)
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 180)
-            .onChange(of: selectedPreset) { _, preset in
-                resizeWindow(to: preset.size)
-            }
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(6)
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
         }
+    }
+
+    @ViewBuilder
+    private func presetButton(_ preset: DevicePreset) -> some View {
+        let isActive = selectedPreset == preset
+        Button {
+            selectedPreset = preset
+            applyPreset(preset)
+        } label: {
+            Image(systemName: preset.icon)
+                .font(.system(size: 11))
+                .frame(width: 30, height: 24)
+                .foregroundColor(isActive ? .white : .primary)
+                .background(isActive ? Color(white: 0.25) : Color.clear)
+                .cornerRadius(5)
+        }
+        .buttonStyle(.plain)
+        .padding(2)
     }
 
     @ViewBuilder
@@ -137,7 +153,7 @@ struct URLBarView: View {
         } label: {
             FAIcon(icon: icon, size: 14)
                 .frame(width: 36, height: 24)
-                .background(isActive ? Color.black : Color.clear)
+                .background(isActive ? Color(white: 0.25) : Color.clear)
                 .cornerRadius(5)
         }
         .buttonStyle(.plain)
@@ -152,17 +168,50 @@ struct URLBarView: View {
         onNavigate(url)
     }
 
-    private func resizeWindow(to size: NSSize) {
+    private func applyPreset(_ preset: DevicePreset) {
         guard let window = NSApplication.shared.keyWindow else { return }
-        // Also update the window's min size so it can shrink to phone dimensions
-        window.minSize = NSSize(width: 320, height: 480)
-        let origin = window.frame.origin
-        let newFrame = NSRect(
-            x: origin.x,
-            y: origin.y + window.frame.height - size.height,
-            width: size.width,
-            height: size.height
-        )
-        window.setFrame(newFrame, display: true, animate: true)
+
+        if preset == .custom {
+            // Enable free resizing
+            window.styleMask.insert(.resizable)
+            window.minSize = NSSize(width: 320, height: 480)
+            window.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        } else if let size = preset.size {
+            // Lock to exact preset size
+            window.minSize = NSSize(width: min(size.width, 320), height: min(size.height, 480))
+            let origin = window.frame.origin
+            let newFrame = NSRect(
+                x: origin.x,
+                y: origin.y + window.frame.height - size.height,
+                width: size.width,
+                height: size.height
+            )
+            window.setFrame(newFrame, display: true, animate: true)
+            // Lock the size after animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard let window = NSApplication.shared.keyWindow else { return }
+                window.minSize = size
+                window.maxSize = size
+            }
+        }
+    }
+
+    /// Watch for user-initiated window resizes — switch to Custom when user drags.
+    private func observeWindowResize() {
+        windowResizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            guard selectedPreset != .custom else { return }
+            guard let window = NSApplication.shared.keyWindow else { return }
+            // If the window size no longer matches the preset, user is dragging — go to custom
+            if let expected = selectedPreset.size,
+               abs(window.frame.width - expected.width) > 2 || abs(window.frame.height - expected.height) > 2 {
+                selectedPreset = .custom
+                window.minSize = NSSize(width: 320, height: 480)
+                window.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            }
+        }
     }
 }
