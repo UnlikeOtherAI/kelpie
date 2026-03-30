@@ -13,10 +13,9 @@ targets:
       - path: Mollotov
         excludes:
           - "**/*.plist"
-          - "**/*.otf"
-    resources:
       - path: Mollotov/Resources
         buildPhase: resources
+        type: folder
     dependencies:
       - framework: Frameworks/Chromium Embedded Framework.framework
         embed: false

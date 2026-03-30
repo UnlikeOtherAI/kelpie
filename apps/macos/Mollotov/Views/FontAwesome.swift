@@ -6,7 +6,10 @@ enum FontAwesome {
     /// Register the Font Awesome Brands font from the app bundle.
     /// Call once at app startup.
     static func registerFonts() {
-        guard let url = Bundle.main.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf") else {
+        // Try root Resources first, then nested Resources/ subdirectory (folder reference)
+        let url = Bundle.main.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf")
+            ?? Bundle.main.url(forResource: "FontAwesome6Brands-Regular", withExtension: "otf", subdirectory: "Resources")
+        guard let url else {
             NSLog("[FontAwesome] Font file not found in bundle")
             return
         }
@@ -22,6 +25,8 @@ enum FontAwesome {
 
     /// The PostScript font name used by Font Awesome 6 Brands.
     static let brandsFontName = "FontAwesome6Brands-Regular"
+    /// The family name (used by SwiftUI .custom on macOS).
+    static let brandsFamilyName = "Font Awesome 6 Brands"
 }
 
 /// A SwiftUI view that renders a Font Awesome Brands icon.
@@ -31,6 +36,6 @@ struct FAIcon: View {
 
     var body: some View {
         Text(icon)
-            .font(.custom(FontAwesome.brandsFontName, size: size))
+            .font(.custom(FontAwesome.brandsFamilyName, size: size))
     }
 }

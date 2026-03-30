@@ -12,7 +12,9 @@
 		126B79978FE3000EF23A8AD4 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */; };
 		152CE0312855D852B3093E71 /* CookieMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579641287CEF21D4E959F84D /* CookieMigrator.swift */; };
 		172225DC1C98D5C2EDEADB43 /* BookmarkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404CB71EEBF3ACE8E45176BB /* BookmarkHandler.swift */; };
+		1C0C3F1150C33957A3CBF94C /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = E185C2E390B740CDF728E19C /* Resources */; };
 		208357A716B18227409295C4 /* MollotovApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76E5AABD4653BD12BB4E2123 /* MollotovApp.swift */; };
+		277973248493B4908CCC68E8 /* FontAwesome6Brands-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */; };
 		2A362459AE00805D47DF675D /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FE84F648BDB15E85E794E70 /* HistoryStore.swift */; };
 		363A13589E8CE9D028236FCE /* CEFBridgeSupport.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4312123302280E706CCB6513 /* CEFBridgeSupport.mm */; };
 		36FCE2157B9F48DCEB944978 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = DEC3C71320922D6D9C4E7DC4 /* main.mm */; };
@@ -99,6 +101,7 @@
 		B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
 		C075E2F2B42D9EDE4C214300 /* CEFBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CEFBridge.h; sourceTree = "<group>"; };
 		C2D650BD3262369BC889CF36 /* Mollotov.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mollotov.entitlements; sourceTree = "<group>"; };
+		C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "FontAwesome6Brands-Regular.otf"; sourceTree = "<group>"; };
 		CCC3FD06DEFCCD993A28E73D /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
 		CF0E0A4BC81E2600D321E0DA /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
 		DBDD8D7C74821BCEA52DA0A8 /* WKWebViewRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WKWebViewRenderer.swift; sourceTree = "<group>"; };
@@ -106,6 +109,7 @@
 		DEC3C71320922D6D9C4E7DC4 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		E0EBDA54AD4B7D66D0679B16 /* NavigationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationHandler.swift; sourceTree = "<group>"; };
 		E0EFFB873E2A0A306CA0D95F /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
+		E185C2E390B740CDF728E19C /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Resources; path = Mollotov/Resources; sourceTree = SOURCE_ROOT; };
 		EBDD878D4C22BF12A3834C0C /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
 		EEAFBD413B4422142E5E8EB2 /* RendererEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RendererEngine.swift; sourceTree = "<group>"; };
 		F1BB3B14BDF40CF58F8064F5 /* EvaluateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluateHandler.swift; sourceTree = "<group>"; };
@@ -136,6 +140,7 @@
 		1C7B40776A4207A60A3D4CFC = {
 			isa = PBXGroup;
 			children = (
+				E185C2E390B740CDF728E19C /* Resources */,
 				2BE81C370766F0DD05C3F5B7 /* Mollotov */,
 				2798A49D696EC55580BFBD32 /* MollotovHelper */,
 				E4341556E208E41AAA37C9BD /* Frameworks */,
@@ -164,6 +169,7 @@
 				F907CA615F54D23F1ECB1CC4 /* LLM */,
 				E8D18713D9A9C55D2F63E2A6 /* Network */,
 				FB469AAE58B78702BB1DF3CE /* Renderer */,
+				A339897F8DAF8E77BF309D44 /* Resources */,
 				8F251B908CD62B55F82DCCB4 /* Views */,
 			);
 			path = Mollotov;
@@ -214,6 +220,14 @@
 				F7CB1B02A9B2992B1E4D0688 /* URLBarView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		A339897F8DAF8E77BF309D44 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		A407DCFEC66FD0D9BF7CDB3A /* Products */ = {
@@ -357,6 +371,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				91B530F2E22FA6BF9E4CF395 /* Assets.xcassets in Resources */,
+				277973248493B4908CCC68E8 /* FontAwesome6Brands-Regular.otf in Resources */,
+				1C0C3F1150C33957A3CBF94C /* Resources in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
