@@ -31,6 +31,10 @@ Get a second opinion from a different provider **before implementation** for: ne
 
 **Skip review for:** typo fixes, doc-only updates, single-file changes under 50 lines.
 
+## Platform Parity (CRITICAL)
+
+iOS and Android must be kept as absolute mirrors with full feature parity. Every feature, UI element, and behavior implemented on one platform must be implemented identically on the other in the same commit or PR.
+
 ## Code Rules
 
 - 500-line file limit — split along responsibility seams, not arbitrarily. Never trim comments or blank lines to fit.
