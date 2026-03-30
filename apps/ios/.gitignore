@@ -1,0 +1,14 @@
+# Xcode build artifacts
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserdata
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# SPM (for local packages)
+Package.swift
+Package.resolved
+
+# OS
+.DS_Store
