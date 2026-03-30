@@ -83,6 +83,8 @@ export const BrowserMcpTools = [
   "mollotov_set_orientation",
   "mollotov_get_orientation",
   "mollotov_safari_auth",
+  "mollotov_set_renderer",
+  "mollotov_get_renderer",
 ] as const;
 
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
@@ -200,4 +202,6 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "set-orientation": "mollotov_set_orientation",
   "get-orientation": "mollotov_get_orientation",
   "safari-auth": "mollotov_safari_auth",
+  "set-renderer": "mollotov_set_renderer",
+  "get-renderer": "mollotov_get_renderer",
 };

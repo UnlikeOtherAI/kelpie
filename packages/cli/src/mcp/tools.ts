@@ -9,7 +9,7 @@ const timeout = z.number().optional().describe("Timeout in milliseconds");
 const message = z.string().optional().describe("Optional message to show on device screen as a toast overlay while this action runs. Use this to narrate what you are doing, e.g. 'Clicking the login button' or 'Scrolling to pricing section'. The toast appears at the bottom of the viewport with a semi-transparent background.");
 
 const filterProps = {
-  platform: z.enum(["ios", "android"]).optional().describe("Filter by platform"),
+  platform: z.enum(["ios", "android", "macos"]).optional().describe("Filter by platform"),
   include: z.string().optional().describe("Comma-separated device IDs or names to include"),
   exclude: z.string().optional().describe("Comma-separated device IDs or names to exclude"),
 };
@@ -43,7 +43,7 @@ function filterBody(args: Record<string, unknown>): Record<string, unknown> {
   return rest;
 }
 
-// --- Browser tool definitions (82 tools) ---
+// --- Browser tool definitions (84 tools) ---
 
 export const browserTools: BrowserToolDef[] = [
   // Navigation
@@ -188,6 +188,10 @@ export const browserTools: BrowserToolDef[] = [
 
   // Safari Auth
   { name: "mollotov_safari_auth", description: "Open the current page (or a specific URL) in a Safari-backed authentication session. This lets the user authenticate using Safari's saved passwords and cookies, then syncs the session back into the browser. Use this when a login page requires credentials the user has saved in Safari, or when OAuth providers block in-app browsers. The user will see a Safari sheet and must complete authentication manually — the tool returns once they finish or cancel.", method: "safariAuth", schema: { device, url: url.optional().describe("URL to authenticate. Defaults to the current page URL."), message }, bodyFromArgs: passthrough },
+
+  // Renderer (macOS only)
+  { name: "mollotov_set_renderer", description: "Switch the browser rendering engine (macOS only). Available engines: 'webkit' (Safari/WebKit) and 'chromium' (Chrome/CEF). Cookies are migrated automatically so login sessions are preserved.", method: "setRenderer", schema: { device, engine: z.enum(["webkit", "chromium"]).describe("Rendering engine to activate"), message }, bodyFromArgs: passthrough },
+  { name: "mollotov_get_renderer", description: "Get the current rendering engine and available engines (macOS only)", method: "getRenderer", schema: { device }, bodyFromArgs: passthrough },
 ];
 
 // --- CLI tool definitions (20 tools) ---

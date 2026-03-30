@@ -40,7 +40,7 @@ function parseService(service: Service): DiscoveredDevice | null {
     name: txt.name ?? service.name,
     ip,
     port: Number(txt.port) || service.port,
-    platform: (txt.platform as "ios" | "android") ?? "ios",
+    platform: (txt.platform as "ios" | "android" | "macos") ?? "ios",
     model: txt.model ?? "Unknown",
     width: Number(txt.width) || 0,
     height: Number(txt.height) || 0,

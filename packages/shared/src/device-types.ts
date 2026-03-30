@@ -1,10 +1,11 @@
-export type Platform = "ios" | "android";
+export type Platform = "ios" | "android" | "macos";
 
 export interface MdnsTxtRecord {
   id: string;
   name: string;
   model: string;
   platform: Platform;
+  engine?: string;
   width: string;
   height: string;
   port: string;
