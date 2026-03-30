@@ -4,15 +4,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -30,16 +27,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun URLBar(
     currentUrl: String,
-    isLoading: Boolean,
     canGoBack: Boolean,
     canGoForward: Boolean,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
     onForward: () -> Unit,
-    onReload: () -> Unit,
-    onStop: () -> Unit,
-    onChromeAuth: () -> Unit,
-    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var urlText by remember(currentUrl) { mutableStateOf(currentUrl) }
@@ -62,6 +54,7 @@ fun URLBar(
             onValueChange = { urlText = it },
             singleLine = true,
             placeholder = { Text("Enter URL") },
+            shape = CircleShape,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = {
                 val url = if (urlText.startsWith("http://") || urlText.startsWith("https://")) {
@@ -75,21 +68,5 @@ fun URLBar(
                 .weight(1f)
                 .padding(horizontal = 4.dp),
         )
-
-        if (isLoading) {
-            IconButton(onClick = onStop, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = "Stop")
-            }
-        } else {
-            IconButton(onClick = onReload, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Reload")
-            }
-        }
-        IconButton(onClick = onChromeAuth, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Filled.Lock, contentDescription = "Authenticate with Chrome")
-        }
-        IconButton(onClick = onSettingsClick, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Filled.Settings, contentDescription = "Settings")
-        }
     }
 }

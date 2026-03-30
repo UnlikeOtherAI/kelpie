@@ -1,7 +1,7 @@
 import SwiftUI
 import WebKit
 
-/// Main browser screen: URL bar + WKWebView + settings button.
+/// Main browser screen: URL bar + WKWebView + floating action menu.
 struct BrowserView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var serverState: ServerState
@@ -10,36 +10,42 @@ struct BrowserView: View {
     private let safariAuth = SafariAuthHelper()
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Loading progress bar
-            if browserState.isLoading {
-                ProgressView(value: browserState.progress)
-                    .progressViewStyle(.linear)
+        ZStack {
+            VStack(spacing: 0) {
+                // Loading progress bar
+                if browserState.isLoading {
+                    ProgressView(value: browserState.progress)
+                        .progressViewStyle(.linear)
+                }
+
+                // URL bar
+                URLBarView(
+                    browserState: browserState,
+                    onNavigate: { url in
+                        guard let webView, let urlObj = URL(string: url) else { return }
+                        webView.load(URLRequest(url: urlObj))
+                    },
+                    onBack: { webView?.goBack() },
+                    onForward: { webView?.goForward() }
+                )
+
+                // WebView
+                WebViewContainer(browserState: browserState, handlerContext: serverState.handlerContext) { wv in
+                    webView = wv
+                    serverState.webView = wv
+                    serverState.handlerContext.webView = wv
+                }
             }
 
-            // URL bar
-            URLBarView(
-                browserState: browserState,
-                showSettings: $showSettings,
-                onNavigate: { url in
-                    guard let webView, let urlObj = URL(string: url) else { return }
-                    webView.load(URLRequest(url: urlObj))
-                },
-                onBack: { webView?.goBack() },
-                onForward: { webView?.goForward() },
+            // Floating action menu overlay
+            FloatingMenuView(
                 onReload: { webView?.reload() },
                 onSafariAuth: {
                     guard let webView, let url = webView.url else { return }
                     safariAuth.authenticate(url: url, webView: webView, from: webView.window) {}
-                }
+                },
+                onSettings: { showSettings = true }
             )
-
-            // WebView
-            WebViewContainer(browserState: browserState, handlerContext: serverState.handlerContext) { wv in
-                webView = wv
-                serverState.webView = wv
-                serverState.handlerContext.webView = wv
-            }
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .sheet(isPresented: $showSettings) {

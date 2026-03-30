@@ -36,6 +36,7 @@
 		A100000032 /* BrowserManagementHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032; };
 		A100000033 /* LLMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033; };
 		A100000034 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000034; };
+		A100000035 /* FloatingMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000035; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -69,6 +70,7 @@
 		B100000032 /* BrowserManagementHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserManagementHandler.swift; sourceTree = "<group>"; };
 		B100000033 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
 		B100000034 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
+		B100000035 /* FloatingMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingMenuView.swift; sourceTree = "<group>"; };
 		B100000099 /* Mollotov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mollotov.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -114,6 +116,7 @@
 				B100000002 /* BrowserView.swift */,
 				B100000003 /* SettingsView.swift */,
 				B100000004 /* URLBarView.swift */,
+				B100000035 /* FloatingMenuView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -293,6 +296,7 @@
 				A100000032 /* BrowserManagementHandler.swift in Sources */,
 				A100000033 /* LLMHandler.swift in Sources */,
 				A100000034 /* SafariAuthHelper.swift in Sources */,
+				A100000035 /* FloatingMenuView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

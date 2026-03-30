@@ -2,6 +2,7 @@ package com.mollotov.browser.ui
 
 import android.app.Activity
 import android.webkit.WebView
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,42 +42,46 @@ fun BrowserScreen(
     var showSettings by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (isLoading) {
-            LinearProgressIndicator(
-                progress = { progress / 100f },
-                modifier = Modifier.fillMaxWidth(),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (isLoading) {
+                LinearProgressIndicator(
+                    progress = { progress / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            URLBar(
+                currentUrl = currentUrl,
+                canGoBack = canGoBack,
+                canGoForward = canGoForward,
+                onNavigate = { url -> webView?.loadUrl(url) },
+                onBack = { webView?.goBack() },
+                onForward = { webView?.goForward() },
+            )
+
+            WebViewContainer(
+                browserState = browserState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                onWebViewCreated = { wv ->
+                    webView = wv
+                    router.webView = wv
+                    handlerContext.webView = wv
+                },
             )
         }
 
-        URLBar(
-            currentUrl = currentUrl,
-            isLoading = isLoading,
-            canGoBack = canGoBack,
-            canGoForward = canGoForward,
-            onNavigate = { url -> webView?.loadUrl(url) },
-            onBack = { webView?.goBack() },
-            onForward = { webView?.goForward() },
+        // Floating action menu overlay
+        FloatingMenu(
             onReload = { webView?.reload() },
-            onStop = { webView?.stopLoading() },
             onChromeAuth = {
                 webView?.let { wv ->
                     handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
                 }
             },
-            onSettingsClick = { showSettings = true },
-        )
-
-        WebViewContainer(
-            browserState = browserState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            onWebViewCreated = { wv ->
-                webView = wv
-                router.webView = wv
-                handlerContext.webView = wv
-            },
+            onSettings = { showSettings = true },
         )
     }
 

@@ -1,14 +1,11 @@
 import SwiftUI
 
-/// URL bar with text input, navigation buttons, and loading indicator.
+/// URL bar with text input and navigation buttons. Pill-shaped URL field.
 struct URLBarView: View {
     @ObservedObject var browserState: BrowserState
-    @Binding var showSettings: Bool
     let onNavigate: (String) -> Void
     let onBack: () -> Void
     let onForward: () -> Void
-    let onReload: () -> Void
-    let onSafariAuth: () -> Void
 
     @State private var urlText: String = ""
 
@@ -25,29 +22,14 @@ struct URLBarView: View {
             .disabled(!browserState.canGoForward)
 
             TextField("URL", text: $urlText)
-                .textFieldStyle(.roundedBorder)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6))
+                .clipShape(Capsule())
                 .autocapitalization(.none)
                 .disableAutocorrection(true)
                 .keyboardType(.URL)
                 .onSubmit { navigate() }
-
-            if browserState.isLoading {
-                Button(action: {}) {
-                    Image(systemName: "xmark")
-                }
-            } else {
-                Button(action: onReload) {
-                    Image(systemName: "arrow.clockwise")
-                }
-            }
-
-            Button(action: onSafariAuth) {
-                Image(systemName: "safari")
-            }
-
-            Button(action: { showSettings = true }) {
-                Image(systemName: "gear")
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
