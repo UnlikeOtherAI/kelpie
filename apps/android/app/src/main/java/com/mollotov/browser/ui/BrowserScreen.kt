@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.mollotov.browser.browser.BrowserState
+import com.mollotov.browser.browser.HistoryStore
 import com.mollotov.browser.browser.WebViewContainer
 import com.mollotov.browser.device.DeviceInfo
 import com.mollotov.browser.handlers.HandlerContext
@@ -39,8 +40,19 @@ fun BrowserScreen(
     val canGoBack by browserState.canGoBack.collectAsState()
     val canGoForward by browserState.canGoForward.collectAsState()
     val progress by browserState.progress.collectAsState()
+    val pageTitle by browserState.pageTitle.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    var showNetworkInspector by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var lastRecordedUrl by remember { mutableStateOf("") }
+
+    // Record history when URL changes
+    if (currentUrl != lastRecordedUrl && currentUrl.isNotEmpty()) {
+        lastRecordedUrl = currentUrl
+        HistoryStore.record(currentUrl, pageTitle)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -82,6 +94,9 @@ fun BrowserScreen(
                 }
             },
             onSettings = { showSettings = true },
+            onBookmarks = { showBookmarks = true },
+            onHistory = { showHistory = true },
+            onNetworkInspector = { showNetworkInspector = true },
         )
     }
 
@@ -95,6 +110,39 @@ fun BrowserScreen(
                 isServerRunning = isServerRunning,
                 isMDNSAdvertising = isMDNSAdvertising,
             )
+        }
+    }
+
+    if (showBookmarks) {
+        ModalBottomSheet(
+            onDismissRequest = { showBookmarks = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            BookmarksSheet(
+                onNavigate = { url -> webView?.loadUrl(url) },
+                onDismiss = { showBookmarks = false },
+            )
+        }
+    }
+
+    if (showHistory) {
+        ModalBottomSheet(
+            onDismissRequest = { showHistory = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            HistorySheet(
+                onNavigate = { url -> webView?.loadUrl(url) },
+                onDismiss = { showHistory = false },
+            )
+        }
+    }
+
+    if (showNetworkInspector) {
+        ModalBottomSheet(
+            onDismissRequest = { showNetworkInspector = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            NetworkInspectorSheet(onDismiss = { showNetworkInspector = false })
         }
     }
 }

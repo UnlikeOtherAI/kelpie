@@ -6,11 +6,14 @@ private let mollotovOrange = Color(red: 244/255, green: 176/255, blue: 120/255)
 /// Floating action button that expands into a fan menu.
 /// - 44pt circular FAB with flame icon, vertically centered on the right edge.
 /// - Horizontally draggable between left and right sides of the screen.
-/// - Opens a subtle blur overlay + fan-out menu items.
+/// - Opens a blur overlay + fan-out menu items (no labels, wider spread).
 struct FloatingMenuView: View {
     let onReload: () -> Void
     let onSafariAuth: () -> Void
     let onSettings: () -> Void
+    let onBookmarks: () -> Void
+    let onHistory: () -> Void
+    let onNetworkInspector: () -> Void
 
     @State private var isOpen = false
     /// Horizontal side: 1 = right (default), -1 = left.
@@ -20,7 +23,7 @@ struct FloatingMenuView: View {
 
     private let fabSize: CGFloat = 44
     private let menuItemSize: CGFloat = 44
-    private let spreadRadius: CGFloat = 70
+    private let spreadRadius: CGFloat = 120
     private let edgePadding: CGFloat = 16
 
     var body: some View {
@@ -32,11 +35,11 @@ struct FloatingMenuView: View {
             let clampedX = min(max(baseX + dragOffset, leftX), rightX)
 
             ZStack {
-                // Blur + dim overlay when menu is open
+                // Blur overlay when menu is open
                 if isOpen {
                     Color.clear
-                        .background(.ultraThinMaterial)
-                        .opacity(0.5)
+                        .background(.regularMaterial)
+                        .opacity(0.6)
                         .ignoresSafeArea()
                         .onTapGesture {
                             withAnimation(.spring(response: 0.35)) { isOpen = false }
@@ -45,16 +48,24 @@ struct FloatingMenuView: View {
 
                 // Menu items + FAB
                 ZStack {
-                    // Fan-out menu items — spread away from the current edge
                     let fanDirection: CGFloat = side > 0 ? -1 : 1
-                    menuItem(icon: "arrow.clockwise", label: "Reload",
-                             angle: fanAngle(base: 180, direction: fanDirection, index: 0),
+                    menuItem(icon: "arrow.clockwise",
+                             angle: fanAngle(direction: fanDirection, index: 0),
                              action: onReload)
-                    menuItem(icon: "safari", label: "Safari Login",
-                             angle: fanAngle(base: 180, direction: fanDirection, index: 1),
+                    menuItem(icon: "safari",
+                             angle: fanAngle(direction: fanDirection, index: 1),
                              action: onSafariAuth)
-                    menuItem(icon: "gear", label: "Settings",
-                             angle: fanAngle(base: 180, direction: fanDirection, index: 2),
+                    menuItem(icon: "bookmark.fill",
+                             angle: fanAngle(direction: fanDirection, index: 2),
+                             action: onBookmarks)
+                    menuItem(icon: "clock.arrow.circlepath",
+                             angle: fanAngle(direction: fanDirection, index: 3),
+                             action: onHistory)
+                    menuItem(icon: "antenna.radiowaves.left.and.right",
+                             angle: fanAngle(direction: fanDirection, index: 4),
+                             action: onNetworkInspector)
+                    menuItem(icon: "gear",
+                             angle: fanAngle(direction: fanDirection, index: 5),
                              action: onSettings)
 
                     // Main FAB — flame icon
@@ -77,7 +88,7 @@ struct FloatingMenuView: View {
                                 isDragging = true
                                 dragOffset = value.translation.width
                             }
-                            .onEnded { value in
+                            .onEnded { _ in
                                 isDragging = false
                                 let finalX = clampedX
                                 let mid = geo.size.width / 2
@@ -93,45 +104,36 @@ struct FloatingMenuView: View {
         }
     }
 
-    /// Compute fan angle: when on right side, items fan upward-left; on left side, upward-right.
-    private func fanAngle(base: Double, direction: CGFloat, index: Int) -> Angle {
-        let step: Double = 35
+    /// Compute fan angle for 6 items spread in a semicircle away from the current edge.
+    private func fanAngle(direction: CGFloat, index: Int) -> Angle {
+        let step: Double = 30
         if direction < 0 {
-            // Right side: fan left and up (180°, 215°, 250°)
-            return .degrees(base + step * Double(index))
+            // Right side: fan left and up (150° → 300°)
+            return .degrees(150 + step * Double(index))
         } else {
-            // Left side: fan right and up (0°, -35°, -70° → 360°, 325°, 290°)
-            return .degrees(360 - step * Double(index))
+            // Left side: fan right and up (30° → -120° → 390°, 360°, 330°…)
+            return .degrees(390 - step * Double(index))
         }
     }
 
     @ViewBuilder
-    private func menuItem(icon: String, label: String, angle: Angle, action: @escaping () -> Void) -> some View {
+    private func menuItem(icon: String, angle: Angle, action: @escaping () -> Void) -> some View {
         let dx: CGFloat = isOpen ? CGFloat(cos(angle.radians)) * spreadRadius : 0
         let dy: CGFloat = isOpen ? CGFloat(sin(angle.radians)) * spreadRadius : 0
-        let offset = CGSize(width: dx, height: dy)
 
         Button {
             action()
             withAnimation(.spring(response: 0.35)) { isOpen = false }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(.white)
-                    .frame(width: menuItemSize, height: menuItemSize)
-                    .background(mollotovOrange)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                if isOpen {
-                    Text(label)
-                        .font(.caption2)
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 2)
-                }
-            }
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .frame(width: menuItemSize, height: menuItemSize)
+                .background(mollotovOrange)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
         }
-        .offset(offset)
+        .offset(CGSize(width: dx, height: dy))
         .opacity(isOpen ? 1 : 0)
         .scaleEffect(isOpen ? 1 : 0.3)
     }

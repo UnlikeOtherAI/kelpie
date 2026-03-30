@@ -6,6 +6,9 @@ struct BrowserView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var serverState: ServerState
     @State private var showSettings = false
+    @State private var showBookmarks = false
+    @State private var showHistory = false
+    @State private var showNetworkInspector = false
     @State private var webView: WKWebView?
     private let safariAuth = SafariAuthHelper()
 
@@ -44,12 +47,33 @@ struct BrowserView: View {
                     guard let webView, let url = webView.url else { return }
                     safariAuth.authenticate(url: url, webView: webView, from: webView.window) {}
                 },
-                onSettings: { showSettings = true }
+                onSettings: { showSettings = true },
+                onBookmarks: { showBookmarks = true },
+                onHistory: { showHistory = true },
+                onNetworkInspector: { showNetworkInspector = true }
             )
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        .onChange(of: browserState.currentURL) { newURL in
+            HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView(serverState: serverState)
+        }
+        .sheet(isPresented: $showBookmarks) {
+            BookmarksView(onNavigate: { url in
+                guard let webView, let urlObj = URL(string: url) else { return }
+                webView.load(URLRequest(url: urlObj))
+            })
+        }
+        .sheet(isPresented: $showHistory) {
+            HistoryView(onNavigate: { url in
+                guard let webView, let urlObj = URL(string: url) else { return }
+                webView.load(URLRequest(url: urlObj))
+            })
+        }
+        .sheet(isPresented: $showNetworkInspector) {
+            NetworkInspectorView()
         }
     }
 }

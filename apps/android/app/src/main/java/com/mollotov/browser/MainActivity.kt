@@ -17,7 +17,12 @@ import com.mollotov.browser.handlers.InteractionHandler
 import com.mollotov.browser.handlers.NavigationHandler
 import com.mollotov.browser.handlers.ScreenshotHandler
 import com.mollotov.browser.handlers.ScrollHandler
+import com.mollotov.browser.handlers.BookmarkHandler
+import com.mollotov.browser.handlers.HistoryHandler
+import com.mollotov.browser.handlers.NetworkInspectorHandler
 import com.mollotov.browser.llm.LLMHandler
+import com.mollotov.browser.browser.BookmarkStore
+import com.mollotov.browser.browser.HistoryStore
 import com.mollotov.browser.network.HTTPServer
 import com.mollotov.browser.network.MDNSAdvertiser
 import com.mollotov.browser.network.Router
@@ -35,6 +40,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val deviceInfo = DeviceInfo.collect(this)
+        BookmarkStore.init(this)
+        HistoryStore.init(this)
 
         setContent {
             MollotovTheme {
@@ -68,6 +75,9 @@ class MainActivity : ComponentActivity() {
         MutationHandler(handlerContext).register(router)
         BrowserManagementHandler(handlerContext, applicationContext).register(router)
         LLMHandler(handlerContext).register(router)
+        BookmarkHandler(handlerContext).register(router)
+        HistoryHandler(handlerContext).register(router)
+        NetworkInspectorHandler(handlerContext).register(router)
 
         router.register("toast") { body ->
             val message = body["message"] as? String ?: "No message"
