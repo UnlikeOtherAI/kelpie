@@ -177,6 +177,7 @@ When exposed via MCP, methods use the `mollotov_` prefix:
 | `/v1/scroll-to-bottom` | `mollotov_scroll_to_bottom` |
 | `/v1/get-viewport` | `mollotov_get_viewport` |
 | `/v1/get-device-info` | `mollotov_get_device_info` |
+| `/v1/get-capabilities` | `mollotov_get_capabilities` |
 | `/v1/wait-for-element` | `mollotov_wait_for_element` |
 | `/v1/wait-for-navigation` | `mollotov_wait_for_navigation` |
 | `/v1/find-element` | `mollotov_find_element` |
@@ -208,6 +209,8 @@ When exposed via MCP, methods use the `mollotov_` prefix:
 | `/v1/switch-to-main` | `mollotov_switch_to_main` |
 | `/v1/get-iframe-context` | `mollotov_get_iframe_context` |
 | `/v1/get-cookies` | `mollotov_get_cookies` |
+| `/v1/set-cookie` | `mollotov_set_cookie` |
+| `/v1/delete-cookies` | `mollotov_delete_cookies` |
 | `/v1/get-storage` | `mollotov_get_storage` |
 | `/v1/set-storage` | `mollotov_set_storage` |
 | `/v1/clear-storage` | `mollotov_clear_storage` |

@@ -141,6 +141,13 @@ Get text content of an element.
 mollotov text "h1" --device "My iPhone"
 ```
 
+### `mollotov attributes <selector>`
+Get all attributes of an element.
+
+```bash
+mollotov attributes "#email-input" --device "My iPhone"
+```
+
 ---
 
 ## Interaction Commands
@@ -425,6 +432,13 @@ Switch back to the main page context.
 mollotov iframe exit --device "My iPhone"
 ```
 
+### `mollotov iframe context`
+Check which context (main page or iframe) commands are currently targeting.
+
+```bash
+mollotov iframe context --device "My iPhone"
+```
+
 ---
 
 ## Cookie & Storage Commands
@@ -435,6 +449,23 @@ Get cookies for the current page.
 ```bash
 mollotov cookies --device "My iPhone"
 mollotov cookies --device "My iPhone" --name "session_id"
+```
+
+### `mollotov cookies set <name> <value>`
+Set a cookie.
+
+```bash
+mollotov cookies set "session_id" "abc123" --device "My iPhone"
+mollotov cookies set "theme" "dark" --device "My iPhone" --domain "example.com" --path "/" --secure
+```
+
+### `mollotov cookies delete`
+Delete cookies.
+
+```bash
+mollotov cookies delete --name "session_id" --device "My iPhone"
+mollotov cookies delete --domain "example.com" --device "My iPhone"
+mollotov cookies delete --all --device "My iPhone"
 ```
 
 ### `mollotov storage`
@@ -579,6 +610,14 @@ mollotov wait ".results-loaded" --device "My iPhone" --timeout 15000
 mollotov wait ".spinner" --device "My iPhone" --state hidden
 ```
 
+### `mollotov wait-nav`
+Wait for a navigation event to complete.
+
+```bash
+mollotov wait-nav --device "My iPhone"
+mollotov wait-nav --device "My iPhone" --timeout 15000
+```
+
 ---
 
 ## Evaluate
@@ -668,8 +707,11 @@ mollotov group find-input "Email"
 ```bash
 mollotov group navigate "https://example.com" --platform ios       # only iOS devices
 mollotov group navigate "https://example.com" --platform android   # only Android
-mollotov group navigate "https://example.com" --exclude "iPad Air" # exclude specific
+mollotov group navigate "https://example.com" --exclude "iPad Air" # exclude specific device
+mollotov group navigate "https://example.com" --include "a1b2c3d4,My iPhone" # only these devices (by ID or name)
 ```
+
+`--include` accepts a comma-separated list of device IDs or names. When both `--include` and `--platform` are specified, only devices matching both filters are targeted.
 
 ---
 

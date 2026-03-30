@@ -4,7 +4,7 @@
 
 Mollotov is an **LLM-first browser** for iOS and Android (phones and tablets) paired with a **Node.js CLI** that enables large language models to discover, control, and orchestrate multiple browser instances on a local network.
 
-Think Playwright, but running natively on real mobile devices — no emulators, no persistent content scripts, no desktop required.
+Think Playwright-style automation, but running natively on real mobile devices — no emulators, no persistent content scripts, no desktop required. Android has near-full parity with desktop automation via CDP; iOS covers core workflows with some platform-specific gaps (see [Platform Support Matrix](api/README.md)).
 
 ## The Problem
 
@@ -23,7 +23,7 @@ Two components that work together:
 
 A minimal native browser built on each platform's WebView engine (WKWebView / Android WebView) that:
 
-- Exposes **full Playwright-equivalent capabilities** through native WebView APIs and platform debugging protocols
+- Exposes **rich browser automation capabilities** through native WebView APIs and CDP (Android). Coverage varies by platform — Android has near-full parity with desktop automation; iOS has some gaps where WKWebView lacks native APIs (see [Platform Support Matrix](api/README.md))
 - Advertises itself via **mDNS** on the local network (`_mollotov._tcp`)
 - Runs a local **HTTP + MCP server** accepting commands from the CLI or any MCP-compatible client
 - Takes screenshots, reads DOM, navigates, clicks, fills forms, scrolls — all via native bridge
@@ -115,7 +115,7 @@ For CLI command reference, see [cli.md](cli.md).
 
 ## Simulator & Emulator Support
 
-Mollotov works on **real devices and simulators/emulators equally**. A developer with no physical phones can run 5-6 iOS Simulators or Android Emulators with different screen sizes, and each instance advertises itself via mDNS and accepts commands identically to a real device.
+Mollotov works on **real devices, simulators, and emulators**. A developer with no physical phones can run 5-6 iOS Simulators or Android Emulators with different screen sizes, and each instance advertises itself via mDNS and accepts commands like a real device.
 
 - **iOS Simulator** — each Simulator instance runs its own Mollotov app, advertises on the host's network via Bonjour, and is discoverable by the CLI
 - **Android Emulator** — each emulator instance runs its own Mollotov app; port forwarding (`adb forward`) maps each emulator's HTTP server to a host port for CLI discovery

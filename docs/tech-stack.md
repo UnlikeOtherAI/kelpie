@@ -25,6 +25,22 @@
 | **Networking** | URLSession | Standard iOS networking |
 | **Min Target** | iOS 16+ | WKWebView snapshot API stability |
 
+### iOS — Required Info.plist Entries
+
+```xml
+<!-- Local network access prompt (required iOS 14+) -->
+<key>NSLocalNetworkUsageDescription</key>
+<string>Mollotov uses the local network to receive browser automation commands from the CLI.</string>
+
+<!-- Bonjour service types for mDNS (required for NWListener/NWBrowser) -->
+<key>NSBonjourServices</key>
+<array>
+  <string>_mollotov._tcp</string>
+</array>
+```
+
+Without these entries, iOS will silently block local network access and mDNS advertisement.
+
 ### iOS — Key APIs
 
 - `WKWebView.evaluateJavaScript(_:)` — DOM queries and reads via native bridge
@@ -116,7 +132,7 @@ packages/
 | **mDNS TXT Records** | `id`, `name`, `model`, `platform`, `width`, `height`, `port`, `version` | Device metadata for discovery |
 | **API Versioning** | URL prefix `/v1/` | Forward-compatible |
 | **Image Format** | PNG (screenshots) | Lossless, LLM-friendly |
-| **Monorepo** | pnpm workspaces | CLI + shared types in one repo; native apps in separate repos |
+| **Monorepo** | pnpm workspaces | CLI, shared types, and native app projects all in one repo |
 
 ---
 

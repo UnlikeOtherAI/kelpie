@@ -312,8 +312,8 @@ Response:
 }
 ```
 
-### `check` / `uncheck`
-Toggle a checkbox or radio button.
+### `check`
+Check a checkbox or radio button.
 
 ```json
 POST /v1/check
@@ -325,6 +325,22 @@ Response:
 {
   "success": true,
   "checked": true
+}
+```
+
+### `uncheck`
+Uncheck a checkbox.
+
+```json
+POST /v1/uncheck
+{
+  "selector": "#agree-terms"
+}
+
+Response:
+{
+  "success": true,
+  "checked": false
 }
 ```
 
@@ -374,7 +390,7 @@ Response:
 }
 ```
 
-### `scrollToTop` / `scrollToBottom`
+### `scrollToTop`
 
 ```json
 POST /v1/scroll-to-top
@@ -383,6 +399,18 @@ Response:
 {
   "success": true,
   "scrollY": 0
+}
+```
+
+### `scrollToBottom`
+
+```json
+POST /v1/scroll-to-bottom
+
+Response:
+{
+  "success": true,
+  "scrollY": 4200
 }
 ```
 

@@ -82,7 +82,7 @@ Each browser app has four internal layers:
 - iOS: `WKWebView` native methods — `evaluateJavaScript`, `takeSnapshot`, scroll via `scrollView`
 - Android: `WebView` + CDP — `DOM.getDocument`, `Page.captureScreenshot`, `Runtime.evaluate`
 
-**Command Handler** — Translates incoming HTTP requests into native WebView calls. Each command maps to a specific native API invocation. No scripts are injected into the page's execution context.
+**Command Handler** — Translates incoming HTTP requests into native WebView calls. Android uses CDP for most operations (no scripts enter the page). iOS uses native `evaluateJavaScript` calls and, for features WebKit doesn't expose natively, ephemeral bridge scripts that are cleared on navigation (see [iOS bridge scripts](#ios--no-injection-dom-access)).
 
 **Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android), MCP server over the same transport, and mDNS service advertisement.
 
@@ -233,7 +233,7 @@ Both browser and CLI MCP servers use **Streamable HTTP** (SSE) transport:
 
 ## Security Model
 
-Mollotov operates exclusively on the local network. No cloud services, no remote access, no authentication tokens.
+Mollotov operates exclusively on the local network. No cloud services, no remote access.
 
 | Boundary | Control |
 |---|---|
@@ -242,6 +242,20 @@ Mollotov operates exclusively on the local network. No cloud services, no remote
 | No persistent scripts | No browser extensions or content scripts. Some iOS features use ephemeral bridge scripts (cleared on navigation) |
 | No data collection | No telemetry, no analytics, no phone-home |
 | Port access | Default 8420, configurable per device |
+
+### Shared Network Risk
+
+Mollotov's HTTP API has **no authentication**. Any device on the same network can send commands. This is acceptable on a private home/office network but poses risks on shared Wi-Fi (coworking spaces, hotel networks, conferences):
+
+- An attacker on the same network could discover Mollotov browsers via mDNS and send commands
+- Sensitive APIs (cookies, storage, clipboard, JS evaluation) are fully exposed
+- There is no TLS — traffic is plaintext HTTP
+
+**Mitigations (planned for v2):**
+- **Pairing code**: On first CLI→browser connection, the browser displays a 6-digit code the user must enter in the CLI. The CLI and browser then exchange a shared secret used to sign subsequent requests.
+- **Allowlist mode**: The browser can restrict connections to specific IP addresses after initial pairing.
+
+**Current recommendation**: Use Mollotov only on trusted private networks. Do not use on public or shared Wi-Fi without a VPN.
 
 ---
 
@@ -262,7 +276,7 @@ These scripts are lightweight, non-persistent, and do not modify page content or
 
 ### Simulator & Emulator Support
 
-Both platforms work identically on simulators/emulators and real devices:
+Both platforms support simulators/emulators alongside real devices. iOS Simulators are zero-setup; Android Emulators require `adb forward` for port mapping:
 
 **iOS Simulator**
 - Each Simulator instance runs its own app process
@@ -282,7 +296,9 @@ Both platforms work identically on simulators/emulators and real devices:
 
 ### Android — Chrome DevTools Protocol
 
-Android WebView is Chromium-based. Enabling `setWebContentsDebuggingEnabled(true)` exposes CDP over a local Unix socket. The app connects to this socket and issues CDP commands:
+Android WebView is Chromium-based. Enabling `setWebContentsDebuggingEnabled(true)` exposes CDP over a local Unix socket. The app connects to this socket and issues CDP commands.
+
+> **Note on `setWebContentsDebuggingEnabled`:** Google documents this API as a debugging tool, not a production control plane. Mollotov enables it intentionally — the app *is* a debugging/automation tool by design. The flag has no known performance or security penalties beyond exposing the CDP socket (which Mollotov's own process consumes). Play Store review has not historically flagged apps that enable it, but this could change. If Google restricts this API in future Android versions, Mollotov would fall back to `evaluateJavascript()` for DOM operations (losing CDP-only features like network interception and the accessibility tree protocol).
 
 - `DOM.*` — full DOM tree traversal and queries
 - `Page.captureScreenshot` — screenshots
