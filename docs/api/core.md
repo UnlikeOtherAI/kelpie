@@ -88,6 +88,8 @@ Response:
 ### `screenshot`
 Capture a screenshot of the current viewport. When `fullPage: true`, captures the entire scrollable page. On Android this uses CDP `Page.captureScreenshot` with `captureBeyondViewport`. On iOS, `WKWebView.takeSnapshot` only captures the visible viewport — full-page requires a scroll-and-stitch approach (slower, may have minor seam artifacts).
 
+> **CLI note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. See [cli.md](../cli.md) for `--output` and `--base64` flags.
+
 ```json
 POST /v1/screenshot
 {

@@ -161,6 +161,8 @@ Response:
 ### `screenshotAnnotated`
 Capture a screenshot with numbered labels overlaid on all interactive elements. The LLM can reference elements by index number instead of generating CSS selectors — dramatically more reliable for visual grounding.
 
+> **CLI note:** Like `screenshot`, the CLI auto-saves annotated screenshots to file and returns the path. See [cli.md](../cli.md).
+
 ```json
 POST /v1/screenshot-annotated
 {

@@ -110,9 +110,19 @@ mollotov url --device "My iPhone"
 mollotov screenshot --device "My iPhone"
 mollotov screenshot --device "My iPhone" --output ./shot.png
 mollotov screenshot --device "My iPhone" --full-page
+mollotov screenshot --device "My iPhone" --base64     # return raw base64 instead of saving
 ```
 
-Without `--output`, returns base64 JSON. With `--output`, saves to file.
+**Default behavior: saves to file, returns the path.** Without `--output`, the CLI auto-generates a filename in the current directory using the pattern `{device}-{timestamp}.png` (e.g., `my-iphone-2026-03-30T10-15-32.png`). The JSON response contains the file path — never base64 — so LLMs don't waste tokens on image data.
+
+| Flag | Behavior |
+|---|---|
+| *(no flag)* | Auto-save to `./{device}-{timestamp}.png`, return `{"file": "..."}` |
+| `--output <path>` | Save to explicit path, return `{"file": "..."}` |
+| `--output <dir>/` | Save to directory with auto-generated filename |
+| `--base64` | Return raw base64 JSON (for programmatic use, not LLM conversations) |
+
+Group screenshots (`mollotov group screenshot`) always save to files — one per device. Use `--output <dir>/` to collect them in a folder.
 
 ---
 
@@ -295,12 +305,13 @@ mollotov a11y --device "My iPhone" --selector "main"
 ```
 
 ### `mollotov annotate`
-Take an annotated screenshot with numbered labels on interactive elements.
+Take an annotated screenshot with numbered labels on interactive elements. Same file-saving behavior as `screenshot` — defaults to auto-save, returns the file path.
 
 ```bash
 mollotov annotate --device "My iPhone"
 mollotov annotate --device "My iPhone" --output ./annotated.png
 mollotov annotate --device "My iPhone" --full-page
+mollotov annotate --device "My iPhone" --base64     # raw base64 instead of file
 ```
 
 ### `mollotov click-index <index>`
