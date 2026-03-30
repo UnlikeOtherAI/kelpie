@@ -5,8 +5,8 @@
 <h1 align="center">Mollotov</h1>
 
 <p align="center">
-  LLM-first browser for iOS and Android.<br>
-  Control real mobile browsers via mDNS discovery, HTTP API, and MCP.
+  LLM-first browser for iOS, Android, and macOS.<br>
+  Control real browsers via mDNS discovery, HTTP API, and MCP. AirPlay to Apple TV supported.
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 ## What it is
 
-Native iOS and Android browser apps paired with a Node.js CLI. Language models discover devices on the local network, then control them: navigate, screenshot, read DOM, click, fill forms, scroll, capture network traffic, evaluate JS. Works on real devices, simulators, and emulators.
+Native iOS, Android, and macOS browser apps paired with a Node.js CLI. Language models discover devices on the local network, then control them: navigate, screenshot, read DOM, click, fill forms, scroll, capture network traffic, evaluate JS. Works on real devices, simulators, and emulators. AirPlay an iPhone to an Apple TV and it appears as a second controllable device.
 
 No emulators pretending to be phones. No persistent content scripts. No browser extensions. Real browsers on real hardware, fully controllable by LLMs.
 
@@ -39,7 +39,8 @@ npm install -g @unlikeotherai/mollotov
 
 ## Key features
 
-- **Real mobile browsers** — WKWebView (iOS) and Android WebView, with native user agents
+- **Real browsers** — WKWebView (iOS/macOS), CEF (macOS), Android WebView, with native user agents
+- **Apple TV support** — AirPlay from iPhone/iPad to Apple TV, TV appears as a separate controllable device
 - **mDNS discovery** — devices advertise `_mollotov._tcp`, CLI auto-discovers them
 - **HTTP + MCP API** — navigate, screenshot, DOM, click, fill, scroll, JS eval
 - **Group commands** — send commands to all devices simultaneously
@@ -51,14 +52,14 @@ npm install -g @unlikeotherai/mollotov
 ## Architecture
 
 ```
-  +-----------+    +-----------+    +-----------+
-  | Mollotov  |    | Mollotov  |    | Mollotov  |
-  | (iPhone)  |    | (iPad)    |    | (Android) |
-  | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |
-  | mDNS      |    | mDNS      |    | mDNS      |
-  +-----+-----+    +-----+-----+    +-----+-----+
-        |               |               |
-        +-------+-------+-------+-------+
+  +-----------+    +-----------+    +-----------+    +-----------+
+  | Mollotov  |    | Mollotov  |    | Mollotov  |    | Apple TV  |
+  | (iPhone)  |    | (iPad)    |    | (Android) |    | (AirPlay) |
+  | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |
+  | mDNS      |    | mDNS      |    | mDNS      |    | mDNS      |
+  +-----+-----+    +-----+-----+    +-----+-----+    +-----+-----+
+        |               |               |               |
+        +-------+-------+-------+-------+-------+-------+
                 |               |
          +------+---------------+------+
          |      Mollotov CLI           |
@@ -74,8 +75,9 @@ npm install -g @unlikeotherai/mollotov
 
 ```
 apps/
-  ios/          iOS app (Swift, SwiftUI, WKWebView)
+  ios/          iOS app (Swift, SwiftUI, WKWebView) + Apple TV via AirPlay
   android/      Android app (Kotlin, Jetpack Compose, WebView)
+  macos/        macOS app (Swift, SwiftUI, WKWebView + CEF)
 packages/
   cli/          Node.js CLI and MCP server
 docs/           Product brief, architecture, API reference, CLI docs

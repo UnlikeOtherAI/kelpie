@@ -251,8 +251,8 @@
   <h2>What it does</h2>
   <div class="features">
     <div class="feature">
-      <h3>Real mobile browsers</h3>
-      <p>Native iOS and Android apps built on WKWebView and Android WebView. No emulators, no desktop wrappers, no Electron.</p>
+      <h3>Real browsers, every platform</h3>
+      <p>Native iOS, Android, and macOS apps built on WKWebView, Android WebView, and CEF. No emulators, no desktop wrappers, no Electron.</p>
     </div>
     <div class="feature">
       <h3>mDNS discovery</h3>
@@ -286,6 +286,10 @@
       <h3>Console capture</h3>
       <p>Read console output (log, warn, error) and JS errors with stack traces. Buffers up to 5,000 entries, clearable on demand.</p>
     </div>
+    <div class="feature">
+      <h3>Apple TV support</h3>
+      <p>AirPlay from an iPhone or iPad to an Apple TV and it appears as a separate controllable device on the network. Fullscreen browser on the big screen, driven entirely from the CLI.</p>
+    </div>
   </div>
 </section>
 
@@ -310,6 +314,11 @@ graph TD
             as["HTTP + MCP Server"]
             am["mDNS _mollotov._tcp"]
         end
+        subgraph tv["Apple TV (AirPlay)"]
+            tb["Fullscreen Browser"]
+            ts["HTTP + MCP Server"]
+            tm["mDNS _mollotov._tcp"]
+        end
     end
 
     subgraph cli["Mollotov CLI (Node.js)"]
@@ -323,12 +332,14 @@ graph TD
     is --> cli
     ps --> cli
     as --> cli
+    ts --> cli
     cli --> llm["LLM Agent"]
 
     style net fill:transparent,stroke:#e0dcd6,stroke-width:1px
     style iphone fill:transparent,stroke:#f4b078,stroke-width:2px
     style ipad fill:transparent,stroke:#f4b078,stroke-width:2px
     style android fill:transparent,stroke:#f4b078,stroke-width:2px
+    style tv fill:transparent,stroke:#f4b078,stroke-width:2px
     style cli fill:transparent,stroke:#e8944a,stroke-width:2px
     style llm fill:#e8944a,color:#fff,stroke:#e8944a
     </pre>
