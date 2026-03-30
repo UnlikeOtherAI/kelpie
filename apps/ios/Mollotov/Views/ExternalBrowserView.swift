@@ -16,5 +16,8 @@ struct ExternalBrowserView: View {
             serverState.handlerContext.webView = wv
         }
         .ignoresSafeArea()
+        .onChange(of: browserState.currentURL) { newURL in
+            HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
+        }
     }
 }
