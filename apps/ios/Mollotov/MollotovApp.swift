@@ -19,7 +19,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         configurationForConnecting connectingSceneSession: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
+        print("[AppDelegate] configurationForConnecting role=\(connectingSceneSession.role.rawValue)")
         if connectingSceneSession.role == .windowExternalDisplayNonInteractive {
+            print("[AppDelegate] Creating external display configuration")
             let config = UISceneConfiguration(
                 name: "External Display",
                 sessionRole: connectingSceneSession.role
@@ -50,6 +52,7 @@ struct MollotovApp: App {
     private func startServices() {
         serverState.startHTTPServer()
         serverState.startMDNS()
+        ExternalDisplayManager.shared.startMonitoring()
         #if DEBUG
         AppRevealSetup.configure()
         #endif
