@@ -5,6 +5,9 @@ import AppKit
 final class HandlerContext {
     var renderer: (any RendererEngine)?
     var consoleMessages: [[String: Any]] = []
+    private var sharedCookiePoller: Timer?
+    private var lastSharedCookieSignature: String = ""
+    private var lastSharedCookieModifiedAt: Date?
 
     init() {}
 
@@ -28,7 +31,8 @@ final class HandlerContext {
                 responseBody: body["responseBody"] as? String,
                 startTime: Date(),
                 duration: body["duration"] as? Int ?? 0,
-                size: body["size"] as? Int ?? 0
+                size: body["size"] as? Int ?? 0,
+                initiator: "js"
             )
             NetworkTrafficStore.shared.append(entry)
 
@@ -158,19 +162,118 @@ final class HandlerContext {
     }
 
     func allCookies() async -> [HTTPCookie] {
-        await renderer?.allCookies() ?? []
+        guard let renderer else { return [] }
+        if renderer.engineName == "chromium" {
+            return SharedCookieJar.load().cookies
+        }
+        return await renderer.allCookies()
     }
 
     func setCookie(_ cookie: HTTPCookie) async {
-        await renderer?.setCookies([cookie])
+        guard let renderer else { return }
+        await renderer.setCookies([cookie])
+
+        if renderer.engineName == "chromium" {
+            var merged = SharedCookieJar.load().cookies
+            merged.removeAll { existing in
+                existing.domain == cookie.domain &&
+                existing.path == cookie.path &&
+                existing.name == cookie.name
+            }
+            merged.append(cookie)
+            SharedCookieJar.save(cookies: merged)
+            let snapshot = SharedCookieJar.load()
+            lastSharedCookieSignature = snapshot.signature
+            lastSharedCookieModifiedAt = snapshot.modifiedAt
+            return
+        }
+
+        await persistRendererCookiesToSharedJar()
     }
 
     func deleteCookie(_ cookie: HTTPCookie) async {
-        await renderer?.deleteCookie(cookie)
+        guard let renderer else { return }
+        await renderer.deleteCookie(cookie)
+
+        if renderer.engineName == "chromium" {
+            var merged = SharedCookieJar.load().cookies
+            merged.removeAll { existing in
+                existing.domain == cookie.domain &&
+                existing.path == cookie.path &&
+                existing.name == cookie.name
+            }
+            SharedCookieJar.save(cookies: merged)
+            let snapshot = SharedCookieJar.load()
+            lastSharedCookieSignature = snapshot.signature
+            lastSharedCookieModifiedAt = snapshot.modifiedAt
+            return
+        }
+
+        await persistRendererCookiesToSharedJar()
     }
 
     func deleteAllCookies() async {
-        await renderer?.deleteAllCookies()
+        guard let renderer else { return }
+        await renderer.deleteAllCookies()
+
+        if renderer.engineName == "chromium" {
+            SharedCookieJar.save(cookies: [])
+            let snapshot = SharedCookieJar.load()
+            lastSharedCookieSignature = snapshot.signature
+            lastSharedCookieModifiedAt = snapshot.modifiedAt
+            return
+        }
+
+        await persistRendererCookiesToSharedJar()
+    }
+
+    func syncSharedCookiesIntoRenderer(force: Bool = false) async {
+        guard let renderer else { return }
+        let snapshot = SharedCookieJar.load()
+
+        if !force,
+           snapshot.signature == lastSharedCookieSignature,
+           snapshot.modifiedAt == lastSharedCookieModifiedAt {
+            return
+        }
+
+        if snapshot.modifiedAt != nil && snapshot.cookies.isEmpty {
+            await renderer.deleteAllCookies()
+        } else if !snapshot.cookies.isEmpty {
+            await renderer.setCookies(snapshot.cookies)
+        }
+        lastSharedCookieSignature = snapshot.signature
+        lastSharedCookieModifiedAt = snapshot.modifiedAt
+    }
+
+    func persistRendererCookiesToSharedJar() async {
+        guard let renderer else { return }
+        guard renderer.engineName != "chromium" else { return }
+        let cookies = await renderer.allCookies()
+        let signature = SharedCookieJar.signature(for: cookies)
+        if signature == lastSharedCookieSignature {
+            return
+        }
+
+        SharedCookieJar.save(cookies: cookies)
+        let snapshot = SharedCookieJar.load()
+        lastSharedCookieSignature = snapshot.signature
+        lastSharedCookieModifiedAt = snapshot.modifiedAt
+    }
+
+    func startSharedCookieSync() {
+        sharedCookiePoller?.invalidate()
+        sharedCookiePoller = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.syncSharedCookiesIntoRenderer()
+                await self?.persistRendererCookiesToSharedJar()
+            }
+        }
+    }
+
+    func stopSharedCookieSync() {
+        sharedCookiePoller?.invalidate()
+        sharedCookiePoller = nil
     }
 }
 

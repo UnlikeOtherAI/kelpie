@@ -17,6 +17,7 @@ final class NetworkTrafficStore: ObservableObject {
         let startTime: Date
         let duration: Int // ms
         let size: Int // bytes
+        let initiator: String  // "browser" or "js"
 
         /// Simplified content type category for filtering.
         var category: String {
@@ -127,6 +128,7 @@ final class NetworkTrafficStore: ObservableObject {
             "statusCode": entry.statusCode,
             "contentType": entry.contentType,
             "category": entry.category,
+            "initiator": entry.initiator,
             "requestHeaders": entry.requestHeaders,
             "responseHeaders": entry.responseHeaders,
             "requestBody": entry.requestBody ?? "",
@@ -290,7 +292,8 @@ final class NetworkTrafficStore: ObservableObject {
             responseBody: optionalStringValue(in: object, keys: ["response_body", "responseBody"]),
             startTime: startTime,
             duration: max(0, intValue(in: object, keys: ["duration"])),
-            size: max(0, intValue(in: object, keys: ["size"]))
+            size: max(0, intValue(in: object, keys: ["size"])),
+            initiator: stringValue(in: object, keys: ["initiator"]) ?? "browser"
         )
     }
 
@@ -322,6 +325,7 @@ final class NetworkTrafficStore: ObservableObject {
             "url": entry.url,
             "statusCode": entry.statusCode,
             "contentType": entry.contentType,
+            "initiator": entry.initiator,
             "requestHeaders": entry.requestHeaders,
             "responseHeaders": entry.responseHeaders,
             "requestBody": entry.requestBody ?? NSNull(),

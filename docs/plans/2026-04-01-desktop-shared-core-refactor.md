@@ -285,8 +285,8 @@ Share:
 
 Share:
 
-- normalized network event model
-- filtering
+- normalized network event model (includes `initiator` field: `"browser"` for document/subresource loads, `"js"` for fetch/XHR)
+- filtering by method, content-type category, initiator/source, URL pattern, and status range
 - paging
 - detail lookup
 - current selection

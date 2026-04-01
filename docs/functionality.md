@@ -80,7 +80,7 @@ Two levels of network visibility:
 
 A built-in network traffic viewer accessible from the floating menu. Captures all HTTP/HTTPS requests and responses flowing through the loaded website.
 
-**List view:** every request shows its HTTP method (GET, POST, PUT, DELETE, OPTIONS, etc.), URL, status code, content type, category, duration, and size. The app now records the top-level page document alongside fetch/XHR traffic, so a normal page load always appears in the inspector. The in-app filter UI is intentionally simpler than the API: use one method dropdown (`All calls`, `GET`, `POST`, `PUT`, `DELETE`) plus URL search, while still showing category metadata on each row.
+**List view:** every request shows its HTTP method (GET, POST, PUT, DELETE, OPTIONS, etc.), URL, status code, content type, category, duration, and size. The app records the top-level page document alongside fetch/XHR traffic, so a normal page load always appears in the inspector. Three filter dropdowns: **Method** (All Methods, GET, POST, PUT, DELETE), **Type** (All Types, HTML, JSON, JS, CSS, Image, Font, XML, Other), and **Source** (All Sources, Browser, JS (fetch/XHR)). The Source filter distinguishes browser-initiated requests (page loads, subresources) from JavaScript-initiated requests (fetch, XHR). URL search is also available. All three platforms (iOS, Android, macOS) have identical filter sets.
 
 **Detail view:** drill into any request to see the full picture — request method, URL, headers, query parameters, and body. Response status, headers, and body (formatted for JSON). Timing: start time, duration, bytes transferred. On Android and Chromium-backed macOS views, top-level document rows may have partial metadata where the native web view does not expose a full response.
 
