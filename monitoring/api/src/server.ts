@@ -18,8 +18,12 @@ export function createServer(deps: AgentDeps & { owner: string; repo: string }) 
   app.get('/api/v1/status', async c => {
     const issues = await searchIssues(deps.octokit, deps.owner, deps.repo, [], '')
     const records = issues
-      .map(i => ({ ...parseMonitoringMetadata(i.body), issueNumber: i.number, title: i.title }))
-      .filter(Boolean)
+      .map(i => {
+        const meta = parseMonitoringMetadata(i.body)
+        if (!meta) return null
+        return { ...meta, issueNumber: i.number, title: i.title }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
     return c.json({ issues: records, fetchedAt: new Date().toISOString() })
   })
 
@@ -31,6 +35,11 @@ export function createServer(deps: AgentDeps & { owner: string; repo: string }) 
   app.post('/api/v1/seed-labels', async c => {
     await seedLabels(deps.octokit, deps.owner, deps.repo)
     return c.json({ seeded: true })
+  })
+
+  app.onError((err, c) => {
+    console.error('[server] Route error:', err)
+    return c.json({ error: err.message }, 500)
   })
 
   return app

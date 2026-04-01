@@ -34,10 +34,11 @@ const deps = {
 
 const app = createServer(deps)
 
-cron.schedule(SCAN_CRON, async () => {
+cron.schedule(SCAN_CRON, () => {
   console.log('[cron] Starting monitoring scan...')
-  const result = await runMonitoringAgent(deps)
-  console.log('[cron] Scan complete:', result)
+  runMonitoringAgent(deps)
+    .then(result => console.log('[cron] Scan complete:', result))
+    .catch(err => console.error('[cron] Scan failed:', err))
 })
 
 serve({ fetch: app.fetch, port: Number(PORT) }, () => {
