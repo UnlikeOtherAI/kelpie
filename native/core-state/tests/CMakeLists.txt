@@ -1,0 +1,10 @@
+function(add_store_test name)
+  add_executable(${name} ${ARGN})
+  target_link_libraries(${name} PRIVATE mollotov_core_state)
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+add_store_test(test_bookmark_store test_bookmark_store.cpp)
+add_store_test(test_history_store test_history_store.cpp)
+add_store_test(test_network_traffic_store test_network_traffic_store.cpp)
+add_store_test(test_console_store test_console_store.cpp)
