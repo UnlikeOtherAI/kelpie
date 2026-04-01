@@ -27,6 +27,8 @@ import com.mollotov.browser.browser.HomeStore
 import com.mollotov.browser.network.HTTPServer
 import com.mollotov.browser.network.MDNSAdvertiser
 import com.mollotov.browser.network.Router
+import com.mollotov.browser.network.errorResponse
+import com.mollotov.browser.network.successResponse
 import com.mollotov.browser.ui.BrowserScreen
 import com.mollotov.browser.ui.theme.MollotovTheme
 
@@ -80,6 +82,17 @@ class MainActivity : ComponentActivity() {
         BookmarkHandler(handlerContext).register(router)
         HistoryHandler(handlerContext).register(router)
         NetworkInspectorHandler(handlerContext).register(router)
+
+        router.register("show-panel") { body ->
+            val panel = body["panel"] as? String
+                ?: return@register errorResponse("MISSING_PARAM", "panel is required")
+            val valid = listOf("history", "bookmarks", "network-inspector", "settings")
+            if (panel !in valid) {
+                return@register errorResponse("INVALID_PARAM", "panel must be one of: ${valid.joinToString()}")
+            }
+            handlerContext.requestPanel(panel)
+            successResponse(mapOf("panel" to panel))
+        }
 
         router.register("toast") { body ->
             val message = body["message"] as? String ?: "No message"

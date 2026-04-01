@@ -11,6 +11,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,10 @@ fun BrowserScreen(
     if (currentUrl != lastRecordedUrl && currentUrl.isNotEmpty()) {
         lastRecordedUrl = currentUrl
         HistoryStore.record(currentUrl, pageTitle)
+    }
+
+    if (currentUrl.isNotEmpty() && pageTitle.isNotBlank()) {
+        HistoryStore.updateLatestTitle(currentUrl, pageTitle)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -152,6 +157,26 @@ fun BrowserScreen(
             sheetState = rememberModalBottomSheetState(),
         ) {
             NetworkInspectorSheet(onDismiss = { showNetworkInspector = false })
+        }
+    }
+
+    // Observe programmatic panel requests from the HTTP API
+    val activePanel by handlerContext.activePanel.collectAsState()
+    LaunchedEffect(activePanel) {
+        val panel = activePanel ?: return@LaunchedEffect
+        handlerContext.clearPanel()
+        // Dismiss any open sheet first
+        showSettings = false
+        showBookmarks = false
+        showHistory = false
+        showNetworkInspector = false
+        // Brief delay for Compose to process dismissals
+        kotlinx.coroutines.delay(400)
+        when (panel) {
+            "history" -> showHistory = true
+            "bookmarks" -> showBookmarks = true
+            "network-inspector" -> showNetworkInspector = true
+            "settings" -> showSettings = true
         }
     }
 }

@@ -6,6 +6,8 @@ import android.webkit.WebView
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -16,6 +18,12 @@ private val mainHandler = Handler(Looper.getMainLooper())
 class HandlerContext {
     var webView: WebView? = null
     val chromeAuth = com.mollotov.browser.browser.ChromeAuthHelper()
+
+    private val _activePanel = MutableStateFlow<String?>(null)
+    val activePanel: StateFlow<String?> = _activePanel
+
+    fun requestPanel(panel: String) { _activePanel.value = panel }
+    fun clearPanel() { _activePanel.value = null }
 
     suspend fun evaluateJS(script: String): String = suspendCoroutine { cont ->
         val wv = webView
