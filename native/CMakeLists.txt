@@ -18,3 +18,5 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 add_subdirectory(core-protocol)
 add_subdirectory(core-state)
+add_subdirectory(core-automation)
+add_subdirectory(core-mcp)
