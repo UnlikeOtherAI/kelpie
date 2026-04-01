@@ -66,22 +66,22 @@ inline std::string GenerateUuidV4() {
   std::uniform_int_distribution<int> nibble(0, 15);
   std::uniform_int_distribution<int> variant(8, 11);
 
-  std::array<int, 16> bytes{};
+  std::array<int, 32> nibbles{};
   {
     std::lock_guard<std::mutex> lock(random_mutex);
-    for (int& byte : bytes) {
-      byte = nibble(generator);
+    for (int& n : nibbles) {
+      n = nibble(generator);
     }
-    bytes[6] = 4;
-    bytes[8] = variant(generator);
+    nibbles[12] = 4;
+    nibbles[16] = variant(generator);
   }
 
   std::ostringstream stream;
-  for (std::size_t index = 0; index < bytes.size(); ++index) {
-    if (index == 4 || index == 6 || index == 8 || index == 10) {
+  for (std::size_t index = 0; index < nibbles.size(); ++index) {
+    if (index == 8 || index == 12 || index == 16 || index == 20) {
       stream << '-';
     }
-    stream << std::hex << std::nouppercase << bytes[index];
+    stream << std::hex << std::nouppercase << nibbles[index];
   }
   return stream.str();
 }

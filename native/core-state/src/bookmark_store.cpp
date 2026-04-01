@@ -33,10 +33,11 @@ void BookmarkStore::Add(const std::string& title, const std::string& url) {
 }
 
 void BookmarkStore::Remove(const std::string& id) {
+  const std::string normalized = store_support::Lowercase(id);
   std::lock_guard<std::mutex> lock(mutex_);
   bookmarks_.erase(
       std::remove_if(bookmarks_.begin(), bookmarks_.end(), [&](const Bookmark& bookmark) {
-        return bookmark.id == id;
+        return store_support::Lowercase(bookmark.id) == normalized;
       }),
       bookmarks_.end());
 }
