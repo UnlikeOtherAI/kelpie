@@ -36,7 +36,7 @@ describe('parseMonitoringMetadata', () => {
   it('round-trips through buildIssueBody', () => {
     const body = buildIssueBody(metadata, 'Release notes here.')
     const parsed = parseMonitoringMetadata(body)
-    expect(parsed).toMatchObject(metadata)
+    expect(parsed).toEqual(metadata)
   })
 
   it('returns null for a body without the metadata block', () => {
