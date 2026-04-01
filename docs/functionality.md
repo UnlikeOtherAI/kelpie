@@ -22,7 +22,7 @@ Works identically with real devices, iOS Simulators, and Android Emulators — a
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
-On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, and uses compact Safari-style rounded chrome with coloured browser-brand renderer switches. On Linux, the GTK shell now uses matching rounded toolbar chrome, a Chromium brand badge in the URL field, and the same warm orange floating menu treatment as the macOS app instead of stock GTK buttons.
+On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses compact Safari-style rounded chrome with coloured browser-brand renderer switches, and supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`. On Linux, the GTK shell now uses matching rounded toolbar chrome, a Chromium brand badge in the URL field, and the same warm orange floating menu treatment as the macOS app instead of stock GTK buttons.
 
 On Linux, the desktop shell runs in either GUI or headless mode. Both modes expose the same HTTP surface, advertise themselves over mDNS, persist profile-backed bookmarks/history/network/console state, support a persisted home page URL, and degrade cleanly when the CEF runtime is unavailable. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. GitHub Releases now attach distro-specific Linux runtime tarballs automatically when a release is published so users can download Linux builds directly from the release page.
 
@@ -108,7 +108,7 @@ API: `history-list` (with limit), `history-clear`.
 
 ## Floating Menu
 
-A 44-point circular flame button, vertically centered on the screen edge. Horizontally draggable — swipe it left or right so it's never in the way. Tap to expand a fan of six icon-only menu items: reload, Safari/Chrome auth, bookmarks, history, network inspector, and settings. Opens with a blur overlay behind it.
+A 44-point circular flame button, vertically centered on the screen edge. Horizontally draggable — swipe it left or right so it's never in the way. Tap to expand a fan of icon-only menu items in a wide half-circle: reload, Safari/Chrome auth, bookmarks, history, network inspector, and settings. On tablets, the fan also includes a phone icon that opens a pill picker anchored off that icon instead of toggling immediately. The picker uses the shared device-category selection (`Base`, `Pro`, `Plus`, `Max`, `Book`, `Book C`, `Flip`, `Flip C`, `Tri`), shows only the categories that fit the current tablet geometry, and tapping the active pill again returns the browser to full width. Opens with a blur overlay behind it.
 
 ## LLM-Optimised Queries
 
@@ -159,7 +159,11 @@ Read and write the device clipboard. On iOS, a system permission banner appears 
 
 Show or hide the soft keyboard, check its state, and see how it affects the visible viewport. Resize the viewport to simulate different screen conditions. Check whether a specific element is obscured (e.g., by the keyboard).
 
-On macOS, the browser window and the browser viewport are separate concepts. Device presets create a centered simulated viewport inside a shell with a fixed minimum size instead of resizing the whole window. The shell can grow larger, but never smaller than the configured minimum. The native titlebar uses the current page title, shows the live viewport resolution in a pill on the right, keeps smaller phone/tablet/laptop viewports centered inside a dark grey stage with a light border, lets oversized viewports scroll instead of shrinking them, persists the user-resized shell window size across launches, and shows the same first-launch welcome card used on iOS. The card can be reopened later from `Help > Show Welcome Screen` even if "Don't show this again" was previously enabled, and the same menu exposes links to the Mollotov website, the GitHub repository, and `unlikeotherai.com`. The floating menu shows custom short hover pills beside each action instead of native macOS tooltip strings, and its settings, bookmarks, history, and network entries now open native macOS sheets backed by the same stores and inspector data as iOS. The macOS bookmarks, history, and network sheets now use full-row hit targets rather than narrow text-only rows.
+On iPad and Android tablets, the browser shell also has a floating-menu phone viewport picker that stages the live browser view inside a centered device-class viewport instead of stretching edge to edge. The staged viewport honors the current tablet orientation: portrait uses a portrait frame, landscape uses a landscape frame, and the preset list only shows the shared category sizes that fit the current device geometry. When staged mode is active, a persistent black close button with a white border sits outside the browser frame at the upper-left, and a centered black summary pill sits above the viewport with clear spacing and shows the simulated inches band and pixel range.
+
+On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native titlebar uses the current page title, shows the live viewport resolution in a pill on the right, persists the user-resized shell window size across launches, and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets: `Compact / Base`, `Standard / Pro`, `Large / Plus`, `Ultra / Pro Max`, `Book Fold (Internal)`, `Book Fold (Cover)`, `Flip Fold (Internal)`, `Flip Fold (Cover)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Mollotov clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Mollotov website, the GitHub repository, and `unlikeotherai.com`. The floating menu shows custom short hover pills beside each action instead of native macOS tooltip strings, and its settings, bookmarks, history, and network entries now open native macOS sheets backed by the same stores and inspector data as iOS. The macOS bookmarks, history, and network sheets now use full-row hit targets rather than narrow text-only rows.
+
+The browser HTTP API and MCP now expose named viewport presets directly via `get-viewport-presets` / `set-viewport-preset` and `mollotov_get_viewport_presets` / `mollotov_set_viewport_preset`, so an LLM can inspect the current preset catalog and activate one of the shared device classes remotely. Linux does not support named viewport presets yet.
 
 ## Orientation Control
 
@@ -207,6 +211,10 @@ The CLI also manages local macOS browser aliases under `~/.mollotov`. `mollotov 
 ## Settings Panel
 
 Slides in from the floating menu. Shows device info (name, model, platform, OS, resolution), connection status (IP, port, mDNS advertising, HTTP server running), and copyable connection URLs. Port and device name are editable.
+
+On iOS and Android, the settings sheet also includes a `Help` section with the same support actions exposed on macOS: `Show Welcome Screen`, `Open Mollotov Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI`. `Show Welcome Screen` is an explicit help action and still opens the welcome card even if the user previously chose not to show it automatically on launch.
+
+On iPad, those same actions are also exposed directly from the app menu, immediately under the app `Settings` item, so keyboard-and-menu users do not need to open the settings sheet first.
 
 ## Dialogs
 

@@ -81,6 +81,72 @@ Response:
 }
 ```
 
+---
+
+## External Display Debug
+
+These methods exist to verify the iOS external-display sync flow without a real AirPlay target.
+
+### `debug-attach-local-tv`
+Create a debug-only local TV WebView and expose it on port `8421`, using the same sync path as the real external-display browser.
+
+```json
+POST /v1/debug-attach-local-tv
+
+Response:
+{
+  "success": true,
+  "connected": true,
+  "attachPath": "debug-local",
+  "port": 8421
+}
+```
+
+### `debug-detach-tv`
+Tear down the debug local TV WebView or any active external-display attachment.
+
+```json
+POST /v1/debug-detach-tv
+
+Response:
+{
+  "success": true,
+  "connected": false
+}
+```
+
+### `set-tv-sync`
+Enable or disable phone-to-TV sync programmatically. This drives the same state as the on-screen sync button.
+
+```json
+POST /v1/set-tv-sync
+{
+  "enabled": true
+}
+
+Response:
+{
+  "success": true,
+  "enabled": true,
+  "connected": true
+}
+```
+
+### `get-tv-sync`
+Read the current sync state and external-display attachment state.
+
+```json
+POST /v1/get-tv-sync
+
+Response:
+{
+  "success": true,
+  "enabled": true,
+  "connected": true,
+  "attachPath": "debug-local"
+}
+```
+
 ### `setHome`
 Set the device's home page URL. Persisted across app restarts.
 
@@ -481,6 +547,8 @@ Response:
 ### `getViewport`
 Get current viewport dimensions and device info.
 
+On macOS this reports the live hosted browser viewport, not the outer app window size. Preset device modes can therefore return a viewport smaller than the outer shell without resizing the native window.
+
 ```json
 POST /v1/get-viewport
 
@@ -492,6 +560,35 @@ Response:
   "platform": "ios",
   "deviceName": "iPhone 15 Pro",
   "orientation": "portrait"
+}
+```
+
+### `getViewportPresets`
+List the named viewport presets available for the current device or window geometry.
+
+On iPad and Android, this is only supported on tablets. Phones return `supportsViewportPresets: false`. On macOS this reports the shared preset catalog that fits the current shell window. Linux does not support named viewport presets yet.
+
+```json
+POST /v1/get-viewport-presets
+
+Response:
+{
+  "success": true,
+  "supportsViewportPresets": true,
+  "presets": [
+    {
+      "id": "compact-base",
+      "name": "Compact / Base",
+      "inches": "6.1\" - 6.3\"",
+      "pixels": "1170 x 2532 - 1206 x 2622",
+      "viewport": {
+        "portrait": {"width": 393, "height": 852},
+        "landscape": {"width": 852, "height": 393}
+      }
+    }
+  ],
+  "availablePresetIds": ["compact-base", "standard-pro", "large-plus"],
+  "activePresetId": "compact-base"
 }
 ```
 
@@ -569,6 +666,8 @@ All fields are best-effort — if a value is unavailable on the platform, it ret
 
 ### `getCapabilities`
 Get which API methods this browser instance supports. Enables capability negotiation — the CLI or LLM can check before sending commands that may not be available on a given platform/version.
+
+Named viewport preset support appears in the capability map as `viewportPresets`.
 
 ```json
 POST /v1/get-capabilities

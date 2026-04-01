@@ -4,6 +4,7 @@ import WebKit
 /// Handles cookies, storage, clipboard, dialogs, keyboard, viewport, and unsupported endpoints.
 struct BrowserManagementHandler {
     let context: HandlerContext
+    let viewportState: ViewportState
 
     func register(on router: Router) {
         // Cookies
@@ -28,6 +29,7 @@ struct BrowserManagementHandler {
         router.register("get-fullscreen") { _ in await getFullscreen() }
         router.register("resize-viewport") { body in await resizeViewport(body) }
         router.register("reset-viewport") { _ in await resetViewport() }
+        router.register("set-viewport-preset") { body in await setViewportPreset(body) }
         router.register("is-element-obscured") { body in await isElementObscured(body) }
 
         // Unsupported
@@ -212,14 +214,63 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func resizeViewport(_ body: [String: Any]) async -> [String: Any] {
-        let width = body["width"] as? Int ?? 390
-        let height = body["height"] as? Int ?? 844
-        return successResponse(["viewport": ["width": width, "height": height], "originalViewport": ["width": 390, "height": 844]])
+        let viewport = viewportState.resizeViewport(
+            width: body["width"] as? Int,
+            height: body["height"] as? Int
+        )
+        let stage = viewportState.fullStageDimensions
+
+        return successResponse([
+            "viewport": ["width": Int(viewport.width), "height": Int(viewport.height)],
+            "originalViewport": ["width": stage.width, "height": stage.height],
+            "activePresetId": NSNull(),
+        ])
     }
 
     @MainActor
     private func resetViewport() async -> [String: Any] {
-        return successResponse(["viewport": ["width": 390, "height": 844]])
+        let viewport = viewportState.resetViewport()
+        return successResponse([
+            "viewport": ["width": Int(viewport.width), "height": Int(viewport.height)],
+            "activePresetId": NSNull(),
+        ])
+    }
+
+    @MainActor
+    private func setViewportPreset(_ body: [String: Any]) async -> [String: Any] {
+        guard let presetID = body["presetId"] as? String, !presetID.isEmpty else {
+            return errorResponse(code: "MISSING_PARAM", message: "presetId is required")
+        }
+        guard let preset = macViewportPresets.first(where: { $0.id == presetID }) else {
+            return errorResponse(code: "INVALID_PARAM", message: "Unknown viewport preset id: \(presetID)")
+        }
+        guard viewportState.availablePresets.contains(where: { $0.id == presetID }) else {
+            return [
+                "success": false,
+                "error": [
+                    "code": "INVALID_PARAM",
+                    "message": "Viewport preset \(presetID) is not available for the current macOS window geometry",
+                    "reason": "unavailable",
+                ],
+            ]
+        }
+        guard let viewport = viewportState.selectPreset(presetID) else {
+            return errorResponse(code: "INVALID_PARAM", message: "Viewport preset \(presetID) could not be selected")
+        }
+
+        return successResponse([
+            "activePresetId": preset.id,
+            "preset": [
+                "id": preset.id,
+                "name": preset.name,
+                "inches": preset.displaySizeLabel,
+                "pixels": preset.pixelResolutionLabel,
+            ],
+            "viewport": [
+                "width": Int(viewport.width),
+                "height": Int(viewport.height),
+            ],
+        ])
     }
 
     @MainActor
