@@ -143,24 +143,65 @@ struct URLBarView: View {
 
     @ViewBuilder
     private var presetSwitch: some View {
-        Menu {
-            Button("Full") {
-                viewportState.selectFullViewport()
+        HStack(spacing: 6) {
+            orientationToggle
+                .disabled(viewportState.mode == .full)
+
+            deviceDropdown
+        }
+    }
+
+    @ViewBuilder
+    private var orientationToggle: some View {
+        AppKitSegmentedStrip(
+            items: [
+                AppKitSegmentedStrip.Item(
+                    id: ViewportOrientation.portrait.rawValue,
+                    systemImageName: "rectangle.portrait",
+                    accessibilityID: "browser.orientation.portrait",
+                    accessibilityLabel: "Portrait",
+                    width: 40,
+                    iconSize: 12
+                ),
+                AppKitSegmentedStrip.Item(
+                    id: ViewportOrientation.landscape.rawValue,
+                    systemImageName: "rectangle",
+                    accessibilityID: "browser.orientation.landscape",
+                    accessibilityLabel: "Landscape",
+                    width: 40,
+                    iconSize: 12
+                ),
+            ],
+            selectedID: viewportState.orientation.rawValue,
+            accessibilityID: "browser.orientation.switch",
+            isEnabled: viewportState.mode != .full,
+            onSelect: { id in
+                guard let o = ViewportOrientation(rawValue: id) else { return }
+                viewportState.selectOrientation(o)
             }
+        )
+        .frame(width: 90, height: 34)
+    }
 
+    @ViewBuilder
+    private var deviceDropdown: some View {
+        Menu {
+            Button("Full") { viewportState.selectFullViewport() }
             Divider()
-
-            ForEach(viewportState.availablePresets) { preset in
-                Button(preset.name) {
-                    _ = viewportState.selectPreset(preset.id)
+            ForEach(viewportState.availablePhonePresets) { preset in
+                Button(preset.menuLabel) { _ = viewportState.selectPreset(preset.id) }
+            }
+            if !viewportState.availableTabletPresets.isEmpty {
+                Divider()
+                ForEach(viewportState.availableTabletPresets) { preset in
+                    Button(preset.menuLabel) { _ = viewportState.selectPreset(preset.id) }
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Text(viewportState.selectedPresetMenuLabel)
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
-
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
@@ -177,7 +218,8 @@ struct URLBarView: View {
             )
         }
         .menuStyle(.borderlessButton)
-        .frame(width: 168, height: 34)
+        .fixedSize()
+        .frame(height: 34)
         .accessibilityIdentifier("browser.preset.switch")
     }
 
