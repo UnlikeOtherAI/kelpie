@@ -2,6 +2,8 @@
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
+For information about browser engine availability by platform and Apple's regulatory requirements for alternative engines, see [browser-engines.md](browser-engines.md).
+
 ---
 
 ## How It Works
@@ -12,13 +14,15 @@ No emulators, no cloud, no persistent scripts. Real browsers on real devices, fu
 
 ## Device Discovery
 
-Every running Mollotov app advertises itself via mDNS (`_mollotov._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address.
+Every running Mollotov app advertises itself via mDNS (`_mollotov._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose.
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
 
 ## Browser Control
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
+
+On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, and uses compact Safari-style rounded chrome with coloured browser-brand renderer switches.
 
 ### Safari / Chrome Authentication
 
@@ -30,7 +34,7 @@ Switch between Safari (WebKit) and Chrome (Chromium/CEF) rendering engines at ru
 
 ## External Display — Apple TV (iOS)
 
-When an iPhone or iPad running Mollotov connects to an Apple TV via AirPlay, the app automatically detects the external screen and displays a fullscreen WKWebView on it. This external browser appears as a separate device in mDNS discovery with the name "{device} (TV)" on port 8421, fully controllable from the CLI independently of the main device. No UI chrome — just the web content, controlled entirely via the API. When the AirPlay connection drops, the external server and window are torn down automatically.
+When an iPhone or iPad running Mollotov connects to an Apple TV via AirPlay, the app automatically detects the external screen and displays a fullscreen WKWebView on it. This external browser appears as a separate device in mDNS discovery with the name "{device} (TV)" on port 8421, fully controllable from the CLI independently of the main device. No UI chrome — just the web content, controlled entirely via the API. The phone UI also exposes a sync control that mirrors the phone browser onto the TV: page URL, cookies, storage-backed session state, and scroll position all stay aligned so the TV follows the same browsing session instead of acting like a separate login context. A landscape touchpad remote with a visible cursor and inertial swipe scrolling is also available. When the AirPlay connection drops, the external server and window are torn down automatically.
 
 ## Screenshots
 
@@ -76,9 +80,9 @@ Two levels of network visibility:
 
 A built-in network traffic viewer accessible from the floating menu. Captures all HTTP/HTTPS requests and responses flowing through the loaded website.
 
-**List view:** every request shows its HTTP method (GET, POST, PUT, DELETE, OPTIONS, etc.), URL, status code, content type, category, duration, and size. Filter by HTTP method, content type (JSON, HTML, CSS, JS, images, fonts), or search by URL.
+**List view:** every request shows its HTTP method (GET, POST, PUT, DELETE, OPTIONS, etc.), URL, status code, content type, category, duration, and size. The app now records the top-level page document alongside fetch/XHR traffic, so a normal page load always appears in the inspector. The in-app filter UI is intentionally simpler than the API: use one method dropdown (`All calls`, `GET`, `POST`, `PUT`, `DELETE`) plus URL search, while still showing category metadata on each row.
 
-**Detail view:** drill into any request to see the full picture — request method, URL, headers, query parameters, and body. Response status, headers, and body (formatted for JSON). Timing: start time, duration, bytes transferred.
+**Detail view:** drill into any request to see the full picture — request method, URL, headers, query parameters, and body. Response status, headers, and body (formatted for JSON). Timing: start time, duration, bytes transferred. On Android and Chromium-backed macOS views, top-level document rows may have partial metadata where the native web view does not expose a full response.
 
 **LLM integration:** the LLM can list and filter captured traffic, navigate to a specific request by index or URL pattern, and read its full details. When the user is viewing a specific request in the inspector, the LLM knows exactly which one and can debug it — inspecting headers, payloads, and response data.
 
@@ -92,7 +96,7 @@ API: `bookmarks-list`, `bookmarks-add`, `bookmarks-remove`, `bookmarks-clear`.
 
 ## History
 
-Chronological log of every URL navigated to. Auto-recorded as you browse, deduplicating consecutive identical URLs. Viewable from the floating menu, clearable by the user or via API. Stores up to 500 entries, persisted across restarts.
+Chronological log of every URL navigated to. Auto-recorded as you browse, deduplicating consecutive identical URLs. Viewable from the floating menu, clearable by the user or via API. Stores up to 500 entries, persisted across restarts. If a navigation is recorded before the page title settles, the latest history entry self-updates once the final title arrives, so rows do not stay blank or half-populated.
 
 API: `history-list` (with limit), `history-clear`.
 
@@ -149,6 +153,8 @@ Read and write the device clipboard. On iOS, a system permission banner appears 
 
 Show or hide the soft keyboard, check its state, and see how it affects the visible viewport. Resize the viewport to simulate different screen conditions. Check whether a specific element is obscured (e.g., by the keyboard).
 
+On macOS, the browser window and the browser viewport are separate concepts. Device presets create a centered simulated viewport inside a shell with a fixed minimum size instead of resizing the whole window. The shell can grow larger, but never smaller than the configured minimum. The native titlebar uses the current page title, shows the live viewport resolution in a pill on the right, keeps smaller phone/tablet/laptop viewports centered inside a dark grey stage with a light border, lets oversized viewports scroll instead of shrinking them, persists the user-resized shell window size across launches, and shows the same first-launch welcome card used on iOS. The card can be reopened later from `Help > Show Welcome Screen` even if "Don't show this again" was previously enabled, and the same menu exposes links to the Mollotov website, the GitHub repository, and `unlikeotherai.com`. The floating menu shows custom short hover pills beside each action instead of native macOS tooltip strings, and its settings, bookmarks, history, and network entries now open native macOS sheets backed by the same stores and inspector data as iOS. The macOS bookmarks, history, and network sheets now use full-row hit targets rather than narrow text-only rows.
+
 ## Orientation Control
 
 Lock the device to portrait, landscape, or auto-rotate. Query the current orientation and lock state.
@@ -159,7 +165,7 @@ Get comprehensive metadata: device ID, name, model, platform, OS version, screen
 
 ## Toast Messages
 
-Show a message overlay on the device screen — a blurred pill at the bottom that auto-dismisses after 3 seconds. Useful for feedback during automation ("Logging in..." or "Test passed"). Accessible via the `toast` endpoint.
+Show a message overlay on the device screen — a blurred pill at the bottom that auto-dismisses after 3 seconds. Useful for feedback during automation ("Logging in..." or "Test passed"). Accessible via the `toast` endpoint. On macOS the toast is rendered as a native shell card over the browser window instead of being injected into the page DOM.
 
 ## Group Commands
 
@@ -189,6 +195,8 @@ All MCP tools use the `mollotov_` prefix and include JSON schemas with descripti
 ## LLM Help System
 
 Every CLI command supports `--llm-help` for machine-readable documentation. `mollotov --llm-help` outputs the complete reference. `mollotov explain <command>` gives natural-language explanations. Designed so an LLM can teach itself the tool without human guidance.
+
+The CLI also manages local macOS browser aliases under `~/.mollotov`. `mollotov browser register <name>` creates a reusable local alias, `mollotov browser launch <name>` starts a fresh Mollotov.app instance for that alias on an explicit or auto-assigned port, and the rest of the CLI can target that launched instance via `--device <name>` without relying on network discovery alone. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
 ## Settings Panel
 

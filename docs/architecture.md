@@ -49,7 +49,7 @@ Mollotov is a two-component system: native browser apps on iOS, Android, and mac
 └────────────────┘    └────────────────┘    └────────────────┘    └───────────────┘
 ```
 
-For full tech stack details, see [tech-stack.md](tech-stack.md).
+For full tech stack details, see [tech-stack.md](tech-stack.md). For browser engine availability by platform and Apple regulatory requirements, see [browser-engines.md](browser-engines.md).
 
 ---
 

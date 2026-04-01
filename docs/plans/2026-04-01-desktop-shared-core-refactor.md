@@ -6,6 +6,8 @@
 
 **Recommendation:** Build a shared C++ core for browser-app logic and keep the current Swift/Kotlin code only as platform shells and renderer adapters where needed.
 
+**See Also:** [browser-engines.md](../browser-engines.md) — Complete guide to engine availability by platform, Apple regulatory requirements, and compliance strategy.
+
 ---
 
 ## Why This Refactor

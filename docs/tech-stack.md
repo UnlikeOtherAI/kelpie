@@ -17,7 +17,7 @@
 | Concern | Choice | Why |
 |---|---|---|
 | **UI Framework** | SwiftUI | Modern declarative UI, native performance |
-| **Browser Engine** | WKWebView | Only allowed engine on iOS; native screenshot + DOM APIs |
+| **Browser Engine** | WKWebView | Only allowed engine on iOS in most regions; native screenshot + DOM APIs. See [browser-engines.md](browser-engines.md) for EU/Japan/UK alternative engine support. |
 | **DOM Access** | WebKit Message Handlers + `evaluateJavaScript` via native bridge | Calls go through WKWebView's native API; some features require ephemeral bridge scripts |
 | **Screenshots** | `WKWebView.takeSnapshot(with:)` | Native API, no JS required |
 | **HTTP Server** | [Swifter](https://github.com/httpswift/swifter) or [Telegraph](https://github.com/nicklama/Telegraph) | Lightweight embedded HTTP server for receiving commands |
