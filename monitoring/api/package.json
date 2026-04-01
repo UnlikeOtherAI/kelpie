@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,5 +26,14 @@
     "ts-jest": "^29.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "jest": {
+    "extensionsToTreatAsEsm": [".ts"],
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", { "useESM": true }]
+    },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
   }
 }
