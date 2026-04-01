@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# Interactive iOS device / simulator picker for `make ios`.
-# Outputs a single line: "<udid_or_identifier>\t<type>"
+# iOS device / simulator picker for `make ios`.
+#
+# Usage:
+#   ios-select.sh              → interactive picker (auto-selects if only one option)
+#   ios-select.sh list         → print numbered list to stdout and exit
+#   ios-select.sh <udid>       → validate + use that identifier directly
+#
+# On success (non-list mode) outputs one line to stdout: "<udid>\t<type>"
 #   type = "simulator" | "device"
+#
 # Remembers last selection in .cache/ios-device.
 
 set -euo pipefail
@@ -9,24 +16,20 @@ set -euo pipefail
 CACHE_FILE="$(git rev-parse --show-toplevel 2>/dev/null || echo '.')/.cache/ios-device"
 mkdir -p "$(dirname "$CACHE_FILE")"
 
+ARG="${1:-}"
+
 # ── collect entries ────────────────────────────────────────────────────────────
-# Format: LABEL|ID|TYPE
+# Format per entry: "LABEL|ID|TYPE"
 
 entries=()
 
 # 1. Connected physical iPhones/iPads via devicectl.
-# Line format (space-padded columns):
-#   Name   Hostname   Identifier(UUID)   State   Model
-# Use grep to find lines with a UUID and "available", then iPhone/iPad.
+# Extract UUID with grep to avoid fighting with space-padded columns.
 while IFS= read -r line; do
-  # extract UUID (36-char hex with dashes)
   identifier=$(echo "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)
   [[ -z "$identifier" ]] && continue
-  # must be available
   echo "$line" | grep -qi "available" || continue
-  # must mention iPhone or iPad somewhere in the line
   echo "$line" | grep -qiE "iPhone|iPad" || continue
-  # Name is everything before the first long run of spaces (before hostname)
   name=$(echo "$line" | sed 's/  .*//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
   entries+=("${name} [device]|${identifier}|device")
 done < <(xcrun devicectl list devices 2>/dev/null | tail -n +3)
@@ -38,8 +41,8 @@ while IFS='|' read -r simname udid rt; do
   rt_short="$(echo "$rt" \
     | sed 's/com\.apple\.CoreSimulator\.SimRuntime\.//' \
     | sed 's/iOS-/iOS /' \
-    | sed 's/-/./g' \
-    | sed 's/\.[0-9]*$//')"
+    | sed 's/-[0-9]*$//' \
+    | sed 's/-/./g')"
   entries+=("${simname} (${rt_short} Simulator)|${udid}|simulator")
 done < <(
   python3 -c "
@@ -58,15 +61,51 @@ if [[ ${#entries[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# ── list mode ─────────────────────────────────────────────────────────────────
+if [[ "$ARG" == "list" ]]; then
+  printf "\n  Available iOS targets:\n\n"
+  for i in "${!entries[@]}"; do
+    label=$(echo "${entries[$i]}" | cut -d'|' -f1)
+    id=$(echo "${entries[$i]}" | cut -d'|' -f2)
+    printf "  %d. %s\n     %s\n\n" "$((i+1))" "$label" "$id"
+  done
+  exit 0
+fi
+
+# ── direct identifier mode ─────────────────────────────────────────────────────
+if [[ -n "$ARG" ]]; then
+  for entry in "${entries[@]}"; do
+    id_field=$(echo "$entry" | cut -d'|' -f2)
+    type_field=$(echo "$entry" | cut -d'|' -f3)
+    if [[ "$id_field" == "$ARG" ]]; then
+      echo "$id_field" > "$CACHE_FILE"
+      printf "%s\t%s\n" "$id_field" "$type_field"
+      exit 0
+    fi
+  done
+  echo "ERROR: '$ARG' not found in available devices/simulators. Run 'make ios list' to see options." >&2
+  exit 1
+fi
+
 # ── load last selection ────────────────────────────────────────────────────────
 last_id=""
 [[ -f "$CACHE_FILE" ]] && last_id=$(cat "$CACHE_FILE")
 
+# ── auto-select if only one option ────────────────────────────────────────────
+if [[ ${#entries[@]} -eq 1 ]]; then
+  id_field=$(echo "${entries[0]}" | cut -d'|' -f2)
+  type_field=$(echo "${entries[0]}" | cut -d'|' -f3)
+  label_field=$(echo "${entries[0]}" | cut -d'|' -f1)
+  echo "$id_field" > "$CACHE_FILE"
+  printf "  Auto-selected: %s\n\n" "$label_field" >&2
+  printf "%s\t%s\n" "$id_field" "$type_field"
+  exit 0
+fi
+
 # ── interactive picker ─────────────────────────────────────────────────────────
 default=0
 for i in "${!entries[@]}"; do
-  id_field=$(echo "${entries[$i]}" | cut -d'|' -f2)
-  if [[ "$id_field" == "$last_id" ]]; then
+  if [[ "$(echo "${entries[$i]}" | cut -d'|' -f2)" == "$last_id" ]]; then
     default=$i
     break
   fi
@@ -81,13 +120,8 @@ draw_menu() {
   for i in "${!entries[@]}"; do
     label=$(echo "${entries[$i]}" | cut -d'|' -f1)
     id_field=$(echo "${entries[$i]}" | cut -d'|' -f2)
-    if [[ $i -eq $selected ]]; then
-      prefix=" ▶ "
-    else
-      prefix="   "
-    fi
-    suffix=""
-    [[ "$id_field" == "$last_id" ]] && suffix="  (last)"
+    [[ $i -eq $selected ]] && prefix=" ▶ " || prefix="   "
+    suffix=""; [[ "$id_field" == "$last_id" ]] && suffix="  (last)"
     printf "  %s%d. %s%s\n" "$prefix" "$((i+1))" "$label" "$suffix" >&2
   done
   printf "\n" >&2
@@ -115,9 +149,7 @@ while true; do
   elif [[ "$k" =~ ^[1-9]$ ]]; then
     n=$(( k - 1 ))
     if [[ $n -lt $count ]]; then
-      selected=$n
-      draw_menu
-      break
+      selected=$n; draw_menu; break
     fi
   elif [[ "$k" == "q" || "$k" == $'\x03' ]]; then
     stty "$old_stty"
@@ -128,14 +160,10 @@ done
 
 stty "$old_stty"
 
-# ── output result ──────────────────────────────────────────────────────────────
-chosen="${entries[$selected]}"
-id_field=$(echo "$chosen" | cut -d'|' -f2)
-type_field=$(echo "$chosen" | cut -d'|' -f3)
-label_field=$(echo "$chosen" | cut -d'|' -f1)
+id_field=$(echo "${entries[$selected]}" | cut -d'|' -f2)
+type_field=$(echo "${entries[$selected]}" | cut -d'|' -f3)
+label_field=$(echo "${entries[$selected]}" | cut -d'|' -f1)
 
 echo "$id_field" > "$CACHE_FILE"
-
 printf "\n  ✓ Selected: %s\n\n" "$label_field" >&2
-
 printf "%s\t%s\n" "$id_field" "$type_field"
