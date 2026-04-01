@@ -97,6 +97,7 @@ struct URLBarView: View {
                 Text("−")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 30, height: 34)
+                    .contentShape(Rectangle())
             }
             .disabled(!viewportState.canScaleDown)
 
@@ -109,6 +110,7 @@ struct URLBarView: View {
                 Text("+")
                     .font(.system(size: 17, weight: .medium))
                     .frame(width: 30, height: 34)
+                    .contentShape(Rectangle())
             }
             .disabled(!viewportState.canScaleUp)
         }
