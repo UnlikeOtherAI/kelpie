@@ -40,11 +40,17 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height) {
 }
 
 void Win32Shell::Show(int show_command) {
+  if (hwnd_ == nullptr) {
+    return;
+  }
   ShowWindow(hwnd_, show_command);
   UpdateWindow(hwnd_);
 }
 
 void Win32Shell::UpdateBrowserState(const BrowserState& state) {
+  if (hwnd_ == nullptr) {
+    return;
+  }
   std::wstring url(state.url.begin(), state.url.end());
   url_bar_.SetUrl(url);
   url_bar_.SetNavigationState(state.can_go_back, state.can_go_forward, state.is_loading);
@@ -55,6 +61,9 @@ void Win32Shell::UpdateBrowserState(const BrowserState& state) {
 }
 
 void Win32Shell::ShowToast(const std::wstring& message) {
+  if (hwnd_ == nullptr) {
+    return;
+  }
   auto* payload = new std::wstring(message);
   PostMessageW(hwnd_, kToastMessage, 0, reinterpret_cast<LPARAM>(payload));
 }

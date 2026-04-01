@@ -108,9 +108,10 @@ int WindowsApp::Run(int show_command) {
   if (!InitializeBrowserRuntime()) {
     return 1;
   }
-  if (!CreateShell(show_command)) {
-    ShutdownBrowserRuntime();
-    return 1;
+  const bool has_shell = CreateShell(show_command);
+  if (!has_shell) {
+    // Shell creation failed (e.g. running under Wine without a display driver).
+    // Continue anyway so the HTTP server is still accessible.
   }
 
   browser_view_->LoadUrl(config_.initial_url);
@@ -118,13 +119,20 @@ int WindowsApp::Run(int show_command) {
   StartHttpServer();
   StartMdns();
 
-  MSG message{};
-  while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
-    TranslateMessage(&message);
-    DispatchMessageW(&message);
+  if (has_shell) {
+    MSG message{};
+    while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
+      TranslateMessage(&message);
+      DispatchMessageW(&message);
 #if defined(HAS_CEF)
-    CefDoMessageLoopWork();
+      CefDoMessageLoopWork();
 #endif
+    }
+  } else {
+    // No message loop — run headless-style until shutdown is requested.
+    while (running_) {
+      Sleep(100);
+    }
   }
 
   SaveStores();

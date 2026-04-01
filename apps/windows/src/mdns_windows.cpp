@@ -90,6 +90,29 @@ void MdnsWindows::Stop() {
 
 bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
 #if defined(_WIN32) && __has_include(<windns.h>)
+  // Load mDNS functions dynamically to avoid crashing on Wine or older Windows
+  // where DnsServiceConstructInstance is not implemented.
+  HMODULE dnsapi = GetModuleHandleW(L"DNSAPI.dll");
+  if (dnsapi == nullptr) {
+    dnsapi = LoadLibraryW(L"DNSAPI.dll");
+  }
+  if (dnsapi == nullptr) {
+    SetError("DNSAPI.dll not available");
+    return false;
+  }
+
+  using ConstructFn = PDNS_SERVICE_INSTANCE(WINAPI*)(PCWSTR, PCWSTR, PIP4_ADDRESS, PIP6_ADDRESS,
+                                                      WORD, WORD, WORD, DWORD, PCWSTR*, PCWSTR*);
+  using RegisterFn = DWORD(WINAPI*)(PDNS_SERVICE_REGISTER_REQUEST, PDNS_SERVICE_CANCEL);
+
+  auto construct = reinterpret_cast<ConstructFn>(GetProcAddress(dnsapi, "DnsServiceConstructInstance"));
+  auto reg = reinterpret_cast<RegisterFn>(GetProcAddress(dnsapi, "DnsServiceRegister"));
+
+  if (construct == nullptr || reg == nullptr) {
+    SetError("Native mDNS APIs not available (Wine or old Windows)");
+    return false;
+  }
+
   const std::wstring instance_name = Utf8ToWide(registration.instance_name);
   const auto keys = Utf8MapValues(registration.txt_records, true);
   const auto values = Utf8MapValues(registration.txt_records, false);
@@ -102,10 +125,10 @@ bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
     value_ptrs.push_back(value.c_str());
   }
   PDNS_SERVICE_INSTANCE instance =
-      DnsServiceConstructInstance(instance_name.c_str(), L"_mollotov._tcp.local", nullptr, nullptr,
-                                  static_cast<WORD>(registration.port), 0, 0,
-                                  static_cast<DWORD>(key_ptrs.size()), key_ptrs.data(),
-                                  value_ptrs.data());
+      construct(instance_name.c_str(), L"_mollotov._tcp.local", nullptr, nullptr,
+                static_cast<WORD>(registration.port), 0, 0,
+                static_cast<DWORD>(key_ptrs.size()), key_ptrs.data(),
+                value_ptrs.data());
   if (instance == nullptr) {
     SetError("DnsServiceConstructInstance failed");
     return false;
@@ -114,7 +137,7 @@ bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
   DNS_SERVICE_REGISTER_REQUEST request{};
   request.Version = DNS_QUERY_REQUEST_VERSION1;
   request.pServiceInstance = instance;
-  const DWORD status = DnsServiceRegister(&request, nullptr);
+  const DWORD status = reg(&request, nullptr);
   if (status != DNS_REQUEST_PENDING) {
     DnsServiceFreeInstance(instance);
     std::ostringstream stream;

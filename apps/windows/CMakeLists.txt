@@ -151,5 +151,5 @@ if(HAS_CEF)
 endif()
 
 if(MINGW)
-  target_link_options(mollotov PRIVATE -municode)
+  target_link_options(mollotov PRIVATE -municode -static -static-libgcc -static-libstdc++)
 endif()
