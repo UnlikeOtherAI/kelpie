@@ -22,7 +22,12 @@ export interface RunResult {
 }
 
 export async function runMonitoringAgent(deps: AgentDeps): Promise<RunResult> {
-  const client = new OpenAI({ apiKey: deps.llmApiKey, baseURL: deps.llmBaseUrl })
+  const isAnthropic = deps.llmBaseUrl.includes('anthropic.com')
+  const client = new OpenAI({
+    apiKey: deps.llmApiKey,
+    baseURL: deps.llmBaseUrl,
+    defaultHeaders: isAnthropic ? { 'anthropic-version': '2023-06-01' } : undefined,
+  })
   const executeTool = createToolExecutor(deps)
 
   const messages: ChatCompletionMessageParam[] = [
