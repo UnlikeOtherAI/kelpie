@@ -138,6 +138,7 @@
 		B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
 		C075E2F2B42D9EDE4C214300 /* CEFBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CEFBridge.h; sourceTree = "<group>"; };
 		C2D650BD3262369BC889CF36 /* Mollotov.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mollotov.entitlements; sourceTree = "<group>"; };
+		C59EB58D4C24405C996EFED9 /* MollotovHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MollotovHelper.entitlements; sourceTree = "<group>"; };
 		C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "FontAwesome6Brands-Regular.otf"; sourceTree = "<group>"; };
 		C92368DA5EFDB00C52250471 /* safari.svg */ = {isa = PBXFileReference; path = safari.svg; sourceTree = "<group>"; };
 		CCC3FD06DEFCCD993A28E73D /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
@@ -201,6 +202,7 @@
 			isa = PBXGroup;
 			children = (
 				DEC3C71320922D6D9C4E7DC4 /* main.mm */,
+				C59EB58D4C24405C996EFED9 /* MollotovHelper.entitlements */,
 			);
 			path = MollotovHelper;
 			sourceTree = "<group>";
@@ -514,7 +516,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "HELPER_EXE=\"${BUILT_PRODUCTS_DIR}/MollotovHelper\"\nHELPER_ROOT=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\n\nstage_helper() {\n  local helper_name=\"$1\"\n  local bundle_id=\"$2\"\n  local app_dir=\"${HELPER_ROOT}/${helper_name}.app\"\n  local exe_dir=\"${app_dir}/Contents/MacOS\"\n  local exe_path=\"${exe_dir}/${helper_name}\"\n  local plist_path=\"${app_dir}/Contents/Info.plist\"\n\n  mkdir -p \"$exe_dir\"\n  cp \"$HELPER_EXE\" \"$exe_path\"\n\n  /usr/libexec/PlistBuddy -c \"Clear dict\" \"$plist_path\" 2>/dev/null || true\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleExecutable string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleIdentifier string ${bundle_id}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleName string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundlePackageType string APPL\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string 1\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :LSUIElement bool true\" \"$plist_path\"\n\n  # Fix CEF framework path — helper is nested 4 levels deep from Frameworks/\n  install_name_tool -change \\\n    \"@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"$exe_path\" 2>/dev/null || true\n\n  codesign -fs - \"$exe_path\" 2>/dev/null || true\n  codesign -fs - \"$app_dir\" 2>/dev/null || true\n}\n\nrm -rf \\\n  \"${HELPER_ROOT}/Mollotov Helper.app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Renderer).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (GPU).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Plugin).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Alerts).app\"\n\nstage_helper \"Mollotov Helper\" \"com.mollotov.browser.helper\"\nstage_helper \"Mollotov Helper (Renderer)\" \"com.mollotov.browser.helper.renderer\"\nstage_helper \"Mollotov Helper (GPU)\" \"com.mollotov.browser.helper.gpu\"\nstage_helper \"Mollotov Helper (Plugin)\" \"com.mollotov.browser.helper.plugin\"\nstage_helper \"Mollotov Helper (Alerts)\" \"com.mollotov.browser.helper.alerts\"\n";
+			shellScript = "HELPER_EXE=\"${BUILT_PRODUCTS_DIR}/MollotovHelper\"\nHELPER_ROOT=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\n\nstage_helper() {\n  local helper_name=\"$1\"\n  local bundle_id=\"$2\"\n  local app_dir=\"${HELPER_ROOT}/${helper_name}.app\"\n  local exe_dir=\"${app_dir}/Contents/MacOS\"\n  local exe_path=\"${exe_dir}/${helper_name}\"\n  local plist_path=\"${app_dir}/Contents/Info.plist\"\n\n  mkdir -p \"$exe_dir\"\n  cp \"$HELPER_EXE\" \"$exe_path\"\n\n  /usr/libexec/PlistBuddy -c \"Clear dict\" \"$plist_path\" 2>/dev/null || true\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleExecutable string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleIdentifier string ${bundle_id}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleName string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundlePackageType string APPL\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string 1\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :LSUIElement bool true\" \"$plist_path\"\n\n  # Fix CEF framework path — helper is nested 4 levels deep from Frameworks/\n  install_name_tool -change \\\n    \"@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"$exe_path\" 2>/dev/null || true\n\n  codesign -fs - --entitlements \"${SRCROOT}/MollotovHelper/MollotovHelper.entitlements\" \"$exe_path\" 2>/dev/null || true\n  codesign -fs - --entitlements \"${SRCROOT}/MollotovHelper/MollotovHelper.entitlements\" \"$app_dir\" 2>/dev/null || true\n}\n\nrm -rf \\\n  \"${HELPER_ROOT}/Mollotov Helper.app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Renderer).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (GPU).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Plugin).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Alerts).app\"\n\nstage_helper \"Mollotov Helper\" \"com.mollotov.browser.helper\"\nstage_helper \"Mollotov Helper (Renderer)\" \"com.mollotov.browser.helper.renderer\"\nstage_helper \"Mollotov Helper (GPU)\" \"com.mollotov.browser.helper.gpu\"\nstage_helper \"Mollotov Helper (Plugin)\" \"com.mollotov.browser.helper.plugin\"\nstage_helper \"Mollotov Helper (Alerts)\" \"com.mollotov.browser.helper.alerts\"\n";
 		};
 		964C7525F2EA2B440ED6545F /* Fix CEF Framework Structure */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -718,6 +720,7 @@
 		B248942DD429D91E0A085CBF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MollotovHelper/MollotovHelper.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
@@ -734,6 +737,7 @@
 		B2886AAC7D6FB229079756D4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MollotovHelper/MollotovHelper.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
