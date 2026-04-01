@@ -1,21 +1,22 @@
 package com.mollotov.browser.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,19 +54,12 @@ fun NetworkInspectorSheet(onDismiss: () -> Unit) {
                 Text("Network", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 TextButton(onClick = { NetworkTrafficStore.clear() }) { Text("Clear") }
             }
-            // Filter chips
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                FilterChip(selected = methodFilter == null && categoryFilter == null, onClick = { methodFilter = null; categoryFilter = null }, label = { Text("All") })
-                listOf("GET", "POST", "PUT", "DELETE").forEach { m ->
-                    FilterChip(selected = methodFilter == m, onClick = { methodFilter = if (methodFilter == m) null else m }, label = { Text(m) })
-                }
-                listOf("JSON", "HTML", "JS", "CSS", "Image").forEach { c ->
-                    FilterChip(selected = categoryFilter == c, onClick = { categoryFilter = if (categoryFilter == c) null else c }, label = { Text(c) })
-                }
-            }
+            FilterRow(
+                methodFilter = methodFilter,
+                onMethodFilterChange = { methodFilter = it },
+                categoryFilter = categoryFilter,
+                onCategoryFilterChange = { categoryFilter = it },
+            )
             Spacer(Modifier.height(8.dp))
 
             val filtered = entries.withIndex().filter { (_, e) ->
@@ -74,7 +68,7 @@ fun NetworkInspectorSheet(onDismiss: () -> Unit) {
             }.toList()
 
             if (filtered.isEmpty()) {
-                Text("No requests captured.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No requests captured yet, including the page document.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 LazyColumn {
                     items(filtered.size) { i ->
@@ -116,6 +110,52 @@ fun NetworkInspectorSheet(onDismiss: () -> Unit) {
             }
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun FilterRow(
+    methodFilter: String?,
+    onMethodFilterChange: (String?) -> Unit,
+    categoryFilter: String?,
+    onCategoryFilterChange: (String?) -> Unit,
+) {
+    val methodOptions = listOf<String?>(null, "GET", "POST", "PUT", "DELETE")
+    val categoryOptions = listOf<String?>(null, "HTML", "JSON", "JS", "CSS", "Image", "Font", "XML", "Other")
+    var methodExpanded by remember { mutableStateOf(false) }
+    var categoryExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            OutlinedButton(onClick = { methodExpanded = true }, shape = RoundedCornerShape(8.dp)) {
+                Text(methodFilter ?: "All Methods")
+            }
+            DropdownMenu(expanded = methodExpanded, onDismissRequest = { methodExpanded = false }) {
+                methodOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option ?: "All Methods") },
+                        onClick = { onMethodFilterChange(option); methodExpanded = false },
+                    )
+                }
+            }
+        }
+        Box {
+            OutlinedButton(onClick = { categoryExpanded = true }, shape = RoundedCornerShape(8.dp)) {
+                Text(categoryFilter ?: "All Types")
+            }
+            DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
+                categoryOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option ?: "All Types") },
+                        onClick = { onCategoryFilterChange(option); categoryExpanded = false },
+                    )
+                }
+            }
+        }
     }
 }
 

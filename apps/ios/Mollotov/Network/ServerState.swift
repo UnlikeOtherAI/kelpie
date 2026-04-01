@@ -6,6 +6,8 @@ final class ServerState: ObservableObject {
     @Published var isServerRunning = false
     @Published var isMDNSAdvertising = false
     @Published var ipAddress: String = "0.0.0.0"
+    /// Set by the `show-panel` debug endpoint to open a UI panel programmatically.
+    @Published var activePanel: String?
 
     let deviceInfo: DeviceInfo
     let router = Router()
@@ -62,6 +64,19 @@ final class ServerState: ObservableObject {
             }
             await ctx.showToast(message)
             return successResponse(["message": message])
+        }
+
+        // Debug: open a UI panel programmatically (history, bookmarks, network-inspector, settings)
+        router.register("show-panel") { [weak self] body in
+            guard let panel = body["panel"] as? String else {
+                return errorResponse(code: "MISSING_PARAM", message: "panel is required")
+            }
+            let valid = ["history", "bookmarks", "network-inspector", "settings"]
+            guard valid.contains(panel) else {
+                return errorResponse(code: "INVALID_PARAM", message: "panel must be one of: \(valid.joined(separator: ", "))")
+            }
+            await MainActor.run { self?.activePanel = panel }
+            return successResponse(["panel": panel])
         }
 
         NavigationHandler(context: ctx).register(on: router)

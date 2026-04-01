@@ -37,11 +37,17 @@ fun BookmarksSheet(
             if (bookmarks.isNotEmpty()) {
                 TextButton(onClick = { BookmarkStore.clear() }) { Text("Clear All") }
             }
-            if (currentUrl.isNotEmpty() && !isCurrentPageBookmarked) {
+            if (currentUrl.isNotEmpty()) {
                 TextButton(onClick = {
-                    val title = currentTitle.ifEmpty { currentUrl }
-                    BookmarkStore.add(title, currentUrl)
-                }) { Text("Add") }
+                    if (isCurrentPageBookmarked) {
+                        bookmarks.firstOrNull { it.url == currentUrl }?.let {
+                            BookmarkStore.remove(it.id)
+                        }
+                    } else {
+                        val title = currentTitle.ifEmpty { currentUrl }
+                        BookmarkStore.add(title, currentUrl)
+                    }
+                }) { Text(if (isCurrentPageBookmarked) "Unbookmark" else "Add") }
             }
         }
         Spacer(Modifier.height(8.dp))

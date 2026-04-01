@@ -5,13 +5,13 @@ import WebKit
 struct BrowserView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var serverState: ServerState
+    @ObservedObject private var externalDisplayManager = ExternalDisplayManager.shared
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
     @State private var showNetworkInspector = false
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
-    @State private var webView: WKWebView?
     @AppStorage("debugOverlay") private var debugOverlayEnabled = false
     @State private var debugText = ""
     private let safariAuth = SafariAuthHelper()
@@ -20,14 +20,7 @@ struct BrowserView: View {
     // FAB side shared with TV controls (1 = right, -1 = left)
     @State private var fabSide: CGFloat = 1
 
-    // External display controls
-    @State private var externalDisplayConnected = false
-    @State private var syncEnabled = false
     @State private var touchpadMode = false
-
-    // Scroll sync — timer polls phone scroll position and syncs to TV
-    private let syncTimer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
-    @State private var lastSyncedY: CGFloat = -1
 
     var body: some View {
         ZStack {
@@ -37,15 +30,10 @@ struct BrowserView: View {
                 browserContent
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .externalDisplayConnectionChanged)) { _ in
-            externalDisplayConnected = ExternalDisplayManager.shared.isConnected
-            if !externalDisplayConnected {
-                syncEnabled = false
+        .onChange(of: externalDisplayManager.isConnected) { connected in
+            if !connected {
                 touchpadMode = false
             }
-        }
-        .onAppear {
-            externalDisplayConnected = ExternalDisplayManager.shared.isConnected
         }
     }
 
@@ -60,18 +48,16 @@ struct BrowserView: View {
 
                 URLBarView(
                     browserState: browserState,
-                    onNavigate: { url in
-                        guard let webView, let urlObj = URL(string: url) else { return }
-                        webView.load(URLRequest(url: urlObj))
-                    },
-                    onBack: { webView?.goBack() },
-                    onForward: { webView?.goForward() }
+                    onNavigate: navigate,
+                    onBack: goBack,
+                    onForward: goForward
                 )
 
                 WebViewContainer(browserState: browserState, handlerContext: serverState.handlerContext) { wv in
-                    webView = wv
+                    browserState.webView = wv
                     serverState.webView = wv
                     serverState.handlerContext.webView = wv
+                    externalDisplayManager.setPhoneWebView(wv)
                 }
             }
 
@@ -82,11 +68,8 @@ struct BrowserView: View {
             }
 
             FloatingMenuView(
-                onReload: { webView?.reload() },
-                onSafariAuth: {
-                    guard let webView, let url = webView.url else { return }
-                    safariAuth.authenticate(url: url, webView: webView)
-                },
+                onReload: reload,
+                onSafariAuth: authenticateInSafari,
                 onSettings: { showSettings = true },
                 onBookmarks: { showBookmarks = true },
                 onHistory: { showHistory = true },
@@ -94,10 +77,13 @@ struct BrowserView: View {
                 side: $fabSide
             )
 
-            if externalDisplayConnected {
+            if externalDisplayManager.isConnected {
                 TVControlsView(
                     fabSide: fabSide,
-                    syncEnabled: $syncEnabled,
+                    syncEnabled: Binding(
+                        get: { externalDisplayManager.isSyncEnabled },
+                        set: { externalDisplayManager.setSyncEnabled($0) }
+                    ),
                     onTouchpad: { enterTouchpadMode() }
                 )
             }
@@ -115,17 +101,13 @@ struct BrowserView: View {
         }
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
-        .onReceive(syncTimer) { _ in pollScrollSync() }
         .ignoresSafeArea(.container, edges: .bottom)
         .onChange(of: browserState.currentURL) { newURL in
             HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
-            syncURLToTV(newURL)
+            externalDisplayManager.triggerSyncPass()
         }
-        .onChange(of: syncEnabled) { enabled in
-            if enabled, let webView, let url = webView.url {
-                syncURLToTV(url.absoluteString)
-            }
-            if !enabled { lastSyncedY = -1 }
+        .onChange(of: browserState.pageTitle) { newTitle in
+            HistoryStore.shared.updateLatestTitle(for: browserState.currentURL, title: newTitle)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(serverState: serverState)
@@ -134,49 +116,56 @@ struct BrowserView: View {
             BookmarksView(
                 currentTitle: browserState.pageTitle,
                 currentURL: browserState.currentURL,
-                onNavigate: { url in
-                    guard let webView, let urlObj = URL(string: url) else { return }
-                    webView.load(URLRequest(url: urlObj))
-                }
+                onNavigate: navigate
             )
         }
         .sheet(isPresented: $showHistory) {
-            HistoryView(onNavigate: { url in
-                guard let webView, let urlObj = URL(string: url) else { return }
-                webView.load(URLRequest(url: urlObj))
-            })
+            HistoryView(onNavigate: navigate)
         }
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
         }
-    }
-
-    // MARK: - Scroll Sync
-
-    private func pollScrollSync() {
-        guard syncEnabled, let webView else { return }
-        let y = webView.scrollView.contentOffset.y
-        guard y != lastSyncedY else { return }
-        lastSyncedY = y
-
-        let sv = webView.scrollView
-        let maxScroll = sv.contentSize.height - sv.bounds.height
-        guard maxScroll > 0 else { return }
-        let ratio = min(max(y / maxScroll, 0), 1)
-
-        guard let tvWV = ExternalDisplayManager.shared.serverState?.handlerContext.webView else { return }
-        tvWV.evaluateJavaScript(
-            "window.scrollTo(0,\(ratio)*Math.max(document.documentElement.scrollHeight-window.innerHeight,0))"
-        )
-    }
-
-    private func syncURLToTV(_ urlString: String) {
-        guard syncEnabled,
-              let tvWV = ExternalDisplayManager.shared.serverState?.handlerContext.webView,
-              let url = URL(string: urlString) else { return }
-        if tvWV.url?.absoluteString != urlString {
-            tvWV.load(URLRequest(url: url))
+        .onChange(of: serverState.activePanel) { panel in
+            guard let panel else { return }
+            serverState.activePanel = nil
+            // Dismiss any open sheet first
+            showHistory = false
+            showBookmarks = false
+            showNetworkInspector = false
+            showSettings = false
+            // Delay to let SwiftUI dismiss, then present the new sheet
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                switch panel {
+                case "history": showHistory = true
+                case "bookmarks": showBookmarks = true
+                case "network-inspector": showNetworkInspector = true
+                case "settings": showSettings = true
+                default: break
+                }
+            }
         }
+    }
+
+    private func navigate(_ urlString: String) {
+        guard let webView = browserState.webView, let url = URL(string: urlString) else { return }
+        webView.load(URLRequest(url: url))
+    }
+
+    private func goBack() {
+        browserState.webView?.goBack()
+    }
+
+    private func goForward() {
+        browserState.webView?.goForward()
+    }
+
+    private func reload() {
+        browserState.webView?.reload()
+    }
+
+    private func authenticateInSafari() {
+        guard let webView = browserState.webView, let url = webView.url else { return }
+        safariAuth.authenticate(url: url, webView: webView)
     }
 
     // MARK: - Touchpad Mode
@@ -210,7 +199,7 @@ struct BrowserView: View {
             lines.append("scr[\(i)] \(Int(o.x)),\(Int(o.y)) \(Int(s.bounds.width))x\(Int(s.bounds.height)) @\(Int(s.scale))x nat=\(Int(s.nativeScale))x mir=\(s.mirrored != nil)")
         }
 
-        lines.append("ext: \(mgr.isConnected ? "ON" : "off") sync=\(syncEnabled)")
+        lines.append("ext: \(mgr.isConnected ? "ON" : "off") sync=\(mgr.isSyncEnabled)")
 
         if let win = mgr.externalWindow {
             let wf = win.frame

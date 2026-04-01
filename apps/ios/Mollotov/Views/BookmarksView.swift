@@ -45,6 +45,7 @@ struct BookmarksView: View {
                                         .lineLimit(1)
                                 }
                             }
+                            .accessibilityIdentifier("browser.bookmarks.row.\(bookmark.id.uuidString)")
                         }
                         .onDelete { offsets in
                             for i in offsets {
@@ -59,19 +60,28 @@ struct BookmarksView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
+                        .accessibilityIdentifier("browser.bookmarks.done")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         if !store.bookmarks.isEmpty {
                             Button("Clear All", role: .destructive) { store.removeAll() }
+                                .accessibilityIdentifier("browser.bookmarks.clear-all")
                         }
-                        if !currentURL.isEmpty && !isCurrentPageBookmarked {
+                        if !currentURL.isEmpty {
                             Button {
-                                let title = currentTitle.isEmpty ? currentURL : currentTitle
-                                store.add(title: title, url: currentURL)
+                                if isCurrentPageBookmarked {
+                                    if let bookmark = store.bookmarks.first(where: { $0.url == currentURL }) {
+                                        store.remove(id: bookmark.id)
+                                    }
+                                } else {
+                                    let title = currentTitle.isEmpty ? currentURL : currentTitle
+                                    store.add(title: title, url: currentURL)
+                                }
                             } label: {
-                                Image(systemName: "plus")
+                                Image(systemName: isCurrentPageBookmarked ? "bookmark.fill" : "plus")
                             }
+                            .accessibilityIdentifier("browser.bookmarks.toggle-current")
                         }
                     }
                 }

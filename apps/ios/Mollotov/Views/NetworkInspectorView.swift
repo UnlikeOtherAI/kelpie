@@ -8,6 +8,9 @@ struct NetworkInspectorView: View {
     @State private var categoryFilter: String?
     @State private var searchText = ""
 
+    private let methodOptions = ["GET", "POST", "PUT", "DELETE"]
+    private let categoryOptions = ["HTML", "JSON", "JS", "CSS", "Image", "Font", "XML", "Other"]
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -20,7 +23,7 @@ struct NetworkInspectorView: View {
                             .foregroundColor(.secondary)
                         Text("No Requests")
                             .font(.headline)
-                        Text("Network traffic will appear here as pages load.")
+                        Text("Network traffic will appear here as pages load, including the page document itself.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -59,51 +62,40 @@ struct NetworkInspectorView: View {
     }
 
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                filterChip("All", active: methodFilter == nil && categoryFilter == nil) {
-                    methodFilter = nil; categoryFilter = nil
-                }
-                Group {
-                    filterChip("GET", active: methodFilter == "GET") { toggleMethod("GET") }
-                    filterChip("POST", active: methodFilter == "POST") { toggleMethod("POST") }
-                    filterChip("PUT", active: methodFilter == "PUT") { toggleMethod("PUT") }
-                    filterChip("DELETE", active: methodFilter == "DELETE") { toggleMethod("DELETE") }
-                }
-                Divider().frame(height: 20)
-                Group {
-                    filterChip("JSON", active: categoryFilter == "JSON") { toggleCategory("JSON") }
-                    filterChip("HTML", active: categoryFilter == "HTML") { toggleCategory("HTML") }
-                    filterChip("JS", active: categoryFilter == "JS") { toggleCategory("JS") }
-                    filterChip("CSS", active: categoryFilter == "CSS") { toggleCategory("CSS") }
-                    filterChip("Image", active: categoryFilter == "Image") { toggleCategory("Image") }
+        HStack(spacing: 12) {
+            Picker("Method", selection: selectedMethodBinding) {
+                Text("All Methods").tag("ALL")
+                ForEach(methodOptions, id: \.self) { method in
+                    Text(method).tag(method)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .pickerStyle(.menu)
+            Picker("Category", selection: selectedCategoryBinding) {
+                Text("All Types").tag("ALL")
+                ForEach(categoryOptions, id: \.self) { cat in
+                    Text(cat).tag(cat)
+                }
+            }
+            .pickerStyle(.menu)
+            Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(Color(.systemGroupedBackground))
     }
 
-    private func toggleMethod(_ m: String) {
-        methodFilter = methodFilter == m ? nil : m
+    private var selectedMethodBinding: Binding<String> {
+        Binding(
+            get: { methodFilter ?? "ALL" },
+            set: { methodFilter = $0 == "ALL" ? nil : $0 }
+        )
     }
 
-    private func toggleCategory(_ c: String) {
-        categoryFilter = categoryFilter == c ? nil : c
-    }
-
-    private func filterChip(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption)
-                .fontWeight(active ? .semibold : .regular)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(active ? Color.accentColor : Color(.tertiarySystemFill))
-                .foregroundColor(active ? .white : .primary)
-                .clipShape(Capsule())
-        }
+    private var selectedCategoryBinding: Binding<String> {
+        Binding(
+            get: { categoryFilter ?? "ALL" },
+            set: { categoryFilter = $0 == "ALL" ? nil : $0 }
+        )
     }
 
     private func requestRow(_ entry: NetworkTrafficStore.TrafficEntry) -> some View {
