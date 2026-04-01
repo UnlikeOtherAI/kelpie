@@ -19,6 +19,7 @@ MACOS_PROJECT := apps/macos/Mollotov.xcodeproj
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 CLI_DIR       := packages/cli
+LINUX_CEF_ROOT := $(HOME)/.cache/mollotov/cef/linux64-current
 
 # ── CLI-style subcommand forwarding ───────────────────────────────────────────
 # Allows:  make ios [list|<udid>]
@@ -187,9 +188,17 @@ linux:
 		echo "✗ apps/linux/CMakeLists.txt not found"; \
 		exit 1; \
 	fi
-	cmake -S native -B native/.build-linux -G Ninja
-	cmake --build native/.build-linux
-	cmake -S apps/linux -B apps/linux/build -G Ninja -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux
+	@if [ -d "$(LINUX_CEF_ROOT)" ]; then \
+		echo "→ Using Linux CEF SDK at $(LINUX_CEF_ROOT)"; \
+		cmake -S native -B native/.build-linux -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DMOLLOTOV_ENABLE_CHROMIUM_DESKTOP=ON; \
+		cmake --build native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+	else \
+		echo "→ No Linux CEF SDK found at $(LINUX_CEF_ROOT); building fallback renderer"; \
+		cmake -S native -B native/.build-linux -G Ninja; \
+		cmake --build native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+	fi
 	cmake --build apps/linux/build
 
 linux-headless-docker:

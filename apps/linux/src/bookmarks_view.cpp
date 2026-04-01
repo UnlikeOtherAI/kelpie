@@ -12,6 +12,9 @@ BookmarksView::BookmarksView(LinuxApp& app) : app_(app) {
 #if MOLLOTOV_LINUX_HAS_GTK
   root_ = gtk_scrolled_window_new(nullptr, nullptr);
   list_ = gtk_list_box_new();
+  gtk_widget_set_hexpand(root_, TRUE);
+  gtk_widget_set_vexpand(root_, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(root_), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
   gtk_container_add(GTK_CONTAINER(root_), list_);
 #endif
 }

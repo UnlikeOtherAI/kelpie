@@ -23,7 +23,10 @@ class UrlBar {
   GtkWidget* back_button_ = nullptr;
   GtkWidget* forward_button_ = nullptr;
   GtkWidget* reload_button_ = nullptr;
+  GtkWidget* brand_badge_ = nullptr;
+  GtkWidget* entry_shell_ = nullptr;
   GtkWidget* entry_ = nullptr;
+  bool editing_ = false;
 };
 
 }  // namespace mollotov::linuxapp

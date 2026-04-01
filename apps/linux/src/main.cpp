@@ -3,6 +3,7 @@
 #include <string>
 
 #include "linux_app.h"
+#include "mollotov/cef_app_factory.h"
 
 #if MOLLOTOV_LINUX_HAS_CEF
 #include "include/cef_app.h"
@@ -44,7 +45,8 @@ void PrintHelp() {
 int main(int argc, char* argv[]) {
 #if MOLLOTOV_LINUX_HAS_CEF
   CefMainArgs main_args(argc, argv);
-  const int subprocess_code = CefExecuteProcess(main_args, nullptr, nullptr);
+  CefRefPtr<CefApp> cef_app = mollotov::CreateDesktopCefApp();
+  const int subprocess_code = CefExecuteProcess(main_args, cef_app, nullptr);
   if (subprocess_code >= 0) {
     return subprocess_code;
   }

@@ -35,6 +35,8 @@ std::optional<std::string> FilterValue(GtkComboBoxText* combo) {
 NetworkInspector::NetworkInspector(LinuxApp& app) : app_(app) {
 #if MOLLOTOV_LINUX_HAS_GTK
   root_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_hexpand(root_, TRUE);
+  gtk_widget_set_vexpand(root_, TRUE);
   GtkWidget* filters = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_box_pack_start(GTK_BOX(root_), filters, FALSE, FALSE, 0);
 
@@ -76,6 +78,9 @@ NetworkInspector::NetworkInspector(LinuxApp& app) : app_(app) {
                                               gtk_cell_renderer_text_new(), "text", 5, nullptr);
 
   GtkWidget* scroll = gtk_scrolled_window_new(nullptr, nullptr);
+  gtk_widget_set_hexpand(scroll, TRUE);
+  gtk_widget_set_vexpand(scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
   gtk_container_add(GTK_CONTAINER(scroll), tree);
   gtk_box_pack_start(GTK_BOX(root_), scroll, TRUE, TRUE, 0);
 

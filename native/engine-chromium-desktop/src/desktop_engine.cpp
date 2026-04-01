@@ -8,30 +8,42 @@
 #include "include/cef_app.h"
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
-#include "include/cef_command_line.h"
 #include "include/cef_render_handler.h"
+#include "mollotov/cef_app_factory.h"
 #include "mollotov/desktop_bridge.h"
 
 namespace mollotov {
-namespace {
 
-class DesktopEngineImpl;
+class DesktopCefClient;
 
-class DesktopCefApp final : public CefApp, public CefBrowserProcessHandler {
+class DesktopEngine::Impl {
  public:
-  explicit DesktopCefApp(DesktopEngineImpl* owner) : owner_(owner) {}
+  explicit Impl(CefRenderer* renderer);
 
-  CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
+  bool Initialize(const DesktopEngine::Config& next_config);
+  void Shutdown();
+  void DoMessageLoopWork();
+  std::string EvaluateJs(const std::string& script);
 
-  void OnBeforeCommandLineProcessing(const CefString&,
-                                     CefRefPtr<CefCommandLine> command_line) override {
-    command_line->AppendSwitch("use-mock-keychain");
-  }
+  DesktopEngine::ViewportState viewport;
+  DesktopEngine::Config config;
+  CefRenderer* renderer = nullptr;
+  CefRefPtr<CefApp> app;
+  CefRefPtr<DesktopCefClient> client;
+  CefRefPtr<CefBrowser> browser;
 
- private:
-  DesktopEngineImpl* owner_;
+  DesktopEngine::JsonEventSink console_sink;
+  DesktopEngine::JsonEventSink network_sink;
+  DesktopEngine::NavigationSink navigation_sink;
 
-  IMPLEMENT_REFCOUNTING(DesktopCefApp);
+  bool initialized = false;
+  bool loading = false;
+  bool can_go_back = false;
+  bool can_go_forward = false;
+  std::string current_url = "about:blank";
+  std::string current_title;
+  std::vector<std::uint8_t> snapshot_bytes;
+  std::mutex mutex;
 };
 
 class DesktopCefClient final : public CefClient,
@@ -40,7 +52,7 @@ class DesktopCefClient final : public CefClient,
                                public CefDisplayHandler,
                                public CefRenderHandler {
  public:
-  explicit DesktopCefClient(DesktopEngineImpl* owner) : owner_(owner) {}
+  explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
 
   CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
@@ -63,7 +75,7 @@ class DesktopCefClient final : public CefClient,
                         const CefString& source,
                         int line) override;
 
-  bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
+  void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
   void OnPaint(CefRefPtr<CefBrowser> browser,
                PaintElementType type,
                const RectList& dirty_rects,
@@ -72,147 +84,132 @@ class DesktopCefClient final : public CefClient,
                int height) override;
 
  private:
-  DesktopEngineImpl* owner_;
+  DesktopEngine::Impl* owner_;
 
   IMPLEMENT_REFCOUNTING(DesktopCefClient);
 };
 
-class DesktopEngineImpl {
- public:
-  explicit DesktopEngineImpl(CefRenderer* renderer) : renderer(renderer) {}
+DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}
 
-  bool Initialize(const DesktopEngine::Config& next_config) {
-    if (initialized) {
-      return true;
-    }
-
-    config = next_config;
-    viewport.width = std::max(1, config.viewport.width);
-    viewport.height = std::max(1, config.viewport.height);
-    viewport.offscreen = config.mode == DesktopEngine::Mode::kOffscreen;
-
-    app = new DesktopCefApp(this);
-    client = new DesktopCefClient(this);
-
-    CefMainArgs main_args;
-    CefSettings settings;
-    settings.no_sandbox = true;
-    settings.windowless_rendering_enabled =
-        config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
-    settings.external_message_pump = config.external_message_pump ? 1 : 0;
-    if (!config.cache_path.empty()) {
-      CefString(&settings.cache_path) = config.cache_path;
-    }
-    if (!config.user_agent.empty()) {
-      CefString(&settings.user_agent) = config.user_agent;
-    }
-
-    initialized = CefInitialize(main_args, settings, app.get(), nullptr);
-    if (!initialized) {
-      return false;
-    }
-
-    CefWindowInfo window_info;
-    if (config.mode == DesktopEngine::Mode::kOffscreen) {
-      window_info.SetAsWindowless(nullptr);
-    } else if (config.configure_window_info) {
-      config.configure_window_info(static_cast<void*>(&window_info));
-    } else {
-      return false;
-    }
-
-    CefBrowserSettings browser_settings;
-    browser = CefBrowserHost::CreateBrowserSync(
-        window_info,
-        client.get(),
-        config.initial_url.empty() ? "about:blank" : config.initial_url,
-        browser_settings,
-        nullptr,
-        nullptr);
-
-    renderer->SetCallbacks({
-        [this](const std::string& script) { return EvaluateJs(script); },
-        [this]() { return snapshot_bytes; },
-        [this](const std::string& url) {
-          if (browser && browser->GetMainFrame()) {
-            browser->GetMainFrame()->LoadURL(url);
-            current_url = url;
-          }
-        },
-        [this]() { return current_url; },
-        [this]() { return current_title; },
-        [this]() { return loading; },
-        [this]() { return can_go_back; },
-        [this]() { return can_go_forward; },
-        [this]() {
-          if (browser) {
-            browser->GoBack();
-          }
-        },
-        [this]() {
-          if (browser) {
-            browser->GoForward();
-          }
-        },
-        [this]() {
-          if (browser) {
-            browser->Reload();
-          }
-        },
-    });
-
-    return browser != nullptr;
+bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
+  if (initialized) {
+    return true;
   }
 
-  void Shutdown() {
-    if (!initialized) {
-      return;
-    }
-    if (browser && browser->GetHost()) {
-      browser->GetHost()->CloseBrowser(true);
-    }
-    browser = nullptr;
-    client = nullptr;
-    app = nullptr;
-    CefShutdown();
-    initialized = false;
+  config = next_config;
+  viewport.width = std::max(1, config.viewport.width);
+  viewport.height = std::max(1, config.viewport.height);
+  viewport.offscreen = config.mode == DesktopEngine::Mode::kOffscreen;
+
+  app = CreateDesktopCefApp();
+  client = new DesktopCefClient(this);
+
+  CefMainArgs main_args(config.argc, config.argv);
+  CefSettings settings;
+  settings.no_sandbox = true;
+  settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
+  settings.external_message_pump = config.external_message_pump ? 1 : 0;
+  if (!config.cache_path.empty()) {
+    CefString(&settings.cache_path) = config.cache_path;
+  }
+  if (!config.user_agent.empty()) {
+    CefString(&settings.user_agent) = config.user_agent;
+  }
+  if (!config.browser_subprocess_path.empty()) {
+    CefString(&settings.browser_subprocess_path) = config.browser_subprocess_path;
+  }
+  if (!config.resources_dir_path.empty()) {
+    CefString(&settings.resources_dir_path) = config.resources_dir_path;
+  }
+  if (!config.locales_dir_path.empty()) {
+    CefString(&settings.locales_dir_path) = config.locales_dir_path;
   }
 
-  void DoMessageLoopWork() {
-    if (initialized && config.external_message_pump) {
-      CefDoMessageLoopWork();
-    }
+  initialized = CefInitialize(main_args, settings, app.get(), nullptr);
+  if (!initialized) {
+    return false;
   }
 
-  std::string EvaluateJs(const std::string& script) {
-    if (!browser || !browser->GetMainFrame()) {
-      return std::string();
-    }
-    CefRefPtr<CefFrame> frame = browser->GetMainFrame();
-    frame->ExecuteJavaScript(script, frame->GetURL(), 0);
+  CefWindowInfo window_info;
+  if (config.mode == DesktopEngine::Mode::kOffscreen) {
+    window_info.SetAsWindowless(0);
+  } else if (config.configure_window_info) {
+    config.configure_window_info(static_cast<void*>(&window_info));
+  } else {
+    return false;
+  }
+
+  CefBrowserSettings browser_settings;
+  browser = CefBrowserHost::CreateBrowserSync(
+      window_info,
+      client.get(),
+      config.initial_url.empty() ? "about:blank" : config.initial_url,
+      browser_settings,
+      nullptr,
+      nullptr);
+
+  renderer->SetCallbacks({
+      [this](const std::string& script) { return EvaluateJs(script); },
+      [this]() { return snapshot_bytes; },
+      [this](const std::string& url) {
+        if (browser && browser->GetMainFrame()) {
+          browser->GetMainFrame()->LoadURL(url);
+          current_url = url;
+        }
+      },
+      [this]() { return current_url; },
+      [this]() { return current_title; },
+      [this]() { return loading; },
+      [this]() { return can_go_back; },
+      [this]() { return can_go_forward; },
+      [this]() {
+        if (browser) {
+          browser->GoBack();
+        }
+      },
+      [this]() {
+        if (browser) {
+          browser->GoForward();
+        }
+      },
+      [this]() {
+        if (browser) {
+          browser->Reload();
+        }
+      },
+  });
+
+  return browser != nullptr;
+}
+
+void DesktopEngine::Impl::Shutdown() {
+  if (!initialized) {
+    return;
+  }
+  if (browser && browser->GetHost()) {
+    browser->GetHost()->CloseBrowser(true);
+  }
+  browser = nullptr;
+  client = nullptr;
+  app = nullptr;
+  CefShutdown();
+  initialized = false;
+}
+
+void DesktopEngine::Impl::DoMessageLoopWork() {
+  if (initialized && config.external_message_pump) {
+    CefDoMessageLoopWork();
+  }
+}
+
+std::string DesktopEngine::Impl::EvaluateJs(const std::string& script) {
+  if (!browser || !browser->GetMainFrame()) {
     return std::string();
   }
-
-  DesktopEngine::ViewportState viewport;
-  DesktopEngine::Config config;
-  CefRenderer* renderer = nullptr;
-  CefRefPtr<DesktopCefApp> app;
-  CefRefPtr<DesktopCefClient> client;
-  CefRefPtr<CefBrowser> browser;
-
-  DesktopEngine::JsonEventSink console_sink;
-  DesktopEngine::JsonEventSink network_sink;
-  DesktopEngine::NavigationSink navigation_sink;
-
-  bool initialized = false;
-  bool loading = false;
-  bool can_go_back = false;
-  bool can_go_forward = false;
-  std::string current_url = "about:blank";
-  std::string current_title;
-  std::vector<std::uint8_t> snapshot_bytes;
-  std::mutex mutex;
-};
+  CefRefPtr<CefFrame> frame = browser->GetMainFrame();
+  frame->ExecuteJavaScript(script, frame->GetURL(), 0);
+  return std::string();
+}
 
 void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
   owner_->browser = browser;
@@ -283,9 +280,8 @@ bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
   return false;
 }
 
-bool DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
+void DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
   rect = CefRect(0, 0, owner_->viewport.width, owner_->viewport.height);
-  return true;
 }
 
 void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser>,
@@ -302,8 +298,6 @@ void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser>,
   owner_->snapshot_bytes.assign(static_cast<const std::uint8_t*>(buffer),
                                 static_cast<const std::uint8_t*>(buffer) + size);
 }
-
-}  // namespace
 
 DesktopEngine::DesktopEngine()
     : renderer_(std::make_unique<CefRenderer>()),
@@ -341,6 +335,54 @@ bool DesktopEngine::ResizeViewport(int width, int height) {
   if (impl_->browser && impl_->browser->GetHost()) {
     impl_->browser->GetHost()->WasResized();
   }
+  return true;
+}
+
+bool DesktopEngine::SendFocusEvent(bool focused) {
+  if (!impl_->browser || !impl_->browser->GetHost()) {
+    return false;
+  }
+  impl_->browser->GetHost()->SetFocus(focused);
+  return true;
+}
+
+bool DesktopEngine::SendMouseMoveEvent(int x, int y, bool mouse_leave) {
+  if (!impl_->browser || !impl_->browser->GetHost()) {
+    return false;
+  }
+  CefMouseEvent event;
+  event.x = x;
+  event.y = y;
+  impl_->browser->GetHost()->SendMouseMoveEvent(event, mouse_leave);
+  return true;
+}
+
+bool DesktopEngine::SendMouseClickEvent(int x, int y, int button, bool mouse_up, int click_count) {
+  if (!impl_->browser || !impl_->browser->GetHost()) {
+    return false;
+  }
+  cef_mouse_button_type_t button_type = MBT_LEFT;
+  if (button == 2) {
+    button_type = MBT_MIDDLE;
+  } else if (button == 3) {
+    button_type = MBT_RIGHT;
+  }
+
+  CefMouseEvent event;
+  event.x = x;
+  event.y = y;
+  impl_->browser->GetHost()->SendMouseClickEvent(event, button_type, mouse_up, click_count);
+  return true;
+}
+
+bool DesktopEngine::SendMouseWheelEvent(int x, int y, int delta_x, int delta_y) {
+  if (!impl_->browser || !impl_->browser->GetHost()) {
+    return false;
+  }
+  CefMouseEvent event;
+  event.x = x;
+  event.y = y;
+  impl_->browser->GetHost()->SendMouseWheelEvent(event, delta_x, delta_y);
   return true;
 }
 

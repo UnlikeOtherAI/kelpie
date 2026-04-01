@@ -1,3 +1,4 @@
+import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
 import type { DiscoveredDevice } from "../types.js";
 import { loadBrowserStore } from "../browser/store.js";
 
@@ -49,6 +50,9 @@ export async function getDevice(query: string): Promise<DiscoveredDevice | undef
   const byIp = all.find((d) => d.ip === query);
   if (byIp) return byIp;
 
+  const directAddress = getDirectAddressDevice(query);
+  if (directAddress) return directAddress;
+
   return undefined;
 }
 
@@ -64,8 +68,27 @@ async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | 
     name: query,
     ip: "127.0.0.1",
     port: running.port,
-    platform: "macos",
-    model: "Mollotov macOS",
+    platform: store.aliases[query]?.platform ?? "macos",
+    model: `Mollotov ${store.aliases[query]?.platform ?? "macos"}`,
+    width: 0,
+    height: 0,
+    version: "0.0.0",
+    lastSeen: Date.now(),
+  };
+}
+
+function getDirectAddressDevice(query: string): DiscoveredDevice | undefined {
+  const match = query.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d+))?$/);
+  if (!match) {
+    return undefined;
+  }
+  return {
+    id: `direct:${query}`,
+    name: query,
+    ip: match[1],
+    port: match[2] ? Number(match[2]) : DEFAULT_PORT,
+    platform: "linux",
+    model: "Mollotov Direct",
     width: 0,
     height: 0,
     version: "0.0.0",

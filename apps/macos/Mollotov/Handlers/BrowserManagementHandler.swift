@@ -24,6 +24,8 @@ struct BrowserManagementHandler {
         router.register("show-keyboard") { body in await showKeyboard(body) }
         router.register("hide-keyboard") { _ in await hideKeyboard() }
         router.register("get-keyboard-state") { _ in await getKeyboardState() }
+        router.register("set-fullscreen") { body in await setFullscreen(body) }
+        router.register("get-fullscreen") { _ in await getFullscreen() }
         router.register("resize-viewport") { body in await resizeViewport(body) }
         router.register("reset-viewport") { _ in await resetViewport() }
         router.register("is-element-obscured") { body in await isElementObscured(body) }
@@ -183,6 +185,27 @@ struct BrowserManagementHandler {
     @MainActor
     private func getKeyboardState() async -> [String: Any] {
         errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "get-keyboard-state is not supported on macOS")
+    }
+
+    @MainActor
+    private func setFullscreen(_ body: [String: Any]) async -> [String: Any] {
+        let enabled = body["enabled"] as? Bool ?? true
+        guard let window = NSApplication.shared.keyWindow else {
+            return errorResponse(code: "NO_WINDOW", message: "No active window")
+        }
+        let isFullscreen = window.styleMask.contains(.fullScreen)
+        if enabled != isFullscreen {
+            window.toggleFullScreen(nil)
+        }
+        return successResponse(["enabled": enabled])
+    }
+
+    @MainActor
+    private func getFullscreen() async -> [String: Any] {
+        guard let window = NSApplication.shared.keyWindow else {
+            return errorResponse(code: "NO_WINDOW", message: "No active window")
+        }
+        return successResponse(["enabled": window.styleMask.contains(.fullScreen)])
     }
 
     // MARK: - Viewport

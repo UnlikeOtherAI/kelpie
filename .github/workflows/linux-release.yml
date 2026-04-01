@@ -1,0 +1,191 @@
+name: Build Linux Release Assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux (${{ matrix.distro.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+            install: |
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential \
+                ca-certificates \
+                cmake \
+                curl \
+                git \
+                libasound2-dev \
+                libatk-bridge2.0-dev \
+                libatk1.0-dev \
+                libavahi-client-dev \
+                libcups2-dev \
+                libdbus-1-dev \
+                libdrm-dev \
+                libfontconfig1-dev \
+                libgbm-dev \
+                libglib2.0-dev \
+                libgtk-3-dev \
+                libnspr4-dev \
+                libnss3-dev \
+                libpango1.0-dev \
+                libx11-dev \
+                libxcomposite-dev \
+                libxdamage-dev \
+                libxext-dev \
+                libxfixes-dev \
+                libxrandr-dev \
+                ninja-build \
+                nlohmann-json3-dev \
+                pkg-config \
+                tar
+              rm -rf /var/lib/apt/lists/*
+          - name: fedora-40
+            image: fedora:40
+            install: |
+              dnf install -y \
+                @development-tools \
+                ca-certificates \
+                cmake \
+                curl \
+                glib2-devel \
+                fontconfig-devel \
+                git \
+                gtk3-devel \
+                libX11-devel \
+                libXcomposite-devel \
+                libXdamage-devel \
+                libXext-devel \
+                libXfixes-devel \
+                libXrandr-devel \
+                libdrm-devel \
+                mesa-libgbm-devel \
+                nlohmann-json-devel \
+                nspr-devel \
+                nss-devel \
+                pango-devel \
+                pkgconf-pkg-config \
+                avahi-devel \
+                cups-devel \
+                dbus-devel \
+                ninja-build \
+                tar
+              dnf clean all
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and package Linux runtime
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+          DISTRO_INSTALL: ${{ matrix.distro.install }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          docker pull "${DISTRO_IMAGE}"
+
+          docker run --rm \
+            -e DISTRO_NAME="${DISTRO_NAME}" \
+            -e DISTRO_INSTALL="${DISTRO_INSTALL}" \
+            -e RELEASE_TAG="${RELEASE_TAG}" \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            "${DISTRO_IMAGE}" \
+            bash -lc '
+              set -euo pipefail
+
+              eval "${DISTRO_INSTALL}"
+
+              bash scripts/download-cef.sh linux
+              make linux
+
+              version="${RELEASE_TAG#v}"
+              package_root="dist/release/${DISTRO_NAME}/mollotov-linux"
+              archive_base="mollotov-linux-${version}-${DISTRO_NAME}-x86_64"
+              mkdir -p "${package_root}"
+
+              runtime_files=(
+                FontAwesome6Brands-Regular.otf
+                chrome-sandbox
+                chrome_100_percent.pak
+                chrome_200_percent.pak
+                icon-1024.png
+                icudtl.dat
+                libEGL.so
+                libGLESv2.so
+                libcef.so
+                libvk_swiftshader.so
+                libvulkan.so.1
+                locales
+                mollotov-linux
+                resources.pak
+                snapshot_blob.bin
+                v8_context_snapshot.bin
+                vk_swiftshader_icd.json
+              )
+
+              for runtime_file in "${runtime_files[@]}"; do
+                if [ ! -e "apps/linux/build/${runtime_file}" ]; then
+                  echo "Missing runtime file: apps/linux/build/${runtime_file}" >&2
+                  exit 1
+                fi
+
+                cp -a "apps/linux/build/${runtime_file}" "${package_root}/"
+              done
+
+              cat > "${package_root}/README.txt" <<EOF
+              Mollotov Linux release bundle
+              Tag: ${RELEASE_TAG}
+              Build: ${DISTRO_NAME}
+
+              Run:
+                ./mollotov-linux
+
+              Notes:
+              - This bundle includes the Chromium Embedded Framework runtime.
+              - It still depends on common desktop libraries such as GTK3, NSS, NSPR, Pango, Fontconfig, Avahi, and ALSA.
+              - GitHub Releases publishes one tarball per distro build so users can pick the closest match for their system.
+              EOF
+
+              tar -C "dist/release/${DISTRO_NAME}" -czf "dist/release/${archive_base}.tar.gz" mollotov-linux
+              sha256sum "dist/release/${archive_base}.tar.gz" > "dist/release/${archive_base}.tar.gz.sha256"
+              chmod -R a+rX dist/release
+            '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-${{ matrix.distro.name }}
+          path: |
+            dist/release/*.tar.gz
+            dist/release/*.sha256
+          if-no-files-found: error
+
+  attach-to-release:
+    name: Attach Linux assets to GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-linux
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-release-*
+          merge-multiple: true
+          path: dist/release
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/release/*.tar.gz
+            dist/release/*.sha256

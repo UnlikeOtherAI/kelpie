@@ -62,11 +62,12 @@ LinuxApp::json LinuxApp::DeviceInfo() const {
 
 LinuxApp::json LinuxApp::Capabilities() const {
   const std::set<std::string> supported_routes = {
-      "navigate",        "back",          "forward",          "reload",
-      "get-current-url", "evaluate",      "get-device-info",  "get-capabilities",
-      "get-bookmarks",   "add-bookmark",  "remove-bookmark",  "clear-bookmarks",
-      "get-history",     "clear-history", "get-network-log",  "get-console-messages",
-      "get-js-errors",   "toast",
+      "navigate",         "back",            "forward",          "reload",
+      "get-current-url",  "set-home",        "get-home",         "evaluate",
+      "get-device-info",  "get-capabilities","get-bookmarks",    "add-bookmark",
+      "remove-bookmark",  "clear-bookmarks", "get-history",      "clear-history",
+      "get-network-log",  "get-console-messages", "get-js-errors","toast",
+      "set-fullscreen",   "get-fullscreen",
   };
   const std::set<std::string> partial_routes = {"evaluate", "get-console-messages", "get-network-log"};
 
@@ -143,6 +144,20 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
     if (endpoint == "get-current-url") {
       return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
     }
+    if (endpoint == "set-home") {
+      const std::string url = params.value("url", "");
+      if (url.empty()) {
+        if (status_code != nullptr) {
+          *status_code = mollotov::ErrorCodeHttpStatus(mollotov::ErrorCode::kInvalidParams);
+        }
+        return mollotov::ErrorResponse(mollotov::ErrorCode::kInvalidParams, "url is required");
+      }
+      SetHomeUrl(url);
+      return mollotov::SuccessResponse({{"url", HomeUrl()}});
+    }
+    if (endpoint == "get-home") {
+      return mollotov::SuccessResponse({{"url", HomeUrl()}});
+    }
     if (endpoint == "evaluate") {
       return mollotov::SuccessResponse(
           {{"result", impl_->handler_context.EvaluateJsReturningString(params.value("expression", ""))}});
@@ -209,6 +224,13 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
     if (endpoint == "toast") {
       ShowToast(params.value("message", ""));
       return mollotov::SuccessResponse();
+    }
+    if (endpoint == "set-fullscreen") {
+      SetFullscreen(params.value("enabled", true));
+      return mollotov::SuccessResponse({{"enabled", WantsFullscreen()}});
+    }
+    if (endpoint == "get-fullscreen") {
+      return mollotov::SuccessResponse({{"enabled", IsFullscreen()}});
     }
 
     if (status_code != nullptr) {

@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -25,9 +26,14 @@ class DesktopEngine {
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
+    int argc = 0;
+    char** argv = nullptr;
     std::string initial_url;
     std::string cache_path;
     std::string user_agent;
+    std::string browser_subprocess_path;
+    std::string resources_dir_path;
+    std::string locales_dir_path;
     bool external_message_pump = true;
     std::function<void(void*)> configure_window_info;
   };
@@ -54,6 +60,10 @@ class DesktopEngine {
 
   ViewportState viewport() const;
   bool ResizeViewport(int width, int height);
+  bool SendFocusEvent(bool focused);
+  bool SendMouseMoveEvent(int x, int y, bool mouse_leave);
+  bool SendMouseClickEvent(int x, int y, int button, bool mouse_up, int click_count);
+  bool SendMouseWheelEvent(int x, int y, int delta_x, int delta_y);
 
   void SetConsoleSink(JsonEventSink sink);
   void SetNetworkSink(JsonEventSink sink);
@@ -62,10 +72,11 @@ class DesktopEngine {
   CefRenderer& renderer();
   const CefRenderer& renderer() const;
 
- private:
   class Impl;
-  std::unique_ptr<Impl> impl_;
+
+ private:
   std::unique_ptr<CefRenderer> renderer_;
+  std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace mollotov

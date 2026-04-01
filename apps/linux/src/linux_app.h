@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -29,6 +31,17 @@ class LinuxApp {
   void RequestShutdown();
   bool IsRunning() const;
   void PumpBrowser();
+  bool AttachBrowserHost(std::uintptr_t parent_window, int width, int height);
+  void ResizeBrowserHost(int width, int height);
+  bool HasNativeBrowser() const;
+  bool FocusBrowser(bool focused);
+  bool SendBrowserMouseMove(int x, int y, bool mouse_leave);
+  bool SendBrowserMouseClick(int x, int y, int button, bool mouse_up, int click_count);
+  bool SendBrowserMouseWheel(int x, int y, int delta_x, int delta_y);
+  void SetFullscreen(bool fullscreen);
+  bool IsFullscreen() const;
+  bool WantsFullscreen() const;
+  void ReportFullscreenState(bool fullscreen);
 
   const AppConfig& config() const;
   int port() const;
@@ -47,6 +60,9 @@ class LinuxApp {
   bool IsLoading() const;
   std::string CurrentUrl() const;
   std::string CurrentTitle() const;
+  std::vector<std::uint8_t> SnapshotBytes() const;
+  std::string HomeUrl() const;
+  void SetHomeUrl(const std::string& url);
 
   void AddBookmark(const std::string& title, const std::string& url);
   void RemoveBookmark(const std::string& id);

@@ -44,10 +44,23 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
 
 option(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
+set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB "")
+set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER "")
 
 if(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP)
+  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/cef_app_factory.cpp)
   if(NOT CEF_ROOT)
     message(FATAL_ERROR "MOLLOTOV_ENABLE_CHROMIUM_DESKTOP requires CEF_ROOT to point at a CEF SDK")
+  endif()
+  if(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
+    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER
+        "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
+  elseif(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
+    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER
+        "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
+  endif()
+  if(EXISTS "${CEF_ROOT}/Release/libcef.so")
+    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.so")
   endif()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine.cpp)
 else()
@@ -67,6 +80,18 @@ target_include_directories(mollotov_engine_chromium_desktop
 
 if(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP)
   target_include_directories(mollotov_engine_chromium_desktop PRIVATE ${CEF_ROOT})
+  if(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER)
+    target_link_libraries(mollotov_engine_chromium_desktop
+      PUBLIC
+        "${MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER}"
+    )
+  endif()
+  if(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB)
+    target_link_libraries(mollotov_engine_chromium_desktop
+      PUBLIC
+        "${MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB}"
+    )
+  endif()
 endif()
 
 target_link_libraries(mollotov_engine_chromium_desktop

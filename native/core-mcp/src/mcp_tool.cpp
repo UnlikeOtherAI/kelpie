@@ -86,6 +86,8 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("mollotov_get_current_url", "get-current-url", "Get the current URL and page title"),
       Tool("mollotov_set_home", "set-home", "Set the device home page URL. Persisted across app restarts."),
       Tool("mollotov_get_home", "get-home", "Get the device home page URL"),
+      Tool("mollotov_set_fullscreen", "set-fullscreen", "Enable or disable fullscreen mode for the desktop browser window."),
+      Tool("mollotov_get_fullscreen", "get-fullscreen", "Get whether the desktop browser window is currently fullscreen."),
       Tool("mollotov_debug_screens", "debug-screens", "Get screen/scene/external display diagnostics. Shows UIScreen count, connected scenes, and external display manager state."),
       Tool("mollotov_set_debug_overlay", "set-debug-overlay", "Enable or disable the on-screen debug overlay showing screen/scene/connection info"),
       Tool("mollotov_get_debug_overlay", "get-debug-overlay", "Get current debug overlay state"),

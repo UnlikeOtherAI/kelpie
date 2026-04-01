@@ -20,6 +20,10 @@ void SettingsView::Show(GtkWindow* parent) {
                                           GTK_RESPONSE_CLOSE,
                                           nullptr);
     content_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_widget_set_hexpand(content_, TRUE);
+    gtk_widget_set_vexpand(content_, TRUE);
+    gtk_window_set_default_size(GTK_WINDOW(dialog_), 560, 420);
+    gtk_window_set_resizable(GTK_WINDOW(dialog_), TRUE);
     gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog_))), content_);
     g_signal_connect_swapped(dialog_, "response", G_CALLBACK(gtk_widget_hide), dialog_);
   }

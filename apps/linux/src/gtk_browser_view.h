@@ -20,7 +20,9 @@ class GtkBrowserView {
  private:
   LinuxApp& app_;
   GtkWidget* frame_ = nullptr;
+  GtkWidget* canvas_ = nullptr;
   GtkWidget* label_ = nullptr;
+  bool attached_ = false;
 };
 
 }  // namespace mollotov::linuxapp

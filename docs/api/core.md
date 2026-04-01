@@ -110,6 +110,35 @@ Response:
 }
 ```
 
+### `setFullscreen`
+Enable or disable fullscreen mode for the desktop browser window.
+
+```json
+POST /v1/set-fullscreen
+{
+  "enabled": true
+}
+
+Response:
+{
+  "success": true,
+  "enabled": true
+}
+```
+
+### `getFullscreen`
+Get whether the desktop browser window is currently fullscreen.
+
+```json
+POST /v1/get-fullscreen
+
+Response:
+{
+  "success": true,
+  "enabled": false
+}
+```
+
 ---
 
 ## Screenshots
