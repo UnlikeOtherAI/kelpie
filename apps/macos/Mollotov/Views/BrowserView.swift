@@ -244,47 +244,54 @@ private struct ViewportStageView<Content: View>: View {
         self.content = content
     }
 
+    // Height of the stage-chrome header (summary pill + spacing below it).
+    private static var stageChromeHeight: CGFloat { 48 }
+
     var body: some View {
         GeometryReader { geometry in
-            let viewportSize = viewportState.viewportSize
+            let vp     = viewportState.viewportSize
+            let scale  = viewportState.scale
+            let chrome = viewportState.showsViewportStageChrome
+
+            // Visual size of the viewport after applying scale.
+            let scaledW = (vp.width  * scale).rounded(.down)
+            let scaledH = (vp.height * scale).rounded(.down)
+            let chromeH: CGFloat = chrome ? (Self.stageChromeHeight + 10) : 0
+
             let canvasSize = CGSize(
-                width: max(viewportSize.width, geometry.size.width),
-                height: max(viewportSize.height, geometry.size.height)
+                width:  max(scaledW, geometry.size.width),
+                height: max(scaledH + chromeH, geometry.size.height)
             )
 
             ZStack {
                 backgroundColor
 
-                if viewportSize.width > 0, viewportSize.height > 0 {
+                if vp.width > 0, vp.height > 0 {
                     ScrollView([.horizontal, .vertical], showsIndicators: true) {
                         ZStack {
-                            Color.clear
-                                .frame(width: canvasSize.width, height: canvasSize.height)
+                            Color.clear.frame(width: canvasSize.width, height: canvasSize.height)
 
-                            content()
-                                .frame(width: viewportSize.width, height: viewportSize.height)
-                                .background(Color.black)
-                                .clipShape(
-                                    RoundedRectangle(
-                                        cornerRadius: viewportState.showsViewportStageChrome ? 16 : 0,
-                                        style: .continuous
+                            VStack(spacing: chrome ? 10 : 0) {
+                                if chrome {
+                                    stageChromeHeader(width: scaledW)
+                                }
+
+                                // Render content at the logical viewport size, then scale visually.
+                                // Negative padding adjusts the layout frame to match the visual size
+                                // so the scroll view sees the correct content bounds.
+                                content()
+                                    .frame(width: vp.width, height: vp.height)
+                                    .scaleEffect(scale, anchor: .center)
+                                    .padding(.horizontal, -(vp.width  * (1 - scale)) / 2)
+                                    .padding(.vertical,   -(vp.height * (1 - scale)) / 2)
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: chrome ? 16 : 0, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: chrome ? 16 : 0, style: .continuous)
+                                            .stroke(chrome ? viewportBorderColor : .clear, lineWidth: 1)
                                     )
-                                )
-                                .overlay(
-                                    RoundedRectangle(
-                                        cornerRadius: viewportState.showsViewportStageChrome ? 16 : 0,
-                                        style: .continuous
-                                    )
-                                    .stroke(
-                                        viewportState.showsViewportStageChrome ? viewportBorderColor : .clear,
-                                        lineWidth: 1
-                                    )
-                                )
-                                .shadow(
-                                    color: viewportState.showsViewportStageChrome ? Color.black.opacity(0.22) : .clear,
-                                    radius: 14,
-                                    y: 6
-                                )
+                                    .shadow(color: chrome ? Color.black.opacity(0.22) : .clear, radius: 14, y: 6)
+                            }
                         }
                         .frame(width: canvasSize.width, height: canvasSize.height)
                     }
@@ -303,6 +310,41 @@ private struct ViewportStageView<Content: View>: View {
 
     private var backgroundColor: Color {
         viewportState.showsViewportStageChrome ? stageColor : Color(nsColor: .windowBackgroundColor)
+    }
+
+    @ViewBuilder
+    private func stageChromeHeader(width: CGFloat) -> some View {
+        ZStack {
+            Text(viewportState.stageSummaryLabel)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.9))
+                .clipShape(Capsule())
+                .overlay {
+                    Capsule().stroke(Color.white.opacity(0.9), lineWidth: 1)
+                }
+                .accessibilityIdentifier("browser.viewport.summary")
+        }
+        .frame(width: max(width, 200), height: Self.stageChromeHeight)
+        .overlay(alignment: .leading) {
+            Button {
+                _ = viewportState.selectFullViewport()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black.opacity(0.9))
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle().stroke(Color.white.opacity(0.9), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("browser.viewport.close")
+        }
     }
 }
 
@@ -375,6 +417,7 @@ private struct WindowChromeBridge: NSViewRepresentable {
                 object: window,
                 queue: .main
             ) { _ in
+                guard !window.styleMask.contains(.fullScreen) else { return }
                 let contentSize = window.contentRect(forFrameRect: window.frame).size
                 ViewportState.persistShellWindowSize(contentSize)
             }
@@ -531,30 +574,28 @@ struct RendererContainerView: NSViewRepresentable {
     }
 
     private func attachActiveRenderer(to container: NSView, coordinator: Coordinator) {
-        guard let view = serverState.handlerContext.renderer?.makeView() else {
-            coordinator.attachedView?.removeFromSuperview()
-            coordinator.attachedView = nil
+        guard let activeView = serverState.handlerContext.renderer?.makeView() else {
+            container.subviews.forEach { $0.isHidden = true }
             coordinator.attachedEngine = nil
             return
         }
 
-        view.frame = container.bounds
-        view.autoresizingMask = [.width, .height]
+        activeView.frame = container.bounds
+        activeView.autoresizingMask = [.width, .height]
 
-        let needsSwap =
-            coordinator.attachedEngine != rendererState.activeEngine ||
-            coordinator.attachedView !== view ||
-            view.superview !== container
-
-        guard needsSwap else { return }
-
-        if view.superview !== container {
-            view.removeFromSuperview()
-            container.subviews.forEach { $0.removeFromSuperview() }
-            container.addSubview(view)
+        // Add the view if it isn't already a subview.
+        // We NEVER remove renderer views from the hierarchy — removing and
+        // re-adding CEF's NSView corrupts its internal compositing state and
+        // causes a CrBrowserMain crash. Use isHidden to switch instead.
+        if activeView.superview !== container {
+            container.addSubview(activeView)
         }
 
-        coordinator.attachedView = view
+        // Show the active view, hide all others.
+        for subview in container.subviews {
+            subview.isHidden = subview !== activeView
+        }
+
         coordinator.attachedEngine = rendererState.activeEngine
     }
 }

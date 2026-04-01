@@ -83,7 +83,47 @@ struct URLBarView: View {
 
             rendererSwitch
                 .disabled(rendererState.isSwitching)
+
+            if viewportState.mode != .full {
+                scaleControl
+            }
         }
+    }
+
+    @ViewBuilder
+    private var scaleControl: some View {
+        HStack(spacing: 0) {
+            Button { viewportState.scaleDown() } label: {
+                Text("−")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 30, height: 34)
+            }
+            .disabled(!viewportState.canScaleDown)
+
+            Text(viewportState.scalePercentLabel)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .frame(minWidth: 40)
+                .lineLimit(1)
+
+            Button { viewportState.scaleUp() } label: {
+                Text("+")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 30, height: 34)
+            }
+            .disabled(!viewportState.canScaleUp)
+        }
+        .foregroundStyle(.primary)
+        .frame(height: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("browser.viewport.scale")
     }
 
     @ViewBuilder

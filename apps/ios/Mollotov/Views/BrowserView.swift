@@ -1,17 +1,111 @@
 import SwiftUI
 import WebKit
 
+let ipadMobileStagePresetDefaultsKey = "ipadMobileStagePreset"
+let ipadMobileStageAvailablePresetIDsDefaultsKey = "ipadMobileStageAvailablePresetIDs"
+let ipadMobileStageAvailableWidthDefaultsKey = "ipadMobileStageAvailableWidth"
+let ipadMobileStageAvailableHeightDefaultsKey = "ipadMobileStageAvailableHeight"
+private let tabletViewportStagePadding: CGFloat = 24
+private let tabletViewportStageTopChromeHeight: CGFloat = 48
+
+private enum WelcomeCardPresentationSource {
+    case automatic
+    case helpMenu
+}
+
+struct TabletViewportPreset: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let label: String
+    let displaySizeLabel: String
+    let pixelResolutionLabel: String
+    let portraitSize: CGSize
+}
+
+private func _cstr(_ ptr: UnsafePointer<CChar>?) -> String {
+    guard let ptr else { return "" }
+    return String(cString: ptr)
+}
+
+let tabletViewportPresets: [TabletViewportPreset] = {
+    var result: [TabletViewportPreset] = []
+    let count = Int(mollotov_viewport_preset_count())
+    for i in 0 ..< count {
+        guard let p = mollotov_viewport_preset_get(Int32(i))?.pointee,
+              p.kind == MOLLOTOV_DEVICE_KIND_PHONE else { continue }
+        result.append(TabletViewportPreset(
+            id:                   _cstr(p.id),
+            name:                 _cstr(p.name),
+            label:                _cstr(p.label),
+            displaySizeLabel:     _cstr(p.display_size_label),
+            pixelResolutionLabel: _cstr(p.pixel_resolution_label),
+            portraitSize:         CGSize(width: CGFloat(p.portrait_width), height: CGFloat(p.portrait_height))
+        ))
+    }
+    return result
+}()
+
+let defaultTabletViewportPresetID = "compact-base"
+
+func tabletViewportPreset(id: String?) -> TabletViewportPreset? {
+    guard let id else { return nil }
+    return tabletViewportPresets.first { $0.id == id }
+}
+
+func currentTabletViewportAvailableSize() -> CGSize {
+    let defaults = UserDefaults.standard
+    return CGSize(
+        width: defaults.double(forKey: ipadMobileStageAvailableWidthDefaultsKey),
+        height: defaults.double(forKey: ipadMobileStageAvailableHeightDefaultsKey)
+    )
+}
+
+func currentTabletViewportAvailablePresetIDs() -> [String] {
+    let raw = UserDefaults.standard.string(forKey: ipadMobileStageAvailablePresetIDsDefaultsKey) ?? ""
+    return raw.split(separator: ",").map(String.init)
+}
+
+func orientedTabletViewportSize(for preset: TabletViewportPreset, availableSize: CGSize) -> CGSize {
+    guard availableSize.width > availableSize.height else { return preset.portraitSize }
+    return CGSize(width: preset.portraitSize.height, height: preset.portraitSize.width)
+}
+
+func fittingTabletViewportPresets(for availableSize: CGSize) -> [TabletViewportPreset] {
+    let maxWidth = max(availableSize.width - tabletViewportStagePadding * 2, 1)
+    let maxHeight = max(availableSize.height - tabletViewportStagePadding * 2 - tabletViewportStageTopChromeHeight, 1)
+
+    return tabletViewportPresets.filter { preset in
+        let targetViewport = orientedTabletViewportSize(for: preset, availableSize: availableSize)
+        return targetViewport.width <= maxWidth && targetViewport.height <= maxHeight
+    }
+}
+
+func tabletViewportSize(for preset: TabletViewportPreset, availableSize: CGSize) -> CGSize {
+    let targetViewport = orientedTabletViewportSize(for: preset, availableSize: availableSize)
+    let maxWidth = max(availableSize.width - tabletViewportStagePadding * 2, 1)
+    let maxHeight = max(availableSize.height - tabletViewportStagePadding * 2 - tabletViewportStageTopChromeHeight, 1)
+
+    return CGSize(
+        width: min(targetViewport.width, maxWidth),
+        height: min(targetViewport.height, maxHeight)
+    )
+}
+
 /// Main browser screen: URL bar + WKWebView + floating action menu.
 struct BrowserView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var serverState: ServerState
     @ObservedObject private var externalDisplayManager = ExternalDisplayManager.shared
+    @AppStorage("ipadMobileStageEnabled") private var legacyIPadMobileStageEnabled = false
+    @AppStorage(ipadMobileStagePresetDefaultsKey) private var iPadMobileStagePresetID = ""
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
     @State private var showNetworkInspector = false
+    @State private var availableIPadViewportPresetIDs: [String] = []
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
+    @State private var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
     @AppStorage("debugOverlay") private var debugOverlayEnabled = false
     @State private var debugText = ""
     private let safariAuth = SafariAuthHelper()
@@ -53,16 +147,14 @@ struct BrowserView: View {
                     onForward: goForward
                 )
 
-                WebViewContainer(browserState: browserState, handlerContext: serverState.handlerContext) { wv in
-                    browserState.webView = wv
-                    serverState.webView = wv
-                    serverState.handlerContext.webView = wv
-                    externalDisplayManager.setPhoneWebView(wv)
-                }
+                browserViewport
             }
 
-            if showWelcome && !hideWelcome {
-                WelcomeCardView { showWelcome = false }
+            if showWelcome && shouldShowWelcomeCard {
+                WelcomeCardView {
+                    showWelcome = false
+                    welcomePresentationSource = .automatic
+                }
                     .transition(.opacity)
                     .zIndex(10)
             }
@@ -74,6 +166,10 @@ struct BrowserView: View {
                 onBookmarks: { showBookmarks = true },
                 onHistory: { showHistory = true },
                 onNetworkInspector: { showNetworkInspector = true },
+                showMobileViewportToggle: isPad,
+                mobileViewportPresets: availableTabletViewportPresetOptions,
+                selectedMobileViewportPresetID: activeTabletViewportPreset?.id,
+                onSelectMobileViewportPreset: toggleTabletViewportPreset,
                 side: $fabSide
             )
 
@@ -101,6 +197,7 @@ struct BrowserView: View {
         }
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
+        .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
         .ignoresSafeArea(.container, edges: .bottom)
         .onChange(of: browserState.currentURL) { newURL in
             HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
@@ -110,7 +207,7 @@ struct BrowserView: View {
             HistoryStore.shared.updateLatestTitle(for: browserState.currentURL, title: newTitle)
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(serverState: serverState)
+            SettingsView(serverState: serverState, onShowWelcome: presentWelcomeFromHelp)
         }
         .sheet(isPresented: $showBookmarks) {
             BookmarksView(
@@ -144,6 +241,170 @@ struct BrowserView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showWelcomeCard)) { _ in
+            welcomePresentationSource = .helpMenu
+            showWelcome = true
+        }
+    }
+
+    private var shouldShowWelcomeCard: Bool {
+        switch welcomePresentationSource {
+        case .automatic:
+            return !hideWelcome
+        case .helpMenu:
+            return true
+        }
+    }
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    @ViewBuilder
+    private var browserViewport: some View {
+        GeometryReader { geometry in
+            let availablePresets = fittingTabletViewportPresets(for: geometry.size)
+            let selectedPreset = availablePresets.first { $0.id == iPadMobileStagePresetID }
+            let mobileStageActive = isPad && selectedPreset != nil
+            let stageSize = selectedPreset.map { tabletViewportSize(for: $0, availableSize: geometry.size) } ?? geometry.size
+
+            ZStack {
+                if mobileStageActive {
+                    Color(uiColor: .systemGray5)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                }
+
+                if let selectedPreset {
+                    stagedWebViewContainer(
+                        preset: selectedPreset,
+                        stageSize: stageSize
+                    )
+                } else {
+                    webViewContainer
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(.easeOut(duration: 0.18), value: mobileStageActive)
+            .animation(.easeOut(duration: 0.18), value: geometry.size)
+            .onAppear { updateAvailableTabletViewportPresetState(for: geometry.size) }
+            .onChange(of: geometry.size) { size in
+                updateAvailableTabletViewportPresetState(for: size)
+            }
+        }
+    }
+
+    private func presentWelcomeFromHelp() {
+        showSettings = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            welcomePresentationSource = .helpMenu
+            showWelcome = true
+        }
+    }
+
+    private var webViewContainer: some View {
+        WebViewContainer(browserState: browserState, handlerContext: serverState.handlerContext) { wv in
+            browserState.webView = wv
+            serverState.webView = wv
+            serverState.handlerContext.webView = wv
+            externalDisplayManager.setPhoneWebView(wv)
+        }
+    }
+
+    @ViewBuilder
+    private func stagedWebViewContainer(preset: TabletViewportPreset, stageSize: CGSize) -> some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Text(stageSummary(for: preset))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.9))
+                    .clipShape(Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                    }
+                    .accessibilityIdentifier("browser.viewport.summary")
+            }
+            .frame(width: stageSize.width, height: 38)
+            .overlay(alignment: .leading) {
+                Button {
+                    setTabletViewportPreset("")
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.black.opacity(0.9))
+                        .clipShape(Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                        }
+                }
+                .accessibilityIdentifier("browser.viewport.close")
+            }
+
+            webViewContainer
+                .frame(width: stageSize.width, height: stageSize.height)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+        }
+        .frame(width: stageSize.width, height: stageSize.height + tabletViewportStageTopChromeHeight)
+    }
+
+    private var activeTabletViewportPreset: TabletViewportPreset? {
+        guard isPad else { return nil }
+        return tabletViewportPresets
+            .filter { availableIPadViewportPresetIDs.contains($0.id) }
+            .first { $0.id == iPadMobileStagePresetID }
+    }
+
+    private var availableTabletViewportPresetOptions: [MobileViewportPresetOption] {
+        tabletViewportPresets
+            .filter { availableIPadViewportPresetIDs.contains($0.id) }
+            .map { MobileViewportPresetOption(id: $0.id, label: $0.label) }
+    }
+
+    private func toggleTabletViewportPreset(_ presetID: String) {
+        setTabletViewportPreset((iPadMobileStagePresetID == presetID) ? "" : presetID)
+    }
+
+    private func stageSummary(for preset: TabletViewportPreset) -> String {
+        "\(preset.displaySizeLabel) • \(preset.pixelResolutionLabel)"
+    }
+
+    private func migrateLegacyTabletViewportSelectionIfNeeded() {
+        guard isPad else { return }
+        guard iPadMobileStagePresetID.isEmpty, legacyIPadMobileStageEnabled else { return }
+        setTabletViewportPreset(defaultTabletViewportPresetID)
+        legacyIPadMobileStageEnabled = false
+    }
+
+    private func updateAvailableTabletViewportPresetState(for availableSize: CGSize) {
+        let nextIDs = fittingTabletViewportPresets(for: availableSize).map(\.id)
+        UserDefaults.standard.set(nextIDs.joined(separator: ","), forKey: ipadMobileStageAvailablePresetIDsDefaultsKey)
+        UserDefaults.standard.set(availableSize.width, forKey: ipadMobileStageAvailableWidthDefaultsKey)
+        UserDefaults.standard.set(availableSize.height, forKey: ipadMobileStageAvailableHeightDefaultsKey)
+
+        if nextIDs != availableIPadViewportPresetIDs {
+            availableIPadViewportPresetIDs = nextIDs
+        }
+
+        if !iPadMobileStagePresetID.isEmpty, !nextIDs.contains(iPadMobileStagePresetID) {
+            setTabletViewportPreset("")
+        }
+    }
+
+    private func setTabletViewportPreset(_ presetID: String) {
+        iPadMobileStagePresetID = presetID
+        UserDefaults.standard.set(presetID, forKey: ipadMobileStagePresetDefaultsKey)
     }
 
     private func navigate(_ urlString: String) {
