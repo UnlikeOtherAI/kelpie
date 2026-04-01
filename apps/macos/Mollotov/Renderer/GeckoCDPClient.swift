@@ -60,15 +60,23 @@ final class GeckoCDPClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func resolveWebSocketURL(port: Int) async throws -> URL {
-        let url = URL(string: "http://localhost:\(port)/json/list")!
-        let (data, _) = try await URLSession.shared.data(from: url)
-        guard let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-              let first = array.first,
-              let wsURLString = first["webSocketDebuggerUrl"] as? String,
-              let wsURL = URL(string: wsURLString) else {
-            throw CDPError.malformedResponse
+        let url = URL(string: "http://127.0.0.1:\(port)/json/list")!
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = 2
+        let sess = URLSession(configuration: cfg)
+        // /json/list may not be ready immediately after /json/version
+        for attempt in 0..<10 {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let (data, resp) = try? await sess.data(from: url),
+                  (resp as? HTTPURLResponse)?.statusCode == 200 else { continue }
+            guard let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                  let first = array.first,
+                  let wsURLString = first["webSocketDebuggerUrl"] as? String,
+                  let wsURL = URL(string: wsURLString) else { continue }
+            NSLog("[GeckoCDPClient] connected after %d attempts", attempt + 1)
+            return wsURL
         }
-        return wsURL
+        throw CDPError.malformedResponse
     }
 
     private func startReceiveLoop() {

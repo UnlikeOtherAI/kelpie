@@ -39,18 +39,24 @@ final class GeckoRenderer: RendererEngine {
         onStateChange?()
         Task { @MainActor in
             try? await cdp.send("Page.navigate", params: ["url": url.absoluteString])
+            // Firefox CDP does not fire Page.loadEventFired; poll nav history instead.
+            await pollUntilLoaded(targetURL: url)
         }
     }
 
     func goBack() {
+        isLoading = true
         Task { @MainActor in
             try? await cdp.send("Page.goBack")
+            await pollUntilLoaded(targetURL: nil)
         }
     }
 
     func goForward() {
+        isLoading = true
         Task { @MainActor in
             try? await cdp.send("Page.goForward")
+            await pollUntilLoaded(targetURL: nil)
         }
     }
 
@@ -59,7 +65,25 @@ final class GeckoRenderer: RendererEngine {
         onStateChange?()
         Task { @MainActor in
             try? await cdp.send("Page.reload")
+            await pollUntilLoaded(targetURL: nil)
         }
+    }
+
+    /// Firefox CDP does not fire Page.loadEventFired. Poll Page.getNavigationHistory
+    /// until the title is non-empty (page loaded) or the deadline passes.
+    private func pollUntilLoaded(targetURL: URL?) async {
+        let titleBefore = currentTitle
+        for _ in 0..<60 {  // up to 6 seconds
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            await refreshNavHistory()
+            let titleChanged = currentTitle != titleBefore
+            // A non-empty, changed title reliably signals the page loaded.
+            if !currentTitle.isEmpty && titleChanged { break }
+            // For about: pages keep polling until URL and title both settle.
+        }
+        isLoading = false
+        estimatedProgress = 1.0
+        onStateChange?()
     }
 
     func evaluateJS(_ script: String) async throws -> Any? {

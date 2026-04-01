@@ -30,9 +30,9 @@ final class GeckoProcessManager {
     static func bundledFirefoxPath() -> String? {
         guard let executableURL = Bundle.main.executableURL else { return nil }
         let path = executableURL
-            .deletingLastPathComponent()          // Contents/MacOS → Contents
-            .deletingLastPathComponent()          // Contents → Mollotov.app
-            .appendingPathComponent("Contents/Frameworks/MollotovGeckoHelper.app/Contents/MacOS/firefox")
+            .deletingLastPathComponent()          // .../MacOS/Mollotov → .../MacOS
+            .deletingLastPathComponent()          // .../MacOS → .../Contents
+            .appendingPathComponent("Frameworks/MollotovGeckoHelper.app/Contents/MacOS/firefox")
             .path
         return FileManager.default.isExecutableFile(atPath: path) ? path : nil
     }
@@ -67,8 +67,13 @@ final class GeckoProcessManager {
             "--headless",
             "about:blank",
         ]
-        proc.standardOutput = FileHandle.nullDevice
-        proc.standardError = FileHandle.nullDevice
+        let logPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mollotov-gecko-\(port).log").path
+        FileManager.default.createFile(atPath: logPath, contents: nil)
+        let logHandle = FileHandle(forWritingAtPath: logPath)
+        proc.standardOutput = logHandle ?? FileHandle.nullDevice
+        proc.standardError = logHandle ?? FileHandle.nullDevice
+        NSLog("[GeckoProcessManager] Firefox log: %@", logPath)
         try proc.run()
         process = proc
         NSLog("[GeckoProcessManager] Firefox PID=%d port=%d", proc.processIdentifier, port)
@@ -107,13 +112,19 @@ final class GeckoProcessManager {
     }
 
     private func waitForEndpoint(port: Int, retries: Int = 40) async throws {
-        let url = URL(string: "http://localhost:\(port)/json/version")!
-        for _ in 0..<retries {
+        let url = URL(string: "http://127.0.0.1:\(port)/json/version")!
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = 1
+        cfg.timeoutIntervalForResource = 1
+        let sess = URLSession(configuration: cfg)
+        for i in 0..<retries {
             try? await Task.sleep(nanoseconds: 250_000_000)
-            if let _ = try? await URLSession.shared.data(from: url) {
+            if let _ = try? await sess.data(from: url) {
+                NSLog("[GeckoProcessManager] endpoint ready after %d polls (port %d)", i + 1, port)
                 return
             }
         }
+        NSLog("[GeckoProcessManager] endpoint not ready after %d polls (port %d)", retries, port)
         throw GeckoError.startupTimeout
     }
 

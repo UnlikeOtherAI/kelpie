@@ -33,11 +33,15 @@ rm -f "$TMP_DMG"
 
 echo "Stripping Mozilla branding..."
 PLIST="$HELPER_APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.mollotov.gecko-helper"  "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName MollotovGeckoHelper"               "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName MollotovGeckoHelper"        "$PLIST"
-/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true"                           "$PLIST" 2>/dev/null \
-  || /usr/libexec/PlistBuddy -c "Set :LSUIElement true"                           "$PLIST"
+plist_set_or_add() {
+  local type="$1" key="$2" value="$3"
+  /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "$PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "$PLIST"
+}
+plist_set_or_add string CFBundleIdentifier  com.mollotov.gecko-helper
+plist_set_or_add string CFBundleName        MollotovGeckoHelper
+plist_set_or_add string CFBundleDisplayName MollotovGeckoHelper
+plist_set_or_add bool   LSUIElement         true
 
 echo "Re-signing with ad-hoc identity..."
 codesign --remove-signature "$HELPER_APP" 2>/dev/null || true
