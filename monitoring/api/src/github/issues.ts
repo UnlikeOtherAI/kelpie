@@ -12,6 +12,7 @@ export interface MonitoringMetadata {
   branchName: string
   prNumber: number | null
   status: 'pending' | 'pr-open' | 'pr-merged' | 'shipped' | 'dismissed'
+  summary?: string
 }
 
 const METADATA_START = '<!-- MONITORING_METADATA'
@@ -27,24 +28,27 @@ export function buildIssueTitle(meta: MonitoringMetadata): string {
 }
 
 export function buildIssueBody(meta: MonitoringMetadata, summary: string): string {
-  const cveList = meta.cves.length > 0
-    ? meta.cves.map(c => `- ${c.id} (${c.severity}) — ${c.description}`).join('\n')
+  // Store summary in metadata so it survives round-trips through status updates
+  const metaWithSummary = { ...meta, summary }
+
+  const cveList = metaWithSummary.cves.length > 0
+    ? metaWithSummary.cves.map(c => `- ${c.id} (${c.severity}) — ${c.description}`).join('\n')
     : '_No CVEs listed for this release._'
 
-  const prLink = meta.prNumber
-    ? `[PR #${meta.prNumber}](https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/pull/${meta.prNumber})`
+  const prLink = metaWithSummary.prNumber
+    ? `[PR #${metaWithSummary.prNumber}](https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/pull/${metaWithSummary.prNumber})`
     : '_No PR yet_'
 
   const daysLeft = Math.ceil(
-    (new Date(meta.deadline).getTime() - Date.now()) / 864e5
+    (new Date(metaWithSummary.deadline).getTime() - Date.now()) / 864e5
   )
   const deadlineNote = daysLeft > 0 ? `(${daysLeft} days remaining)` : `(OVERDUE by ${-daysLeft} days)`
 
-  return `## Engine Update: ${meta.engine === 'chromium' ? 'Chromium' : 'Gecko/Firefox'} v${meta.version}
+  return `## Engine Update: ${metaWithSummary.engine === 'chromium' ? 'Chromium' : 'Gecko/Firefox'} v${metaWithSummary.version}
 
-**Release Date:** ${meta.releaseDate}
-**Deadline:** ${meta.deadline} ${deadlineNote}
-**Status:** ${meta.status}
+**Release Date:** ${metaWithSummary.releaseDate}
+**Deadline:** ${metaWithSummary.deadline} ${deadlineNote}
+**Status:** ${metaWithSummary.status}
 
 ${summary}
 
@@ -54,13 +58,13 @@ ${cveList}
 
 ### Links
 
-- [Upstream release notes](${meta.upstreamUrl})
+- [Upstream release notes](${metaWithSummary.upstreamUrl})
 - PR: ${prLink}
 
 ---
 
 ${METADATA_START}
-${JSON.stringify(meta, null, 2)}
+${JSON.stringify(metaWithSummary, null, 2)}
 ${METADATA_END}`
 }
 

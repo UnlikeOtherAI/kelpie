@@ -207,8 +207,9 @@ export function createToolExecutor(deps: {
           .map(l => (typeof l === 'string' ? l : l.name ?? ''))
           .filter(l => !STATUS_LABELS.includes(l))
 
+        const summary = meta.summary ?? '_Status updated by monitoring agent._'
         await updateIssue(octokit, owner, repo, args['issueNumber'] as number, {
-          body: buildIssueBody(updated, '_Status updated by monitoring agent._'),
+          body: buildIssueBody(updated, summary),
           labels: [...currentLabels, `status:${args['status']}`],
         })
 

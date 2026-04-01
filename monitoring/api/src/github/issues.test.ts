@@ -13,6 +13,7 @@ const metadata: MonitoringMetadata = {
   branchName: 'engine-update/chromium-125.0.6422.142',
   prNumber: null,
   status: 'pending',
+  summary: 'Release notes here.',
 }
 
 describe('buildIssueTitle', () => {
