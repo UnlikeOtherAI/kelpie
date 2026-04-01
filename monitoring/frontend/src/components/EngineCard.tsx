@@ -49,7 +49,7 @@ export function EngineCard({ issue }: Props) {
     if (days < 0) {
       daysLabel = (
         <span style={{ color: '#f85149', fontWeight: 600 }}>
-          {' '}(overdue by {Math.abs(days)} day{Math.abs(days) !== 1 ? 's' : ''})
+          {' '}OVERDUE
         </span>
       )
     } else if (days < 5) {
