@@ -29,6 +29,17 @@ Mobile model storage:
 - iOS: `<app>/Documents/models/`
 - Android: `<app>/files/models/`
 
+**Shared model store (macOS).** Both the CLI and the macOS app read and write `~/.mollotov/models/`. Either can download, delete, or list models. The `registry.json` file is the single source of truth — both sides read it on startup and before any operation. File-level locking (`flock`) prevents concurrent writes during downloads.
+
+The macOS app watches `~/.mollotov/models/` via `DispatchSource.makeFileSystemObjectSource` (FSEvents) to detect CLI-initiated changes. When the CLI downloads or deletes a model, the app's Models tab updates immediately without polling.
+
+The CLI can also manage models on a running device remotely via HTTP:
+- `mollotov ai load <model> --device mac` → `POST /v1/ai-load`
+- `mollotov ai unload --device mac` → `POST /v1/ai-unload`
+- `mollotov ai status --device mac` → `GET /v1/ai-status`
+
+Downloads always happen locally (CLI or app write to disk) — the HTTP API only handles load/unload/status/inference.
+
 ### Approved Model Registry
 
 The CLI ships with a built-in list of approved models (JSON embedded in the package). Each entry specifies:

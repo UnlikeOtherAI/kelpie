@@ -703,13 +703,15 @@ Downloads are managed by the CLI (macOS) or the app directly (mobile). Progress 
 }
 ```
 
-### macOS: Browser downloads directly
+### macOS: Shared model store — CLI and app
 
-The macOS app manages downloads to `~/.mollotov/models/`. When the user clicks Download on a model card in the panel's Models tab:
+Both the CLI (`mollotov ai pull`) and the macOS app (Models tab download button) write to the same `~/.mollotov/models/` directory. Either can download, delete, or list models.
 
-1. `ModelDownloader` actor streams from HuggingFace using `URLSession`, reports progress
-2. Model card shows progress bar with cancel option
-3. On completion, card changes to [▶ Load]
+**App download:** User clicks Download in the panel's Models tab → `ModelDownloader` actor streams from HuggingFace via `URLSession` → progress bar on the card → writes to `~/.mollotov/models/<id>/model.gguf` → updates `registry.json`.
+
+**CLI download:** User runs `mollotov ai pull gemma-4-e2b-q4` → CLI streams from HuggingFace → progress bar in terminal → writes to the same path → updates `registry.json`.
+
+**Sync:** The macOS app watches `~/.mollotov/models/` via FSEvents (`DispatchSource.makeFileSystemObjectSource`). When the CLI downloads or deletes a model, the app's Models tab updates live — no restart needed. File-level locking (`flock`) on `registry.json` prevents corruption from concurrent writes.
 
 ### Mobile: App downloads directly
 
