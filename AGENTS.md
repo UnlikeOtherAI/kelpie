@@ -95,6 +95,20 @@ Only commit permanent, hand-authored files. If it can be regenerated, do not com
 - Android: `./gradlew build` succeeds
 - macOS: After every change, rebuild and launch the app to verify. Kill any stale instance first, then keep the new one running until the next build replaces it.
 
+## Versioning
+
+Each component owns its version in its own manifest — do not create a central version file:
+
+| Component | Version location |
+|-----------|-----------------|
+| macOS app | `apps/macos/Mollotov/Info.plist` → `CFBundleShortVersionString` |
+| iOS app   | `apps/ios/Mollotov.xcodeproj/project.pbxproj` → `MARKETING_VERSION` |
+| Android   | `apps/android/app/build.gradle.kts` → `versionName` |
+| CLI       | `packages/cli/package.json` → `version` |
+
+- Bump only the component(s) being released — other components stay at their current version.
+- GitHub releases use a date tag (`release/YYYY-MM-DD`). The tag description must list every component version included in that release.
+
 ## Commits
 
 - Small, focused commits — one concern per commit
