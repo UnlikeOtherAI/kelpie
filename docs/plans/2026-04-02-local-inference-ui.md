@@ -662,7 +662,7 @@ Tapping the brain in the floating menu:
 
 **Not available on Linux.** Linux has no AI features.
 
-**macOS requires Apple Silicon (M1+).** On Intel Macs, the entire AI feature is hidden — no brain pill, no panel, no AI section in settings. Check at startup with `ProcessInfo.processInfo.processorArchitecture` or `sysctl("hw.optional.arm64")`. If not Apple Silicon, `AIState.isAvailable` is `false` and all AI UI is suppressed.
+**macOS native inference requires Apple Silicon (M1+).** On Intel Macs, native GGUF models are hidden. However, **Ollama-only mode works on Intel** — if Ollama is detected at startup, Intel users see the brain pill, panel, and Ollama models. If Ollama is not running, AI is fully hidden on Intel. Check at startup: `sysctl("hw.optional.arm64")`. `AIState.isAvailable` is true if either Apple Silicon OR Ollama is detected.
 
 ### Voice routing
 
@@ -685,10 +685,12 @@ During recording:
 
 | Platform | API | Notes |
 |---|---|---|
-| macOS | `AVAudioEngine` | Needs `NSMicrophoneUsageDescription` in Info.plist |
-| iOS | `AVAudioEngine` | Same permission. Foreground only. |
-| Android | `AudioRecord` | `RECORD_AUDIO` permission in manifest |
+| macOS | `AVAudioEngine` | Needs `NSMicrophoneUsageDescription` in Info.plist. For STT fallback: `NSSpeechRecognitionUsageDescription` |
+| iOS | `AVAudioEngine` | `NSMicrophoneUsageDescription` + `NSSpeechRecognitionUsageDescription` in Info.plist. Foreground only. |
+| Android | `AudioRecord` | `RECORD_AUDIO` permission in manifest. For STT fallback: `SpeechRecognizer` requires no extra permission. |
 | Linux | N/A | No AI features |
+
+**When STT permission is denied:** Show the mic button but display a toast "Speech recognition permission required — type your question instead" when tapped. Do not block the entire AI feature.
 
 Output format: 16-bit PCM WAV, 16kHz mono (~960KB for 30 seconds).
 

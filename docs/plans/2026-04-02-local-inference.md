@@ -55,7 +55,7 @@ Single source of truth for the active AI state. Every browser window, the CLI, a
 | `backend` | `"native"`, `"ollama"`, or `"platform"` (mobile default) |
 | `ollamaEndpoint` | Ollama API URL (persisted across sessions) |
 | `ollamaModel` | Ollama model name when backend is ollama (e.g. `"llava:7b"`) |
-| `loadedAt` | Timestamp of last load (used for staleness detection) |
+| `loadedAt` | ISO 8601 timestamp of last load — informational only, shown in `ai status` output. Not used for staleness detection (the in-memory engine is the authority). |
 
 **Who writes:**
 - macOS app (any window) — when user loads/unloads via the Models tab
@@ -119,7 +119,7 @@ interface ModelDescription {
 }
 ```
 
-**`memory` field:** Indicates whether the model can maintain context across multiple queries. For Phase 1, all native GGUF models are `memory: false` — every query is a fresh start. Ollama models could potentially support memory via Ollama's server-side context caching, but we mark them `false` for now too. The UI shows this as a badge so users know what to expect.
+**`memory` field:** Indicates whether the model can maintain context across multiple queries. Native GGUF models are `memory: false` — every query is a fresh start with no conversation history. Ollama models are `memory: true` — Ollama handles context server-side, so the in-app chat sends a sliding window of recent exchanges via `/api/chat`. MCP callers always get stateless behavior regardless of the `memory` flag. The UI shows this as a badge so users know what to expect.
 
 **`capabilities` values:**
 
@@ -144,7 +144,7 @@ On macOS via CLI, users can also specify an arbitrary Hugging Face GGUF URL to d
 
 **Only one model loaded at a time.** The browser loads a single model into memory. Loading a second model requires unloading the first. This is a hard constraint — we can't afford to keep multiple models in RAM, especially on devices with 8-16 GB.
 
-**macOS requires Apple Silicon (M1+).** On Intel Macs, the entire AI feature is disabled and hidden. llama.cpp inference depends on the Neural Engine and unified memory architecture. No brain pill, no panel, no AI settings. Check at startup: `sysctl("hw.optional.arm64")`.
+**macOS native inference requires Apple Silicon (M1+).** llama.cpp depends on the Neural Engine and unified memory architecture. On Intel Macs, native GGUF inference is disabled. However, **Ollama-only mode is available on Intel** — if Ollama is detected, Intel users see the brain pill and can use Ollama models. The AI panel's Models tab shows only Ollama models (no native download cards). If Ollama is not running, AI is fully hidden on Intel. Check at startup: `sysctl("hw.optional.arm64")`.
 
 ### Ollama Integration
 
@@ -703,8 +703,8 @@ The `pull` command:
 4. Writes `metadata.json` with source info
 
 The `load` command:
-1. Resolves model-id to local file path
-2. Sends `POST /v1/ai-load { path: "..." }` to the target device
+1. Sends `POST /v1/ai-load { "model": "<model-id>" }` to the target device
+2. The **device** resolves the model ID to its local file path (the CLI never sends absolute paths — the model must be downloaded on the target device)
 
 ### Error Handling
 
@@ -733,6 +733,8 @@ The MCP tools should return clear, actionable errors:
 ---
 
 ## Implementation Tasks
+
+**Prerequisite (not a numbered task — do first):** Extend `DeviceInfo.system` in `packages/shared/src/device-types.ts` to add `diskFreeGB: number`, `chipset: string`. Update all platform implementations (macOS, iOS, Android) to report these fields. The UI plan's hardware fitness scoring depends on them.
 
 ### Task 1: Approved Model Registry (CLI)
 
@@ -1237,7 +1239,7 @@ Add to the `browserTools` array:
 { name: "mollotov_ai_status", description: "Get the local inference engine status — whether a model is loaded, which model, its capabilities, and memory usage", method: "aiStatus", schema: { device }, bodyFromArgs: passthrough },
 { name: "mollotov_ai_load", description: "Load a model on a device for local inference. Pass a model ID (resolved to local path) or an ollama: prefixed ID. The model must be downloaded first (use mollotov_ai_pull). Only one model at a time — auto-unloads the current model.", method: "aiLoad", schema: { device, model: z.string().describe("Model ID (e.g. 'gemma-4-e2b-q4') or Ollama model (e.g. 'ollama:llava:7b')") }, bodyFromArgs: passthrough },
 { name: "mollotov_ai_unload", description: "Unload the current model from a device, freeing memory", method: "aiUnload", schema: { device }, bodyFromArgs: passthrough },
-{ name: "mollotov_ai_ask", description: "Ask the locally-loaded model a question about the current page. Use 'context' to auto-gather page data (page_text, screenshot, dom, accessibility) or provide 'text' directly. Returns the model's response. This runs entirely on-device — no data is sent to the cloud.", method: "aiInfer", schema: { device, prompt: z.string().describe("Question or instruction for the model"), context: z.enum(["page_text", "screenshot", "dom", "accessibility"]).optional().describe("Auto-gather page context before prompting"), text: z.string().optional().describe("Raw text input (alternative to context)"), maxTokens: z.number().optional().describe("Maximum tokens to generate (default 512)"), temperature: z.number().optional().describe("Sampling temperature (default 0.7)") }, bodyFromArgs: passthrough },
+{ name: "mollotov_ai_ask", description: "Ask the locally-loaded model a question about the current page. Use 'context' to auto-gather page data (page_text, screenshot, dom, accessibility) or provide 'text' directly. Returns the model's response. This runs entirely on-device — no data is sent to the cloud.", method: "aiInfer", schema: { device, prompt: z.string().optional().describe("Question or instruction for the model (omit if sending audio)"), audio: z.string().optional().describe("Base64-encoded WAV audio (16kHz mono, max 30s) — requires audio-capable model"), context: z.enum(["page_text", "screenshot", "dom", "accessibility"]).optional().describe("Auto-gather page context before prompting"), text: z.string().optional().describe("Raw text input (alternative to context)"), maxTokens: z.number().optional().describe("Maximum tokens to generate (default 512)"), temperature: z.number().optional().describe("Sampling temperature (default 0.7)") }, bodyFromArgs: passthrough },
 ```
 
 **Step 2: Add CLI tool definitions**
@@ -1278,6 +1280,17 @@ Add to `httpToMcp`:
 "ai-record": "mollotov_ai_record",
 ```
 
+Add to `BrowserToolUnsupportedPlatforms`:
+```ts
+mollotov_ai_status: ["linux", "windows"],
+mollotov_ai_load: ["linux", "windows"],
+mollotov_ai_unload: ["linux", "windows"],
+mollotov_ai_ask: ["linux", "windows"],
+mollotov_ai_record: ["linux", "windows"],
+```
+
+Update shared tests (`packages/shared/tests/index.test.ts`) to account for the new tool count and error codes.
+
 **Step 4: Add AI CLI tool handlers in `server.ts`**
 
 The AI CLI tools (`mollotov_ai_models`, `mollotov_ai_pull`, `mollotov_ai_remove`) are `discovery` kind but need custom handling in `handleDiscovery()` — they don't scan for devices, they manage local model state. Add a new handler branch:
@@ -1286,8 +1299,10 @@ The AI CLI tools (`mollotov_ai_models`, `mollotov_ai_pull`, `mollotov_ai_remove`
 if (method === "aiModels") {
   const store = getModelStore();
   const approved = getApprovedModels();
-  const downloaded = store.listDownloaded(); // includes { id, path } for each
-  return { content: [{ type: "text", text: JSON.stringify({ success: true, approved, downloaded }) }] };
+  const downloaded = store.listDownloaded();
+  // Also probe Ollama if reachable
+  const ollamaModels = await listOllamaModels().catch(() => []);
+  return { content: [{ type: "text", text: JSON.stringify({ success: true, approved, downloaded, ollama: ollamaModels }) }] };
 }
 
 if (method === "aiPull") {
@@ -1647,14 +1662,24 @@ import Foundation
 final class AIState: ObservableObject {
     static let shared = AIState()
 
-    /// True only on Apple Silicon (M1+). All AI UI is hidden when false.
-    let isAvailable: Bool
+    /// True on Apple Silicon (native + Ollama) or Intel with Ollama detected.
+    /// All AI UI is hidden when false.
+    @Published private(set) var isAvailable: Bool = false
+    let isAppleSilicon: Bool
 
     private init() {
         var result: Int32 = 0
         var size = MemoryLayout<Int32>.size
         let err = sysctlbyname("hw.optional.arm64", &result, &size, nil, 0)
-        isAvailable = (err == 0 && result == 1)
+        isAppleSilicon = (err == 0 && result == 1)
+        // On Apple Silicon: always available (native + Ollama)
+        // On Intel: available only if Ollama is detected (checked async at startup)
+        isAvailable = isAppleSilicon
+    }
+
+    /// Called at startup after Ollama detection completes.
+    func enableOllamaOnly() {
+        if !isAppleSilicon { isAvailable = true }
     }
 }
 ```
