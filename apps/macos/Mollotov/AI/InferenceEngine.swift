@@ -46,22 +46,12 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                     return
                 }
 
-                let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-
-                // TODO: Replace the sentinel state below with llama.cpp model/context loading.
-                self.model = OpaquePointer(bitPattern: 0x1)
-                self.ctx = OpaquePointer(bitPattern: 0x2)
-                self.loadedModelName = name
-                self.loadedCapabilities = capabilities
-                self.estimatedMemoryUsageMB = max(1, Int((Double(fileSize) * 1.5) / 1_048_576.0))
-
-                Task { @MainActor in
-                    self.isLoaded = true
-                    self.modelName = name
-                    self.capabilities = capabilities
-                }
-
-                continuation.resume()
+                // TODO: Replace with llama.cpp model/context loading.
+                // Until llama.cpp is linked, reject the load so ai-status never
+                // reports isLoaded=true while infer always throws.
+                continuation.resume(throwing: InferenceError.loadFailed(
+                    "Native inference is not available until the llama.cpp package is linked."
+                ))
             }
         }
     }

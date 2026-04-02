@@ -405,8 +405,22 @@ struct InferenceHarness {
     }
 
     private func parseJSONObject(from text: String) -> [String: Any]? {
-        guard let range = text.range(of: "\\{.*\\}", options: .regularExpression),
-              let data = String(text[range]).data(using: .utf8),
+        guard let start = text.firstIndex(of: "{") else { return nil }
+        var depth = 0
+        var end: String.Index?
+        for index in text.indices[start...] {
+            switch text[index] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 { end = index; break }
+            default: break
+            }
+            if end != nil { break }
+        }
+        guard let end else { return nil }
+        let json = String(text[start...end])
+        guard let data = json.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }

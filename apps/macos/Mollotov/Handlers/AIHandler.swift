@@ -561,8 +561,21 @@ struct AIHandler {
     }
 
     private func parseResponseJSON(_ text: String) -> (answer: String, transcription: String?) {
-        guard let range = text.range(of: "\\{.*\\}", options: .regularExpression),
-              let data = String(text[range]).data(using: .utf8),
+        guard let start = text.firstIndex(of: "{") else { return (text, nil) }
+        var depth = 0
+        var end: String.Index?
+        for index in text.indices[start...] {
+            switch text[index] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 { end = index; break }
+            default: break
+            }
+            if end != nil { break }
+        }
+        guard let end,
+              let data = String(text[start...end]).data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return (text, nil)
         }
