@@ -12,6 +12,7 @@
 		126B79978FE3000EF23A8AD4 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */; };
 		152CE0312855D852B3093E71 /* CookieMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 579641287CEF21D4E959F84D /* CookieMigrator.swift */; };
 		172225DC1C98D5C2EDEADB43 /* BookmarkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 404CB71EEBF3ACE8E45176BB /* BookmarkHandler.swift */; };
+		175237A2A1049A5E81861DF2 /* PageSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90EBC1A5CCA4A50AFD6E49E5 /* PageSummary.swift */; };
 		1C0C3F1150C33957A3CBF94C /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = E185C2E390B740CDF728E19C /* Resources */; };
 		208357A716B18227409295C4 /* MollotovApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76E5AABD4653BD12BB4E2123 /* MollotovApp.swift */; };
 		277973248493B4908CCC68E8 /* FontAwesome6Brands-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */; };
@@ -42,8 +43,10 @@
 		7B82683E8037080965A5D734 /* NetworkInspectorHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50514DB8C2D787EBE4AF3305 /* NetworkInspectorHandler.swift */; };
 		7B9AFE78B45F9BDE1376442E /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78906A0BAF9128FDE0823BE4 /* ConsoleHandler.swift */; };
 		7D2A8BF2E3A83FF76E052EF7 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445AA6C28445CBA942E6BEF0 /* BookmarkStore.swift */; };
+		86236C1CDA2709D12451F957 /* InferenceHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B5A7BFB995417D32420CB0 /* InferenceHarness.swift */; };
 		8882FD2F27FE96A3F5F42AF8 /* DOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D3DCAD6C6B3FDA9D44E7E1 /* DOMHandler.swift */; };
 		8A8B7EF10041EF851F7AAA2D /* HistoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E98BF1291FC4D3F61C4FA60 /* HistoryHandler.swift */; };
+		8E059CD0A918C3B132A18C20 /* AIHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56EA41EC37CBBB94ABD146D9 /* AIHandler.swift */; };
 		90BA786857C6D50F62AAFD54 /* SharedCookieJar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A279DEE1B36B3F00D8B5DD /* SharedCookieJar.swift */; };
 		91B530F2E22FA6BF9E4CF395 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7FA104E8D04E745182A19899 /* Assets.xcassets */; };
 		9682541DA04399AA9B5D6E6F /* NetworkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A8E784B0595FFB37EFB3AB /* NetworkHandler.swift */; };
@@ -60,14 +63,18 @@
 		AFF490F9BBDA0CCCC5DEB31C /* ScrollHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8EF32C2FF0EEDCEF69F7500 /* ScrollHandler.swift */; };
 		B9418B2ED3FC60A43675184F /* FloatingMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF87ABB3FE3E6A86205ACC2C /* FloatingMenuView.swift */; };
 		C1BF7ADBB60F48EE5D437D69 /* DeviceInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0EFFB873E2A0A306CA0D95F /* DeviceInfo.swift */; };
+		C5AFD11AD39881255196C56D /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD49F7E42E6F598E70664C8 /* AudioRecorder.swift */; };
+		C5ED3961F39583CDA49BB39A /* SystemPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3165F3E062D65F1295516C83 /* SystemPrompt.swift */; };
 		C9CA1F85F7BC8D9DE8F1149A /* AppReveal in Frameworks */ = {isa = PBXBuildFile; productRef = 0DB8F1E8A17657F7F8DC8E1C /* AppReveal */; };
 		CAF0411C9D6561E176B982B7 /* HandlerContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162978C8F601CE6E2D0F6240 /* HandlerContext.swift */; };
 		D5A592B57370DE31F56E2989 /* LLMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA139A3CF468F423C529E96 /* LLMHandler.swift */; };
 		DBD1B5EC65CAC78C7DC5DFEC /* MDNSAdvertiser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5700A0FAD36439D6FEB2D758 /* MDNSAdvertiser.swift */; };
+		E7141A48689A12C8FD52CC10 /* InferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EA976116B8E1E538FF7020 /* InferenceEngine.swift */; };
 		ECD3B26C589B270B52A3C86F /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0281EE6ADC6C42F25FB6DEAA /* HistoryView.swift */; };
 		F0288C63BFECEC5F21C7362E /* BrowserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA0199ABF8A784789BDC239 /* BrowserState.swift */; };
 		F2B3429AE5A07A7A2FDA5F3A /* FontAwesome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F290067E390E0CB0B9E6B3 /* FontAwesome.swift */; };
 		F448A8B2E1B3A561B2C60C92 /* ScreenshotHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852B4917F01094DFDF3771CC /* ScreenshotHandler.swift */; };
+		F6043F6FF255B6973C5D5C4F /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5F2EA8022E452E864C22E /* AIState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -94,6 +101,8 @@
 		1DA139A3CF468F423C529E96 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
 		281B211E466DC23877A0CFAA /* Chromium Embedded Framework.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = "Chromium Embedded Framework.framework"; path = "Frameworks/Chromium Embedded Framework.framework"; sourceTree = "<group>"; };
 		309E4F27B9334A3F85201824 /* Mollotov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mollotov.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3165F3E062D65F1295516C83 /* SystemPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPrompt.swift; sourceTree = "<group>"; };
+		3CD49F7E42E6F598E70664C8 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		404CB71EEBF3ACE8E45176BB /* BookmarkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkHandler.swift; sourceTree = "<group>"; };
 		4312123302280E706CCB6513 /* CEFBridgeSupport.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CEFBridgeSupport.mm; sourceTree = "<group>"; };
 		436A6AEA38D754ACEFE7DD71 /* ToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarView.swift; sourceTree = "<group>"; };
@@ -104,6 +113,7 @@
 		53D3DCAD6C6B3FDA9D44E7E1 /* DOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOMHandler.swift; sourceTree = "<group>"; };
 		56127AD5A3662A6031D9923B /* MutationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutationHandler.swift; sourceTree = "<group>"; };
 		562FBEF540E65E59C1981712 /* ShadowDOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDOMHandler.swift; sourceTree = "<group>"; };
+		56EA41EC37CBBB94ABD146D9 /* AIHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandler.swift; sourceTree = "<group>"; };
 		5700A0FAD36439D6FEB2D758 /* MDNSAdvertiser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MDNSAdvertiser.swift; sourceTree = "<group>"; };
 		579641287CEF21D4E959F84D /* CookieMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieMigrator.swift; sourceTree = "<group>"; };
 		63A8E784B0595FFB37EFB3AB /* NetworkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkHandler.swift; sourceTree = "<group>"; };
@@ -112,25 +122,28 @@
 		7214F2ECA9672C277FEA029F /* CEFBridgeSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CEFBridgeSupport.h; sourceTree = "<group>"; };
 		76E5AABD4653BD12BB4E2123 /* MollotovApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MollotovApp.swift; sourceTree = "<group>"; };
 		78906A0BAF9128FDE0823BE4 /* ConsoleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleHandler.swift; sourceTree = "<group>"; };
+		79B5A7BFB995417D32420CB0 /* InferenceHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceHarness.swift; sourceTree = "<group>"; };
 		7FA104E8D04E745182A19899 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7FE84F648BDB15E85E794E70 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		8162809E474528D24E3E9B7C /* ServerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerState.swift; sourceTree = "<group>"; };
 		852B4917F01094DFDF3771CC /* ScreenshotHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotHandler.swift; sourceTree = "<group>"; };
 		89C861F192A9A3ACE2F8938D /* Mollotov-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Mollotov-Bridging-Header.h"; sourceTree = "<group>"; };
 		8E98BF1291FC4D3F61C4FA60 /* HistoryHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryHandler.swift; sourceTree = "<group>"; };
+		90EBC1A5CCA4A50AFD6E49E5 /* PageSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSummary.swift; sourceTree = "<group>"; };
 		960708A4F41329C95791056C /* BrowserManagementHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserManagementHandler.swift; sourceTree = "<group>"; };
 		9A725A6D726F01958B42A058 /* iOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iOS; path = vendor/AppReveal/iOS; sourceTree = SOURCE_ROOT; };
 		9BA0199ABF8A784789BDC239 /* BrowserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserState.swift; sourceTree = "<group>"; };
 		9DF73FE78326C991680045EA /* ShellToastCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellToastCardView.swift; sourceTree = "<group>"; };
+		9EA291E9B4630814D706614C /* MollotovHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MollotovHelper.entitlements; sourceTree = "<group>"; };
 		9EEE4C649FA0D9CDB87D5CAE /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		A3A279DEE1B36B3F00D8B5DD /* SharedCookieJar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedCookieJar.swift; sourceTree = "<group>"; };
 		A3E8E0DA5886C252FE1BCE75 /* NetworkTrafficStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTrafficStore.swift; sourceTree = "<group>"; };
 		A8EF32C2FF0EEDCEF69F7500 /* ScrollHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollHandler.swift; sourceTree = "<group>"; };
 		AF87ABB3FE3E6A86205ACC2C /* FloatingMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingMenuView.swift; sourceTree = "<group>"; };
+		B2EA976116B8E1E538FF7020 /* InferenceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceEngine.swift; sourceTree = "<group>"; };
 		B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
 		C075E2F2B42D9EDE4C214300 /* CEFBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CEFBridge.h; sourceTree = "<group>"; };
 		C2D650BD3262369BC889CF36 /* Mollotov.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mollotov.entitlements; sourceTree = "<group>"; };
-		C59EB58D4C24405C996EFED9 /* MollotovHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MollotovHelper.entitlements; sourceTree = "<group>"; };
 		C5EC38FA257BD4850CFDA1CB /* FontAwesome6Brands-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "FontAwesome6Brands-Regular.otf"; sourceTree = "<group>"; };
 		C92368DA5EFDB00C52250471 /* safari.svg */ = {isa = PBXFileReference; path = safari.svg; sourceTree = "<group>"; };
 		CCC3FD06DEFCCD993A28E73D /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
@@ -142,6 +155,7 @@
 		E0EBDA54AD4B7D66D0679B16 /* NavigationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationHandler.swift; sourceTree = "<group>"; };
 		E0EFFB873E2A0A306CA0D95F /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
 		E185C2E390B740CDF728E19C /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Resources; path = Mollotov/Resources; sourceTree = SOURCE_ROOT; };
+		E4C5F2EA8022E452E864C22E /* AIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIState.swift; sourceTree = "<group>"; };
 		EBDD878D4C22BF12A3834C0C /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
 		EEAFBD413B4422142E5E8EB2 /* RendererEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RendererEngine.swift; sourceTree = "<group>"; };
 		F1BB3B14BDF40CF58F8064F5 /* EvaluateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluateHandler.swift; sourceTree = "<group>"; };
@@ -178,6 +192,19 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
+		19ABEC179548C6C2DCE330DB /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				E4C5F2EA8022E452E864C22E /* AIState.swift */,
+				3CD49F7E42E6F598E70664C8 /* AudioRecorder.swift */,
+				B2EA976116B8E1E538FF7020 /* InferenceEngine.swift */,
+				79B5A7BFB995417D32420CB0 /* InferenceHarness.swift */,
+				90EBC1A5CCA4A50AFD6E49E5 /* PageSummary.swift */,
+				3165F3E062D65F1295516C83 /* SystemPrompt.swift */,
+			);
+			path = AI;
+			sourceTree = "<group>";
+		};
 		1C7B40776A4207A60A3D4CFC = {
 			isa = PBXGroup;
 			children = (
@@ -194,7 +221,7 @@
 			isa = PBXGroup;
 			children = (
 				DEC3C71320922D6D9C4E7DC4 /* main.mm */,
-				C59EB58D4C24405C996EFED9 /* MollotovHelper.entitlements */,
+				9EA291E9B4630814D706614C /* MollotovHelper.entitlements */,
 			);
 			path = MollotovHelper;
 			sourceTree = "<group>";
@@ -206,6 +233,7 @@
 				89C861F192A9A3ACE2F8938D /* Mollotov-Bridging-Header.h */,
 				C2D650BD3262369BC889CF36 /* Mollotov.entitlements */,
 				76E5AABD4653BD12BB4E2123 /* MollotovApp.swift */,
+				19ABEC179548C6C2DCE330DB /* AI */,
 				E213F9D08D175FDABEA91E16 /* Browser */,
 				37B70E4EE5E0F80C2705D1F6 /* Device */,
 				4A09CCC739B0B4F9D271BA6F /* Handlers */,
@@ -230,6 +258,7 @@
 		4A09CCC739B0B4F9D271BA6F /* Handlers */ = {
 			isa = PBXGroup;
 			children = (
+				56EA41EC37CBBB94ABD146D9 /* AIHandler.swift */,
 				404CB71EEBF3ACE8E45176BB /* BookmarkHandler.swift */,
 				960708A4F41329C95791056C /* BrowserManagementHandler.swift */,
 				78906A0BAF9128FDE0823BE4 /* ConsoleHandler.swift */,
@@ -367,6 +396,7 @@
 				DCD02691F673967519F5DDAC /* Frameworks */,
 				1D04DF0D46620C8E549FAB02 /* Embed CEF Framework */,
 				4C90643931740D7E422B9615 /* Embed MollotovHelper */,
+				34132CF9D4B139B897917E84 /* Embed Gecko Helper */,
 			);
 			buildRules = (
 			);
@@ -407,9 +437,10 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
 			};
 			buildConfigurationList = F622A74E7772E11DDD09D877 /* Build configuration list for PBXProject "Mollotov" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -422,6 +453,7 @@
 				5A46441D4B75BCEF8B7354B4 /* XCLocalSwiftPackageReference "vendor/AppReveal/iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = A407DCFEC66FD0D9BF7CDB3A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -467,6 +499,25 @@
 			shellPath = /bin/sh;
 			shellScript = "CEF_SRC=\"${PROJECT_DIR}/Frameworks/Chromium Embedded Framework.framework\"\nCEF_DST=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Chromium Embedded Framework.framework\"\nrm -rf \"$CEF_DST\"\nmkdir -p \"$CEF_DST/Versions/A\"\ncp \"$CEF_SRC/Chromium Embedded Framework\" \"$CEF_DST/Versions/A/\"\nrsync -a \"$CEF_SRC/Resources/\" \"$CEF_DST/Versions/A/Resources/\"\nif [ -d \"$CEF_SRC/Libraries\" ]; then\n  rsync -a \"$CEF_SRC/Libraries/\" \"$CEF_DST/Versions/A/Libraries/\"\n  ln -sf Versions/Current/Libraries \"$CEF_DST/Libraries\"\nfi\nln -sf A \"$CEF_DST/Versions/Current\"\nln -sf \"Versions/Current/Chromium Embedded Framework\" \"$CEF_DST/Chromium Embedded Framework\"\nln -sf Versions/Current/Resources \"$CEF_DST/Resources\"\n";
 		};
+		34132CF9D4B139B897917E84 /* Embed Gecko Helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Gecko Helper";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "GECKO_SRC=\"${PROJECT_DIR}/Frameworks/MollotovGeckoHelper.app\"\nGECKO_DST=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/MollotovGeckoHelper.app\"\nif [ -d \"$GECKO_SRC\" ]; then\n  rm -rf \"$GECKO_DST\"\n  cp -R \"$GECKO_SRC\" \"$GECKO_DST\"\n  codesign -fs - \"$GECKO_DST\" 2>/dev/null || true\n  echo \"Gecko helper embedded at $GECKO_DST\"\nelse\n  echo \"warning: MollotovGeckoHelper.app not found — run 'make gecko-runtime' first\"\nfi\n";
+		};
 		4C90643931740D7E422B9615 /* Embed MollotovHelper */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -484,7 +535,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "HELPER_EXE=\"${BUILT_PRODUCTS_DIR}/MollotovHelper\"\nHELPER_ROOT=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\n\nstage_helper() {\n  local helper_name=\"$1\"\n  local bundle_id=\"$2\"\n  local app_dir=\"${HELPER_ROOT}/${helper_name}.app\"\n  local exe_dir=\"${app_dir}/Contents/MacOS\"\n  local exe_path=\"${exe_dir}/${helper_name}\"\n  local plist_path=\"${app_dir}/Contents/Info.plist\"\n\n  mkdir -p \"$exe_dir\"\n  cp \"$HELPER_EXE\" \"$exe_path\"\n\n  /usr/libexec/PlistBuddy -c \"Clear dict\" \"$plist_path\" 2>/dev/null || true\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleExecutable string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleIdentifier string ${bundle_id}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleName string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundlePackageType string APPL\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string 1\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :LSUIElement bool true\" \"$plist_path\"\n\n  # Fix CEF framework path — helper is nested 4 levels deep from Frameworks/\n  install_name_tool -change \\\n    \"@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"$exe_path\" 2>/dev/null || true\n\n  codesign -fs - --entitlements \"${SRCROOT}/MollotovHelper/MollotovHelper.entitlements\" \"$exe_path\" 2>/dev/null || true\n  codesign -fs - --entitlements \"${SRCROOT}/MollotovHelper/MollotovHelper.entitlements\" \"$app_dir\" 2>/dev/null || true\n}\n\nrm -rf \\\n  \"${HELPER_ROOT}/Mollotov Helper.app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Renderer).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (GPU).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Plugin).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Alerts).app\"\n\nstage_helper \"Mollotov Helper\" \"com.mollotov.browser.helper\"\nstage_helper \"Mollotov Helper (Renderer)\" \"com.mollotov.browser.helper.renderer\"\nstage_helper \"Mollotov Helper (GPU)\" \"com.mollotov.browser.helper.gpu\"\nstage_helper \"Mollotov Helper (Plugin)\" \"com.mollotov.browser.helper.plugin\"\nstage_helper \"Mollotov Helper (Alerts)\" \"com.mollotov.browser.helper.alerts\"\n";
+			shellScript = "HELPER_EXE=\"${BUILT_PRODUCTS_DIR}/MollotovHelper\"\nHELPER_ROOT=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\n\nstage_helper() {\n  local helper_name=\"$1\"\n  local bundle_id=\"$2\"\n  local app_dir=\"${HELPER_ROOT}/${helper_name}.app\"\n  local exe_dir=\"${app_dir}/Contents/MacOS\"\n  local exe_path=\"${exe_dir}/${helper_name}\"\n  local plist_path=\"${app_dir}/Contents/Info.plist\"\n\n  mkdir -p \"$exe_dir\"\n  cp \"$HELPER_EXE\" \"$exe_path\"\n\n  /usr/libexec/PlistBuddy -c \"Clear dict\" \"$plist_path\" 2>/dev/null || true\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleExecutable string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleIdentifier string ${bundle_id}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleName string ${helper_name}\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundlePackageType string APPL\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string 1\" \"$plist_path\"\n  /usr/libexec/PlistBuddy -c \"Add :LSUIElement bool true\" \"$plist_path\"\n\n  # Fix CEF framework path — helper is nested 4 levels deep from Frameworks/\n  install_name_tool -change \\\n    \"@executable_path/../Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework\" \\\n    \"$exe_path\" 2>/dev/null || true\n\n  codesign -fs - \"$exe_path\" 2>/dev/null || true\n  codesign -fs - \"$app_dir\" 2>/dev/null || true\n}\n\nrm -rf \\\n  \"${HELPER_ROOT}/Mollotov Helper.app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Renderer).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (GPU).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Plugin).app\" \\\n  \"${HELPER_ROOT}/Mollotov Helper (Alerts).app\"\n\nstage_helper \"Mollotov Helper\" \"com.mollotov.browser.helper\"\nstage_helper \"Mollotov Helper (Renderer)\" \"com.mollotov.browser.helper.renderer\"\nstage_helper \"Mollotov Helper (GPU)\" \"com.mollotov.browser.helper.gpu\"\nstage_helper \"Mollotov Helper (Plugin)\" \"com.mollotov.browser.helper.plugin\"\nstage_helper \"Mollotov Helper (Alerts)\" \"com.mollotov.browser.helper.alerts\"\n";
 		};
 		964C7525F2EA2B440ED6545F /* Fix CEF Framework Structure */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -512,6 +563,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8E059CD0A918C3B132A18C20 /* AIHandler.swift in Sources */,
+				F6043F6FF255B6973C5D5C4F /* AIState.swift in Sources */,
+				C5AFD11AD39881255196C56D /* AudioRecorder.swift in Sources */,
 				172225DC1C98D5C2EDEADB43 /* BookmarkHandler.swift in Sources */,
 				7D2A8BF2E3A83FF76E052EF7 /* BookmarkStore.swift in Sources */,
 				51C6761FB2859B6F6F989784 /* BookmarksView.swift in Sources */,
@@ -535,6 +589,8 @@
 				8A8B7EF10041EF851F7AAA2D /* HistoryHandler.swift in Sources */,
 				2A362459AE00805D47DF675D /* HistoryStore.swift in Sources */,
 				ECD3B26C589B270B52A3C86F /* HistoryView.swift in Sources */,
+				E7141A48689A12C8FD52CC10 /* InferenceEngine.swift in Sources */,
+				86236C1CDA2709D12451F957 /* InferenceHarness.swift in Sources */,
 				ADD06DFD9092FE2E691350CD /* InteractionHandler.swift in Sources */,
 				D5A592B57370DE31F56E2989 /* LLMHandler.swift in Sources */,
 				DBD1B5EC65CAC78C7DC5DFEC /* MDNSAdvertiser.swift in Sources */,
@@ -546,6 +602,7 @@
 				7B82683E8037080965A5D734 /* NetworkInspectorHandler.swift in Sources */,
 				77D3AD70DE5B5EE422C071B8 /* NetworkInspectorView.swift in Sources */,
 				617ED286D4D49B4C388F2527 /* NetworkTrafficStore.swift in Sources */,
+				175237A2A1049A5E81861DF2 /* PageSummary.swift in Sources */,
 				53AEC20EFF3F4E970C1B4789 /* RendererEngine.swift in Sources */,
 				5254EB171A93AFE1024C3C6C /* RendererHandler.swift in Sources */,
 				52698080F050A35F497008AF /* RendererState.swift in Sources */,
@@ -558,6 +615,7 @@
 				6C20C0A317E39E5743D84A29 /* ShadowDOMHandler.swift in Sources */,
 				90BA786857C6D50F62AAFD54 /* SharedCookieJar.swift in Sources */,
 				A16EB5D32549CB66C73D9F83 /* ShellToastCardView.swift in Sources */,
+				C5ED3961F39583CDA49BB39A /* SystemPrompt.swift in Sources */,
 				98ECBDAA13AB0E99D6D60C1B /* ToolbarView.swift in Sources */,
 				662663FD968E2DD3AFAA1DD0 /* URLBarView.swift in Sources */,
 				383CFB825CB94A5E8271E602 /* ViewportState.swift in Sources */,
@@ -592,7 +650,6 @@
 				CODE_SIGN_ENTITLEMENTS = Mollotov/Mollotov.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
 					"\"Frameworks\"",
@@ -685,7 +742,6 @@
 		B248942DD429D91E0A085CBF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MollotovHelper/MollotovHelper.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
@@ -702,7 +758,6 @@
 		B2886AAC7D6FB229079756D4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = MollotovHelper/MollotovHelper.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
@@ -786,7 +841,6 @@
 				CODE_SIGN_ENTITLEMENTS = Mollotov/Mollotov.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(PROJECT_DIR)/Frameworks",
 					"\"Frameworks\"",

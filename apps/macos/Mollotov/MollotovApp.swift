@@ -206,6 +206,7 @@ struct MollotovApp: App {
     init() {
         let launchPort = Self.launchPortArgument() ?? 8420
         _serverState = StateObject(wrappedValue: ServerState(port: UInt16(launchPort)))
+        _ = AIState.shared
     }
 
     var body: some Scene {

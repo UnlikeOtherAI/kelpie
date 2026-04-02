@@ -57,6 +57,7 @@ final class Router: @unchecked Sendable {
             "show-keyboard", "hide-keyboard", "get-keyboard-state",
             "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
             "toast", "safari-auth",
+            "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record",
             "set-orientation", "get-orientation",
         ]
         for method in methods {
