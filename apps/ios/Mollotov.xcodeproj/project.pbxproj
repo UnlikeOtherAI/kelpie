@@ -49,6 +49,9 @@
 		A100000043 /* ExternalDisplayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000043 /* ExternalDisplayManager.swift */; };
 		A100000044 /* TVControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000044 /* TVControlsView.swift */; };
 		A100000045 /* TouchpadOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000045 /* TouchpadOverlayView.swift */; };
+		A100000051 /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* AIState.swift */; };
+		A100000052 /* PlatformAIEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000052 /* PlatformAIEngine.swift */; };
+		A100000053 /* AIHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000053 /* AIHandler.swift */; };
 		A100000050 /* AppReveal in Frameworks */ = {isa = PBXBuildFile; productRef = C400000001 /* AppReveal */; };
 		B8938E567C074345A7356BE6 /* BookmarkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */; };
 		D2474B135EE9443A9A60289B /* NetworkTrafficStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E8CCB2224B44E128F3A4D13 /* NetworkTrafficStore.swift */; };
@@ -100,6 +103,9 @@
 		B100000043 /* ExternalDisplayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDisplayManager.swift; sourceTree = "<group>"; };
 		B100000044 /* TVControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVControlsView.swift; sourceTree = "<group>"; };
 		B100000045 /* TouchpadOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchpadOverlayView.swift; sourceTree = "<group>"; };
+		B100000051 /* AIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIState.swift; sourceTree = "<group>"; };
+		B100000052 /* PlatformAIEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformAIEngine.swift; sourceTree = "<group>"; };
+		B100000053 /* AIHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandler.swift; sourceTree = "<group>"; };
 		B100000099 /* Mollotov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mollotov.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B18084C632DD449F8D789F86 /* BookmarksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksView.swift; sourceTree = "<group>"; };
 		D43743BF12FB4153846B26F0 /* NetworkInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInspectorView.swift; sourceTree = "<group>"; };
@@ -133,6 +139,7 @@
 				B100000014 /* Assets.xcassets */,
 				D100000003 /* Views */,
 				D100000004 /* Browser */,
+				D100000010 /* AI */,
 				D100000005 /* Network */,
 				D100000006 /* Device */,
 				D100000007 /* Debug */,
@@ -172,6 +179,15 @@
 				B100000043 /* ExternalDisplayManager.swift */,
 			);
 			path = Browser;
+			sourceTree = "<group>";
+		};
+		D100000010 /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				B100000051 /* AIState.swift */,
+				B100000052 /* PlatformAIEngine.swift */,
+			);
+			path = AI;
 			sourceTree = "<group>";
 		};
 		D100000005 /* Network */ = {
@@ -221,6 +237,7 @@
 				6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */,
 				2B6D15DFA38F44B4B6FAF87A /* HistoryHandler.swift */,
 				5DB2AF2F00F14EECB220A2EB /* NetworkInspectorHandler.swift */,
+				B100000053 /* AIHandler.swift */,
 				B100000040 /* NetworkBridge.swift */,
 			);
 			path = Handlers;
@@ -352,6 +369,9 @@
 				A100000043 /* ExternalDisplayManager.swift in Sources */,
 				A100000044 /* TVControlsView.swift in Sources */,
 				A100000045 /* TouchpadOverlayView.swift in Sources */,
+				A100000051 /* AIState.swift in Sources */,
+				A100000052 /* PlatformAIEngine.swift in Sources */,
+				A100000053 /* AIHandler.swift in Sources */,
 				DFDB1F217CF14213A9FB5CCE /* BookmarkStore.swift in Sources */,
 				557BEEFEC864450EB89DE351 /* HistoryStore.swift in Sources */,
 				D2474B135EE9443A9A60289B /* NetworkTrafficStore.swift in Sources */,

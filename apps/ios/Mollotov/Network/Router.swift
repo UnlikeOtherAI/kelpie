@@ -58,6 +58,7 @@ final class Router: @unchecked Sendable {
             "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
             "toast", "safari-auth",
             "set-orientation", "get-orientation",
+            "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record",
         ]
         for method in methods {
             if routes[method] == nil {

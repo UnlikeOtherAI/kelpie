@@ -13,6 +13,7 @@ All methods are available via three interfaces:
 | [llm.md](llm.md) | LLM-optimized methods — accessibility tree, annotated screenshots, visible elements, page text, form state, smart queries |
 | [devtools.md](devtools.md) | Console/JS errors, network log, resource timeline, mutation observation, shadow DOM, request interception |
 | [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, renderer management |
+| [ai.md](ai.md) | Local inference backends, model switching, inference, and audio recording endpoints |
 
 ---
 
@@ -57,6 +58,7 @@ Not all methods have identical implementations on Android, iOS, and macOS. Andro
 | Keyboard simulation | Native | Native | Not supported | macOS has no soft keyboard equivalent to show or hide |
 | Named viewport presets (`get-viewport-presets`, `set-viewport-preset`) | Native (tablet only) | Native (iPad only) | Native | Linux does not support named viewport presets yet; phones return no preset support |
 | Renderer switching (`set-renderer`, `get-renderer`) | Not supported | Not supported | Native | macOS switches between WebKit and Chromium/CEF at runtime and migrates cookies automatically |
+| AI endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`) | App-managed | App-managed | App-managed | iOS/Android default to platform AI on supported hardware and can switch to remote Ollama; macOS uses native GGUF or Ollama |
 
 **Legend:**
 - **Native** — uses platform SDK APIs, no scripts needed
@@ -243,6 +245,11 @@ When exposed via MCP, methods use the `mollotov_` prefix:
 | `/v1/set-orientation` | `mollotov_set_orientation` |
 | `/v1/get-orientation` | `mollotov_get_orientation` |
 | `/v1/is-element-obscured` | `mollotov_is_element_obscured` |
+| `/v1/ai-status` | `mollotov_ai_status` |
+| `/v1/ai-load` | `mollotov_ai_load` |
+| `/v1/ai-unload` | `mollotov_ai_unload` |
+| `/v1/ai-infer` | `mollotov_ai_ask` |
+| `/v1/ai-record` | `mollotov_ai_record` |
 
 CLI MCP adds additional tools:
 

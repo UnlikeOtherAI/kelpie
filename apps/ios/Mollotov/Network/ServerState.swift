@@ -92,6 +92,7 @@ final class ServerState: ObservableObject {
         ShadowDOMHandler(context: ctx).register(on: router)
         BrowserManagementHandler(context: ctx).register(on: router)
         LLMHandler(context: ctx).register(on: router)
+        AIHandler(context: ctx).register(on: router)
         BookmarkHandler(context: ctx).register(on: router)
         HistoryHandler(context: ctx).register(on: router)
         NetworkInspectorHandler(context: ctx).register(on: router)

@@ -1839,6 +1839,17 @@ git add apps/ios/Mollotov/AI/ apps/ios/Mollotov/Handlers/AIHandler.swift apps/io
 git commit -m "feat(ios): add platform AI (Apple Intelligence) as default backend"
 ```
 
+#### Cross-Provider Review
+
+- Reviewer: Gemini CLI adversarial review on 2026-04-02.
+- Adopted:
+  - Keep backend transitions explicit on iOS. If Ollama is configured but unavailable, `ai-infer` fails with an Ollama error instead of silently falling back to platform AI mid-request.
+  - Persist iOS backend state so `ai-status`, `ai-load`, and `ai-unload` stay coherent across launches.
+  - Report iOS platform AI as text-only in `ai-status`.
+- Rejected for Task 12:
+  - Replacing the `iOS 26` availability proxy now. The task is explicitly stubbed until the Foundation Models SDK is available in-tree, so the version check remains a temporary placeholder.
+  - Pulling the full macOS inference harness into iOS. Task 12 is only backend selection and transport plumbing.
+
 ---
 
 ### Task 13: Android — Platform AI Handler
