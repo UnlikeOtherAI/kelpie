@@ -1,10 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "./dist",
-    "rootDir": "./src",
     "composite": false,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@unlikeotherai/mollotov-shared": ["../shared/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }
