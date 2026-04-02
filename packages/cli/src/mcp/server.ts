@@ -8,9 +8,10 @@ import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
 import type { Platform } from "@unlikeotherai/mollotov-shared";
+import { join } from "node:path";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
-import { downloadModel } from "../ai/download.js";
+import { buildDownloadUrl, downloadModel } from "../ai/download.js";
 import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 
 export function createMcpServer(): McpServer {
@@ -77,7 +78,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
       id: m.id,
       name: m.name,
       quantization: m.quantization,
-      sizeGB: m.sizeGB,
+      sizeGB: +(m.sizeBytes / 1_073_741_824).toFixed(1),
       downloaded: downloaded.some((d) => d.id === m.id),
     }));
     const result: Record<string, unknown> = { success: true, models: rows };
@@ -100,9 +101,11 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
       return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, message: "Already downloaded", path: store.getModelPath(modelId) }) }] };
     }
     try {
-      const result = await downloadModel(model);
-      store.register(modelId, result.path, result.sha256);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, model: modelId, path: result.path }) }] };
+      const url = buildDownloadUrl(model.huggingFaceRepo, model.huggingFaceFile);
+      const destPath = join(store.getModelDir(modelId), "model.gguf");
+      await downloadModel(url, destPath, model.sha256);
+      store.register(modelId, { name: model.name, capabilities: [...model.capabilities] });
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, model: modelId, path: destPath }) }] };
     } catch (err) {
       return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: { code: "DOWNLOAD_FAILED", message: (err as Error).message } }) }] };
     }

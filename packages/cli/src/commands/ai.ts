@@ -1,8 +1,9 @@
 import type { Command } from "commander";
+import { join } from "node:path";
 import { deviceCommand, getGlobals } from "./helpers.js";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
-import { downloadModel } from "../ai/download.js";
+import { buildDownloadUrl, downloadModel } from "../ai/download.js";
 import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 import { print } from "../output/formatter.js";
 
@@ -20,7 +21,7 @@ export function registerAI(program: Command): void {
         id: m.id,
         name: m.name,
         quantization: m.quantization,
-        sizeGB: m.sizeGB,
+        sizeGB: +(m.sizeBytes / 1_073_741_824).toFixed(1),
         downloaded: downloaded.some((d) => d.id === m.id),
       }));
       const result: Record<string, unknown> = { success: true, models: rows };
@@ -50,10 +51,13 @@ export function registerAI(program: Command): void {
         return;
       }
       try {
-        console.error(`Downloading ${model.name} (${model.sizeGB} GB)...`);
-        const result = await downloadModel(model);
-        store.register(modelId, result.path, result.sha256);
-        print({ success: true, model: modelId, path: result.path, sha256: result.sha256 }, globals.format);
+        const sizeGB = (model.sizeBytes / 1_073_741_824).toFixed(1);
+        console.error(`Downloading ${model.name} (${sizeGB} GB)...`);
+        const url = buildDownloadUrl(model.huggingFaceRepo, model.huggingFaceFile);
+        const destPath = join(store.getModelDir(modelId), "model.gguf");
+        await downloadModel(url, destPath, model.sha256);
+        store.register(modelId, { name: model.name, capabilities: [...model.capabilities] });
+        print({ success: true, model: modelId, path: destPath }, globals.format);
       } catch (err) {
         print({ success: false, error: { code: "DOWNLOAD_FAILED", message: (err as Error).message } }, globals.format);
         process.exitCode = 1;
