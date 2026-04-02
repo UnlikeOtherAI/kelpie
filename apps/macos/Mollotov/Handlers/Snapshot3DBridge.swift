@@ -166,7 +166,13 @@ enum Snapshot3DBridge {
                 if (isInsideSVG(el) && el.tagName !== 'svg' && el.tagName !== 'SVG') continue;
 
                 var depth = getDepth(el) + baseDepth;
-                collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el) });
+                var cs = window.getComputedStyle(el);
+                var pos = cs.position;
+                var isCrossOriginIframe = false;
+                if (el.tagName === 'IFRAME') {
+                    try { var _d = el.contentDocument; } catch(e) { isCrossOriginIframe = true; }
+                }
+                collected.push({ el: el, depth: depth, isLeaf: isLeafPlane(el), position: pos, isCrossOriginIframe: isCrossOriginIframe, hasProcessedChild: false });
 
                 // Recurse into open shadow roots
                 if (el.shadowRoot && collected.length < MAX_ELEMENTS) {
@@ -186,6 +192,37 @@ enum Snapshot3DBridge {
         }
 
         collectElements(document.body, 0);
+
+        // Show warning toast if element cap was hit
+        if (collected.length >= MAX_ELEMENTS) {
+            var toast = document.createElement('div');
+            toast.id = '__m3d_toast';
+            toast.textContent = 'Page has too many elements for 3D inspection. Showing top ' + MAX_ELEMENTS + '.';
+            toast.style.cssText = [
+                'position: fixed', 'top: 16px', 'left: 50%', 'transform: translateX(-50%)',
+                'padding: 10px 20px', 'border-radius: 10px',
+                'background: rgba(200, 80, 0, 0.9)', 'color: #fff',
+                'font: 600 13px/1.4 -apple-system, system-ui, sans-serif',
+                'pointer-events: none', 'z-index: 2147483647',
+                'backdrop-filter: blur(8px)', '-webkit-backdrop-filter: blur(8px)',
+                'transition: opacity 0.3s'
+            ].join(';');
+            document.documentElement.appendChild(toast);
+            setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 5000);
+        }
+
+        // Mark ancestors of processed children for selective overflow override
+        for (var a = 0; a < collected.length; a++) {
+            var ancestor = collected[a].el.parentElement;
+            while (ancestor && ancestor !== document.documentElement) {
+                var found = false;
+                for (var b = 0; b < collected.length; b++) {
+                    if (collected[b].el === ancestor) { collected[b].hasProcessedChild = true; found = true; break; }
+                }
+                if (found) break;
+                ancestor = ancestor.parentElement;
+            }
+        }
 
         // Read original styles for each element
         for (var r = 0; r < collected.length; r++) {
@@ -246,23 +283,35 @@ enum Snapshot3DBridge {
             try { el.style.webkitMask = 'none'; } catch(e) {}
             try { el.style.mask = 'none'; } catch(e) {}
 
-            // Only override overflow on ancestors of 3D children (not leaf nodes)
-            if (!item.isLeaf) {
+            // Only override overflow on direct ancestors of processed 3D children
+            if (item.hasProcessedChild) {
                 el.style.overflow = 'visible';
             }
 
-            // Convert fixed/sticky to absolute
-            var cs = window.getComputedStyle(el);
-            if (cs.position === 'fixed' || cs.position === 'sticky') {
+            // Convert fixed/sticky to absolute (using Phase 1 stored value)
+            if (item.position === 'fixed' || item.position === 'sticky') {
                 el.style.position = 'absolute';
             }
 
-            // Subtle background for transparent containers
+            // Subtle background for transparent containers (read bg before any writes above)
             if (!item.isLeaf && el.children.length > 0) {
-                var bg = cs.backgroundColor;
+                var bg = window.getComputedStyle(el).backgroundColor;
                 if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') {
                     el.style.background = 'rgba(200, 210, 220, 0.04)';
                 }
+            }
+
+            // Add domain label for cross-origin iframes
+            if (item.isCrossOriginIframe) {
+                var iframeSrc = el.getAttribute('src') || '';
+                var domain = '';
+                try { domain = new URL(iframeSrc, window.location.href).hostname; } catch(e) { domain = iframeSrc; }
+                var label = document.createElement('div');
+                label.className = '__m3d_iframe_label';
+                label.textContent = 'iframe: ' + (domain || 'cross-origin');
+                label.style.cssText = 'position:absolute;top:0;left:0;padding:2px 6px;background:rgba(0,0,0,0.7);color:#fff;font:10px/1.2 -apple-system,system-ui,sans-serif;pointer-events:none;z-index:2147483647;border-radius:0 0 4px 0;';
+                el.parentElement.insertBefore(label, el.nextSibling);
+                state.modifiedElements.push(label);
             }
 
             el.setAttribute('data-m3d-depth', String(depth));
@@ -384,8 +433,6 @@ enum Snapshot3DBridge {
                     ? '.' + Array.from(hoveredEl.classList).join('.') : '';
                 var depthAttr = hoveredEl.getAttribute('data-m3d-depth') || '?';
 
-                // Show original dimensions (pre-transform)
-                var origRect = state.origStyles.get(hoveredEl);
                 var rect = hoveredEl.getBoundingClientRect();
                 var dim = Math.round(rect.width) + '\u00D7' + Math.round(rect.height);
 
@@ -395,6 +442,17 @@ enum Snapshot3DBridge {
                 var zIdx = cs.zIndex;
                 var meta = pos !== 'static' ? ' pos:' + pos : '';
                 meta += zIdx !== 'auto' ? ' z:' + zIdx : '';
+
+                // Detect stacking context creation
+                var createsCtx = false;
+                if (pos !== 'static' && zIdx !== 'auto') createsCtx = true;
+                else if (cs.opacity !== '1') createsCtx = true;
+                else if (cs.transform && cs.transform !== 'none') createsCtx = true;
+                else if (cs.filter && cs.filter !== 'none') createsCtx = true;
+                else if (cs.isolation === 'isolate') createsCtx = true;
+                else if (cs.mixBlendMode && cs.mixBlendMode !== 'normal') createsCtx = true;
+                else if (cs.contain === 'layout' || cs.contain === 'paint' || cs.contain === 'strict' || cs.contain === 'content') createsCtx = true;
+                if (createsCtx) meta += ' [stacking-ctx]';
 
                 infoPanel.textContent = '<' + tag + id + cls + '> ' + dim + ' depth:' + depthAttr + meta;
                 infoPanel.style.opacity = '1';
@@ -474,11 +532,17 @@ enum Snapshot3DBridge {
             try { entry[0].removeEventListener(entry[1], entry[2], entry[3]); } catch(e) {}
         }
 
-        // Remove overlay and suppression style
+        // Remove overlay, suppression style, and warning toast
         var overlay = document.getElementById('__m3d_overlay');
         if (overlay) overlay.remove();
         var suppress = document.getElementById('__m3d_suppress');
         if (suppress) suppress.remove();
+        var toast = document.getElementById('__m3d_toast');
+        if (toast) toast.remove();
+
+        // Remove cross-origin iframe labels
+        var labels = document.querySelectorAll('.__m3d_iframe_label');
+        for (var l = 0; l < labels.length; l++) labels[l].remove();
 
         // Restore element styles from WeakMap
         for (var j = 0; j < state.modifiedElements.length; j++) {

@@ -179,12 +179,24 @@ final class HandlerContext {
     }
 
     func reloadPage() {
-        reset3DInspectorForNavigation()
+        if isIn3DInspector {
+            Task { @MainActor in
+                await exit3DInspectorIfNeeded(notify: true)
+                renderer?.reload()
+            }
+            return
+        }
         renderer?.reload()
     }
 
     func hardReloadPage() {
-        reset3DInspectorForNavigation()
+        if isIn3DInspector {
+            Task { @MainActor in
+                await exit3DInspectorIfNeeded(notify: true)
+                renderer?.hardReload()
+            }
+            return
+        }
         renderer?.hardReload()
     }
 

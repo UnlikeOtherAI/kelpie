@@ -231,11 +231,11 @@ Response:
 ```
 
 ### `snapshot-3d-enter`
-Enter 3D DOM inspection mode. Explodes the page into a layered depth view.
+Enter 3D DOM inspection mode. Explodes the page into a layered depth view. Requires the 3D inspector feature flag to be enabled (Settings toggle or `MOLLOTOV_3D_INSPECTOR=1` environment variable).
 
 - Method: POST
 - Body: none
-- Response: `{success: true}` or error if already active
+- Response: `{success: true}` or error (`FEATURE_DISABLED`, `ALREADY_ACTIVE`, `ACTIVATION_FAILED`)
 
 ### `snapshot-3d-exit`
 Exit 3D DOM inspection mode. Restores the page to its original state.
@@ -247,9 +247,10 @@ Exit 3D DOM inspection mode. Restores the page to its original state.
 ### `snapshot-3d-status`
 Check whether 3D DOM inspection mode is currently active.
 
-- Method: POST
+- Method: GET
 - Body: none
 - Response: `{success: true, active: true|false}`
+
 ## Mutation Observation
 
 ### `watchMutations`
