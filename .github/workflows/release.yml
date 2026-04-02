@@ -172,7 +172,7 @@ jobs:
 
               (
                 cd "${package_root}"
-                sha256sum *.tar.gz *.deb *.rpm *.AppImage 2>/dev/null | tee checksums.txt || true
+                sha256sum ./*.tar.gz ./*.deb ./*.rpm ./*.AppImage 2>/dev/null | tee checksums.txt || true
               )
               chmod -R a+rX dist/release
             '
@@ -246,7 +246,7 @@ jobs:
 
           (
             cd "${out_dir}"
-            sha256sum *.apk *.aab > checksums.txt
+            sha256sum ./*.apk ./*.aab > checksums.txt
           )
 
       - uses: actions/upload-artifact@v4
@@ -305,15 +305,17 @@ jobs:
           pnpm --filter @unlikeotherai/mollotov pack --pack-destination dist/release/cli
           (
             cd dist/release/cli
-            sha256sum *.tgz > checksums.txt
+            sha256sum ./*.tgz > checksums.txt
           )
 
       - name: Publish shared package to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            exit 0
+          fi
           version="$(node -p "require('./packages/shared/package.json').version")"
           if npm view "@unlikeotherai/mollotov-shared@${version}" version >/dev/null 2>&1; then
             echo "@unlikeotherai/mollotov-shared@${version} already published"
@@ -322,11 +324,13 @@ jobs:
           fi
 
       - name: Publish CLI package to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            exit 0
+          fi
           version="$(node -p "require('./packages/cli/package.json').version")"
           if npm view "@unlikeotherai/mollotov@${version}" version >/dev/null 2>&1; then
             echo "@unlikeotherai/mollotov@${version} already published"
@@ -388,10 +392,12 @@ jobs:
           sudo apt-get install -y apt-utils createrepo-c
 
       - name: Import APT signing key
-        if: ${{ secrets.APT_GPG_PRIVATE_KEY != '' }}
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         run: |
+          if [ -z "${APT_GPG_PRIVATE_KEY}" ]; then
+            exit 0
+          fi
           printf '%s' "${APT_GPG_PRIVATE_KEY}" | gpg --batch --import
 
       - name: Build package repositories in site/

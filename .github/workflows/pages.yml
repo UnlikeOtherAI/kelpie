@@ -28,10 +28,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y apt-utils createrepo-c
       - name: Import APT signing key
-        if: ${{ secrets.APT_GPG_PRIVATE_KEY != '' }}
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         run: |
+          if [ -z "${APT_GPG_PRIVATE_KEY}" ]; then
+            exit 0
+          fi
           printf '%s' "${APT_GPG_PRIVATE_KEY}" | gpg --batch --import
       - name: Rebuild Linux package repositories
         env:
