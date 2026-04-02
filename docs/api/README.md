@@ -275,3 +275,6 @@ CLI MCP adds additional tools:
 | `mollotov_group_visible` | Get visible elements from all devices |
 | `mollotov_group_keyboard_show` | Show keyboard on all devices |
 | `mollotov_group_keyboard_hide` | Hide keyboard on all devices |
+| `mollotov_ai_models` | List approved models and download status |
+| `mollotov_ai_pull` | Download a GGUF model from HuggingFace |
+| `mollotov_ai_remove` | Delete a downloaded model |

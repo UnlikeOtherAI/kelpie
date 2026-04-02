@@ -122,9 +122,15 @@ Purpose-built methods that return semantic data instead of raw HTML:
 
 ## Local AI
 
-Mollotov exposes built-in AI backends over the same `/v1/` HTTP and MCP surface as the rest of the browser. On supported Android 14+ devices, the app now defaults to the `platform` backend, so `ai-status`, `ai-load`, `ai-unload`, `ai-infer`, and `ai-record` are available without downloading a model first. The current Android platform backend is text-only and intentionally stubbed until the AI Edge SDK can be linked directly, but the transport and state model are in place.
+On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`) and corresponding MCP tools let language models query local AI without sending data to the cloud.
 
-On mobile, users can also switch the backend to a remote Ollama model by loading an `ollama:`-prefixed model ID with an optional custom endpoint. Unloading reverts the device to the platform backend. If the configured Ollama endpoint is unavailable, Mollotov returns an explicit error instead of silently changing backends mid-request. Android reserves `ai-record` for future audio capture, but that route still returns `NOT_IMPLEMENTED` today.
+**macOS — native GGUF + Ollama:** The CLI manages GGUF model downloads from HuggingFace (`mollotov ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode.
+
+**iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) is the default backend on supported hardware. Text-only until the iOS 26 SDK is linked. Users can switch to a remote Ollama model for vision-capable inference.
+
+**Android — Gemini Nano + Ollama:** Platform AI (Google AI Edge SDK) is the default backend on Android 14+ hardware. Text-only until the SDK is integrated. Users can switch to a remote Ollama model for vision-capable inference.
+
+**CLI model management:** `mollotov ai list` shows approved models and their download status, plus any locally running Ollama models. `mollotov ai pull/rm` manage downloads. `mollotov ai load/unload/status/ask` control inference on devices. All available as MCP tools (`mollotov_ai_models`, `mollotov_ai_pull`, `mollotov_ai_remove`, `mollotov_ai_status`, `mollotov_ai_load`, `mollotov_ai_unload`, `mollotov_ai_ask`, `mollotov_ai_record`).
 
 ## Annotated Screenshot Workflow
 
@@ -175,7 +181,7 @@ The browser HTTP API and MCP now expose named viewport presets directly via `get
 
 Lock the device to portrait, landscape, or auto-rotate. Query the current orientation and lock state.
 
-On macOS this applies to the staged viewport only, not the native window. A named viewport preset must be active before orientation can change. If automation asks for orientation while macOS is in `Full` mode or raw `Custom` viewport mode, Mollotov now returns an explicit explanatory error instead of pretending the feature is unsupported.
+On macOS this applies to the staged viewport only, not the native window. A named viewport preset must be active before orientation can change, and the toolbar hides the portrait/landscape toggle unless such a preset is active. If automation asks for orientation while macOS is in `Full` mode or raw `Custom` viewport mode, Mollotov now returns an explicit explanatory error instead of pretending the feature is unsupported.
 
 ## Device Info
 

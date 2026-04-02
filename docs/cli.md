@@ -814,6 +814,67 @@ mollotov mcp --http --port 8421
 
 ---
 
+## AI Commands
+
+### `mollotov ai list`
+List approved models, their download status, and Ollama models if available.
+
+```bash
+mollotov ai list
+```
+
+### `mollotov ai pull <model>`
+Download a model from HuggingFace.
+
+```bash
+mollotov ai pull gemma-4-e2b-q4
+```
+
+### `mollotov ai rm <model>`
+Delete a downloaded model.
+
+```bash
+mollotov ai rm gemma-4-e2b-q4
+```
+
+### `mollotov ai status`
+Check inference status on a device.
+
+```bash
+mollotov ai status --device mac
+```
+
+### `mollotov ai load <model>`
+Load a model on a device. Supports native model IDs and `ollama:` prefixed IDs.
+
+```bash
+mollotov ai load gemma-4-e2b-q4 --device mac
+mollotov ai load ollama:llava:7b --device iphone
+```
+
+### `mollotov ai unload`
+Unload the current model from a device.
+
+```bash
+mollotov ai unload --device mac
+```
+
+### `mollotov ai ask <prompt>`
+Run inference on the device's loaded model.
+
+| Flag | Description |
+|---|---|
+| `-c, --context <mode>` | Context mode: `page_text`, `screenshot`, `dom`, `accessibility` |
+| `--max-tokens <n>` | Maximum tokens to generate (default: 512) |
+| `--temperature <t>` | Sampling temperature (default: 0.7) |
+
+```bash
+mollotov ai ask "summarise this page" --device mac -c page_text
+mollotov ai ask "describe what you see" --device mac -c screenshot
+```
+
+---
+
 ## LLM Help System
 
 Every command includes structured help designed for LLMs.
