@@ -8,6 +8,110 @@ For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
 ---
 
+## AI
+
+These methods expose the local AI backend used by Mollotov. On Android, supported devices default to the `platform` backend (Gemini Nano once the AI Edge SDK is wired), and `ollama:` model IDs switch inference to a configured Ollama endpoint.
+
+### `ai-status`
+
+Report the active AI backend, model, and capabilities.
+
+```json
+POST /v1/ai-status
+{}
+
+Response:
+{
+  "success": true,
+  "loaded": true,
+  "backend": "platform",
+  "model": "platform",
+  "capabilities": ["text"]
+}
+```
+
+### `ai-load`
+
+Switch to the platform backend or load an Ollama-managed model.
+
+```json
+POST /v1/ai-load
+{
+  "model": "ollama:llava:7b",
+  "ollamaEndpoint": "http://192.168.1.50:11434"
+}
+
+Response:
+{
+  "success": true,
+  "backend": "ollama",
+  "model": "llava:7b",
+  "loadTimeMs": 12
+}
+```
+
+Pass `{ "model": "platform" }` to return to the default on-device backend.
+
+### `ai-unload`
+
+Clear the active non-platform model and fall back to the platform backend when available.
+
+```json
+POST /v1/ai-unload
+{}
+
+Response:
+{
+  "success": true,
+  "backend": "platform",
+  "model": "platform"
+}
+```
+
+### `ai-infer`
+
+Run inference against the active backend. Platform inference is text-only. Ollama requests may use single-shot prompts or multi-turn `messages`.
+
+```json
+POST /v1/ai-infer
+{
+  "prompt": "Summarise this page in 3 bullet points",
+  "maxTokens": 256
+}
+
+Response:
+{
+  "success": true,
+  "response": "The page highlights three pricing tiers...",
+  "tokensUsed": 46,
+  "inferenceTimeMs": 1450
+}
+```
+
+If the platform backend is selected before the AI Edge SDK is wired, Android currently returns `PLATFORM_AI_NOT_WIRED`. If Ollama becomes unreachable mid-request, Mollotov returns `OLLAMA_DISCONNECTED`.
+
+### `ai-record`
+
+Reserved for chat audio capture. Android currently exposes the route as a stub.
+
+```json
+POST /v1/ai-record
+{
+  "action": "start"
+}
+
+Response:
+{
+  "success": false,
+  "error": {
+    "code": "NOT_IMPLEMENTED",
+    "message": "ai-record start is not yet implemented on Android"
+  }
+}
+```
+
+---
+
 ## Smart Queries (Group Context)
 
 These methods are designed for multi-device scenarios. On a single device they work normally; via the CLI's group commands, they enable LLM decision-making.

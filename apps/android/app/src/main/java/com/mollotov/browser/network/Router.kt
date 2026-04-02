@@ -41,6 +41,7 @@ class Router {
             "scroll-to-top", "scroll-to-bottom", "get-viewport", "get-device-info",
             "get-viewport-presets", "get-capabilities", "wait-for-element", "wait-for-navigation",
             "find-element", "find-button", "find-link", "find-input",
+            "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record",
             "evaluate", "get-console-messages", "get-js-errors",
             "get-network-log", "get-resource-timeline", "clear-console",
             "get-accessibility-tree", "screenshot-annotated", "click-annotation",

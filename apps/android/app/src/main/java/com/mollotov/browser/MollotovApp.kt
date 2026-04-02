@@ -2,6 +2,7 @@ package com.mollotov.browser
 
 import android.app.Application
 import android.webkit.WebView
+import com.mollotov.browser.ai.AIState
 import com.mollotov.browser.browser.NetworkTrafficStore
 import com.mollotov.browser.ui.TabletViewportPresetStore
 
@@ -18,5 +19,6 @@ class MollotovApp : Application() {
         WebView.setWebContentsDebuggingEnabled(true)
         NetworkTrafficStore.init(this)
         TabletViewportPresetStore.init(this)
+        AIState.initialize(this)
     }
 }

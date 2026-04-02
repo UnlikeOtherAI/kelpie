@@ -122,9 +122,9 @@ Purpose-built methods that return semantic data instead of raw HTML:
 
 ## Local AI
 
-Mollotov exposes built-in AI backends over the same `/v1/` HTTP and MCP surface as the rest of the browser. On iOS, Apple Intelligence is now the default backend on supported hardware, so `ai-status`, `ai-load`, `ai-unload`, `ai-infer`, and `ai-record` are available without downloading a model first. The current iOS platform backend is text-only and intentionally stubbed until the Foundation Models SDK can be linked directly, but the transport and state model are in place.
+Mollotov exposes built-in AI backends over the same `/v1/` HTTP and MCP surface as the rest of the browser. On supported Android 14+ devices, the app now defaults to the `platform` backend, so `ai-status`, `ai-load`, `ai-unload`, `ai-infer`, and `ai-record` are available without downloading a model first. The current Android platform backend is text-only and intentionally stubbed until the AI Edge SDK can be linked directly, but the transport and state model are in place.
 
-On mobile, users can also switch the backend to a remote Ollama model by loading an `ollama:`-prefixed model ID with an optional custom endpoint. Unloading reverts the device to the platform backend. If the configured Ollama endpoint is unavailable, Mollotov returns an explicit error instead of silently changing backends mid-request.
+On mobile, users can also switch the backend to a remote Ollama model by loading an `ollama:`-prefixed model ID with an optional custom endpoint. Unloading reverts the device to the platform backend. If the configured Ollama endpoint is unavailable, Mollotov returns an explicit error instead of silently changing backends mid-request. Android reserves `ai-record` for future audio capture, but that route still returns `NOT_IMPLEMENTED` today.
 
 ## Annotated Screenshot Workflow
 
