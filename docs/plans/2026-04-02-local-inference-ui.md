@@ -43,10 +43,11 @@ Linux and Windows already report memory. Add `diskFreeGB` and `chipset` to them 
 | `fa-circle-check` | U+F058 | Downloaded / ready |
 | `fa-spinner` | U+F110 | Downloading (animated rotation) |
 | `fa-trash-can` | U+F2ED | Delete model |
-| `fa-brain` | U+F5DC | AI status pill in URL bar |
+| `fa-brain` | U+F5DC | AI pill in URL bar, opens chat panel |
 | `fa-circle-exclamation` | U+F06A | Warning (model too large for device) |
 | `fa-server` | U+F233 | Ollama backend indicator |
-| `fa-microphone` | U+F130 | Voice transcription indicator in response card |
+| `fa-microphone` | U+F130 | Voice input button in chat |
+| `fa-thumbtack` | U+F08D | Pin/unpin chat panel (macOS) |
 
 ### Platform integration
 
@@ -363,7 +364,7 @@ AI Models
 
 ## macOS Settings — AI Section
 
-New "AI" section added to `SettingsView` between "Renderer" and "Network":
+The Settings panel keeps a compact AI section for quick model selection. The full chat and model browsing experience lives in the side panel (see below). Settings is for configuration, not interaction.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -380,46 +381,9 @@ New "AI" section added to `SettingsView` between "Renderer" and "Network":
 │  Available    webkit, chromium                                │
 │                                                              │
 │  AI                                                          │
-│  ┌──────────────────────────────────────────────────────────┐│
-│  │  Active Model    None                              [▾]   ││
-│  │                                                          ││
-│  │  Device: Apple M2, 16 GB RAM, 87 GB free                ││
-│  └──────────────────────────────────────────────────────────┘│
-│                                                              │
-│  When the model picker [▾] is expanded:                      │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────────┐│
-│  │  ○  None (AI disabled)                                   ││
-│  │  ──── Native ────────────────────────────────────────    ││
-│  │  ┌────────────────────────────────────────────────────┐  ││
-│  │  │  👁 Gemma 4 E2B Q4                    [✓ Ready]    │  ││
-│  │  │  Text + Vision • 3.8 GB RAM • moderate speed      │  ││
-│  │  │  Understands text and images — page analysis      │  ││
-│  │  │  with visual understanding                        │  ││
-│  │  └────────────────────────────────────────────────────┘  ││
-│  │  ┌────────────────────────────────────────────────────┐  ││
-│  │  │  👁 Gemma 4 E2B Q8                  [↓ Download]   │  ││
-│  │  │  Text + Vision • 8 GB RAM • moderate speed        │  ││
-│  │  │  Higher quality — more accurate, needs more RAM   │  ││
-│  │  └────────────────────────────────────────────────────┘  ││
-│  │  ──── Ollama (● online) ─────────────────────────────    ││
-│  │  ┌────────────────────────────────────────────────────┐  ││
-│  │  │  👁 llava:7b                          [Ready]      │  ││
-│  │  │  Text + Vision • managed by Ollama                │  ││
-│  │  └────────────────────────────────────────────────────┘  ││
-│  │  ┌────────────────────────────────────────────────────┐  ││
-│  │  │  ⊘ llama3.2:3b                       [Ready]      │  ││
-│  │  │  Text only • managed by Ollama                    │  ││
-│  │  └────────────────────────────────────────────────────┘  ││
-│  │  ──── On-Device ─────────────────────────────────────    ││
-│  │  ┌────────────────────────────────────────────────────┐  ││
-│  │  │  ⊘ Apple Intelligence                 [Ready]      │  ││
-│  │  │  Text only • instant • managed by OS              │  ││
-│  │  └────────────────────────────────────────────────────┘  ││
-│  └──────────────────────────────────────────────────────────┘│
-│                                                              │
-│  Ollama Endpoint                                             │
-│  http://localhost:11434                      [Test] ● Online │
+│  Active Model    Gemma 4 E2B Q4                       [▾]    │
+│  Device: Apple M2, 16 GB RAM, 87 GB free                     │
+│  Ollama          http://localhost:11434       [Test] ● Online │
 │                                                              │
 │  Models run locally. No data leaves your device.             │
 │                                                              │
@@ -428,29 +392,13 @@ New "AI" section added to `SettingsView` between "Renderer" and "Network":
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Download flow within Settings
-
-When user clicks [↓ Download] on a model card:
-
-1. Button changes to a progress bar with cancel option
-2. Progress shows bytes downloaded / total and percentage
-3. On completion, button changes to [✓ Ready]
-4. If error, shows brief error message with retry button
-
-### Model loading flow
-
-When user selects a downloaded model from the picker:
-
-1. If another model is loaded, auto-unload it first
-2. Show loading spinner on the card: "Loading model..."
-3. On success, card shows ● Active with RAM usage
-4. If load fails (e.g. not enough RAM), show error with suggestion
+The model picker dropdown shows the same condensed list (Native / Ollama / On-Device sections). Downloading, fitness scoring, and model cards are in the side panel's Models tab.
 
 ---
 
 ## iOS / Android Settings — AI Section
 
-Same structure as macOS, adapted to mobile list-based settings.
+Same compact approach as macOS settings.
 
 ### iOS
 
@@ -461,285 +409,203 @@ Same structure as macOS, adapted to mobile list-based settings.
 │                                                  │
 │  AI                                              │
 │  ──────────────────────────────────────────────  │
-│  Active Model              None               >  │
+│  Active Model              Gemma 4 E2B Q4     >  │
 │  Ollama Endpoint           Not configured     >  │
 │                                                  │
 │  Device: iPhone 15 Pro, 8 GB RAM, 34 GB free     │
 │  ──────────────────────────────────────────────  │
-│                                                  │
-│  Tapping "Active Model" pushes to model list:    │
-│                                                  │
-│  ┌──────────────────────────────────────────────┐│
-│  │  AI Models                          [Back]   ││
-│  │                                              ││
-│  │  NATIVE                                      ││
-│  │  ┌──────────────────────────────────────────┐││
-│  │  │ 👁  Gemma 4 E2B Q4              2.5 GB  │││
-│  │  │ Text + Vision                           │││
-│  │  │ Understands text and images — page      │││
-│  │  │ analysis with visual understanding      │││
-│  │  │                                         │││
-│  │  │ ⚠ May run slowly on this device         │││
-│  │  │ Needs ~3.8 GB RAM                       │││
-│  │  │                                         │││
-│  │  │         [↓ Download]                    │││
-│  │  └──────────────────────────────────────────┘││
-│  │                                              ││
-│  │  OLLAMA (remote)                             ││
-│  │  ┌──────────────────────────────────────────┐││
-│  │  │ 👁  llava:7b                             │││
-│  │  │ Text + Vision • runs on your Mac         │││
-│  │  │                          [Select]        │││
-│  │  └──────────────────────────────────────────┘││
-│  │                                              ││
-│  │  ON-DEVICE                                   ││
-│  │  ┌──────────────────────────────────────────┐││
-│  │  │ ⊘  Apple Intelligence                    │││
-│  │  │ Text only • instant • no download        │││
-│  │  │                          [Select]        │││
-│  │  └──────────────────────────────────────────┘││
-│  │                                              ││
-│  │  Want a model added to the list?             ││
-│  │  Open a PR on GitHub                      >  ││
-│  └──────────────────────────────────────────────┘│
-│                                                  │
-│  Tapping "Ollama Endpoint" pushes to config:     │
-│                                                  │
-│  ┌──────────────────────────────────────────────┐│
-│  │  Ollama Endpoint                    [Back]   ││
-│  │                                              ││
-│  │  Server URL                                  ││
-│  │  ┌──────────────────────────────────────────┐││
-│  │  │ http://192.168.1.50:11434                │││
-│  │  └──────────────────────────────────────────┘││
-│  │                                              ││
-│  │  [Test Connection]              ● Connected  ││
-│  │                                              ││
-│  │  Found 3 models on this server               ││
-│  │                                              ││
-│  │  Your Mac runs the model. This device sends  ││
-│  │  page data to it over your local network.    ││
-│  │  Nothing leaves your network.                ││
-│  └──────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────┘
 ```
+
+Tapping "Active Model" navigates to the AI chat screen's Models tab. Tapping "Ollama Endpoint" pushes to the Ollama config screen (URL field, test connection button).
 
 ### Android
 
-Identical structure to iOS, using Material 3 components:
-- `ListItem` with `leadingContent` for icons, `trailingContent` for status
-- `LinearProgressIndicator` for download progress
-- `OutlinedTextField` for Ollama endpoint
-- Same card layout with Material3 `Card` composable
+Identical structure, Material 3 components.
 
 ---
 
-## URL Bar AI Status Pill
+## AI Chat Panel (macOS)
 
-The AI pill lives in the URL bar on every platform. It's always visible when a model is loaded — this is a first-class feature, not buried in settings.
+The primary AI interaction on macOS is a **side panel** attached to the browser window. Not a popover, not a modal — a persistent chat panel.
 
-### iOS
+### Opening the panel
 
-The URL bar is `< > [URL field]`. The pill sits to the right of the URL field as a 34x34 tappable circle (matching nav button size). When no model is loaded, the pill isn't shown and the URL field stretches to fill.
-
-```
-No model:
-┌──────────────────────────────────────────────────┐
-│  <  >  [  https://example.com                  ] │
-└──────────────────────────────────────────────────┘
-
-Vision model loaded:
-┌──────────────────────────────────────────────────┐
-│  <  >  [  https://example.com          ]  (🧠👁) │
-└──────────────────────────────────────────────────┘
-
-Text-only model loaded:
-┌──────────────────────────────────────────────────┐
-│  <  >  [  https://example.com          ]  (🧠⊘) │
-└──────────────────────────────────────────────────┘
-```
-
-The pill is a circle with `fa-brain` as the main icon. A tiny 10px badge in the bottom-right corner shows `fa-eye` (vision) or `fa-eye-slash` (text-only). Background is a subtle tinted fill (e.g. `systemGray5` with accent overlay when active).
-
-**Tap** → starts voice recording (if model has audio capability) or opens text query card (if text-only model). See "Voice Input" section below for full recording flow.
-
-**Long-press (mobile) / Hover (macOS)** → shows model info popover:
+**Tap the brain pill** in the URL bar → toggles the side panel open/closed.
 
 ```
-┌────────────────────────────────────┐
-│                                    │
-│  🧠  Gemma 4 E2B Q4               │
-│                                    │
-│  👁  Text + Vision + Audio         │
-│  3.8 GB RAM  •  native             │
-│  Speed: moderate                   │
-│                                    │
-│  ┌──────────┐   ┌──────────────┐   │
-│  │  Unload  │   │  AI Settings │   │
-│  └──────────┘   └──────────────┘   │
-│                                    │
-└────────────────────────────────────┘
-```
-
-"AI Settings" navigates to the full model list (same as Settings > AI > Active Model).
-
-**When no model is loaded** — the pill spot is empty. But to make AI discoverable, add a subtle ghost pill on first launch (or until the user has configured AI):
-
-```
-┌──────────────────────────────────────────────────┐
-│  <  >  [  https://example.com          ]  (🧠?)  │
-└──────────────────────────────────────────────────┘
-```
-
-Tapping the ghost pill opens the AI models screen directly. After the user either loads a model or explicitly dismisses, the ghost pill disappears permanently (stored in `UserDefaults`).
-
-### macOS
-
-The pill sits between the address field and the selectors row. It's a capsule shape showing the brain icon + model name.
-
-```
-Wide window:
+Brain pill in URL bar (model loaded):
 ← → ↻ [ https://example.com ] [🧠 👁 Gemma 4 Q4] [iPhone 15 ▾] [⬜▬] [Safari Chrome] [−100%+]
 
-Narrow window (selectors on second row):
-← → ↻ [ https://example.com ] [🧠 👁 Gemma 4 Q4]
-       [iPhone 15 ▾] [⬜▬] [Safari Chrome] [−100%+]
-
-No model:
-← → ↻ [ https://example.com ] [iPhone 15 ▾] [⬜▬] [Safari Chrome] [−100%+]
+Brain pill (no model):
+← → ↻ [ https://example.com ] [🧠] [iPhone 15 ▾] [⬜▬] [Safari Chrome] [−100%+]
 ```
 
-The macOS pill has room to show the model name inline. Clicking it shows a popover with model info and an Unload button, same content as iOS.
+### Panel layout
 
-When no model is loaded, the pill is hidden. No ghost pill on macOS — the Settings panel is discoverable enough.
+250px wide. Right edge of the browser window. Two tabs at the top, chat input at the bottom.
 
-### Android
-
-Same layout as iOS — pill to the right of the URL field, same 34dp tappable circle, same popover behavior.
-
-### Pill Implementation (all platforms)
-
-The pill component needs:
-
-```swift
-// iOS/macOS
-struct AIStatusPill: View {
-    @ObservedObject var aiState: AIState  // Published: isLoaded, modelName, hasVision, backend, ramUsageMB
-
-    var body: some View {
-        // If no model loaded: hidden (or ghost on iOS first-launch)
-        // If loaded: 34pt circle with fa-brain, vision badge
-        // Tap -> popover
-    }
-}
+```
+┌────────────────────────────────────────────────┬─────────────────────────────┐
+│                                                │ [Chat]  [Models]       [📌] │
+│                                                ├─────────────────────────────┤
+│                                                │                             │
+│                                                │  🧠 Gemma 4 E2B Q4          │
+│                                                │  What are the prices on     │
+│  Browser viewport                              │  this page?                 │
+│  (shrinks by 250px when panel is pinned)       │                             │
+│                                                │  ─────────────────────────  │
+│                                                │                             │
+│                                                │  The page shows three tiers:│
+│                                                │  • Basic: $9/mo             │
+│                                                │  • Pro: $29/mo              │
+│                                                │  • Enterprise: $99/mo       │
+│                                                │                             │
+│                                                │                             │
+│                                                │                             │
+│                                                ├─────────────────────────────┤
+│                                                │  [Type a question...   ] 🎤 │
+└────────────────────────────────────────────────┴─────────────────────────────┘
 ```
 
-```kotlin
-// Android
-@Composable
-fun AIStatusPill(aiState: AIState, onTap: () -> Unit)
+### Tab 1: Chat
+
+Scrollable conversation view. User messages right-aligned, assistant messages left-aligned. Chat input fixed at the bottom: text field + microphone button.
+
+**Speech button (🎤):** Tap to start voice recording. Mic pulses red, countdown bar appears inside the input area (decreasing over 30 seconds). Tap again to stop early. If model has `audio` capability, raw audio goes to the model. If not, platform STT transcribes first.
+
+**Conversation behavior depends on the model:**
+- Native GGUF (`memory: false`): Each message is standalone. No history is sent. The chat view shows prior Q&A for reference, but the model doesn't see them.
+- Ollama (`memory: true`): Sliding window of last 10 exchanges sent via `/api/chat`. Real multi-turn conversation.
+
+**Page navigation resets the conversation** for both model types. When the URL changes, the chat clears.
+
+### Tab 2: Models
+
+Full model card list with download, load, unload. Same card design as the Model Card section above. Users can manage everything without opening Settings.
+
+```
+┌────────────────────────────────────────────────┬─────────────────────────────┐
+│                                                │ [Chat]  [Models]       [📌] │
+│                                                ├─────────────────────────────┤
+│                                                │                             │
+│                                                │  NATIVE                     │
+│                                                │  ┌─────────────────────────┐│
+│  Browser viewport                              │  │ 👁 Gemma 4 E2B Q4      ││
+│                                                │  │ Text+Vision+Audio       ││
+│                                                │  │ 2.5 GB • ● Active      ││
+│                                                │  │           [⏹ Unload]   ││
+│                                                │  └─────────────────────────┘│
+│                                                │  ┌─────────────────────────┐│
+│                                                │  │ 👁 Gemma 4 E2B Q8      ││
+│                                                │  │ Text+Vision+Audio       ││
+│                                                │  │ 5.0 GB  [↓ Download]   ││
+│                                                │  └─────────────────────────┘│
+│                                                │                             │
+│                                                │  OLLAMA (● online)          │
+│                                                │  ┌─────────────────────────┐│
+│                                                │  │ 👁 llava:7b             ││
+│                                                │  │ Text+Vision             ││
+│                                                │  │        [▶ Load]        ││
+│                                                │  └─────────────────────────┘│
+│                                                │                             │
+└────────────────────────────────────────────────┴─────────────────────────────┘
 ```
 
-The `AIState` observable is shared with the AIHandler — it updates when models are loaded/unloaded.
+### Pin / Unpin
+
+Pin icon (`fa-thumbtack`) in the top-right corner of the tab bar. **Pinned by default** — panel lives inside the browser window, viewport shrinks by 250px.
+
+**Unpinning** detaches the panel into a separate `NSWindow`. The chat becomes a floating window that can be moved anywhere, including to another screen. But it's **bound to the parent browser window** — they're a pair:
+- Closing the browser window closes the chat window
+- Minimizing the browser minimizes the chat
+- The chat window title includes the browser window identifier
+
+**Magnetic docking:** When the user drags the detached chat window close to the right edge of its parent browser window (within ~20px), the chat snaps back into the browser as a pinned panel. While dragging, a subtle highlight appears on the browser's right edge to show the docking zone. Once docked, both windows move together as one.
+
+**Each browser window gets its own chat instance.** Opening a second browser window creates a second independent chat. If unpinned, it's a separate floating window bound to the second browser window.
+
+**Re-pinning** (clicking the pin icon in a detached window, or magnetic docking) snaps the floating window back into the browser as a side panel.
+
+| State | Panel location | Viewport | Behavior |
+|---|---|---|---|
+| Pinned (default) | Inside browser window, right edge | Shrinks by 250px | Moves with browser |
+| Unpinned | Separate `NSWindow`, freely movable | Full width restored | Bound to parent — close/minimize together, magnetic re-dock |
+| Closed | Hidden | Full width | Brain pill toggles it back |
+
+### Brain pill states (macOS)
+
+| State | Visual | Tap action |
+|---|---|---|
+| No model loaded | `[🧠]` (dimmed) | Opens panel on Models tab |
+| Model loaded, panel closed | `[🧠 👁 Gemma 4 Q4]` | Opens panel on Chat tab |
+| Model loaded, panel open | `[🧠 👁 Gemma 4 Q4]` (highlighted) | Closes panel |
 
 ---
 
-## Voice Input (Talk to the Browser)
+## AI Chat Screen (iOS / Android)
 
-Gemma 4 E2B accepts audio input natively — up to 30 seconds. The user taps the brain pill and starts speaking. The local model processes their voice alongside page context. No cloud, no separate STT step.
+On mobile, tapping the brain pill navigates to a **full-screen chat view**. Same two-tab structure as macOS, filling the screen instead of a side panel.
 
-**Not available on Linux.** Linux has no AI/voice features.
+### Opening
 
-### The brain pill is the mic
+**Tap brain pill in URL bar** → pushes a new screen (iOS: `NavigationLink`, Android: nav component).
 
-There is no separate microphone button. The brain pill has two interaction modes:
+**Back button** → returns to the browser. Chat state persists until page navigation.
 
-- **Tap** → start voice recording (if model supports audio) or show the AI response card (if text-only model)
-- **Long-press (mobile) / Hover (macOS)** → show model info popover (model name, capabilities, Unload, AI Settings link)
+**Brain pill in floating menu** → same behavior as the URL bar pill.
 
-If the loaded model does NOT have audio capability, tapping the brain opens the text query card instead (same as the response display, but with a text input field).
-
-### Recording flow
-
-1. User taps the brain pill
-2. The brain icon pulses red. A thin progress bar appears across the top of the viewport (full width, like the page loading bar) — it starts full and decreases over 30 seconds
-3. User speaks their question
-4. User taps the brain again to stop early, OR the bar reaches zero and recording stops automatically
-5. Brain shows a spinner state while the model processes
-6. Response card slides up from the bottom
-
-### Progress bar (countdown)
-
-The progress bar replaces the page loading indicator position — same thin bar across the full width of the viewport, directly under the URL bar. It's red/accent-colored and starts at 100%, decreasing linearly to 0% over 30 seconds.
+### Layout
 
 ```
-Recording active (4 seconds in, 26 seconds remaining):
 ┌──────────────────────────────────────────────────┐
-│  <  >  [  https://example.com          ]  (🧠👁) │ ← brain pulsing red
-├████████████████████████████████████░░░░░░░░░░░░░░┤ ← countdown bar (86% remaining)
+│  ←  AI Assistant          [Chat]  [Models]       │
+├──────────────────────────────────────────────────┤
 │                                                  │
-│  Browser viewport                                │
+│                   🧠 Gemma 4 E2B Q4              │
 │                                                  │
+│  ┌──────────────────────────────────────────┐    │
+│  │  What are the prices on this page?      │    │ ← user (right)
+│  └──────────────────────────────────────────┘    │
+│                                                  │
+│  ┌──────────────────────────────────────────┐    │
+│  │  The page shows three pricing tiers:    │    │ ← assistant (left)
+│  │  • Basic: $9/mo                         │    │
+│  │  • Pro: $29/mo                          │    │
+│  │  • Enterprise: $99/mo                   │    │
+│  └──────────────────────────────────────────┘    │
+│                                                  │
+│                                                  │
+├──────────────────────────────────────────────────┤
+│  [Type a question...                       ] 🎤  │
+└──────────────────────────────────────────────────┘
+```
+
+### Models tab (mobile)
+
+Full-width model card list. Download, load, unload. Ollama endpoint config accessible from here too.
+
+### Brain pill (iOS/Android)
+
+34x34 tappable circle to the right of the URL field.
+
+```
+No model:
+┌──────────────────────────────────────────────────┐
+│  <  >  [  https://example.com            ]  (🧠) │
 └──────────────────────────────────────────────────┘
 
-Recording active (25 seconds in, 5 seconds remaining):
+Model loaded:
 ┌──────────────────────────────────────────────────┐
 │  <  >  [  https://example.com          ]  (🧠👁) │
-├█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░┤ ← bar almost empty
-│                                                  │
-│  Browser viewport                                │
-│                                                  │
 └──────────────────────────────────────────────────┘
 ```
 
-### Brain pill states
+**Tap** → navigates to the AI chat screen. No model loaded → Models tab. Model loaded → Chat tab. Ghost pill on first launch (stored in UserDefaults) to make AI discoverable.
 
-| State | Visual | Interaction |
-|---|---|---|
-| No model loaded | Ghost pill `(🧠?)` or hidden | Tap → opens AI model list |
-| Model loaded (idle) | `(🧠👁)` or `(🧠⊘)` | Tap → start recording (audio model) or open text query (text-only). Long-press/hover → model info popover |
-| Recording | `(🧠)` pulsing red | Tap → stop recording |
-| Processing | `(🧠)` with spinner overlay | Non-interactive |
-| Response showing | `(🧠👁)` normal | Tap → new recording. Long-press → model info |
+---
 
-### Response display
-
-After the model responds, a card slides up from the bottom of the viewport. Persistent until dismissed.
-
-```
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│  Browser viewport                                    │
-│                                                      │
-├──────────────────────────────────────────────────────┤
-│  🎤 "What are the prices on this page?"              │ ← transcription (dimmed)
-│                                                      │
-│  The page shows three pricing tiers:                 │ ← model response
-│  • Basic: $9/month                                   │
-│  • Pro: $29/month                                    │
-│  • Enterprise: $99/month                             │
-│                                                      │
-│                                   [Copy]  [Dismiss]  │
-└──────────────────────────────────────────────────────┘
-```
-
-- Transcription line: what the model heard (dimmed, mic icon prefix)
-- Response: the model's answer
-- Copy: copies response text to clipboard
-- Dismiss: swipe down (mobile) or click (macOS). Auto-dismisses after 30 seconds if untouched.
-
-### Context pairing
-
-When recording voice, the browser automatically pairs it with page context. Default context mode is `"screenshot"` for audio+vision models:
-
-- **screenshot** (default for vision+audio): Takes a screenshot. Model sees the page AND hears the voice.
-- **page_text**: Extracts page text. Model reads content AND hears the voice.
-- **accessibility**: Sends the a11y tree. Good for "click the submit button" type commands.
-- **none**: Just the voice, no page context.
-
-The default context mode is configurable in the AI section of settings.
-
-### Floating Menu Integration
+## Floating Menu Integration
 
 On all platforms (except Linux), the floating action menu gets a brain button:
 
@@ -748,7 +614,7 @@ iOS/Android floating menu:
 ┌───┐
 │ ↻ │  Reload
 │ 🔒│  Safari Auth
-│ 🧠│  ← AI brain button (NEW)
+│ 🧠│  ← AI brain button
 │ 🔖│  Bookmarks
 │ 📜│  History
 │ 📡│  Network
@@ -760,19 +626,49 @@ Same — brain icon added to the menu items.
 ```
 
 Tapping the brain in the floating menu:
-- If no model loaded → opens AI model list (same as Settings > AI)
-- If model loaded → starts voice recording (same as tapping the URL bar pill)
-- Long-press → opens model info popover
+- If no model loaded → opens panel/screen on Models tab
+- If model loaded → opens panel/screen on Chat tab
+- Same behavior as the URL bar brain pill
 
-This makes AI accessible from the floating menu without needing the URL bar pill, useful when the URL bar is scrolled off-screen on mobile.
+---
 
-### MCP integration
+## Voice Input
 
-The MCP tool `mollotov_ai_ask` accepts an `audio` field (base64 WAV). An LLM orchestrator can record audio through the device microphone via a new endpoint:
+**Not available on Linux.** Linux has no AI features.
+
+**macOS requires Apple Silicon (M1+).** On Intel Macs, the entire AI feature is hidden — no brain pill, no panel, no AI section in settings. Check at startup with `ProcessInfo.processInfo.processorArchitecture` or `sysctl("hw.optional.arm64")`. If not Apple Silicon, `AIState.isAvailable` is `false` and all AI UI is suppressed.
+
+### Voice routing
+
+The 🎤 button in the chat input decides how to handle audio:
+
+1. User taps 🎤 → browser records audio (max 30s, 16-bit PCM WAV, 16kHz mono)
+2. Check loaded model's `audio` capability
+3. **Model has `audio`** (e.g. Gemma 4 E2B): raw audio sent directly to model — single pass transcription + understanding (preferred, higher quality)
+4. **Model lacks `audio`** (text-only): platform STT transcribes (SFSpeechRecognizer / SpeechRecognizer) → transcribed text sent as normal chat message (fallback)
+
+### Recording UX
+
+During recording:
+- 🎤 button pulses red
+- Countdown bar appears in the input area (starts full, decreases over 30 seconds)
+- Tap 🎤 again to stop early
+- Spinner while model processes, then response appears in chat
+
+### Platform audio recording
+
+| Platform | API | Notes |
+|---|---|---|
+| macOS | `AVAudioEngine` | Needs `NSMicrophoneUsageDescription` in Info.plist |
+| iOS | `AVAudioEngine` | Same permission. Foreground only. |
+| Android | `AudioRecord` | `RECORD_AUDIO` permission in manifest |
+| Linux | N/A | No AI features |
+
+Output format: 16-bit PCM WAV, 16kHz mono (~960KB for 30 seconds).
+
+### MCP audio recording endpoint
 
 #### `POST /v1/ai-record`
-
-Start/stop audio recording on the device.
 
 ```json
 // Start recording
@@ -788,26 +684,6 @@ Start/stop audio recording on the device.
 → { "success": true, "recording": true, "elapsedMs": 3100 }
 ```
 
-This lets the MCP orchestrator do: record → stop → send audio to `ai-infer` with context.
-
-### Platform audio recording
-
-| Platform | API | Notes |
-|---|---|---|
-| macOS | `AVAudioEngine` | Needs microphone permission (Info.plist `NSMicrophoneUsageDescription`) |
-| iOS | `AVAudioEngine` | Same permission. Works in foreground only. |
-| Android | `AudioRecord` / `MediaRecorder` | `RECORD_AUDIO` permission in manifest |
-| Linux | N/A | No AI features on Linux |
-
-Output format: 16-bit PCM WAV, 16kHz mono. This is what Gemma 4's audio encoder expects and keeps the payload small (~960KB for 30 seconds).
-
-### Icon additions
-
-| Icon | Codepoint | Usage |
-|---|---|---|
-| `fa-microphone` | U+F130 | Shown in transcription line of response card |
-| `fa-brain` | U+F5DC | Already listed — the main AI pill icon, doubles as mic trigger |
-
 ---
 
 ## Download Progress — Implementation Notes
@@ -819,7 +695,7 @@ Downloads are managed by the CLI (macOS) or the app directly (mobile). Progress 
 ```json
 {
   "modelId": "gemma-4-e2b-q4",
-  "state": "downloading",        // "pending" | "downloading" | "complete" | "failed" | "cancelled"
+  "state": "downloading",
   "bytesDownloaded": 1258291200,
   "bytesTotal": 2500000000,
   "bytesPerSecond": 45000000,
@@ -827,14 +703,13 @@ Downloads are managed by the CLI (macOS) or the app directly (mobile). Progress 
 }
 ```
 
-### macOS: CLI downloads, browser shows progress
+### macOS: Browser downloads directly
 
-The CLI manages the download to `~/.mollotov/models/`. When the Settings UI triggers a download:
+The macOS app manages downloads to `~/.mollotov/models/`. When the user clicks Download on a model card in the panel's Models tab:
 
-1. Settings sends `POST /v1/ai-pull { model: "gemma-4-e2b-q4" }` (new endpoint)
-2. The macOS app delegates to a `ModelDownloader` actor
-3. `ModelDownloader` streams from HuggingFace using `URLSession`, reports progress
-4. Settings UI polls or observes the `ModelDownloader` `@Published` state
+1. `ModelDownloader` actor streams from HuggingFace using `URLSession`, reports progress
+2. Model card shows progress bar with cancel option
+3. On completion, card changes to [▶ Load]
 
 ### Mobile: App downloads directly
 
@@ -851,25 +726,28 @@ Both write to the app's local model directory and update the local registry.
 | Platform | File | Purpose |
 |---|---|---|
 | All | `FontAwesome6Free-Solid-900.otf` | Font file bundled in resources |
-| macOS | `Mollotov/Views/AISettingsView.swift` | AI section in settings |
-| macOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill in URL bar + voice recording trigger |
-| macOS | `Mollotov/Views/AIResponseCard.swift` | Slide-up response card with transcription |
+| macOS | `Mollotov/Views/AIChatPanel.swift` | 250px side panel with Chat + Models tabs, pin/unpin |
+| macOS | `Mollotov/Views/AIChatView.swift` | Chat conversation view with input + mic button |
+| macOS | `Mollotov/Views/AIModelListView.swift` | Model card list for panel's Models tab |
+| macOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill in URL bar — toggles side panel |
 | macOS | `Mollotov/AI/ModelDownloader.swift` | HuggingFace download with progress |
 | macOS | `Mollotov/AI/ModelRegistry.swift` | Approved models, fitness scoring, Ollama detection |
-| macOS | `Mollotov/AI/AudioRecorder.swift` | AVAudioEngine-based 30s recorder, outputs PCM WAV |
-| macOS | `Mollotov/AI/AIState.swift` | Published state: loaded model, capabilities, recording status |
-| iOS | `Mollotov/Views/AISettingsView.swift` | AI model list and Ollama config |
-| iOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill + voice trigger |
-| iOS | `Mollotov/Views/AIResponseCard.swift` | Response card |
+| macOS | `Mollotov/AI/AudioRecorder.swift` | AVAudioEngine 30s recorder, outputs PCM WAV |
+| macOS | `Mollotov/AI/AIState.swift` | Published state: loaded model, capabilities, chat history |
+| iOS | `Mollotov/Views/AIChatScreen.swift` | Full-screen chat with Chat + Models tabs |
+| iOS | `Mollotov/Views/AIChatView.swift` | Chat conversation view |
+| iOS | `Mollotov/Views/AIModelListView.swift` | Model card list |
+| iOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill + navigation trigger |
 | iOS | `Mollotov/AI/ModelDownloader.swift` | Background download support |
 | iOS | `Mollotov/AI/ModelRegistry.swift` | Curated model list + fitness |
 | iOS | `Mollotov/AI/AudioRecorder.swift` | AVAudioEngine recorder |
 | iOS | `Mollotov/AI/AIState.swift` | Published state |
-| Android | `ui/AISettingsScreen.kt` | AI model list and Ollama config |
+| Android | `ui/AIChatScreen.kt` | Full-screen chat with tabs |
+| Android | `ui/AIChatView.kt` | Chat conversation composable |
+| Android | `ui/AIModelListView.kt` | Model card list composable |
 | Android | `ui/AIStatusPill.kt` | Brain pill composable |
-| Android | `ui/AIResponseCard.kt` | Response card composable |
 | Android | `ai/ModelDownloader.kt` | DownloadManager integration |
 | Android | `ai/ModelRegistry.kt` | Curated model list + fitness |
-| Android | `ai/AudioRecorder.kt` | AudioRecord-based recorder |
+| Android | `ai/AudioRecorder.kt` | AudioRecord recorder |
 | Android | `ai/AIState.kt` | State holder |
 | CLI | `src/ai/fitness.ts` | Hardware evaluation logic |

@@ -72,6 +72,8 @@ On macOS via CLI, users can also specify an arbitrary Hugging Face GGUF URL to d
 
 **Only one model loaded at a time.** The browser loads a single model into memory. Loading a second model requires unloading the first. This is a hard constraint — we can't afford to keep multiple models in RAM, especially on devices with 8-16 GB.
 
+**macOS requires Apple Silicon (M1+).** On Intel Macs, the entire AI feature is disabled and hidden. llama.cpp inference depends on the Neural Engine and unified memory architecture. No brain pill, no panel, no AI settings. Check at startup: `sysctl("hw.optional.arm64")`.
+
 ### Ollama Integration
 
 If the user has Ollama installed, Mollotov detects it and surfaces Ollama-managed models as a second-tier option alongside the native GGUF models.
