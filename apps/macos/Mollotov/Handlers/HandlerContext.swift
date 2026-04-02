@@ -5,6 +5,7 @@ import AppKit
 final class HandlerContext {
     var renderer: (any RendererEngine)?
     var consoleMessages: [[String: Any]] = []
+    var isIn3DInspector = false
     private var sharedCookiePoller: Timer?
     private var lastSharedCookieSignature: String = ""
     private var lastSharedCookieModifiedAt: Date?
@@ -15,8 +16,22 @@ final class HandlerContext {
     func handleScriptMessage(name: String, body: [String: Any]) {
         switch name {
         case "mollotovConsole":
+            let message = body["message"] as? String ?? body["text"] as? String ?? ""
+            if message == "__mollotov_3d_exit__" && isIn3DInspector {
+                Task { @MainActor in
+                    await exit3DInspectorIfNeeded(notify: true)
+                }
+                return
+            }
             consoleMessages.append(body)
             if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
+
+        case "mollotov3DSnapshot":
+            if body["action"] as? String == "exit" {
+                Task { @MainActor in
+                    await exit3DInspectorIfNeeded(notify: true)
+                }
+            }
 
         case "mollotovNetwork":
             let entry = NetworkTrafficStore.TrafficEntry(
@@ -143,6 +158,7 @@ final class HandlerContext {
     }
 
     func load(url: URL) {
+        reset3DInspectorForNavigation()
         renderer?.load(url: url)
     }
 
@@ -152,10 +168,25 @@ final class HandlerContext {
     var pageCanGoBack: Bool { renderer?.canGoBack ?? false }
     var pageCanGoForward: Bool { renderer?.canGoForward ?? false }
 
-    func goBack() { renderer?.goBack() }
-    func goForward() { renderer?.goForward() }
-    func reloadPage() { renderer?.reload() }
-    func hardReloadPage() { renderer?.hardReload() }
+    func goBack() {
+        reset3DInspectorForNavigation()
+        renderer?.goBack()
+    }
+
+    func goForward() {
+        reset3DInspectorForNavigation()
+        renderer?.goForward()
+    }
+
+    func reloadPage() {
+        reset3DInspectorForNavigation()
+        renderer?.reload()
+    }
+
+    func hardReloadPage() {
+        reset3DInspectorForNavigation()
+        renderer?.hardReload()
+    }
 
     func takeSnapshot() async throws -> NSImage {
         guard let renderer else { throw HandlerError.noWebView }
@@ -295,6 +326,27 @@ final class HandlerContext {
         sharedCookiePoller?.invalidate()
         sharedCookiePoller = nil
     }
+
+    func mark3DInspectorInactive(notify: Bool) {
+        isIn3DInspector = false
+        guard notify else { return }
+        NotificationCenter.default.post(name: .snapshot3DExited, object: nil)
+    }
+
+    func exit3DInspectorIfNeeded(notify: Bool) async {
+        guard isIn3DInspector else { return }
+        try? await evaluateJS(Snapshot3DBridge.exitScript)
+        mark3DInspectorInactive(notify: notify)
+    }
+
+    private func reset3DInspectorForNavigation() {
+        guard isIn3DInspector else { return }
+        mark3DInspectorInactive(notify: true)
+    }
+}
+
+extension Notification.Name {
+    static let snapshot3DExited = Notification.Name("mollotov.snapshot3DExited")
 }
 
 enum HandlerError: Error {

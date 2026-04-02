@@ -41,6 +41,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
         ucc.add(self, name: "mollotovNetwork")
         ucc.add(self, name: "mollotovConsole")
+        ucc.add(self, name: "mollotov3DSnapshot")
 
         webView.navigationDelegate = self
         webView.uiDelegate = self

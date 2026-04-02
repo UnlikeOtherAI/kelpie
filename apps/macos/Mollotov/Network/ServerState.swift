@@ -125,6 +125,7 @@ final class ServerState: ObservableObject {
         HistoryHandler(context: ctx).register(on: router)
         NetworkInspectorHandler(context: ctx).register(on: router)
         AIHandler(context: ctx).register(on: router)
+        Snapshot3DHandler(context: ctx).register(on: router)
 
         // Renderer switching handler
         RendererHandler(
