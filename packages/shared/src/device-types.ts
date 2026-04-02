@@ -60,6 +60,8 @@ export interface DeviceSystem {
   thermalState: string | null;
   availableMemory: number | null;
   totalMemory: number | null;
+  diskFreeGB?: number;
+  chipset?: string;
 }
 
 export interface DeviceInfoFull {

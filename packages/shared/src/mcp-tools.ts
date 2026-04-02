@@ -94,11 +94,21 @@ export const BrowserMcpTools = [
   "mollotov_safari_auth",
   "mollotov_set_renderer",
   "mollotov_get_renderer",
+  "mollotov_ai_status",
+  "mollotov_ai_load",
+  "mollotov_ai_unload",
+  "mollotov_ai_ask",
+  "mollotov_ai_record",
 ] as const;
 
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
 
 export const BrowserToolUnsupportedPlatforms = {
+  mollotov_ai_status: ["linux", "windows"],
+  mollotov_ai_load: ["linux", "windows"],
+  mollotov_ai_unload: ["linux", "windows"],
+  mollotov_ai_ask: ["linux", "windows"],
+  mollotov_ai_record: ["linux", "windows"],
   mollotov_show_keyboard: ["linux", "windows"],
   mollotov_hide_keyboard: ["linux", "windows"],
   mollotov_get_viewport_presets: ["linux", "windows"],
@@ -129,6 +139,9 @@ export const CliMcpTools = [
   "mollotov_group_visible",
   "mollotov_group_keyboard_show",
   "mollotov_group_keyboard_hide",
+  "mollotov_ai_models",
+  "mollotov_ai_pull",
+  "mollotov_ai_remove",
 ] as const;
 
 export type CliMcpTool = (typeof CliMcpTools)[number];
@@ -229,4 +242,9 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "safari-auth": "mollotov_safari_auth",
   "set-renderer": "mollotov_set_renderer",
   "get-renderer": "mollotov_get_renderer",
+  "ai-status": "mollotov_ai_status",
+  "ai-load": "mollotov_ai_load",
+  "ai-unload": "mollotov_ai_unload",
+  "ai-infer": "mollotov_ai_ask",
+  "ai-record": "mollotov_ai_record",
 };

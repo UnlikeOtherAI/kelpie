@@ -71,11 +71,11 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(92);
+    expect(BrowserMcpTools.length).toBe(97);
   });
 
   it("has correct count of CLI tools", () => {
-    expect(CliMcpTools.length).toBe(20);
+    expect(CliMcpTools.length).toBe(23);
   });
 
   it("httpToMcp maps all browser endpoints", () => {
@@ -87,6 +87,11 @@ describe("MCP tools", () => {
   });
 
   it("tracks linux and windows unsupported browser tools", () => {
+    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_status).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_load).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_unload).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_ask).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_record).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.mollotov_show_keyboard).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.mollotov_hide_keyboard).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.mollotov_get_viewport_presets).toEqual(["linux", "windows"]);
