@@ -29,6 +29,9 @@ struct FloatingMenuView: View {
     let onBookmarks: () -> Void
     let onHistory: () -> Void
     let onNetworkInspector: () -> Void
+    let onAI: () -> Void
+    let onSnapshot3D: () -> Void
+    let show3DInspector: Bool
     let showMobileViewportToggle: Bool
     let mobileViewportPresets: [MobileViewportPresetOption]
     let selectedMobileViewportPresetID: String?
@@ -42,7 +45,8 @@ struct FloatingMenuView: View {
 
     private let fabSize: CGFloat = 44
     private let menuItemSize: CGFloat = 44
-    private let spreadRadius: CGFloat = 150
+    private let baseSpreadRadius: CGFloat = 150
+    private let minimumMenuItemGap: CGFloat = 12
     private let edgePadding: CGFloat = 16
     private let viewportPillWidth: CGFloat = 168
     private let viewportPillHeight: CGFloat = 36
@@ -160,8 +164,22 @@ struct FloatingMenuView: View {
             .init(icon: "bookmark.fill", elementId: "browser.menu.bookmarks", tint: .white, closesMenu: true, action: onBookmarks),
             .init(icon: "clock.arrow.circlepath", elementId: "browser.menu.history", tint: .white, closesMenu: true, action: onHistory),
             .init(icon: "antenna.radiowaves.left.and.right", elementId: "browser.menu.network-inspector", tint: .white, closesMenu: true, action: onNetworkInspector),
+            .init(icon: "brain", elementId: "browser.menu.ai", tint: .white, closesMenu: true, action: onAI),
             .init(icon: "gear", elementId: "browser.menu.settings", tint: .white, closesMenu: true, action: onSettings),
         ]
+
+        if show3DInspector {
+            items.insert(
+                MenuItem(
+                    icon: "cube.transparent",
+                    elementId: "browser.menu.snapshot-3d",
+                    tint: .white,
+                    closesMenu: true,
+                    action: onSnapshot3D
+                ),
+                at: max(items.count - 1, 0)
+            )
+        }
 
         if showMobileViewportToggle {
             items.insert(
@@ -192,9 +210,19 @@ struct FloatingMenuView: View {
         return .degrees(center - 90.0 + step * Double(index))
     }
 
+    private func spreadRadius(for itemCount: Int) -> CGFloat {
+        guard itemCount > 1 else { return baseSpreadRadius }
+
+        let stepRadians = CGFloat.pi / CGFloat(itemCount - 1)
+        let minimumCenterDistance = menuItemSize + minimumMenuItemGap
+        let requiredRadius = minimumCenterDistance / (2 * sin(stepRadians / 2))
+        return max(baseSpreadRadius, requiredRadius)
+    }
+
     private func menuItemOffset(index: Int, itemCount: Int, fanDirection: CGFloat,
                                 fabX: CGFloat, fabY: CGFloat, geo: GeometryProxy) -> CGSize {
         let angle = fanAngle(direction: fanDirection, index: index, itemCount: itemCount)
+        let spreadRadius = spreadRadius(for: itemCount)
         let rawDx: CGFloat = isOpen ? CGFloat(cos(angle.radians)) * spreadRadius : 0
         let rawDy: CGFloat = isOpen ? CGFloat(sin(angle.radians)) * spreadRadius : 0
         let margin = menuItemSize / 2 + edgePadding

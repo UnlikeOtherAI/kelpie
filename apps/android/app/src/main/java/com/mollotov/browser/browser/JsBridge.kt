@@ -9,12 +9,18 @@ import org.json.JSONObject
  * Receives console messages and network traffic events from injected scripts.
  */
 class JsBridge(
+    private val handlerContext: com.mollotov.browser.handlers.HandlerContext?,
     private val consoleHandler: ConsoleHandler?,
 ) {
     @JavascriptInterface
     fun onConsoleMessage(jsonString: String) {
         try {
             val obj = JSONObject(jsonString)
+            val message = obj.optString("message", obj.optString("text", ""))
+            if (message == "__mollotov_3d_exit__") {
+                handlerContext?.mark3DInspectorInactive()
+                return
+            }
             val map = mutableMapOf<String, Any?>()
             for (key in obj.keys()) {
                 map[key] = when {
@@ -23,6 +29,16 @@ class JsBridge(
                 }
             }
             consoleHandler?.addMessage(map)
+        } catch (_: Exception) {}
+    }
+
+    @JavascriptInterface
+    fun on3DSnapshotEvent(jsonString: String) {
+        try {
+            val obj = JSONObject(jsonString)
+            if (obj.optString("action") == "exit") {
+                handlerContext?.mark3DInspectorInactive()
+            }
         } catch (_: Exception) {}
     }
 
@@ -45,8 +61,8 @@ class JsBridge(
                 contentType = obj.optString("contentType", ""),
                 requestHeaders = reqHeaders,
                 responseHeaders = respHeaders,
-                requestBody = obj.optString("requestBody", null),
-                responseBody = obj.optString("responseBody", null),
+                requestBody = obj.opt("requestBody")?.toString(),
+                responseBody = obj.opt("responseBody")?.toString(),
                 duration = obj.optInt("duration", 0),
                 size = obj.optInt("size", 0),
                 initiator = "js",

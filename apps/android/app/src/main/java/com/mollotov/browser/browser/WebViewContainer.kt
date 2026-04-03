@@ -15,6 +15,7 @@ import com.mollotov.browser.devtools.ConsoleHandler
 @Composable
 fun WebViewContainer(
     browserState: BrowserState,
+    handlerContext: com.mollotov.browser.handlers.HandlerContext? = null,
     modifier: Modifier = Modifier,
     consoleHandler: ConsoleHandler? = null,
     onWebViewCreated: (WebView) -> Unit = {},
@@ -31,7 +32,7 @@ fun WebViewContainer(
                 settings.userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Version/131.0.0.0 Mobile Safari/537.36"
 
                 // Add JS bridge for console + network capture
-                addJavascriptInterface(JsBridge(consoleHandler), "MollotovBridge")
+                addJavascriptInterface(JsBridge(handlerContext, consoleHandler), "MollotovBridge")
 
                 webViewClient = object : WebViewClient() {
                     private var documentNavigationUrl: String? = null
@@ -40,6 +41,7 @@ fun WebViewContainer(
                     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                         browserState.updateUrl(url)
                         browserState.updateLoading(true)
+                        handlerContext?.mark3DInspectorInactive()
                         documentNavigationUrl = url
                         didCaptureDocumentForNavigation = false
                     }

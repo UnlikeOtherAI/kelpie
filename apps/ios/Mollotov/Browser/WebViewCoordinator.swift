@@ -8,7 +8,7 @@ struct WebViewContainer: UIViewRepresentable {
     let onWebView: (WKWebView) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(browserState: browserState)
+        Coordinator(browserState: browserState, handlerContext: handlerContext)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -24,6 +24,7 @@ struct WebViewContainer: UIViewRepresentable {
             ucc.add(handlerContext, name: "mollotovNetwork")
             ucc.addUserScript(ConsoleHandler.bridgeScript)
             ucc.add(handlerContext, name: "mollotovConsole")
+            ucc.add(handlerContext, name: "mollotov3DSnapshot")
         }
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -49,6 +50,7 @@ struct WebViewContainer: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let browserState: BrowserState
+        weak var handlerContext: HandlerContext?
         weak var webView: WKWebView?
         private var progressObservation: NSKeyValueObservation?
         private var titleObservation: NSKeyValueObservation?
@@ -59,8 +61,9 @@ struct WebViewContainer: UIViewRepresentable {
         private var documentNavigationStart: Date?
         private var capturedDocumentResponseURL: String?
 
-        init(browserState: BrowserState) {
+        init(browserState: BrowserState, handlerContext: HandlerContext?) {
             self.browserState = browserState
+            self.handlerContext = handlerContext
             super.init()
         }
 
@@ -107,6 +110,7 @@ struct WebViewContainer: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
             observe(webView)
+            handlerContext?.mark3DInspectorInactive(notify: false)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
         }

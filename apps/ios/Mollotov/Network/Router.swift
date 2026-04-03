@@ -58,6 +58,7 @@ final class Router: @unchecked Sendable {
             "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
             "toast", "safari-auth",
             "set-orientation", "get-orientation",
+            "snapshot-3d-enter", "snapshot-3d-exit", "snapshot-3d-status",
             "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record",
         ]
         for method in methods {

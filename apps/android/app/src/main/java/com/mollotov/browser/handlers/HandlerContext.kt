@@ -20,10 +20,19 @@ class HandlerContext {
     val chromeAuth = com.mollotov.browser.browser.ChromeAuthHelper()
 
     private val _activePanel = MutableStateFlow<String?>(null)
+    private val _isIn3DInspector = MutableStateFlow(false)
     val activePanel: StateFlow<String?> = _activePanel
+    val isIn3DInspectorFlow: StateFlow<Boolean> = _isIn3DInspector
+
+    var isIn3DInspector: Boolean
+        get() = _isIn3DInspector.value
+        set(value) {
+            _isIn3DInspector.value = value
+        }
 
     fun requestPanel(panel: String) { _activePanel.value = panel }
     fun clearPanel() { _activePanel.value = null }
+    fun mark3DInspectorInactive() { isIn3DInspector = false }
 
     suspend fun evaluateJS(script: String): String = suspendCoroutine { cont ->
         val wv = webView

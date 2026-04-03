@@ -5,6 +5,7 @@ import WebKit
 final class HandlerContext: NSObject, WKScriptMessageHandler {
     weak var webView: WKWebView?
     var consoleMessages: [[String: Any]] = []
+    var isIn3DInspector = false
     let safariAuth = SafariAuthHelper()
 
     nonisolated override init() { super.init() }
@@ -14,8 +15,22 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
 
         switch message.name {
         case "mollotovConsole":
+            let text = body["message"] as? String ?? body["text"] as? String ?? ""
+            if text == "__mollotov_3d_exit__" && isIn3DInspector {
+                Task { @MainActor in
+                    await exit3DInspectorIfNeeded(notify: true)
+                }
+                return
+            }
             consoleMessages.append(body)
             if consoleMessages.count > 5000 { consoleMessages.removeFirst() }
+
+        case "mollotov3DSnapshot":
+            if body["action"] as? String == "exit" {
+                Task { @MainActor in
+                    await exit3DInspectorIfNeeded(notify: true)
+                }
+            }
 
         case "mollotovNetwork":
             let entry = NetworkTrafficStore.TrafficEntry(
@@ -140,6 +155,19 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
         }
         return json
     }
+
+    func mark3DInspectorInactive(notify: Bool) {
+        isIn3DInspector = false
+        if notify {
+            NotificationCenter.default.post(name: .snapshot3DExited, object: nil)
+        }
+    }
+
+    func exit3DInspectorIfNeeded(notify: Bool) async {
+        guard isIn3DInspector else { return }
+        _ = try? await evaluateJS(Snapshot3DBridge.exitScript)
+        mark3DInspectorInactive(notify: notify)
+    }
 }
 
 enum HandlerError: Error {
@@ -157,4 +185,8 @@ func successResponse(_ data: [String: Any] = [:]) -> [String: Any] {
     var result: [String: Any] = ["success": true]
     for (key, value) in data { result[key] = value }
     return result
+}
+
+extension Notification.Name {
+    static let snapshot3DExited = Notification.Name("mollotov.snapshot3DExited")
 }

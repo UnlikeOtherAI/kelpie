@@ -24,6 +24,7 @@ import com.mollotov.browser.handlers.NavigationHandler
 import com.mollotov.browser.handlers.NetworkInspectorHandler
 import com.mollotov.browser.handlers.ScreenshotHandler
 import com.mollotov.browser.handlers.ScrollHandler
+import com.mollotov.browser.handlers.Snapshot3DHandler
 import com.mollotov.browser.llm.LLMHandler
 import com.mollotov.browser.network.HTTPServer
 import com.mollotov.browser.network.MDNSAdvertiser
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity() {
         BrowserManagementHandler(handlerContext, applicationContext).register(router)
         LLMHandler(handlerContext).register(router)
         AIHandler(applicationContext).register(router)
+        Snapshot3DHandler(handlerContext) { FeatureFlags.is3DInspectorEnabled(applicationContext) }.register(router)
         BookmarkHandler(handlerContext).register(router)
         HistoryHandler(handlerContext).register(router)
         NetworkInspectorHandler(handlerContext).register(router)
@@ -88,7 +90,7 @@ class MainActivity : ComponentActivity() {
         router.register("show-panel") { body ->
             val panel = body["panel"] as? String
                 ?: return@register errorResponse("MISSING_PARAM", "panel is required")
-            val valid = listOf("history", "bookmarks", "network-inspector", "settings")
+            val valid = listOf("history", "bookmarks", "network-inspector", "settings", "ai")
             if (panel !in valid) {
                 return@register errorResponse("INVALID_PARAM", "panel must be one of: ${valid.joinToString()}")
             }

@@ -72,6 +72,9 @@ fun FloatingMenu(
     onBookmarks: () -> Unit,
     onHistory: () -> Unit,
     onNetworkInspector: () -> Unit,
+    onAI: () -> Unit,
+    onSnapshot3D: () -> Unit,
+    show3DInspector: Boolean,
     showMobileViewportToggle: Boolean,
     mobileViewportPresets: List<TabletViewportPreset>,
     selectedMobileViewportPresetId: String?,
@@ -92,7 +95,8 @@ fun FloatingMenu(
     val fabSizePx = with(density) { fabSizeDp.toPx() }
     val edgePaddingPx = with(density) { 16.dp.toPx() }
     val menuItemSizePx = fabSizePx
-    val spreadRadius = 150f
+    val baseSpreadRadius = 150f
+    val minimumMenuItemGapPx = with(density) { 12.dp.toPx() }
     val dragThreshold = 10f
     val pillWidthPx = with(density) { pillWidthDp.toPx() }
     val pillHeightPx = with(density) { pillHeightDp.toPx() }
@@ -101,7 +105,6 @@ fun FloatingMenu(
 
     data class MenuItem(
         val id: String,
-        val angle: Double,
         val action: () -> Unit,
         val iconName: String,
         val tint: Color = Color.White,
@@ -155,8 +158,18 @@ fun FloatingMenu(
             return center - 90.0 + step * index
         }
 
+        fun spreadRadius(itemCount: Int): Float {
+            if (itemCount <= 1) return baseSpreadRadius
+
+            val stepRadians = Math.PI / (itemCount - 1).toDouble()
+            val minimumCenterDistance = menuItemSizePx + minimumMenuItemGapPx
+            val requiredRadius = (minimumCenterDistance / (2 * sin(stepRadians / 2))).toFloat()
+            return maxOf(baseSpreadRadius, requiredRadius)
+        }
+
         fun menuItemOffset(index: Int, itemCount: Int): IntOffset {
             val angleRad = Math.toRadians(fanAngle(index, itemCount))
+            val spreadRadius = spreadRadius(itemCount)
             val rawDx = if (isOpen) (cos(angleRad) * spreadRadius).toFloat() else 0f
             val rawDy = if (isOpen) (sin(angleRad) * spreadRadius).toFloat() else 0f
             val margin = menuItemSizePx / 2 + edgePaddingPx
@@ -170,13 +183,12 @@ fun FloatingMenu(
         }
 
         val rawItems = buildList {
-            add(MenuItem(id = "browser.menu.reload", angle = 0.0, action = onReload, iconName = "refresh"))
-            add(MenuItem(id = "browser.menu.safari-auth", angle = 0.0, action = onChromeAuth, iconName = "lock"))
+            add(MenuItem(id = "browser.menu.reload", action = onReload, iconName = "refresh"))
+            add(MenuItem(id = "browser.menu.safari-auth", action = onChromeAuth, iconName = "lock"))
             if (showMobileViewportToggle) {
                 add(
                     MenuItem(
                         id = "browser.viewport.mobile-toggle",
-                        angle = 0.0,
                         action = {
                             if (mobileViewportPresets.isNotEmpty()) {
                                 isMobileViewportPickerOpen = !isMobileViewportPickerOpen
@@ -190,14 +202,16 @@ fun FloatingMenu(
                     ),
                 )
             }
-            add(MenuItem(id = "browser.menu.bookmarks", angle = 0.0, action = onBookmarks, iconName = "bookmark"))
-            add(MenuItem(id = "browser.menu.history", angle = 0.0, action = onHistory, iconName = "history"))
-            add(MenuItem(id = "browser.menu.network-inspector", angle = 0.0, action = onNetworkInspector, iconName = "network"))
-            add(MenuItem(id = "browser.menu.settings", angle = 0.0, action = onSettings, iconName = "settings"))
+            add(MenuItem(id = "browser.menu.bookmarks", action = onBookmarks, iconName = "bookmark"))
+            add(MenuItem(id = "browser.menu.history", action = onHistory, iconName = "history"))
+            add(MenuItem(id = "browser.menu.network-inspector", action = onNetworkInspector, iconName = "network"))
+            add(MenuItem(id = "browser.menu.ai", action = onAI, iconName = "ai"))
+            if (show3DInspector) {
+                add(MenuItem(id = "browser.menu.snapshot-3d", action = onSnapshot3D, iconName = "snapshot3d"))
+            }
+            add(MenuItem(id = "browser.menu.settings", action = onSettings, iconName = "settings"))
         }
-        val items = rawItems.mapIndexed { index, item ->
-            item.copy(angle = fanAngle(index, rawItems.size))
-        }
+        val items = rawItems
 
         // Fan-out items with screen-bound clamping
         items.forEachIndexed { index, item ->
@@ -236,7 +250,7 @@ fun FloatingMenu(
                         }
                     },
             ) {
-                val icon: ImageVector = when (item.iconName) {
+                val icon: ImageVector? = when (item.iconName) {
                     "refresh" -> Icons.Filled.Refresh
                     "lock" -> Icons.Filled.Lock
                     "mobile" -> Icons.Filled.PhoneIphone
@@ -244,9 +258,17 @@ fun FloatingMenu(
                     "history" -> Icons.AutoMirrored.Filled.List
                     "network" -> Icons.Filled.Info
                     "settings" -> Icons.Filled.Settings
-                    else -> Icons.Filled.Settings
+                    else -> null
                 }
-                Icon(imageVector = icon, contentDescription = item.iconName, modifier = Modifier.size(20.dp), tint = item.tint)
+                if (icon != null) {
+                    Icon(imageVector = icon, contentDescription = item.iconName, modifier = Modifier.size(20.dp), tint = item.tint)
+                } else {
+                    Text(
+                        text = if (item.iconName == "snapshot3d") "3D" else "AI",
+                        color = item.tint,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
 

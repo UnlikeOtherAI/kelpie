@@ -66,12 +66,12 @@ final class ServerState: ObservableObject {
             return successResponse(["message": message])
         }
 
-        // Debug: open a UI panel programmatically (history, bookmarks, network-inspector, settings)
+        // Debug: open a UI panel programmatically (history, bookmarks, network-inspector, settings, ai)
         router.register("show-panel") { [weak self] body in
             guard let panel = body["panel"] as? String else {
                 return errorResponse(code: "MISSING_PARAM", message: "panel is required")
             }
-            let valid = ["history", "bookmarks", "network-inspector", "settings"]
+            let valid = ["history", "bookmarks", "network-inspector", "settings", "ai"]
             guard valid.contains(panel) else {
                 return errorResponse(code: "INVALID_PARAM", message: "panel must be one of: \(valid.joined(separator: ", "))")
             }
@@ -93,6 +93,7 @@ final class ServerState: ObservableObject {
         BrowserManagementHandler(context: ctx).register(on: router)
         LLMHandler(context: ctx).register(on: router)
         AIHandler(context: ctx).register(on: router)
+        Snapshot3DHandler(context: ctx).register(on: router)
         BookmarkHandler(context: ctx).register(on: router)
         HistoryHandler(context: ctx).register(on: router)
         NetworkInspectorHandler(context: ctx).register(on: router)

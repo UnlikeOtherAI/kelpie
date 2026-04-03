@@ -57,6 +57,7 @@ class Router {
             "get-intercepted-requests", "clear-request-interception",
             "show-keyboard", "hide-keyboard", "get-keyboard-state",
             "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
+            "snapshot-3d-enter", "snapshot-3d-exit", "snapshot-3d-status",
         )
         for (method in methods) {
             if (!routes.containsKey(method)) {
