@@ -6,6 +6,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "model_store.h"
+
 namespace mollotov::ai_internal {
 
 using json = nlohmann::json;
@@ -27,6 +29,8 @@ struct MollotovAiManager {
   std::string models_dir;
   std::string hf_token;
   std::string ollama_endpoint = "http://localhost:11434";
+  mollotov::ModelStore store;
 
-  explicit MollotovAiManager(std::string dir) : models_dir(std::move(dir)) {}
+  explicit MollotovAiManager(std::string dir)
+      : models_dir(dir), store(dir) {}
 };

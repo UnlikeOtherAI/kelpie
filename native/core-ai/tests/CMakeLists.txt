@@ -5,3 +5,4 @@ function(add_ai_test name)
 endfunction()
 
 add_ai_test(test_ai_catalog test_ai_catalog.cpp)
+add_ai_test(test_ai_store test_ai_store.cpp)
