@@ -38,18 +38,17 @@ struct InferenceHarness {
         var pendingImage: Data?
 
         if let preloadedContext {
-            let fullPrompt = buildPrompt(
+            let fullPrompt = buildDirectAnswerPrompt(
                 userPrompt: prompt,
                 pageSummary: summary.formatted(),
-                preloadedContext: preloadedContext,
-                transcript: []
+                pageText: preloadedContext
             )
             let inference = try await engine.infer(prompt: fullPrompt, audio: audio, image: nil)
             totalTokens += inference.tokensUsed
-            let parsed = parseFinalAnswer(from: inference.text)
+            let answer = inference.text.trimmingCharacters(in: .whitespacesAndNewlines)
             return Result(
-                answer: parsed.answer,
-                references: parsed.references,
+                answer: answer.isEmpty ? "No response." : answer,
+                references: [],
                 toolCallsMade: 0,
                 totalTokens: totalTokens,
                 totalTimeMs: elapsedMs(since: startedAt),
@@ -348,6 +347,21 @@ struct InferenceHarness {
         guard text.count > maxCharacters else { return text }
         let endIndex = text.index(text.startIndex, offsetBy: maxCharacters)
         return text[..<endIndex] + "... [truncated, \(text.count) chars total]"
+    }
+
+    private func buildDirectAnswerPrompt(userPrompt: String, pageSummary: String, pageText: String) -> String {
+        """
+        You are a browser assistant. Answer the user's question based ONLY on the page content below.
+        Be concise. Do not make up information not present in the content.
+
+        \(pageSummary)
+
+        Page content:
+        \(pageText)
+
+        Question: \(userPrompt)
+        Answer:
+        """
     }
 
     private func buildPrompt(
