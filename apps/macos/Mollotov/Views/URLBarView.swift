@@ -17,6 +17,7 @@ struct URLBarView: View {
     let onReload: () -> Void
     let onAIToggle: () -> Void
     let onSnapshot3D: () -> Void
+    let is3DActive: Bool
     let show3DControls: Bool
     let inspectorMode: String
     let onSetInspectorMode: (String) -> Void
@@ -32,23 +33,23 @@ struct URLBarView: View {
     var body: some View {
         VStack(spacing: 4) {
             HStack(spacing: 8) {
-                navButton(
+                AppKitToolbarButton(
                     systemName: "chevron.left",
-                    isEnabled: browserState.canGoBack,
                     accessibilityID: "browser.nav.back",
                     accessibilityLabel: "Back",
+                    isEnabled: browserState.canGoBack,
                     action: onBack
                 )
 
-                navButton(
+                AppKitToolbarButton(
                     systemName: "chevron.right",
-                    isEnabled: browserState.canGoForward,
                     accessibilityID: "browser.nav.forward",
                     accessibilityLabel: "Forward",
+                    isEnabled: browserState.canGoForward,
                     action: onForward
                 )
 
-                navButton(
+                AppKitToolbarButton(
                     systemName: "arrow.clockwise",
                     accessibilityID: "browser.nav.reload",
                     accessibilityLabel: "Reload",
@@ -66,10 +67,11 @@ struct URLBarView: View {
                     .fixedSize(horizontal: true, vertical: false)
                 }
 
-                navButton(
+                AppKitToolbarButton(
                     systemName: "cube.transparent",
                     accessibilityID: "browser.nav.snapshot3d",
                     accessibilityLabel: "3D Inspector",
+                    isSelected: is3DActive,
                     action: onSnapshot3D
                 )
 
@@ -151,28 +153,28 @@ struct URLBarView: View {
             )
             .frame(width: 90, height: 34)
 
-            navButton(
+            AppKitToolbarButton(
                 systemName: "minus.magnifyingglass",
                 accessibilityID: "browser.snapshot3d.zoom-out",
                 accessibilityLabel: "Zoom out 3D view",
                 action: onInspectorZoomOut
             )
 
-            navButton(
+            AppKitToolbarButton(
                 systemName: "plus.magnifyingglass",
                 accessibilityID: "browser.snapshot3d.zoom-in",
                 accessibilityLabel: "Zoom in 3D view",
                 action: onInspectorZoomIn
             )
 
-            navButton(
+            AppKitToolbarButton(
                 systemName: "arrow.counterclockwise",
                 accessibilityID: "browser.snapshot3d.reset",
                 accessibilityLabel: "Reset 3D view",
                 action: onInspectorReset
             )
 
-            navButton(
+            AppKitToolbarButton(
                 systemName: "xmark",
                 accessibilityID: "browser.snapshot3d.exit",
                 accessibilityLabel: "Exit 3D view",
@@ -356,39 +358,6 @@ struct URLBarView: View {
         .accessibilityIdentifier("browser.preset.switch")
     }
 
-    @ViewBuilder
-    private func navButton(
-        systemName: String,
-        isEnabled: Bool = true,
-        accessibilityID: String,
-        accessibilityLabel: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                    )
-
-                Image(systemName: systemName)
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .frame(
-                width: Self.toolbarButtonSize.width,
-                height: Self.toolbarButtonSize.height
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1.0 : 0.55)
-        .accessibilityIdentifier(accessibilityID)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
     private func navigate() {
         var url = urlText.trimmingCharacters(in: .whitespaces)
         if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
@@ -397,6 +366,108 @@ struct URLBarView: View {
         onNavigate(url)
     }
 }
+
+// MARK: - AppKit toolbar button (bypasses SwiftUI hit testing / first-responder issues)
+
+private struct AppKitToolbarButton: NSViewRepresentable {
+    let systemName: String
+    let accessibilityID: String
+    let accessibilityLabel: String
+    var isEnabled: Bool = true
+    var isSelected: Bool = false
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeNSView(context: Context) -> ToolbarButtonView {
+        let btn = ToolbarButtonView(systemName: systemName)
+        btn.setAccessibilityIdentifier(accessibilityID)
+        btn.setAccessibilityLabel(accessibilityLabel)
+        btn.target = context.coordinator
+        btn.action = #selector(Coordinator.handlePress)
+        return btn
+    }
+
+    func updateNSView(_ nsView: ToolbarButtonView, context: Context) {
+        context.coordinator.action = action
+        nsView.isEnabled = isEnabled
+        nsView.isButtonSelected = isSelected
+        nsView.updateIcon(systemName: systemName)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarButtonView, context: Context) -> CGSize? {
+        CGSize(width: 40, height: 34)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func handlePress() { action() }
+    }
+}
+
+private final class ToolbarButtonView: NSButton {
+    private let iconView = NSImageView()
+    var isButtonSelected = false { didSet { applyAppearance() } }
+
+    init(systemName: String) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 40, height: 34))
+        setButtonType(.momentaryPushIn)
+        isBordered = false
+        bezelStyle = .regularSquare
+        imagePosition = .noImage
+        title = ""
+        wantsLayer = true
+        layer?.cornerRadius = 8
+        layer?.masksToBounds = true
+        layer?.borderWidth = 0.5
+
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 16),
+            iconView.heightAnchor.constraint(equalToConstant: 16),
+        ])
+
+        updateIcon(systemName: systemName)
+        applyAppearance()
+    }
+
+    func updateIcon(systemName: String) {
+        iconView.image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        applyAppearance()
+    }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 40, height: 34) }
+
+    override var isHighlighted: Bool { didSet { applyAppearance() } }
+    override var isEnabled: Bool { didSet { alphaValue = isEnabled ? 1.0 : 0.55 } }
+
+    private func applyAppearance() {
+        if isHighlighted {
+            layer?.backgroundColor = isButtonSelected
+                ? NSColor.selectedControlColor.withAlphaComponent(0.75).cgColor
+                : NSColor.separatorColor.withAlphaComponent(0.18).cgColor
+            iconView.contentTintColor = isButtonSelected ? .white : NSColor.labelColor
+        } else if isButtonSelected {
+            layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.92).cgColor
+            layer?.borderColor = NSColor.selectedControlColor.withAlphaComponent(0.5).cgColor
+            iconView.contentTintColor = .white
+        } else {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
+            iconView.contentTintColor = NSColor.labelColor
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - AppKit segmented strip
 
 private struct AppKitSegmentedStrip: NSViewRepresentable {
     struct Item: Equatable {

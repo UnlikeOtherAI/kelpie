@@ -48,6 +48,7 @@ struct BrowserView: View {
                             await toggle3DInspector()
                         }
                     },
+                    is3DActive: isIn3DInspector,
                     show3DControls: isIn3DInspector,
                     inspectorMode: inspectorMode,
                     onSetInspectorMode: { mode in
@@ -138,7 +139,7 @@ struct BrowserView: View {
 
                     // AI panel — outside the overlay ZStack so buttons are always clickable
                     if isAIPanelOpen {
-                        AIPanelResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
+                        AppKitResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
                         AIChatPanel(
                             aiState: aiState,
                             session: aiChatSession,
@@ -509,20 +510,9 @@ private struct ViewportStageView<Content: View>: View {
     @ViewBuilder
     private func stageChromeHeader(width: CGFloat) -> some View {
         HStack(spacing: 6) {
-            Button {
-                _ = viewportState.selectFullViewport()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.black.opacity(0.9))
-                    .clipShape(Circle())
-                    .overlay { Circle().stroke(Color.white.opacity(0.9), lineWidth: 1) }
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("browser.viewport.close")
+            ViewportCloseButton(action: { _ = viewportState.selectFullViewport() })
+                .frame(width: 28, height: 28)
+                .accessibilityIdentifier("browser.viewport.close")
 
             Text(viewportState.stageSummaryLabel)
                 .font(.system(size: 12, weight: .semibold))
@@ -709,50 +699,182 @@ private struct WindowBlurOverlay: NSViewRepresentable {
     }
 }
 
-private struct AIPanelResizeHandle: View {
+// MARK: - AppKit-backed resize handle (bypasses WebView first-responder hit-test issue)
+
+private struct AppKitResizeHandle: NSViewRepresentable {
     @Binding var panelWidth: CGFloat
     let onDragEnd: () -> Void
 
-    @State private var dragStartWidth: CGFloat?
+    func makeCoordinator() -> Coordinator { Coordinator(binding: $panelWidth, onDragEnd: onDragEnd) }
 
-    var body: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(width: 1)
-            .padding(.horizontal, 2.5)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if dragStartWidth == nil {
-                            dragStartWidth = panelWidth
-                        }
-                        guard let startWidth = dragStartWidth else { return }
-                        let proposed = startWidth - value.translation.width
-                        let newWidth = min(max(proposed, 200), 500)
-                        if let window = NSApp.keyWindow {
-                            let delta = newWidth - panelWidth
-                            if abs(delta) > 0.5 {
-                                var frame = window.frame
-                                frame.size.width += delta
-                                window.setFrame(frame, display: true)
-                            }
-                        }
-                        panelWidth = newWidth
-                    }
-                    .onEnded { _ in
-                        dragStartWidth = nil
-                        onDragEnd()
-                    }
-            )
+    func makeNSView(context: Context) -> ResizeHandleView {
+        let view = ResizeHandleView()
+        view.coordinator = context.coordinator
+        return view
     }
+
+    func updateNSView(_ nsView: ResizeHandleView, context: Context) {
+        context.coordinator.onDragEnd = onDragEnd
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ResizeHandleView, context: Context) -> CGSize? {
+        CGSize(width: 6, height: proposal.height ?? 0)
+    }
+
+    final class Coordinator: NSObject {
+        private var binding: Binding<CGFloat>
+        var onDragEnd: () -> Void
+        var dragStartWidth: CGFloat?
+        var dragStartX: CGFloat?
+
+        var panelWidth: CGFloat {
+            get { binding.wrappedValue }
+            set { binding.wrappedValue = newValue }
+        }
+
+        init(binding: Binding<CGFloat>, onDragEnd: @escaping () -> Void) {
+            self.binding = binding
+            self.onDragEnd = onDragEnd
+        }
+    }
+}
+
+private final class ResizeHandleView: NSView {
+    weak var coordinator: AppKitResizeHandle.Coordinator?
+    private var trackingArea: NSTrackingArea?
+    private let bar = NSView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+
+        bar.wantsLayer = true
+        bar.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(bar)
+        NSLayoutConstraint.activate([
+            bar.widthAnchor.constraint(equalToConstant: 1),
+            bar.centerXAnchor.constraint(equalTo: centerXAnchor),
+            bar.topAnchor.constraint(equalTo: topAnchor),
+            bar.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = trackingArea { removeTrackingArea(t) }
+        let t = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(t)
+        trackingArea = t
+    }
+
+    override func mouseEntered(with event: NSEvent) { NSCursor.resizeLeftRight.push() }
+    override func mouseExited(with event: NSEvent) { NSCursor.pop() }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let c = coordinator else { return }
+        c.dragStartWidth = c.panelWidth
+        c.dragStartX = event.locationInWindow.x
+        NSCursor.resizeLeftRight.push()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let c = coordinator,
+              let startWidth = c.dragStartWidth,
+              let startX = c.dragStartX else { return }
+        let dx = startX - event.locationInWindow.x
+        let newWidth = min(max(startWidth + dx, 200), 500)
+        let delta = newWidth - c.panelWidth
+        if abs(delta) > 0.5, let window = self.window {
+            var frame = window.frame
+            frame.size.width += delta
+            window.setFrame(frame, display: true)
+        }
+        c.panelWidth = newWidth
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        coordinator?.dragStartWidth = nil
+        coordinator?.dragStartX = nil
+        coordinator?.onDragEnd()
+        NSCursor.pop()
+    }
+
+    override var acceptsFirstResponder: Bool { true }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - AppKit-backed viewport close button
+
+private struct ViewportCloseButton: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeNSView(context: Context) -> ViewportCloseButtonView {
+        let btn = ViewportCloseButtonView()
+        btn.target = context.coordinator
+        btn.action = #selector(Coordinator.handlePress)
+        return btn
+    }
+
+    func updateNSView(_ nsView: ViewportCloseButtonView, context: Context) {
+        context.coordinator.action = action
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ViewportCloseButtonView, context: Context) -> CGSize? {
+        CGSize(width: 28, height: 28)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func handlePress() { action() }
+    }
+}
+
+private final class ViewportCloseButtonView: NSButton {
+    private let iconView = NSImageView()
+
+    override init(frame: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
+        setButtonType(.momentaryPushIn)
+        isBordered = false
+        bezelStyle = .regularSquare
+        imagePosition = .noImage
+        title = ""
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.9).cgColor
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.9).cgColor
+        layer?.borderWidth = 1
+
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .bold))
+        iconView.contentTintColor = .white
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        addSubview(iconView)
+        NSLayoutConstraint.activate([
+            iconView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 12),
+            iconView.heightAnchor.constraint(equalToConstant: 12),
+        ])
+    }
+
+    override var isHighlighted: Bool {
+        didSet {
+            layer?.backgroundColor = isHighlighted
+                ? NSColor.white.withAlphaComponent(0.25).cgColor
+                : NSColor.black.withAlphaComponent(0.9).cgColor
+        }
+    }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 28, height: 28) }
+    required init?(coder: NSCoder) { fatalError() }
 }
 
 private final class ResolutionTitlebarAccessoryController: NSTitlebarAccessoryViewController {
@@ -799,6 +921,34 @@ struct RendererContainerView: NSViewRepresentable {
     final class Coordinator {
         var attachedEngine: RendererState.Engine?
         weak var attachedView: NSView?
+        private var eventMonitor: Any?
+
+        /// Installs a local event monitor that resigns the WebView as first responder
+        /// whenever the user clicks outside the renderer container. This allows SwiftUI
+        /// controls elsewhere in the window (AI panel, resize separator, overlays) to
+        /// receive mouse events normally.
+        func installEventMonitor(for container: NSView) {
+            guard eventMonitor == nil else { return }
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak container] event in
+                guard let container, let window = container.window, event.window === window else {
+                    return event
+                }
+                let locationInContainer = container.convert(event.locationInWindow, from: nil)
+                if !container.bounds.contains(locationInContainer) {
+                    if let fr = window.firstResponder {
+                        let cls = NSStringFromClass(type(of: fr))
+                        if cls.contains("WKWeb") || cls.contains("CrWeb") || cls.contains("CEF") {
+                            window.makeFirstResponder(nil)
+                        }
+                    }
+                }
+                return event
+            }
+        }
+
+        deinit {
+            if let monitor = eventMonitor { NSEvent.removeMonitor(monitor) }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -809,6 +959,7 @@ struct RendererContainerView: NSViewRepresentable {
         let container = NSView()
         container.wantsLayer = true
         attachActiveRenderer(to: container, coordinator: context.coordinator)
+        context.coordinator.installEventMonitor(for: container)
         return container
     }
 
