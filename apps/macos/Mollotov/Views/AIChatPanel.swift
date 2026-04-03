@@ -157,19 +157,20 @@ struct AIChatPanel: View {
                         }
                     }
 
-                Button {
-                    Task {
-                        await session.send(using: aiState)
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 18))
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(aiState.activeModel == nil || session.isSending || session.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityIdentifier("browser.ai.chat.send")
+                let canSend = aiState.activeModel != nil && !session.isSending && !session.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 18))
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(canSend ? Color.accentColor : Color.secondary)
+                    .overlay(
+                        AppKitInvisibleButton(
+                            accessibilityID: "browser.ai.chat.send",
+                            accessibilityLabel: "Send",
+                            isEnabled: canSend
+                        ) {
+                            Task { await session.send(using: aiState) }
+                        }
+                    )
 
                 Button {} label: {
                     Image(systemName: "mic.fill")

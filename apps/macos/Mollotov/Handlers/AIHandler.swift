@@ -190,7 +190,7 @@ struct AIHandler {
             do {
                 let image = contextMode == "screenshot" ? try await screenshotData() : nil
                 let result: InferenceEngine.InferenceResult
-                if let messages, !messages.isEmpty {
+                if let messages {
                     result = try await inferWithOllamaAgentLoop(
                         endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
                         model: model,
@@ -456,7 +456,20 @@ struct AIHandler {
         let harness = InferenceHarness(context: context)
         let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
 
-        let systemMessage: [String: Any] = ["role": "system", "content": SystemPrompt.build()]
+        // Pre-fetch page text — fast JS call, works with every model
+        let pageText = await harness.executeTool("get_text", args: [:])
+        let summary = await PageSummary.gather(from: context)
+        let systemContent = """
+        You are a browser assistant built into Mollotov. Answer questions about the current web page.
+        Be concise. Only state facts present in the page content below. Never guess or make up content.
+
+        Page: "\(summary.title)"
+        URL: \(summary.url)
+
+        Page content:
+        \(pageText)
+        """
+        let systemMessage: [String: Any] = ["role": "system", "content": systemContent]
         var messages: [[String: Any]] = [systemMessage] + historyMessages
         var userMessage: [String: Any] = ["role": "user", "content": prompt]
         if let image {
@@ -464,61 +477,18 @@ struct AIHandler {
         }
         messages.append(userMessage)
 
-        var totalTokens = 0
-
-        for _ in 0..<3 {
-            let payload: [String: Any] = ["model": model, "messages": messages, "stream": false]
-            let response = try await postJSON(url: url, payload: payload)
-            let content = ((response["message"] as? [String: Any])?["content"] as? String ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            totalTokens += response["eval_count"] as? Int ?? approximateTokens(for: content)
-
-            if let toolCall = extractOllamaToolCall(from: content) {
-                messages.append(["role": "assistant", "content": content])
-                let toolResult = await harness.executeTool(toolCall.name, args: toolCall.args)
-                messages.append(["role": "user", "content": "Tool \(toolCall.name) result: \(toolResult)"])
-                continue
-            }
-
-            let answer = parseResponseJSON(content).answer
-            let duration = parseDurationMs(response["total_duration"])
-            return InferenceEngine.InferenceResult(
-                text: answer,
-                tokensUsed: totalTokens,
-                inferenceTimeMs: duration ?? elapsedMs(since: startedAt)
-            )
-        }
-
+        let payload: [String: Any] = ["model": model, "messages": messages, "stream": false]
+        let response = try await postJSON(url: url, payload: payload)
+        let content = ((response["message"] as? [String: Any])?["content"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let totalTokens = response["eval_count"] as? Int ?? approximateTokens(for: content)
         return InferenceEngine.InferenceResult(
-            text: "I need more information than I can gather in one pass.",
+            text: content.isEmpty ? "No response." : content,
             tokensUsed: totalTokens,
-            inferenceTimeMs: elapsedMs(since: startedAt)
+            inferenceTimeMs: parseDurationMs(response["total_duration"]) ?? elapsedMs(since: startedAt)
         )
     }
 
-    private func extractOllamaToolCall(from text: String) -> (name: String, args: [String: String])? {
-        guard let start = text.firstIndex(of: "{") else { return nil }
-        var depth = 0
-        var end: String.Index?
-        for index in text.indices[start...] {
-            switch text[index] {
-            case "{": depth += 1
-            case "}":
-                depth -= 1
-                if depth == 0 { end = index; break }
-            default: break
-            }
-            if end != nil { break }
-        }
-        guard let end,
-              let data = String(text[start...end]).data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tool = object["tool"] as? String else { return nil }
-        let args = (object["args"] as? [String: Any] ?? [:]).reduce(into: [String: String]()) { acc, kv in
-            acc[kv.key] = kv.value as? String ?? String(describing: kv.value)
-        }
-        return (tool, args)
-    }
 
     private func inferWithOllama(
         endpoint: String,
@@ -580,6 +550,7 @@ struct AIHandler {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        request.timeoutInterval = 300
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
@@ -726,3 +697,4 @@ struct AIHandler {
 
     private let defaultOllamaEndpoint = "http://localhost:11434"
 }
+
