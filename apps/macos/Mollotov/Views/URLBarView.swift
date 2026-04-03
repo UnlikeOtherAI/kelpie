@@ -380,6 +380,7 @@ struct URLBarView: View {
                 width: Self.toolbarButtonSize.width,
                 height: Self.toolbarButtonSize.height
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)

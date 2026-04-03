@@ -78,18 +78,21 @@ struct AIChatPanel: View {
     private var header: some View {
         HStack(spacing: 6) {
             ForEach(AIPanelTab.allCases, id: \.self) { tab in
-                Button(tab.rawValue) {
+                Button {
                     selectedTab = tab
+                } label: {
+                    Text(tab.rawValue)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selectedTab == tab ? Color.accentColor.opacity(0.16) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(selectedTab == tab ? Color.accentColor.opacity(0.16) : Color.clear)
-                )
-                .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
                 .accessibilityIdentifier("browser.ai.tab.\(tab.rawValue.lowercased())")
             }
 
@@ -98,9 +101,11 @@ struct AIChatPanel: View {
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
             .accessibilityIdentifier("browser.ai.panel.close")
         }
         .padding(.horizontal, 12)
@@ -159,6 +164,8 @@ struct AIChatPanel: View {
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 18))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(aiState.activeModel == nil || session.isSending || session.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -168,6 +175,8 @@ struct AIChatPanel: View {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 15))
                         .foregroundStyle(aiState.activeModel?.capabilities.contains("audio") == true ? Color.accentColor : .secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(true)
@@ -195,6 +204,7 @@ struct AIChatPanel: View {
                                     .font(.system(size: 10, weight: .medium))
                             }
                             .foregroundStyle(aiState.huggingFaceToken.isEmpty ? .orange : .secondary)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("browser.ai.hf-token")
@@ -246,9 +256,11 @@ struct AIChatPanel: View {
             Button(action: dismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

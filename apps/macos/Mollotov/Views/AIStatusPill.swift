@@ -33,6 +33,7 @@ struct AIStatusPill: View {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
                     .stroke(borderColor, lineWidth: 0.5)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .opacity(aiState.isAvailable ? 1 : 0.65)

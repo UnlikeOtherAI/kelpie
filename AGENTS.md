@@ -84,6 +84,16 @@ SwiftUI buttons and gestures behind a full-window NSViewRepresentable are dead â
 - When adding a new overlay or floating control, verify that SwiftUI buttons both above and below it in the view hierarchy still respond to clicks.
 - If a control must work reliably alongside NSViewRepresentable overlays, use AppKit-backed controls (NSViewRepresentable with custom NSButton/NSView) instead of SwiftUI Button.
 
+### macOS: `.buttonStyle(.plain)` Hit Areas (CRITICAL)
+
+On macOS, `.buttonStyle(.plain)` buttons have their clickable area determined **only by the label content itself**. Modifiers like `.frame()`, `.padding()`, `.background()`, and `.contentShape()` applied to the Button wrapper (outside the label closure) do NOT expand the hit area â€” they only affect layout.
+
+**Rules:**
+- All visual frame, padding, background, and foregroundStyle modifiers MUST go inside the Button's `label:` closure, not on the Button wrapper.
+- Every `.buttonStyle(.plain)` button MUST have `.contentShape(Rectangle())` (or appropriate shape) as the last modifier inside its label closure.
+- The Button wrapper should only carry `.buttonStyle(.plain)`, `.disabled()`, `.accessibilityIdentifier()`, and similar non-visual modifiers.
+- When adding a new `.buttonStyle(.plain)` button, always verify it is clickable after building.
+
 ### Architecture and Quality
 
 - Prefer single-responsibility functions. When touching a method that mixes responsibilities, split it before adding more logic.
