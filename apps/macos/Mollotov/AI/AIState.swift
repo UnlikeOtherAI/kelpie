@@ -83,6 +83,12 @@ final class AIState: ObservableObject {
     private let fileManager = FileManager.default
     private let decoder = JSONDecoder()
 
+    private let aiManager: AIManager = {
+        let modelsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".mollotov/models", isDirectory: true).path
+        return AIManager(modelsDir: modelsDir)
+    }()
+
     private init() {
         let isArm64 = Self.detectAppleSilicon()
         isAppleSilicon = isArm64
@@ -166,10 +172,12 @@ final class AIState: ObservableObject {
     }
 
     func downloadNativeModel(id: String) {
-        guard downloadTasks[id] == nil, let model = AIModelCatalog.approvedModel(id: id) else { return }
+        guard downloadTasks[id] == nil, AIModelCatalog.approvedModel(id: id) != nil else { return }
 
         downloadStates[id] = .downloading
         rebuildModelCards()
+
+        aiManager.hfToken = huggingFaceToken
 
         downloadTasks[id] = Task { [weak self] in
             guard let self else { return }
@@ -181,55 +189,33 @@ final class AIState: ObservableObject {
                 }
             }
 
-            do {
-                let destination = Self.modelDirectory(id: id)
-                try self.fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-                let tempURL = destination.appendingPathComponent("model.gguf.download")
-                let finalURL = destination.appendingPathComponent("model.gguf")
-                let metadataURL = destination.appendingPathComponent("metadata.json")
+            let error = await Task.detached { [weak self] in
+                self?.aiManager.downloadModel(id: id, progress: nil)
+            }.value
 
-                if self.fileManager.fileExists(atPath: tempURL.path) {
-                    try self.fileManager.removeItem(at: tempURL)
-                }
-
-                let (downloadedURL, _) = try await URLSession.shared.download(from: model.downloadURL)
-
-                if self.fileManager.fileExists(atPath: finalURL.path) {
-                    try self.fileManager.removeItem(at: finalURL)
-                }
-                try self.fileManager.moveItem(at: downloadedURL, to: tempURL)
-                try self.fileManager.moveItem(at: tempURL, to: finalURL)
-
-                let metadata = [
-                    "name": model.name,
-                    "capabilities": model.capabilities,
-                ] as [String: Any]
-                let metadataData = try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted])
-                try metadataData.write(to: metadataURL, options: [.atomic])
-
-                await self.refresh()
-            } catch {
+            if let error {
                 await MainActor.run {
-                    self.lastError = error.localizedDescription
+                    if error.contains("auth_required") {
+                        self.lastError = "This model requires a Hugging Face token."
+                        self.onAuthFailureNavigate?(
+                            URL(string: "https://huggingface.co/settings/tokens")!
+                        )
+                    } else {
+                        self.lastError = error
+                    }
                 }
+                return
             }
+
+            await self.refresh()
         }
     }
 
     func removeNativeModel(id: String) {
         Task { [weak self] in
             guard let self else { return }
-            do {
-                let dir = Self.modelDirectory(id: id)
-                if self.fileManager.fileExists(atPath: dir.path) {
-                    try self.fileManager.removeItem(at: dir)
-                }
-                await self.refresh()
-            } catch {
-                await MainActor.run {
-                    self.lastError = error.localizedDescription
-                }
-            }
+            _ = await Task.detached { self.aiManager.removeModel(id: id) }.value
+            await self.refresh()
         }
     }
 
@@ -243,7 +229,7 @@ final class AIState: ObservableObject {
     private func rebuildModelCards() {
         nativeModelCards = AIModelCatalog.approvedNativeModels
             .map { model in
-                let downloaded = fileManager.fileExists(atPath: Self.modelDirectory(id: model.id).appendingPathComponent("model.gguf").path)
+                let downloaded = aiManager.isModelDownloaded(id: model.id)
                 let active = activeModel?.backend == .native && activeModel?.id == model.id
                 return AINativeModelCard(
                     id: model.id,
@@ -309,44 +295,37 @@ final class AIState: ObservableObject {
     }
 
     private func refreshOllamaModels() async {
-        guard let url = URL(string: ollamaEndpoint)?.appending(path: "api/tags") else {
+        aiManager.setOllamaEndpoint(ollamaEndpoint)
+
+        let reachable = await Task.detached { [weak self] in
+            self?.aiManager.ollamaReachable() ?? false
+        }.value
+
+        guard reachable else {
             ollamaReachable = false
             ollamaModels = []
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        let modelsJSON = await Task.detached { [weak self] in
+            self?.aiManager.ollamaListModels() ?? []
+        }.value
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
-                ollamaReachable = false
-                ollamaModels = []
-                return
+        ollamaModels = modelsJSON
+            .compactMap { raw in
+                guard let name = raw["name"] as? String else { return nil }
+                let size = (raw["size"] as? NSNumber)?.int64Value
+                let caps = (raw["capabilities"] as? [String]) ?? Self.ollamaCapabilities(for: name)
+                return AIOllamaModel(
+                    id: name,
+                    name: name,
+                    sizeBytes: size,
+                    capabilities: caps,
+                    isActive: activeModel?.backend == .ollama && activeModel?.name == name
+                )
             }
-
-            let parsed = (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
-            let models = parsed["models"] as? [[String: Any]] ?? []
-            ollamaModels = models
-                .compactMap { raw in
-                    guard let name = raw["name"] as? String else { return nil }
-                    let size = (raw["size"] as? NSNumber)?.int64Value
-                    let capabilities = Self.ollamaCapabilities(for: name)
-                    return AIOllamaModel(
-                        id: name,
-                        name: name,
-                        sizeBytes: size,
-                        capabilities: capabilities,
-                        isActive: activeModel?.backend == .ollama && activeModel?.name == name
-                    )
-                }
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            ollamaReachable = true
-        } catch {
-            ollamaReachable = false
-            ollamaModels = []
-        }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        ollamaReachable = true
     }
 
     private func sendControlRequest(method: String, body: [String: Any]) async -> Bool {
