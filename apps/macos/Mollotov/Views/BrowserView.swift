@@ -28,7 +28,7 @@ struct BrowserView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // URL bar — fixed height, never compressed
+                // URL bar — above all overlays so buttons are always clickable
                 URLBarView(
                     browserState: browserState,
                     rendererState: rendererState,
@@ -85,8 +85,58 @@ struct BrowserView: View {
                 .layoutPriority(1)
 
                 HStack(spacing: 0) {
-                    rendererSurface
+                    // Renderer with overlays — FloatingMenuView only covers this area
+                    ZStack {
+                        rendererSurface
 
+                        if browserState.isLoading {
+                            FloatingProgressPill(progress: browserState.progress)
+                                .zIndex(10)
+                        }
+
+                        if isFloatingMenuOpen {
+                            WindowBlurOverlay(opacity: 0.5)
+                                .ignoresSafeArea()
+                                .allowsHitTesting(false)
+                        }
+
+                        FloatingMenuView(
+                            isOpen: $isFloatingMenuOpen,
+                            onReload: { serverState.handlerContext.reloadPage() },
+                            onSafariAuth: {
+                                if let url = serverState.handlerContext.currentURL {
+                                    let helper = SafariAuthHelper()
+                                    helper.handlerContext = serverState.handlerContext
+                                    helper.authenticate(url: url)
+                                }
+                            },
+                            onSettings: { showSettings = true },
+                            onBookmarks: { showBookmarks = true },
+                            onHistory: { showHistory = true },
+                            onNetworkInspector: { showNetworkInspector = true },
+                            onAI: openAIFromMenu,
+                            onSnapshot3D: {
+                                Task { @MainActor in
+                                    await toggle3DInspector()
+                                }
+                            }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+
+                        if let message = serverState.shellToastMessage {
+                            VStack {
+                                Spacer()
+                                ShellToastCardView(message: message)
+                                    .padding(.bottom, 20)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .allowsHitTesting(false)
+                            .zIndex(20)
+                        }
+                    }
+
+                    // AI panel — outside the overlay ZStack so buttons are always clickable
                     if isAIPanelOpen {
                         AIPanelResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
                         AIChatPanel(
@@ -98,54 +148,6 @@ struct BrowserView: View {
                         .frame(width: aiPanelWidth)
                     }
                 }
-            }
-
-            if browserState.isLoading {
-                FloatingProgressPill(progress: browserState.progress)
-                    .zIndex(10)
-            }
-
-            if isFloatingMenuOpen {
-                WindowBlurOverlay(opacity: 0.5)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-
-            FloatingMenuView(
-                isOpen: $isFloatingMenuOpen,
-                onReload: { serverState.handlerContext.reloadPage() },
-                onSafariAuth: {
-                    if let url = serverState.handlerContext.currentURL {
-                        let helper = SafariAuthHelper()
-                        helper.handlerContext = serverState.handlerContext
-                        helper.authenticate(url: url)
-                    }
-                },
-                onSettings: { showSettings = true },
-                onBookmarks: { showBookmarks = true },
-                onHistory: { showHistory = true },
-                onNetworkInspector: { showNetworkInspector = true },
-                onAI: openAIFromMenu,
-                onSnapshot3D: {
-                    Task { @MainActor in
-                        await toggle3DInspector()
-                    }
-                }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-            .padding(.trailing, isAIPanelOpen ? aiPanelWidth + 7 : 0)
-            .animation(.easeOut(duration: 0.2), value: isAIPanelOpen)
-
-            if let message = serverState.shellToastMessage {
-                VStack {
-                    Spacer()
-                    ShellToastCardView(message: message)
-                        .padding(.bottom, 20)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
-                .zIndex(20)
             }
 
             if showWelcome && shouldShowWelcomeCard {

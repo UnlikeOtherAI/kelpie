@@ -74,6 +74,16 @@ During debugging or verification, always terminate any existing Mollotov browser
 
 Feature work is incomplete until docs are updated. When adding or changing API endpoints, CLI commands, or MCP tools, update the relevant docs in the same commit. Every user-facing feature must be described in [docs/functionality.md](docs/functionality.md) — update it when adding or changing features.
 
+### macOS: NSViewRepresentable Hit Testing (CRITICAL)
+
+SwiftUI buttons and gestures behind a full-window NSViewRepresentable are dead — SwiftUI's gesture pipeline does not forward mouseDown events through NSViewRepresentable views, even if the underlying NSView returns nil from hitTest. AppKit-backed controls (NSViewRepresentable, Menu) work because they are resolved at the NSView hitTest level before SwiftUI's gesture system runs.
+
+**Rules:**
+- Never place an NSViewRepresentable with `.frame(maxWidth: .infinity, maxHeight: .infinity)` as a ZStack overlay above SwiftUI buttons. It will block every SwiftUI control behind it.
+- Scope NSViewRepresentable overlays to the smallest possible area. In BrowserView, the FloatingMenuView is scoped to the renderer ZStack — not the full window — so the URL bar and AI panel remain clickable.
+- When adding a new overlay or floating control, verify that SwiftUI buttons both above and below it in the view hierarchy still respond to clicks.
+- If a control must work reliably alongside NSViewRepresentable overlays, use AppKit-backed controls (NSViewRepresentable with custom NSButton/NSView) instead of SwiftUI Button.
+
 ### Architecture and Quality
 
 - Prefer single-responsibility functions. When touching a method that mixes responsibilities, split it before adding more logic.
