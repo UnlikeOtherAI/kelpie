@@ -23,16 +23,20 @@ ARG="${1:-}"
 
 entries=()
 
-# 1. Connected physical iPhones/iPads via devicectl.
-# Extract UUID with grep to avoid fighting with space-padded columns.
+# 1. Connected physical iPhones/iPads via xctrace (IDs match what xcodebuild expects).
+# xctrace output: "Name (OS) (ECID)" under "== Devices ==" section.
+in_devices=false
 while IFS= read -r line; do
-  identifier=$(echo "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)
-  [[ -z "$identifier" ]] && continue
-  echo "$line" | grep -qi "available" || continue
+  [[ "$line" == "== Devices ==" ]] && { in_devices=true; continue; }
+  [[ "$line" == "== Simulators ==" ]] && break
+  $in_devices || continue
   echo "$line" | grep -qiE "iPhone|iPad" || continue
-  name=$(echo "$line" | sed 's/  .*//' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+  # ECID format: 8 hex chars, hyphen, 16 hex chars — distinct from UUID/SHA1
+  identifier=$(echo "$line" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}' | head -1)
+  [[ -z "$identifier" ]] && continue
+  name=$(echo "$line" | sed 's/ ([^)]*) ([^)]*)[[:space:]]*$//' | sed 's/^[[:space:]]*//')
   entries+=("${name} [device]|${identifier}|device")
-done < <(xcrun devicectl list devices 2>/dev/null | tail -n +3)
+done < <(xcrun xctrace list devices 2>/dev/null)
 
 # 2. Available simulators (iPhone / iPad only)
 while IFS='|' read -r simname udid rt; do
