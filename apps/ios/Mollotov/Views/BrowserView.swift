@@ -116,12 +116,15 @@ struct BrowserView: View {
     @State private var showBookmarks = false
     @State private var showHistory = false
     @State private var showNetworkInspector = false
+    @State private var showAI = false
     @State private var availableIPadViewportPresetIDs: [String] = []
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
     @State private var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
     @AppStorage("debugOverlay") private var debugOverlayEnabled = false
     @State private var debugText = ""
+    @State private var isIn3DInspector = false
+    @State private var inspectorMode = "rotate"
     private let safariAuth = SafariAuthHelper()
     private let debugTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -158,7 +161,13 @@ struct BrowserView: View {
                     browserState: browserState,
                     onNavigate: navigate,
                     onBack: goBack,
-                    onForward: goForward
+                    onForward: goForward,
+                    onAI: { showAI = true },
+                    onSnapshot3D: {
+                        Task { @MainActor in
+                            await toggle3DInspector()
+                        }
+                    }
                 )
 
                 browserViewport
@@ -180,6 +189,13 @@ struct BrowserView: View {
                 onBookmarks: { showBookmarks = true },
                 onHistory: { showHistory = true },
                 onNetworkInspector: { showNetworkInspector = true },
+                onAI: { showAI = true },
+                onSnapshot3D: {
+                    Task { @MainActor in
+                        await toggle3DInspector()
+                    }
+                },
+                show3DInspector: FeatureFlags.is3DInspectorEnabled,
                 showMobileViewportToggle: isPad,
                 mobileViewportPresets: availableTabletViewportPresetOptions,
                 selectedMobileViewportPresetID: activeTabletViewportPreset?.id,
@@ -196,6 +212,42 @@ struct BrowserView: View {
                     ),
                     onTouchpad: { enterTouchpadMode() }
                 )
+            }
+
+            if isIn3DInspector {
+                VStack {
+                    Spacer()
+                    Inspector3DControlsView(
+                        mode: inspectorMode,
+                        onSelectMode: { mode in
+                            Task { @MainActor in
+                                await set3DInspectorMode(mode)
+                            }
+                        },
+                        onZoomOut: {
+                            Task { @MainActor in
+                                await zoom3DInspector(by: -0.12)
+                            }
+                        },
+                        onZoomIn: {
+                            Task { @MainActor in
+                                await zoom3DInspector(by: 0.12)
+                            }
+                        },
+                        onReset: {
+                            Task { @MainActor in
+                                await reset3DInspectorView()
+                            }
+                        },
+                        onExit: {
+                            Task { @MainActor in
+                                await exit3DInspector()
+                            }
+                        }
+                    )
+                    .padding(.bottom, 88)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .overlay(alignment: .bottomLeading) {
@@ -236,6 +288,9 @@ struct BrowserView: View {
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
         }
+        .sheet(isPresented: $showAI) {
+            AIStatusView()
+        }
         .onChange(of: serverState.activePanel) { panel in
             guard let panel else { return }
             serverState.activePanel = nil
@@ -244,6 +299,7 @@ struct BrowserView: View {
             showBookmarks = false
             showNetworkInspector = false
             showSettings = false
+            showAI = false
             // Delay to let SwiftUI dismiss, then present the new sheet
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 switch panel {
@@ -251,6 +307,7 @@ struct BrowserView: View {
                 case "bookmarks": showBookmarks = true
                 case "network-inspector": showNetworkInspector = true
                 case "settings": showSettings = true
+                case "ai": showAI = true
                 default: break
                 }
             }
@@ -258,6 +315,10 @@ struct BrowserView: View {
         .onReceive(NotificationCenter.default.publisher(for: .showWelcomeCard)) { _ in
             welcomePresentationSource = .helpMenu
             showWelcome = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .snapshot3DExited)) { _ in
+            isIn3DInspector = false
+            inspectorMode = "rotate"
         }
         .onReceive(NotificationCenter.default.publisher(for: .selectViewportPreset)) { notification in
             guard isPad else { return }
@@ -447,6 +508,52 @@ struct BrowserView: View {
     private func authenticateInSafari() {
         guard let webView = browserState.webView, let url = webView.url else { return }
         safariAuth.authenticate(url: url, webView: webView)
+    }
+
+    @MainActor
+    private func toggle3DInspector() async {
+        if serverState.handlerContext.isIn3DInspector || isIn3DInspector {
+            await exit3DInspector()
+            return
+        }
+
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
+        let active = try? await serverState.handlerContext.evaluateJSReturningString("!!window.__m3d")
+        guard active == "true" else { return }
+
+        serverState.handlerContext.isIn3DInspector = true
+        isIn3DInspector = true
+        inspectorMode = "rotate"
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(inspectorMode))
+    }
+
+    @MainActor
+    private func exit3DInspector() async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.exitScript)
+        serverState.handlerContext.mark3DInspectorInactive(notify: true)
+        isIn3DInspector = false
+        inspectorMode = "rotate"
+    }
+
+    @MainActor
+    private func set3DInspectorMode(_ mode: String) async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        let normalized = mode == "scroll" ? "scroll" : "rotate"
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(normalized))
+        inspectorMode = normalized
+    }
+
+    @MainActor
+    private func zoom3DInspector(by delta: Double) async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
+    }
+
+    @MainActor
+    private func reset3DInspectorView() async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.resetViewScript)
     }
 
     // MARK: - Touchpad Mode

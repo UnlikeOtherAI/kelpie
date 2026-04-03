@@ -6,6 +6,8 @@ struct URLBarView: View {
     let onNavigate: (String) -> Void
     let onBack: () -> Void
     let onForward: () -> Void
+    let onAI: () -> Void
+    let onSnapshot3D: () -> Void
 
     @State private var urlText: String = ""
     private let navigationButtonSize: CGFloat = 44
@@ -42,6 +44,24 @@ struct URLBarView: View {
                 .keyboardType(.URL)
                 .accessibilityIdentifier("browser.url.field")
                 .onSubmit { navigate() }
+
+            Button(action: onAI) {
+                Image(systemName: "brain")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: navigationButtonSize, height: navigationButtonSize)
+                    .background(Color(.systemGray6))
+                    .clipShape(Circle())
+            }
+            .accessibilityIdentifier("browser.ai.button")
+
+            Button(action: onSnapshot3D) {
+                Image(systemName: "cube.transparent")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: navigationButtonSize, height: navigationButtonSize)
+                    .background(Color(.systemGray6))
+                    .clipShape(Circle())
+            }
+            .accessibilityIdentifier("browser.snapshot-3d.button")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

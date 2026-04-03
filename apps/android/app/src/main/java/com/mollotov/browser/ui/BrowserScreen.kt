@@ -23,9 +23,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +49,11 @@ import com.mollotov.browser.browser.BrowserState
 import com.mollotov.browser.browser.HistoryStore
 import com.mollotov.browser.browser.WebViewContainer
 import com.mollotov.browser.device.DeviceInfo
+import com.mollotov.browser.FeatureFlags
 import com.mollotov.browser.handlers.HandlerContext
+import com.mollotov.browser.handlers.Snapshot3DBridge
 import com.mollotov.browser.network.Router
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +76,10 @@ fun BrowserScreen(
     var showBookmarks by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var showNetworkInspector by remember { mutableStateOf(false) }
+    var showAI by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val isTablet = remember(context) { context.isTabletDevice() }
+    val coroutineScope = rememberCoroutineScope()
     var showWelcome by remember { mutableStateOf(shouldShowWelcome(context)) }
     var forceShowWelcome by remember { mutableStateOf(false) }
     var pendingWelcomeFromHelp by remember { mutableStateOf(false) }
@@ -107,6 +114,21 @@ fun BrowserScreen(
                 onNavigate = { url -> webView?.loadUrl(url) },
                 onBack = { webView?.goBack() },
                 onForward = { webView?.goForward() },
+                onAI = { showAI = true },
+                onSnapshot3D = {
+                    coroutineScope.launch {
+                        if (handlerContext.isIn3DInspector) {
+                            runCatching { handlerContext.evaluateJS(Snapshot3DBridge.EXIT_SCRIPT) }
+                            handlerContext.mark3DInspectorInactive()
+                        } else {
+                            runCatching { handlerContext.evaluateJS(Snapshot3DBridge.ENTER_SCRIPT) }
+                            val active = runCatching { handlerContext.evaluateJS("!!window.__m3d") }.getOrNull()
+                            if (active?.contains("true") == true) {
+                                handlerContext.isIn3DInspector = true
+                            }
+                        }
+                    }
+                },
             )
 
             BoxWithConstraints(
@@ -150,6 +172,7 @@ fun BrowserScreen(
                         ) {
                             WebViewContainer(
                                 browserState = browserState,
+                                handlerContext = handlerContext,
                                 modifier = Modifier.fillMaxSize(),
                                 onWebViewCreated = { wv ->
                                     webView = wv
@@ -161,6 +184,7 @@ fun BrowserScreen(
                     } else {
                         WebViewContainer(
                             browserState = browserState,
+                            handlerContext = handlerContext,
                             modifier = Modifier.fillMaxSize(),
                             onWebViewCreated = { wv ->
                                 webView = wv
@@ -194,6 +218,22 @@ fun BrowserScreen(
             onBookmarks = { showBookmarks = true },
             onHistory = { showHistory = true },
             onNetworkInspector = { showNetworkInspector = true },
+            onAI = { showAI = true },
+            onSnapshot3D = {
+                coroutineScope.launch {
+                    if (handlerContext.isIn3DInspector) {
+                        runCatching { handlerContext.evaluateJS(Snapshot3DBridge.EXIT_SCRIPT) }
+                        handlerContext.mark3DInspectorInactive()
+                    } else {
+                        runCatching { handlerContext.evaluateJS(Snapshot3DBridge.ENTER_SCRIPT) }
+                        val active = runCatching { handlerContext.evaluateJS("!!window.__m3d") }.getOrNull()
+                        if (active?.contains("true") == true) {
+                            handlerContext.isIn3DInspector = true
+                        }
+                    }
+                }
+            },
+            show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
             showMobileViewportToggle = isTablet,
             mobileViewportPresets = availableTabletViewportPresets,
             selectedMobileViewportPresetId = availableTabletViewportPresets
@@ -266,6 +306,15 @@ fun BrowserScreen(
         }
     }
 
+    if (showAI) {
+        ModalBottomSheet(
+            onDismissRequest = { showAI = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            AIStatusSheet(onDismiss = { showAI = false })
+        }
+    }
+
     // Observe programmatic panel requests from the HTTP API
     val activePanel by handlerContext.activePanel.collectAsState()
     LaunchedEffect(activePanel) {
@@ -276,6 +325,7 @@ fun BrowserScreen(
         showBookmarks = false
         showHistory = false
         showNetworkInspector = false
+        showAI = false
         // Brief delay for Compose to process dismissals
         kotlinx.coroutines.delay(400)
         when (panel) {
@@ -283,7 +333,53 @@ fun BrowserScreen(
             "bookmarks" -> showBookmarks = true
             "network-inspector" -> showNetworkInspector = true
             "settings" -> showSettings = true
+            "ai" -> showAI = true
         }
+    }
+}
+
+@Composable
+private fun AIStatusSheet(onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+    ) {
+        Text("Local AI", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.size(12.dp))
+        AIInfoRow("Backend", if (com.mollotov.browser.ai.AIState.backend == com.mollotov.browser.ai.AIState.OLLAMA_BACKEND) "Ollama" else "Platform")
+        AIInfoRow("Availability", if (com.mollotov.browser.ai.AIState.isAvailable) "Available" else "Unavailable")
+        AIInfoRow("Active Model", com.mollotov.browser.ai.AIState.activeModel ?: if (com.mollotov.browser.ai.AIState.isAvailable) "Platform AI" else "None")
+        AIInfoRow(
+            "Capabilities",
+            if (com.mollotov.browser.ai.AIState.isAvailable || com.mollotov.browser.ai.AIState.activeModel != null) "text" else "None",
+        )
+        com.mollotov.browser.ai.AIState.ollamaEndpoint?.let { endpoint ->
+            AIInfoRow("Ollama", endpoint)
+        }
+        Spacer(Modifier.size(12.dp))
+        Text(
+            text = if (com.mollotov.browser.ai.AIState.isAvailable) {
+                "AI is available from the browser shell and the HTTP API."
+            } else {
+                "Platform AI is unavailable on this device right now. You can still load an Ollama model over the API."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.size(16.dp))
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+            Text("Done")
+        }
+    }
+}
+
+@Composable
+private fun AIInfoRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.weight(1f))
+        Text(value)
     }
 }
 

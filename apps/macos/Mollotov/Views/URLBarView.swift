@@ -9,10 +9,21 @@ struct URLBarView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
+    @ObservedObject var aiState: AIState
+    let isAIPanelOpen: Bool
     let onNavigate: (String) -> Void
     let onBack: () -> Void
     let onForward: () -> Void
     let onReload: () -> Void
+    let onAIToggle: () -> Void
+    let onSnapshot3D: () -> Void
+    let show3DControls: Bool
+    let inspectorMode: String
+    let onSetInspectorMode: (String) -> Void
+    let onInspectorExit: () -> Void
+    let onInspectorZoomIn: () -> Void
+    let onInspectorZoomOut: () -> Void
+    let onInspectorReset: () -> Void
     let onSwitchRenderer: (RendererState.Engine) -> Void
 
     @State private var urlText: String = ""
@@ -46,6 +57,20 @@ struct URLBarView: View {
 
                 addressField
 
+                AIStatusPill(
+                    aiState: aiState,
+                    isOpen: isAIPanelOpen,
+                    action: onAIToggle
+                )
+                .fixedSize(horizontal: true, vertical: false)
+
+                navButton(
+                    systemName: "cube.transparent",
+                    accessibilityID: "browser.nav.snapshot3d",
+                    accessibilityLabel: "3D Inspector",
+                    action: onSnapshot3D
+                )
+
                 if !isNarrow {
                     selectorsRow
                 }
@@ -76,10 +101,15 @@ struct URLBarView: View {
     @ViewBuilder
     private var selectorsRow: some View {
         HStack(spacing: 6) {
+            if show3DControls {
+                inspectorControlsRow
+            }
+
             deviceDropdown
 
-            orientationToggle
-                .disabled(viewportState.mode == .full)
+            if viewportState.supportsOrientationSelection {
+                orientationToggle
+            }
 
             rendererSwitch
                 .disabled(rendererState.isSwitching)
@@ -87,6 +117,65 @@ struct URLBarView: View {
             if viewportState.mode != .full {
                 scaleControl
             }
+        }
+    }
+
+    @ViewBuilder
+    private var inspectorControlsRow: some View {
+        HStack(spacing: 6) {
+            AppKitSegmentedStrip(
+                items: [
+                    AppKitSegmentedStrip.Item(
+                        id: "rotate",
+                        systemImageName: "hand.draw",
+                        accessibilityID: "browser.snapshot3d.mode.rotate",
+                        accessibilityLabel: "Rotate mode",
+                        width: 40,
+                        iconSize: 13
+                    ),
+                    AppKitSegmentedStrip.Item(
+                        id: "scroll",
+                        systemImageName: "arrow.up.and.down",
+                        accessibilityID: "browser.snapshot3d.mode.scroll",
+                        accessibilityLabel: "Scroll mode",
+                        width: 40,
+                        iconSize: 13
+                    ),
+                ],
+                selectedID: inspectorMode,
+                accessibilityID: "browser.snapshot3d.mode",
+                isEnabled: true,
+                onSelect: onSetInspectorMode
+            )
+            .frame(width: 90, height: 34)
+
+            navButton(
+                systemName: "minus.magnifyingglass",
+                accessibilityID: "browser.snapshot3d.zoom-out",
+                accessibilityLabel: "Zoom out 3D view",
+                action: onInspectorZoomOut
+            )
+
+            navButton(
+                systemName: "plus.magnifyingglass",
+                accessibilityID: "browser.snapshot3d.zoom-in",
+                accessibilityLabel: "Zoom in 3D view",
+                action: onInspectorZoomIn
+            )
+
+            navButton(
+                systemName: "arrow.counterclockwise",
+                accessibilityID: "browser.snapshot3d.reset",
+                accessibilityLabel: "Reset 3D view",
+                action: onInspectorReset
+            )
+
+            navButton(
+                systemName: "xmark",
+                accessibilityID: "browser.snapshot3d.exit",
+                accessibilityLabel: "Exit 3D view",
+                action: onInspectorExit
+            )
         }
     }
 

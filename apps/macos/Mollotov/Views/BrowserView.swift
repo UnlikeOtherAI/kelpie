@@ -6,13 +6,17 @@ struct BrowserView: View {
     @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
+    @ObservedObject private var aiState = AIState.shared
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
     @State private var showNetworkInspector = false
-    @State private var showAI = false
+    @StateObject private var aiChatSession = AIChatSession()
+    @State private var isAIPanelOpen = false
+    @State private var aiPanelTab: AIPanelTab = .models
     @State private var isFloatingMenuOpen = false
     @State private var isIn3DInspector = false
+    @State private var inspectorMode = "rotate"
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
     @State private var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
@@ -25,6 +29,8 @@ struct BrowserView: View {
                     browserState: browserState,
                     rendererState: rendererState,
                     viewportState: viewportState,
+                    aiState: aiState,
+                    isAIPanelOpen: isAIPanelOpen,
                     onNavigate: { url in
                         guard let urlObj = URL(string: url) else { return }
                         serverState.handlerContext.load(url: urlObj)
@@ -32,6 +38,39 @@ struct BrowserView: View {
                     onBack: { serverState.handlerContext.goBack() },
                     onForward: { serverState.handlerContext.goForward() },
                     onReload: { serverState.handlerContext.reloadPage() },
+                    onAIToggle: handleAIPillTap,
+                    onSnapshot3D: {
+                        Task { @MainActor in
+                            await toggle3DInspector()
+                        }
+                    },
+                    show3DControls: isIn3DInspector,
+                    inspectorMode: inspectorMode,
+                    onSetInspectorMode: { mode in
+                        Task { @MainActor in
+                            await set3DInspectorMode(mode)
+                        }
+                    },
+                    onInspectorExit: {
+                        Task { @MainActor in
+                            await exit3DInspector()
+                        }
+                    },
+                    onInspectorZoomIn: {
+                        Task { @MainActor in
+                            await zoom3DInspector(by: 0.12)
+                        }
+                    },
+                    onInspectorZoomOut: {
+                        Task { @MainActor in
+                            await zoom3DInspector(by: -0.12)
+                        }
+                    },
+                    onInspectorReset: {
+                        Task { @MainActor in
+                            await reset3DInspectorView()
+                        }
+                    },
                     onSwitchRenderer: { engine in
                         Task {
                             await serverState.switchRenderer(to: engine)
@@ -41,7 +80,20 @@ struct BrowserView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
 
-                rendererSurface
+                HStack(spacing: 0) {
+                    rendererSurface
+
+                    if isAIPanelOpen {
+                        Divider()
+                        AIChatPanel(
+                            aiState: aiState,
+                            session: aiChatSession,
+                            selectedTab: $aiPanelTab,
+                            onClose: { isAIPanelOpen = false }
+                        )
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
             }
 
             if browserState.isLoading {
@@ -69,25 +121,10 @@ struct BrowserView: View {
                 onBookmarks: { showBookmarks = true },
                 onHistory: { showHistory = true },
                 onNetworkInspector: { showNetworkInspector = true },
-                onAI: { showAI = true },
+                onAI: openAIFromMenu,
                 onSnapshot3D: {
                     Task { @MainActor in
-                        let context = serverState.handlerContext
-                        let isActive = context.isIn3DInspector || isIn3DInspector
-
-                        if isActive {
-                            try? await context.evaluateJS(Snapshot3DBridge.exitScript)
-                            context.mark3DInspectorInactive(notify: true)
-                            isIn3DInspector = false
-                            return
-                        }
-
-                        try? await context.evaluateJS(Snapshot3DBridge.enterScript)
-                        let active = try? await context.evaluateJSReturningString("!!window.__m3d")
-                        if active == "true" {
-                            context.isIn3DInspector = true
-                            isIn3DInspector = true
-                        }
+                        await toggle3DInspector()
                     }
                 }
             )
@@ -118,6 +155,7 @@ struct BrowserView: View {
         }
         .onChange(of: browserState.currentURL) { _, newURL in
             HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
+            aiChatSession.reset()
             Task { @MainActor in
                 await serverState.handlerContext.persistRendererCookiesToSharedJar()
             }
@@ -130,6 +168,7 @@ struct BrowserView: View {
             guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
             serverState.handlerContext.mark3DInspectorInactive(notify: false)
             isIn3DInspector = false
+            inspectorMode = "rotate"
         }
         .animation(.easeOut(duration: 0.2), value: serverState.shellToastMessage != nil)
         .background(
@@ -164,15 +203,13 @@ struct BrowserView: View {
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
         }
-        .sheet(isPresented: $showAI) {
-            AIStatusView()
-        }
         .onAppear {
             // Remove focus from URL bar on launch
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
             }
             Task { @MainActor in
+                aiState.configure(localServerPort: UInt16(serverState.deviceInfo.port))
                 await connectRendererState()
             }
         }
@@ -204,6 +241,7 @@ struct BrowserView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .snapshot3DExited)) { _ in
             isIn3DInspector = false
+            inspectorMode = "rotate"
         }
     }
 
@@ -262,10 +300,69 @@ struct BrowserView: View {
         serverState.handlerContext.load(url: url)
     }
 
+    private func openAIFromMenu() {
+        aiPanelTab = aiState.activeModel == nil ? .models : .chat
+        isAIPanelOpen = true
+    }
+
+    private func handleAIPillTap() {
+        if isAIPanelOpen {
+            isAIPanelOpen = false
+            return
+        }
+        openAIFromMenu()
+    }
+
     private func notifyRendererViewportChangeIfNeeded() {
         guard rendererState.activeEngine == .chromium else { return }
         guard viewportState.showsViewportStageChrome else { return }
         serverState.handlerContext.renderer?.viewportDidChange()
+    }
+
+    @MainActor
+    private func toggle3DInspector() async {
+        if serverState.handlerContext.isIn3DInspector || isIn3DInspector {
+            await exit3DInspector()
+            return
+        }
+
+        try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
+        let active = try? await serverState.handlerContext.evaluateJSReturningString("!!window.__m3d")
+        guard active == "true" else { return }
+
+        serverState.handlerContext.isIn3DInspector = true
+        isIn3DInspector = true
+        inspectorMode = "rotate"
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(inspectorMode))
+    }
+
+    @MainActor
+    private func exit3DInspector() async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.exitScript)
+        serverState.handlerContext.mark3DInspectorInactive(notify: true)
+        isIn3DInspector = false
+        inspectorMode = "rotate"
+    }
+
+    @MainActor
+    private func set3DInspectorMode(_ mode: String) async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        let normalized = mode == "scroll" ? "scroll" : "rotate"
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.setModeScript(normalized))
+        inspectorMode = normalized
+    }
+
+    @MainActor
+    private func zoom3DInspector(by delta: Double) async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
+    }
+
+    @MainActor
+    private func reset3DInspectorView() async {
+        guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.resetViewScript)
     }
 
     @ViewBuilder
