@@ -3,6 +3,7 @@
 
 #import "CEFBridge.h"
 #import "mollotov/state_c_api.h"
+#import "mollotov/ai_c_api.h"
 #import "mollotov/viewport_presets_c_api.h"
 
 #endif

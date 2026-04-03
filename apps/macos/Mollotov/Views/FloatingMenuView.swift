@@ -8,11 +8,28 @@ private let menuItemOrange = NSColor(calibratedRed: 240/255, green: 148/255, blu
 private enum FloatingMenuLayout {
     static let fabSize: CGFloat = 52
     static let menuItemSize: CGFloat = 52
-    static let spreadRadius: CGFloat = 132
+    static let baseSpreadRadius: CGFloat = 132
+    static let minimumItemGap: CGFloat = 12
     static let edgePadding: CGFloat = 16
     static let tooltipSpacing: CGFloat = 10
     static let tooltipEdgeOffset: CGFloat = 12
     static let tooltipFadeDuration: TimeInterval = 0.2
+
+    static func spreadRadius(for itemCount: Int) -> CGFloat {
+        guard itemCount > 1 else { return baseSpreadRadius }
+
+        let stepRadians = CGFloat.pi / CGFloat(itemCount - 1)
+        let minimumCenterDistance = menuItemSize + minimumItemGap
+        let requiredRadius = minimumCenterDistance / (2 * sin(stepRadians / 2))
+        return max(baseSpreadRadius, requiredRadius)
+    }
+
+    static func fanAngle(index: Int, itemCount: Int, center: Double = 180) -> Angle {
+        guard itemCount > 1 else { return .degrees(center) }
+
+        let step = 180.0 / Double(itemCount - 1)
+        return .degrees(center - 90 + step * Double(index))
+    }
 }
 
 /// Floating action button that expands into a fan menu.
@@ -251,22 +268,16 @@ private struct AppKitFloatingMenuOverlay: NSViewRepresentable {
         }
 
         func centerForItem(index: Int) -> CGPoint {
-            let angle = fanAngle(index: index)
-            let rawDx = CGFloat(cos(angle.radians)) * FloatingMenuLayout.spreadRadius
-            let rawDy = CGFloat(sin(angle.radians)) * FloatingMenuLayout.spreadRadius
+            let angle = FloatingMenuLayout.fanAngle(index: index, itemCount: itemCount)
+            let spreadRadius = FloatingMenuLayout.spreadRadius(for: itemCount)
+            let rawDx = CGFloat(cos(angle.radians)) * spreadRadius
+            let rawDy = CGFloat(sin(angle.radians)) * spreadRadius
             let margin = FloatingMenuLayout.menuItemSize / 2 + FloatingMenuLayout.edgePadding
 
             let dx = min(max(rawDx, margin - fabCenter.x), size.width - margin - fabCenter.x)
             let dy = min(max(rawDy, margin - fabCenter.y), size.height - margin - fabCenter.y)
 
             return CGPoint(x: fabCenter.x + dx, y: fabCenter.y + dy)
-        }
-
-        private func fanAngle(index: Int) -> Angle {
-            let step: Double = 30
-            let halfArc = step * Double(max(itemCount - 1, 1)) / 2
-            let center: Double = 180
-            return .degrees(center - halfArc + step * Double(index))
         }
     }
 }

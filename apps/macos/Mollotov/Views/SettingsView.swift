@@ -5,6 +5,7 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
+    @ObservedObject private var aiState = AIState.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -21,6 +22,53 @@ struct SettingsView: View {
                 Section("Renderer") {
                     row("Active Engine", rendererState.activeEngine.displayName)
                     row("Available", RendererState.Engine.allCases.map(\.rawValue).joined(separator: ", "))
+                }
+
+                if aiState.isAvailable {
+                    Section("AI") {
+                        Picker("Active Model", selection: activeModelSelection) {
+                            Text("None").tag("none")
+
+                            if !aiState.nativeModelCards.filter(\.isDownloaded).isEmpty {
+                                Text("Native").tag("native.header").disabled(true)
+                                ForEach(aiState.nativeModelCards.filter(\.isDownloaded)) { card in
+                                    Text(card.model.name).tag(card.id)
+                                }
+                            }
+
+                            if !aiState.ollamaModels.isEmpty {
+                                Text("Ollama").tag("ollama.header").disabled(true)
+                                ForEach(aiState.ollamaModels) { model in
+                                    Text(model.name).tag("ollama:\(model.name)")
+                                }
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        row("Device", aiState.deviceCapabilities.summaryLine)
+
+                        HStack {
+                            Text("Ollama")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            TextField("http://localhost:11434", text: $aiState.ollamaEndpoint)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 210)
+                            Button("Test") {
+                                Task { await aiState.testOllama() }
+                            }
+                            .controlSize(.small)
+                            Circle()
+                                .fill(aiState.ollamaReachable ? Color.green : Color.secondary.opacity(0.5))
+                                .frame(width: 8, height: 8)
+                            Text(aiState.ollamaReachable ? "Online" : "Offline")
+                                .foregroundColor(.secondary)
+                        }
+
+                        Text("Models run locally. No data leaves your device.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Section("Network") {
@@ -67,6 +115,32 @@ struct SettingsView: View {
             .padding()
         }
         .frame(width: 400, height: 500)
+    }
+
+    private var activeModelSelection: Binding<String> {
+        Binding(
+            get: {
+                guard let activeModel = aiState.activeModel else { return "none" }
+                if activeModel.backend == .ollama {
+                    return "ollama:\(activeModel.name)"
+                }
+                return activeModel.id
+            },
+            set: { selection in
+                Task {
+                    switch selection {
+                    case "none":
+                        _ = await aiState.unloadModel()
+                    case let value where value.hasPrefix("ollama:"):
+                        _ = await aiState.loadOllamaModel(name: String(value.dropFirst("ollama:".count)))
+                    case "native.header", "ollama.header":
+                        break
+                    default:
+                        _ = await aiState.loadNativeModel(id: selection)
+                    }
+                }
+            }
+        )
     }
 
     private func row(_ label: String, _ value: String) -> some View {

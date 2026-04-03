@@ -1,23 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-    <!-- Required for V8 JIT: allows pthread_jit_write_protect_np to switch
-         MAP_JIT memory between writable and executable modes on Apple Silicon.
-         Without this, JIT-allocated pages stay rw- and SIGBUS on execution. -->
-    <key>com.apple.security.cs.allow-jit</key>
-    <true/>
-    <!-- Required by Chromium for certain internal memory allocations that
-         need execute permission without going through the MAP_JIT path. -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    <!-- Required to load the CEF framework, which is not Apple-signed. -->
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
-    <!-- Network access for web browsing and the HTTP API server. -->
-    <key>com.apple.security.network.client</key>
-    <true/>
-    <key>com.apple.security.network.server</key>
-    <true/>
-</dict>
+<dict/>
 </plist>

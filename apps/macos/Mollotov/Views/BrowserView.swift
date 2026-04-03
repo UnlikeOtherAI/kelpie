@@ -219,6 +219,9 @@ struct BrowserView: View {
             }
             Task { @MainActor in
                 aiState.configure(localServerPort: UInt16(serverState.deviceInfo.port))
+                aiState.onAuthFailureNavigate = { [weak serverState] url in
+                    serverState?.handlerContext.load(url: url)
+                }
                 await connectRendererState()
             }
         }

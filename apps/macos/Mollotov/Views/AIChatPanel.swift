@@ -45,6 +45,7 @@ struct AIChatPanel: View {
     @ObservedObject var session: AIChatSession
     @Binding var selectedTab: AIPanelTab
     let onClose: () -> Void
+    @State private var showHFTokenPopover = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -179,7 +180,29 @@ struct AIChatPanel: View {
     private var modelsTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                CollapsibleModelSection(title: "NATIVE", defaultsKey: "com.mollotov.macos.ai-section-native") {
+                CollapsibleModelSection(
+                    title: "NATIVE",
+                    defaultsKey: "com.mollotov.macos.ai-section-native",
+                    trailing: {
+                        Spacer()
+                        Button {
+                            showHFTokenPopover = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 9))
+                                Text("Set HF Token")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(aiState.huggingFaceToken.isEmpty ? .orange : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("browser.ai.hf-token")
+                        .popover(isPresented: $showHFTokenPopover, arrowEdge: .bottom) {
+                            HFTokenPopover(token: $aiState.huggingFaceToken)
+                        }
+                    }
+                ) {
                     ForEach(aiState.nativeModelCards) { card in
                         AINativeModelCardView(card: card, aiState: aiState)
                     }
@@ -469,5 +492,54 @@ private struct AIOllamaModelCardView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
+    }
+}
+
+private struct HFTokenPopover: View {
+    @Binding var token: String
+    @State private var draft: String = ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Hugging Face Token")
+                .font(.system(size: 12, weight: .semibold))
+
+            Text("Some models require authentication. Generate a token at huggingface.co/settings/tokens and paste it here.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            SecureField("hf_...", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+                .accessibilityIdentifier("browser.ai.hf-token.input")
+
+            HStack {
+                if !token.isEmpty {
+                    Button("Clear") {
+                        token = ""
+                        draft = ""
+                        dismiss()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                Spacer()
+                Button("Save") {
+                    token = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("browser.ai.hf-token.save")
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+        .onAppear {
+            draft = token
+        }
     }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00F6B75E56A9FC9ECA87171D /* AIModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43CF9B5BCFBF5B766478404 /* AIModelCatalog.swift */; };
 		08A3C77148480B9DE9EA9435 /* ServerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8162809E474528D24E3E9B7C /* ServerState.swift */; };
 		0AFB883945F27BD2A657FFD4 /* EvaluateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BB3B14BDF40CF58F8064F5 /* EvaluateHandler.swift */; };
 		126B79978FE3000EF23A8AD4 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97D4B03D93C21B9D3C35336 /* SafariAuthHelper.swift */; };
@@ -31,6 +32,7 @@
 		5254EB171A93AFE1024C3C6C /* RendererHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE484112AAFD31856BF4C25C /* RendererHandler.swift */; };
 		52698080F050A35F497008AF /* RendererState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE5748C499201EFFBA3807DB /* RendererState.swift */; };
 		53AEC20EFF3F4E970C1B4789 /* RendererEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEAFBD413B4422142E5E8EB2 /* RendererEngine.swift */; };
+		575109F16E508640719CEBC2 /* AIChatPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223DCB7A84A6CF2A772EDD8B /* AIChatPanel.swift */; };
 		5A253299557771C8136237E6 /* WKWebViewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBDD8D7C74821BCEA52DA0A8 /* WKWebViewRenderer.swift */; };
 		617ED286D4D49B4C388F2527 /* NetworkTrafficStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E8E0DA5886C252FE1BCE75 /* NetworkTrafficStore.swift */; };
 		6474BE5B3FBDAAC77ADE63C4 /* Chromium Embedded Framework.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 281B211E466DC23877A0CFAA /* Chromium Embedded Framework.framework */; };
@@ -44,6 +46,7 @@
 		7B82683E8037080965A5D734 /* NetworkInspectorHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50514DB8C2D787EBE4AF3305 /* NetworkInspectorHandler.swift */; };
 		7B9AFE78B45F9BDE1376442E /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78906A0BAF9128FDE0823BE4 /* ConsoleHandler.swift */; };
 		7D2A8BF2E3A83FF76E052EF7 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445AA6C28445CBA942E6BEF0 /* BookmarkStore.swift */; };
+		818EDC831C382C3B4AF0BAB6 /* AIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C572C09F8D76279F28B1342 /* AIManager.swift */; };
 		86236C1CDA2709D12451F957 /* InferenceHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B5A7BFB995417D32420CB0 /* InferenceHarness.swift */; };
 		8882FD2F27FE96A3F5F42AF8 /* DOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D3DCAD6C6B3FDA9D44E7E1 /* DOMHandler.swift */; };
 		8A8B7EF10041EF851F7AAA2D /* HistoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E98BF1291FC4D3F61C4FA60 /* HistoryHandler.swift */; };
@@ -54,7 +57,6 @@
 		98ECBDAA13AB0E99D6D60C1B /* ToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A6AEA38D754ACEFE7DD71 /* ToolbarView.swift */; };
 		9ABB36F814C7683FC7872121 /* NetworkBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C431FE8672453FA02398A35 /* NetworkBridge.swift */; };
 		9FEFB51796B444CA61357022 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C625D56E93B41DC885E496 /* BrowserView.swift */; };
-		A200000001 /* AIStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000001 /* AIStatusView.swift */; };
 		A16EB5D32549CB66C73D9F83 /* ShellToastCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DF73FE78326C991680045EA /* ShellToastCardView.swift */; };
 		A3EA0ECBEACE03916E8B454C /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBDD878D4C22BF12A3834C0C /* Router.swift */; };
 		A4927AE8ED848FBA84FF5463 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAD0796D10DE23B652F3F43 /* SettingsView.swift */; };
@@ -77,6 +79,7 @@
 		ECD3B26C589B270B52A3C86F /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0281EE6ADC6C42F25FB6DEAA /* HistoryView.swift */; };
 		F0288C63BFECEC5F21C7362E /* BrowserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA0199ABF8A784789BDC239 /* BrowserState.swift */; };
 		F2B3429AE5A07A7A2FDA5F3A /* FontAwesome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F290067E390E0CB0B9E6B3 /* FontAwesome.swift */; };
+		F3C599EC8FDE2FCF1792AABC /* AIStatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B6E378CD08BC024643B704 /* AIStatusPill.swift */; };
 		F448A8B2E1B3A561B2C60C92 /* ScreenshotHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852B4917F01094DFDF3771CC /* ScreenshotHandler.swift */; };
 		F6043F6FF255B6973C5D5C4F /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5F2EA8022E452E864C22E /* AIState.swift */; };
 /* End PBXBuildFile section */
@@ -95,8 +98,8 @@
 		011215869B267C4C4E0A90A5 /* NetworkInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInspectorView.swift; sourceTree = "<group>"; };
 		0215848A303CA575C381B8E3 /* BookmarksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksView.swift; sourceTree = "<group>"; };
 		0281EE6ADC6C42F25FB6DEAA /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		02B6E378CD08BC024643B704 /* AIStatusPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStatusPill.swift; sourceTree = "<group>"; };
 		10C625D56E93B41DC885E496 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
-		B200000001 /* AIStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStatusView.swift; sourceTree = "<group>"; };
 		162978C8F601CE6E2D0F6240 /* HandlerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandlerContext.swift; sourceTree = "<group>"; };
 		17FB3F895B63A2FD9435A5E8 /* MollotovHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = MollotovHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		195659D2CDA9D4293FEE48D1 /* ViewportState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportState.swift; sourceTree = "<group>"; };
@@ -104,6 +107,7 @@
 		1C431FE8672453FA02398A35 /* NetworkBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkBridge.swift; sourceTree = "<group>"; };
 		1C5CB8EFBD176E045F6DBD06 /* WelcomeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeCardView.swift; sourceTree = "<group>"; };
 		1DA139A3CF468F423C529E96 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
+		223DCB7A84A6CF2A772EDD8B /* AIChatPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatPanel.swift; sourceTree = "<group>"; };
 		281B211E466DC23877A0CFAA /* Chromium Embedded Framework.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = "Chromium Embedded Framework.framework"; path = "Frameworks/Chromium Embedded Framework.framework"; sourceTree = "<group>"; };
 		309E4F27B9334A3F85201824 /* Mollotov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mollotov.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3165F3E062D65F1295516C83 /* SystemPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPrompt.swift; sourceTree = "<group>"; };
@@ -140,11 +144,13 @@
 		960708A4F41329C95791056C /* BrowserManagementHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserManagementHandler.swift; sourceTree = "<group>"; };
 		9A725A6D726F01958B42A058 /* iOS */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iOS; path = vendor/AppReveal/iOS; sourceTree = SOURCE_ROOT; };
 		9BA0199ABF8A784789BDC239 /* BrowserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserState.swift; sourceTree = "<group>"; };
+		9C572C09F8D76279F28B1342 /* AIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIManager.swift; sourceTree = "<group>"; };
 		9DF73FE78326C991680045EA /* ShellToastCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellToastCardView.swift; sourceTree = "<group>"; };
 		9EA291E9B4630814D706614C /* MollotovHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MollotovHelper.entitlements; sourceTree = "<group>"; };
 		9EEE4C649FA0D9CDB87D5CAE /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		A3A279DEE1B36B3F00D8B5DD /* SharedCookieJar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedCookieJar.swift; sourceTree = "<group>"; };
 		A3E8E0DA5886C252FE1BCE75 /* NetworkTrafficStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTrafficStore.swift; sourceTree = "<group>"; };
+		A43CF9B5BCFBF5B766478404 /* AIModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelCatalog.swift; sourceTree = "<group>"; };
 		A8EF32C2FF0EEDCEF69F7500 /* ScrollHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollHandler.swift; sourceTree = "<group>"; };
 		AF87ABB3FE3E6A86205ACC2C /* FloatingMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingMenuView.swift; sourceTree = "<group>"; };
 		B2EA976116B8E1E538FF7020 /* InferenceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceEngine.swift; sourceTree = "<group>"; };
@@ -203,6 +209,8 @@
 		19ABEC179548C6C2DCE330DB /* AI */ = {
 			isa = PBXGroup;
 			children = (
+				9C572C09F8D76279F28B1342 /* AIManager.swift */,
+				A43CF9B5BCFBF5B766478404 /* AIModelCatalog.swift */,
 				E4C5F2EA8022E452E864C22E /* AIState.swift */,
 				3CD49F7E42E6F598E70664C8 /* AudioRecorder.swift */,
 				B2EA976116B8E1E538FF7020 /* InferenceEngine.swift */,
@@ -303,7 +311,8 @@
 		8F251B908CD62B55F82DCCB4 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				B200000001 /* AIStatusView.swift */,
+				223DCB7A84A6CF2A772EDD8B /* AIChatPanel.swift */,
+				02B6E378CD08BC024643B704 /* AIStatusPill.swift */,
 				0215848A303CA575C381B8E3 /* BookmarksView.swift */,
 				10C625D56E93B41DC885E496 /* BrowserView.swift */,
 				AF87ABB3FE3E6A86205ACC2C /* FloatingMenuView.swift */,
@@ -575,16 +584,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				575109F16E508640719CEBC2 /* AIChatPanel.swift in Sources */,
 				8E059CD0A918C3B132A18C20 /* AIHandler.swift in Sources */,
+				818EDC831C382C3B4AF0BAB6 /* AIManager.swift in Sources */,
+				00F6B75E56A9FC9ECA87171D /* AIModelCatalog.swift in Sources */,
 				F6043F6FF255B6973C5D5C4F /* AIState.swift in Sources */,
+				F3C599EC8FDE2FCF1792AABC /* AIStatusPill.swift in Sources */,
 				C5AFD11AD39881255196C56D /* AudioRecorder.swift in Sources */,
 				172225DC1C98D5C2EDEADB43 /* BookmarkHandler.swift in Sources */,
 				7D2A8BF2E3A83FF76E052EF7 /* BookmarkStore.swift in Sources */,
 				51C6761FB2859B6F6F989784 /* BookmarksView.swift in Sources */,
 				3CF289177780838AFCB6222B /* BrowserManagementHandler.swift in Sources */,
 				F0288C63BFECEC5F21C7362E /* BrowserState.swift in Sources */,
-				A200000001 /* AIStatusView.swift in Sources */,
-			9FEFB51796B444CA61357022 /* BrowserView.swift in Sources */,
+				9FEFB51796B444CA61357022 /* BrowserView.swift in Sources */,
 				396A817DAF92EDE94E56AA76 /* CEFBridge.mm in Sources */,
 				363A13589E8CE9D028236FCE /* CEFBridgeSupport.mm in Sources */,
 				AC654CA845B3F41AF6D45CB5 /* CEFRenderer.swift in Sources */,
@@ -676,6 +688,7 @@
 					"$(PROJECT_DIR)/../../native/core-protocol/include",
 					"$(PROJECT_DIR)/../../native/core-automation/include",
 					"$(PROJECT_DIR)/../../native/core-mcp/include",
+					"$(PROJECT_DIR)/../../native/core-ai/include",
 					"$(PROJECT_DIR)/vendor/llama.cpp/include",
 				);
 				INFOPLIST_FILE = Mollotov/Info.plist;
@@ -685,13 +698,22 @@
 					"$(PROJECT_DIR)/../../native/.build/core-protocol",
 					"$(PROJECT_DIR)/../../native/.build/core-automation",
 					"$(PROJECT_DIR)/../../native/.build/core-mcp",
+					"$(PROJECT_DIR)/../../native/.build/core-ai",
 					"$(PROJECT_DIR)/vendor/llama.cpp/lib",
+					/opt/homebrew/opt/openssl/lib,
+					/opt/homebrew/opt/brotli/lib,
 				);
 				OTHER_LDFLAGS = (
 					"-lmollotov_core_state",
 					"-lmollotov_core_protocol",
 					"-lmollotov_core_automation",
 					"-lmollotov_core_mcp",
+					"-lmollotov_core_ai",
+					"-lssl",
+					"-lcrypto",
+					"-lz",
+					"-lbrotlidec",
+					"-lbrotlicommon",
 					"-lllama",
 					"-lggml",
 					"-lggml-base",
@@ -878,6 +900,7 @@
 					"$(PROJECT_DIR)/../../native/core-protocol/include",
 					"$(PROJECT_DIR)/../../native/core-automation/include",
 					"$(PROJECT_DIR)/../../native/core-mcp/include",
+					"$(PROJECT_DIR)/../../native/core-ai/include",
 					"$(PROJECT_DIR)/vendor/llama.cpp/include",
 				);
 				INFOPLIST_FILE = Mollotov/Info.plist;
@@ -887,13 +910,22 @@
 					"$(PROJECT_DIR)/../../native/.build/core-protocol",
 					"$(PROJECT_DIR)/../../native/.build/core-automation",
 					"$(PROJECT_DIR)/../../native/.build/core-mcp",
+					"$(PROJECT_DIR)/../../native/.build/core-ai",
 					"$(PROJECT_DIR)/vendor/llama.cpp/lib",
+					/opt/homebrew/opt/openssl/lib,
+					/opt/homebrew/opt/brotli/lib,
 				);
 				OTHER_LDFLAGS = (
 					"-lmollotov_core_state",
 					"-lmollotov_core_protocol",
 					"-lmollotov_core_automation",
 					"-lmollotov_core_mcp",
+					"-lmollotov_core_ai",
+					"-lssl",
+					"-lcrypto",
+					"-lz",
+					"-lbrotlidec",
+					"-lbrotlicommon",
 					"-lllama",
 					"-lggml",
 					"-lggml-base",

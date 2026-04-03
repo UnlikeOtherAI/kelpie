@@ -67,6 +67,7 @@ enum Snapshot3DBridge {
             scrollPositions: [],
             pausedMedia: [],
             listeners: [],
+            mode: 'rotate',
             spacing: LAYER_SPACING,
             scrollX: window.scrollX,
             scrollY: window.scrollY
@@ -342,22 +343,6 @@ enum Snapshot3DBridge {
         ].join(';');
         overlay.appendChild(inputCapture);
 
-        // Close button
-        var closeBtn = document.createElement('div');
-        closeBtn.id = '__m3d_close';
-        closeBtn.textContent = '\u00D7 Exit 3D';
-        closeBtn.style.cssText = [
-            'position: absolute', 'top: 16px', 'right: 16px',
-            'padding: 8px 16px', 'border-radius: 10px',
-            'background: rgba(0,0,0,0.85)', 'color: #fff',
-            'font: 600 13px/1 -apple-system, system-ui, sans-serif',
-            'cursor: pointer', 'pointer-events: auto',
-            'border: 1px solid rgba(255,255,255,0.3)',
-            'backdrop-filter: blur(8px)', '-webkit-backdrop-filter: blur(8px)',
-            'user-select: none'
-        ].join(';');
-        overlay.appendChild(closeBtn);
-
         // Info panel
         var infoPanel = document.createElement('div');
         infoPanel.id = '__m3d_info';
@@ -379,6 +364,14 @@ enum Snapshot3DBridge {
 
         var rotX = 15, rotY = -25, scale = 0.85;
         var isDragging = false, lastX = 0, lastY = 0;
+        var activeTouchId = null;
+        var multiTouchActive = false;
+        var lastPinchDistance = 0;
+        var lastMultiCenterY = 0;
+        var multiTouchMoved = false;
+        var multiTouchStartTime = 0;
+        var multiTouchStartDistance = 0;
+        var multiTouchStartCenterY = 0;
         var hoveredEl = null;
 
         function applyTransform() {
@@ -386,24 +379,154 @@ enum Snapshot3DBridge {
         }
         applyTransform();
 
+        function clampScale(nextScale) {
+            return Math.max(0.15, Math.min(2.5, nextScale));
+        }
+
+        function resetView() {
+            rotX = 15;
+            rotY = -25;
+            scale = 0.85;
+            applyTransform();
+        }
+
+        function updateCursor() {
+            inputCapture.style.cursor = isDragging ? 'grabbing' : (state.mode === 'scroll' ? 'ns-resize' : 'grab');
+        }
+
+        function touchDistance(a, b) {
+            var dx = a.clientX - b.clientX;
+            var dy = a.clientY - b.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function touchCenterY(a, b) {
+            return (a.clientY + b.clientY) / 2;
+        }
+
+        function scrollScene(deltaY) {
+            if (!deltaY) return;
+            window.scrollBy(0, -deltaY);
+            state.scrollX = window.scrollX;
+            state.scrollY = window.scrollY;
+        }
+
+        function zoomBy(delta) {
+            if (!delta) return scale;
+            scale = clampScale(scale + delta);
+            applyTransform();
+            return scale;
+        }
+
+        function beginSingleTouchDrag(touch) {
+            if (!touch) return;
+            multiTouchActive = false;
+            activeTouchId = touch.identifier;
+            isDragging = true;
+            lastX = touch.clientX;
+            lastY = touch.clientY;
+            updateCursor();
+        }
+
+        function clearTouchState() {
+            isDragging = false;
+            activeTouchId = null;
+            multiTouchActive = false;
+            lastPinchDistance = 0;
+            lastMultiCenterY = 0;
+            updateCursor();
+        }
+
         function addListener(target, type, fn, opts) {
             target.addEventListener(type, fn, opts);
             state.listeners.push([target, type, fn, opts]);
         }
 
+        function exitViaMessage() {
+            if (window.webkit && window.webkit.messageHandlers &&
+                window.webkit.messageHandlers.mollotov3DSnapshot) {
+                window.webkit.messageHandlers.mollotov3DSnapshot.postMessage({action: 'exit'});
+            } else if (window.MollotovBridge && typeof window.MollotovBridge.on3DSnapshotEvent === 'function') {
+                window.MollotovBridge.on3DSnapshotEvent(JSON.stringify({action: 'exit'}));
+            } else {
+                console.log('__mollotov_3d_exit__');
+            }
+        }
+
+        function reapplyDepths() {
+            for (var i = 0; i < state.modifiedElements.length; i++) {
+                var el = state.modifiedElements[i];
+                var d = parseInt(el.getAttribute('data-m3d-depth')) || 0;
+                el.style.transform = 'translateZ(' + (d * state.spacing) + 'px)';
+            }
+            applyTransform();
+        }
+
+        state.setMode = function(nextMode) {
+            state.mode = nextMode === 'scroll' ? 'scroll' : 'rotate';
+            updateCursor();
+            return state.mode;
+        };
+        state.getMode = function() {
+            return state.mode;
+        };
+        state.zoomBy = function(delta) {
+            return zoomBy(delta);
+        };
+        state.resetView = function() {
+            resetView();
+            return true;
+        };
+        state.exit = function() {
+            exitViaMessage();
+            return true;
+        };
+        state.reapplyDepths = function() {
+            reapplyDepths();
+            return state.spacing;
+        };
+
         addListener(inputCapture, 'mousedown', function(e) {
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
-            inputCapture.style.cursor = 'grabbing';
+            updateCursor();
             e.preventDefault();
         }, false);
 
+        addListener(inputCapture, 'touchstart', function(e) {
+            if (e.touches.length === 1) {
+                beginSingleTouchDrag(e.touches[0]);
+            } else if (e.touches.length === 2) {
+                var firstTouch = e.touches[0];
+                var secondTouch = e.touches[1];
+                isDragging = false;
+                activeTouchId = null;
+                multiTouchActive = true;
+                multiTouchMoved = false;
+                multiTouchStartTime = Date.now();
+                multiTouchStartDistance = touchDistance(firstTouch, secondTouch);
+                lastPinchDistance = multiTouchStartDistance;
+                multiTouchStartCenterY = touchCenterY(firstTouch, secondTouch);
+                lastMultiCenterY = multiTouchStartCenterY;
+            } else {
+                isDragging = false;
+                activeTouchId = null;
+                multiTouchActive = false;
+                return;
+            }
+            e.preventDefault();
+        }, { passive: false });
+
         addListener(document, 'mousemove', function(e) {
             if (isDragging) {
-                rotY += (e.clientX - lastX) * 0.4;
-                rotX -= (e.clientY - lastY) * 0.4;
-                rotX = Math.max(-90, Math.min(90, rotX));
+                if (state.mode === 'scroll') {
+                    scrollScene(e.clientY - lastY);
+                } else {
+                    rotY += (e.clientX - lastX) * 0.4;
+                    rotX -= (e.clientY - lastY) * 0.4;
+                    rotX = Math.max(-90, Math.min(90, rotX));
+                }
                 lastX = e.clientX;
                 lastY = e.clientY;
                 applyTransform();
@@ -461,39 +584,107 @@ enum Snapshot3DBridge {
             }
         }, false);
 
+        addListener(document, 'touchmove', function(e) {
+            if (multiTouchActive && e.touches.length === 2) {
+                var firstTouch = e.touches[0];
+                var secondTouch = e.touches[1];
+                var distance = touchDistance(firstTouch, secondTouch);
+                var centerY = touchCenterY(firstTouch, secondTouch);
+                var distanceDelta = distance - lastPinchDistance;
+                var centerDeltaY = centerY - lastMultiCenterY;
+
+                if (Math.abs(distance - multiTouchStartDistance) > 4 ||
+                    Math.abs(centerY - multiTouchStartCenterY) > 4) {
+                    multiTouchMoved = true;
+                }
+
+                if (Math.abs(distanceDelta) > 2) {
+                    scale = clampScale(scale + distanceDelta * 0.004);
+                }
+
+                if (Math.abs(centerDeltaY) > 1) {
+                    scrollScene(centerDeltaY);
+                }
+
+                lastPinchDistance = distance;
+                lastMultiCenterY = centerY;
+                applyTransform();
+                e.preventDefault();
+                return;
+            }
+
+            if (multiTouchActive && e.touches.length === 1) {
+                beginSingleTouchDrag(e.touches[0]);
+            }
+
+            if (!isDragging || activeTouchId === null) return;
+            var touch = null;
+            for (var i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === activeTouchId) {
+                    touch = e.touches[i];
+                    break;
+                }
+            }
+            if (!touch) return;
+
+            if (state.mode === 'scroll') {
+                scrollScene(touch.clientY - lastY);
+            } else {
+                rotY += (touch.clientX - lastX) * 0.4;
+                rotX -= (touch.clientY - lastY) * 0.4;
+                rotX = Math.max(-90, Math.min(90, rotX));
+            }
+            lastX = touch.clientX;
+            lastY = touch.clientY;
+            applyTransform();
+            e.preventDefault();
+        }, { passive: false });
+
         addListener(document, 'mouseup', function() {
             if (isDragging) {
                 isDragging = false;
-                inputCapture.style.cursor = 'grab';
+                updateCursor();
             }
+        }, false);
+
+        addListener(document, 'touchend', function(e) {
+            if (multiTouchActive) {
+                if (e.touches.length === 1) {
+                    var shouldReset = !multiTouchMoved && (Date.now() - multiTouchStartTime) < 250;
+                    beginSingleTouchDrag(e.touches[0]);
+                    if (shouldReset) {
+                        resetView();
+                    }
+                } else if (e.touches.length === 0) {
+                    clearTouchState();
+                }
+                return;
+            }
+
+            if (!isDragging || activeTouchId === null) return;
+            for (var i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === activeTouchId) {
+                    isDragging = false;
+                    activeTouchId = null;
+                    break;
+                }
+            }
+        }, false);
+
+        addListener(document, 'touchcancel', function() {
+            clearTouchState();
         }, false);
 
         addListener(inputCapture, 'wheel', function(e) {
             e.preventDefault();
-            scale += e.deltaY * -0.002;
-            scale = Math.max(0.15, Math.min(2.5, scale));
-            applyTransform();
+            if (state.mode === 'scroll') {
+                scrollScene(-e.deltaY);
+            } else {
+                zoomBy(e.deltaY * -0.002);
+            }
         }, { passive: false });
 
         // ---- Phase 5: Keyboard controls ----
-
-        function exitViaMessage() {
-            if (window.webkit && window.webkit.messageHandlers &&
-                window.webkit.messageHandlers.mollotov3DSnapshot) {
-                window.webkit.messageHandlers.mollotov3DSnapshot.postMessage({action: 'exit'});
-            } else {
-                console.log('__mollotov_3d_exit__');
-            }
-        }
-
-        function reapplyDepths() {
-            for (var i = 0; i < state.modifiedElements.length; i++) {
-                var el = state.modifiedElements[i];
-                var d = parseInt(el.getAttribute('data-m3d-depth')) || 0;
-                el.style.transform = 'translateZ(' + (d * state.spacing) + 'px)';
-            }
-            applyTransform();
-        }
 
         addListener(document, 'keydown', function(e) {
             if (e.key === 'Escape') {
@@ -505,18 +696,11 @@ enum Snapshot3DBridge {
                 state.spacing = Math.max(5, state.spacing - 5);
                 reapplyDepths();
             } else if (e.key === 'r' || e.key === 'R') {
-                rotX = 15; rotY = -25; scale = 0.85;
-                applyTransform();
+                resetView();
             }
             e.preventDefault();
             e.stopPropagation();
         }, true);
-
-        // Close button
-        addListener(closeBtn, 'click', function(e) {
-            e.stopPropagation();
-            exitViaMessage();
-        }, false);
     })();
     """#
 
@@ -587,4 +771,29 @@ enum Snapshot3DBridge {
         delete window.__m3d;
     })();
     """#
+
+    static func setModeScript(_ mode: String) -> String {
+        """
+        (function() {
+            if (!window.__m3d || typeof window.__m3d.setMode !== 'function') return null;
+            return window.__m3d.setMode('\(mode)');
+        })();
+        """
+    }
+
+    static let resetViewScript = #"""
+    (function() {
+        if (!window.__m3d || typeof window.__m3d.resetView !== 'function') return false;
+        return window.__m3d.resetView();
+    })();
+    """#
+
+    static func zoomByScript(_ delta: Double) -> String {
+        """
+        (function() {
+            if (!window.__m3d || typeof window.__m3d.zoomBy !== 'function') return null;
+            return window.__m3d.zoomBy(\(delta));
+        })();
+        """
+    }
 }
