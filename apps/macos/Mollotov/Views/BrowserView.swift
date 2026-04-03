@@ -10,6 +10,7 @@ struct BrowserView: View {
     @State private var showBookmarks = false
     @State private var showHistory = false
     @State private var showNetworkInspector = false
+    @State private var showAI = false
     @State private var isFloatingMenuOpen = false
     @State private var isIn3DInspector = false
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
@@ -68,6 +69,7 @@ struct BrowserView: View {
                 onBookmarks: { showBookmarks = true },
                 onHistory: { showHistory = true },
                 onNetworkInspector: { showNetworkInspector = true },
+                onAI: { showAI = true },
                 onSnapshot3D: {
                     Task { @MainActor in
                         let context = serverState.handlerContext
@@ -161,6 +163,9 @@ struct BrowserView: View {
         }
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
+        }
+        .sheet(isPresented: $showAI) {
+            AIStatusView()
         }
         .onAppear {
             // Remove focus from URL bar on launch

@@ -27,6 +27,7 @@ struct FloatingMenuView: View {
     let onBookmarks: () -> Void
     let onHistory: () -> Void
     let onNetworkInspector: () -> Void
+    let onAI: () -> Void
     let onSnapshot3D: () -> Void
 
     var body: some View {
@@ -62,6 +63,7 @@ struct FloatingMenuView: View {
             .init(id: "bookmarks", icon: "bookmark.fill", accessibilityID: "browser.floating-menu.bookmark-fill", tooltip: "Bookmarks", action: onBookmarks),
             .init(id: "history", icon: "clock.arrow.circlepath", accessibilityID: "browser.floating-menu.clock-arrow-circlepath", tooltip: "History", action: onHistory),
             .init(id: "network-inspector", icon: "antenna.radiowaves.left.and.right", accessibilityID: "browser.floating-menu.antenna-radiowaves-left-and-right", tooltip: "Network", action: onNetworkInspector),
+            .init(id: "ai", icon: "brain", accessibilityID: "browser.floating-menu.brain", tooltip: "AI", action: onAI),
             .init(id: "settings", icon: "gear", accessibilityID: "browser.floating-menu.gear", tooltip: "Settings", action: onSettings),
         ]
 
@@ -262,7 +264,7 @@ private struct AppKitFloatingMenuOverlay: NSViewRepresentable {
 
         private func fanAngle(index: Int) -> Angle {
             let step: Double = 30
-            let halfArc: Double = step * 2.5
+            let halfArc = step * Double(max(itemCount - 1, 1)) / 2
             let center: Double = 180
             return .degrees(center - halfArc + step * Double(index))
         }
