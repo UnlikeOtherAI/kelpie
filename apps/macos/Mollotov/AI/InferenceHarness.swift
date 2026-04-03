@@ -107,7 +107,7 @@ struct InferenceHarness {
     }
 
     @MainActor
-    private func executeTool(_ name: String, args: [String: String]) async -> String {
+    func executeTool(_ name: String, args: [String: String]) async -> String {
         let payload: Any
 
         switch name {

@@ -150,14 +150,13 @@ final class AIState: ObservableObject {
             throw NSError(domain: "AIState", code: 1, userInfo: [NSLocalizedDescriptionKey: "Load a model first."])
         }
 
-        var body: [String: Any] = [
-            "prompt": prompt,
-            "context": "page_text",
-        ]
+        var body: [String: Any] = ["prompt": prompt]
 
         if activeModel.backend == .ollama {
             let priorMessages = history.suffix(10).map { $0.apiPayload }
             body["messages"] = priorMessages
+        } else {
+            body["context"] = "page_text"
         }
 
         let response = try await sendLocalRequest(method: "ai-infer", body: body)

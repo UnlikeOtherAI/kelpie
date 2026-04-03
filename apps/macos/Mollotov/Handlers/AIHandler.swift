@@ -188,17 +188,27 @@ struct AIHandler {
             }
 
             do {
-                let fallbackContext = await preloadedContext(mode: contextMode)
-                let contextText = explicitText ?? fallbackContext
                 let image = contextMode == "screenshot" ? try await screenshotData() : nil
-                let result = try await inferWithOllama(
-                    endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                    model: model,
-                    prompt: prompt,
-                    messages: messages,
-                    contextText: contextText,
-                    image: image
-                )
+                let result: InferenceEngine.InferenceResult
+                if let messages, !messages.isEmpty {
+                    result = try await inferWithOllamaAgentLoop(
+                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
+                        model: model,
+                        prompt: prompt,
+                        historyMessages: messages,
+                        image: image
+                    )
+                } else {
+                    let fallbackContext = await preloadedContext(mode: contextMode)
+                    result = try await inferWithOllama(
+                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
+                        model: model,
+                        prompt: prompt,
+                        messages: nil,
+                        contextText: explicitText ?? fallbackContext,
+                        image: image
+                    )
+                }
                 return successResponse([
                     "response": result.text,
                     "tokensUsed": result.tokensUsed,
@@ -433,6 +443,81 @@ struct AIHandler {
             throw NSError(domain: "AIHandler", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"])
         }
         return png
+    }
+
+    private func inferWithOllamaAgentLoop(
+        endpoint: String,
+        model: String,
+        prompt: String,
+        historyMessages: [[String: Any]],
+        image: Data?
+    ) async throws -> InferenceEngine.InferenceResult {
+        let startedAt = DispatchTime.now()
+        let harness = InferenceHarness(context: context)
+        let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
+
+        let systemMessage: [String: Any] = ["role": "system", "content": SystemPrompt.build()]
+        var messages: [[String: Any]] = [systemMessage] + historyMessages
+        var userMessage: [String: Any] = ["role": "user", "content": prompt]
+        if let image {
+            userMessage["images"] = [image.base64EncodedString()]
+        }
+        messages.append(userMessage)
+
+        var totalTokens = 0
+
+        for _ in 0..<3 {
+            let payload: [String: Any] = ["model": model, "messages": messages, "stream": false]
+            let response = try await postJSON(url: url, payload: payload)
+            let content = ((response["message"] as? [String: Any])?["content"] as? String ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            totalTokens += response["eval_count"] as? Int ?? approximateTokens(for: content)
+
+            if let toolCall = extractOllamaToolCall(from: content) {
+                messages.append(["role": "assistant", "content": content])
+                let toolResult = await harness.executeTool(toolCall.name, args: toolCall.args)
+                messages.append(["role": "user", "content": "Tool \(toolCall.name) result: \(toolResult)"])
+                continue
+            }
+
+            let answer = parseResponseJSON(content).answer
+            let duration = parseDurationMs(response["total_duration"])
+            return InferenceEngine.InferenceResult(
+                text: answer,
+                tokensUsed: totalTokens,
+                inferenceTimeMs: duration ?? elapsedMs(since: startedAt)
+            )
+        }
+
+        return InferenceEngine.InferenceResult(
+            text: "I need more information than I can gather in one pass.",
+            tokensUsed: totalTokens,
+            inferenceTimeMs: elapsedMs(since: startedAt)
+        )
+    }
+
+    private func extractOllamaToolCall(from text: String) -> (name: String, args: [String: String])? {
+        guard let start = text.firstIndex(of: "{") else { return nil }
+        var depth = 0
+        var end: String.Index?
+        for index in text.indices[start...] {
+            switch text[index] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 { end = index; break }
+            default: break
+            }
+            if end != nil { break }
+        }
+        guard let end,
+              let data = String(text[start...end]).data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tool = object["tool"] as? String else { return nil }
+        let args = (object["args"] as? [String: Any] ?? [:]).reduce(into: [String: String]()) { acc, kv in
+            acc[kv.key] = kv.value as? String ?? String(describing: kv.value)
+        }
+        return (tool, args)
     }
 
     private func inferWithOllama(
