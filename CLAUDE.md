@@ -12,6 +12,10 @@ Mollotov is an LLM-first browser for iOS and Android that enables language model
 - If deeper scoped behavior is needed, use `.claude/rules/` files.
 - Prefer single-responsibility functions. When touching a method that mixes multiple concerns, split it along readability and responsibility boundaries before adding more logic.
 
+## macOS SwiftUI + WebView Hit Testing
+
+Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS.md. Short version: **any button in a window containing a WebView must be an AppKit-backed NSButton subclass**. SwiftUI `Button` + WebView first-responder = broken every time.
+
 ## Debugging Protocol
 
 - **Always check logs first** before diving into source code. Check device HTTP server logs, mDNS advertisement logs, and CLI output before analyzing code.

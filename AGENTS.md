@@ -74,25 +74,24 @@ During debugging or verification, always terminate any existing Mollotov browser
 
 Feature work is incomplete until docs are updated. When adding or changing API endpoints, CLI commands, or MCP tools, update the relevant docs in the same commit. Every user-facing feature must be described in [docs/functionality.md](docs/functionality.md) — update it when adding or changing features.
 
-### macOS: NSViewRepresentable Hit Testing (CRITICAL)
+### macOS: SwiftUI Buttons in WebView Windows (CRITICAL)
 
-SwiftUI buttons and gestures behind a full-window NSViewRepresentable are dead — SwiftUI's gesture pipeline does not forward mouseDown events through NSViewRepresentable views, even if the underlying NSView returns nil from hitTest. AppKit-backed controls (NSViewRepresentable, Menu) work because they are resolved at the NSView hitTest level before SwiftUI's gesture system runs.
+Three distinct mechanisms can silently kill SwiftUI button clicks. All three have hit this codebase.
 
-**Rules:**
-- Never place an NSViewRepresentable with `.frame(maxWidth: .infinity, maxHeight: .infinity)` as a ZStack overlay above SwiftUI buttons. It will block every SwiftUI control behind it.
-- Scope NSViewRepresentable overlays to the smallest possible area. In BrowserView, the FloatingMenuView is scoped to the renderer ZStack — not the full window — so the URL bar and AI panel remain clickable.
-- When adding a new overlay or floating control, verify that SwiftUI buttons both above and below it in the view hierarchy still respond to clicks.
-- If a control must work reliably alongside NSViewRepresentable overlays, use AppKit-backed controls (NSViewRepresentable with custom NSButton/NSView) instead of SwiftUI Button.
+**1 — WebView first-responder steals mouseDown (the hardest to debug)**
+Once WKWebView or CEF becomes first responder, macOS dispatches all subsequent `mouseDown` events through the AppKit responder chain starting at the WebView. SwiftUI `Button` views live in NSHostingView's gesture layer and lose the race — they never receive the event. `.contentShape(Rectangle())` does NOT fix this.
 
-### macOS: `.buttonStyle(.plain)` Hit Areas (CRITICAL)
+**Rule: Every toolbar/UI control in a window that contains a WebView MUST be an AppKit-backed `NSButton` subclass via NSViewRepresentable.** AppKit resolves these at the `hitTest` level before the responder chain runs, so WebView focus cannot block them. Follow the `AppKitToolbarButton` / `AppKitSegmentedStrip` pattern in `URLBarView.swift`. Never add a new SwiftUI `Button` to the URL bar or any chrome area adjacent to the renderer.
 
-On macOS, `.buttonStyle(.plain)` buttons have their clickable area determined **only by the label content itself**. Modifiers like `.frame()`, `.padding()`, `.background()`, and `.contentShape()` applied to the Button wrapper (outside the label closure) do NOT expand the hit area — they only affect layout.
+**2 — Full-window NSViewRepresentable overlays block SwiftUI gestures**
+SwiftUI's gesture pipeline does not forward `mouseDown` through NSViewRepresentable views even when the underlying NSView returns `nil` from `hitTest`. A full-window overlay kills every SwiftUI control behind it.
 
-**Rules:**
-- All visual frame, padding, background, and foregroundStyle modifiers MUST go inside the Button's `label:` closure, not on the Button wrapper.
-- Every `.buttonStyle(.plain)` button MUST have `.contentShape(Rectangle())` (or appropriate shape) as the last modifier inside its label closure.
-- The Button wrapper should only carry `.buttonStyle(.plain)`, `.disabled()`, `.accessibilityIdentifier()`, and similar non-visual modifiers.
-- When adding a new `.buttonStyle(.plain)` button, always verify it is clickable after building.
+**Rule:** Scope NSViewRepresentable overlays to the smallest possible area. `FloatingMenuView` is scoped to the renderer ZStack only — not the full window. Never use `.frame(maxWidth: .infinity, maxHeight: .infinity)` on an NSViewRepresentable that sits above SwiftUI buttons.
+
+**3 — `.buttonStyle(.plain)` hit areas are label-only**
+`.frame()`, `.padding()`, `.background()`, and `.contentShape()` on the Button wrapper do not expand the clickable area — only what is inside the `label:` closure counts.
+
+**Rule:** Put all visual modifiers inside the `label:` closure and end with `.contentShape(Rectangle())`. The Button wrapper should only carry `.buttonStyle(.plain)`, `.disabled()`, and `.accessibilityIdentifier()`.
 
 ### Architecture and Quality
 
