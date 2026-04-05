@@ -6,7 +6,7 @@
 
 **Goal:** Add Firefox/Gecko as a third renderer option on macOS alongside WebKit and Chromium (CEF), using Firefox's Remote Protocol (CDP-compatible WebSocket) to control a Firefox subprocess.
 
-**Architecture:** Spawn Firefox.app as a subprocess with `--remote-debugging-port <PORT>`, connect via WebSocket using Firefox's CDP-compatible Remote Protocol, and implement `RendererEngine` using CDP commands for navigation, JS eval, screenshots, and cookies. The `makeView()` returns a `GeckoLiveView` that auto-refreshes from `Page.captureScreenshot` at ~5fps to show actual Firefox rendering inside the Mollotov shell.
+**Architecture:** Spawn Firefox.app as a subprocess with `--remote-debugging-port <PORT>`, connect via WebSocket using Firefox's CDP-compatible Remote Protocol, and implement `RendererEngine` using CDP commands for navigation, JS eval, screenshots, and cookies. The `makeView()` returns a `GeckoLiveView` that auto-refreshes from `Page.captureScreenshot` at ~5fps to show actual Firefox rendering inside the Kelpie shell.
 
 **Tech Stack:** Swift, URLSession WebSocket, Firefox Remote Protocol (CDP-compatible), Foundation Process, macOS 13+
 
@@ -40,7 +40,7 @@ Firefox must already be installed at one of the standard paths:
 ## Task 1: Add gecko case to RendererState
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Renderer/RendererState.swift`
+- Modify: `apps/macos/Kelpie/Renderer/RendererState.swift`
 
 **Step 1: Open the file and add the `.gecko` case**
 
@@ -69,7 +69,7 @@ Open Xcode → Product → Build (⌘B). Expect: build succeeds. The `RendererHa
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/RendererState.swift
+git add apps/macos/Kelpie/Renderer/RendererState.swift
 git commit -m "feat(macos): add gecko case to RendererState.Engine"
 ```
 
@@ -78,7 +78,7 @@ git commit -m "feat(macos): add gecko case to RendererState.Engine"
 ## Task 2: Firefox process manager
 
 **Files:**
-- Create: `apps/macos/Mollotov/Renderer/GeckoProcessManager.swift`
+- Create: `apps/macos/Kelpie/Renderer/GeckoProcessManager.swift`
 
 **Overview:** Finds Firefox.app, spawns it with remote debugging flags on a free port, and manages the process lifecycle (start, stop, crash detection).
 
@@ -128,7 +128,7 @@ final class GeckoProcessManager {
 
         // Isolated profile so Gecko doesn't touch the user's Firefox data
         let tempProfile = FileManager.default.temporaryDirectory
-            .appendingPathComponent("com.mollotov.gecko-profile-\(port)")
+            .appendingPathComponent("com.kelpie.gecko-profile-\(port)")
         try? FileManager.default.createDirectory(at: tempProfile, withIntermediateDirectories: true)
         profileDir = tempProfile
 
@@ -209,7 +209,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/GeckoProcessManager.swift
+git add apps/macos/Kelpie/Renderer/GeckoProcessManager.swift
 git commit -m "feat(macos): add GeckoProcessManager for Firefox subprocess lifecycle"
 ```
 
@@ -218,7 +218,7 @@ git commit -m "feat(macos): add GeckoProcessManager for Firefox subprocess lifec
 ## Task 3: CDP WebSocket client
 
 **Files:**
-- Create: `apps/macos/Mollotov/Renderer/GeckoCDPClient.swift`
+- Create: `apps/macos/Kelpie/Renderer/GeckoCDPClient.swift`
 
 **Overview:** A minimal CDP JSON-RPC client over `URLSessionWebSocketTask`. Sends commands (returns a `Sendable` result future keyed by ID), and delivers events to registered handlers.
 
@@ -365,7 +365,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/GeckoCDPClient.swift
+git add apps/macos/Kelpie/Renderer/GeckoCDPClient.swift
 git commit -m "feat(macos): add GeckoCDPClient - CDP WebSocket client for Firefox"
 ```
 
@@ -374,7 +374,7 @@ git commit -m "feat(macos): add GeckoCDPClient - CDP WebSocket client for Firefo
 ## Task 4: GeckoLiveView — screenshot-driven NSView
 
 **Files:**
-- Create: `apps/macos/Mollotov/Renderer/GeckoLiveView.swift`
+- Create: `apps/macos/Kelpie/Renderer/GeckoLiveView.swift`
 
 **Overview:** An `NSView` subclass that periodically fires a screenshot callback and renders the result using `CALayer`. Drives itself; the owner just sets `screenshotProvider` and calls `startRefreshing()`/`stopRefreshing()`.
 
@@ -442,7 +442,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/GeckoLiveView.swift
+git add apps/macos/Kelpie/Renderer/GeckoLiveView.swift
 git commit -m "feat(macos): add GeckoLiveView - screenshot-driven NSView for Firefox rendering"
 ```
 
@@ -451,7 +451,7 @@ git commit -m "feat(macos): add GeckoLiveView - screenshot-driven NSView for Fir
 ## Task 5: GeckoRenderer — core implementation
 
 **Files:**
-- Create: `apps/macos/Mollotov/Renderer/GeckoRenderer.swift`
+- Create: `apps/macos/Kelpie/Renderer/GeckoRenderer.swift`
 
 **Overview:** Implements `RendererEngine` by combining `GeckoProcessManager`, `GeckoCDPClient`, and `GeckoLiveView`. On init, starts Firefox and connects CDP. All `RendererEngine` methods translate directly to CDP commands.
 
@@ -668,7 +668,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/GeckoRenderer.swift
+git add apps/macos/Kelpie/Renderer/GeckoRenderer.swift
 git commit -m "feat(macos): add GeckoRenderer - Firefox via CDP Remote Protocol"
 ```
 
@@ -677,7 +677,7 @@ git commit -m "feat(macos): add GeckoRenderer - Firefox via CDP Remote Protocol"
 ## Task 6: Wire gecko into ServerState
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Network/ServerState.swift`
+- Modify: `apps/macos/Kelpie/Network/ServerState.swift`
 
 **Step 1: Add geckoRenderer stored property**
 
@@ -711,7 +711,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Network/ServerState.swift
+git add apps/macos/Kelpie/Network/ServerState.swift
 git commit -m "feat(macos): wire GeckoRenderer into ServerState"
 ```
 
@@ -720,8 +720,8 @@ git commit -m "feat(macos): wire GeckoRenderer into ServerState"
 ## Task 7: Update RendererHandler and CookieMigrator
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Handlers/RendererHandler.swift`
-- Modify: `apps/macos/Mollotov/Renderer/CookieMigrator.swift`
+- Modify: `apps/macos/Kelpie/Handlers/RendererHandler.swift`
+- Modify: `apps/macos/Kelpie/Renderer/CookieMigrator.swift`
 
 **Step 1: Update RendererHandler error message**
 
@@ -756,7 +756,7 @@ Build in Xcode (⌘B). Expected: no errors.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Handlers/RendererHandler.swift
+git add apps/macos/Kelpie/Handlers/RendererHandler.swift
 git commit -m "feat(macos): update RendererHandler to accept gecko engine"
 ```
 

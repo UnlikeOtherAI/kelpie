@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/icon-1024.png" width="128" height="128" alt="Mollotov icon">
+  <img src="assets/icon-1024.png" width="128" height="128" alt="Kelpie icon">
 </p>
 
-<h1 align="center">Mollotov</h1>
+<h1 align="center">Kelpie</h1>
 
 <p align="center">
   LLM-first browser for iOS, Android, macOS, and desktop work in progress.<br>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://unlikeotherai.github.io/mollotov">Website</a> &middot;
+  <a href="https://unlikeotherai.github.io/kelpie">Website</a> &middot;
   <a href="docs/brief.md">Product Brief</a> &middot;
   <a href="docs/architecture.md">Architecture</a> &middot;
   <a href="docs/api/">API Reference</a> &middot;
@@ -39,7 +39,7 @@ No emulators pretending to be phones. No persistent content scripts. No browser 
 ## Install
 
 ```
-npm install -g @unlikeotherai/mollotov
+npm install -g @unlikeotherai/kelpie
 ```
 
 Published releases also attach Android artifacts plus Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` downloads. GitHub Pages publishes Linux package repositories for `apt` and `dnf` from the same release flow.
@@ -47,14 +47,14 @@ Published releases also attach Android artifacts plus Linux `.tar.gz`, `.deb`, `
 ## Quick start
 
 1. Build and run the iOS or Android app on a device or simulator
-2. `mollotov discover` — lists all Mollotov instances on your network
-3. `mollotov navigate --url https://example.com` — or connect your LLM via MCP
+2. `kelpie discover` — lists all Kelpie instances on your network
+3. `kelpie navigate --url https://example.com` — or connect your LLM via MCP
 
 ## Key features
 
 - **Real browsers** — WKWebView (iOS/macOS), CEF (macOS), Android WebView, with native user agents
 - **Apple TV support** — AirPlay from iPhone/iPad to Apple TV, TV appears as a separate controllable device
-- **mDNS discovery** — devices advertise `_mollotov._tcp`, CLI auto-discovers them
+- **mDNS discovery** — devices advertise `_kelpie._tcp`, CLI auto-discovers them
 - **HTTP + MCP API** — navigate, screenshot, DOM, click, fill, scroll, JS eval
 - **Group commands** — send commands to all devices simultaneously
 - **Annotated screenshots** — numbered labels on interactive elements for visual-first automation
@@ -66,7 +66,7 @@ Published releases also attach Android artifacts plus Linux `.tar.gz`, `.deb`, `
 
 ```
   +-----------+    +-----------+    +-----------+    +-----------+
-  | Mollotov  |    | Mollotov  |    | Mollotov  |    | Apple TV  |
+  | Kelpie  |    | Kelpie  |    | Kelpie  |    | Apple TV  |
   | (iPhone)  |    | (iPad)    |    | (Android) |    | (AirPlay) |
   | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |    | HTTP+MCP  |
   | mDNS      |    | mDNS      |    | mDNS      |    | mDNS      |
@@ -75,7 +75,7 @@ Published releases also attach Android artifacts plus Linux `.tar.gz`, `.deb`, `
         +-------+-------+-------+-------+-------+-------+
                 |               |
          +------+---------------+------+
-         |      Mollotov CLI           |
+         |      Kelpie CLI           |
          |      (Node.js / MCP)        |
          +-------------+---------------+
                        |
@@ -111,7 +111,7 @@ docs/           Product brief, architecture, API reference, CLI docs
 
 ### [AppReveal](https://github.com/UnlikeOtherAI/AppReveal)
 
-Mollotov uses AppReveal only for debug automation. The CLI helper and the in-app library are separate things, and the in-app SDK must never ship in release builds. See [docs.md](docs.md).
+Kelpie uses AppReveal only for debug automation. The CLI helper and the in-app library are separate things, and the in-app SDK must never ship in release builds. See [docs.md](docs.md).
 
 ## License
 

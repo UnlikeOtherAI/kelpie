@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot (if needed), install, and launch the Mollotov app on an Android target.
+# Boot (if needed), install, and launch the Kelpie app on an Android target.
 #
 # Usage: android-run.sh <target> <type> <apk>
 #   target  — ADB serial (type=running) or AVD name (type=avd)
@@ -64,5 +64,5 @@ echo "→ Installing $APK on $SERIAL..."
 "$ADB" -s "$SERIAL" install -r "$APK"
 
 echo "→ Launching..."
-"$ADB" -s "$SERIAL" shell am start -n com.mollotov.browser/.MainActivity
+"$ADB" -s "$SERIAL" shell am start -n com.kelpie.browser/.MainActivity
 echo "✓ App launched on $SERIAL"

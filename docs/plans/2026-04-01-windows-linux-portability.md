@@ -14,7 +14,7 @@ What we can transfer directly today:
 
 - The CLI and shared TypeScript packages
 - The `/v1/` HTTP contract and MCP tool surface
-- The device discovery model and `_mollotov._tcp` advertisement contract
+- The device discovery model and `_kelpie._tcp` advertisement contract
 - The macOS app's separation between UI shell, renderer, handlers, and network server
 - The Chromium/CEF renderer strategy already proven on macOS
 - The browser stores and invariants: bookmarks, history, cookies, network traffic, console log, viewport state
@@ -45,14 +45,14 @@ The parts of the macOS app worth preserving are architectural seams, not the App
 
 ### Proven reusable seams
 
-- [`apps/macos/Mollotov/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Renderer/RendererEngine.swift) defines the right abstraction boundary: navigation, JS evaluation, cookies, screenshots, view attachment, and state callbacks.
-- [`apps/macos/Mollotov/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Handlers/HandlerContext.swift) centralizes browser actions behind the active renderer.
-- [`apps/macos/Mollotov/Network/ServerState.swift`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Network/ServerState.swift) already separates server lifecycle, mDNS, renderer lifecycle, and switching.
-- [`packages/shared/src/device-types.ts`](/System/Volumes/Data/.internal/projects/Projects/mollotov/packages/shared/src/device-types.ts) and [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/mollotov/packages/shared/src/api-types.ts) already define the external contract consumed by the CLI and MCP.
+- [`apps/macos/Kelpie/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Renderer/RendererEngine.swift) defines the right abstraction boundary: navigation, JS evaluation, cookies, screenshots, view attachment, and state callbacks.
+- [`apps/macos/Kelpie/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Handlers/HandlerContext.swift) centralizes browser actions behind the active renderer.
+- [`apps/macos/Kelpie/Network/ServerState.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Network/ServerState.swift) already separates server lifecycle, mDNS, renderer lifecycle, and switching.
+- [`packages/shared/src/device-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/device-types.ts) and [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/api-types.ts) already define the external contract consumed by the CLI and MCP.
 
 ### macOS-specific code we should not treat as portable
 
-- SwiftUI views under [`apps/macos/Mollotov/Views/`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Views)
+- SwiftUI views under [`apps/macos/Kelpie/Views/`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Views)
 - Apple networking primitives in the macOS server layer
 - WebKit renderer implementation
 - Safari auth helper

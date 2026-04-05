@@ -1,4 +1,4 @@
-#include "mollotov/network_traffic_store.h"
+#include "kelpie/network_traffic_store.h"
 
 #include <algorithm>
 #include <cctype>
@@ -8,7 +8,7 @@
 
 #include "store_support.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 using json = nlohmann::json;
@@ -308,4 +308,4 @@ void NetworkTrafficStore::ClampAfterTrimLocked(std::size_t removed_count) {
   }
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

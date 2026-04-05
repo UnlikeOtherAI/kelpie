@@ -1,13 +1,13 @@
-#include "mollotov/desktop_http_server.h"
+#include "kelpie/desktop_http_server.h"
 
 #include <thread>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
-#include "mollotov/desktop_router.h"
+#include "kelpie/desktop_router.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 void AddCorsHeaders(httplib::Response& response) {
@@ -110,4 +110,4 @@ int DesktopHttpServer::bound_port() const {
   return impl_->bound_port;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

@@ -4,7 +4,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 bool ToastView::Create(HWND parent, HINSTANCE instance) {
   hwnd_ = CreateWindowExW(WS_EX_LAYERED, L"STATIC", L"", WS_CHILD | SS_CENTER,
@@ -47,4 +47,4 @@ void ToastView::Hide() {
   }
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

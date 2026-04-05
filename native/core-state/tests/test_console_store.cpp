@@ -1,5 +1,5 @@
-#include "mollotov/console_store.h"
-#include "mollotov/state_c_api.h"
+#include "kelpie/console_store.h"
+#include "kelpie/state_c_api.h"
 
 #include <cassert>
 #include <iostream>
@@ -11,10 +11,10 @@ namespace {
 using json = nlohmann::json;
 
 void TestAppendFilteringAndErrorsOnly() {
-  mollotov::ConsoleStore store;
-  store.Append(mollotov::ConsoleEntry{
+  kelpie::ConsoleStore store;
+  store.Append(kelpie::ConsoleEntry{
       "",
-      mollotov::ConsoleLevel::kLog,
+      kelpie::ConsoleLevel::kLog,
       "plain log",
       "app.js",
       4,
@@ -22,9 +22,9 @@ void TestAppendFilteringAndErrorsOnly() {
       "2026-04-01T12:00:00Z",
       std::nullopt,
   });
-  store.Append(mollotov::ConsoleEntry{
+  store.Append(kelpie::ConsoleEntry{
       "",
-      mollotov::ConsoleLevel::kError,
+      kelpie::ConsoleLevel::kError,
       "boom",
       "app.js",
       8,
@@ -43,11 +43,11 @@ void TestAppendFilteringAndErrorsOnly() {
 }
 
 void TestCapacityAndLoadJson() {
-  mollotov::ConsoleStore store;
+  kelpie::ConsoleStore store;
   for (int index = 0; index < 1005; ++index) {
-    store.Append(mollotov::ConsoleEntry{
+    store.Append(kelpie::ConsoleEntry{
         "",
-        mollotov::ConsoleLevel::kDebug,
+        kelpie::ConsoleLevel::kDebug,
         "message-" + std::to_string(index),
         "",
         0,
@@ -74,24 +74,24 @@ void TestCapacityAndLoadJson() {
 }
 
 void TestCApiOperations() {
-  MollotovConsoleStoreRef store = mollotov_console_store_create();
+  KelpieConsoleStoreRef store = kelpie_console_store_create();
   assert(store != nullptr);
 
-  assert(mollotov_console_store_append_json(
+  assert(kelpie_console_store_append_json(
              store,
              R"({"level":"error","text":"ffi-error","source":"ffi.js","line":1,"column":2,"timestamp":"2026-04-01T12:00:00Z","stack_trace":"trace"})") == 1);
-  assert(mollotov_console_store_append_json(
+  assert(kelpie_console_store_append_json(
              store,
              R"({"level":"info","text":"ffi-info","source":"ffi.js","line":3,"column":4,"timestamp":"2026-04-01T12:00:01Z"})") == 1);
 
-  char* errors = mollotov_console_store_get_errors_only(store);
+  char* errors = kelpie_console_store_get_errors_only(store);
   assert(errors != nullptr);
   const json error_entries = json::parse(errors);
-  mollotov_free_string(errors);
+  kelpie_free_string(errors);
   assert(error_entries.size() == 1);
   assert(error_entries[0]["text"] == "ffi-error");
 
-  mollotov_console_store_destroy(store);
+  kelpie_console_store_destroy(store);
 }
 
 }  // namespace

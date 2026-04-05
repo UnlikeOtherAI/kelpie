@@ -7,29 +7,29 @@
 
 #include <nlohmann/json.hpp>
 
-#include "mollotov/bookmark_store.h"
-#include "mollotov/console_store.h"
-#include "mollotov/history_store.h"
-#include "mollotov/network_traffic_store.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/console_store.h"
+#include "kelpie/history_store.h"
+#include "kelpie/network_traffic_store.h"
 #include "store_support.h"
 
-struct MollotovBookmarkStore {
-  mollotov::BookmarkStore store;
+struct KelpieBookmarkStore {
+  kelpie::BookmarkStore store;
 };
 
-struct MollotovHistoryStore {
-  mollotov::HistoryStore store;
+struct KelpieHistoryStore {
+  kelpie::HistoryStore store;
 };
 
-struct MollotovNetworkTrafficStore {
-  mollotov::NetworkTrafficStore store;
+struct KelpieNetworkTrafficStore {
+  kelpie::NetworkTrafficStore store;
 };
 
-struct MollotovConsoleStore {
-  mollotov::ConsoleStore store;
+struct KelpieConsoleStore {
+  kelpie::ConsoleStore store;
 };
 
-namespace mollotov::state_c_api_internal {
+namespace kelpie::state_c_api_internal {
 
 using json = nlohmann::json;
 
@@ -118,4 +118,4 @@ inline std::optional<ConsoleEntry> ParseConsoleEntry(const char* json_text) {
   };
 }
 
-}  // namespace mollotov::state_c_api_internal
+}  // namespace kelpie::state_c_api_internal

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-dmg.sh — Build and package Mollotov.app into a distributable DMG.
+# build-dmg.sh — Build and package Kelpie.app into a distributable DMG.
 # Usage:
 #   ./scripts/build-dmg.sh               # unsigned (for dev distribution)
 #   ./scripts/build-dmg.sh --sign        # sign + notarize (requires Developer ID)
@@ -9,14 +9,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MACOS_DIR="$SCRIPT_DIR/.."
 BUILD_DIR="$MACOS_DIR/.build/dmg"
-APP_NAME="Mollotov"
-SCHEME="Mollotov"
+APP_NAME="Kelpie"
+SCHEME="Kelpie"
 CONFIGURATION="Release"
 DMG_NAME="${APP_NAME}.dmg"
 
 SIGN=false
 IDENTITY=""
-BUNDLE_ID="com.mollotov.browser.macos"
+BUNDLE_ID="com.kelpie.browser.macos"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

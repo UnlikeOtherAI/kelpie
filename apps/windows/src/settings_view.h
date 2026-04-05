@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 struct SettingsValues {
   int port = 8420;
@@ -26,4 +26,4 @@ class SettingsView {
                  SettingsValues& updated_values);
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

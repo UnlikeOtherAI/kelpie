@@ -1,3 +1,3 @@
 add_executable(test_mcp_registry test_mcp_registry.cpp)
-target_link_libraries(test_mcp_registry PRIVATE mollotov_core_mcp)
+target_link_libraries(test_mcp_registry PRIVATE kelpie_core_mcp)
 add_test(NAME test_mcp_registry COMMAND test_mcp_registry)

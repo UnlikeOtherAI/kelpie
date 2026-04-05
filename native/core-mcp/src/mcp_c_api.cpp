@@ -1,4 +1,4 @@
-#include "mollotov/mcp_c_api.h"
+#include "kelpie/mcp_c_api.h"
 
 #include <cstring>
 #include <new>
@@ -6,13 +6,13 @@
 
 #include <nlohmann/json.hpp>
 
-#include "mollotov/mcp_registry.h"
+#include "kelpie/mcp_registry.h"
 
-struct MollotovMcpRegistry {
-  mollotov::McpRegistry registry;
+struct KelpieMcpRegistry {
+  kelpie::McpRegistry registry;
 };
 
-namespace mollotov::mcp_c_api_internal {
+namespace kelpie::mcp_c_api_internal {
 
 using json = nlohmann::json;
 
@@ -25,7 +25,7 @@ char* CopyString(const std::string& value) {
   return buffer;
 }
 
-json AvailabilityToJson(const mollotov::ToolAvailability& availability) {
+json AvailabilityToJson(const kelpie::ToolAvailability& availability) {
   json payload = {
       {"platforms", json::array()},
       {"engines", availability.engines},
@@ -33,23 +33,23 @@ json AvailabilityToJson(const mollotov::ToolAvailability& availability) {
       {"allowed_headless", availability.allowed_headless},
       {"required_capabilities", availability.required_capabilities},
   };
-  for (const mollotov::Platform platform : availability.platforms) {
-    payload["platforms"].push_back(mollotov::PlatformToString(platform));
+  for (const kelpie::Platform platform : availability.platforms) {
+    payload["platforms"].push_back(kelpie::PlatformToString(platform));
   }
   return payload;
 }
 
-bool ParsePlatform(int32_t raw_platform, mollotov::Platform* platform) {
+bool ParsePlatform(int32_t raw_platform, kelpie::Platform* platform) {
   if (platform == nullptr) {
     return false;
   }
   switch (raw_platform) {
-    case MOLLOTOV_PLATFORM_IOS:
-    case MOLLOTOV_PLATFORM_ANDROID:
-    case MOLLOTOV_PLATFORM_MACOS:
-    case MOLLOTOV_PLATFORM_LINUX:
-    case MOLLOTOV_PLATFORM_WINDOWS:
-      *platform = static_cast<mollotov::Platform>(raw_platform);
+    case KELPIE_PLATFORM_IOS:
+    case KELPIE_PLATFORM_ANDROID:
+    case KELPIE_PLATFORM_MACOS:
+    case KELPIE_PLATFORM_LINUX:
+    case KELPIE_PLATFORM_WINDOWS:
+      *platform = static_cast<kelpie::Platform>(raw_platform);
       return true;
     default:
       return false;
@@ -60,59 +60,59 @@ const char* SafeCString(const char* value) {
   return value == nullptr ? "" : value;
 }
 
-}  // namespace mollotov::mcp_c_api_internal
+}  // namespace kelpie::mcp_c_api_internal
 
 extern "C" {
 
-MollotovMcpRegistryRef mollotov_mcp_registry_create(void) {
+KelpieMcpRegistryRef kelpie_mcp_registry_create(void) {
   try {
-    return new MollotovMcpRegistry();
+    return new KelpieMcpRegistry();
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_mcp_registry_tools_for_platform(MollotovMcpRegistryRef registry, int32_t platform) {
+char* kelpie_mcp_registry_tools_for_platform(KelpieMcpRegistryRef registry, int32_t platform) {
   if (registry == nullptr) {
     return nullptr;
   }
-  mollotov::Platform parsed_platform;
-  if (!mollotov::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
+  kelpie::Platform parsed_platform;
+  if (!kelpie::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
     return nullptr;
   }
 
   try {
     nlohmann::json payload = nlohmann::json::array();
-    for (const mollotov::McpTool& tool : registry->registry.tools_for_platform(parsed_platform)) {
+    for (const kelpie::McpTool& tool : registry->registry.tools_for_platform(parsed_platform)) {
       payload.push_back({
           {"name", tool.name},
           {"http_endpoint", tool.http_endpoint},
           {"description", tool.description},
-          {"availability", mollotov::mcp_c_api_internal::AvailabilityToJson(tool.availability)},
+          {"availability", kelpie::mcp_c_api_internal::AvailabilityToJson(tool.availability)},
       });
     }
-    return mollotov::mcp_c_api_internal::CopyString(payload.dump());
+    return kelpie::mcp_c_api_internal::CopyString(payload.dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-int32_t mollotov_mcp_registry_is_available(MollotovMcpRegistryRef registry,
+int32_t kelpie_mcp_registry_is_available(KelpieMcpRegistryRef registry,
                                            const char* name,
                                            int32_t platform,
                                            const char* engine) {
   if (registry == nullptr) {
     return 0;
   }
-  mollotov::Platform parsed_platform;
-  if (!mollotov::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
+  kelpie::Platform parsed_platform;
+  if (!kelpie::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
     return 0;
   }
 
   try {
     return registry->registry.is_tool_available(
-               mollotov::mcp_c_api_internal::SafeCString(name), parsed_platform,
-               mollotov::mcp_c_api_internal::SafeCString(engine))
+               kelpie::mcp_c_api_internal::SafeCString(name), parsed_platform,
+               kelpie::mcp_c_api_internal::SafeCString(engine))
                ? 1
                : 0;
   } catch (...) {
@@ -120,39 +120,39 @@ int32_t mollotov_mcp_registry_is_available(MollotovMcpRegistryRef registry,
   }
 }
 
-char* mollotov_mcp_registry_get_capabilities(MollotovMcpRegistryRef registry,
+char* kelpie_mcp_registry_get_capabilities(KelpieMcpRegistryRef registry,
                                              int32_t platform,
                                              const char* engine) {
   if (registry == nullptr) {
     return nullptr;
   }
-  mollotov::Platform parsed_platform;
-  if (!mollotov::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
+  kelpie::Platform parsed_platform;
+  if (!kelpie::mcp_c_api_internal::ParsePlatform(platform, &parsed_platform)) {
     return nullptr;
   }
 
   try {
-    const mollotov::McpCapabilities capabilities =
+    const kelpie::McpCapabilities capabilities =
         registry->registry.get_capabilities(parsed_platform,
-                                            mollotov::mcp_c_api_internal::SafeCString(engine));
+                                            kelpie::mcp_c_api_internal::SafeCString(engine));
     const nlohmann::json payload = {
-        {"platform", mollotov::PlatformToString(parsed_platform)},
-        {"engine", mollotov::mcp_c_api_internal::SafeCString(engine)},
+        {"platform", kelpie::PlatformToString(parsed_platform)},
+        {"engine", kelpie::mcp_c_api_internal::SafeCString(engine)},
         {"supported", capabilities.supported},
         {"partial", capabilities.partial},
         {"unsupported", capabilities.unsupported},
     };
-    return mollotov::mcp_c_api_internal::CopyString(payload.dump());
+    return kelpie::mcp_c_api_internal::CopyString(payload.dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_mcp_registry_destroy(MollotovMcpRegistryRef registry) {
+void kelpie_mcp_registry_destroy(KelpieMcpRegistryRef registry) {
   delete registry;
 }
 
-void mollotov_mcp_free_string(char* value) {
+void kelpie_mcp_free_string(char* value) {
   delete[] value;
 }
 

@@ -6,7 +6,7 @@
 
 #include "device_info_linux.h"
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 struct MdnsServiceConfig {
   DeviceInfoSnapshot device;
@@ -34,7 +34,7 @@ class MdnsAvahi {
   std::string last_error_;
   std::atomic<bool> running_{false};
 
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
   void Run(const MdnsServiceConfig& config);
   std::thread thread_;
   void* simple_poll_ = nullptr;
@@ -43,4 +43,4 @@ class MdnsAvahi {
 #endif
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

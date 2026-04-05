@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 struct DeviceInfoSnapshot {
   std::string id;
@@ -41,4 +41,4 @@ class DeviceInfoLinux {
   std::string profile_dir_;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

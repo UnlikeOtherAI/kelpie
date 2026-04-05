@@ -1,6 +1,6 @@
 #include "interaction_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 const char* kClickScript = R"JS(
@@ -170,4 +170,4 @@ nlohmann::json InteractionHandler::Check(const nlohmann::json& params, bool chec
   }
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

@@ -10,16 +10,16 @@
 #include "ui_theme.h"
 #include "url_bar.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gdk/gdkkeysyms.h>
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 namespace {
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 void ConfigureToolDialog(GtkWidget* dialog, GtkWidget* content) {
   gtk_window_set_default_size(GTK_WINDOW(dialog), 720, 520);
   gtk_window_set_resizable(GTK_WINDOW(dialog), TRUE);
@@ -33,15 +33,15 @@ void ConfigureToolDialog(GtkWidget* dialog, GtkWidget* content) {
 GUIShell::GUIShell(LinuxApp& app) : app_(app) {}
 
 int GUIShell::Run() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   gtk_disable_setlocale();
   gtk_init(nullptr, nullptr);
   ui::InstallTheme();
 
   auto* window = GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
-  gtk_window_set_title(window, "Mollotov Linux");
+  gtk_window_set_title(window, "Kelpie Linux");
   gtk_window_set_default_size(window, app_.config().width, app_.config().height);
-  gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(window)), "mollotov-window");
+  gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(window)), "kelpie-window");
   ui::ApplyWindowIcon(window);
 
   UrlBar url_bar(app_);
@@ -66,7 +66,7 @@ int GUIShell::Run() {
   gtk_widget_set_halign(menu_button, GTK_ALIGN_END);
   gtk_widget_set_valign(menu_button, GTK_ALIGN_CENTER);
   gtk_widget_set_margin_end(menu_button, 16);
-  gtk_style_context_add_class(gtk_widget_get_style_context(menu_button), "mollotov-fab");
+  gtk_style_context_add_class(gtk_widget_get_style_context(menu_button), "kelpie-fab");
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), menu_button);
 
   GtkWidget* menu = gtk_popover_new(menu_button);
@@ -87,12 +87,12 @@ int GUIShell::Run() {
   gtk_box_pack_start(GTK_BOX(menu_content), history_item, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(menu_content), network_item, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(menu_content), settings_item, FALSE, FALSE, 0);
-  gtk_style_context_add_class(gtk_widget_get_style_context(menu), "mollotov-menu-popover");
-  gtk_style_context_add_class(gtk_widget_get_style_context(reload_item), "mollotov-menu-row");
-  gtk_style_context_add_class(gtk_widget_get_style_context(bookmarks_item), "mollotov-menu-row");
-  gtk_style_context_add_class(gtk_widget_get_style_context(history_item), "mollotov-menu-row");
-  gtk_style_context_add_class(gtk_widget_get_style_context(network_item), "mollotov-menu-row");
-  gtk_style_context_add_class(gtk_widget_get_style_context(settings_item), "mollotov-menu-row");
+  gtk_style_context_add_class(gtk_widget_get_style_context(menu), "kelpie-menu-popover");
+  gtk_style_context_add_class(gtk_widget_get_style_context(reload_item), "kelpie-menu-row");
+  gtk_style_context_add_class(gtk_widget_get_style_context(bookmarks_item), "kelpie-menu-row");
+  gtk_style_context_add_class(gtk_widget_get_style_context(history_item), "kelpie-menu-row");
+  gtk_style_context_add_class(gtk_widget_get_style_context(network_item), "kelpie-menu-row");
+  gtk_style_context_add_class(gtk_widget_get_style_context(settings_item), "kelpie-menu-row");
   gtk_widget_show_all(menu);
   gtk_menu_button_set_popover(GTK_MENU_BUTTON(menu_button), menu);
 
@@ -236,4 +236,4 @@ int GUIShell::Run() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

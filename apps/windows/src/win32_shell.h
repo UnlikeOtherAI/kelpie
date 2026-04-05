@@ -18,7 +18,7 @@
 #include "url_bar.h"
 #include "win32_browser_view.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class ShellDelegate : public UrlBarDelegate {
  public:
@@ -62,4 +62,4 @@ class Win32Shell {
   NetworkInspector network_view_;
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

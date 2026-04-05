@@ -2,16 +2,16 @@
 
 #include "linux_app.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <cairo.h>
 #include <gdk/gdkkeysyms.h>
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   frame_ = gtk_overlay_new();
   canvas_ = gtk_drawing_area_new();
   label_ = gtk_label_new("");
@@ -201,7 +201,7 @@ GtkWidget* GtkBrowserView::widget() const {
 }
 
 void GtkBrowserView::Sync() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (label_ == nullptr) {
     return;
   }
@@ -220,4 +220,4 @@ void GtkBrowserView::Sync() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

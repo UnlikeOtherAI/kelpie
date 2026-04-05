@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(mollotov_windows LANGUAGES CXX RC)
+project(kelpie_windows LANGUAGES CXX RC)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,17 +8,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
-set(MOLLOTOV_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
-if(NOT EXISTS "${MOLLOTOV_NATIVE_ROOT}/CMakeLists.txt")
-  message(FATAL_ERROR "Expected native core at ${MOLLOTOV_NATIVE_ROOT}")
+set(KELPIE_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
+if(NOT EXISTS "${KELPIE_NATIVE_ROOT}/CMakeLists.txt")
+  message(FATAL_ERROR "Expected native core at ${KELPIE_NATIVE_ROOT}")
 endif()
 
 set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
 
-if(NOT TARGET mollotov_core_protocol)
-  add_subdirectory("${MOLLOTOV_NATIVE_ROOT}" "${CMAKE_BINARY_DIR}/mollotov_native")
+if(NOT TARGET kelpie_core_protocol)
+  add_subdirectory("${KELPIE_NATIVE_ROOT}" "${CMAKE_BINARY_DIR}/kelpie_native")
 endif()
 
 FetchContent_Declare(
@@ -59,17 +59,17 @@ set(WINDOWS_APP_HEADERS
 )
 
 set(WINDOWS_APP_RESOURCES
-  resources/mollotov.rc
+  resources/kelpie.rc
   resources/resource.h
 )
 
-add_executable(mollotov WIN32
+add_executable(kelpie WIN32
   ${WINDOWS_APP_SOURCES}
   ${WINDOWS_APP_HEADERS}
   ${WINDOWS_APP_RESOURCES}
 )
 
-target_compile_definitions(mollotov
+target_compile_definitions(kelpie
   PRIVATE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
@@ -78,19 +78,19 @@ target_compile_definitions(mollotov
     _UNICODE
 )
 
-target_include_directories(mollotov
+target_include_directories(kelpie
   PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
-target_link_libraries(mollotov
+target_link_libraries(kelpie
   PRIVATE
     httplib::httplib
-    mollotov_core_protocol
-    mollotov_core_state
-    mollotov_core_automation
-    mollotov_core_mcp
+    kelpie_core_protocol
+    kelpie_core_state
+    kelpie_core_automation
+    kelpie_core_mcp
     nlohmann_json::nlohmann_json
     user32
     gdi32
@@ -104,12 +104,12 @@ target_link_libraries(mollotov
     Rpcrt4
 )
 
-set_target_properties(mollotov PROPERTIES
-  OUTPUT_NAME "mollotov"
+set_target_properties(kelpie PROPERTIES
+  OUTPUT_NAME "kelpie"
 )
 
-if(TARGET mollotov_engine_chromium_desktop)
-  target_link_libraries(mollotov PRIVATE mollotov_engine_chromium_desktop)
+if(TARGET kelpie_engine_chromium_desktop)
+  target_link_libraries(kelpie PRIVATE kelpie_engine_chromium_desktop)
 endif()
 
 option(HAS_CEF "Build Windows app with Chromium Embedded Framework" OFF)
@@ -122,17 +122,17 @@ if(HAS_CEF)
     message(FATAL_ERROR "HAS_CEF requires CEF_ROOT to point at a CEF binary distribution")
   endif()
 
-  target_compile_definitions(mollotov PRIVATE HAS_CEF=1)
-  target_include_directories(mollotov PRIVATE "${CEF_ROOT}" "${CEF_ROOT}/include")
+  target_compile_definitions(kelpie PRIVATE HAS_CEF=1)
+  target_include_directories(kelpie PRIVATE "${CEF_ROOT}" "${CEF_ROOT}/include")
 
   find_library(CEF_LIBCEF NAMES libcef PATHS "${CEF_ROOT}/Release" "${CEF_ROOT}/Debug" NO_DEFAULT_PATH)
   find_library(CEF_WRAPPER NAMES libcef_dll_wrapper PATHS "${CEF_ROOT}/Release" "${CEF_ROOT}/Debug" NO_DEFAULT_PATH)
 
   if(CEF_LIBCEF)
-    target_link_libraries(mollotov PRIVATE "${CEF_LIBCEF}")
+    target_link_libraries(kelpie PRIVATE "${CEF_LIBCEF}")
   endif()
   if(CEF_WRAPPER)
-    target_link_libraries(mollotov PRIVATE "${CEF_WRAPPER}")
+    target_link_libraries(kelpie PRIVATE "${CEF_WRAPPER}")
   endif()
 
   file(GLOB CEF_RUNTIME_FILES
@@ -142,14 +142,14 @@ if(HAS_CEF)
     "${CEF_ROOT}/Resources/*"
   )
   foreach(runtime_file IN LISTS CEF_RUNTIME_FILES)
-    add_custom_command(TARGET mollotov POST_BUILD
+    add_custom_command(TARGET kelpie POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${runtime_file}"
-        "$<TARGET_FILE_DIR:mollotov>"
+        "$<TARGET_FILE_DIR:kelpie>"
     )
   endforeach()
 endif()
 
 if(MINGW)
-  target_link_options(mollotov PRIVATE -municode -static -static-libgcc -static-libstdc++)
+  target_link_options(kelpie PRIVATE -municode -static -static-libgcc -static-libstdc++)
 endif()

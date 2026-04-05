@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.mollotov.browser"
+    namespace = "com.kelpie.browser"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.mollotov.browser"
+        applicationId = "com.kelpie.browser"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

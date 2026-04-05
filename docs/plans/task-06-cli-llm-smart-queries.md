@@ -32,15 +32,15 @@ packages/cli/tests/commands/
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov a11y` | `get-accessibility-tree` | `--interactable-only`, `--selector`, `--max-depth` |
+| `kelpie a11y` | `get-accessibility-tree` | `--interactable-only`, `--selector`, `--max-depth` |
 
 ### Annotated Screenshots (`annotate.ts`)
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov annotate` | `screenshot-annotated` | `--output`, `--full-page`, `--base64`, `--interactable-only` |
-| `mollotov click-index <index>` | `click-annotation` | index (positional) |
-| `mollotov fill-index <index> <value>` | `fill-annotation` | index, value (positional) |
+| `kelpie annotate` | `screenshot-annotated` | `--output`, `--full-page`, `--base64`, `--interactable-only` |
+| `kelpie click-index <index>` | `click-annotation` | index (positional) |
+| `kelpie fill-index <index> <value>` | `fill-annotation` | index, value (positional) |
 
 `annotate` follows the same file-save behavior as `screenshot` (Task 03). The JSON response also includes the `annotations` array with element metadata.
 
@@ -48,19 +48,19 @@ packages/cli/tests/commands/
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov visible` | `get-visible-elements` | `--interactable-only` |
+| `kelpie visible` | `get-visible-elements` | `--interactable-only` |
 
 ### Page Text (`page-text.ts`)
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov page-text` | `get-page-text` | `--mode <readable\|full\|markdown>`, `--selector` |
+| `kelpie page-text` | `get-page-text` | `--mode <readable\|full\|markdown>`, `--selector` |
 
 ### Form State (`form-state.ts`)
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov form-state` | `get-form-state` | `--selector` |
+| `kelpie form-state` | `get-form-state` | `--selector` |
 
 ### Smart Queries (`find.ts`)
 
@@ -68,10 +68,10 @@ These are single-device commands here. Group variants are in Task 07.
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov find-element <text>` | `find-element` | text, `--role` |
-| `mollotov find-button <text>` | `find-button` | text |
-| `mollotov find-link <text>` | `find-link` | text |
-| `mollotov find-input <label>` | `find-input` | label, `--placeholder`, `--name` |
+| `kelpie find-element <text>` | `find-element` | text, `--role` |
+| `kelpie find-button <text>` | `find-button` | text |
+| `kelpie find-link <text>` | `find-link` | text |
+| `kelpie find-input <label>` | `find-input` | label, `--placeholder`, `--name` |
 
 ## Tests
 

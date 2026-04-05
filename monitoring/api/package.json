@@ -1,5 +1,5 @@
 {
-  "name": "@mollotov/monitoring-api",
+  "name": "@kelpie/monitoring-api",
   "version": "0.1.0",
   "private": true,
   "type": "module",

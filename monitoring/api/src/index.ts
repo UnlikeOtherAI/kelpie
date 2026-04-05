@@ -7,7 +7,7 @@ import { runMonitoringAgent } from './agent/loop.js'
 const {
   GITHUB_TOKEN,
   GITHUB_OWNER = 'UnlikeOtherAI',
-  GITHUB_REPO = 'mollotov',
+  GITHUB_REPO = 'kelpie',
   MINIMAX_API_KEY,
   MINIMAX_BASE_URL = 'https://api.minimax.chat/v1',
   MINIMAX_MODEL = 'minimax-text-01',

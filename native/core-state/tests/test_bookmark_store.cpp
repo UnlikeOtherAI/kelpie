@@ -1,5 +1,5 @@
-#include "mollotov/bookmark_store.h"
-#include "mollotov/state_c_api.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/state_c_api.h"
 
 #include <cassert>
 #include <iostream>
@@ -11,13 +11,13 @@ namespace {
 using json = nlohmann::json;
 
 void TestEmptyStore() {
-  mollotov::BookmarkStore store;
+  kelpie::BookmarkStore store;
   assert(store.Count() == 0);
   assert(json::parse(store.ToJson()).empty());
 }
 
 void TestAddRemoveAndClear() {
-  mollotov::BookmarkStore store;
+  kelpie::BookmarkStore store;
   store.Add("Example", "https://example.com");
   store.Add("Docs", "https://docs.example.com");
 
@@ -35,7 +35,7 @@ void TestAddRemoveAndClear() {
 }
 
 void TestLoadJsonRoundTripAndInvalidInput() {
-  mollotov::BookmarkStore store;
+  kelpie::BookmarkStore store;
   store.LoadJson(R"([
     {"id":"a","title":"One","url":"https://one.test","created_at":"2026-04-01T12:00:00Z"},
     {"id":"b","title":"Two","url":"https://two.test","createdAt":"2026-04-01T12:01:00Z"},
@@ -51,23 +51,23 @@ void TestLoadJsonRoundTripAndInvalidInput() {
 }
 
 void TestCApiRoundTrip() {
-  MollotovBookmarkStoreRef store = mollotov_bookmark_store_create();
+  KelpieBookmarkStoreRef store = kelpie_bookmark_store_create();
   assert(store != nullptr);
 
-  mollotov_bookmark_store_add(store, "API", "https://ffi.test");
-  assert(mollotov_bookmark_store_count(store) == 1);
+  kelpie_bookmark_store_add(store, "API", "https://ffi.test");
+  assert(kelpie_bookmark_store_count(store) == 1);
 
-  char* payload = mollotov_bookmark_store_to_json(store);
+  char* payload = kelpie_bookmark_store_to_json(store);
   assert(payload != nullptr);
   const json entries = json::parse(payload);
-  mollotov_free_string(payload);
+  kelpie_free_string(payload);
   assert(entries.size() == 1);
 
-  mollotov_bookmark_store_load_json(
+  kelpie_bookmark_store_load_json(
       store, R"([{"id":"x","title":"Reloaded","url":"https://reload.test","created_at":"2026-04-01T12:00:00Z"}])");
-  assert(mollotov_bookmark_store_count(store) == 1);
+  assert(kelpie_bookmark_store_count(store) == 1);
 
-  mollotov_bookmark_store_destroy(store);
+  kelpie_bookmark_store_destroy(store);
 }
 
 }  // namespace

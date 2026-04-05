@@ -4,7 +4,7 @@
 
 **Goal:** Move all AI model management, HF token auth, Ollama integration, and HF cloud inference into a shared C++ library (`native/core-ai`) so every platform (macOS, iOS, Android) uses the same logic, with only the UI and local inference engines remaining platform-specific.
 
-**Architecture:** A new `native/core-ai` static library following the exact patterns of `core-state`. Exposes a C ABI via opaque `MollotovAiManagerRef` handle. Manages the model catalog, HF token, model downloads with auth, Ollama HTTP client, and HF Inference API cloud calls. Platforms call the C API from Swift (bridging header) or Kotlin (JNI). Local inference engines (llama.cpp, Apple Foundation Models, Google AI Edge) stay platform-specific and are plugged in via a callback the platform registers.
+**Architecture:** A new `native/core-ai` static library following the exact patterns of `core-state`. Exposes a C ABI via opaque `KelpieAiManagerRef` handle. Manages the model catalog, HF token, model downloads with auth, Ollama HTTP client, and HF Inference API cloud calls. Platforms call the C API from Swift (bridging header) or Kotlin (JNI). Local inference engines (llama.cpp, Apple Foundation Models, Google AI Edge) stay platform-specific and are plugged in via a callback the platform registers.
 
 **Tech Stack:** C++17, nlohmann_json, cpp-httplib (for Ollama + HF cloud HTTP), CMake, C ABI
 
@@ -32,7 +32,7 @@
 
 **Files:**
 - Create: `native/core-ai/CMakeLists.txt`
-- Create: `native/core-ai/include/mollotov/ai_c_api.h`
+- Create: `native/core-ai/include/kelpie/ai_c_api.h`
 - Create: `native/core-ai/src/ai_c_api.cpp`
 - Create: `native/core-ai/src/ai_c_api_internal.h`
 - Modify: `native/CMakeLists.txt:36` — add `add_subdirectory(core-ai)`
@@ -40,18 +40,18 @@
 **Step 1: Create CMakeLists.txt**
 
 ```cmake
-add_library(mollotov_core_ai STATIC
+add_library(kelpie_core_ai STATIC
   src/ai_c_api.cpp
 )
 
-target_include_directories(mollotov_core_ai
+target_include_directories(kelpie_core_ai
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(mollotov_core_ai
+target_link_libraries(kelpie_core_ai
   PUBLIC
-    mollotov_core_protocol
+    kelpie_core_protocol
     nlohmann_json::nlohmann_json
 )
 
@@ -63,7 +63,7 @@ endif()
 **Step 2: Create the C API header**
 
 ```c
-// native/core-ai/include/mollotov/ai_c_api.h
+// native/core-ai/include/kelpie/ai_c_api.h
 #pragma once
 
 #include <stdbool.h>
@@ -73,50 +73,50 @@ endif()
 extern "C" {
 #endif
 
-typedef struct MollotovAiManager* MollotovAiManagerRef;
+typedef struct KelpieAiManager* KelpieAiManagerRef;
 
 // Lifecycle
-MollotovAiManagerRef mollotov_ai_create(const char* models_dir);
-void mollotov_ai_destroy(MollotovAiManagerRef mgr);
+KelpieAiManagerRef kelpie_ai_create(const char* models_dir);
+void kelpie_ai_destroy(KelpieAiManagerRef mgr);
 
 // String ownership — caller must free returned strings
-void mollotov_ai_free_string(char* str);
+void kelpie_ai_free_string(char* str);
 
 // HF token
-void mollotov_ai_set_hf_token(MollotovAiManagerRef mgr, const char* token);
-char* mollotov_ai_get_hf_token(MollotovAiManagerRef mgr);
+void kelpie_ai_set_hf_token(KelpieAiManagerRef mgr, const char* token);
+char* kelpie_ai_get_hf_token(KelpieAiManagerRef mgr);
 
 // Model catalog
-char* mollotov_ai_list_approved_models(MollotovAiManagerRef mgr);
-char* mollotov_ai_model_fitness(MollotovAiManagerRef mgr,
+char* kelpie_ai_list_approved_models(KelpieAiManagerRef mgr);
+char* kelpie_ai_model_fitness(KelpieAiManagerRef mgr,
                                 const char* model_id,
                                 double total_ram_gb,
                                 double disk_free_gb);
 
 // Model store
-bool mollotov_ai_is_model_downloaded(MollotovAiManagerRef mgr, const char* model_id);
-char* mollotov_ai_model_path(MollotovAiManagerRef mgr, const char* model_id);
-bool mollotov_ai_remove_model(MollotovAiManagerRef mgr, const char* model_id);
+bool kelpie_ai_is_model_downloaded(KelpieAiManagerRef mgr, const char* model_id);
+char* kelpie_ai_model_path(KelpieAiManagerRef mgr, const char* model_id);
+bool kelpie_ai_remove_model(KelpieAiManagerRef mgr, const char* model_id);
 
 // Model download (blocking — platform wraps in async)
 // Returns NULL on success, error JSON string on failure.
 // progress_cb receives (bytes_downloaded, total_bytes, user_data).
-typedef void (*MollotovAiDownloadProgressCb)(int64_t downloaded, int64_t total, void* user_data);
-char* mollotov_ai_download_model(MollotovAiManagerRef mgr,
+typedef void (*KelpieAiDownloadProgressCb)(int64_t downloaded, int64_t total, void* user_data);
+char* kelpie_ai_download_model(KelpieAiManagerRef mgr,
                                  const char* model_id,
-                                 MollotovAiDownloadProgressCb progress_cb,
+                                 KelpieAiDownloadProgressCb progress_cb,
                                  void* user_data);
 
 // Ollama
-void mollotov_ai_set_ollama_endpoint(MollotovAiManagerRef mgr, const char* endpoint);
-bool mollotov_ai_ollama_reachable(MollotovAiManagerRef mgr);
-char* mollotov_ai_ollama_list_models(MollotovAiManagerRef mgr);
-char* mollotov_ai_ollama_infer(MollotovAiManagerRef mgr,
+void kelpie_ai_set_ollama_endpoint(KelpieAiManagerRef mgr, const char* endpoint);
+bool kelpie_ai_ollama_reachable(KelpieAiManagerRef mgr);
+char* kelpie_ai_ollama_list_models(KelpieAiManagerRef mgr);
+char* kelpie_ai_ollama_infer(KelpieAiManagerRef mgr,
                                const char* model_name,
                                const char* request_json);
 
 // HF cloud inference
-char* mollotov_ai_hf_infer(MollotovAiManagerRef mgr,
+char* kelpie_ai_hf_infer(KelpieAiManagerRef mgr,
                             const char* model_id,
                             const char* request_json);
 
@@ -129,43 +129,43 @@ char* mollotov_ai_hf_infer(MollotovAiManagerRef mgr,
 
 ```cpp
 // native/core-ai/src/ai_c_api.cpp
-#include "mollotov/ai_c_api.h"
+#include "kelpie/ai_c_api.h"
 #include "ai_c_api_internal.h"
 
 extern "C" {
 
-MollotovAiManagerRef mollotov_ai_create(const char* models_dir) {
+KelpieAiManagerRef kelpie_ai_create(const char* models_dir) {
   try {
-    return new MollotovAiManager(
-        mollotov::ai_internal::SafeCString(models_dir));
+    return new KelpieAiManager(
+        kelpie::ai_internal::SafeCString(models_dir));
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_ai_destroy(MollotovAiManagerRef mgr) {
+void kelpie_ai_destroy(KelpieAiManagerRef mgr) {
   delete mgr;
 }
 
-void mollotov_ai_free_string(char* str) {
+void kelpie_ai_free_string(char* str) {
   delete[] str;
 }
 
 // --- stubs (filled in by later tasks) ---
 
-void mollotov_ai_set_hf_token(MollotovAiManagerRef, const char*) {}
-char* mollotov_ai_get_hf_token(MollotovAiManagerRef) { return nullptr; }
-char* mollotov_ai_list_approved_models(MollotovAiManagerRef) { return nullptr; }
-char* mollotov_ai_model_fitness(MollotovAiManagerRef, const char*, double, double) { return nullptr; }
-bool mollotov_ai_is_model_downloaded(MollotovAiManagerRef, const char*) { return false; }
-char* mollotov_ai_model_path(MollotovAiManagerRef, const char*) { return nullptr; }
-bool mollotov_ai_remove_model(MollotovAiManagerRef, const char*) { return false; }
-char* mollotov_ai_download_model(MollotovAiManagerRef, const char*, MollotovAiDownloadProgressCb, void*) { return nullptr; }
-void mollotov_ai_set_ollama_endpoint(MollotovAiManagerRef, const char*) {}
-bool mollotov_ai_ollama_reachable(MollotovAiManagerRef) { return false; }
-char* mollotov_ai_ollama_list_models(MollotovAiManagerRef) { return nullptr; }
-char* mollotov_ai_ollama_infer(MollotovAiManagerRef, const char*, const char*) { return nullptr; }
-char* mollotov_ai_hf_infer(MollotovAiManagerRef, const char*, const char*) { return nullptr; }
+void kelpie_ai_set_hf_token(KelpieAiManagerRef, const char*) {}
+char* kelpie_ai_get_hf_token(KelpieAiManagerRef) { return nullptr; }
+char* kelpie_ai_list_approved_models(KelpieAiManagerRef) { return nullptr; }
+char* kelpie_ai_model_fitness(KelpieAiManagerRef, const char*, double, double) { return nullptr; }
+bool kelpie_ai_is_model_downloaded(KelpieAiManagerRef, const char*) { return false; }
+char* kelpie_ai_model_path(KelpieAiManagerRef, const char*) { return nullptr; }
+bool kelpie_ai_remove_model(KelpieAiManagerRef, const char*) { return false; }
+char* kelpie_ai_download_model(KelpieAiManagerRef, const char*, KelpieAiDownloadProgressCb, void*) { return nullptr; }
+void kelpie_ai_set_ollama_endpoint(KelpieAiManagerRef, const char*) {}
+bool kelpie_ai_ollama_reachable(KelpieAiManagerRef) { return false; }
+char* kelpie_ai_ollama_list_models(KelpieAiManagerRef) { return nullptr; }
+char* kelpie_ai_ollama_infer(KelpieAiManagerRef, const char*, const char*) { return nullptr; }
+char* kelpie_ai_hf_infer(KelpieAiManagerRef, const char*, const char*) { return nullptr; }
 
 }  // extern "C"
 ```
@@ -182,7 +182,7 @@ char* mollotov_ai_hf_infer(MollotovAiManagerRef, const char*, const char*) { ret
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::ai_internal {
+namespace kelpie::ai_internal {
 
 using json = nlohmann::json;
 
@@ -197,14 +197,14 @@ inline char* CopyString(const std::string& value) {
   return buffer;
 }
 
-}  // namespace mollotov::ai_internal
+}  // namespace kelpie::ai_internal
 
-struct MollotovAiManager {
+struct KelpieAiManager {
   std::string models_dir;
   std::string hf_token;
   std::string ollama_endpoint = "http://localhost:11434";
 
-  explicit MollotovAiManager(std::string dir) : models_dir(std::move(dir)) {}
+  explicit KelpieAiManager(std::string dir) : models_dir(std::move(dir)) {}
 };
 ```
 
@@ -223,7 +223,7 @@ Create `native/core-ai/tests/CMakeLists.txt`:
 ```cmake
 function(add_ai_test name)
   add_executable(${name} ${ARGN})
-  target_link_libraries(${name} PRIVATE mollotov_core_ai)
+  target_link_libraries(${name} PRIVATE kelpie_core_ai)
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
@@ -233,14 +233,14 @@ add_ai_test(test_ai_catalog test_ai_catalog.cpp)
 Create `native/core-ai/tests/test_ai_catalog.cpp`:
 
 ```cpp
-#include "mollotov/ai_c_api.h"
+#include "kelpie/ai_c_api.h"
 #include <cassert>
 #include <iostream>
 
 void TestCreateDestroy() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
   assert(mgr != nullptr);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_destroy(mgr);
 }
 
 int main() {
@@ -254,7 +254,7 @@ int main() {
 
 ```bash
 cd native && mkdir -p .build && cd .build
-cmake .. -DBUILD_TESTING=ON && cmake --build . --target mollotov_core_ai
+cmake .. -DBUILD_TESTING=ON && cmake --build . --target kelpie_core_ai
 ctest -R test_ai_catalog --output-on-failure
 ```
 
@@ -286,8 +286,8 @@ Add to `test_ai_catalog.cpp`:
 using json = nlohmann::json;
 
 void TestListApprovedModels() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_list_approved_models(mgr);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_list_approved_models(mgr);
   assert(result != nullptr);
   json models = json::parse(result);
   assert(models.is_array());
@@ -297,27 +297,27 @@ void TestListApprovedModels() {
   assert(models[0].contains("hugging_face_repo"));
   assert(models[0].contains("size_bytes"));
   assert(models[0].contains("capabilities"));
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessRecommended() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 50.0);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 50.0);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "recommended");
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessNoStorage() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 0.1);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 0.1);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "no_storage");
   assert(fitness.contains("message"));
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 ```
 
@@ -337,7 +337,7 @@ cd native/.build && cmake --build . && ctest -R test_ai_catalog --output-on-fail
 #include <vector>
 #include <nlohmann/json.hpp>
 
-namespace mollotov {
+namespace kelpie {
 
 struct ApprovedModel {
   std::string id;
@@ -374,14 +374,14 @@ class ModelCatalog {
                               double disk_free_gb);
 };
 
-}  // namespace mollotov
+}  // namespace kelpie
 ```
 
 `native/core-ai/src/model_catalog.cpp` — implement with the two Gemma models (same data as `AIModelCatalog.swift`), `download_url()` returns `https://huggingface.co/{repo}/resolve/main/{file}`, `fitness()` checks disk/RAM thresholds.
 
 **Step 4: Wire into C API**
 
-Implement `mollotov_ai_list_approved_models` and `mollotov_ai_model_fitness` in `ai_c_api.cpp` by delegating to `ModelCatalog`.
+Implement `kelpie_ai_list_approved_models` and `kelpie_ai_model_fitness` in `ai_c_api.cpp` by delegating to `ModelCatalog`.
 
 **Step 5: Build, run tests**
 
@@ -412,7 +412,7 @@ git commit -m "feat(native): model catalog and fitness evaluation in core-ai"
 `test_ai_store.cpp`:
 
 ```cpp
-#include "mollotov/ai_c_api.h"
+#include "kelpie/ai_c_api.h"
 #include <cassert>
 #include <cstdio>
 #include <filesystem>
@@ -423,22 +423,22 @@ namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 void TestHfToken() {
-  auto* mgr = mollotov_ai_create("/tmp/test_ai_store");
-  mollotov_ai_set_hf_token(mgr, "hf_test_123");
-  char* token = mollotov_ai_get_hf_token(mgr);
+  auto* mgr = kelpie_ai_create("/tmp/test_ai_store");
+  kelpie_ai_set_hf_token(mgr, "hf_test_123");
+  char* token = kelpie_ai_get_hf_token(mgr);
   assert(std::string(token) == "hf_test_123");
-  mollotov_ai_free_string(token);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(token);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelNotDownloaded() {
-  auto* mgr = mollotov_ai_create("/tmp/test_ai_store_empty");
-  assert(!mollotov_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
-  char* path = mollotov_ai_model_path(mgr, "gemma-4-e2b-q4");
+  auto* mgr = kelpie_ai_create("/tmp/test_ai_store_empty");
+  assert(!kelpie_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
+  char* path = kelpie_ai_model_path(mgr, "gemma-4-e2b-q4");
   // Path returned even if not downloaded (for resolution)
   assert(path != nullptr);
-  mollotov_ai_free_string(path);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(path);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestRemoveModel() {
@@ -448,11 +448,11 @@ void TestRemoveModel() {
   std::ofstream(dir + "/gemma-4-e2b-q4/model.gguf") << "fake";
   std::ofstream(dir + "/gemma-4-e2b-q4/metadata.json") << "{}";
 
-  auto* mgr = mollotov_ai_create(dir.c_str());
-  assert(mollotov_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
-  assert(mollotov_ai_remove_model(mgr, "gemma-4-e2b-q4"));
-  assert(!mollotov_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
-  mollotov_ai_destroy(mgr);
+  auto* mgr = kelpie_ai_create(dir.c_str());
+  assert(kelpie_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
+  assert(kelpie_ai_remove_model(mgr, "gemma-4-e2b-q4"));
+  assert(!kelpie_ai_is_model_downloaded(mgr, "gemma-4-e2b-q4"));
+  kelpie_ai_destroy(mgr);
   fs::remove_all(dir);
 }
 
@@ -486,8 +486,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cpp_httplib)
 
-target_link_libraries(mollotov_core_ai
-  PUBLIC mollotov_core_protocol nlohmann_json::nlohmann_json
+target_link_libraries(kelpie_core_ai
+  PUBLIC kelpie_core_protocol nlohmann_json::nlohmann_json
   PRIVATE httplib::httplib
 )
 ```
@@ -543,11 +543,11 @@ git commit -m "feat(native): HF token, model store, and authenticated downloads"
 
 ```cpp
 void TestOllamaEndpoint() {
-  auto* mgr = mollotov_ai_create("/tmp/test_ollama");
-  mollotov_ai_set_ollama_endpoint(mgr, "http://localhost:11434");
+  auto* mgr = kelpie_ai_create("/tmp/test_ollama");
+  kelpie_ai_set_ollama_endpoint(mgr, "http://localhost:11434");
   // Reachability depends on live server — just verify no crash
-  mollotov_ai_ollama_reachable(mgr);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_ollama_reachable(mgr);
+  kelpie_ai_destroy(mgr);
 }
 ```
 
@@ -607,11 +607,11 @@ git commit -m "feat(native): HF cloud inference client in core-ai"
 
 **Files:**
 - Modify: `apps/macos/project.yml` — add header/library search paths and linker flag
-- Modify: `apps/macos/Mollotov/Mollotov-Bridging-Header.h` — import `ai_c_api.h`
-- Create: `apps/macos/Mollotov/AI/AIManager.swift` — Swift wrapper around C API
-- Modify: `apps/macos/Mollotov/AI/AIState.swift` — delegate to AIManager instead of inline logic
-- Modify: `apps/macos/Mollotov/Views/AIChatPanel.swift` — add HF token button + popover
-- Modify: `apps/macos/Mollotov/Views/BrowserView.swift` — wire auth-failure navigation
+- Modify: `apps/macos/Kelpie/Kelpie-Bridging-Header.h` — import `ai_c_api.h`
+- Create: `apps/macos/Kelpie/AI/AIManager.swift` — Swift wrapper around C API
+- Modify: `apps/macos/Kelpie/AI/AIState.swift` — delegate to AIManager instead of inline logic
+- Modify: `apps/macos/Kelpie/Views/AIChatPanel.swift` — add HF token button + popover
+- Modify: `apps/macos/Kelpie/Views/BrowserView.swift` — wire auth-failure navigation
 
 **Step 1: Update project.yml**
 
@@ -627,32 +627,32 @@ Add to `LIBRARY_SEARCH_PATHS`:
 
 Add to `OTHER_LDFLAGS`:
 ```yaml
-- "-lmollotov_core_ai"
+- "-lkelpie_core_ai"
 ```
 
 **Step 2: Update bridging header**
 
 ```objc
-#import "mollotov/ai_c_api.h"
+#import "kelpie/ai_c_api.h"
 ```
 
 **Step 3: Create AIManager.swift**
 
-Thin Swift wrapper that creates the `MollotovAiManagerRef` on init, calls C functions, and converts between `char*` and `String`. All methods are synchronous — `AIState` wraps them in `Task {}` for async.
+Thin Swift wrapper that creates the `KelpieAiManagerRef` on init, calls C functions, and converts between `char*` and `String`. All methods are synchronous — `AIState` wraps them in `Task {}` for async.
 
 ```swift
 final class AIManager {
-    private let ref: MollotovAiManagerRef
+    private let ref: KelpieAiManagerRef
 
     init(modelsDir: String) {
-        ref = mollotov_ai_create(modelsDir)!
+        ref = kelpie_ai_create(modelsDir)!
     }
 
-    deinit { mollotov_ai_destroy(ref) }
+    deinit { kelpie_ai_destroy(ref) }
 
     var hfToken: String {
-        get { string(mollotov_ai_get_hf_token(ref)) }
-        set { mollotov_ai_set_hf_token(ref, newValue) }
+        get { string(kelpie_ai_get_hf_token(ref)) }
+        set { kelpie_ai_set_hf_token(ref, newValue) }
     }
 
     func listApprovedModels() -> [[String: Any]] { ... }
@@ -668,7 +668,7 @@ final class AIManager {
 
     private func string(_ ptr: UnsafeMutablePointer<CChar>?) -> String {
         guard let ptr else { return "" }
-        defer { mollotov_ai_free_string(ptr) }
+        defer { kelpie_ai_free_string(ptr) }
         return String(cString: ptr)
     }
 }
@@ -689,13 +689,13 @@ When a download returns `auth_required`, navigate the browser to `https://huggin
 **Step 7: Build the native library for macOS**
 
 ```bash
-cd native/.build && cmake .. && cmake --build . --target mollotov_core_ai
+cd native/.build && cmake .. && cmake --build . --target kelpie_core_ai
 ```
 
 **Step 8: Build and launch the macOS app**
 
 ```bash
-cd apps/macos && xcodebuild -project Mollotov.xcodeproj -scheme Mollotov -configuration Debug build
+cd apps/macos && xcodebuild -project Kelpie.xcodeproj -scheme Kelpie -configuration Debug build
 ```
 
 **Step 9: Commit**
@@ -710,32 +710,32 @@ git commit -m "feat(macos): wire core-ai shared library into macOS app"
 ### Task 7: Wire core-ai into Android app
 
 **Files:**
-- Modify: `apps/android/app/src/main/cpp/CMakeLists.txt` — link `mollotov_core_ai`
-- Modify: `apps/android/app/src/main/cpp/mollotov_jni.cpp` — add JNI wrappers for ai C API
-- Create: `apps/android/app/src/main/java/com/mollotov/browser/nativecore/AiManager.kt` — Kotlin wrapper
-- Modify: `apps/android/app/src/main/java/com/mollotov/browser/ai/AIHandler.kt` — delegate to AiManager
+- Modify: `apps/android/app/src/main/cpp/CMakeLists.txt` — link `kelpie_core_ai`
+- Modify: `apps/android/app/src/main/cpp/kelpie_jni.cpp` — add JNI wrappers for ai C API
+- Create: `apps/android/app/src/main/java/com/kelpie/browser/nativecore/AiManager.kt` — Kotlin wrapper
+- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — delegate to AiManager
 
 **Step 1: Update Android CMakeLists**
 
 ```cmake
-target_link_libraries(mollotov_jni
+target_link_libraries(kelpie_jni
   PRIVATE
-    mollotov_core_state
-    mollotov_core_protocol
-    mollotov_core_ai
+    kelpie_core_state
+    kelpie_core_protocol
+    kelpie_core_ai
 )
 ```
 
 **Step 2: Add JNI wrappers**
 
-Follow existing pattern in `mollotov_jni.cpp`:
+Follow existing pattern in `kelpie_jni.cpp`:
 
 ```cpp
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_mollotov_browser_nativecore_NativeCore_aiManagerCreateNative(
+Java_com_kelpie_browser_nativecore_NativeCore_aiManagerCreateNative(
     JNIEnv* env, jobject, jstring models_dir) {
   auto dir = JStringToUtf8(env, models_dir);
-  return reinterpret_cast<jlong>(mollotov_ai_create(dir.c_str()));
+  return reinterpret_cast<jlong>(kelpie_ai_create(dir.c_str()));
 }
 // ... wrappers for each C API function
 ```
@@ -763,8 +763,8 @@ git commit -m "feat(android): wire core-ai shared library into Android app"
 **Files:**
 - Modify: iOS Xcode project settings — add header/library paths
 - Modify: iOS bridging header — import `ai_c_api.h`
-- Create: `apps/ios/Mollotov/AI/AIManager.swift` — same wrapper as macOS
-- Modify: `apps/ios/Mollotov/AI/AIState.swift` — delegate to AIManager
+- Create: `apps/ios/Kelpie/AI/AIManager.swift` — same wrapper as macOS
+- Modify: `apps/ios/Kelpie/AI/AIState.swift` — delegate to AIManager
 
 Same approach as Task 6 but for iOS target. iOS won't use `download_model` for local GGUF files (no llama.cpp on iOS), but will use HF cloud inference and Ollama.
 
@@ -779,8 +779,8 @@ git commit -m "feat(ios): wire core-ai shared library into iOS app"
 ### Task 9: Remove duplicated Swift/Kotlin AI logic
 
 **Files:**
-- Modify: `apps/macos/Mollotov/AI/AIState.swift` — remove inline model catalog, download logic, Ollama HTTP calls
-- Modify: `apps/android/app/src/main/java/com/mollotov/browser/ai/AIHandler.kt` — remove Ollama HTTP duplication
+- Modify: `apps/macos/Kelpie/AI/AIState.swift` — remove inline model catalog, download logic, Ollama HTTP calls
+- Modify: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt` — remove Ollama HTTP duplication
 - Delete: model catalog data from platform code (single source of truth is now `model_catalog.cpp`)
 
 **Step 1: Audit remaining duplication**
@@ -791,7 +791,7 @@ Grep for any inline HF URLs, Ollama HTTP calls, or model catalog definitions in 
 
 ```bash
 # macOS
-cd apps/macos && xcodebuild -scheme Mollotov -configuration Debug build
+cd apps/macos && xcodebuild -scheme Kelpie -configuration Debug build
 
 # Android
 cd apps/android && ./gradlew build

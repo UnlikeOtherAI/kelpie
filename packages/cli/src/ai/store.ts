@@ -40,7 +40,7 @@ function isPidAlive(pid: number): boolean {
 export class ModelStore {
   readonly rootDir: string;
 
-  constructor(rootDir = join(homedir(), ".mollotov", "models")) {
+  constructor(rootDir = join(homedir(), ".kelpie", "models")) {
     this.rootDir = rootDir;
   }
 

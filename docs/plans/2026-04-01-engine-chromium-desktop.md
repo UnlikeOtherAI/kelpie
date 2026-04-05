@@ -11,7 +11,7 @@
 The module must match the existing shared browser contract instead of inventing desktop-only names.
 
 - HTTP endpoints stay under `/v1/`
-- MCP tool names stay under `mollotov_`
+- MCP tool names stay under `kelpie_`
 - Navigation methods are `navigate`, `back`, `forward`, `reload`, and `get-current-url`
 - Cookie/storage methods follow the existing names: `get-cookies`, `set-cookie`, `delete-cookies`, `get-storage`, `set-storage`, `clear-storage`
 - Unsupported but contract-stable endpoints return `PLATFORM_NOT_SUPPORTED`
@@ -24,7 +24,7 @@ This matters because the current MCP registry and docs already expose these name
 ```text
 native/engine-chromium-desktop/
   CMakeLists.txt
-  include/mollotov/
+  include/kelpie/
     desktop_app.h
     desktop_bridge.h
     desktop_engine.h
@@ -192,10 +192,10 @@ To keep complexity bounded for the first desktop core cut:
 
 The module links:
 
-- `mollotov_core_protocol`
-- `mollotov_core_state`
-- `mollotov_core_automation`
-- `mollotov_core_mcp`
+- `kelpie_core_protocol`
+- `kelpie_core_state`
+- `kelpie_core_automation`
+- `kelpie_core_mcp`
 - `nlohmann_json::nlohmann_json`
 - `httplib::httplib`
 - CEF libraries from `CEF_ROOT`

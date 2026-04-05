@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(mollotov_native LANGUAGES CXX)
+project(kelpie_native LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,7 +36,7 @@ add_subdirectory(core-automation)
 add_subdirectory(core-mcp)
 add_subdirectory(core-ai)
 
-option(MOLLOTOV_BUILD_DESKTOP_ENGINES "Build desktop browser engines (CEF/Chromium)" ON)
-if(MOLLOTOV_BUILD_DESKTOP_ENGINES)
+option(KELPIE_BUILD_DESKTOP_ENGINES "Build desktop browser engines (CEF/Chromium)" ON)
+if(KELPIE_BUILD_DESKTOP_ENGINES)
   add_subdirectory(engine-chromium-desktop)
 endif()

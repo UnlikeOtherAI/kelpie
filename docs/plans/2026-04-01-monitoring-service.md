@@ -65,7 +65,7 @@ Each issue body ends with a machine-readable metadata block (HTML comment, invis
 ### Links
 
 - [Upstream release notes](https://chromereleases.googleblog.com/...)
-- [PR #1847](https://github.com/UnlikeOtherAI/mollotov/pull/1847)
+- [PR #1847](https://github.com/UnlikeOtherAI/kelpie/pull/1847)
 
 ---
 
@@ -129,7 +129,7 @@ const BRANCH_PATTERNS = {
 `monitoring/api/package.json`:
 ```json
 {
-  "name": "@mollotov/monitoring-api",
+  "name": "@kelpie/monitoring-api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -188,7 +188,7 @@ export {};
 `monitoring/frontend/package.json`:
 ```json
 {
-  "name": "@mollotov/monitoring-frontend",
+  "name": "@kelpie/monitoring-frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -233,7 +233,7 @@ export default defineConfig({
 # GitHub
 GITHUB_TOKEN=ghp_...
 GITHUB_OWNER=UnlikeOtherAI
-GITHUB_REPO=mollotov
+GITHUB_REPO=kelpie
 
 # Minimax 2.7 (OpenAI-compatible)
 MINIMAX_API_KEY=...
@@ -1369,9 +1369,9 @@ export function createToolExecutor(deps: {
 
 `monitoring/api/src/agent/prompt.ts`:
 ```typescript
-export const SYSTEM_PROMPT = `You are the Mollotov Engine Monitoring Agent.
+export const SYSTEM_PROMPT = `You are the Kelpie Engine Monitoring Agent.
 
-Your job is to ensure that the Mollotov browser app stays up-to-date with Chromium and Gecko engine releases to comply with Apple's App Review requirements (15-day update rule, 30-day critical CVE rule).
+Your job is to ensure that the Kelpie browser app stays up-to-date with Chromium and Gecko engine releases to comply with Apple's App Review requirements (15-day update rule, 30-day critical CVE rule).
 
 You run on a schedule every 2 hours. Each run, you:
 
@@ -1543,7 +1543,7 @@ import { runMonitoringAgent } from './agent/loop.js'
 const {
   GITHUB_TOKEN,
   GITHUB_OWNER = 'UnlikeOtherAI',
-  GITHUB_REPO = 'mollotov',
+  GITHUB_REPO = 'kelpie',
   MINIMAX_API_KEY,
   MINIMAX_BASE_URL = 'https://api.minimax.chat/v1',
   MINIMAX_MODEL = 'minimax-text-01',
@@ -1609,7 +1609,7 @@ git commit -m "feat(monitoring): hono API server with cron scheduler"
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mollotov Engine Monitor</title>
+    <title>Kelpie Engine Monitor</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
@@ -1685,7 +1685,7 @@ export function App() {
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 16px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
-        Mollotov Engine Monitor
+        Kelpie Engine Monitor
       </h1>
       {lastFetch && (
         <p style={{ color: '#8b949e', fontSize: 13, marginBottom: 32 }}>

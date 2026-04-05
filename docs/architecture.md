@@ -1,8 +1,8 @@
-# Mollotov — System Architecture
+# Kelpie — System Architecture
 
 ## Overview
 
-Mollotov is a two-component system: native browser apps on iOS, Android, macOS, and Linux devices and a CLI orchestrator on the developer's machine. All components communicate over the local network via HTTP/JSON. Discovery is automatic via mDNS.
+Kelpie is a two-component system: native browser apps on iOS, Android, macOS, and Linux devices and a CLI orchestrator on the developer's machine. All components communicate over the local network via HTTP/JSON. Discovery is automatic via mDNS.
 
 ```
                         ┌─────────────┐
@@ -12,7 +12,7 @@ Mollotov is a two-component system: native browser apps on iOS, Android, macOS, 
                         └──────┬──────┘
                                │ MCP / CLI
                         ┌──────┴──────┐
-                        │  Mollotov   │
+                        │  Kelpie   │
                         │    CLI      │
                         │             │
                         │ ┌─────────┐ │
@@ -135,7 +135,7 @@ Cross-platform C++17 static libraries with C ABI, shared by all platforms via br
 
 **Device Manager** — Maintains a live registry of discovered devices. Tracks each device's name, IP, port, platform, resolution, and health status. Provides resolution metadata for resolution-aware commands.
 
-**Network Layer** — mDNS scanner continuously discovers `_mollotov._tcp` services. HTTP client sends commands to individual browser HTTP servers.
+**Network Layer** — mDNS scanner continuously discovers `_kelpie._tcp` services. HTTP client sends commands to individual browser HTTP servers.
 
 **MCP Server** — Wraps all CLI commands as MCP tools. An LLM connected via MCP can discover devices, send commands, and receive results without going through the CLI interface.
 
@@ -146,7 +146,7 @@ Cross-platform C++17 static libraries with C ABI, shared by all platforms via br
 ### Single Device Command
 
 ```
-LLM → CLI (mollotov click --device iphone "#submit")
+LLM → CLI (kelpie click --device iphone "#submit")
   → Device Manager (resolve "iphone" → 192.168.1.42:8420)
   → HTTP POST 192.168.1.42:8420/v1/click {selector: "#submit"}
   → Browser Command Handler
@@ -159,7 +159,7 @@ LLM → CLI (mollotov click --device iphone "#submit")
 ### Group Command
 
 ```
-LLM → CLI (mollotov group navigate "https://example.com")
+LLM → CLI (kelpie group navigate "https://example.com")
   → Device Manager (all devices: [iphone, ipad, pixel])
   → Parallel HTTP POST to each /v1/navigate
   → Each browser navigates independently
@@ -171,7 +171,7 @@ LLM → CLI (mollotov group navigate "https://example.com")
 ### Smart Query
 
 ```
-LLM → CLI (mollotov group find-button "Submit")
+LLM → CLI (kelpie group find-button "Submit")
   → Device Manager (all devices)
   → Parallel HTTP POST to each /v1/find-element {text: "Submit", role: "button"}
   → Collect results, filter to found-only
@@ -184,7 +184,7 @@ LLM → CLI (mollotov group find-button "Submit")
 ### Resolution-Aware Command (scroll2)
 
 ```
-LLM → CLI (mollotov scroll2 --device iphone "#footer")
+LLM → CLI (kelpie scroll2 --device iphone "#footer")
   → Device Manager (resolve "iphone" → 192.168.1.42:8420)
   → HTTP POST 192.168.1.42:8420/v1/scroll2 {selector: "#footer", position: "center"}
   → Browser calculates element position relative to its own viewport
@@ -209,7 +209,7 @@ All browser-CLI communication uses REST over HTTP/JSON.
 ### mDNS Service
 
 ```
-Service Type: _mollotov._tcp
+Service Type: _kelpie._tcp
 Port: 8420
 
 TXT Records:
@@ -226,7 +226,7 @@ TXT Records:
 
 ### Device Identity
 
-Every Mollotov browser instance has a **stable unique device ID** used for reliable targeting across sessions:
+Every Kelpie browser instance has a **stable unique device ID** used for reliable targeting across sessions:
 
 - **iOS**: Uses `identifierForVendor` (UUID that persists across app launches, resets only on full app reinstall). Stored in Keychain for extra persistence.
 - **Android**: Uses a self-generated UUIDv4, stored in SharedPreferences on first launch. Persists across app restarts. Falls back to `Settings.Secure.ANDROID_ID` as a secondary identifier.
@@ -254,7 +254,7 @@ Both browser and CLI MCP servers use **Streamable HTTP** (SSE) transport:
 
 ## Security Model
 
-Mollotov operates exclusively on the local network. No cloud services, no remote access.
+Kelpie operates exclusively on the local network. No cloud services, no remote access.
 
 | Boundary | Control |
 |---|---|
@@ -266,9 +266,9 @@ Mollotov operates exclusively on the local network. No cloud services, no remote
 
 ### Shared Network Risk
 
-Mollotov's HTTP API has **no authentication**. Any device on the same network can send commands. This is acceptable on a private home/office network but poses risks on shared Wi-Fi (coworking spaces, hotel networks, conferences):
+Kelpie's HTTP API has **no authentication**. Any device on the same network can send commands. This is acceptable on a private home/office network but poses risks on shared Wi-Fi (coworking spaces, hotel networks, conferences):
 
-- An attacker on the same network could discover Mollotov browsers via mDNS and send commands
+- An attacker on the same network could discover Kelpie browsers via mDNS and send commands
 - Sensitive APIs (cookies, storage, clipboard, JS evaluation) are fully exposed
 - There is no TLS — traffic is plaintext HTTP
 
@@ -276,7 +276,7 @@ Mollotov's HTTP API has **no authentication**. Any device on the same network ca
 - **Pairing code**: On first CLI→browser connection, the browser displays a 6-digit code the user must enter in the CLI. The CLI and browser then exchange a shared secret used to sign subsequent requests.
 - **Allowlist mode**: The browser can restrict connections to specific IP addresses after initial pairing.
 
-**Current recommendation**: Use Mollotov only on trusted private networks. Do not use on public or shared Wi-Fi without a VPN.
+**Current recommendation**: Use Kelpie only on trusted private networks. Do not use on public or shared Wi-Fi without a VPN.
 
 ---
 
@@ -291,7 +291,7 @@ The macOS app exposes the same HTTP and MCP surface as the mobile apps, but its 
 
 Both renderers conform to a shared abstraction, so navigation, JavaScript evaluation, screenshots, cookies, and state reads go through one handler interface. The toolbar segmented control and the `/v1/set-renderer` / `/v1/get-renderer` endpoints switch the active engine without changing the API contract.
 
-When the renderer changes, Mollotov migrates cookies from the previous engine into the new one before resuming automation. That preserves authenticated sessions while letting the user or LLM switch between Safari and Chrome rendering behavior.
+When the renderer changes, Kelpie migrates cookies from the previous engine into the new one before resuming automation. That preserves authenticated sessions while letting the user or LLM switch between Safari and Chrome rendering behavior.
 
 ### iOS — No-Injection DOM Access
 
@@ -330,7 +330,7 @@ Both mobile platforms support simulators/emulators alongside real devices. iOS S
 
 Android WebView is Chromium-based. Enabling `setWebContentsDebuggingEnabled(true)` exposes CDP over a local Unix socket. The app connects to this socket and issues CDP commands.
 
-> **Note on `setWebContentsDebuggingEnabled`:** Google documents this API as a debugging tool, not a production control plane. Mollotov enables it intentionally — the app *is* a debugging/automation tool by design. The flag has no known performance or security penalties beyond exposing the CDP socket (which Mollotov's own process consumes). Play Store review has not historically flagged apps that enable it, but this could change. If Google restricts this API in future Android versions, Mollotov would fall back to `evaluateJavascript()` for DOM operations (losing CDP-only features like network interception and the accessibility tree protocol).
+> **Note on `setWebContentsDebuggingEnabled`:** Google documents this API as a debugging tool, not a production control plane. Kelpie enables it intentionally — the app *is* a debugging/automation tool by design. The flag has no known performance or security penalties beyond exposing the CDP socket (which Kelpie's own process consumes). Play Store review has not historically flagged apps that enable it, but this could change. If Google restricts this API in future Android versions, Kelpie would fall back to `evaluateJavascript()` for DOM operations (losing CDP-only features like network interception and the accessibility tree protocol).
 
 - `DOM.*` — full DOM tree traversal and queries
 - `Page.captureScreenshot` — screenshots

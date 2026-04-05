@@ -3,7 +3,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-namespace mollotov {
+namespace kelpie {
 
 class OllamaClient {
  public:
@@ -24,4 +24,4 @@ class OllamaClient {
   void parse_endpoint();
 };
 
-}  // namespace mollotov
+}  // namespace kelpie

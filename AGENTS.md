@@ -1,4 +1,4 @@
-# Mollotov — Agent Guide
+# Kelpie — Agent Guide
 
 > Read CLAUDE.md and AGENTS.md before starting any work. Update both when policy changes.
 
@@ -41,12 +41,12 @@ iOS and Android must be kept as absolute mirrors with full feature parity. Every
 - Documentation: 1,000-line limit — exceeding requires a dedicated folder with README.md linking sub-files.
 - No persistent content scripts — interaction via native WebView APIs and CDP. Some iOS features use ephemeral bridge scripts (see architecture.md).
 - All browser-CLI communication over HTTP/JSON with `/v1/` prefix.
-- MCP tools use `mollotov_` prefix.
-- mDNS service type: `_mollotov._tcp`.
+- MCP tools use `kelpie_` prefix.
+- mDNS service type: `_kelpie._tcp`.
 - Default port: `8420`.
 - Package manager: pnpm.
 - CLI: TypeScript, native apps: Swift (iOS) / Kotlin (Android).
-- npm scope: `@unlikeotherai/mollotov`.
+- npm scope: `@unlikeotherai/kelpie`.
 
 ## Agent Behavior Rules
 
@@ -68,7 +68,7 @@ Never manually fix state to work around a bug. Fix the code so the system self-h
 
 ### Kill Stale Browser Instances (CRITICAL)
 
-During debugging or verification, always terminate any existing Mollotov browser app instance that could block ports, AppReveal, or interaction testing before launching the build you intend to test. Do not work around stale processes by guessing which instance responded — ensure there is one known-good target.
+During debugging or verification, always terminate any existing Kelpie browser app instance that could block ports, AppReveal, or interaction testing before launching the build you intend to test. Do not work around stale processes by guessing which instance responded — ensure there is one known-good target.
 
 ### Documentation Alignment (CRITICAL)
 
@@ -120,8 +120,8 @@ Each component owns its version in its own manifest — do not create a central 
 
 | Component | Version location |
 |-----------|-----------------|
-| macOS app | `apps/macos/Mollotov/Info.plist` → `CFBundleShortVersionString` |
-| iOS app   | `apps/ios/Mollotov.xcodeproj/project.pbxproj` → `MARKETING_VERSION` |
+| macOS app | `apps/macos/Kelpie/Info.plist` → `CFBundleShortVersionString` |
+| iOS app   | `apps/ios/Kelpie.xcodeproj/project.pbxproj` → `MARKETING_VERSION` |
 | Android   | `apps/android/app/build.gradle.kts` → `versionName` |
 | CLI       | `packages/cli/package.json` → `version` |
 

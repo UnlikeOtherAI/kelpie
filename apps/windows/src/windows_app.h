@@ -17,11 +17,11 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
-#include "mollotov/bookmark_store.h"
-#include "mollotov/handler_context.h"
-#include "mollotov/history_store.h"
-#include "mollotov/mcp_registry.h"
-#include "mollotov/network_traffic_store.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/handler_context.h"
+#include "kelpie/history_store.h"
+#include "kelpie/mcp_registry.h"
+#include "kelpie/network_traffic_store.h"
 
 #include "device_info_windows.h"
 #include "mdns_windows.h"
@@ -29,7 +29,7 @@
 #include "win32_browser_view.h"
 #include "win32_shell.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 struct AppConfig {
   int port = 8420;
@@ -116,4 +116,4 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::thread http_thread_;
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

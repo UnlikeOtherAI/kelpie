@@ -1,13 +1,13 @@
 #include "toast_view.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 ToastView::ToastView() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   revealer_ = gtk_revealer_new();
   gtk_widget_set_halign(revealer_, GTK_ALIGN_CENTER);
   gtk_widget_set_valign(revealer_, GTK_ALIGN_END);
@@ -24,7 +24,7 @@ GtkWidget* ToastView::widget() const {
 }
 
 void ToastView::Show(const std::string& message) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (label_ == nullptr) {
     return;
   }
@@ -40,4 +40,4 @@ void ToastView::Show(const std::string& message) {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

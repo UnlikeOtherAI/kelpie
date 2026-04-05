@@ -18,7 +18,7 @@ describe("constants", () => {
   });
 
   it("has correct mDNS service type", () => {
-    expect(MDNS_SERVICE_TYPE).toBe("_mollotov._tcp");
+    expect(MDNS_SERVICE_TYPE).toBe("_kelpie._tcp");
   });
 
   it("has correct API version prefix", () => {
@@ -26,7 +26,7 @@ describe("constants", () => {
   });
 
   it("has correct MCP tool prefix", () => {
-    expect(MCP_TOOL_PREFIX).toBe("mollotov_");
+    expect(MCP_TOOL_PREFIX).toBe("kelpie_");
   });
 });
 
@@ -58,15 +58,15 @@ describe("error codes", () => {
 });
 
 describe("MCP tools", () => {
-  it("all browser tools use mollotov_ prefix", () => {
+  it("all browser tools use kelpie_ prefix", () => {
     for (const tool of BrowserMcpTools) {
-      expect(tool).toMatch(/^mollotov_/);
+      expect(tool).toMatch(/^kelpie_/);
     }
   });
 
-  it("all CLI tools use mollotov_ prefix", () => {
+  it("all CLI tools use kelpie_ prefix", () => {
     for (const tool of CliMcpTools) {
-      expect(tool).toMatch(/^mollotov_/);
+      expect(tool).toMatch(/^kelpie_/);
     }
   });
 
@@ -87,16 +87,16 @@ describe("MCP tools", () => {
   });
 
   it("tracks linux and windows unsupported browser tools", () => {
-    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_status).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_load).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_unload).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_ask).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_ai_record).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_show_keyboard).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_hide_keyboard).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_get_viewport_presets).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_set_viewport_preset).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_set_orientation).toEqual(["linux", "windows"]);
-    expect(BrowserToolUnsupportedPlatforms.mollotov_safari_auth).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_status).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_load).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_unload).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_ask).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_record).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_show_keyboard).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_hide_keyboard).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_get_viewport_presets).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_set_viewport_preset).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_set_orientation).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_safari_auth).toEqual(["linux", "windows"]);
   });
 });

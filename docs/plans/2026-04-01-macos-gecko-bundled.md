@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Bundle a stripped Firefox runtime inside Mollotov.app so the Gecko renderer requires no external Firefox installation — identical to how `Chromium Embedded Framework.framework` is bundled for CEF.
+**Goal:** Bundle a stripped Firefox runtime inside Kelpie.app so the Gecko renderer requires no external Firefox installation — identical to how `Chromium Embedded Framework.framework` is bundled for CEF.
 
-**Architecture:** A download script fetches a pinned Firefox DMG, extracts the binary, strips Mozilla branding (bundle ID, display name, adds `LSUIElement` so it never appears in the Dock), and places the result as `apps/macos/Frameworks/MollotovGeckoHelper.app` (gitignored, same as the CEF framework). A `project.yml` post-build script copies it into the built app's `Contents/Frameworks/`. `GeckoProcessManager` prefers the bundled binary path over any system Firefox, falling back to system Firefox for developer convenience. Rendering stays headless + CDP screenshot-based (same as current); the win is no external dependency.
+**Architecture:** A download script fetches a pinned Firefox DMG, extracts the binary, strips Mozilla branding (bundle ID, display name, adds `LSUIElement` so it never appears in the Dock), and places the result as `apps/macos/Frameworks/KelpieGeckoHelper.app` (gitignored, same as the CEF framework). A `project.yml` post-build script copies it into the built app's `Contents/Frameworks/`. `GeckoProcessManager` prefers the bundled binary path over any system Firefox, falling back to system Firefox for developer convenience. Rendering stays headless + CDP screenshot-based (same as current); the win is no external dependency.
 
 **Tech Stack:** bash (download script), Swift (`GeckoProcessManager`), xcodegen (`project.yml`), GNU Make
 
@@ -33,19 +33,19 @@ Open-source project, MPL 2.0. No licensing issues. Don't use the "Firefox" name 
 ```bash
 #!/usr/bin/env bash
 # Downloads a pinned Firefox release, strips Mozilla branding, and places the
-# result as apps/macos/Frameworks/MollotovGeckoHelper.app.
+# result as apps/macos/Frameworks/KelpieGeckoHelper.app.
 # Run once: make gecko-runtime
 set -euo pipefail
 
 FIREFOX_VERSION="122.0.1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEST_DIR="$SCRIPT_DIR/../apps/macos/Frameworks"
-HELPER_APP="$DEST_DIR/MollotovGeckoHelper.app"
-TMP_DMG="/tmp/mollotov-gecko-${FIREFOX_VERSION}.dmg"
-MOUNT_POINT="/Volumes/MollotovFirefoxSetup"
+HELPER_APP="$DEST_DIR/KelpieGeckoHelper.app"
+TMP_DMG="/tmp/kelpie-gecko-${FIREFOX_VERSION}.dmg"
+MOUNT_POINT="/Volumes/KelpieFirefoxSetup"
 
 if [ -d "$HELPER_APP" ]; then
-  echo "MollotovGeckoHelper.app already present. Delete it to re-download."
+  echo "KelpieGeckoHelper.app already present. Delete it to re-download."
   exit 0
 fi
 
@@ -66,9 +66,9 @@ rm -f "$TMP_DMG"
 
 echo "→ Stripping Mozilla branding..."
 PLIST="$HELPER_APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.mollotov.gecko-helper"  "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName MollotovGeckoHelper"               "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName MollotovGeckoHelper"        "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kelpie.gecko-helper"  "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName KelpieGeckoHelper"               "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName KelpieGeckoHelper"        "$PLIST"
 # Prevent the helper from appearing in the Dock or App Switcher
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true"                           "$PLIST" 2>/dev/null \
   || /usr/libexec/PlistBuddy -c "Set :LSUIElement true"                           "$PLIST"
@@ -77,7 +77,7 @@ echo "→ Re-signing with ad-hoc identity..."
 codesign --remove-signature "$HELPER_APP" 2>/dev/null || true
 codesign -fs - "$HELPER_APP" 2>/dev/null || true
 
-echo "✓ MollotovGeckoHelper.app ready at $HELPER_APP"
+echo "✓ KelpieGeckoHelper.app ready at $HELPER_APP"
 ```
 
 **Step 2: Make it executable**
@@ -90,7 +90,7 @@ chmod +x scripts/download-gecko-runtime.sh
 
 ```bash
 bash scripts/download-gecko-runtime.sh
-ls -la apps/macos/Frameworks/MollotovGeckoHelper.app/Contents/MacOS/firefox
+ls -la apps/macos/Frameworks/KelpieGeckoHelper.app/Contents/MacOS/firefox
 ```
 
 Expected: file exists, is executable.
@@ -99,10 +99,10 @@ Expected: file exists, is executable.
 
 ```bash
 /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
-  apps/macos/Frameworks/MollotovGeckoHelper.app/Contents/Info.plist
+  apps/macos/Frameworks/KelpieGeckoHelper.app/Contents/Info.plist
 ```
 
-Expected: `com.mollotov.gecko-helper`
+Expected: `com.kelpie.gecko-helper`
 
 **Step 5: Commit**
 
@@ -156,22 +156,22 @@ git commit -m "feat(macos): add make gecko-runtime target"
 **Files:**
 - Modify: `apps/macos/project.yml`
 
-**Step 1: Add postBuildScript to the `Mollotov` target**
+**Step 1: Add postBuildScript to the `Kelpie` target**
 
-In `project.yml`, the `Mollotov` target already has `postBuildScripts`. Add a new entry after the existing `Embed MollotovHelper` script:
+In `project.yml`, the `Kelpie` target already has `postBuildScripts`. Add a new entry after the existing `Embed KelpieHelper` script:
 
 ```yaml
       - name: Embed Gecko Helper
         script: |
-          GECKO_SRC="${PROJECT_DIR}/Frameworks/MollotovGeckoHelper.app"
-          GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/MollotovGeckoHelper.app"
+          GECKO_SRC="${PROJECT_DIR}/Frameworks/KelpieGeckoHelper.app"
+          GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/KelpieGeckoHelper.app"
           if [ -d "$GECKO_SRC" ]; then
             rm -rf "$GECKO_DST"
             cp -R "$GECKO_SRC" "$GECKO_DST"
             codesign -fs - "$GECKO_DST" 2>/dev/null || true
             echo "Gecko helper embedded at $GECKO_DST"
           else
-            echo "warning: MollotovGeckoHelper.app not found in Frameworks/ — run 'make gecko-runtime' first"
+            echo "warning: KelpieGeckoHelper.app not found in Frameworks/ — run 'make gecko-runtime' first"
           fi
         basedOnDependencyAnalysis: false
 ```
@@ -182,12 +182,12 @@ In `project.yml`, the `Mollotov` target already has `postBuildScripts`. Add a ne
 cd apps/macos && xcodegen generate --spec project.yml
 ```
 
-Expected: `Created project at .../Mollotov.xcodeproj`
+Expected: `Created project at .../Kelpie.xcodeproj`
 
 **Step 3: Verify build still passes**
 
 ```bash
-cd apps/macos && xcodebuild -scheme Mollotov -configuration Debug build 2>&1 | tail -5
+cd apps/macos && xcodebuild -scheme Kelpie -configuration Debug build 2>&1 | tail -5
 ```
 
 Expected: `** BUILD SUCCEEDED **`
@@ -195,16 +195,16 @@ Expected: `** BUILD SUCCEEDED **`
 If Gecko runtime is present, also verify it ends up in the built app:
 
 ```bash
-find apps/macos/.build -name "firefox" -path "*/MollotovGeckoHelper*" 2>/dev/null | head -3
+find apps/macos/.build -name "firefox" -path "*/KelpieGeckoHelper*" 2>/dev/null | head -3
 ```
 
-Expected: path inside `Mollotov.app/Contents/Frameworks/MollotovGeckoHelper.app/`.
+Expected: path inside `Kelpie.app/Contents/Frameworks/KelpieGeckoHelper.app/`.
 
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/project.yml apps/macos/Mollotov.xcodeproj/project.pbxproj
-git commit -m "feat(macos): embed MollotovGeckoHelper.app in app bundle via postBuildScript"
+git add apps/macos/project.yml apps/macos/Kelpie.xcodeproj/project.pbxproj
+git commit -m "feat(macos): embed KelpieGeckoHelper.app in app bundle via postBuildScript"
 ```
 
 ---
@@ -212,12 +212,12 @@ git commit -m "feat(macos): embed MollotovGeckoHelper.app in app bundle via post
 ## Task 4: Update GeckoProcessManager to use bundled binary
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Renderer/GeckoProcessManager.swift`
+- Modify: `apps/macos/Kelpie/Renderer/GeckoProcessManager.swift`
 
 **Step 1: Read the current file**
 
 ```
-apps/macos/Mollotov/Renderer/GeckoProcessManager.swift
+apps/macos/Kelpie/Renderer/GeckoProcessManager.swift
 ```
 
 **Step 2: Replace `locateFirefox()` and add `bundledFirefoxPath()`**
@@ -225,15 +225,15 @@ apps/macos/Mollotov/Renderer/GeckoProcessManager.swift
 Replace the existing `locateFirefox()` static method and `firefoxPaths` property with:
 
 ```swift
-/// Path to the Firefox binary bundled inside Mollotov.app.
+/// Path to the Firefox binary bundled inside Kelpie.app.
 /// Returns nil if the Gecko runtime has not been downloaded yet.
 static func bundledFirefoxPath() -> String? {
-    // In the built app: Mollotov.app/Contents/Frameworks/MollotovGeckoHelper.app/Contents/MacOS/firefox
+    // In the built app: Kelpie.app/Contents/Frameworks/KelpieGeckoHelper.app/Contents/MacOS/firefox
     guard let executableURL = Bundle.main.executableURL else { return nil }
     let path = executableURL
         .deletingLastPathComponent()           // Contents/MacOS
         .deletingLastPathComponent()           // Contents
-        .appendingPathComponent("Frameworks/MollotovGeckoHelper.app/Contents/MacOS/firefox")
+        .appendingPathComponent("Frameworks/KelpieGeckoHelper.app/Contents/MacOS/firefox")
         .path
     return FileManager.default.isExecutableFile(atPath: path) ? path : nil
 }
@@ -259,7 +259,7 @@ Also update `start()` to create the profile with privacy prefs. Replace the prof
 
 ```swift
 let tempProfile = FileManager.default.temporaryDirectory
-    .appendingPathComponent("com.mollotov.gecko-profile-\(port)")
+    .appendingPathComponent("com.kelpie.gecko-profile-\(port)")
 try? FileManager.default.createDirectory(at: tempProfile, withIntermediateDirectories: true)
 profileDir = tempProfile
 // Write profile prefs to suppress Firefox first-run UI and telemetry
@@ -291,7 +291,7 @@ private func writeProfilePrefs(to profileURL: URL) {
 **Step 3: Verify build**
 
 ```bash
-cd apps/macos && xcodebuild -scheme Mollotov -configuration Debug build 2>&1 | grep -E "error:|BUILD"
+cd apps/macos && xcodebuild -scheme Kelpie -configuration Debug build 2>&1 | grep -E "error:|BUILD"
 ```
 
 Expected: `** BUILD SUCCEEDED **` with no `error:` lines.
@@ -299,7 +299,7 @@ Expected: `** BUILD SUCCEEDED **` with no `error:` lines.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Renderer/GeckoProcessManager.swift
+git add apps/macos/Kelpie/Renderer/GeckoProcessManager.swift
 git commit -m "feat(macos): GeckoProcessManager uses bundled Firefox runtime with privacy prefs"
 ```
 
@@ -327,7 +327,7 @@ Gecko renderer option works. The runtime is gitignored (same as CEF).
 Find the Gecko paragraph added in the previous plan and update the line about "requires Firefox.app installed":
 
 Before: `Firefox must be installed at a standard path...`
-After: `The Gecko runtime is bundled inside Mollotov.app (run \`make gecko-runtime\` once during setup). No external Firefox installation required.`
+After: `The Gecko runtime is bundled inside Kelpie.app (run \`make gecko-runtime\` once during setup). No external Firefox installation required.`
 
 **Step 3: Mark the old plan superseded**
 
@@ -350,16 +350,16 @@ git commit -m "docs: update Gecko setup docs — bundled runtime, make gecko-run
 
 1. `make gecko-runtime` → downloads, places, strips branding, no errors
 2. `xcodebuild ... build` → `** BUILD SUCCEEDED **`
-3. `find apps/macos/.build -name "firefox" -path "*/MollotovGeckoHelper*"` → file found inside built bundle
+3. `find apps/macos/.build -name "firefox" -path "*/KelpieGeckoHelper*"` → file found inside built bundle
 4. Launch app → switch to Gecko via `curl -X POST http://localhost:8420/v1/set-renderer -d '{"engine":"gecko"}'`
 5. Response → `{"success":true,"engine":"gecko","changed":true}`
 6. Navigate → `curl -X POST http://localhost:8420/v1/navigate -d '{"url":"https://example.com"}'`
 7. `curl http://localhost:8420/v1/get-current-url` → `{"url":"https://example.com",...}`
 8. No Firefox window appears in Dock or App Switcher
-9. Delete `apps/macos/Frameworks/MollotovGeckoHelper.app`, re-run `make gecko-runtime`, repeat 2–8
+9. Delete `apps/macos/Frameworks/KelpieGeckoHelper.app`, re-run `make gecko-runtime`, repeat 2–8
 
 ---
 
 ## Known limitation
 
-The live view in `GeckoLiveView` renders via CDP `Page.captureScreenshot` at ~5fps (screenshot polling). This gives real Firefox rendering in the Mollotov shell but with slight lag. Firefox's CDP does not expose `Page.startScreencast` (a Chrome-only extension). A higher-fidelity path using `ScreenCaptureKit` to capture the Firefox window directly can be added in a follow-up — it would require Screen Recording permission but deliver 60fps rendering.
+The live view in `GeckoLiveView` renders via CDP `Page.captureScreenshot` at ~5fps (screenshot polling). This gives real Firefox rendering in the Kelpie shell but with slight lag. Firefox's CDP does not expose `Page.startScreencast` (a Chrome-only extension). A higher-fidelity path using `ScreenCaptureKit` to capture the Firefox window directly can be added in a follow-up — it would require Screen Recording permission but deliver 60fps rendering.

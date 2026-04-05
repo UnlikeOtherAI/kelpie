@@ -1,9 +1,9 @@
 #pragma once
 
 #include "handler_support.h"
-#include "mollotov/desktop_router.h"
+#include "kelpie/desktop_router.h"
 
-namespace mollotov {
+namespace kelpie {
 
 class CookieHandler {
  public:
@@ -22,4 +22,4 @@ class CookieHandler {
   DesktopHandlerRuntime runtime_;
 };
 
-}  // namespace mollotov
+}  // namespace kelpie

@@ -1,17 +1,17 @@
 /**
- * E2E test helpers for Mollotov integration tests.
+ * E2E test helpers for Kelpie integration tests.
  *
  * These tests verify the CLI-to-device pipeline works end-to-end.
- * They require at least one real device (Simulator/Emulator) running Mollotov,
+ * They require at least one real device (Simulator/Emulator) running Kelpie,
  * or fall back to a local HTTP mock server for CI.
  */
 
 import type { DiscoveredDevice } from "../../src/types.js";
-import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 
 /** Env var to point tests at a specific device without mDNS discovery. */
-const DEVICE_HOST = process.env.MOLLOTOV_TEST_HOST ?? "localhost";
-const DEVICE_PORT = parseInt(process.env.MOLLOTOV_TEST_PORT ?? String(DEFAULT_PORT), 10);
+const DEVICE_HOST = process.env.KELPIE_TEST_HOST ?? "localhost";
+const DEVICE_PORT = parseInt(process.env.KELPIE_TEST_PORT ?? String(DEFAULT_PORT), 10);
 
 /** Create a test device descriptor pointing at a real or mock server. */
 export function testDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice {

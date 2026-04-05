@@ -1,4 +1,4 @@
-#include "mollotov/desktop_engine.h"
+#include "kelpie/desktop_engine.h"
 
 #include <algorithm>
 #include <mutex>
@@ -9,10 +9,10 @@
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
-#include "mollotov/cef_app_factory.h"
-#include "mollotov/desktop_bridge.h"
+#include "kelpie/cef_app_factory.h"
+#include "kelpie/desktop_bridge.h"
 
-namespace mollotov {
+namespace kelpie {
 
 class DesktopCefClient;
 
@@ -406,4 +406,4 @@ const CefRenderer& DesktopEngine::renderer() const {
   return *renderer_;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

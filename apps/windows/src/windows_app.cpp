@@ -16,7 +16,7 @@
 #include "include/cef_app.h"
 #endif
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -46,9 +46,9 @@ std::string WideToUtf8(const std::wstring& value) {
 std::filesystem::path RoamingAppDataPath() {
   wchar_t buffer[MAX_PATH]{};
   if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, buffer))) {
-    return std::filesystem::path(buffer) / "Mollotov";
+    return std::filesystem::path(buffer) / "Kelpie";
   }
-  return std::filesystem::temp_directory_path() / "Mollotov";
+  return std::filesystem::temp_directory_path() / "Kelpie";
 }
 
 bool LoadJsonFile(const std::filesystem::path& path, nlohmann::json& output) {
@@ -320,7 +320,7 @@ void WindowsApp::RefreshDeviceInfo() {
 }
 
 std::wstring WindowsApp::AppTitle() const {
-  return L"Mollotov";
+  return L"Kelpie";
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

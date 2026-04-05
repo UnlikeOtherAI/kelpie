@@ -20,8 +20,8 @@ apps/android/
     src/
       main/
         AndroidManifest.xml                 # Permissions, network config
-        java/com/mollotov/browser/
-          MollotovApp.kt                    # Application class
+        java/com/kelpie/browser/
+          KelpieApp.kt                    # Application class
           MainActivity.kt                   # Single activity host
 
           ui/
@@ -45,7 +45,7 @@ apps/android/
             DeviceInfo.kt                  # Collect device metadata
 
       debug/
-        java/com/mollotov/browser/debug/
+        java/com/kelpie/browser/debug/
           AppRevealSetup.kt               # AppReveal.start() in debug
 ```
 
@@ -101,10 +101,10 @@ includeBuild("path/to/AppReveal/Android") {
 <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 ```
 
-### 4. Application Class (`MollotovApp.kt`)
+### 4. Application Class (`KelpieApp.kt`)
 
 ```kotlin
-class MollotovApp : Application() {
+class KelpieApp : Application() {
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
@@ -129,8 +129,8 @@ WebView(context).apply {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     WebView.setWebContentsDebuggingEnabled(true) // Enables CDP
-    webViewClient = MollotovWebViewClient()
-    webChromeClient = MollotovChromeClient()
+    webViewClient = KelpieWebViewClient()
+    webChromeClient = KelpieChromeClient()
 }
 ```
 
@@ -156,7 +156,7 @@ embeddedServer(Netty, port = 8420) {
 ```kotlin
 val serviceInfo = NsdServiceInfo().apply {
     serviceName = deviceName
-    serviceType = "_mollotov._tcp"
+    serviceType = "_kelpie._tcp"
     port = 8420
     setAttribute("id", deviceId)
     setAttribute("name", deviceName)
@@ -202,7 +202,7 @@ git add apps/android/ && git commit -m "feat: Android app foundation — Compose
 - [ ] Settings panel shows device IP, port, mDNS status
 - [ ] Ktor HTTP server starts on port 8420
 - [ ] `curl http://10.0.2.2:8420/v1/get-device-info` returns JSON (via adb forward)
-- [ ] NsdManager advertises `_mollotov._tcp` — discoverable on local network
+- [ ] NsdManager advertises `_kelpie._tcp` — discoverable on local network
 - [ ] TXT records include: id, name, model, platform, width, height, port, version
 - [ ] `WebView.setWebContentsDebuggingEnabled(true)` is called — CDP is available
 - [ ] Device ID persists across app restarts

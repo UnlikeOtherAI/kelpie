@@ -1,19 +1,19 @@
-#include "mollotov/desktop_app.h"
+#include "kelpie/desktop_app.h"
 
 #include <memory>
 #include <thread>
 
-#include "mollotov/bookmark_store.h"
-#include "mollotov/console_store.h"
-#include "mollotov/desktop_http_server.h"
-#include "mollotov/desktop_mdns.h"
-#include "mollotov/desktop_mcp_server.h"
-#include "mollotov/desktop_router.h"
-#include "mollotov/history_store.h"
-#include "mollotov/handler_context.h"
-#include "mollotov/mcp_registry.h"
-#include "mollotov/network_traffic_store.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/console_store.h"
+#include "kelpie/desktop_http_server.h"
+#include "kelpie/desktop_mdns.h"
+#include "kelpie/desktop_mcp_server.h"
+#include "kelpie/desktop_router.h"
+#include "kelpie/history_store.h"
+#include "kelpie/handler_context.h"
+#include "kelpie/mcp_registry.h"
+#include "kelpie/network_traffic_store.h"
+#include "kelpie/response_helpers.h"
 #include "handlers/bookmark_handler.h"
 #include "handlers/browser_mgmt_handler.h"
 #include "handlers/console_handler.h"
@@ -30,7 +30,7 @@
 #include "handlers/scroll_handler.h"
 #include "handlers/viewport_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 void AppendConsole(ConsoleStore& store, const nlohmann::json& event) {
@@ -147,9 +147,9 @@ class DesktopApp::Impl {
           {"devicePixelRatio", viewport.device_pixel_ratio},
           {"platform", PlatformToString(config.platform)},
           {"deviceName", config.device_info_provider == nullptr
-                             ? std::string("Mollotov Desktop")
+                             ? std::string("Kelpie Desktop")
                              : config.device_info_provider->GetDeviceInfo().value("name",
-                                                                                  std::string("Mollotov Desktop"))},
+                                                                                  std::string("Kelpie Desktop"))},
           {"orientation", viewport.width >= viewport.height ? "landscape" : "portrait"},
       };
       return response;
@@ -335,4 +335,4 @@ McpRegistry& DesktopApp::mcp_registry() {
   return impl_->mcp_registry;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

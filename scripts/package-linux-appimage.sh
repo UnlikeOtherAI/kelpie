@@ -45,19 +45,19 @@ fi
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 
-APPDIR="${WORK_DIR}/Mollotov.AppDir"
-mkdir -p "${APPDIR}/usr/lib/mollotov"
-cp -a "${BUNDLE_DIR}/." "${APPDIR}/usr/lib/mollotov/"
+APPDIR="${WORK_DIR}/Kelpie.AppDir"
+mkdir -p "${APPDIR}/usr/lib/kelpie"
+cp -a "${BUNDLE_DIR}/." "${APPDIR}/usr/lib/kelpie/"
 
 cat > "${APPDIR}/AppRun" <<'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
-exec "${HERE}/usr/lib/mollotov/mollotov-linux" "$@"
+exec "${HERE}/usr/lib/kelpie/kelpie-linux" "$@"
 EOF
 chmod 755 "${APPDIR}/AppRun"
 
-sed 's|^Exec=.*|Exec=mollotov-linux %u|' packaging/linux/mollotov.desktop > "${APPDIR}/mollotov.desktop"
-cp "${BUNDLE_DIR}/icon-1024.png" "${APPDIR}/mollotov.png"
+sed 's|^Exec=.*|Exec=kelpie-linux %u|' packaging/linux/kelpie.desktop > "${APPDIR}/kelpie.desktop"
+cp "${BUNDLE_DIR}/icon-1024.png" "${APPDIR}/kelpie.png"
 
 mkdir -p "${OUTPUT_DIR}"
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" "${APPDIR}" "${OUTPUT_DIR}/Mollotov-${VERSION}-x86_64.AppImage"
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "${APPIMAGETOOL}" "${APPDIR}" "${OUTPUT_DIR}/Kelpie-${VERSION}-x86_64.AppImage"

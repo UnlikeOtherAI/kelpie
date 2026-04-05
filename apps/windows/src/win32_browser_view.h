@@ -12,9 +12,9 @@
 #endif
 #include <windows.h>
 
-#include "mollotov/renderer_interface.h"
+#include "kelpie/renderer_interface.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 struct BrowserState {
   std::string url;
@@ -70,4 +70,4 @@ class Win32BrowserView final : public RendererInterface {
 #endif
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

@@ -6,12 +6,12 @@
 
 #include <nlohmann/json.hpp>
 
-#if MOLLOTOV_AI_HAS_HTTPLIB
+#if KELPIE_AI_HAS_HTTPLIB
 #include "model_store.h"
 #include "ollama_client.h"
 #endif
 
-namespace mollotov::ai_internal {
+namespace kelpie::ai_internal {
 
 using json = nlohmann::json;
 
@@ -26,20 +26,20 @@ inline char* CopyString(const std::string& value) {
   return buffer;
 }
 
-}  // namespace mollotov::ai_internal
+}  // namespace kelpie::ai_internal
 
-struct MollotovAiManager {
+struct KelpieAiManager {
   std::string models_dir;
   std::string hf_token;
   std::string ollama_endpoint = "http://localhost:11434";
-#if MOLLOTOV_AI_HAS_HTTPLIB
-  mollotov::ModelStore store;
-  mollotov::OllamaClient ollama;
+#if KELPIE_AI_HAS_HTTPLIB
+  kelpie::ModelStore store;
+  kelpie::OllamaClient ollama;
 #endif
 
-  explicit MollotovAiManager(std::string dir)
+  explicit KelpieAiManager(std::string dir)
       : models_dir(dir)
-#if MOLLOTOV_AI_HAS_HTTPLIB
+#if KELPIE_AI_HAS_HTTPLIB
         , store(dir), ollama("http://localhost:11434")
 #endif
   {}

@@ -1,4 +1,4 @@
-# Mollotov API — LLM-Optimized Methods
+# Kelpie API — LLM-Optimized Methods
 
 Accessibility tree, annotated screenshots, visible elements, page text extraction, form state, smart queries.
 
@@ -10,7 +10,7 @@ For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
 ## AI
 
-These methods expose the local AI backend used by Mollotov. On Android, supported devices default to the `platform` backend (Gemini Nano once the AI Edge SDK is wired), and `ollama:` model IDs switch inference to a configured Ollama endpoint.
+These methods expose the local AI backend used by Kelpie. On Android, supported devices default to the `platform` backend (Gemini Nano once the AI Edge SDK is wired), and `ollama:` model IDs switch inference to a configured Ollama endpoint.
 
 ### `ai-status`
 
@@ -88,7 +88,7 @@ Response:
 }
 ```
 
-If the platform backend is selected before the AI Edge SDK is wired, Android currently returns `PLATFORM_AI_NOT_WIRED`. If Ollama becomes unreachable mid-request, Mollotov returns `OLLAMA_DISCONNECTED`.
+If the platform backend is selected before the AI Edge SDK is wired, Android currently returns `PLATFORM_AI_NOT_WIRED`. If Ollama becomes unreachable mid-request, Kelpie returns `OLLAMA_DISCONNECTED`.
 
 ### `ai-record`
 

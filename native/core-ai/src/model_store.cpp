@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-namespace mollotov {
+namespace kelpie {
 
 ModelStore::ModelStore(std::string models_dir)
     : models_dir_(std::move(models_dir)) {}
@@ -170,4 +170,4 @@ std::string ModelStore::download(const std::string& model_id,
   return "";  // Success
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

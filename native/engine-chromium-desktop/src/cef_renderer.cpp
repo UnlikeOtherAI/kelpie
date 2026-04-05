@@ -1,8 +1,8 @@
-#include "mollotov/cef_renderer.h"
+#include "kelpie/cef_renderer.h"
 
 #include <stdexcept>
 
-namespace mollotov {
+namespace kelpie {
 
 CefRenderer::CefRenderer() = default;
 
@@ -85,4 +85,4 @@ void CefRenderer::InvokeVoid(const VoidCallback& callback) {
   }
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

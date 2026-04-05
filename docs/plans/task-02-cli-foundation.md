@@ -20,14 +20,14 @@ packages/cli/
     client/
       http-client.ts            # HTTP client wrapping native fetch
     commands/
-      discover.ts               # mollotov discover
-      devices.ts                # mollotov devices
-      ping.ts                   # mollotov ping
+      discover.ts               # kelpie discover
+      devices.ts                # kelpie devices
+      ping.ts                   # kelpie ping
     output/
       formatter.ts              # JSON/table/text output formatting
     types.ts                    # CLI-internal types (DiscoveredDevice, etc.)
   bin/
-    mollotov.ts                 # CLI entry point (shebang + import)
+    kelpie.ts                 # CLI entry point (shebang + import)
   tests/
     discovery/
       scanner.test.ts
@@ -60,7 +60,7 @@ Commander program with:
 
 ### 3. mDNS Scanner (`discovery/scanner.ts`)
 
-- Uses `bonjour-service` to browse for `_mollotov._tcp`
+- Uses `bonjour-service` to browse for `_kelpie._tcp`
 - Scans for a configurable duration (default 3 seconds)
 - Parses TXT records into `MdnsTxtRecord` type from shared
 - Returns array of discovered devices
@@ -110,11 +110,11 @@ git add -A && git commit -m "feat: CLI foundation — discovery, HTTP client, en
 
 ## Acceptance Criteria
 
-- [ ] `mollotov --version` prints the version from package.json
-- [ ] `mollotov --help` shows all global options and available commands
-- [ ] `mollotov discover` scans mDNS and returns JSON with device list (test with mock)
-- [ ] `mollotov devices` returns cached device list
-- [ ] `mollotov ping --device <name>` sends HTTP request and reports status
+- [ ] `kelpie --version` prints the version from package.json
+- [ ] `kelpie --help` shows all global options and available commands
+- [ ] `kelpie discover` scans mDNS and returns JSON with device list (test with mock)
+- [ ] `kelpie devices` returns cached device list
+- [ ] `kelpie ping --device <name>` sends HTTP request and reports status
 - [ ] `--device` resolves by ID (exact), name (fuzzy), or IP
 - [ ] `--format table` renders a readable table
 - [ ] `--timeout` is respected by HTTP client

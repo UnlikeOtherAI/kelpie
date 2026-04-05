@@ -1,9 +1,9 @@
-#include "mollotov/desktop_router.h"
+#include "kelpie/desktop_router.h"
 
 #include <cassert>
 
 int main() {
-  mollotov::DesktopRouter router;
+  kelpie::DesktopRouter router;
   router.Register("ping", [](const nlohmann::json& params) {
     return nlohmann::json{{"success", true}, {"echo", params.value("value", 0)}};
   });

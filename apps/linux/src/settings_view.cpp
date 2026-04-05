@@ -2,16 +2,16 @@
 
 #include "linux_app.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 SettingsView::SettingsView(LinuxApp& app) : app_(app) {}
 
 void SettingsView::Show(GtkWindow* parent) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (dialog_ == nullptr) {
     dialog_ = gtk_dialog_new_with_buttons("Settings",
                                           parent,
@@ -35,7 +35,7 @@ void SettingsView::Show(GtkWindow* parent) {
 }
 
 void SettingsView::Refresh() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (content_ == nullptr) {
     return;
   }
@@ -55,4 +55,4 @@ void SettingsView::Refresh() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

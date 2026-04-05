@@ -1,5 +1,5 @@
-#include "mollotov/network_traffic_store.h"
-#include "mollotov/state_c_api.h"
+#include "kelpie/network_traffic_store.h"
+#include "kelpie/state_c_api.h"
 
 #include <cassert>
 #include <iostream>
@@ -11,8 +11,8 @@ namespace {
 using json = nlohmann::json;
 
 void TestAppendAndFiltering() {
-  mollotov::NetworkTrafficStore store;
-  store.Append(mollotov::TrafficEntry{
+  kelpie::NetworkTrafficStore store;
+  store.Append(kelpie::TrafficEntry{
       "",
       "post",
       "https://api.test/data",
@@ -43,9 +43,9 @@ void TestAppendAndFiltering() {
 }
 
 void TestSelectionAndTrimSafety() {
-  mollotov::NetworkTrafficStore store;
+  kelpie::NetworkTrafficStore store;
   for (int index = 0; index < 3; ++index) {
-    store.Append(mollotov::TrafficEntry{
+    store.Append(kelpie::TrafficEntry{
         "",
         "GET",
         "https://trim.test/" + std::to_string(index),
@@ -66,7 +66,7 @@ void TestSelectionAndTrimSafety() {
   assert(*store.SelectedIndex() == 1);
 
   for (int index = 3; index < 2002; ++index) {
-    store.Append(mollotov::TrafficEntry{
+    store.Append(kelpie::TrafficEntry{
         "",
         "GET",
         "https://trim.test/" + std::to_string(index),
@@ -88,7 +88,7 @@ void TestSelectionAndTrimSafety() {
 }
 
 void TestLoadJsonAndInvalidInput() {
-  mollotov::NetworkTrafficStore store;
+  kelpie::NetworkTrafficStore store;
   store.LoadJson(R"([
     {
       "id":"a",
@@ -115,31 +115,31 @@ void TestLoadJsonAndInvalidInput() {
 }
 
 void TestCApiOperations() {
-  MollotovNetworkTrafficStoreRef store = mollotov_network_traffic_store_create();
+  KelpieNetworkTrafficStoreRef store = kelpie_network_traffic_store_create();
   assert(store != nullptr);
 
-  assert(mollotov_network_traffic_store_append_json(
+  assert(kelpie_network_traffic_store_append_json(
              store,
              R"({"method":"post","url":"https://ffi.test/api","status_code":201,"content_type":"application/json"})") == 1);
-  mollotov_network_traffic_store_append_document_navigation(
+  kelpie_network_traffic_store_append_document_navigation(
       store, "https://ffi.test/page", 200, "text/html", R"({"server":"ffi"})", 42,
       "2026-04-01T12:00:00Z", 9);
 
   char* summary =
-      mollotov_network_traffic_store_to_summary_json(store, "POST", "json", "200-299", "ffi.test");
+      kelpie_network_traffic_store_to_summary_json(store, "POST", "json", "200-299", "ffi.test");
   assert(summary != nullptr);
   const json summary_entries = json::parse(summary);
-  mollotov_free_string(summary);
+  kelpie_free_string(summary);
   assert(summary_entries.size() == 1);
 
-  assert(mollotov_network_traffic_store_select(store, 1) == 1);
-  char* selected = mollotov_network_traffic_store_get_selected_json(store);
+  assert(kelpie_network_traffic_store_select(store, 1) == 1);
+  char* selected = kelpie_network_traffic_store_get_selected_json(store);
   assert(selected != nullptr);
   const json selected_entry = json::parse(selected);
-  mollotov_free_string(selected);
+  kelpie_free_string(selected);
   assert(selected_entry["category"] == "HTML");
 
-  mollotov_network_traffic_store_destroy(store);
+  kelpie_network_traffic_store_destroy(store);
 }
 
 }  // namespace

@@ -1,18 +1,18 @@
 # core-ai — Shared AI Management Library
 
-C++17 static library providing all shareable AI logic across Mollotov platforms.
+C++17 static library providing all shareable AI logic across Kelpie platforms.
 
 ## What it does
 
 | Feature | C API function |
 |---------|---------------|
-| Model catalog (approved models, metadata, download URLs) | `mollotov_ai_list_approved_models` |
-| Device fitness evaluation (RAM/disk checks) | `mollotov_ai_model_fitness` |
-| HF token storage | `mollotov_ai_set_hf_token`, `mollotov_ai_get_hf_token` |
-| Model store (exists, path, remove) | `mollotov_ai_is_model_downloaded`, `mollotov_ai_model_path`, `mollotov_ai_remove_model` |
-| Authenticated model downloads | `mollotov_ai_download_model` |
-| Ollama HTTP client (reachable, list, infer) | `mollotov_ai_ollama_*` |
-| HF Inference API cloud calls | `mollotov_ai_hf_infer` |
+| Model catalog (approved models, metadata, download URLs) | `kelpie_ai_list_approved_models` |
+| Device fitness evaluation (RAM/disk checks) | `kelpie_ai_model_fitness` |
+| HF token storage | `kelpie_ai_set_hf_token`, `kelpie_ai_get_hf_token` |
+| Model store (exists, path, remove) | `kelpie_ai_is_model_downloaded`, `kelpie_ai_model_path`, `kelpie_ai_remove_model` |
+| Authenticated model downloads | `kelpie_ai_download_model` |
+| Ollama HTTP client (reachable, list, infer) | `kelpie_ai_ollama_*` |
+| HF Inference API cloud calls | `kelpie_ai_hf_infer` |
 
 ## Platform integration
 
@@ -20,26 +20,26 @@ C++17 static library providing all shareable AI logic across Mollotov platforms.
 |----------|---------|-------|
 | macOS | Static `.a` via bridging header | cpp-httplib + OpenSSL |
 | Linux | Static `.a` via direct C calls | cpp-httplib + OpenSSL |
-| Android | Static via JNI (`mollotov_jni.so`) | Disabled — OkHttp handles HTTPS |
+| Android | Static via JNI (`kelpie_jni.so`) | Disabled — OkHttp handles HTTPS |
 | iOS | Static `.a` via bridging header | Disabled — URLSession handles HTTPS |
 
-On mobile, build with `-DMOLLOTOV_AI_USE_HTTPLIB=OFF` to exclude HTTP-dependent code. Catalog, fitness, and token functions remain available.
+On mobile, build with `-DKELPIE_AI_USE_HTTPLIB=OFF` to exclude HTTP-dependent code. Catalog, fitness, and token functions remain available.
 
 ## Build
 
 ```bash
 cd native && mkdir -p .build && cd .build
 cmake .. -DBUILD_TESTING=ON
-cmake --build . --target mollotov_core_ai
+cmake --build . --target kelpie_core_ai
 ctest -R test_ai --output-on-failure
 ```
 
 ## C API pattern
 
 Follows the same conventions as `core-state`:
-- Opaque pointer handle: `MollotovAiManagerRef`
+- Opaque pointer handle: `KelpieAiManagerRef`
 - `extern "C"` block with null checks and try-catch on every function
-- Caller-owned strings freed via `mollotov_ai_free_string()`
+- Caller-owned strings freed via `kelpie_ai_free_string()`
 - JSON in/out via `nlohmann_json`
 
 ## Tests

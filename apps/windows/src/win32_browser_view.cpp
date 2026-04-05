@@ -20,7 +20,7 @@
 #include "include/cef_life_span_handler.h"
 #endif
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -270,4 +270,4 @@ void Win32BrowserView::UpdateFallbackText(const std::wstring& message) const {
   }
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

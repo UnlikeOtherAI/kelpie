@@ -7,7 +7,7 @@ import {
   CliMcpTools,
   httpToMcp,
   BrowserToolUnsupportedPlatforms,
-} from "@unlikeotherai/mollotov-shared";
+} from "@unlikeotherai/kelpie-shared";
 
 describe("AI integration", () => {
   it("all approved models have valid HuggingFace URLs", () => {
@@ -45,7 +45,7 @@ describe("AI integration", () => {
 
   it("AI browser tools are registered in shared BrowserMcpTools", () => {
     const aiToolNames = browserTools
-      .filter((t) => t.name.startsWith("mollotov_ai_"))
+      .filter((t) => t.name.startsWith("kelpie_ai_"))
       .map((t) => t.name);
 
     expect(aiToolNames.length).toBe(5);
@@ -56,7 +56,7 @@ describe("AI integration", () => {
 
   it("AI CLI tools are registered in shared CliMcpTools", () => {
     const aiToolNames = cliTools
-      .filter((t) => t.name.startsWith("mollotov_ai_"))
+      .filter((t) => t.name.startsWith("kelpie_ai_"))
       .map((t) => t.name);
 
     expect(aiToolNames.length).toBe(3);
@@ -74,7 +74,7 @@ describe("AI integration", () => {
 
   it("AI browser tools have linux/windows unsupported platform gates", () => {
     const aiToolNames = browserTools
-      .filter((t) => t.name.startsWith("mollotov_ai_"))
+      .filter((t) => t.name.startsWith("kelpie_ai_"))
       .map((t) => t.name);
 
     for (const name of aiToolNames) {

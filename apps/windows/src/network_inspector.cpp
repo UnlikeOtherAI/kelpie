@@ -10,7 +10,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -51,7 +51,7 @@ bool NetworkInspector::EnsureCreated(HINSTANCE instance, HWND owner) {
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = &NetworkInspector::WindowProc;
   window_class.hInstance = instance_;
-  window_class.lpszClassName = L"MollotovNetworkInspector";
+  window_class.lpszClassName = L"KelpieNetworkInspector";
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   RegisterClassW(&window_class);
 
@@ -226,4 +226,4 @@ void NetworkInspector::ApplyFilter() {
   }
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

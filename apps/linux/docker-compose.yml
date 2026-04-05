@@ -1,18 +1,18 @@
 version: "3.8"
 
 services:
-  mollotov-headless:
+  kelpie-headless:
     build:
       context: ../..
       dockerfile: apps/linux/Dockerfile
-    container_name: mollotov-linux-headless
+    container_name: kelpie-linux-headless
     ports:
       - "8420:8420"
     volumes:
-      - mollotov-data:/data/mollotov
+      - kelpie-data:/data/kelpie
     environment:
       - DISPLAY=:99
-      - MOLLOTOV_PROFILE_DIR=/data/mollotov
+      - KELPIE_PROFILE_DIR=/data/kelpie
     restart: unless-stopped
     # Enable mDNS - requires host network for real mDNS, or
     # use port mapping and manual CLI connection
@@ -22,30 +22,30 @@ services:
   test:
     image: curlimages/curl:latest
     depends_on:
-      - mollotov-headless
+      - kelpie-headless
     profiles:
       - test
     entrypoint: ["sh", "-c"]
     command:
       - |
-        echo "Waiting for mollotov-headless to start..."
+        echo "Waiting for kelpie-headless to start..."
         sleep 5
         echo "--- Health check ---"
-        curl -s http://mollotov-headless:8420/health
+        curl -s http://kelpie-headless:8420/health
         echo ""
         echo "--- Device info ---"
-        curl -s -X POST http://mollotov-headless:8420/v1/get-device-info -H 'Content-Type: application/json' -d '{}'
+        curl -s -X POST http://kelpie-headless:8420/v1/get-device-info -H 'Content-Type: application/json' -d '{}'
         echo ""
         echo "--- Navigate ---"
-        curl -s -X POST http://mollotov-headless:8420/v1/navigate -H 'Content-Type: application/json' -d '{"url":"https://example.com"}'
+        curl -s -X POST http://kelpie-headless:8420/v1/navigate -H 'Content-Type: application/json' -d '{"url":"https://example.com"}'
         echo ""
         echo "--- Screenshot ---"
-        curl -s -X POST http://mollotov-headless:8420/v1/screenshot -H 'Content-Type: application/json' -d '{}' | head -c 100
+        curl -s -X POST http://kelpie-headless:8420/v1/screenshot -H 'Content-Type: application/json' -d '{}' | head -c 100
         echo ""
         echo "--- Evaluate ---"
-        curl -s -X POST http://mollotov-headless:8420/v1/evaluate -H 'Content-Type: application/json' -d '{"expression":"document.title"}'
+        curl -s -X POST http://kelpie-headless:8420/v1/evaluate -H 'Content-Type: application/json' -d '{"expression":"document.title"}'
         echo ""
         echo "=== Tests complete ==="
 
 volumes:
-  mollotov-data:
+  kelpie-data:

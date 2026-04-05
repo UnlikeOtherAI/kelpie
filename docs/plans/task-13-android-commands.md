@@ -11,7 +11,7 @@ Implement all HTTP API endpoint handlers for the Android app using CDP (Chrome D
 ## Files to Create
 
 ```
-apps/android/app/src/main/java/com/mollotov/browser/
+apps/android/app/src/main/java/com/kelpie/browser/
   handlers/
     NavigationHandler.kt          # navigate, back, forward, reload, getCurrentUrl
     ScreenshotHandler.kt          # screenshot via CDP Page.captureScreenshot
@@ -100,7 +100,7 @@ Same approach as iOS: array of WebView instances, each with its own CDP session.
 
 ### MCP Server
 
-Runs on the same Ktor server at `/mcp` path. Streamable HTTP (SSE) transport. All tools registered with `mollotov_` prefix.
+Runs on the same Ktor server at `/mcp` path. Streamable HTTP (SSE) transport. All tools registered with `kelpie_` prefix.
 
 ## Tests (via AppReveal)
 

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 class LinuxApp;
 
@@ -14,4 +14,4 @@ class GUIShell {
   LinuxApp& app_;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

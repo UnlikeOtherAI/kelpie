@@ -1,4 +1,4 @@
-# Mollotov API — Browser Management Methods
+# Kelpie API — Browser Management Methods
 
 Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation.
 
@@ -497,7 +497,7 @@ Response:
 ### `resizeViewport`
 Simulate a reduced viewport size — shrink the visible area as if the keyboard, a toolbar, or another overlay is present. This does NOT change the actual device resolution; it constrains the WebView's visible bounds. Useful for testing responsive layouts at arbitrary viewport dimensions.
 
-On macOS this updates the hosted viewport inside the browser shell and does not resize the native window. If the requested viewport is larger than the visible stage, Mollotov keeps the full requested size and makes the shell scrollable instead of scaling the viewport down.
+On macOS this updates the hosted viewport inside the browser shell and does not resize the native window. If the requested viewport is larger than the visible stage, Kelpie keeps the full requested size and makes the shell scrollable instead of scaling the viewport down.
 
 Any `resize-viewport` call clears the active named viewport preset and enters raw custom viewport mode on macOS.
 

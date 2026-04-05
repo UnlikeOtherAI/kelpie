@@ -22,7 +22,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
   browser: {
     command: "browser",
     purpose: "Manage local macOS browser aliases",
-    when: "You need to register, launch, inspect, or remove named local Mollotov app instances",
+    when: "You need to register, launch, inspect, or remove named local Kelpie app instances",
     params: [],
     related: ["browser register", "browser launch", "browser list", "browser inspect", "browser remove"],
   },
@@ -32,14 +32,14 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
     when: "You need a stable local identifier before launching a browser instance",
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
-      { name: "app", type: "string", required: false, description: "Optional path to Mollotov.app" },
+      { name: "app", type: "string", required: false, description: "Optional path to Kelpie.app" },
     ],
     related: ["browser launch", "browser inspect", "browser remove"],
   },
   "browser launch": {
     command: "browser launch",
     purpose: "Launch a named local macOS browser instance",
-    when: "You want a fresh local Mollotov.app process for a saved alias",
+    when: "You want a fresh local Kelpie.app process for a saved alias",
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
       { name: "port", type: "number", required: false, description: "Optional explicit HTTP port" },
@@ -74,7 +74,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
 /** Convert a MCP tool name to CLI kebab-case command name */
 function mcpToCommand(name: string): string {
   return name
-    .replace(/^mollotov_/, "")
+    .replace(/^kelpie_/, "")
     .replace(/^group_/, "group ")
     .replace(/_/g, "-");
 }
@@ -118,7 +118,7 @@ export function generateLlmHelp(commandFilter?: string): string {
     }
     // Try prefix match for group commands
     const prefix = commandFilter.replace(/-/g, "_");
-    const groupMatch = all.filter((t) => t.name.startsWith(`mollotov_${prefix}`));
+    const groupMatch = all.filter((t) => t.name.startsWith(`kelpie_${prefix}`));
     if (groupMatch.length > 0) {
       return JSON.stringify(groupMatch.map(toolToHelp), null, 2);
     }

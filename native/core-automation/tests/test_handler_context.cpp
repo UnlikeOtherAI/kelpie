@@ -1,6 +1,6 @@
-#include "mollotov/automation_c_api.h"
-#include "mollotov/handler_context.h"
-#include "mollotov/renderer_interface.h"
+#include "kelpie/automation_c_api.h"
+#include "kelpie/handler_context.h"
+#include "kelpie/renderer_interface.h"
 
 #include <cassert>
 #include <cstdint>
@@ -11,7 +11,7 @@
 
 namespace {
 
-class MockRenderer : public mollotov::RendererInterface {
+class MockRenderer : public kelpie::RendererInterface {
  public:
   std::string next_result;
   std::string last_script;
@@ -58,7 +58,7 @@ class MockRenderer : public mollotov::RendererInterface {
 };
 
 void TestContextTracksRendererPresence() {
-  mollotov::HandlerContext context;
+  kelpie::HandlerContext context;
   assert(!context.HasRenderer());
 
   MockRenderer renderer;
@@ -69,7 +69,7 @@ void TestContextTracksRendererPresence() {
 
 void TestEvaluateJsReturningStringAndJson() {
   MockRenderer renderer;
-  mollotov::HandlerContext context(&renderer);
+  kelpie::HandlerContext context(&renderer);
 
   renderer.next_result = "plain-result";
   assert(context.EvaluateJsReturningString("document.title") == "plain-result");
@@ -84,7 +84,7 @@ void TestEvaluateJsReturningStringAndJson() {
 
 void TestEvaluateJsReturningJsonFallsBackToEmptyObject() {
   MockRenderer renderer;
-  mollotov::HandlerContext context(&renderer);
+  kelpie::HandlerContext context(&renderer);
 
   renderer.next_result = "not json";
   assert(context.EvaluateJsReturningJson("window.__broken").empty());
@@ -94,7 +94,7 @@ void TestEvaluateJsReturningJsonFallsBackToEmptyObject() {
 }
 
 void TestContextThrowsWithoutRendererAndCApiReturnsNull() {
-  mollotov::HandlerContext context;
+  kelpie::HandlerContext context;
 
   bool threw = false;
   try {
@@ -104,10 +104,10 @@ void TestContextThrowsWithoutRendererAndCApiReturnsNull() {
   }
   assert(threw);
 
-  MollotovHandlerContextRef ref = mollotov_handler_context_create();
+  KelpieHandlerContextRef ref = kelpie_handler_context_create();
   assert(ref != nullptr);
-  assert(mollotov_handler_context_evaluate_js(ref, "document.title") == nullptr);
-  mollotov_handler_context_destroy(ref);
+  assert(kelpie_handler_context_evaluate_js(ref, "document.title") == nullptr);
+  kelpie_handler_context_destroy(ref);
 }
 
 }  // namespace

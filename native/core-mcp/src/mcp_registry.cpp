@@ -1,8 +1,8 @@
-#include "mollotov/mcp_registry.h"
+#include "kelpie/mcp_registry.h"
 
 #include <algorithm>
 
-namespace mollotov {
+namespace kelpie {
 
 McpRegistry::McpRegistry() : McpRegistry(CreateDefaultMcpTools()) {}
 
@@ -68,4 +68,4 @@ McpCapabilities McpRegistry::get_capabilities(Platform platform, std::string_vie
   return capabilities;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

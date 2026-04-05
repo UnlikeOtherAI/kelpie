@@ -10,7 +10,7 @@ export function explainCommand(command: string): string {
   }
 
   // Try MCP tool name match
-  const mcpName = `mollotov_${command.replace(/-/g, "_")}`;
+  const mcpName = `kelpie_${command.replace(/-/g, "_")}`;
   const tool = [...browserTools, ...cliTools].find((t) => t.name === mcpName);
   if (tool) {
     const cmd = command;
@@ -18,7 +18,7 @@ export function explainCommand(command: string): string {
     return formatExplanation(command, m?.explanation ?? tool.description, m?.related);
   }
 
-  return `Unknown command: ${command}\n\nRun 'mollotov --help' to see all available commands.`;
+  return `Unknown command: ${command}\n\nRun 'kelpie --help' to see all available commands.`;
 }
 
 function formatExplanation(command: string, explanation: string, related?: string[]): string {

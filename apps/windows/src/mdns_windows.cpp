@@ -18,7 +18,7 @@
 #include <dns_sd.h>
 #endif
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -125,7 +125,7 @@ bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
     value_ptrs.push_back(value.c_str());
   }
   PDNS_SERVICE_INSTANCE instance =
-      construct(instance_name.c_str(), L"_mollotov._tcp.local", nullptr, nullptr,
+      construct(instance_name.c_str(), L"_kelpie._tcp.local", nullptr, nullptr,
                 static_cast<WORD>(registration.port), 0, 0,
                 static_cast<DWORD>(key_ptrs.size()), key_ptrs.data(),
                 value_ptrs.data());
@@ -160,7 +160,7 @@ bool MdnsWindows::StartBonjour(const MdnsRegistration& registration) {
   const auto txt = BuildTxtRecord(registration.txt_records);
   DNSServiceRef service = nullptr;
   const DNSServiceErrorType error = DNSServiceRegister(
-      &service, 0, 0, registration.instance_name.c_str(), "_mollotov._tcp", "local", nullptr,
+      &service, 0, 0, registration.instance_name.c_str(), "_kelpie._tcp", "local", nullptr,
       htons(registration.port), static_cast<uint16_t>(txt.size()), txt.data(), nullptr, nullptr);
   if (error != kDNSServiceErr_NoError) {
     std::ostringstream stream;
@@ -181,4 +181,4 @@ void MdnsWindows::SetError(std::string message) {
   last_error_ = std::move(message);
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::string WideToUtf8(const std::wstring& value) {
@@ -37,10 +37,10 @@ std::optional<std::wstring> ReadValue(const std::vector<std::wstring>& args, std
 }
 
 }  // namespace
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
-  using namespace mollotov::windows;
+  using namespace kelpie::windows;
 
   int argc = 0;
   LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);

@@ -1,6 +1,6 @@
 #include "mdns_avahi.h"
 
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
 #include <avahi-common/error.h>
@@ -10,11 +10,11 @@
 
 #include <utility>
 
-#include "mollotov/constants.h"
+#include "kelpie/constants.h"
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
 namespace {
 
 AvahiStringList* BuildTxtList(const MdnsServiceConfig& config) {
@@ -45,7 +45,7 @@ bool MdnsAvahi::Start(const MdnsServiceConfig& config) {
   Stop();
   service_name_ = config.device.name;
 
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
   running_ = true;
   thread_ = std::thread([this, config]() { Run(config); });
   return true;
@@ -56,7 +56,7 @@ bool MdnsAvahi::Start(const MdnsServiceConfig& config) {
 }
 
 void MdnsAvahi::Stop() {
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
   if (simple_poll_ != nullptr) {
     avahi_simple_poll_quit(static_cast<AvahiSimplePoll*>(simple_poll_));
   }
@@ -75,14 +75,14 @@ std::string MdnsAvahi::ServiceName() const {
   if (service_name_.empty()) {
     return std::string();
   }
-  return service_name_ + "." + std::string(mollotov::kMdnsServiceType) + ".local";
+  return service_name_ + "." + std::string(kelpie::kMdnsServiceType) + ".local";
 }
 
 std::string MdnsAvahi::LastError() const {
   return last_error_;
 }
 
-#if MOLLOTOV_LINUX_HAS_AVAHI
+#if KELPIE_LINUX_HAS_AVAHI
 void MdnsAvahi::Run(const MdnsServiceConfig& config) {
   struct State {
     MdnsAvahi* owner;
@@ -119,7 +119,7 @@ void MdnsAvahi::Run(const MdnsServiceConfig& config) {
             AVAHI_PROTO_UNSPEC,
             static_cast<AvahiPublishFlags>(0),
             state_ptr->config.device.name.c_str(),
-            std::string(mollotov::kMdnsServiceType).c_str(),
+            std::string(kelpie::kMdnsServiceType).c_str(),
             nullptr,
             nullptr,
             static_cast<std::uint16_t>(state_ptr->config.port),
@@ -184,4 +184,4 @@ void MdnsAvahi::Run(const MdnsServiceConfig& config) {
 }
 #endif
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

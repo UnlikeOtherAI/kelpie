@@ -1,10 +1,10 @@
-#include "mollotov/error_codes.h"
+#include "kelpie/error_codes.h"
 
 #include <string_view>
 
-#include "mollotov/protocol.h"
+#include "kelpie/protocol.h"
 
-namespace mollotov {
+namespace kelpie {
 
 const char* ErrorCodeToString(ErrorCode code) {
   switch (code) {
@@ -113,16 +113,16 @@ std::int32_t ErrorCodeHttpStatus(ErrorCode code) {
   return 500;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie
 
 extern "C" {
 
-const char* mollotov_error_code_name(MollotovErrorCode code) {
-  return mollotov::ErrorCodeToString(static_cast<mollotov::ErrorCode>(code));
+const char* kelpie_error_code_name(KelpieErrorCode code) {
+  return kelpie::ErrorCodeToString(static_cast<kelpie::ErrorCode>(code));
 }
 
-int32_t mollotov_error_http_status(MollotovErrorCode code) {
-  return mollotov::ErrorCodeHttpStatus(static_cast<mollotov::ErrorCode>(code));
+int32_t kelpie_error_http_status(KelpieErrorCode code) {
+  return kelpie::ErrorCodeHttpStatus(static_cast<kelpie::ErrorCode>(code));
 }
 
 }  // extern "C"

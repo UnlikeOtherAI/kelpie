@@ -1,8 +1,8 @@
-#include "mollotov/handler_context.h"
+#include "kelpie/handler_context.h"
 
 #include <stdexcept>
 
-namespace mollotov {
+namespace kelpie {
 
 HandlerContext::HandlerContext(RendererInterface* renderer)
     : renderer_(renderer) {}
@@ -47,4 +47,4 @@ RendererInterface& HandlerContext::RequireRenderer() const {
   return *renderer_;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

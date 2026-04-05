@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TARGET_PLATFORM="${1:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
-TMP_ROOT="/tmp/mollotov-cef"
+TMP_ROOT="/tmp/kelpie-cef"
 mkdir -p "${TMP_ROOT}"
 
 download_and_extract() {
@@ -56,7 +56,7 @@ install_macos_arm64() {
 install_linux_x64() {
     local cef_version="120.2.7+g4bc6a59+chromium-120.0.6099.234"
     local cef_platform="linux64_minimal"
-    local cache_root="${HOME}/.cache/mollotov/cef"
+    local cache_root="${HOME}/.cache/kelpie/cef"
     local version_root="${cache_root}/cef_binary_${cef_version}_${cef_platform}"
     local current_link="${cache_root}/linux64-current"
     local tarball="${TMP_ROOT}/cef-${cef_platform}.tar.bz2"

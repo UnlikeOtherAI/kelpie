@@ -4,7 +4,7 @@
 #include <functional>
 #include <string>
 
-namespace mollotov {
+namespace kelpie {
 
 using DownloadProgressCb = std::function<void(int64_t downloaded, int64_t total)>;
 
@@ -27,4 +27,4 @@ class ModelStore {
   std::string model_dir(const std::string& model_id) const;
 };
 
-}  // namespace mollotov
+}  // namespace kelpie

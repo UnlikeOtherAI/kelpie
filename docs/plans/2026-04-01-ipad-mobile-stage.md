@@ -55,11 +55,11 @@
 
 ## Files
 
-- `apps/ios/Mollotov/Views/BrowserView.swift`
-- `apps/ios/Mollotov/Views/FloatingMenuView.swift`
-- `apps/ios/Mollotov/Views/WelcomeCardView.swift`
-- `apps/android/app/src/main/java/com/mollotov/browser/ui/BrowserScreen.kt`
-- `apps/android/app/src/main/java/com/mollotov/browser/ui/FloatingMenu.kt`
+- `apps/ios/Kelpie/Views/BrowserView.swift`
+- `apps/ios/Kelpie/Views/FloatingMenuView.swift`
+- `apps/ios/Kelpie/Views/WelcomeCardView.swift`
+- `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- `apps/android/app/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
 - `docs/functionality.md`
 - `docs/ui/mobile.md`
 

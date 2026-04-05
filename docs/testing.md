@@ -1,4 +1,4 @@
-# Mollotov -- Testing Guide
+# Kelpie -- Testing Guide
 
 ## Test Types
 
@@ -18,11 +18,11 @@ All unit tests use mocked HTTP (`vi.fn()` on `globalThis.fetch`) and run without
 
 ## Running E2E Tests
 
-E2E tests verify the full CLI-to-device pipeline. They send real HTTP requests to Mollotov running on a Simulator or Emulator.
+E2E tests verify the full CLI-to-device pipeline. They send real HTTP requests to Kelpie running on a Simulator or Emulator.
 
 ### Prerequisites
 
-1. Build and install Mollotov on a target device
+1. Build and install Kelpie on a target device
 2. The device's HTTP server must be reachable from the test machine
 
 ### Option A: iOS Simulator
@@ -30,11 +30,11 @@ E2E tests verify the full CLI-to-device pipeline. They send real HTTP requests t
 ```bash
 # Build and install
 cd apps/ios
-xcodebuild -scheme Mollotov -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -scheme Kelpie -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
 # Launch simulator and app
 xcrun simctl boot "iPhone 17 Pro"
-xcrun simctl launch booted com.unlike-other-ai.mollotov
+xcrun simctl launch booted com.unlike-other-ai.kelpie
 ```
 
 ### Option B: Android Emulator
@@ -57,7 +57,7 @@ cd packages/cli
 pnpm test:e2e
 
 # Against a specific device
-MOLLOTOV_TEST_HOST=192.168.1.50 MOLLOTOV_TEST_PORT=8420 pnpm test:e2e
+KELPIE_TEST_HOST=192.168.1.50 KELPIE_TEST_PORT=8420 pnpm test:e2e
 ```
 
 Tests auto-skip when no device is reachable. The test output shows which tests ran and which were skipped.
@@ -66,8 +66,8 @@ Tests auto-skip when no device is reachable. The test output shows which tests r
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOLLOTOV_TEST_HOST` | `localhost` | IP or hostname of the test device |
-| `MOLLOTOV_TEST_PORT` | `8420` | HTTP server port |
+| `KELPIE_TEST_HOST` | `localhost` | IP or hostname of the test device |
+| `KELPIE_TEST_PORT` | `8420` | HTTP server port |
 
 ## E2E Test Coverage
 
@@ -91,7 +91,7 @@ Tests auto-skip when no device is reachable. The test output shows which tests r
 
 ```bash
 cd apps/ios
-xcodebuild -scheme Mollotov -sdk iphonesimulator \
+xcodebuild -scheme Kelpie -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 

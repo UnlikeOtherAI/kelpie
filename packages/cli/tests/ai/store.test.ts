@@ -15,7 +15,7 @@ describe("ModelStore", () => {
   let store: ModelStore;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "mollotov-models-"));
+    dir = mkdtempSync(join(tmpdir(), "kelpie-models-"));
     store = new ModelStore(dir);
   });
 

@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class NetworkInspector {
  public:
@@ -36,4 +36,4 @@ class NetworkInspector {
   std::string network_json_ = "[]";
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

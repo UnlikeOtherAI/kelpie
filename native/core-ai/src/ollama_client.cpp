@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace mollotov {
+namespace kelpie {
 
 OllamaClient::OllamaClient(std::string endpoint)
     : endpoint_(std::move(endpoint)) {
@@ -154,4 +154,4 @@ nlohmann::json OllamaClient::infer(const std::string& model_name,
   return result;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

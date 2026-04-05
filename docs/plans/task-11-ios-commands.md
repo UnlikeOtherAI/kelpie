@@ -11,7 +11,7 @@ Implement all HTTP API endpoint handlers for the iOS app, including bridge scrip
 ## Files to Create
 
 ```
-apps/ios/Mollotov/
+apps/ios/Kelpie/
   Handlers/
     NavigationHandler.swift        # navigate, back, forward, reload, getCurrentUrl
     ScreenshotHandler.swift        # screenshot (viewport + full-page stitch)
@@ -102,12 +102,12 @@ These return `PLATFORM_NOT_SUPPORTED` on iOS:
 
 ### MCP Server
 
-Reuses the same HTTP server (different path: `/mcp`). Implements MCP protocol over Streamable HTTP. Registers all tools with `mollotov_` prefix matching docs/api/README.md tool name table.
+Reuses the same HTTP server (different path: `/mcp`). Implements MCP protocol over Streamable HTTP. Registers all tools with `kelpie_` prefix matching docs/api/README.md tool name table.
 
 ## Tests (via AppReveal)
 
 In debug builds, AppReveal gives external agents access to:
-- Take screenshots of the Mollotov app itself (not just the WebView)
+- Take screenshots of the Kelpie app itself (not just the WebView)
 - Inspect UI elements (URL bar, settings panel, WebView state)
 - Verify navigation state after commands
 

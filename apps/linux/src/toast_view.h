@@ -1,6 +1,6 @@
 #pragma once
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #else
 typedef struct _GtkWidget GtkWidget;
@@ -8,7 +8,7 @@ typedef struct _GtkWidget GtkWidget;
 
 #include <string>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 class ToastView {
  public:
@@ -22,4 +22,4 @@ class ToastView {
   GtkWidget* label_ = nullptr;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

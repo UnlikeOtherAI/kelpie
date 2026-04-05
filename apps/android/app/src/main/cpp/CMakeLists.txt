@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project(mollotov_android_jni LANGUAGES CXX)
+project(kelpie_android_jni LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,13 +10,13 @@ include(FetchContent)
 
 set(BUILD_TESTING OFF CACHE BOOL "Disable native tests for Android JNI builds" FORCE)
 
-set(MOLLOTOV_NATIVE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../native)
+set(KELPIE_NATIVE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../native)
 
 # Disable httplib in core-ai on Android — HTTPS is handled by OkHttp in Kotlin.
-set(MOLLOTOV_AI_USE_HTTPLIB OFF CACHE BOOL "" FORCE)
+set(KELPIE_AI_USE_HTTPLIB OFF CACHE BOOL "" FORCE)
 
 # Skip desktop browser engines (CEF/Chromium) — not applicable on Android.
-set(MOLLOTOV_BUILD_DESKTOP_ENGINES OFF CACHE BOOL "" FORCE)
+set(KELPIE_BUILD_DESKTOP_ENGINES OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
   nlohmann_json
@@ -26,15 +26,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-add_subdirectory(${MOLLOTOV_NATIVE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/mollotov-native)
+add_subdirectory(${KELPIE_NATIVE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/kelpie-native)
 
-add_library(mollotov_jni SHARED
-  mollotov_jni.cpp
+add_library(kelpie_jni SHARED
+  kelpie_jni.cpp
 )
 
-target_link_libraries(mollotov_jni
+target_link_libraries(kelpie_jni
   PRIVATE
-    mollotov_core_state
-    mollotov_core_protocol
-    mollotov_core_ai
+    kelpie_core_state
+    kelpie_core_protocol
+    kelpie_core_ai
 )

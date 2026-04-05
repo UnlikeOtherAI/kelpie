@@ -1,6 +1,6 @@
 function(add_desktop_engine_test name)
   add_executable(${name} ${ARGN})
-  target_link_libraries(${name} PRIVATE mollotov_engine_chromium_desktop)
+  target_link_libraries(${name} PRIVATE kelpie_engine_chromium_desktop)
   target_include_directories(${name} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/../src

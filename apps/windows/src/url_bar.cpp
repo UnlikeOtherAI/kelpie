@@ -5,7 +5,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::string WideToUtf8(const std::wstring& value) {
@@ -103,4 +103,4 @@ void UrlBar::SubmitCurrentUrl() {
   delegate_->OnNavigateRequested(WideToUtf8(buffer));
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

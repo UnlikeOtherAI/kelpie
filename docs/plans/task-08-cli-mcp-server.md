@@ -6,7 +6,7 @@
 
 ## Goal
 
-Expose all CLI commands as MCP tools so LLMs can drive Mollotov directly. Both stdio and HTTP transports.
+Expose all CLI commands as MCP tools so LLMs can drive Kelpie directly. Both stdio and HTTP transports.
 
 ## Files to Create
 
@@ -35,24 +35,24 @@ pnpm add @modelcontextprotocol/sdk
 ```
 
 Two launch modes:
-- `mollotov mcp` — stdio transport (standard MCP CLI pattern)
-- `mollotov mcp --http --port 8421` — HTTP/SSE transport
+- `kelpie mcp` — stdio transport (standard MCP CLI pattern)
+- `kelpie mcp --http --port 8421` — HTTP/SSE transport
 
 ### Tool Definitions (`mcp/tools.ts`)
 
-Each MCP tool maps to a CLI command. Uses `mollotov_` prefix for all tool names.
+Each MCP tool maps to a CLI command. Uses `kelpie_` prefix for all tool names.
 
 **Browser-level tools (80+):** Map directly to HTTP API methods. Each tool takes a `device` parameter (required for individual commands) plus the method-specific params.
 
 From docs/api/README.md MCP tool table:
-- `mollotov_navigate`, `mollotov_back`, `mollotov_forward`, `mollotov_reload`
-- `mollotov_screenshot`, `mollotov_get_dom`, `mollotov_query_selector`
-- `mollotov_click`, `mollotov_fill`, `mollotov_type`, `mollotov_scroll2`
+- `kelpie_navigate`, `kelpie_back`, `kelpie_forward`, `kelpie_reload`
+- `kelpie_screenshot`, `kelpie_get_dom`, `kelpie_query_selector`
+- `kelpie_click`, `kelpie_fill`, `kelpie_type`, `kelpie_scroll2`
 - ... (all 80+ tools from the table)
 
 **CLI-level tools (20+):** Group commands + discovery.
-- `mollotov_discover`, `mollotov_list_devices`
-- `mollotov_group_navigate`, `mollotov_group_screenshot`, `mollotov_group_find_button`
+- `kelpie_discover`, `kelpie_list_devices`
+- `kelpie_group_navigate`, `kelpie_group_screenshot`, `kelpie_group_find_button`
 - ... (all group tools from the table)
 
 ### Tool Registration Pattern
@@ -60,7 +60,7 @@ From docs/api/README.md MCP tool table:
 Each tool definition:
 ```typescript
 {
-  name: "mollotov_navigate",
+  name: "kelpie_navigate",
   description: "Navigate a device browser to a URL",
   inputSchema: {
     type: "object",
@@ -92,11 +92,11 @@ Group tools omit the `device` parameter and take filter params (`platform`, `inc
 
 ## Acceptance Criteria
 
-- [ ] `mollotov mcp` starts stdio MCP server
-- [ ] `mollotov mcp --http --port 8421` starts HTTP MCP server
+- [ ] `kelpie mcp` starts stdio MCP server
+- [ ] `kelpie mcp --http --port 8421` starts HTTP MCP server
 - [ ] All browser-level MCP tools are registered (cross-reference docs/api/README.md table)
 - [ ] All CLI-level group MCP tools are registered
-- [ ] Tool names use `mollotov_` prefix with underscores (not hyphens)
+- [ ] Tool names use `kelpie_` prefix with underscores (not hyphens)
 - [ ] Each tool has a clear description and correct input schema
 - [ ] Individual tools require `device` parameter
 - [ ] Group tools accept `platform`, `include`, `exclude` filter params

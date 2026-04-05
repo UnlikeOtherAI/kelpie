@@ -11,15 +11,15 @@ REPO_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 ANDROID_SDK   := $(HOME)/Library/Android/sdk
 
 # ── Xcode ──────────────────────────────────────────────────────────────────────
-IOS_SCHEME    := Mollotov
-IOS_PROJECT   := apps/ios/Mollotov.xcodeproj
+IOS_SCHEME    := Kelpie
+IOS_PROJECT   := apps/ios/Kelpie.xcodeproj
 
-MACOS_SCHEME  := Mollotov
-MACOS_PROJECT := apps/macos/Mollotov.xcodeproj
+MACOS_SCHEME  := Kelpie
+MACOS_PROJECT := apps/macos/Kelpie.xcodeproj
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 CLI_DIR       := packages/cli
-LINUX_CEF_ROOT := $(HOME)/.cache/mollotov/cef/linux64-current
+LINUX_CEF_ROOT := $(HOME)/.cache/kelpie/cef/linux64-current
 
 # ── CLI-style subcommand forwarding ───────────────────────────────────────────
 # Allows:  make ios [list|<udid>]
@@ -61,12 +61,12 @@ cli: cli-build cli-link
 
 cli-build:
 	@echo "→ Building CLI..."
-	pnpm --filter @unlikeotherai/mollotov build
+	pnpm --filter @unlikeotherai/kelpie build
 
 cli-link:
-	@echo "→ Linking mollotov to system..."
+	@echo "→ Linking kelpie to system..."
 	cd $(CLI_DIR) && pnpm link --global
-	@echo "✓ mollotov linked — run 'mollotov --help' to verify"
+	@echo "✓ kelpie linked — run 'kelpie --help' to verify"
 
 # ── iOS ────────────────────────────────────────────────────────────────────────
 
@@ -116,20 +116,20 @@ ios-build:
 
 ios-run:
 	@if [ "$(IOS_TYPE)" = "device" ]; then \
-		APP_PATH=$$(find apps/ios/.build -name "Mollotov.app" -not -path "*simulator*" 2>/dev/null | head -1); \
+		APP_PATH=$$(find apps/ios/.build -name "Kelpie.app" -not -path "*simulator*" 2>/dev/null | head -1); \
 		echo "→ Installing on device $(IOS_TARGET) ..."; \
 		xcrun devicectl device install app --device $(IOS_TARGET) "$$APP_PATH"; \
 		echo "→ Launching..."; \
-		xcrun devicectl device process launch --device $(IOS_TARGET) com.unlikeotherai.mollotov; \
+		xcrun devicectl device process launch --device $(IOS_TARGET) com.unlikeotherai.kelpie; \
 	else \
 		echo "→ Booting simulator $(IOS_TARGET)..."; \
 		xcrun simctl boot $(IOS_TARGET) 2>/dev/null || true; \
 		open -a Simulator; \
-		APP_PATH=$$(find apps/ios/.build -name "Mollotov.app" -not -path "*iphonesimulator.xcarchive*" 2>/dev/null | head -1); \
+		APP_PATH=$$(find apps/ios/.build -name "Kelpie.app" -not -path "*iphonesimulator.xcarchive*" 2>/dev/null | head -1); \
 		echo "→ Installing $$APP_PATH ..."; \
 		xcrun simctl install $(IOS_TARGET) "$$APP_PATH"; \
 		echo "→ Launching..."; \
-		xcrun simctl launch $(IOS_TARGET) com.unlikeotherai.mollotov; \
+		xcrun simctl launch $(IOS_TARGET) com.unlikeotherai.kelpie; \
 	fi
 
 # ── Android ────────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ macos-build:
 		build
 
 macos-run:
-	@APP_PATH=$$(find apps/macos/.build -name "Mollotov.app" 2>/dev/null | head -1); \
+	@APP_PATH=$$(find apps/macos/.build -name "Kelpie.app" 2>/dev/null | head -1); \
 	echo "→ Launching $$APP_PATH ..."; \
 	open "$$APP_PATH"
 
@@ -190,7 +190,7 @@ linux:
 	fi
 	@if [ -d "$(LINUX_CEF_ROOT)" ]; then \
 		echo "→ Using Linux CEF SDK at $(LINUX_CEF_ROOT)"; \
-		cmake -S native -B native/.build-linux -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DMOLLOTOV_ENABLE_CHROMIUM_DESKTOP=ON; \
+		cmake -S native -B native/.build-linux -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DKELPIE_ENABLE_CHROMIUM_DESKTOP=ON; \
 		cmake --build native/.build-linux; \
 		cmake -S apps/linux -B apps/linux/build -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
 	else \
@@ -203,7 +203,7 @@ linux:
 
 linux-headless-docker:
 	@echo "→ Building Linux headless Docker image..."
-	docker build -t mollotov-linux-headless -f apps/linux/Dockerfile .
+	docker build -t kelpie-linux-headless -f apps/linux/Dockerfile .
 
 windows:
 	@echo "→ Windows cross-compilation from macOS is not configured yet."

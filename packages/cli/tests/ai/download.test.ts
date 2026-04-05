@@ -14,7 +14,7 @@ describe("Hugging Face download", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "mollotov-download-"));
+    dir = mkdtempSync(join(tmpdir(), "kelpie-download-"));
   });
 
   afterEach(() => {
@@ -46,7 +46,7 @@ describe("Hugging Face download", () => {
 
   it("downloads a file atomically and verifies checksum", async () => {
     const destPath = join(dir, "model.gguf");
-    const content = "hello from mollotov";
+    const content = "hello from kelpie";
     const progress: Array<{ downloaded: number; total?: number }> = [];
 
     globalThis.fetch = vi.fn(async () =>

@@ -119,7 +119,7 @@ export function EngineCard({ issue }: Props) {
       {issue.prNumber && (
         <p style={{ fontSize: 13, marginTop: 8 }}>
           <a
-            href={`https://github.com/unlikeotherai/mollotov/pull/${issue.prNumber}`}
+            href={`https://github.com/unlikeotherai/kelpie/pull/${issue.prNumber}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: '#388bfd', textDecoration: 'none' }}

@@ -1,6 +1,6 @@
 #include "network_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 NetworkHandler::NetworkHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -104,4 +104,4 @@ nlohmann::json NetworkHandler::ClearNetworkLog() const {
   return SuccessResponse({{"cleared", count}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

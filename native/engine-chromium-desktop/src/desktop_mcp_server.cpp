@@ -1,13 +1,13 @@
-#include "mollotov/desktop_mcp_server.h"
+#include "kelpie/desktop_mcp_server.h"
 
 #include <algorithm>
 #include <iostream>
 
-#include "mollotov/desktop_router.h"
-#include "mollotov/mcp_registry.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/desktop_router.h"
+#include "kelpie/mcp_registry.h"
+#include "kelpie/response_helpers.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 nlohmann::json JsonRpcResult(const nlohmann::json& id, const nlohmann::json& result) {
@@ -128,4 +128,4 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
   return JsonRpcError(id, -32601, "Unsupported method: " + method);
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

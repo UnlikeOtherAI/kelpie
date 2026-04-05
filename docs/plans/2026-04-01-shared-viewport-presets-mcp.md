@@ -100,8 +100,8 @@ Keep `reset-viewport` as the way to leave named preset mode and return to the pl
 
 ### MCP names
 
-- `mollotov_get_viewport_presets`
-- `mollotov_set_viewport_preset`
+- `kelpie_get_viewport_presets`
+- `kelpie_set_viewport_preset`
 
 ### State rules
 
@@ -143,18 +143,18 @@ Keep `reset-viewport` as the way to leave named preset mode and return to the pl
 
 ## Files
 
-- `apps/ios/Mollotov/Views/BrowserView.swift`
-- `apps/ios/Mollotov/Views/FloatingMenuView.swift`
-- `apps/ios/Mollotov/Handlers/DeviceHandler.swift`
-- `apps/ios/Mollotov/Handlers/BrowserManagementHandler.swift`
-- `apps/android/app/src/main/java/com/mollotov/browser/ui/BrowserScreen.kt`
-- `apps/android/app/src/main/java/com/mollotov/browser/ui/FloatingMenu.kt`
-- `apps/android/app/src/main/java/com/mollotov/browser/handlers/DeviceHandler.kt`
-- `apps/android/app/src/main/java/com/mollotov/browser/handlers/BrowserManagementHandler.kt`
-- `apps/macos/Mollotov/Browser/ViewportState.swift`
-- `apps/macos/Mollotov/Views/URLBarView.swift`
-- `apps/macos/Mollotov/Handlers/DeviceHandler.swift`
-- `apps/macos/Mollotov/Handlers/BrowserManagementHandler.swift`
+- `apps/ios/Kelpie/Views/BrowserView.swift`
+- `apps/ios/Kelpie/Views/FloatingMenuView.swift`
+- `apps/ios/Kelpie/Handlers/DeviceHandler.swift`
+- `apps/ios/Kelpie/Handlers/BrowserManagementHandler.swift`
+- `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- `apps/android/app/src/main/java/com/kelpie/browser/ui/FloatingMenu.kt`
+- `apps/android/app/src/main/java/com/kelpie/browser/handlers/DeviceHandler.kt`
+- `apps/android/app/src/main/java/com/kelpie/browser/handlers/BrowserManagementHandler.kt`
+- `apps/macos/Kelpie/Browser/ViewportState.swift`
+- `apps/macos/Kelpie/Views/URLBarView.swift`
+- `apps/macos/Kelpie/Handlers/DeviceHandler.swift`
+- `apps/macos/Kelpie/Handlers/BrowserManagementHandler.swift`
 - `packages/cli/src/mcp/tools.ts`
 - `docs/api/README.md`
 - `docs/api/core.md`

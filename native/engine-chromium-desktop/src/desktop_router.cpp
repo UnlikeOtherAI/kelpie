@@ -1,12 +1,12 @@
-#include "mollotov/desktop_router.h"
+#include "kelpie/desktop_router.h"
 
 #include <algorithm>
 #include <stdexcept>
 
-#include "mollotov/error_codes.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/error_codes.h"
+#include "kelpie/response_helpers.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 int StatusForResponse(const nlohmann::json& response) {
@@ -63,4 +63,4 @@ std::vector<std::string> DesktopRouter::RegisteredMethods() const {
   return methods;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

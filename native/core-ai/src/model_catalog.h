@@ -4,7 +4,7 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
-namespace mollotov {
+namespace kelpie {
 
 struct ApprovedModel {
   std::string id;
@@ -43,4 +43,4 @@ class ModelCatalog {
                               double disk_free_gb);
 };
 
-}  // namespace mollotov
+}  // namespace kelpie

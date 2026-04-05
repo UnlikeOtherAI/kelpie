@@ -1,9 +1,9 @@
-#include "mollotov/cef_app_factory.h"
+#include "kelpie/cef_app_factory.h"
 
 #include "include/cef_browser_process_handler.h"
 #include "include/cef_command_line.h"
 
-namespace mollotov {
+namespace kelpie {
 
 namespace {
 
@@ -29,4 +29,4 @@ CefRefPtr<CefApp> CreateDesktopCefApp() {
   return new DesktopCefApp();
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

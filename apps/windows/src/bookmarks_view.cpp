@@ -6,7 +6,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -33,7 +33,7 @@ bool BookmarksView::EnsureCreated(HINSTANCE instance, HWND owner) {
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = &BookmarksView::WindowProc;
   window_class.hInstance = instance_;
-  window_class.lpszClassName = L"MollotovBookmarksView";
+  window_class.lpszClassName = L"KelpieBookmarksView";
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   RegisterClassW(&window_class);
 
@@ -136,4 +136,4 @@ void BookmarksView::Populate() {
   }
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

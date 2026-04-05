@@ -11,11 +11,11 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#include "mollotov/error_codes.h"
-#include "mollotov/platform.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/error_codes.h"
+#include "kelpie/platform.h"
+#include "kelpie/response_helpers.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 constexpr char kAppVersion[] = "0.1.0";
@@ -244,4 +244,4 @@ WindowsApp::json WindowsApp::CurrentUrlResponse() const {
   });
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

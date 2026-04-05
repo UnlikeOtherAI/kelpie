@@ -11,7 +11,7 @@ Set up the pnpm monorepo structure and create the shared TypeScript types packag
 ## Files to Create
 
 ```
-mollotov/
+kelpie/
   .gitignore
   .npmrc
   pnpm-workspace.yaml
@@ -19,7 +19,7 @@ mollotov/
   tsconfig.base.json                    # shared TS config
   packages/
     shared/
-      package.json                      # @unlike-other-ai/mollotov-shared
+      package.json                      # @unlike-other-ai/kelpie-shared
       tsconfig.json
       src/
         index.ts                        # barrel export
@@ -29,7 +29,7 @@ mollotov/
         mcp-tools.ts                    # MCP tool name constants
         constants.ts                    # port, mDNS service type, API version prefix
     cli/
-      package.json                      # @unlike-other-ai/mollotov (stub)
+      package.json                      # @unlike-other-ai/kelpie (stub)
       tsconfig.json
   apps/
     ios/.gitkeep
@@ -49,7 +49,7 @@ packages:
 Create root `package.json`:
 ```json
 {
-  "name": "mollotov-monorepo",
+  "name": "kelpie-monorepo",
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
@@ -74,7 +74,7 @@ Create `tsconfig.base.json` with strict mode, ES2022 target, NodeNext module res
 Create `packages/shared/package.json`:
 ```json
 {
-  "name": "@unlike-other-ai/mollotov-shared",
+  "name": "@unlike-other-ai/kelpie-shared",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -91,7 +91,7 @@ Create `packages/shared/package.json`:
 
 ### 3. Type definitions
 
-**`constants.ts`** — Default port (8420), mDNS service type (`_mollotov._tcp`), API version prefix (`/v1/`), MCP tool prefix (`mollotov_`).
+**`constants.ts`** — Default port (8420), mDNS service type (`_kelpie._tcp`), API version prefix (`/v1/`), MCP tool prefix (`kelpie_`).
 
 **`error-codes.ts`** — Enum of all error codes from docs/api/README.md: `ELEMENT_NOT_FOUND`, `ELEMENT_NOT_VISIBLE`, `TIMEOUT`, `NAVIGATION_ERROR`, `INVALID_SELECTOR`, `INVALID_PARAMS`, `WEBVIEW_ERROR`, `IFRAME_ACCESS_DENIED`, `WATCH_NOT_FOUND`, `ANNOTATION_EXPIRED`, `PLATFORM_NOT_SUPPORTED`, `PERMISSION_REQUIRED`, `SHADOW_ROOT_CLOSED`. Plus the `ErrorResponse` type.
 
@@ -112,7 +112,7 @@ Create `packages/shared/package.json`:
 
 ### 4. CLI package stub
 
-Create `packages/cli/package.json` with name `@unlike-other-ai/mollotov`, version `0.1.0`, dependency on `@unlike-other-ai/mollotov-shared`.
+Create `packages/cli/package.json` with name `@unlike-other-ai/kelpie`, version `0.1.0`, dependency on `@unlike-other-ai/kelpie-shared`.
 
 ### 5. Build and verify
 
@@ -136,7 +136,7 @@ git add -A && git commit -m "feat: monorepo scaffold and shared types package"
 - [ ] `pnpm build` succeeds in `packages/shared/`
 - [ ] All API types from docs/api/ are represented (cross-reference against MCP tool table)
 - [ ] Error codes match docs/api/README.md exactly
-- [ ] Constants match documented values (port 8420, `_mollotov._tcp`, `/v1/`)
+- [ ] Constants match documented values (port 8420, `_kelpie._tcp`, `/v1/`)
 - [ ] `packages/cli/` exists with correct package name and dependency on shared
 - [ ] `apps/ios/` and `apps/android/` directories exist
 - [ ] `.gitignore` excludes `node_modules/`, `dist/`, `*.tsbuildinfo`

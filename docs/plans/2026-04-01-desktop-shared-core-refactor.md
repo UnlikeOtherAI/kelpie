@@ -1,6 +1,6 @@
 # Desktop Shared Core Refactor Plan
 
-**Goal:** Refactor the browser-app side of Mollotov so that the shared browser protocol, MCP interface, state stores, and renderer-agnostic automation logic live in reusable libraries, while platform shells stay thin.
+**Goal:** Refactor the browser-app side of Kelpie so that the shared browser protocol, MCP interface, state stores, and renderer-agnostic automation logic live in reusable libraries, while platform shells stay thin.
 
 **Scope:** This plan covers the shared refactor and implementation sequence for the browser app side only. The Node CLI remains in TypeScript. Platform-specific delivery for Linux and Windows is split into separate plans.
 
@@ -14,9 +14,9 @@
 
 The current repo already has the right external seam:
 
-- shared HTTP contract in [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/mollotov/packages/shared/src/api-types.ts)
-- shared MCP tool names in [`packages/shared/src/mcp-tools.ts`](/System/Volumes/Data/.internal/projects/Projects/mollotov/packages/shared/src/mcp-tools.ts)
-- renderer abstraction and handler context on macOS in [`apps/macos/Mollotov/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Renderer/RendererEngine.swift) and [`apps/macos/Mollotov/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/macos/Mollotov/Handlers/HandlerContext.swift)
+- shared HTTP contract in [`packages/shared/src/api-types.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/api-types.ts)
+- shared MCP tool names in [`packages/shared/src/mcp-tools.ts`](/System/Volumes/Data/.internal/projects/Projects/kelpie/packages/shared/src/mcp-tools.ts)
+- renderer abstraction and handler context on macOS in [`apps/macos/Kelpie/Renderer/RendererEngine.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Renderer/RendererEngine.swift) and [`apps/macos/Kelpie/Handlers/HandlerContext.swift`](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/macos/Kelpie/Handlers/HandlerContext.swift)
 
 What is missing is a reusable internal core. Right now the external contract is shared, but the browser-app implementation is not.
 
@@ -237,13 +237,13 @@ Minimum availability metadata:
 
 Example cases:
 
-- `mollotov_safari_auth`
+- `kelpie_safari_auth`
   - platforms: `ios`, `macos`
   - requires UI: `true`
-- `mollotov_set_renderer`
+- `kelpie_set_renderer`
   - platforms: `ios` (EU/UK/JP only), `android`, `macos`, `windows`, `linux`
   - engines: `webkit` (iOS/macOS), `chromium` (all), `gecko` (all)
-- `mollotov_show_keyboard`
+- `kelpie_show_keyboard`
   - platforms: `ios`, `android`
   - requires UI: `true`
 

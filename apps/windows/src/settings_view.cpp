@@ -8,7 +8,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 class SettingsDialogState {
@@ -117,7 +117,7 @@ bool SettingsView::ShowModal(HINSTANCE instance,
                              HWND owner,
                              const SettingsValues& initial_values,
                              SettingsValues& updated_values) {
-  const wchar_t kClassName[] = L"MollotovSettingsDialog";
+  const wchar_t kClassName[] = L"KelpieSettingsDialog";
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = &SettingsProc;
   window_class.hInstance = instance;
@@ -150,4 +150,4 @@ bool SettingsView::ShowModal(HINSTANCE instance,
   return state.accepted;
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

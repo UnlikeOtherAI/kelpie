@@ -26,7 +26,7 @@ export async function startHttp(server: McpServer, port: number): Promise<void> 
 
   await server.connect(transport);
   httpServer.listen(port, () => {
-    console.error(`Mollotov MCP server listening on http://localhost:${port}/mcp`);
+    console.error(`Kelpie MCP server listening on http://localhost:${port}/mcp`);
   });
 
   await new Promise<void>((resolve) => {

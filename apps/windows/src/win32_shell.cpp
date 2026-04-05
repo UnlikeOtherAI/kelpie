@@ -7,7 +7,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 constexpr UINT kToastMessage = WM_APP + 1;
@@ -26,9 +26,9 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height) {
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = &Win32Shell::WindowProc;
   window_class.hInstance = instance_;
-  window_class.lpszClassName = L"Mollotov";
+  window_class.lpszClassName = L"Kelpie";
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  window_class.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_MOLLOTOV));
+  window_class.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_KELPIE));
   window_class.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
   RegisterClassExW(&window_class);
 
@@ -56,7 +56,7 @@ void Win32Shell::UpdateBrowserState(const BrowserState& state) {
   url_bar_.SetNavigationState(state.can_go_back, state.can_go_forward, state.is_loading);
   if (!state.title.empty()) {
     std::wstring title(state.title.begin(), state.title.end());
-    SetWindowTextW(hwnd_, (title + L" - Mollotov").c_str());
+    SetWindowTextW(hwnd_, (title + L" - Kelpie").c_str());
   }
 }
 
@@ -186,4 +186,4 @@ void Win32Shell::LayoutChildren(int width, int height) {
   toast_.Resize(rect);
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

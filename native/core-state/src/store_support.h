@@ -17,7 +17,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::store_support {
+namespace kelpie::store_support {
 
 using json = nlohmann::json;
 
@@ -135,4 +135,4 @@ inline std::optional<T> OptionalValue(const json& object, const char* key) {
   return it->get<T>();
 }
 
-}  // namespace mollotov::store_support
+}  // namespace kelpie::store_support

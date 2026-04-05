@@ -4,7 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 StubRenderer::StubRenderer(std::string initial_url) {
   NavigateInternal(initial_url.empty() ? "about:blank" : std::move(initial_url), true);
@@ -112,4 +112,4 @@ void StubRenderer::ApplyHistoryEntry() {
   title_ = TitleForUrl(current_url_);
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

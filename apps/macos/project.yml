@@ -1,28 +1,28 @@
-name: Mollotov
+name: Kelpie
 packages:
   AppReveal:
     path: vendor/AppReveal/iOS
 options:
-  bundleIdPrefix: com.mollotov
+  bundleIdPrefix: com.kelpie
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "16.0"
 
 targets:
-  Mollotov:
+  Kelpie:
     type: application
     platform: macOS
     sources:
-      - path: Mollotov
+      - path: Kelpie
         excludes:
           - "**/*.plist"
-      - path: Mollotov/Resources
+      - path: Kelpie/Resources
         buildPhase: resources
         type: folder
     dependencies:
       - framework: Frameworks/Chromium Embedded Framework.framework
         embed: false
-      - target: MollotovHelper
+      - target: KelpieHelper
       - package: AppReveal
         product: AppReveal
     preBuildScripts:
@@ -50,9 +50,9 @@ targets:
           ln -sf "Versions/Current/Chromium Embedded Framework" "$CEF_DST/Chromium Embedded Framework"
           ln -sf Versions/Current/Resources "$CEF_DST/Resources"
         basedOnDependencyAnalysis: false
-      - name: Embed MollotovHelper
+      - name: Embed KelpieHelper
         script: |
-          HELPER_EXE="${BUILT_PRODUCTS_DIR}/MollotovHelper"
+          HELPER_EXE="${BUILT_PRODUCTS_DIR}/KelpieHelper"
           HELPER_ROOT="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 
           stage_helper() {
@@ -85,34 +85,34 @@ targets:
           }
 
           rm -rf \
-            "${HELPER_ROOT}/Mollotov Helper.app" \
-            "${HELPER_ROOT}/Mollotov Helper (Renderer).app" \
-            "${HELPER_ROOT}/Mollotov Helper (GPU).app" \
-            "${HELPER_ROOT}/Mollotov Helper (Plugin).app" \
-            "${HELPER_ROOT}/Mollotov Helper (Alerts).app"
+            "${HELPER_ROOT}/Kelpie Helper.app" \
+            "${HELPER_ROOT}/Kelpie Helper (Renderer).app" \
+            "${HELPER_ROOT}/Kelpie Helper (GPU).app" \
+            "${HELPER_ROOT}/Kelpie Helper (Plugin).app" \
+            "${HELPER_ROOT}/Kelpie Helper (Alerts).app"
 
-          stage_helper "Mollotov Helper" "com.mollotov.browser.helper"
-          stage_helper "Mollotov Helper (Renderer)" "com.mollotov.browser.helper.renderer"
-          stage_helper "Mollotov Helper (GPU)" "com.mollotov.browser.helper.gpu"
-          stage_helper "Mollotov Helper (Plugin)" "com.mollotov.browser.helper.plugin"
-          stage_helper "Mollotov Helper (Alerts)" "com.mollotov.browser.helper.alerts"
+          stage_helper "Kelpie Helper" "com.kelpie.browser.helper"
+          stage_helper "Kelpie Helper (Renderer)" "com.kelpie.browser.helper.renderer"
+          stage_helper "Kelpie Helper (GPU)" "com.kelpie.browser.helper.gpu"
+          stage_helper "Kelpie Helper (Plugin)" "com.kelpie.browser.helper.plugin"
+          stage_helper "Kelpie Helper (Alerts)" "com.kelpie.browser.helper.alerts"
         basedOnDependencyAnalysis: false
       - name: Embed Gecko Helper
         script: |
-          GECKO_SRC="${PROJECT_DIR}/Frameworks/MollotovGeckoHelper.app"
-          GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/MollotovGeckoHelper.app"
+          GECKO_SRC="${PROJECT_DIR}/Frameworks/KelpieGeckoHelper.app"
+          GECKO_DST="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/KelpieGeckoHelper.app"
           if [ -d "$GECKO_SRC" ]; then
             rm -rf "$GECKO_DST"
             cp -R "$GECKO_SRC" "$GECKO_DST"
             codesign -fs - "$GECKO_DST" 2>/dev/null || true
             echo "Gecko helper embedded at $GECKO_DST"
           else
-            echo "warning: MollotovGeckoHelper.app not found — run 'make gecko-runtime' first"
+            echo "warning: KelpieGeckoHelper.app not found — run 'make gecko-runtime' first"
           fi
         basedOnDependencyAnalysis: false
     settings:
       base:
-        SWIFT_OBJC_BRIDGING_HEADER: Mollotov/Mollotov-Bridging-Header.h
+        SWIFT_OBJC_BRIDGING_HEADER: Kelpie/Kelpie-Bridging-Header.h
         FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks"
         HEADER_SEARCH_PATHS:
           - "$(PROJECT_DIR)/Frameworks/cef_include"
@@ -132,11 +132,11 @@ targets:
           - "/opt/homebrew/opt/openssl/lib"
           - "/opt/homebrew/opt/brotli/lib"
         OTHER_LDFLAGS:
-          - "-lmollotov_core_state"
-          - "-lmollotov_core_protocol"
-          - "-lmollotov_core_automation"
-          - "-lmollotov_core_mcp"
-          - "-lmollotov_core_ai"
+          - "-lkelpie_core_state"
+          - "-lkelpie_core_protocol"
+          - "-lkelpie_core_automation"
+          - "-lkelpie_core_mcp"
+          - "-lkelpie_core_ai"
           - "-lssl"
           - "-lcrypto"
           - "-lz"
@@ -153,20 +153,20 @@ targets:
           - "-framework Accelerate"
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
         SWIFT_IMPORT_PATHS: "$(PROJECT_DIR)/vendor/llama.cpp/include"
-        CODE_SIGN_ENTITLEMENTS: Mollotov/Mollotov.entitlements
-        INFOPLIST_FILE: Mollotov/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.mollotov.browser.macos
+        CODE_SIGN_ENTITLEMENTS: Kelpie/Kelpie.entitlements
+        INFOPLIST_FILE: Kelpie/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.kelpie.browser.macos
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: false
         VALIDATE_PRODUCT: false
     entitlements:
-      path: Mollotov/Mollotov.entitlements
+      path: Kelpie/Kelpie.entitlements
 
-  MollotovHelper:
+  KelpieHelper:
     type: tool
     platform: macOS
     sources:
-      - path: MollotovHelper
+      - path: KelpieHelper
         excludes:
           - "**/*.plist"
     dependencies:
@@ -177,5 +177,5 @@ targets:
         FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks"
         HEADER_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks/cef_include"
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../../../../Frameworks"
-        INFOPLIST_FILE: MollotovHelper/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.mollotov.browser.helper
+        INFOPLIST_FILE: KelpieHelper/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.kelpie.browser.helper

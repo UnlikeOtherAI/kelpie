@@ -1,4 +1,4 @@
-#include "mollotov/bookmark_store.h"
+#include "kelpie/bookmark_store.h"
 
 #include <algorithm>
 
@@ -6,7 +6,7 @@
 
 #include "store_support.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 using json = nlohmann::json;
@@ -90,4 +90,4 @@ std::int32_t BookmarkStore::Count() const {
   return static_cast<std::int32_t>(bookmarks_.size());
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

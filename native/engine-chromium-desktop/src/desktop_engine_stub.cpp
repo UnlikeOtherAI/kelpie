@@ -1,6 +1,6 @@
-#include "mollotov/desktop_engine.h"
+#include "kelpie/desktop_engine.h"
 
-namespace mollotov {
+namespace kelpie {
 
 class DesktopEngine::Impl {
  public:
@@ -70,4 +70,4 @@ const CefRenderer& DesktopEngine::renderer() const {
   return *renderer_;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

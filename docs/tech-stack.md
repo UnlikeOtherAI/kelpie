@@ -1,4 +1,4 @@
-# Mollotov — Tech Stack
+# Kelpie — Tech Stack
 
 ## Platform Matrix
 
@@ -8,7 +8,7 @@
 | **Android App** | Jetpack Compose + WebView | Kotlin | Chrome DevTools Protocol for DOM access |
 | **macOS App** | SwiftUI + WKWebView + CEF | Swift | Dual Safari/WebKit and Chrome/Chromium renderers, macOS 14+ |
 | **Linux App** | C++17 + GTK3 + CEF + Avahi | C++ | Chromium-only desktop shell with optional headless mode |
-| **CLI** | Node.js | TypeScript | Published as `@unlikeotherai/mollotov` |
+| **CLI** | Node.js | TypeScript | Published as `@unlikeotherai/kelpie` |
 | **MCP Servers** | MCP SDK | Per-platform | Browser-embedded + CLI standalone |
 
 ---
@@ -32,12 +32,12 @@
 ```xml
 <!-- Local network access prompt (required iOS 14+) -->
 <key>NSLocalNetworkUsageDescription</key>
-<string>Mollotov uses the local network to receive browser automation commands from the CLI.</string>
+<string>Kelpie uses the local network to receive browser automation commands from the CLI.</string>
 
 <!-- Bonjour service types for mDNS (required for NWListener/NWBrowser) -->
 <key>NSBonjourServices</key>
 <array>
-  <string>_mollotov._tcp</string>
+  <string>_kelpie._tcp</string>
 </array>
 ```
 
@@ -98,7 +98,7 @@ Both paths are available. CDP is preferred for DOM operations because:
 | **Browser Engines** | `WKWebView` + CEF + Gecko | Runtime switching between Safari/WebKit, Chrome/Chromium, and Firefox/Gecko |
 | **Renderer Abstraction** | Shared Swift protocol over all engines | Keeps one handler surface for navigation, JS, screenshots, and cookies |
 | **CEF Integration** | Objective-C++ bridge over the CEF C API | Exposes Chromium safely to Swift code |
-| **Gecko Integration** | Bundled Firefox runtime via CDP subprocess | Firefox binary bundled in `Frameworks/MollotovGeckoHelper.app`; run `make gecko-runtime` once to download |
+| **Gecko Integration** | Bundled Firefox runtime via CDP subprocess | Firefox binary bundled in `Frameworks/KelpieGeckoHelper.app`; run `make gecko-runtime` once to download |
 | **HTTP Server / mDNS** | Network.framework | Reuses Apple-native local networking primitives on macOS |
 | **Min Target** | macOS 14+ | Required for the native app baseline and SwiftUI app lifecycle |
 
@@ -125,13 +125,13 @@ Both paths are available. CDP is preferred for DOM operations because:
 | **Output Formatting** | [chalk](https://www.npmjs.com/package/chalk) + [cli-table3](https://www.npmjs.com/package/cli-table3) | Terminal colors + table formatting |
 | **Build** | [tsup](https://github.com/egoist/tsup) | Fast bundler for CLI distribution |
 | **Package Manager** | pnpm | Workspace-aware, fast, disk-efficient |
-| **Publishing** | npm as `@unlikeotherai/mollotov` | Scoped under org |
+| **Publishing** | npm as `@unlikeotherai/kelpie` | Scoped under org |
 
 ### CLI — Project Structure
 
 ```
 packages/
-  cli/                    # @unlikeotherai/mollotov
+  cli/                    # @unlikeotherai/kelpie
     src/
       commands/           # Commander command definitions
       discovery/          # mDNS browser discovery
@@ -140,7 +140,7 @@ packages/
       mcp/                # MCP server implementation
       help/               # LLM help system
     bin/
-      mollotov.ts         # Entry point
+      kelpie.ts         # Entry point
     package.json
 ```
 
@@ -152,7 +152,7 @@ packages/
 |---|---|---|
 | **Protocol** | HTTP/JSON | All browser-CLI communication over REST |
 | **MCP Transport** | Streamable HTTP (SSE) | Standard MCP transport for both browser and CLI servers |
-| **mDNS Service Type** | `_mollotov._tcp` | Service discovery identifier |
+| **mDNS Service Type** | `_kelpie._tcp` | Service discovery identifier |
 | **mDNS TXT Records** | `id`, `name`, `model`, `platform`, `width`, `height`, `port`, `version` | Device metadata for discovery |
 | **API Versioning** | URL prefix `/v1/` | Forward-compatible |
 | **Image Format** | PNG (screenshots) | Lossless, LLM-friendly |
@@ -164,7 +164,7 @@ packages/
 ## Repository Structure
 
 ```
-mollotov/
+kelpie/
   native/
     core-protocol/        # Shared native protocol constants and enums
     core-state/           # Shared native bookmark/history/console/network stores
@@ -172,12 +172,12 @@ mollotov/
     core-mcp/             # Shared browser-side MCP registry
     engine-chromium-desktop/ # Shared CEF-based desktop engine for Linux/Windows shells
   packages/
-    cli/                  # Node.js CLI — @unlikeotherai/mollotov
+    cli/                  # Node.js CLI — @unlikeotherai/kelpie
     shared/               # Shared TypeScript types and constants
   apps/
-    ios/                  # Xcode project — Mollotov Browser
-    android/              # Android Studio project — Mollotov Browser
-    macos/                # Xcode project — Mollotov Browser for macOS
+    ios/                  # Xcode project — Kelpie Browser
+    android/              # Android Studio project — Kelpie Browser
+    macos/                # Xcode project — Kelpie Browser for macOS
     linux/                # Linux app shell consuming the shared desktop engine
     windows/              # Windows app shell consuming the shared desktop engine
   docs/                   # This documentation
@@ -223,7 +223,7 @@ WebView, NsdManager, PixelCopy are all Android SDK built-ins.
 
 | Component | Build Command | Run Command |
 |---|---|---|
-| CLI | `pnpm build` | `mollotov` (global) or `pnpm dev` |
+| CLI | `pnpm build` | `kelpie` (global) or `pnpm dev` |
 | iOS | Xcode build | Run on device/simulator |
 | Android | `./gradlew assembleDebug` | Run on device/emulator |
 | macOS | Xcode build | Run on Mac |

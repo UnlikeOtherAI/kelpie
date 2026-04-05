@@ -56,7 +56,7 @@ This change is limited to the macOS app.
   - Apple Silicon vs Ollama-only mode
   - active backend/model/capabilities
   - Ollama endpoint and reachability
-  - downloaded native models from `~/.mollotov/models/*/metadata.json`
+  - downloaded native models from `~/.kelpie/models/*/metadata.json`
   - detected Ollama models from `/api/tags`
 - Keep inference execution in `InferenceEngine` and handler routing in `AIHandler`.
 - Do not add a downloader in this change. The models UI will support load/unload and reflect downloaded/native inventory plus Ollama inventory.
@@ -82,19 +82,19 @@ The detachable unpinned window and magnetic re-docking are intentionally exclude
 
 ## Files Expected To Change
 
-- `apps/macos/Mollotov/Views/BrowserView.swift`
-- `apps/macos/Mollotov/Views/URLBarView.swift`
-- `apps/macos/Mollotov/Views/SettingsView.swift`
-- `apps/macos/Mollotov/Views/FloatingMenuView.swift`
-- `apps/macos/Mollotov/AI/AIState.swift`
-- `apps/macos/Mollotov/MollotovApp.swift`
+- `apps/macos/Kelpie/Views/BrowserView.swift`
+- `apps/macos/Kelpie/Views/URLBarView.swift`
+- `apps/macos/Kelpie/Views/SettingsView.swift`
+- `apps/macos/Kelpie/Views/FloatingMenuView.swift`
+- `apps/macos/Kelpie/AI/AIState.swift`
+- `apps/macos/Kelpie/KelpieApp.swift`
 
 New views are likely:
 
-- `apps/macos/Mollotov/Views/AIChatPanel.swift`
-- `apps/macos/Mollotov/Views/AIChatView.swift`
-- `apps/macos/Mollotov/Views/AIModelListView.swift`
-- `apps/macos/Mollotov/Views/AIStatusPill.swift`
+- `apps/macos/Kelpie/Views/AIChatPanel.swift`
+- `apps/macos/Kelpie/Views/AIChatView.swift`
+- `apps/macos/Kelpie/Views/AIModelListView.swift`
+- `apps/macos/Kelpie/Views/AIStatusPill.swift`
 
 ## Acceptance Criteria
 

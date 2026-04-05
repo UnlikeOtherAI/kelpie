@@ -1,4 +1,4 @@
-# Mollotov API — Core Methods
+# Kelpie API — Core Methods
 
 Navigation, screenshots, DOM access, interaction, scrolling, viewport/device info, wait/sync.
 
@@ -643,7 +643,7 @@ Response:
   "network": {
     "ip": "192.168.1.42",
     "port": 8420,
-    "mdnsName": "my-iphone._mollotov._tcp.local",
+    "mdnsName": "my-iphone._kelpie._tcp.local",
     "networkType": "wifi",
     "ssid": "MyNetwork"
   },

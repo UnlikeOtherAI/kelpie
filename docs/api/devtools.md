@@ -1,4 +1,4 @@
-# Mollotov API — DevTools Methods
+# Kelpie API — DevTools Methods
 
 Console/JS errors, network log, resource timeline, mutation observation, shadow DOM, request interception.
 
@@ -231,7 +231,7 @@ Response:
 ```
 
 ### `snapshot-3d-enter`
-Enter 3D DOM inspection mode. Explodes the page into a layered depth view. Requires the 3D inspector feature flag to be enabled (Settings toggle or `MOLLOTOV_3D_INSPECTOR=1` environment variable).
+Enter 3D DOM inspection mode. Explodes the page into a layered depth view. Requires the 3D inspector feature flag to be enabled (Settings toggle or `KELPIE_3D_INSPECTOR=1` environment variable).
 
 - Method: POST
 - Body: none

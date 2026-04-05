@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class UrlBarDelegate {
  public:
@@ -48,4 +48,4 @@ class UrlBar {
   WNDPROC original_edit_proc_ = nullptr;
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

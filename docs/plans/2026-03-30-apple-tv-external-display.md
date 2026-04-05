@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** When an iPhone running Mollotov connects to an Apple TV via AirPlay, display a fullscreen WKWebView on the TV that appears as a separate controllable device on the network.
+**Goal:** When an iPhone running Kelpie connects to an Apple TV via AirPlay, display a fullscreen WKWebView on the TV that appears as a separate controllable device on the network.
 
 **Architecture:** Listen for `UIScreen.didConnectNotification` (works iOS 15+). When an external screen connects, spin up a second `ServerState` on port 8421 with its own `BrowserState`, `HandlerContext`, `WKWebView`, and mDNS advertisement. The external display advertises as "{DeviceName} (TV)" so the CLI sees it as a distinct device. When the screen disconnects, tear everything down.
 
@@ -15,7 +15,7 @@
 Fullscreen SwiftUI view containing just a WKWebView — no URL bar, no floating menu, no welcome card. This is what renders on the Apple TV.
 
 **Files:**
-- Create: `apps/ios/Mollotov/Views/ExternalBrowserView.swift`
+- Create: `apps/ios/Kelpie/Views/ExternalBrowserView.swift`
 
 **Step 1: Write the view**
 
@@ -44,7 +44,7 @@ struct ExternalBrowserView: View {
 
 **Step 2: Add to Xcode project**
 
-Add `ExternalBrowserView.swift` to the Views group in `Mollotov.xcodeproj/project.pbxproj`:
+Add `ExternalBrowserView.swift` to the Views group in `Kelpie.xcodeproj/project.pbxproj`:
 - PBXFileReference: `B100000042` → `ExternalBrowserView.swift`
 - PBXGroup (Views `D100000003`): add to children
 - PBXBuildFile: `A100000042` → Sources
@@ -53,7 +53,7 @@ Add `ExternalBrowserView.swift` to the Views group in `Mollotov.xcodeproj/projec
 **Step 3: Commit**
 
 ```bash
-git add apps/ios/Mollotov/Views/ExternalBrowserView.swift apps/ios/Mollotov.xcodeproj/project.pbxproj
+git add apps/ios/Kelpie/Views/ExternalBrowserView.swift apps/ios/Kelpie.xcodeproj/project.pbxproj
 git commit -m "feat(ios): add ExternalBrowserView for Apple TV display"
 ```
 
@@ -64,8 +64,8 @@ git commit -m "feat(ios): add ExternalBrowserView for Apple TV display"
 Singleton that monitors screen connections and manages the external window + server lifecycle.
 
 **Files:**
-- Create: `apps/ios/Mollotov/Browser/ExternalDisplayManager.swift`
-- Modify: `apps/ios/Mollotov/Device/DeviceInfo.swift` — add `externalDisplay(port:screenSize:)` factory
+- Create: `apps/ios/Kelpie/Browser/ExternalDisplayManager.swift`
+- Modify: `apps/ios/Kelpie/Device/DeviceInfo.swift` — add `externalDisplay(port:screenSize:)` factory
 
 **Step 1: Add `externalDisplay` factory to DeviceInfo**
 
@@ -187,24 +187,24 @@ Add `ExternalDisplayManager.swift` to the Browser group in `project.pbxproj`:
 **Step 4: Commit**
 
 ```bash
-git add apps/ios/Mollotov/Browser/ExternalDisplayManager.swift \
-        apps/ios/Mollotov/Device/DeviceInfo.swift \
-        apps/ios/Mollotov.xcodeproj/project.pbxproj
+git add apps/ios/Kelpie/Browser/ExternalDisplayManager.swift \
+        apps/ios/Kelpie/Device/DeviceInfo.swift \
+        apps/ios/Kelpie.xcodeproj/project.pbxproj
 git commit -m "feat(ios): add ExternalDisplayManager for Apple TV AirPlay"
 ```
 
 ---
 
-### Task 3: Wire into MollotovApp
+### Task 3: Wire into KelpieApp
 
 Start external display monitoring when the app launches.
 
 **Files:**
-- Modify: `apps/ios/Mollotov/MollotovApp.swift`
+- Modify: `apps/ios/Kelpie/KelpieApp.swift`
 
 **Step 1: Add monitoring to startServices()**
 
-In `MollotovApp.swift`, add `ExternalDisplayManager.shared.startMonitoring()` to `startServices()`:
+In `KelpieApp.swift`, add `ExternalDisplayManager.shared.startMonitoring()` to `startServices()`:
 
 ```swift
 private func startServices() {
@@ -222,7 +222,7 @@ No additional state objects needed — `ExternalDisplayManager` is a self-contai
 **Step 2: Commit**
 
 ```bash
-git add apps/ios/Mollotov/MollotovApp.swift
+git add apps/ios/Kelpie/KelpieApp.swift
 git commit -m "feat(ios): start external display monitoring on app launch"
 ```
 

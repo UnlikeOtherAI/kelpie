@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Downloads a pinned Firefox release, strips Mozilla branding, and places the
-# result as apps/macos/Frameworks/MollotovGeckoHelper.app.
+# result as apps/macos/Frameworks/KelpieGeckoHelper.app.
 # Run once: make gecko-runtime
 set -euo pipefail
 
 FIREFOX_VERSION="122.0.1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEST_DIR="$SCRIPT_DIR/../apps/macos/Frameworks"
-HELPER_APP="$DEST_DIR/MollotovGeckoHelper.app"
-TMP_DMG="/tmp/mollotov-gecko-${FIREFOX_VERSION}.dmg"
-MOUNT_POINT="/Volumes/MollotovFirefoxSetup"
+HELPER_APP="$DEST_DIR/KelpieGeckoHelper.app"
+TMP_DMG="/tmp/kelpie-gecko-${FIREFOX_VERSION}.dmg"
+MOUNT_POINT="/Volumes/KelpieFirefoxSetup"
 
 if [ -d "$HELPER_APP" ]; then
-  echo "MollotovGeckoHelper.app already present. Delete it to re-download."
+  echo "KelpieGeckoHelper.app already present. Delete it to re-download."
   exit 0
 fi
 
@@ -38,13 +38,13 @@ plist_set_or_add() {
   /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "$PLIST" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "$PLIST"
 }
-plist_set_or_add string CFBundleIdentifier  com.mollotov.gecko-helper
-plist_set_or_add string CFBundleName        MollotovGeckoHelper
-plist_set_or_add string CFBundleDisplayName MollotovGeckoHelper
+plist_set_or_add string CFBundleIdentifier  com.kelpie.gecko-helper
+plist_set_or_add string CFBundleName        KelpieGeckoHelper
+plist_set_or_add string CFBundleDisplayName KelpieGeckoHelper
 plist_set_or_add bool   LSUIElement         true
 
 echo "Re-signing with ad-hoc identity..."
 codesign --remove-signature "$HELPER_APP" 2>/dev/null || true
 codesign -fs - "$HELPER_APP" 2>/dev/null || true
 
-echo "MollotovGeckoHelper.app ready at $HELPER_APP"
+echo "KelpieGeckoHelper.app ready at $HELPER_APP"

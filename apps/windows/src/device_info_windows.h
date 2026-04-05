@@ -5,9 +5,9 @@
 
 #include <nlohmann/json.hpp>
 
-#include "mollotov/types.h"
+#include "kelpie/types.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 struct DeviceInfo {
   std::string id;
@@ -39,4 +39,4 @@ class DeviceInfoWindows {
   std::filesystem::path profile_dir_;
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

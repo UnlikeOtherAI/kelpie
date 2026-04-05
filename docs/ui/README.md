@@ -1,4 +1,4 @@
-# Mollotov — UI Documentation
+# Kelpie — UI Documentation
 
 ## Index
 
@@ -22,7 +22,7 @@
 - Device presets simulate phone, tablet, and laptop viewports inside the shell instead of resizing the native window, and oversized viewports scroll instead of scaling down.
 - The native window title mirrors the current page title, and the titlebar shows the live viewport resolution in a pill aligned to the right.
 - The macOS shell shows the same welcome card used on iOS until dismissed, including the persisted "Don't show this again" preference, and the card can be reopened from `Help > Show Welcome Screen` even when that preference is enabled.
-- The macOS `Help` menu also links to the Mollotov website, the GitHub repository, and `unlikeotherai.com`.
+- The macOS `Help` menu also links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`.
 - The active macOS browser scene maps `Cmd+R` to a hard refresh. WebKit uses `reloadFromOrigin()`, and Chromium uses CEF's cache-bypassing reload path.
 - MCP and HTTP `toast` messages render as a native bottom card in the macOS shell, not as an injected page overlay.
 - Floating menu actions show custom black hover pills with a grey border and short labels instead of native macOS tooltips.

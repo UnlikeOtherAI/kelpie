@@ -1,8 +1,8 @@
-#include "mollotov/response_helpers.h"
+#include "kelpie/response_helpers.h"
 
 #include <stdexcept>
 
-namespace mollotov {
+namespace kelpie {
 
 nlohmann::json SuccessResponse(const nlohmann::json& data) {
   nlohmann::json response = {{"success", true}};
@@ -30,4 +30,4 @@ nlohmann::json ErrorResponse(std::string_view code, std::string_view message) {
   };
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

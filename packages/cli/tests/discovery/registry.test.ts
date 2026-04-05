@@ -39,7 +39,7 @@ describe("device registry", () => {
   });
 
   beforeEach(async () => {
-    homeDir = await mkdtemp(path.join(os.tmpdir(), "mollotov-registry-"));
+    homeDir = await mkdtemp(path.join(os.tmpdir(), "kelpie-registry-"));
     process.env.HOME = homeDir;
   });
 
@@ -111,7 +111,7 @@ describe("device registry", () => {
     expect(deviceCount()).toBe(0);
   });
 
-  it("resolves a launched local browser alias from ~/.mollotov", async () => {
+  it("resolves a launched local browser alias from ~/.kelpie", async () => {
     await upsertBrowserAlias("claude-a", { platform: "macos" });
     await setRunningBrowser("claude-a", {
       port: 8427,

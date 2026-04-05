@@ -1,4 +1,4 @@
-import { API_VERSION_PREFIX } from "@unlikeotherai/mollotov-shared";
+import { API_VERSION_PREFIX } from "@unlikeotherai/kelpie-shared";
 import type { DiscoveredDevice } from "../types.js";
 
 export interface HttpResponse<T = unknown> {

@@ -1,0 +1,608 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1175893C3157411BB4B63C6D /* HistoryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B6D15DFA38F44B4B6FAF87A /* HistoryHandler.swift */; };
+		154AD08F226A4320A1989AB4 /* NetworkInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43743BF12FB4153846B26F0 /* NetworkInspectorView.swift */; };
+		3F764BF16D374126B3F53B9D /* BookmarksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18084C632DD449F8D789F86 /* BookmarksView.swift */; };
+		557BEEFEC864450EB89DE351 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF936A1AD0C457183D75A46 /* HistoryStore.swift */; };
+		880BA6CECAFD41D5BF973D93 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97A9457AB5504B3B83606F95 /* HistoryView.swift */; };
+		99DE373D7E6C4C6EAB936E67 /* NetworkInspectorHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB2AF2F00F14EECB220A2EB /* NetworkInspectorHandler.swift */; };
+		A100000001 /* KelpieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000001 /* KelpieApp.swift */; };
+		A100000002 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000002 /* BrowserView.swift */; };
+		A100000003 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000003 /* SettingsView.swift */; };
+		A100000004 /* URLBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000004 /* URLBarView.swift */; };
+		A100000005 /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000005 /* WebViewCoordinator.swift */; };
+		A100000006 /* BrowserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* BrowserState.swift */; };
+		A100000055 /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000055 /* FeatureFlags.swift */; };
+		A100000056 /* Snapshot3DBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000056 /* Snapshot3DBridge.swift */; };
+		A100000057 /* Snapshot3DHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000057 /* Snapshot3DHandler.swift */; };
+		A100000007 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000007 /* HTTPServer.swift */; };
+		A100000008 /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000008 /* Router.swift */; };
+		A100000009 /* MDNSAdvertiser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000009 /* MDNSAdvertiser.swift */; };
+		A100000010 /* ServerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000010 /* ServerState.swift */; };
+		A100000011 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000011 /* DeviceIdentity.swift */; };
+		A100000012 /* DeviceInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000012 /* DeviceInfo.swift */; };
+		A100000013 /* AppRevealSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000013 /* AppRevealSetup.swift */; };
+		A100000014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000014 /* Assets.xcassets */; };
+		A100000020 /* HandlerContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000020 /* HandlerContext.swift */; };
+		A100000021 /* NavigationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000021 /* NavigationHandler.swift */; };
+		A100000022 /* ScreenshotHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000022 /* ScreenshotHandler.swift */; };
+		A100000023 /* DOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000023 /* DOMHandler.swift */; };
+		A100000024 /* InteractionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024 /* InteractionHandler.swift */; };
+		A100000025 /* ScrollHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ScrollHandler.swift */; };
+		A100000026 /* DeviceHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026 /* DeviceHandler.swift */; };
+		A100000027 /* EvaluateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000027 /* EvaluateHandler.swift */; };
+		A100000028 /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000028 /* ConsoleHandler.swift */; };
+		A100000029 /* NetworkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000029 /* NetworkHandler.swift */; };
+		A100000030 /* MutationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000030 /* MutationHandler.swift */; };
+		A100000031 /* ShadowDOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000031 /* ShadowDOMHandler.swift */; };
+		A100000032 /* BrowserManagementHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000032 /* BrowserManagementHandler.swift */; };
+		A100000033 /* LLMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000033 /* LLMHandler.swift */; };
+		A100000034 /* SafariAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000034 /* SafariAuthHelper.swift */; };
+		A100000035 /* FloatingMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000035 /* FloatingMenuView.swift */; };
+		A100000040 /* NetworkBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000040 /* NetworkBridge.swift */; };
+		A100000041 /* WelcomeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000041 /* WelcomeCardView.swift */; };
+		A100000042 /* ExternalBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000042 /* ExternalBrowserView.swift */; };
+		A100000043 /* ExternalDisplayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000043 /* ExternalDisplayManager.swift */; };
+		A100000044 /* TVControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000044 /* TVControlsView.swift */; };
+		A100000045 /* TouchpadOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000045 /* TouchpadOverlayView.swift */; };
+		A100000058 /* Inspector3DControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000058 /* Inspector3DControlsView.swift */; };
+		A100000051 /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* AIState.swift */; };
+		A100000052 /* PlatformAIEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000052 /* PlatformAIEngine.swift */; };
+		A100000053 /* AIHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000053 /* AIHandler.swift */; };
+		A100000054 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000054 /* AudioRecorder.swift */; };
+		A100000060 /* AIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000060 /* AIManager.swift */; };
+		A100000050 /* AppReveal in Frameworks */ = {isa = PBXBuildFile; productRef = C400000001 /* AppReveal */; };
+		B8938E567C074345A7356BE6 /* BookmarkHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */; };
+		D2474B135EE9443A9A60289B /* NetworkTrafficStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E8CCB2224B44E128F3A4D13 /* NetworkTrafficStore.swift */; };
+		DFDB1F217CF14213A9FB5CCE /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4372587B096643C1AE55184F /* BookmarkStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		2B6D15DFA38F44B4B6FAF87A /* HistoryHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryHandler.swift; sourceTree = "<group>"; };
+		2FF936A1AD0C457183D75A46 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		4372587B096643C1AE55184F /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
+		5DB2AF2F00F14EECB220A2EB /* NetworkInspectorHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInspectorHandler.swift; sourceTree = "<group>"; };
+		6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkHandler.swift; sourceTree = "<group>"; };
+		7E8CCB2224B44E128F3A4D13 /* NetworkTrafficStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkTrafficStore.swift; sourceTree = "<group>"; };
+		97A9457AB5504B3B83606F95 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		B100000001 /* KelpieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelpieApp.swift; sourceTree = "<group>"; };
+		B100000002 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
+		B100000003 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B100000004 /* URLBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLBarView.swift; sourceTree = "<group>"; };
+		B100000005 /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
+		B100000006 /* BrowserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserState.swift; sourceTree = "<group>"; };
+		B100000055 /* FeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlags.swift; sourceTree = "<group>"; };
+		B100000056 /* Snapshot3DBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot3DBridge.swift; path = ../macos/Kelpie/Handlers/Snapshot3DBridge.swift; sourceTree = SOURCE_ROOT; };
+		B100000057 /* Snapshot3DHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot3DHandler.swift; path = ../macos/Kelpie/Handlers/Snapshot3DHandler.swift; sourceTree = SOURCE_ROOT; };
+		B100000007 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
+		B100000008 /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
+		B100000009 /* MDNSAdvertiser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MDNSAdvertiser.swift; sourceTree = "<group>"; };
+		B100000010 /* ServerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerState.swift; sourceTree = "<group>"; };
+		B100000011 /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
+		B100000012 /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
+		B100000013 /* AppRevealSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRevealSetup.swift; sourceTree = "<group>"; };
+		B100000014 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B100000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B100000020 /* HandlerContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandlerContext.swift; sourceTree = "<group>"; };
+		B100000021 /* NavigationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationHandler.swift; sourceTree = "<group>"; };
+		B100000022 /* ScreenshotHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotHandler.swift; sourceTree = "<group>"; };
+		B100000023 /* DOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOMHandler.swift; sourceTree = "<group>"; };
+		B100000024 /* InteractionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionHandler.swift; sourceTree = "<group>"; };
+		B100000025 /* ScrollHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollHandler.swift; sourceTree = "<group>"; };
+		B100000026 /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
+		B100000027 /* EvaluateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluateHandler.swift; sourceTree = "<group>"; };
+		B100000028 /* ConsoleHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleHandler.swift; sourceTree = "<group>"; };
+		B100000029 /* NetworkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkHandler.swift; sourceTree = "<group>"; };
+		B100000030 /* MutationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutationHandler.swift; sourceTree = "<group>"; };
+		B100000031 /* ShadowDOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShadowDOMHandler.swift; sourceTree = "<group>"; };
+		B100000032 /* BrowserManagementHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserManagementHandler.swift; sourceTree = "<group>"; };
+		B100000033 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
+		B100000034 /* SafariAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariAuthHelper.swift; sourceTree = "<group>"; };
+		B100000035 /* FloatingMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingMenuView.swift; sourceTree = "<group>"; };
+		B100000040 /* NetworkBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkBridge.swift; sourceTree = "<group>"; };
+		B100000041 /* WelcomeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeCardView.swift; sourceTree = "<group>"; };
+		B100000042 /* ExternalBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalBrowserView.swift; sourceTree = "<group>"; };
+		B100000043 /* ExternalDisplayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDisplayManager.swift; sourceTree = "<group>"; };
+		B100000044 /* TVControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVControlsView.swift; sourceTree = "<group>"; };
+		B100000045 /* TouchpadOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchpadOverlayView.swift; sourceTree = "<group>"; };
+		B100000058 /* Inspector3DControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inspector3DControlsView.swift; sourceTree = "<group>"; };
+		B100000051 /* AIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIState.swift; sourceTree = "<group>"; };
+		B100000052 /* PlatformAIEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformAIEngine.swift; sourceTree = "<group>"; };
+		B100000053 /* AIHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandler.swift; sourceTree = "<group>"; };
+		B100000054 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		B100000060 /* AIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIManager.swift; sourceTree = "<group>"; };
+		B100000099 /* Kelpie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kelpie.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B18084C632DD449F8D789F86 /* BookmarksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksView.swift; sourceTree = "<group>"; };
+		D43743BF12FB4153846B26F0 /* NetworkInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInspectorView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000050 /* AppReveal in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D100000001 = {
+			isa = PBXGroup;
+			children = (
+				D100000002 /* Kelpie */,
+				D100000099 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D100000002 /* Kelpie */ = {
+			isa = PBXGroup;
+			children = (
+				B100000001 /* KelpieApp.swift */,
+				B100000015 /* Info.plist */,
+				B100000014 /* Assets.xcassets */,
+				D100000003 /* Views */,
+				D100000004 /* Browser */,
+				D100000010 /* AI */,
+				D100000005 /* Network */,
+				D100000006 /* Device */,
+				D100000007 /* Debug */,
+				D100000008 /* Handlers */,
+				D100000009 /* LLM */,
+			);
+			path = Kelpie;
+			sourceTree = "<group>";
+		};
+		D100000003 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B100000002 /* BrowserView.swift */,
+				B100000003 /* SettingsView.swift */,
+				B100000004 /* URLBarView.swift */,
+				B100000035 /* FloatingMenuView.swift */,
+				B18084C632DD449F8D789F86 /* BookmarksView.swift */,
+				97A9457AB5504B3B83606F95 /* HistoryView.swift */,
+				D43743BF12FB4153846B26F0 /* NetworkInspectorView.swift */,
+				B100000041 /* WelcomeCardView.swift */,
+				B100000042 /* ExternalBrowserView.swift */,
+				B100000044 /* TVControlsView.swift */,
+				B100000045 /* TouchpadOverlayView.swift */,
+				B100000058 /* Inspector3DControlsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		D100000004 /* Browser */ = {
+			isa = PBXGroup;
+			children = (
+				B100000005 /* WebViewCoordinator.swift */,
+				B100000006 /* BrowserState.swift */,
+				B100000055 /* FeatureFlags.swift */,
+				B100000034 /* SafariAuthHelper.swift */,
+				4372587B096643C1AE55184F /* BookmarkStore.swift */,
+				2FF936A1AD0C457183D75A46 /* HistoryStore.swift */,
+				7E8CCB2224B44E128F3A4D13 /* NetworkTrafficStore.swift */,
+				B100000043 /* ExternalDisplayManager.swift */,
+			);
+			path = Browser;
+			sourceTree = "<group>";
+		};
+		D100000010 /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				B100000060 /* AIManager.swift */,
+				B100000051 /* AIState.swift */,
+				B100000054 /* AudioRecorder.swift */,
+				B100000052 /* PlatformAIEngine.swift */,
+			);
+			path = AI;
+			sourceTree = "<group>";
+		};
+		D100000005 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				B100000007 /* HTTPServer.swift */,
+				B100000008 /* Router.swift */,
+				B100000009 /* MDNSAdvertiser.swift */,
+				B100000010 /* ServerState.swift */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		D100000006 /* Device */ = {
+			isa = PBXGroup;
+			children = (
+				B100000011 /* DeviceIdentity.swift */,
+				B100000012 /* DeviceInfo.swift */,
+			);
+			path = Device;
+			sourceTree = "<group>";
+		};
+		D100000007 /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				B100000013 /* AppRevealSetup.swift */,
+			);
+			path = Debug;
+			sourceTree = "<group>";
+		};
+		D100000008 /* Handlers */ = {
+			isa = PBXGroup;
+			children = (
+				B100000020 /* HandlerContext.swift */,
+				B100000021 /* NavigationHandler.swift */,
+				B100000022 /* ScreenshotHandler.swift */,
+				B100000023 /* DOMHandler.swift */,
+				B100000024 /* InteractionHandler.swift */,
+				B100000025 /* ScrollHandler.swift */,
+				B100000026 /* DeviceHandler.swift */,
+				B100000027 /* EvaluateHandler.swift */,
+				B100000028 /* ConsoleHandler.swift */,
+				B100000029 /* NetworkHandler.swift */,
+				B100000030 /* MutationHandler.swift */,
+				B100000031 /* ShadowDOMHandler.swift */,
+				B100000032 /* BrowserManagementHandler.swift */,
+				6E330B8CE19B4B3EAE902E58 /* BookmarkHandler.swift */,
+				2B6D15DFA38F44B4B6FAF87A /* HistoryHandler.swift */,
+				5DB2AF2F00F14EECB220A2EB /* NetworkInspectorHandler.swift */,
+				B100000053 /* AIHandler.swift */,
+				B100000057 /* Snapshot3DHandler.swift */,
+				B100000056 /* Snapshot3DBridge.swift */,
+				B100000040 /* NetworkBridge.swift */,
+			);
+			path = Handlers;
+			sourceTree = "<group>";
+		};
+		D100000009 /* LLM */ = {
+			isa = PBXGroup;
+			children = (
+				B100000033 /* LLMHandler.swift */,
+			);
+			path = LLM;
+			sourceTree = "<group>";
+		};
+		D100000099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B100000099 /* Kelpie.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E100000001 /* Kelpie */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F100000003 /* Build configuration list for PBXNativeTarget "Kelpie" */;
+			buildPhases = (
+				E100000002 /* Sources */,
+				C100000001 /* Frameworks */,
+				E100000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Kelpie;
+			packageProductDependencies = (
+				C400000001 /* AppReveal */,
+			);
+			productName = Kelpie;
+			productReference = B100000099 /* Kelpie.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					E100000001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = F100000002 /* Build configuration list for PBXProject "Kelpie" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D100000001;
+			packageReferences = (
+				C300000001 /* XCLocalSwiftPackageReference "iOS" */,
+			);
+			productRefGroup = D100000099 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E100000001 /* Kelpie */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E100000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000014 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E100000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A100000001 /* KelpieApp.swift in Sources */,
+				A100000002 /* BrowserView.swift in Sources */,
+				A100000003 /* SettingsView.swift in Sources */,
+				A100000004 /* URLBarView.swift in Sources */,
+				A100000005 /* WebViewCoordinator.swift in Sources */,
+				A100000006 /* BrowserState.swift in Sources */,
+				A100000055 /* FeatureFlags.swift in Sources */,
+				A100000007 /* HTTPServer.swift in Sources */,
+				A100000008 /* Router.swift in Sources */,
+				A100000009 /* MDNSAdvertiser.swift in Sources */,
+				A100000010 /* ServerState.swift in Sources */,
+				A100000011 /* DeviceIdentity.swift in Sources */,
+				A100000012 /* DeviceInfo.swift in Sources */,
+				A100000013 /* AppRevealSetup.swift in Sources */,
+				A100000020 /* HandlerContext.swift in Sources */,
+				A100000021 /* NavigationHandler.swift in Sources */,
+				A100000022 /* ScreenshotHandler.swift in Sources */,
+				A100000023 /* DOMHandler.swift in Sources */,
+				A100000024 /* InteractionHandler.swift in Sources */,
+				A100000025 /* ScrollHandler.swift in Sources */,
+				A100000026 /* DeviceHandler.swift in Sources */,
+				A100000027 /* EvaluateHandler.swift in Sources */,
+				A100000028 /* ConsoleHandler.swift in Sources */,
+				A100000040 /* NetworkBridge.swift in Sources */,
+				A100000029 /* NetworkHandler.swift in Sources */,
+				A100000030 /* MutationHandler.swift in Sources */,
+				A100000031 /* ShadowDOMHandler.swift in Sources */,
+				A100000032 /* BrowserManagementHandler.swift in Sources */,
+				A100000033 /* LLMHandler.swift in Sources */,
+				A100000034 /* SafariAuthHelper.swift in Sources */,
+				A100000035 /* FloatingMenuView.swift in Sources */,
+				A100000041 /* WelcomeCardView.swift in Sources */,
+				A100000042 /* ExternalBrowserView.swift in Sources */,
+				A100000043 /* ExternalDisplayManager.swift in Sources */,
+				A100000044 /* TVControlsView.swift in Sources */,
+				A100000045 /* TouchpadOverlayView.swift in Sources */,
+				A100000058 /* Inspector3DControlsView.swift in Sources */,
+				A100000051 /* AIState.swift in Sources */,
+				A100000052 /* PlatformAIEngine.swift in Sources */,
+				A100000053 /* AIHandler.swift in Sources */,
+				A100000054 /* AudioRecorder.swift in Sources */,
+				A100000060 /* AIManager.swift in Sources */,
+				A100000056 /* Snapshot3DBridge.swift in Sources */,
+				A100000057 /* Snapshot3DHandler.swift in Sources */,
+				DFDB1F217CF14213A9FB5CCE /* BookmarkStore.swift in Sources */,
+				557BEEFEC864450EB89DE351 /* HistoryStore.swift in Sources */,
+				D2474B135EE9443A9A60289B /* NetworkTrafficStore.swift in Sources */,
+				3F764BF16D374126B3F53B9D /* BookmarksView.swift in Sources */,
+				880BA6CECAFD41D5BF973D93 /* HistoryView.swift in Sources */,
+				154AD08F226A4320A1989AB4 /* NetworkInspectorView.swift in Sources */,
+				B8938E567C074345A7356BE6 /* BookmarkHandler.swift in Sources */,
+				1175893C3157411BB4B63C6D /* HistoryHandler.swift in Sources */,
+				99DE373D7E6C4C6EAB936E67 /* NetworkInspectorHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		G100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG APPREVEAL_ENABLED";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		G100000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		G100000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = G42HP8BM2N;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../native/core-state/include",
+					"$(PROJECT_DIR)/../../native/core-protocol/include",
+					"$(PROJECT_DIR)/../../native/core-automation/include",
+					"$(PROJECT_DIR)/../../native/core-mcp/include",
+					"$(PROJECT_DIR)/../../native/core-ai/include",
+				);
+				INFOPLIST_FILE = Kelpie/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-state",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-protocol",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-automation",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-mcp",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-ai",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lkelpie_core_state",
+					"-lkelpie_core_protocol",
+					"-lkelpie_core_automation",
+					"-lkelpie_core_mcp",
+					"-lkelpie_core_ai",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.unlikeotherai.kelpie;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Kelpie/Kelpie-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		G100000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = G42HP8BM2N;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../native/core-state/include",
+					"$(PROJECT_DIR)/../../native/core-protocol/include",
+					"$(PROJECT_DIR)/../../native/core-automation/include",
+					"$(PROJECT_DIR)/../../native/core-mcp/include",
+					"$(PROJECT_DIR)/../../native/core-ai/include",
+				);
+				INFOPLIST_FILE = Kelpie/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-state",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-protocol",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-automation",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-mcp",
+					"$(PROJECT_DIR)/../../native/.build-ios/core-ai",
+				);
+				MARKETING_VERSION = 0.1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lkelpie_core_state",
+					"-lkelpie_core_protocol",
+					"-lkelpie_core_automation",
+					"-lkelpie_core_mcp",
+					"-lkelpie_core_ai",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.unlikeotherai.kelpie;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Kelpie/Kelpie-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F100000002 /* Build configuration list for PBXProject "Kelpie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G100000001 /* Debug */,
+				G100000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F100000003 /* Build configuration list for PBXNativeTarget "Kelpie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G100000003 /* Debug */,
+				G100000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C300000001 /* XCLocalSwiftPackageReference "iOS" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../vendor/AppReveal/iOS;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C400000001 /* AppReveal */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppReveal;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F100000001 /* Project object */;
+}

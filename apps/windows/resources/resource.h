@@ -1,6 +1,6 @@
 #pragma once
 
-#define IDI_MOLLOTOV 101
+#define IDI_KELPIE 101
 
 #define IDC_BACK_BUTTON 1001
 #define IDC_FORWARD_BUTTON 1002

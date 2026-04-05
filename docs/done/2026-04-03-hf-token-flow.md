@@ -13,7 +13,7 @@
 ### Task 1: Store and expose the HF token on AIState
 
 **Files:**
-- Modify: `apps/macos/Mollotov/AI/AIState.swift`
+- Modify: `apps/macos/Kelpie/AI/AIState.swift`
 
 **Step 1: Add the token property**
 
@@ -34,7 +34,7 @@ var onAuthFailureNavigate: ((URL) -> Void)?
 **Step 3: Commit**
 
 ```
-git add apps/macos/Mollotov/AI/AIState.swift
+git add apps/macos/Kelpie/AI/AIState.swift
 git commit -m "feat(macos): add HF token storage and auth-failure navigation hook"
 ```
 
@@ -43,7 +43,7 @@ git commit -m "feat(macos): add HF token storage and auth-failure navigation hoo
 ### Task 2: Send the token on download requests and detect auth failure
 
 **Files:**
-- Modify: `apps/macos/Mollotov/AI/AIState.swift` — `downloadNativeModel` method (lines 165-214)
+- Modify: `apps/macos/Kelpie/AI/AIState.swift` — `downloadNativeModel` method (lines 165-214)
 
 **Step 1: Replace the bare download call with an authenticated URLRequest**
 
@@ -103,7 +103,7 @@ if fileSize < 1_000_000 {
 **Step 3: Commit**
 
 ```
-git add apps/macos/Mollotov/AI/AIState.swift
+git add apps/macos/Kelpie/AI/AIState.swift
 git commit -m "feat(macos): authenticate HF downloads and detect auth failures"
 ```
 
@@ -112,7 +112,7 @@ git commit -m "feat(macos): authenticate HF downloads and detect auth failures"
 ### Task 3: Wire the navigation callback in BrowserView
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Views/BrowserView.swift`
+- Modify: `apps/macos/Kelpie/Views/BrowserView.swift`
 
 **Step 1: Set the callback in onAppear**
 
@@ -127,7 +127,7 @@ aiState.onAuthFailureNavigate = { [weak serverState] url in
 **Step 2: Commit**
 
 ```
-git add apps/macos/Mollotov/Views/BrowserView.swift
+git add apps/macos/Kelpie/Views/BrowserView.swift
 git commit -m "feat(macos): navigate browser to HF tokens page on auth failure"
 ```
 
@@ -136,7 +136,7 @@ git commit -m "feat(macos): navigate browser to HF tokens page on auth failure"
 ### Task 4: Add the "Set HF Token" button and popover to the Models tab
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Views/AIChatPanel.swift`
+- Modify: `apps/macos/Kelpie/Views/AIChatPanel.swift`
 
 **Step 1: Add a `@State` for the popover**
 
@@ -241,7 +241,7 @@ private struct HFTokenPopover: View {
 **Step 4: Commit**
 
 ```
-git add apps/macos/Mollotov/Views/AIChatPanel.swift
+git add apps/macos/Kelpie/Views/AIChatPanel.swift
 git commit -m "feat(macos): add Set HF Token button and popover in AI panel"
 ```
 
@@ -252,15 +252,15 @@ git commit -m "feat(macos): add Set HF Token button and popover in AI panel"
 **Step 1: Remove the existing corrupt model**
 
 ```bash
-rm -rf ~/.mollotov/models/gemma-4-e2b-q4
+rm -rf ~/.kelpie/models/gemma-4-e2b-q4
 ```
 
 **Step 2: Build and launch**
 
 ```bash
-pkill -f Mollotov; sleep 1
-cd apps/macos && xcodebuild -project Mollotov.xcodeproj -scheme Mollotov -configuration Debug build
-open /tmp/gpteen-xcode2/Prod/Debug/Mollotov.app
+pkill -f Kelpie; sleep 1
+cd apps/macos && xcodebuild -project Kelpie.xcodeproj -scheme Kelpie -configuration Debug build
+open /tmp/gpteen-xcode2/Prod/Debug/Kelpie.app
 ```
 
 **Step 3: Verify the flow**

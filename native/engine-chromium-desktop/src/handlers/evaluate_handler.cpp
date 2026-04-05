@@ -1,6 +1,6 @@
 #include "evaluate_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 EvaluateHandler::EvaluateHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -19,4 +19,4 @@ nlohmann::json EvaluateHandler::Evaluate(const nlohmann::json& params) const {
   }
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

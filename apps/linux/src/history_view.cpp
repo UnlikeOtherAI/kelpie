@@ -2,14 +2,14 @@
 
 #include "linux_app.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 HistoryView::HistoryView(LinuxApp& app) : app_(app) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   root_ = gtk_scrolled_window_new(nullptr, nullptr);
   list_ = gtk_list_box_new();
   gtk_widget_set_hexpand(root_, TRUE);
@@ -24,7 +24,7 @@ GtkWidget* HistoryView::widget() const {
 }
 
 void HistoryView::Refresh() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (list_ == nullptr) {
     return;
   }
@@ -42,7 +42,7 @@ void HistoryView::Refresh() {
     gtk_label_set_xalign(GTK_LABEL(label), 0.0);
     gtk_container_add(GTK_CONTAINER(row), label);
     g_object_set_data_full(G_OBJECT(row),
-                           "mollotov-url",
+                           "kelpie-url",
                            g_strdup(entry.value("url", "").c_str()),
                            g_free);
     gtk_container_add(GTK_CONTAINER(list_), row);
@@ -50,7 +50,7 @@ void HistoryView::Refresh() {
   g_signal_handlers_disconnect_by_data(list_, &app_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox*, GtkListBoxRow* row, gpointer user_data) {
                      auto* app_ptr = static_cast<LinuxApp*>(user_data);
-                     const char* url = static_cast<const char*>(g_object_get_data(G_OBJECT(row), "mollotov-url"));
+                     const char* url = static_cast<const char*>(g_object_get_data(G_OBJECT(row), "kelpie-url"));
                      if (url != nullptr) {
                        app_ptr->Navigate(url);
                      }
@@ -60,4 +60,4 @@ void HistoryView::Refresh() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

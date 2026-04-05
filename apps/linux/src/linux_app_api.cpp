@@ -2,10 +2,10 @@
 
 #include <set>
 
-#include "mollotov/error_codes.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/error_codes.h"
+#include "kelpie/response_helpers.h"
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 LinuxApp::json LinuxApp::ConsoleMessages(const std::optional<std::string>& level) const {
   const json messages = json::parse(impl_->console.ToJson(level));
@@ -75,8 +75,8 @@ LinuxApp::json LinuxApp::Capabilities() const {
   json partial = json::array();
   json unsupported = json::array();
 
-  for (const auto& tool : impl_->registry.tools_for_platform(mollotov::Platform::kLinux)) {
-    if (!mollotov::SupportsEngine(tool.availability, "chromium")) {
+  for (const auto& tool : impl_->registry.tools_for_platform(kelpie::Platform::kLinux)) {
+    if (!kelpie::SupportsEngine(tool.availability, "chromium")) {
       continue;
     }
     if (impl_->config.headless && tool.availability.requires_ui) {
@@ -122,51 +122,51 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
       const std::string url = params.value("url", "");
       if (url.empty()) {
         if (status_code != nullptr) {
-          *status_code = mollotov::ErrorCodeHttpStatus(mollotov::ErrorCode::kInvalidParams);
+          *status_code = kelpie::ErrorCodeHttpStatus(kelpie::ErrorCode::kInvalidParams);
         }
-        return mollotov::ErrorResponse(mollotov::ErrorCode::kInvalidParams, "url is required");
+        return kelpie::ErrorResponse(kelpie::ErrorCode::kInvalidParams, "url is required");
       }
       Navigate(url);
-      return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}, {"loadTime", 0}});
+      return kelpie::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}, {"loadTime", 0}});
     }
     if (endpoint == "back") {
       GoBack();
-      return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
+      return kelpie::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
     }
     if (endpoint == "forward") {
       GoForward();
-      return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
+      return kelpie::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
     }
     if (endpoint == "reload") {
       Reload();
-      return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"loadTime", 0}});
+      return kelpie::SuccessResponse({{"url", CurrentUrl()}, {"loadTime", 0}});
     }
     if (endpoint == "get-current-url") {
-      return mollotov::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
+      return kelpie::SuccessResponse({{"url", CurrentUrl()}, {"title", CurrentTitle()}});
     }
     if (endpoint == "set-home") {
       const std::string url = params.value("url", "");
       if (url.empty()) {
         if (status_code != nullptr) {
-          *status_code = mollotov::ErrorCodeHttpStatus(mollotov::ErrorCode::kInvalidParams);
+          *status_code = kelpie::ErrorCodeHttpStatus(kelpie::ErrorCode::kInvalidParams);
         }
-        return mollotov::ErrorResponse(mollotov::ErrorCode::kInvalidParams, "url is required");
+        return kelpie::ErrorResponse(kelpie::ErrorCode::kInvalidParams, "url is required");
       }
       SetHomeUrl(url);
-      return mollotov::SuccessResponse({{"url", HomeUrl()}});
+      return kelpie::SuccessResponse({{"url", HomeUrl()}});
     }
     if (endpoint == "get-home") {
-      return mollotov::SuccessResponse({{"url", HomeUrl()}});
+      return kelpie::SuccessResponse({{"url", HomeUrl()}});
     }
     if (endpoint == "evaluate") {
-      return mollotov::SuccessResponse(
+      return kelpie::SuccessResponse(
           {{"result", impl_->handler_context.EvaluateJsReturningString(params.value("expression", ""))}});
     }
     if (endpoint == "screenshot") {
       if (status_code != nullptr) {
         *status_code = 503;
       }
-      return mollotov::ErrorResponse("cef_unavailable", "CEF SDK is not linked in this build");
+      return kelpie::ErrorResponse("cef_unavailable", "CEF SDK is not linked in this build");
     }
     if (endpoint == "get-device-info") {
       return DeviceInfo();
@@ -176,29 +176,29 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
     }
     if (endpoint == "get-bookmarks") {
       const json bookmarks = json::parse(BookmarksJson());
-      return mollotov::SuccessResponse({{"bookmarks", bookmarks}, {"count", bookmarks.size()}});
+      return kelpie::SuccessResponse({{"bookmarks", bookmarks}, {"count", bookmarks.size()}});
     }
     if (endpoint == "add-bookmark") {
       const std::string url = params.value("url", CurrentUrl());
       const std::string title = params.value("title", CurrentTitle());
       AddBookmark(title, url);
-      return mollotov::SuccessResponse({{"url", url}, {"title", title}});
+      return kelpie::SuccessResponse({{"url", url}, {"title", title}});
     }
     if (endpoint == "remove-bookmark") {
       RemoveBookmark(params.value("id", ""));
-      return mollotov::SuccessResponse();
+      return kelpie::SuccessResponse();
     }
     if (endpoint == "clear-bookmarks") {
       ClearBookmarks();
-      return mollotov::SuccessResponse();
+      return kelpie::SuccessResponse();
     }
     if (endpoint == "get-history") {
       const json history = json::parse(HistoryJson());
-      return mollotov::SuccessResponse({{"entries", history}, {"count", history.size()}});
+      return kelpie::SuccessResponse({{"entries", history}, {"count", history.size()}});
     }
     if (endpoint == "clear-history") {
       ClearHistory();
-      return mollotov::SuccessResponse();
+      return kelpie::SuccessResponse();
     }
     if (endpoint == "get-console-messages") {
       return ConsoleMessages(params.contains("level") && !params["level"].is_null()
@@ -207,7 +207,7 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
     }
     if (endpoint == "get-js-errors") {
       const json messages = ConsoleMessages("error");
-      return mollotov::SuccessResponse({{"errors", messages["messages"]}, {"count", messages["count"]}});
+      return kelpie::SuccessResponse({{"errors", messages["messages"]}, {"count", messages["count"]}});
     }
     if (endpoint == "get-network-log") {
       return NetworkEntries(
@@ -223,27 +223,27 @@ LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
     }
     if (endpoint == "toast") {
       ShowToast(params.value("message", ""));
-      return mollotov::SuccessResponse();
+      return kelpie::SuccessResponse();
     }
     if (endpoint == "set-fullscreen") {
       SetFullscreen(params.value("enabled", true));
-      return mollotov::SuccessResponse({{"enabled", WantsFullscreen()}});
+      return kelpie::SuccessResponse({{"enabled", WantsFullscreen()}});
     }
     if (endpoint == "get-fullscreen") {
-      return mollotov::SuccessResponse({{"enabled", IsFullscreen()}});
+      return kelpie::SuccessResponse({{"enabled", IsFullscreen()}});
     }
 
     if (status_code != nullptr) {
-      *status_code = mollotov::ErrorCodeHttpStatus(mollotov::ErrorCode::kPlatformNotSupported);
+      *status_code = kelpie::ErrorCodeHttpStatus(kelpie::ErrorCode::kPlatformNotSupported);
     }
-    return mollotov::ErrorResponse(mollotov::ErrorCode::kPlatformNotSupported,
+    return kelpie::ErrorResponse(kelpie::ErrorCode::kPlatformNotSupported,
                                    "Method is not implemented on Linux yet");
   } catch (const std::exception& exception) {
     if (status_code != nullptr) {
       *status_code = 500;
     }
-    return mollotov::ErrorResponse("INTERNAL_ERROR", exception.what());
+    return kelpie::ErrorResponse("INTERNAL_ERROR", exception.what());
   }
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

@@ -1,10 +1,10 @@
-# Mollotov — Project Guide
+# Kelpie — Project Guide
 
 @./AGENTS.md
 
 ## What This Is
 
-Mollotov is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
+Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
 
 ## Claude-Specific Notes
 
@@ -20,7 +20,7 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 
 - **Always check logs first** before diving into source code. Check device HTTP server logs, mDNS advertisement logs, and CLI output before analyzing code.
 - **Never manually fix state** — if the mDNS discovery, HTTP server, or MCP server is stuck, fix the code so it self-heals.
-- **Kill stale Mollotov app instances before verification** when they could block ports, AppReveal, or input testing. Debug against one known app process, not a mixture of old and new sessions.
+- **Kill stale Kelpie app instances before verification** when they could block ports, AppReveal, or input testing. Debug against one known app process, not a mixture of old and new sessions.
 
 ## How to Run Parallel Adversarial Reviews
 

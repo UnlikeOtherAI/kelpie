@@ -1,6 +1,6 @@
 #include "dom_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 DomHandler::DomHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -113,4 +113,4 @@ nlohmann::json DomHandler::GetDom(const nlohmann::json& params) const {
   });
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

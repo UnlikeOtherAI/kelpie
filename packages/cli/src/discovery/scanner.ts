@@ -4,7 +4,7 @@ import {
   type MdnsTxtRecord,
   type Platform,
   type RuntimeMode,
-} from "@unlikeotherai/mollotov-shared";
+} from "@unlikeotherai/kelpie-shared";
 import type { DiscoveredDevice } from "../types.js";
 
 const platforms: readonly Platform[] = ["ios", "android", "macos", "linux", "windows"];

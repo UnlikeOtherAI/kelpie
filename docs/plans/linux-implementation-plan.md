@@ -51,7 +51,7 @@ This is shared with Windows. Build it first.
 ```
 native/engine-chromium-desktop/
   CMakeLists.txt
-  include/mollotov/
+  include/kelpie/
     desktop_engine.h          # CEF lifecycle, windowed + offscreen modes
     desktop_http_server.h     # HTTP server (cpp-httplib)
     desktop_router.h          # Routes /v1/{method} to handlers
@@ -104,7 +104,7 @@ native/engine-chromium-desktop/
 **mDNS:**
 - Linux: Avahi via `avahi-client` library (D-Bus)
 - Windows: `dns-sd` API (Bonjour for Windows) or mdnsresponder
-- Advertise `_mollotov._tcp` with TXT record: id, name, model, platform, engine, width, height, port, version
+- Advertise `_kelpie._tcp` with TXT record: id, name, model, platform, engine, width, height, port, version
 
 **Handler wiring:**
 - Each handler receives `HandlerContext` (from core-automation) and JSON params
@@ -133,12 +133,12 @@ int main(int argc, char* argv[]) {
 - No GTK dependency in headless mode
 - CEF off-screen rendering: `OnPaint` captures pixel buffer for screenshots
 - Full HTTP/MCP surface active
-- Profile directory: `~/.config/mollotov/` (or `--profile-dir`)
+- Profile directory: `~/.config/kelpie/` (or `--profile-dir`)
 - Cookies, bookmarks, history persisted to profile directory
 
 ### Device info
 
-- ID: persistent UUID from `~/.config/mollotov/device-id`
+- ID: persistent UUID from `~/.config/kelpie/device-id`
 - Name: Linux hostname
 - Model: from `/sys/devices/virtual/dmi/id/product_name` or `uname`
 - Platform: `linux`
@@ -156,10 +156,10 @@ RUN apt-get update && apt-get install -y \
     libdrm2 libgbm1 libgtk-3-0 libpango-1.0-0 libasound2 \
     libnspr4 libnss3 xvfb avahi-daemon dbus \
     && rm -rf /var/lib/apt/lists/*
-COPY build/ /opt/mollotov/
-WORKDIR /opt/mollotov
+COPY build/ /opt/kelpie/
+WORKDIR /opt/kelpie
 ENV DISPLAY=:99
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./mollotov-linux --headless --port 8420"]
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./kelpie-linux --headless --port 8420"]
 ```
 
 ### Verification checklist
@@ -174,7 +174,7 @@ CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./mollotov-linux --headless 
 - [ ] `POST /v1/get-history` shows navigation history
 - [ ] `POST /v1/get-network-log` captures traffic
 - [ ] `POST /v1/get-console-messages` captures console output
-- [ ] mDNS advertisement visible from host (`avahi-browse _mollotov._tcp`)
+- [ ] mDNS advertisement visible from host (`avahi-browse _kelpie._tcp`)
 - [ ] CLI discovers and controls the headless browser
 
 ---
@@ -216,7 +216,7 @@ CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./mollotov-linux --headless 
 
 ## Phase 4: Packaging
 
-- CMake install target produces: `mollotov-linux` binary + CEF resources + locales
+- CMake install target produces: `kelpie-linux` binary + CEF resources + locales
 - AppImage or tarball for initial distribution
 - `make linux` target in root Makefile
 - `make linux-headless-docker` for Docker image
@@ -239,10 +239,10 @@ CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & ./mollotov-linux --headless 
 ## CLI flags
 
 ```
-mollotov-linux [options]
+kelpie-linux [options]
   --headless          Run without visible window
   --port PORT         HTTP server port (default: 8420)
-  --profile-dir DIR   Data directory (default: ~/.config/mollotov)
+  --profile-dir DIR   Data directory (default: ~/.config/kelpie)
   --url URL           Initial URL to load
   --width WIDTH       Viewport width (default: 1920)
   --height HEIGHT     Viewport height (default: 1080)
@@ -262,5 +262,5 @@ Accepted findings:
 - Missing CEF support must return a structured 503 error for screenshot-style endpoints instead of empty data or crashes.
 
 Rejected findings:
-- Splitting the app into separate GUI and headless binaries was rejected. The current requirement is a single `mollotov-linux` binary with runtime flags and optional dependency gates.
+- Splitting the app into separate GUI and headless binaries was rejected. The current requirement is a single `kelpie-linux` binary with runtime flags and optional dependency gates.
 - Dropping the network inspector UI was rejected. The requested file structure includes it, so the initial implementation keeps a minimal GTK inspector while the HTTP surface remains the real source of truth.

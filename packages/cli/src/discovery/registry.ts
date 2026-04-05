@@ -1,4 +1,4 @@
-import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { DiscoveredDevice } from "../types.js";
 import { loadBrowserStore } from "../browser/store.js";
 
@@ -69,7 +69,7 @@ async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | 
     ip: "127.0.0.1",
     port: running.port,
     platform: store.aliases[query]?.platform ?? "macos",
-    model: `Mollotov ${store.aliases[query]?.platform ?? "macos"}`,
+    model: `Kelpie ${store.aliases[query]?.platform ?? "macos"}`,
     width: 0,
     height: 0,
     version: "0.0.0",
@@ -88,7 +88,7 @@ function getDirectAddressDevice(query: string): DiscoveredDevice | undefined {
     ip: match[1],
     port: match[2] ? Number(match[2]) : DEFAULT_PORT,
     platform: "linux",
-    model: "Mollotov Direct",
+    model: "Kelpie Direct",
     width: 0,
     height: 0,
     version: "0.0.0",

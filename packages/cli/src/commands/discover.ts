@@ -7,7 +7,7 @@ import type { GlobalOptions } from "../types.js";
 export function registerDiscover(program: Command): void {
   program
     .command("discover")
-    .description("Scan the local network for Mollotov browser instances")
+    .description("Scan the local network for Kelpie browser instances")
     .option("--scan-timeout <ms>", "mDNS scan duration in milliseconds", "3000")
     .action(async (opts: { scanTimeout: string }) => {
       const globals = program.opts<GlobalOptions>();

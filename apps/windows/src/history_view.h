@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class HistoryView {
  public:
@@ -32,4 +32,4 @@ class HistoryView {
   std::string history_json_ = "[]";
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

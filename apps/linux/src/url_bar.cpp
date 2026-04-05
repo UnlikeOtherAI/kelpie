@@ -3,17 +3,17 @@
 #include "linux_app.h"
 #include "ui_theme.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 UrlBar::UrlBar(LinuxApp& app) : app_(app) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   ui::InstallTheme();
   root_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  gtk_style_context_add_class(gtk_widget_get_style_context(root_), "mollotov-toolbar");
+  gtk_style_context_add_class(gtk_widget_get_style_context(root_), "kelpie-toolbar");
 
   back_button_ = ui::CreateSymbolButton("go-previous-symbolic", "Back");
   forward_button_ = ui::CreateSymbolButton("go-next-symbolic", "Forward");
@@ -23,8 +23,8 @@ UrlBar::UrlBar(LinuxApp& app) : app_(app) {
   entry_ = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(entry_), "Enter URL");
   gtk_widget_set_hexpand(entry_shell_, TRUE);
-  gtk_style_context_add_class(gtk_widget_get_style_context(entry_shell_), "mollotov-url-shell");
-  gtk_style_context_add_class(gtk_widget_get_style_context(entry_), "mollotov-url-entry");
+  gtk_style_context_add_class(gtk_widget_get_style_context(entry_shell_), "kelpie-url-shell");
+  gtk_style_context_add_class(gtk_widget_get_style_context(entry_), "kelpie-url-entry");
 
   gtk_box_pack_start(GTK_BOX(root_), back_button_, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(root_), forward_button_, FALSE, FALSE, 0);
@@ -68,7 +68,7 @@ GtkWidget* UrlBar::widget() const {
 }
 
 void UrlBar::Sync() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (entry_ == nullptr) {
     return;
   }
@@ -80,4 +80,4 @@ void UrlBar::Sync() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

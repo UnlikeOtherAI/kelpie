@@ -1,4 +1,4 @@
-#include "mollotov/history_store.h"
+#include "kelpie/history_store.h"
 
 #include <algorithm>
 
@@ -6,7 +6,7 @@
 
 #include "store_support.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 using json = nlohmann::json;
@@ -104,4 +104,4 @@ std::int32_t HistoryStore::Count() const {
   return static_cast<std::int32_t>(entries_.size());
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

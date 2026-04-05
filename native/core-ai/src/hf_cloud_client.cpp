@@ -5,7 +5,7 @@
 
 #include <chrono>
 
-namespace mollotov {
+namespace kelpie {
 
 nlohmann::json HfCloudClient::infer(const std::string& model_id,
                                      const std::string& hf_token,
@@ -133,4 +133,4 @@ nlohmann::json HfCloudClient::infer(const std::string& model_id,
               {"model_id", model_id}};
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

@@ -41,7 +41,7 @@ export function registerAI(program: Command): void {
       const globals = getGlobals(program);
       const model = findModel(modelId);
       if (!model) {
-        print({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Unknown model "${modelId}". Run 'mollotov ai list' to see available models.` } }, globals.format);
+        print({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Unknown model "${modelId}". Run 'kelpie ai list' to see available models.` } }, globals.format);
         process.exitCode = 1;
         return;
       }

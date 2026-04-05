@@ -1,6 +1,6 @@
 #include "browser_mgmt_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 BrowserManagementHandler::BrowserManagementHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -37,4 +37,4 @@ nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) co
   });
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

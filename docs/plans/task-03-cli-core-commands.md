@@ -30,11 +30,11 @@ packages/cli/tests/commands/
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov navigate <url>` | `navigate` | url (positional) |
-| `mollotov back` | `back` | — |
-| `mollotov forward` | `forward` | — |
-| `mollotov reload` | `reload` | — |
-| `mollotov url` | `get-current-url` | — |
+| `kelpie navigate <url>` | `navigate` | url (positional) |
+| `kelpie back` | `back` | — |
+| `kelpie forward` | `forward` | — |
+| `kelpie reload` | `reload` | — |
+| `kelpie url` | `get-current-url` | — |
 
 All require `--device`. Return JSON response from browser.
 
@@ -42,7 +42,7 @@ All require `--device`. Return JSON response from browser.
 
 | Command | API Method | Flags |
 |---------|-----------|-------|
-| `mollotov screenshot` | `screenshot` | `--output`, `--full-page`, `--base64`, `--format` |
+| `kelpie screenshot` | `screenshot` | `--output`, `--full-page`, `--base64`, `--format` |
 
 **File-save behavior (critical — read docs/cli.md):**
 - Default: auto-save to `./{device}-{timestamp}.png`, return `{"file": "path"}`
@@ -60,10 +60,10 @@ Implementation:
 
 | Command | API Method | Args/Flags |
 |---------|-----------|------------|
-| `mollotov dom` | `get-dom` | `--selector`, `--depth` |
-| `mollotov query <selector>` | `query-selector` / `query-selector-all` | selector (positional), `--all` |
-| `mollotov text <selector>` | `get-element-text` | selector (positional) |
-| `mollotov attributes <selector>` | `get-attributes` | selector (positional) |
+| `kelpie dom` | `get-dom` | `--selector`, `--depth` |
+| `kelpie query <selector>` | `query-selector` / `query-selector-all` | selector (positional), `--all` |
+| `kelpie text <selector>` | `get-element-text` | selector (positional) |
+| `kelpie attributes <selector>` | `get-attributes` | selector (positional) |
 
 ## Tests
 

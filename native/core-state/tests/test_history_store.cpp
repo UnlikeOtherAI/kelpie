@@ -1,5 +1,5 @@
-#include "mollotov/history_store.h"
-#include "mollotov/state_c_api.h"
+#include "kelpie/history_store.h"
+#include "kelpie/state_c_api.h"
 
 #include <cassert>
 #include <iostream>
@@ -11,14 +11,14 @@ namespace {
 using json = nlohmann::json;
 
 void TestEmptyAndClear() {
-  mollotov::HistoryStore store;
+  kelpie::HistoryStore store;
   assert(store.Count() == 0);
   store.Clear();
   assert(json::parse(store.ToJson()).empty());
 }
 
 void TestDedupAndLatestTitleUpdate() {
-  mollotov::HistoryStore store;
+  kelpie::HistoryStore store;
   store.Record("https://one.test", "One");
   store.Record("https://one.test", "Ignored duplicate");
   store.Record("https://two.test", "Two");
@@ -33,7 +33,7 @@ void TestDedupAndLatestTitleUpdate() {
 }
 
 void TestCapacityAndLoadJson() {
-  mollotov::HistoryStore store;
+  kelpie::HistoryStore store;
   for (int index = 0; index < 505; ++index) {
     store.Record("https://site.test/" + std::to_string(index), "Page " + std::to_string(index));
   }
@@ -54,22 +54,22 @@ void TestCapacityAndLoadJson() {
 }
 
 void TestCApiRoundTrip() {
-  MollotovHistoryStoreRef store = mollotov_history_store_create();
+  KelpieHistoryStoreRef store = kelpie_history_store_create();
   assert(store != nullptr);
 
-  mollotov_history_store_record(store, "https://ffi.test/1", "One");
-  mollotov_history_store_record(store, "https://ffi.test/1", "Duplicate ignored");
-  mollotov_history_store_record(store, "https://ffi.test/2", "Two");
-  mollotov_history_store_update_latest_title(store, "https://ffi.test/2", "  Updated Two  ");
+  kelpie_history_store_record(store, "https://ffi.test/1", "One");
+  kelpie_history_store_record(store, "https://ffi.test/1", "Duplicate ignored");
+  kelpie_history_store_record(store, "https://ffi.test/2", "Two");
+  kelpie_history_store_update_latest_title(store, "https://ffi.test/2", "  Updated Two  ");
 
-  char* payload = mollotov_history_store_to_json(store);
+  char* payload = kelpie_history_store_to_json(store);
   assert(payload != nullptr);
   const json entries = json::parse(payload);
-  mollotov_free_string(payload);
+  kelpie_free_string(payload);
   assert(entries.size() == 2);
   assert(entries[0]["title"] == "Updated Two");
 
-  mollotov_history_store_destroy(store);
+  kelpie_history_store_destroy(store);
 }
 
 }  // namespace

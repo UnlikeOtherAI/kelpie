@@ -2,14 +2,14 @@
 
 #include "linux_app.h"
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 namespace {
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 std::optional<std::string> FilterValue(GtkComboBoxText* combo) {
   const gchar* text = gtk_combo_box_text_get_active_text(combo);
   if (text == nullptr) {
@@ -33,7 +33,7 @@ std::optional<std::string> FilterValue(GtkComboBoxText* combo) {
 }  // namespace
 
 NetworkInspector::NetworkInspector(LinuxApp& app) : app_(app) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   root_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   gtk_widget_set_hexpand(root_, TRUE);
   gtk_widget_set_vexpand(root_, TRUE);
@@ -98,7 +98,7 @@ GtkWidget* NetworkInspector::widget() const {
 }
 
 void NetworkInspector::Refresh() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (store_ == nullptr) {
     return;
   }
@@ -131,4 +131,4 @@ void NetworkInspector::Refresh() {
 #endif
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

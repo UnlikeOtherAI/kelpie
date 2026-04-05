@@ -1,7 +1,7 @@
 import net from "node:net";
 import { existsSync } from "node:fs";
 import type { BrowserAlias } from "./store.js";
-import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 
 const RESERVED_PORTS = new Set([8421]); // AppReveal + CLI MCP
 
@@ -10,7 +10,7 @@ export function validateBrowserName(name: string): boolean {
 }
 
 export function resolveAppPath(alias: Pick<BrowserAlias, "platform" | "appPath">): string | null {
-  const appPath = alias.appPath ?? (alias.platform === "macos" ? "/Applications/Mollotov.app" : null);
+  const appPath = alias.appPath ?? (alias.platform === "macos" ? "/Applications/Kelpie.app" : null);
   if (!appPath) return null;
   return existsSync(appPath) ? appPath : null;
 }

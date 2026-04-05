@@ -1,8 +1,8 @@
-# Mollotov — Product Brief
+# Kelpie — Product Brief
 
 ## What It Is
 
-Mollotov is an **LLM-first browser** for iOS and Android (phones and tablets) paired with a **Node.js CLI** that enables large language models to discover, control, and orchestrate multiple browser instances on a local network.
+Kelpie is an **LLM-first browser** for iOS and Android (phones and tablets) paired with a **Node.js CLI** that enables large language models to discover, control, and orchestrate multiple browser instances on a local network.
 
 Think Playwright-style automation, but running natively on real mobile devices — no emulators, no persistent content scripts, no desktop required. Android has near-full parity with desktop automation via CDP; iOS covers core workflows with some platform-specific gaps (see [Platform Support Matrix](api/README.md)).
 
@@ -19,21 +19,21 @@ LLMs that need to interact with web content on mobile devices today have no good
 
 Two components that work together:
 
-### 1. Mollotov Browser (Native iOS + Android App)
+### 1. Kelpie Browser (Native iOS + Android App)
 
 A minimal native browser built on each platform's WebView engine (WKWebView / Android WebView) that:
 
 - Exposes **rich browser automation capabilities** through native WebView APIs and CDP (Android). Coverage varies by platform — Android has near-full parity with desktop automation; iOS has some gaps where WKWebView lacks native APIs (see [Platform Support Matrix](api/README.md))
-- Advertises itself via **mDNS** on the local network (`_mollotov._tcp`)
+- Advertises itself via **mDNS** on the local network (`_kelpie._tcp`)
 - Runs a local **HTTP + MCP server** accepting commands from the CLI or any MCP-compatible client
 - Takes screenshots, reads DOM, navigates, clicks, fills forms, scrolls — all via native bridge
 - Provides a minimal UI: URL bar + settings panel with connection info
 
-### 2. Mollotov CLI (`@unlikeotherai/mollotov`)
+### 2. Kelpie CLI (`@unlikeotherai/kelpie`)
 
 A Node.js CLI published on npm that:
 
-- **Discovers** all Mollotov browser instances on the local network via mDNS
+- **Discovers** all Kelpie browser instances on the local network via mDNS
 - Sends **individual commands** to any single device
 - Sends **group commands** to all (or a subset of) devices simultaneously
 - Provides **resolution-aware methods** (e.g., `scroll2`) that adapt behavior per device viewport
@@ -46,7 +46,7 @@ A Node.js CLI published on npm that:
 | Feature | Description |
 |---|---|
 | **No persistent content scripts** | Page interaction through native WebView APIs and CDP (Android). Some iOS features use lightweight bridge scripts for capabilities WKWebView doesn't expose natively (console capture, mutation observation). No browser extension model, no content script persistence across navigations. |
-| **mDNS discovery** | Browsers advertise `_mollotov._tcp` with device metadata (name, platform, resolution, version) — CLI auto-discovers them |
+| **mDNS discovery** | Browsers advertise `_kelpie._tcp` with device metadata (name, platform, resolution, version) — CLI auto-discovers them |
 | **Individual control** | Target any single device by name/IP for precise commands |
 | **Group commands** | Send the same command to all devices — fill forms, navigate, click simultaneously |
 | **Smart queries** | `findButton("Submit")` across all devices returns which ones found it — LLM makes the decision |
@@ -63,7 +63,7 @@ A Node.js CLI published on npm that:
 │                    Local Network                         │
 │                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  Mollotov    │  │  Mollotov    │  │  Mollotov    │  │
+│  │  Kelpie    │  │  Kelpie    │  │  Kelpie    │  │
 │  │  Browser     │  │  Browser     │  │  Browser     │  │
 │  │  (iPhone)    │  │  (iPad)      │  │  (Android)   │  │
 │  │              │  │              │  │              │  │
@@ -74,7 +74,7 @@ A Node.js CLI published on npm that:
 │         └────────────┬────┴────┬────────────┘           │
 │                      │         │                        │
 │              ┌───────┴─────────┴────────┐               │
-│              │     Mollotov CLI         │               │
+│              │     Kelpie CLI         │               │
 │              │   (Node.js / MCP)        │               │
 │              │                          │               │
 │              │  mDNS Discovery          │               │
@@ -110,17 +110,17 @@ For CLI command reference, see [cli.md](cli.md).
 ### Phase 3 — Polish
 - CLI MCP server for direct LLM integration
 - Built-in LLM help system
-- npm publish `@unlikeotherai/mollotov`
+- npm publish `@unlikeotherai/kelpie`
 - Settings panel with connection info and QR code
 
 ## Simulator & Emulator Support
 
-Mollotov works on **real devices, simulators, and emulators**. A developer with no physical phones can run 5-6 iOS Simulators or Android Emulators with different screen sizes, and each instance advertises itself via mDNS and accepts commands like a real device.
+Kelpie works on **real devices, simulators, and emulators**. A developer with no physical phones can run 5-6 iOS Simulators or Android Emulators with different screen sizes, and each instance advertises itself via mDNS and accepts commands like a real device.
 
-- **iOS Simulator** — each Simulator instance runs its own Mollotov app, advertises on the host's network via Bonjour, and is discoverable by the CLI
-- **Android Emulator** — each emulator instance runs its own Mollotov app; port forwarding (`adb forward`) maps each emulator's HTTP server to a host port for CLI discovery
+- **iOS Simulator** — each Simulator instance runs its own Kelpie app, advertises on the host's network via Bonjour, and is discoverable by the CLI
+- **Android Emulator** — each emulator instance runs its own Kelpie app; port forwarding (`adb forward`) maps each emulator's HTTP server to a host port for CLI discovery
 - **Mixed fleets** — real devices and simulators can coexist on the same network; the CLI treats them identically
-- **Zero-setup goal** — clone the repo, open in Xcode/Android Studio, run on simulator, `mollotov discover` finds it
+- **Zero-setup goal** — clone the repo, open in Xcode/Android Studio, run on simulator, `kelpie discover` finds it
 
 The `getDeviceInfo` endpoint (see [api/core.md](api/core.md)) includes an `isSimulator` field so the LLM knows whether it's talking to a real device or a simulated one.
 
@@ -133,10 +133,10 @@ The `getDeviceInfo` endpoint (see [api/core.md](api/core.md)) includes an `isSim
 
 ## Publishing
 
-- **npm**: `@unlikeotherai/mollotov`
-- **App Store**: Mollotov Browser
-- **Play Store**: Mollotov Browser
-- **Icon/branding**: Mollotov (two Ls)
+- **npm**: `@unlikeotherai/kelpie`
+- **App Store**: Kelpie Browser
+- **Play Store**: Kelpie Browser
+- **Icon/branding**: Kelpie (two Ls)
 
 ## App Icon
 

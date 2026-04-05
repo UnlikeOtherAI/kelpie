@@ -1,6 +1,6 @@
 #include "bookmark_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 BookmarkHandler::BookmarkHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -61,4 +61,4 @@ nlohmann::json BookmarkHandler::Clear() const {
   return SuccessResponse({{"cleared", true}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

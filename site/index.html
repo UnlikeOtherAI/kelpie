@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mollotov — LLM-First Mobile Browser</title>
+<title>Kelpie — LLM-First Mobile Browser</title>
 <meta name="description" content="Control real mobile browsers with language models. Native iOS and Android apps with mDNS discovery, HTTP API, and MCP.">
 <style>
   :root {
@@ -228,18 +228,18 @@
 <body>
 
 <div class="hero">
-  <img src="icon-1024.png" alt="Mollotov icon" width="120" height="120">
-  <h1>Mollotov</h1>
+  <img src="icon-1024.png" alt="Kelpie icon" width="120" height="120">
+  <h1>Kelpie</h1>
   <p class="tagline">The mobile browser built for the age of agents. Real devices, real browsers, fully controllable by LLMs.</p>
   <div class="hero-buttons">
-    <a href="https://github.com/UnlikeOtherAI/mollotov" class="btn btn-primary">GitHub</a>
-    <a href="https://github.com/UnlikeOtherAI/mollotov/tree/main/docs" class="btn btn-secondary">Documentation</a>
+    <a href="https://github.com/UnlikeOtherAI/kelpie" class="btn btn-primary">GitHub</a>
+    <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs" class="btn btn-secondary">Documentation</a>
   </div>
 </div>
 
 <div class="install">
   <div class="install-wrap">
-    <code id="install-cmd">npm install -g @unlikeotherai/mollotov</code>
+    <code id="install-cmd">npm install -g @unlikeotherai/kelpie</code>
     <button class="copy-btn" onclick="copyInstall()" title="Copy to clipboard" aria-label="Copy to clipboard">
       <svg id="copy-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
       <svg id="check-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none;color:#4ade80"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -256,7 +256,7 @@
     </div>
     <div class="feature">
       <h3>mDNS discovery</h3>
-      <p>Every running instance advertises <code>_mollotov._tcp</code> on the local network. The CLI auto-discovers all devices with metadata: name, platform, resolution, version.</p>
+      <p>Every running instance advertises <code>_kelpie._tcp</code> on the local network. The CLI auto-discovers all devices with metadata: name, platform, resolution, version.</p>
     </div>
     <div class="feature">
       <h3>HTTP + MCP API</h3>
@@ -300,28 +300,28 @@
 graph TD
     subgraph net["Local Network"]
         subgraph iphone["iPhone"]
-            ib["Mollotov Browser"]
+            ib["Kelpie Browser"]
             is["HTTP + MCP Server"]
-            im["mDNS _mollotov._tcp"]
+            im["mDNS _kelpie._tcp"]
         end
         subgraph ipad["iPad"]
-            pb["Mollotov Browser"]
+            pb["Kelpie Browser"]
             ps["HTTP + MCP Server"]
-            pm["mDNS _mollotov._tcp"]
+            pm["mDNS _kelpie._tcp"]
         end
         subgraph android["Android"]
-            ab["Mollotov Browser"]
+            ab["Kelpie Browser"]
             as["HTTP + MCP Server"]
-            am["mDNS _mollotov._tcp"]
+            am["mDNS _kelpie._tcp"]
         end
         subgraph tv["Apple TV (AirPlay)"]
             tb["Fullscreen Browser"]
             ts["HTTP + MCP Server"]
-            tm["mDNS _mollotov._tcp"]
+            tm["mDNS _kelpie._tcp"]
         end
     end
 
-    subgraph cli["Mollotov CLI (Node.js)"]
+    subgraph cli["Kelpie CLI (Node.js)"]
         disc["mDNS Discovery"]
         ind["Individual Commands"]
         grp["Group Commands"]
@@ -351,7 +351,7 @@ graph TD
   <div class="features" style="grid-template-columns: 1fr;">
     <div class="feature">
       <h3>1. Install the CLI</h3>
-      <p><code>npm install -g @unlikeotherai/mollotov</code></p>
+      <p><code>npm install -g @unlikeotherai/kelpie</code></p>
     </div>
     <div class="feature">
       <h3>2. Run the app</h3>
@@ -359,11 +359,11 @@ graph TD
     </div>
     <div class="feature">
       <h3>3. Discover devices</h3>
-      <p><code>mollotov discover</code> — lists all Mollotov instances on your network with name, platform, IP, and resolution.</p>
+      <p><code>kelpie discover</code> — lists all Kelpie instances on your network with name, platform, IP, and resolution.</p>
     </div>
     <div class="feature">
       <h3>4. Control</h3>
-      <p><code>mollotov navigate --url https://example.com</code> — or connect your LLM via MCP and let it drive.</p>
+      <p><code>kelpie navigate --url https://example.com</code> — or connect your LLM via MCP and let it drive.</p>
     </div>
   </div>
 </section>
@@ -373,7 +373,7 @@ graph TD
   <div class="projects">
     <div class="project-card">
       <h3><a href="https://github.com/UnlikeOtherAI/AppReveal">AppReveal</a></h3>
-      <p>Drop-in Swift package that turns any iOS app into an MCP-controllable agent. Exposes 44 tools: screenshot, tap, get DOM, fill forms, navigate, inspect view hierarchy. Discovered via mDNS, accessed over streamable HTTP. Used by Mollotov for debug integration and automated testing.</p>
+      <p>Drop-in Swift package that turns any iOS app into an MCP-controllable agent. Exposes 44 tools: screenshot, tap, get DOM, fill forms, navigate, inspect view hierarchy. Discovered via mDNS, accessed over streamable HTTP. Used by Kelpie for debug integration and automated testing.</p>
       <a href="https://github.com/UnlikeOtherAI/AppReveal" class="btn btn-secondary">View on GitHub</a>
     </div>
   </div>

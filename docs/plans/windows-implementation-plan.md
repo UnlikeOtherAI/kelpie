@@ -35,8 +35,8 @@ apps/windows/
     device_info_windows.h / .cpp # Windows-specific device info
     mdns_windows.h / .cpp     # Windows mDNS (dns-sd API or Bonjour SDK)
   resources/
-    mollotov.rc               # Windows resource file
-    mollotov.ico              # App icon
+    kelpie.rc               # Windows resource file
+    kelpie.ico              # App icon
     manifest.xml              # App manifest (DPI awareness, etc.)
 ```
 
@@ -114,7 +114,7 @@ The shared `engine-chromium-desktop` must be built first (see Linux plan). Windo
 
 **Settings dialog:**
 - Modal dialog with port, profile directory, startup URL
-- Persisted to `%APPDATA%\Mollotov\settings.json`
+- Persisted to `%APPDATA%\Kelpie\settings.json`
 
 ---
 
@@ -122,7 +122,7 @@ The shared `engine-chromium-desktop` must be built first (see Linux plan). Windo
 
 ### Device info (Windows-specific)
 
-- ID: persistent UUID from `%APPDATA%\Mollotov\device-id`
+- ID: persistent UUID from `%APPDATA%\Kelpie\device-id`
 - Name: `GetComputerNameEx(ComputerNameDnsHostname)`
 - Model: WMI `Win32_ComputerSystem.Model` or registry
 - Platform: `windows`
@@ -135,7 +135,7 @@ The shared `engine-chromium-desktop` must be built first (see Linux plan). Windo
 
 Option A: Bonjour SDK for Windows (Apple's `dns_sd.h` API)
 - Requires Bonjour service installed (comes with iTunes, or standalone installer)
-- `DNSServiceRegister()` to advertise `_mollotov._tcp`
+- `DNSServiceRegister()` to advertise `_kelpie._tcp`
 
 Option B: Windows built-in mDNS (`DnsServiceRegister` from `windns.h`, Windows 10+)
 - Native, no extra dependencies
@@ -148,17 +148,17 @@ Recommendation: Start with Option B (native), fall back to Option A.
 ## Phase 4: Packaging
 
 ### Local dev build
-- CMake build produces: `mollotov.exe` + CEF DLLs + resources
+- CMake build produces: `kelpie.exe` + CEF DLLs + resources
 - Run from build directory
 
 ### Distributable
 - Zip archive with all files
 - Optional: NSIS or WiX installer later
-- User data: `%APPDATA%\Mollotov\`
+- User data: `%APPDATA%\Kelpie\`
 
 ### Profile directory layout
 ```
-%APPDATA%\Mollotov\
+%APPDATA%\Kelpie\
   device-id                # Persistent device UUID
   settings.json            # App settings
   cache/                   # CEF cache
@@ -179,7 +179,7 @@ Recommendation: Start with Option B (native), fall back to Option A.
 - [ ] `POST /v1/evaluate` runs JS
 - [ ] Bookmarks/history panels show data
 - [ ] Network inspector shows traffic with filter dropdowns
-- [ ] mDNS advertisement visible (`dns-sd -B _mollotov._tcp local.`)
+- [ ] mDNS advertisement visible (`dns-sd -B _kelpie._tcp local.`)
 - [ ] CLI discovers and controls the Windows browser
 - [ ] Browser-side MCP exposes supported tools only
 
@@ -214,9 +214,9 @@ Recommendation: Start with Option B (native), fall back to Option A.
 ## CLI flags
 
 ```
-mollotov.exe [options]
+kelpie.exe [options]
   --port PORT         HTTP server port (default: 8420)
-  --profile-dir DIR   Data directory (default: %APPDATA%\Mollotov)
+  --profile-dir DIR   Data directory (default: %APPDATA%\Kelpie)
   --url URL           Initial URL to load
   --width WIDTH       Window width (default: 1920)
   --height HEIGHT     Window height (default: 1080)

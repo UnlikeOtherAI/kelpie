@@ -1,6 +1,6 @@
-# AppReveal In Mollotov
+# AppReveal In Kelpie
 
-This document is the source of truth for how Mollotov uses AppReveal.
+This document is the source of truth for how Kelpie uses AppReveal.
 
 ## Two separate things
 
@@ -28,9 +28,9 @@ That means:
 - Android: AppReveal belongs in `debugImplementation` only, with no release inclusion.
 - Release builds must behave as if AppReveal does not exist.
 
-## Mollotov integration model
+## Kelpie integration model
 
-Mollotov uses AppReveal for debug automation and verification, not for core product behavior.
+Kelpie uses AppReveal for debug automation and verification, not for core product behavior.
 
 AppReveal is used to:
 - inspect visible windows and UI state
@@ -38,7 +38,7 @@ AppReveal is used to:
 - drive taps and other debug interactions
 - support local debug automation from an external agent
 
-Mollotov does not depend on AppReveal for:
+Kelpie does not depend on AppReveal for:
 - browser control over the product HTTP API
 - end-user features
 - release functionality
@@ -46,7 +46,7 @@ Mollotov does not depend on AppReveal for:
 ## iOS
 
 The iOS integration lives in:
-- [AppRevealSetup.swift](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/ios/Mollotov/Debug/AppRevealSetup.swift)
+- [AppRevealSetup.swift](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/ios/Kelpie/Debug/AppRevealSetup.swift)
 
 Current model:
 - import AppReveal only behind debug-only compilation conditions
@@ -62,7 +62,7 @@ Updating one does not update the other.
 ## Android
 
 The Android debug integration entry point lives in:
-- [AppRevealSetup.kt](/System/Volumes/Data/.internal/projects/Projects/mollotov/apps/android/app/src/debug/java/com/mollotov/browser/debug/AppRevealSetup.kt)
+- [AppRevealSetup.kt](/System/Volumes/Data/.internal/projects/Projects/kelpie/apps/android/app/src/debug/java/com/kelpie/browser/debug/AppRevealSetup.kt)
 
 The intended model is:
 - include AppReveal only in debug dependencies
@@ -74,7 +74,7 @@ The intended model is:
 When AppReveal behavior is wrong, first identify which layer is wrong:
 - CLI/helper problem
 - in-app SDK/library problem
-- Mollotov integration problem
+- Kelpie integration problem
 
 Do not treat "update AppReveal" as a single action until that distinction is clear.
 

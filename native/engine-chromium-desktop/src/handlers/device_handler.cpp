@@ -1,6 +1,6 @@
 #include "device_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 DeviceHandler::DeviceHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -25,4 +25,4 @@ nlohmann::json DeviceHandler::GetCapabilities() const {
   return runtime_.capabilities_supplier();
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

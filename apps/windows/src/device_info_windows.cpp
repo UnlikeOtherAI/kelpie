@@ -18,7 +18,7 @@
 #include <winreg.h>
 #include <winternl.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::string WideToUtf8(const std::wstring& value) {
@@ -186,4 +186,4 @@ DeviceInfo DeviceInfoWindows::Collect(int port, int width, int height, const std
   return info;
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

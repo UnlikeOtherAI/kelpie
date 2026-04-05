@@ -5,15 +5,15 @@
 Add CLI-managed macOS browser instance management so parallel local agent sessions can:
 
 - register a named browser alias
-- launch a new Mollotov macOS app instance for that alias
+- launch a new Kelpie macOS app instance for that alias
 - inspect and list registered aliases and current runtime state
 
-This is CLI-local state, not part of network discovery. Persistent state lives under `~/.mollotov`.
+This is CLI-local state, not part of network discovery. Persistent state lives under `~/.kelpie`.
 
 ## Constraints
 
 - Keep discovery as live network truth. Do not mix persistent aliases into mDNS/device discovery.
-- If `Mollotov.app` is not installed, fail with a clear CLI error.
+- If `Kelpie.app` is not installed, fail with a clear CLI error.
 - `browser launch` must support an explicit `--port` but also auto-assign a free port when omitted.
 - Help must exist at each command level: root CLI, `browser`, and `browser` subcommands.
 - Keep complexity low. The CLI owns alias persistence; the macOS app only needs launch-time configuration.
@@ -21,11 +21,11 @@ This is CLI-local state, not part of network discovery. Persistent state lives u
 ## Proposed CLI Surface
 
 ```bash
-mollotov browser register <name> [--app <path>]
-mollotov browser launch <name> [--port <port>] [--wait]
-mollotov browser list
-mollotov browser inspect <name>
-mollotov browser remove <name>
+kelpie browser register <name> [--app <path>]
+kelpie browser launch <name> [--port <port>] [--wait]
+kelpie browser list
+kelpie browser inspect <name>
+kelpie browser remove <name>
 ```
 
 ### Semantics
@@ -62,7 +62,7 @@ mollotov browser remove <name>
 
 Single file:
 
-- `~/.mollotov/browsers.json`
+- `~/.kelpie/browsers.json`
 
 Proposed shape:
 
@@ -72,7 +72,7 @@ Proposed shape:
   "browsers": {
     "claude-a": {
       "platform": "macos",
-      "appPath": "/Applications/Mollotov.app"
+      "appPath": "/Applications/Kelpie.app"
     }
   },
   "running": {
@@ -94,8 +94,8 @@ Rationale:
 Resolution order:
 
 1. Alias `appPath` if configured
-2. `/Applications/Mollotov.app`
-3. `~/Applications/Mollotov.app`
+2. `/Applications/Kelpie.app`
+3. `~/Applications/Kelpie.app`
 
 If none exist, return:
 
@@ -104,7 +104,7 @@ If none exist, return:
   "success": false,
   "error": {
     "code": "APP_NOT_INSTALLED",
-    "message": "Mollotov.app was not found in /Applications, ~/Applications, or the registered app path."
+    "message": "Kelpie.app was not found in /Applications, ~/Applications, or the registered app path."
   }
 }
 ```
@@ -132,7 +132,7 @@ Behavior:
 
 - The app creates `ServerState(port: parsedPort)` for the launched instance.
 - Existing fallback logic in `ServerState` still applies if the requested port becomes unavailable before bind.
-- `open -n -a /Applications/Mollotov.app --args --port 8427` launches a distinct process and window.
+- `open -n -a /Applications/Kelpie.app --args --port 8427` launches a distinct process and window.
 - No new `/v1/*` browser routes are required for this feature, so there is no HTTP route-surface clash to manage.
 
 No persistent app-side alias storage is needed.
@@ -142,12 +142,12 @@ No persistent app-side alias storage is needed.
 Add or improve:
 
 - root CLI `--help` to include the `browser` command
-- `mollotov browser --help`
-- `mollotov browser register --help`
-- `mollotov browser launch --help`
-- `mollotov browser list --help`
-- `mollotov browser inspect --help`
-- `mollotov browser remove --help`
+- `kelpie browser --help`
+- `kelpie browser register --help`
+- `kelpie browser launch --help`
+- `kelpie browser list --help`
+- `kelpie browser inspect --help`
+- `kelpie browser remove --help`
 
 Also update:
 

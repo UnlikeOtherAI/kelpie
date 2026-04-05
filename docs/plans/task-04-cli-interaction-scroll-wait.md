@@ -32,42 +32,42 @@ packages/cli/tests/commands/
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov click <selector>` | `click` | selector, `--timeout` |
-| `mollotov tap <x> <y>` | `tap` | x, y (positional) |
-| `mollotov fill <selector> <value>` | `fill` | selector, value, `--timeout` |
-| `mollotov type <text>` | `type` | text, `--selector`, `--delay` |
-| `mollotov select <selector> <value>` | `select-option` | selector, value |
-| `mollotov check <selector>` | `check` | selector |
-| `mollotov uncheck <selector>` | `uncheck` | selector |
+| `kelpie click <selector>` | `click` | selector, `--timeout` |
+| `kelpie tap <x> <y>` | `tap` | x, y (positional) |
+| `kelpie fill <selector> <value>` | `fill` | selector, value, `--timeout` |
+| `kelpie type <text>` | `type` | text, `--selector`, `--delay` |
+| `kelpie select <selector> <value>` | `select-option` | selector, value |
+| `kelpie check <selector>` | `check` | selector |
+| `kelpie uncheck <selector>` | `uncheck` | selector |
 
 ### Scrolling (`scroll.ts`)
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov scroll` | `scroll` | `--x`, `--y` |
-| `mollotov scroll2 <selector>` | `scroll2` | selector, `--position`, `--max-scrolls` |
-| `mollotov scroll-top` | `scroll-to-top` | — |
-| `mollotov scroll-bottom` | `scroll-to-bottom` | — |
+| `kelpie scroll` | `scroll` | `--x`, `--y` |
+| `kelpie scroll2 <selector>` | `scroll2` | selector, `--position`, `--max-scrolls` |
+| `kelpie scroll-top` | `scroll-to-top` | — |
+| `kelpie scroll-bottom` | `scroll-to-bottom` | — |
 
 ### Wait (`wait.ts`)
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov wait <selector>` | `wait-for-element` | selector, `--timeout`, `--state` |
-| `mollotov wait-nav` | `wait-for-navigation` | `--timeout` |
+| `kelpie wait <selector>` | `wait-for-element` | selector, `--timeout`, `--state` |
+| `kelpie wait-nav` | `wait-for-navigation` | `--timeout` |
 
 ### Device Info (`device-info.ts`)
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov info` | `get-device-info` | `--device` (optional, all if omitted) |
-| `mollotov viewport` | `get-viewport` | `--device` |
+| `kelpie info` | `get-device-info` | `--device` (optional, all if omitted) |
+| `kelpie viewport` | `get-viewport` | `--device` |
 
 ### Evaluate (`eval.ts`)
 
 | Command | API Method | Args |
 |---------|-----------|------|
-| `mollotov eval <expression>` | `evaluate` | expression (positional) |
+| `kelpie eval <expression>` | `evaluate` | expression (positional) |
 
 ## Tests
 

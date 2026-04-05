@@ -1,6 +1,6 @@
 function(add_automation_test name)
   add_executable(${name} ${ARGN})
-  target_link_libraries(${name} PRIVATE mollotov_core_automation)
+  target_link_libraries(${name} PRIVATE kelpie_core_automation)
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 

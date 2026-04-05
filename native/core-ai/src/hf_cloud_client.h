@@ -3,7 +3,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-namespace mollotov {
+namespace kelpie {
 
 class HfCloudClient {
  public:
@@ -12,4 +12,4 @@ class HfCloudClient {
                         const nlohmann::json& request) const;
 };
 
-}  // namespace mollotov
+}  // namespace kelpie

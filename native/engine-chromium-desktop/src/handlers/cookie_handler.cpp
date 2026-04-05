@@ -1,6 +1,6 @@
 #include "cookie_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 CookieHandler::CookieHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -123,4 +123,4 @@ nlohmann::json CookieHandler::ClearStorage(const nlohmann::json& params) const {
   return SuccessResponse({{"cleared", type}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

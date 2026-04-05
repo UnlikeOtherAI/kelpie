@@ -14,7 +14,7 @@ Implement the LLM help system, configure tsup build, finalize the entry point, a
 packages/cli/src/
   help/
     llm-help.ts               # --llm-help implementation
-    explain.ts                 # mollotov explain <command>
+    explain.ts                 # kelpie explain <command>
     command-metadata.ts        # structured metadata for every command
   commands/
     explain.ts                 # explain command registration
@@ -24,7 +24,7 @@ packages/cli/src/
 ```
 packages/cli/
   tsup.config.ts              # build config
-  bin/mollotov.ts              # entry point (finalize)
+  bin/kelpie.ts              # entry point (finalize)
   package.json                 # publish config (bin, files, exports)
 ```
 
@@ -41,9 +41,9 @@ packages/cli/tests/help/
 When passed globally or on any command, outputs machine-readable structured help:
 
 ```bash
-mollotov --llm-help              # full reference for all commands
-mollotov click --llm-help        # help for specific command
-mollotov group --llm-help        # help for group commands
+kelpie --llm-help              # full reference for all commands
+kelpie click --llm-help        # help for specific command
+kelpie group --llm-help        # help for group commands
 ```
 
 Output format:
@@ -56,7 +56,7 @@ Output format:
     {"name": "selector", "type": "string", "required": true, "description": "CSS selector of element to click"},
     {"name": "timeout", "type": "number", "required": false, "default": 5000, "description": "Wait timeout in ms"}
   ],
-  "example": {"request": "mollotov click \"#submit\" --device \"iPhone\"", "response": {"success": true, "element": {"tag": "button", "text": "Submit"}}},
+  "example": {"request": "kelpie click \"#submit\" --device \"iPhone\"", "response": {"success": true, "element": {"tag": "button", "text": "Submit"}}},
   "errors": ["ELEMENT_NOT_FOUND", "ELEMENT_NOT_VISIBLE", "TIMEOUT"],
   "related": ["tap", "fill", "find-button"]
 }
@@ -65,7 +65,7 @@ Output format:
 ### `explain` Command (`help/explain.ts`)
 
 ```bash
-mollotov explain scroll2
+kelpie explain scroll2
 ```
 
 Returns natural language explanation (pre-written per command in `command-metadata.ts`).
@@ -95,10 +95,10 @@ export default defineConfig({
 
 ```json
 {
-  "name": "@unlike-other-ai/mollotov",
+  "name": "@unlike-other-ai/kelpie",
   "version": "0.1.0",
   "type": "module",
-  "bin": { "mollotov": "./dist/index.js" },
+  "bin": { "kelpie": "./dist/index.js" },
   "files": ["dist"],
   "exports": { ".": { "import": "./dist/index.js" } },
   "engines": { "node": ">=20" },
@@ -106,7 +106,7 @@ export default defineConfig({
 }
 ```
 
-### Entry Point (`bin/mollotov.ts`)
+### Entry Point (`bin/kelpie.ts`)
 
 Shebang line + import:
 ```typescript
@@ -122,9 +122,9 @@ import "../dist/index.js";
 
 ## Acceptance Criteria
 
-- [ ] `mollotov --llm-help` outputs valid JSON with all commands
-- [ ] `mollotov click --llm-help` outputs structured help for click command
-- [ ] `mollotov explain scroll2` outputs natural language explanation
+- [ ] `kelpie --llm-help` outputs valid JSON with all commands
+- [ ] `kelpie click --llm-help` outputs structured help for click command
+- [ ] `kelpie explain scroll2` outputs natural language explanation
 - [ ] `pnpm build` succeeds, produces `dist/` with single bundle
 - [ ] `node dist/index.js --version` works
 - [ ] `node dist/index.js --help` shows all commands

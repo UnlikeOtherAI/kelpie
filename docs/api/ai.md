@@ -1,4 +1,4 @@
-# Mollotov — AI API
+# Kelpie — AI API
 
 AI methods expose the active local inference backend on each device. The HTTP shape is shared across platforms, but the backing engine differs:
 

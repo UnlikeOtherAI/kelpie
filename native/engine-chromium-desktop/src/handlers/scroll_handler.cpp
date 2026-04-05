@@ -1,6 +1,6 @@
 #include "scroll_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 ScrollHandler::ScrollHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -39,4 +39,4 @@ nlohmann::json ScrollHandler::ScrollTo(const std::string& expression) const {
   return SuccessResponse({{"scrollY", result.value("scrollY", 0)}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

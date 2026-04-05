@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-#include "mollotov/renderer_interface.h"
+#include "kelpie/renderer_interface.h"
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
-class StubRenderer final : public mollotov::RendererInterface {
+class StubRenderer final : public kelpie::RendererInterface {
  public:
   explicit StubRenderer(std::string initial_url);
 
@@ -38,4 +38,4 @@ class StubRenderer final : public mollotov::RendererInterface {
   std::string title_;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

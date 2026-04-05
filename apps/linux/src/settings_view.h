@@ -1,13 +1,13 @@
 #pragma once
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #else
 typedef struct _GtkWidget GtkWidget;
 typedef struct _GtkWindow GtkWindow;
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 class LinuxApp;
 
@@ -24,4 +24,4 @@ class SettingsView {
   GtkWidget* content_ = nullptr;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

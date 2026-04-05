@@ -3,9 +3,9 @@
 #include <string>
 
 #include "linux_app.h"
-#include "mollotov/cef_app_factory.h"
+#include "kelpie/cef_app_factory.h"
 
-#if MOLLOTOV_LINUX_HAS_CEF
+#if KELPIE_LINUX_HAS_CEF
 #include "include/cef_app.h"
 #endif
 
@@ -13,7 +13,7 @@ namespace {
 
 std::string DefaultProfileDir() {
   const char* home = std::getenv("HOME");
-  return std::string(home == nullptr ? "" : home) + "/.config/mollotov";
+  return std::string(home == nullptr ? "" : home) + "/.config/kelpie";
 }
 
 bool ParseInt(const char* value, int* output) {
@@ -31,7 +31,7 @@ bool ParseInt(const char* value, int* output) {
 
 void PrintHelp() {
   std::cout
-      << "mollotov-linux [options]\n"
+      << "kelpie-linux [options]\n"
       << "  --headless\n"
       << "  --port PORT\n"
       << "  --profile-dir DIR\n"
@@ -43,16 +43,16 @@ void PrintHelp() {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-#if MOLLOTOV_LINUX_HAS_CEF
+#if KELPIE_LINUX_HAS_CEF
   CefMainArgs main_args(argc, argv);
-  CefRefPtr<CefApp> cef_app = mollotov::CreateDesktopCefApp();
+  CefRefPtr<CefApp> cef_app = kelpie::CreateDesktopCefApp();
   const int subprocess_code = CefExecuteProcess(main_args, cef_app, nullptr);
   if (subprocess_code >= 0) {
     return subprocess_code;
   }
 #endif
 
-  mollotov::linuxapp::AppConfig config;
+  kelpie::linuxapp::AppConfig config;
   config.port = 8420;
   config.profile_dir = DefaultProfileDir();
   config.width = 1920;
@@ -91,6 +91,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  mollotov::linuxapp::LinuxApp app(config, argc, argv);
+  kelpie::linuxapp::LinuxApp app(config, argc, argv);
   return app.Run();
 }

@@ -11,16 +11,16 @@
 
 #include <nlohmann/json.hpp>
 
-#include "mollotov/bookmark_store.h"
-#include "mollotov/console_store.h"
-#include "mollotov/desktop_app.h"
-#include "mollotov/error_codes.h"
-#include "mollotov/handler_context.h"
-#include "mollotov/history_store.h"
-#include "mollotov/network_traffic_store.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/console_store.h"
+#include "kelpie/desktop_app.h"
+#include "kelpie/error_codes.h"
+#include "kelpie/handler_context.h"
+#include "kelpie/history_store.h"
+#include "kelpie/network_traffic_store.h"
+#include "kelpie/response_helpers.h"
 
-namespace mollotov {
+namespace kelpie {
 
 struct DesktopHandlerRuntime {
   using json = nlohmann::json;
@@ -173,4 +173,4 @@ inline std::string Base64Encode(const std::vector<std::uint8_t>& input) {
   return output;
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

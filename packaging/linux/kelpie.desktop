@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Kelpie
+Comment=LLM-first browser for Linux
+Exec=/opt/kelpie/kelpie-linux %u
+Icon=/opt/kelpie/kelpie.png
+Terminal=false
+Categories=Network;WebBrowser;Development;
+StartupWMClass=Kelpie
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;

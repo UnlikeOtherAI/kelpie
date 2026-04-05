@@ -1,13 +1,13 @@
-#include "mollotov/platform.h"
+#include "kelpie/platform.h"
 
 #include <algorithm>
 #include <cctype>
 #include <string_view>
 
-#include "mollotov/constants.h"
-#include "mollotov/protocol.h"
+#include "kelpie/constants.h"
+#include "kelpie/protocol.h"
 
-namespace mollotov {
+namespace kelpie {
 
 const StringSet kAlternativeEngineRegions = {
     "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB",
@@ -57,32 +57,32 @@ bool IsAlternativeEngineRegion(std::string_view value) {
   return kAlternativeEngineRegions.find(normalized) != kAlternativeEngineRegions.end();
 }
 
-}  // namespace mollotov
+}  // namespace kelpie
 
 extern "C" {
 
-const char* mollotov_platform_name(MollotovPlatform platform) {
-  return mollotov::PlatformToString(static_cast<mollotov::Platform>(platform));
+const char* kelpie_platform_name(KelpiePlatform platform) {
+  return kelpie::PlatformToString(static_cast<kelpie::Platform>(platform));
 }
 
-int32_t mollotov_default_port(void) {
-  return mollotov::kDefaultPort;
+int32_t kelpie_default_port(void) {
+  return kelpie::kDefaultPort;
 }
 
-const char* mollotov_mdns_service_type(void) {
-  return mollotov::kMdnsServiceType.data();
+const char* kelpie_mdns_service_type(void) {
+  return kelpie::kMdnsServiceType.data();
 }
 
-const char* mollotov_api_version_prefix(void) {
-  return mollotov::kApiVersionPrefix.data();
+const char* kelpie_api_version_prefix(void) {
+  return kelpie::kApiVersionPrefix.data();
 }
 
-const char* mollotov_mcp_tool_prefix(void) {
-  return mollotov::kMcpToolPrefix.data();
+const char* kelpie_mcp_tool_prefix(void) {
+  return kelpie::kMcpToolPrefix.data();
 }
 
-int32_t mollotov_cli_mcp_port(void) {
-  return mollotov::kCliMcpPort;
+int32_t kelpie_cli_mcp_port(void) {
+  return kelpie::kCliMcpPort;
 }
 
 }  // extern "C"

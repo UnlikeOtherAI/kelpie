@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <string>
 
-#include "mollotov/types.h"
+#include "kelpie/types.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 struct MdnsRegistration {
   std::string instance_name;
@@ -41,4 +41,4 @@ class MdnsWindows {
 #endif
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

@@ -7,7 +7,7 @@ import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
-import type { Platform } from "@unlikeotherai/mollotov-shared";
+import type { Platform } from "@unlikeotherai/kelpie-shared";
 import { join } from "node:path";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
@@ -16,7 +16,7 @@ import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 
 export function createMcpServer(): McpServer {
   const server = new McpServer(
-    { name: "mollotov", version: "0.1.0" },
+    { name: "kelpie", version: "0.1.0" },
     { capabilities: { tools: {} } },
   );
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { testDevice, isDeviceReachable } from "./setup.js";
-import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/mollotov-shared";
+import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/kelpie-shared";
 
 /**
  * MCP tool definition tests — verify all tools are correctly defined
@@ -10,20 +10,20 @@ describe("E2E: MCP Tool Definitions", () => {
   it("browser MCP tools cover all expected methods", () => {
     expect(BrowserMcpTools.length).toBe(92);
     // Spot check key tools
-    expect(BrowserMcpTools).toContain("mollotov_navigate");
-    expect(BrowserMcpTools).toContain("mollotov_screenshot");
-    expect(BrowserMcpTools).toContain("mollotov_click");
-    expect(BrowserMcpTools).toContain("mollotov_get_accessibility_tree");
-    expect(BrowserMcpTools).toContain("mollotov_get_page_text");
-    expect(BrowserMcpTools).toContain("mollotov_get_viewport_presets");
-    expect(BrowserMcpTools).toContain("mollotov_set_viewport_preset");
+    expect(BrowserMcpTools).toContain("kelpie_navigate");
+    expect(BrowserMcpTools).toContain("kelpie_screenshot");
+    expect(BrowserMcpTools).toContain("kelpie_click");
+    expect(BrowserMcpTools).toContain("kelpie_get_accessibility_tree");
+    expect(BrowserMcpTools).toContain("kelpie_get_page_text");
+    expect(BrowserMcpTools).toContain("kelpie_get_viewport_presets");
+    expect(BrowserMcpTools).toContain("kelpie_set_viewport_preset");
   });
 
   it("CLI MCP tools cover all expected methods", () => {
     expect(CliMcpTools.length).toBe(20);
-    expect(CliMcpTools).toContain("mollotov_discover");
-    expect(CliMcpTools).toContain("mollotov_group_navigate");
-    expect(CliMcpTools).toContain("mollotov_list_devices");
+    expect(CliMcpTools).toContain("kelpie_discover");
+    expect(CliMcpTools).toContain("kelpie_group_navigate");
+    expect(CliMcpTools).toContain("kelpie_list_devices");
   });
 
   it("total MCP tools is 112", () => {

@@ -49,7 +49,7 @@ describe("MCP tool definitions", () => {
   });
 
   it("group tool platform filters accept linux and windows", () => {
-    const groupNav = cliTools.find((t) => t.name === "mollotov_group_navigate")!;
+    const groupNav = cliTools.find((t) => t.name === "kelpie_group_navigate")!;
     expect(groupNav.schema.platform.safeParse("linux").success).toBe(true);
     expect(groupNav.schema.platform.safeParse("windows").success).toBe(true);
     expect(groupNav.schema.platform.safeParse("unknown").success).toBe(false);
@@ -61,9 +61,9 @@ describe("MCP tool definitions", () => {
     }
   });
 
-  it("all tool names use mollotov_ prefix", () => {
+  it("all tool names use kelpie_ prefix", () => {
     for (const tool of [...browserTools, ...cliTools]) {
-      expect(tool.name).toMatch(/^mollotov_/);
+      expect(tool.name).toMatch(/^kelpie_/);
     }
   });
 
@@ -74,14 +74,14 @@ describe("MCP tool definitions", () => {
   });
 
   it("bodyFromArgs strips device from browser tools", () => {
-    const navTool = browserTools.find((t) => t.name === "mollotov_navigate")!;
+    const navTool = browserTools.find((t) => t.name === "kelpie_navigate")!;
     const body = navTool.bodyFromArgs({ device: "iphone", url: "https://example.com" });
     expect(body).toEqual({ url: "https://example.com" });
     expect(body).not.toHaveProperty("device");
   });
 
   it("bodyFromArgs strips filter params from CLI tools", () => {
-    const groupNav = cliTools.find((t) => t.name === "mollotov_group_navigate")!;
+    const groupNav = cliTools.find((t) => t.name === "kelpie_group_navigate")!;
     const body = groupNav.bodyFromArgs({ platform: "ios", include: "iPhone", exclude: "", url: "https://example.com" });
     expect(body).toEqual({ url: "https://example.com" });
     expect(body).not.toHaveProperty("platform");

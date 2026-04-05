@@ -1,13 +1,13 @@
 #pragma once
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #else
 typedef struct _GtkWidget GtkWidget;
 typedef struct _GtkWindow GtkWindow;
 #endif
 
-namespace mollotov::linuxapp::ui {
+namespace kelpie::linuxapp::ui {
 
 constexpr const char* kFontAwesomeChrome = "\uf268";
 constexpr const char* kFontAwesomeSafari = "\uf267";
@@ -20,4 +20,4 @@ GtkWidget* CreateFabChild();
 GtkWidget* CreateMenuRow(const char* icon_name, const char* label_text);
 bool ApplyWindowIcon(GtkWindow* window);
 
-}  // namespace mollotov::linuxapp::ui
+}  // namespace kelpie::linuxapp::ui

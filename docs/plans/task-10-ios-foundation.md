@@ -12,9 +12,9 @@ Create the complete iOS app foundation: Xcode project, SwiftUI browser UI, WKWeb
 
 ```
 apps/ios/
-  Mollotov.xcodeproj/
-  Mollotov/
-    MollotovApp.swift                    # App entry point
+  Kelpie.xcodeproj/
+  Kelpie/
+    KelpieApp.swift                    # App entry point
     Info.plist                           # Network permissions, Bonjour config
     Assets.xcassets/                     # App icon from assets/icon-1024.png
 
@@ -53,20 +53,20 @@ Create iOS project targeting iOS 16+. Swift Package Manager dependencies:
 Required entries (from docs/tech-stack.md):
 ```xml
 <key>NSLocalNetworkUsageDescription</key>
-<string>Mollotov uses the local network to receive browser automation commands from the CLI.</string>
+<string>Kelpie uses the local network to receive browser automation commands from the CLI.</string>
 
 <key>NSBonjourServices</key>
 <array>
-  <string>_mollotov._tcp</string>
+  <string>_kelpie._tcp</string>
   <string>_appreveal._tcp</string>
 </array>
 ```
 
-### 3. App Entry Point (`MollotovApp.swift`)
+### 3. App Entry Point (`KelpieApp.swift`)
 
 ```swift
 @main
-struct MollotovApp: App {
+struct KelpieApp: App {
     @StateObject private var browserState = BrowserState()
     @StateObject private var serverState = ServerState()
 
@@ -111,7 +111,7 @@ Start with stub handlers that return `{"success": false, "error": {"code": "NOT_
 
 ### 7. mDNS Advertisement
 
-**MDNSAdvertiser** — Uses `NWListener` (Network.framework) to advertise `_mollotov._tcp` with TXT records: id, name, model, platform, width, height, port, version.
+**MDNSAdvertiser** — Uses `NWListener` (Network.framework) to advertise `_kelpie._tcp` with TXT records: id, name, model, platform, width, height, port, version.
 
 ### 8. Device Identity
 
@@ -149,7 +149,7 @@ git add apps/ios/ && git commit -m "feat: iOS app foundation — UI, WebView, HT
 - [ ] Settings panel shows device IP, port, mDNS status
 - [ ] HTTP server starts on port 8420 and responds to requests
 - [ ] `curl http://localhost:8420/v1/get-device-info` returns JSON (even if stub)
-- [ ] mDNS advertises `_mollotov._tcp` — discoverable via `dns-sd -B _mollotov._tcp local.`
+- [ ] mDNS advertises `_kelpie._tcp` — discoverable via `dns-sd -B _kelpie._tcp local.`
 - [ ] TXT records include: id, name, model, platform, width, height, port, version
 - [ ] Device ID is stable across app restarts (Simulator)
 - [ ] AppReveal is active in debug builds — discoverable via `dns-sd -B _appreveal._tcp local.`

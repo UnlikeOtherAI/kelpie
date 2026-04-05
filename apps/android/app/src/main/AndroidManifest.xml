@@ -8,13 +8,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
-        android:name=".MollotovApp"
+        android:name=".KelpieApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="Mollotov"
+        android:label="Kelpie"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Mollotov"
+        android:theme="@style/Theme.Kelpie"
         android:usesCleartextTraffic="true">
 
         <activity

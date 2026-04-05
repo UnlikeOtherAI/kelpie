@@ -1,8 +1,8 @@
-# Mollotov — Implementation Plan
+# Kelpie — Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build the complete Mollotov system — CLI, iOS app, Android app — from the existing documentation spec.
+**Goal:** Build the complete Kelpie system — CLI, iOS app, Android app — from the existing documentation spec.
 
 **Architecture:** Three components communicate over HTTP/JSON on the local network. The CLI discovers native browser apps via mDNS and sends commands. Each native app embeds an HTTP server, MCP server, and mDNS advertiser. AppReveal is integrated in debug builds for automated testing.
 

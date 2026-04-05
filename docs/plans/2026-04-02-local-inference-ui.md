@@ -282,7 +282,7 @@ speedRating: "moderate"
 
 **Ollama model (generic, auto-generated from Ollama metadata):**
 ```
-summary: "Installed via Ollama. Managed externally — Mollotov can use it but doesn't download or delete it."
+summary: "Installed via Ollama. Managed externally — Kelpie can use it but doesn't download or delete it."
 strengths: [derived from model capabilities if known]
 limitations: ["Requires Ollama to be running"]
 bestFor: "Use your existing Ollama models without re-downloading"
@@ -321,7 +321,7 @@ speedRating: "fast"
 
 ## CLI Output
 
-### `mollotov ai list`
+### `kelpie ai list`
 
 ```
 AI Models
@@ -355,7 +355,7 @@ AI Models
      Apple Intelligence — fast text summaries, no vision
 ```
 
-### `mollotov ai list` on a constrained device (8 GB)
+### `kelpie ai list` on a constrained device (8 GB)
 
 ```
   AI Models
@@ -373,7 +373,7 @@ AI Models
      ✗ Not recommended — needs ~8 GB RAM, you have 8 GB total
 ```
 
-### `mollotov ai status --device mac`
+### `kelpie ai status --device mac`
 
 ```
   Device: Mac Studio (Apple M2 Ultra, 64 GB RAM)
@@ -547,7 +547,7 @@ Pin icon (`fa-thumbtack`) in the top-right corner of the tab bar. **Pinned by de
 
 **Magnetic docking:** When the user drags the detached chat window close to the right edge of its parent browser window (within ~20px), the chat snaps back into the browser as a pinned panel. While dragging, a subtle highlight appears on the browser's right edge to show the docking zone. Once docked, both windows move together as one.
 
-**Each browser window gets its own chat history** but shares the same loaded model. The model is process-wide (one model at a time) — switching models in any window's Models tab writes `~/.mollotov/ai-config.json`, and all other windows pick up the change via FSEvents within one frame. Brain pills, panel headers, and Models tab active indicators all update immediately across every window.
+**Each browser window gets its own chat history** but shares the same loaded model. The model is process-wide (one model at a time) — switching models in any window's Models tab writes `~/.kelpie/ai-config.json`, and all other windows pick up the change via FSEvents within one frame. Brain pills, panel headers, and Models tab active indicators all update immediately across every window.
 
 **Re-pinning** (clicking the pin icon in a detached window, or magnetic docking) snaps the floating window back into the browser as a side panel.
 
@@ -733,13 +733,13 @@ Downloads are managed by the CLI (macOS) or the app directly (mobile). Progress 
 
 ### macOS: Shared model store — CLI and app
 
-Both the CLI (`mollotov ai pull`) and the macOS app (Models tab download button) write to the same `~/.mollotov/models/` directory. Either can download, delete, or list models.
+Both the CLI (`kelpie ai pull`) and the macOS app (Models tab download button) write to the same `~/.kelpie/models/` directory. Either can download, delete, or list models.
 
-**App download:** User clicks Download in the panel's Models tab → `ModelDownloader` actor streams from HuggingFace via `URLSession` → progress bar on the card → writes to `~/.mollotov/models/<id>/model.gguf` → updates `registry.json`.
+**App download:** User clicks Download in the panel's Models tab → `ModelDownloader` actor streams from HuggingFace via `URLSession` → progress bar on the card → writes to `~/.kelpie/models/<id>/model.gguf` → updates `registry.json`.
 
-**CLI download:** User runs `mollotov ai pull gemma-4-e2b-q4` → CLI streams from HuggingFace → progress bar in terminal → writes to the same path → updates `registry.json`.
+**CLI download:** User runs `kelpie ai pull gemma-4-e2b-q4` → CLI streams from HuggingFace → progress bar in terminal → writes to the same path → updates `registry.json`.
 
-**Sync:** The macOS app watches `~/.mollotov/models/` via FSEvents (`DispatchSource.makeFileSystemObjectSource`). When the CLI downloads or deletes a model, the app's Models tab updates live — no restart needed. File-level locking (`flock`) on `registry.json` prevents corruption from concurrent writes.
+**Sync:** The macOS app watches `~/.kelpie/models/` via FSEvents (`DispatchSource.makeFileSystemObjectSource`). When the CLI downloads or deletes a model, the app's Models tab updates live — no restart needed. File-level locking (`flock`) on `registry.json` prevents corruption from concurrent writes.
 
 ### Mobile: App downloads directly
 
@@ -756,23 +756,23 @@ Both write to the app's local model directory and update the local registry.
 | Platform | File | Purpose |
 |---|---|---|
 | All | `FontAwesome6Free-Solid-900.otf` | Font file bundled in resources |
-| macOS | `Mollotov/Views/AIChatPanel.swift` | 250px side panel with Chat + Models tabs, pin/unpin |
-| macOS | `Mollotov/Views/AIChatView.swift` | Chat conversation view with input + mic button |
-| macOS | `Mollotov/Views/AIModelListView.swift` | Model card list for panel's Models tab |
-| macOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill in URL bar — toggles side panel |
-| macOS | `Mollotov/AI/ModelDownloader.swift` | HuggingFace download with progress |
-| macOS | `Mollotov/AI/ModelRegistry.swift` | Approved models, fitness scoring, Ollama detection |
-| macOS | `Mollotov/AI/AudioRecorder.swift` | AVAudioEngine 30s recorder, outputs PCM WAV |
-| macOS | `Mollotov/AI/AIState.swift` | Published state: loaded model, capabilities, chat history |
-| iOS | `Mollotov/Views/AIChatScreen.swift` | Full-screen chat with Chat + Models tabs |
-| iOS | `Mollotov/Views/AIChatView.swift` | Chat conversation view |
-| iOS | `Mollotov/Views/AIModelListView.swift` | Model card list |
-| iOS | `Mollotov/Views/AIStatusPill.swift` | Brain pill + navigation trigger |
-| iOS | `Mollotov/AI/ModelDownloader.swift` | Background download support |
-| iOS | `Mollotov/AI/ModelRegistry.swift` | Curated model list + fitness |
-| iOS | `Mollotov/AI/AudioRecorder.swift` | AVAudioEngine recorder |
-| iOS | `Mollotov/AI/PlatformAIEngine.swift` | Apple Intelligence wrapper (Foundation Models) |
-| iOS | `Mollotov/AI/AIState.swift` | Published state — always available on supported hardware |
+| macOS | `Kelpie/Views/AIChatPanel.swift` | 250px side panel with Chat + Models tabs, pin/unpin |
+| macOS | `Kelpie/Views/AIChatView.swift` | Chat conversation view with input + mic button |
+| macOS | `Kelpie/Views/AIModelListView.swift` | Model card list for panel's Models tab |
+| macOS | `Kelpie/Views/AIStatusPill.swift` | Brain pill in URL bar — toggles side panel |
+| macOS | `Kelpie/AI/ModelDownloader.swift` | HuggingFace download with progress |
+| macOS | `Kelpie/AI/ModelRegistry.swift` | Approved models, fitness scoring, Ollama detection |
+| macOS | `Kelpie/AI/AudioRecorder.swift` | AVAudioEngine 30s recorder, outputs PCM WAV |
+| macOS | `Kelpie/AI/AIState.swift` | Published state: loaded model, capabilities, chat history |
+| iOS | `Kelpie/Views/AIChatScreen.swift` | Full-screen chat with Chat + Models tabs |
+| iOS | `Kelpie/Views/AIChatView.swift` | Chat conversation view |
+| iOS | `Kelpie/Views/AIModelListView.swift` | Model card list |
+| iOS | `Kelpie/Views/AIStatusPill.swift` | Brain pill + navigation trigger |
+| iOS | `Kelpie/AI/ModelDownloader.swift` | Background download support |
+| iOS | `Kelpie/AI/ModelRegistry.swift` | Curated model list + fitness |
+| iOS | `Kelpie/AI/AudioRecorder.swift` | AVAudioEngine recorder |
+| iOS | `Kelpie/AI/PlatformAIEngine.swift` | Apple Intelligence wrapper (Foundation Models) |
+| iOS | `Kelpie/AI/AIState.swift` | Published state — always available on supported hardware |
 | Android | `ui/AIChatScreen.kt` | Full-screen chat with tabs |
 | Android | `ui/AIChatView.kt` | Chat conversation composable |
 | Android | `ui/AIModelListView.kt` | Model card list composable |

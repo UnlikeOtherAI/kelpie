@@ -1,6 +1,6 @@
 function(add_store_test name)
   add_executable(${name} ${ARGN})
-  target_link_libraries(${name} PRIVATE mollotov_core_state)
+  target_link_libraries(${name} PRIVATE kelpie_core_state)
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 

@@ -2,7 +2,7 @@ import os from "node:os";
 import { access } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { Command } from "commander";
 import { print } from "../output/formatter.js";
 import {
@@ -124,7 +124,7 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
-      const appPath = alias.appPath ?? "/Applications/Mollotov.app";
+      const appPath = alias.appPath ?? "/Applications/Kelpie.app";
       try {
         await access(appPath);
       } catch {

@@ -1,4 +1,4 @@
-import type { Platform, RuntimeMode } from "@unlikeotherai/mollotov-shared";
+import type { Platform, RuntimeMode } from "@unlikeotherai/kelpie-shared";
 
 export interface DiscoveredDevice {
   id: string;

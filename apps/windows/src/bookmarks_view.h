@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class BookmarksView {
  public:
@@ -32,4 +32,4 @@ class BookmarksView {
   std::string bookmarks_json_ = "[]";
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

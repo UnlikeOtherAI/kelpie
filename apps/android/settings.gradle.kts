@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Mollotov"
+rootProject.name = "Kelpie"
 include(":app")

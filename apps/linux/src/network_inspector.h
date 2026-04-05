@@ -1,6 +1,6 @@
 #pragma once
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
 #else
 typedef struct _GtkWidget GtkWidget;
@@ -8,7 +8,7 @@ typedef struct _GtkComboBoxText GtkComboBoxText;
 typedef struct _GtkListStore GtkListStore;
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 class LinuxApp;
 
@@ -28,4 +28,4 @@ class NetworkInspector {
   GtkListStore* store_ = nullptr;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

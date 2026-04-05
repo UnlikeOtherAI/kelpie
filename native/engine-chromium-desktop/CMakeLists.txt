@@ -42,64 +42,64 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/cookie_handler.cpp
 )
 
-option(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
+option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
-set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB "")
-set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER "")
+set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "")
+set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER "")
 
-if(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP)
+if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/cef_app_factory.cpp)
   if(NOT CEF_ROOT)
-    message(FATAL_ERROR "MOLLOTOV_ENABLE_CHROMIUM_DESKTOP requires CEF_ROOT to point at a CEF SDK")
+    message(FATAL_ERROR "KELPIE_ENABLE_CHROMIUM_DESKTOP requires CEF_ROOT to point at a CEF SDK")
   endif()
   if(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
-    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER
+    set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
         "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
   elseif(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
-    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER
+    set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
         "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
   endif()
   if(EXISTS "${CEF_ROOT}/Release/libcef.so")
-    set(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.so")
+    set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.so")
   endif()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine.cpp)
 else()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)
 endif()
 
-add_library(mollotov_engine_chromium_desktop STATIC
+add_library(kelpie_engine_chromium_desktop STATIC
   ${MOLOTOV_DESKTOP_ENGINE_SOURCES}
 )
 
-target_include_directories(mollotov_engine_chromium_desktop
+target_include_directories(kelpie_engine_chromium_desktop
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-if(MOLLOTOV_ENABLE_CHROMIUM_DESKTOP)
-  target_include_directories(mollotov_engine_chromium_desktop PRIVATE ${CEF_ROOT})
-  if(MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER)
-    target_link_libraries(mollotov_engine_chromium_desktop
+if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
+  target_include_directories(kelpie_engine_chromium_desktop PRIVATE ${CEF_ROOT})
+  if(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER)
+    target_link_libraries(kelpie_engine_chromium_desktop
       PUBLIC
-        "${MOLLOTOV_CHROMIUM_DESKTOP_CEF_WRAPPER}"
+        "${KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER}"
     )
   endif()
-  if(MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB)
-    target_link_libraries(mollotov_engine_chromium_desktop
+  if(KELPIE_CHROMIUM_DESKTOP_CEF_LIB)
+    target_link_libraries(kelpie_engine_chromium_desktop
       PUBLIC
-        "${MOLLOTOV_CHROMIUM_DESKTOP_CEF_LIB}"
+        "${KELPIE_CHROMIUM_DESKTOP_CEF_LIB}"
     )
   endif()
 endif()
 
-target_link_libraries(mollotov_engine_chromium_desktop
+target_link_libraries(kelpie_engine_chromium_desktop
   PUBLIC
-    mollotov_core_protocol
-    mollotov_core_state
-    mollotov_core_automation
-    mollotov_core_mcp
+    kelpie_core_protocol
+    kelpie_core_state
+    kelpie_core_automation
+    kelpie_core_mcp
     nlohmann_json::nlohmann_json
     httplib::httplib
     Threads::Threads

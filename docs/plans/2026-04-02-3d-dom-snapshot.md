@@ -133,7 +133,7 @@ Document this honestly.
 The core JavaScript: a single IIFE injected via `evaluateJS()`, cleaned up by a second script.
 
 **Files:**
-- Create: `apps/macos/Mollotov/Handlers/Snapshot3DBridge.swift` (JS as Swift string constants)
+- Create: `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift` (JS as Swift string constants)
 
 **Step 1: Write the enter script**
 
@@ -516,10 +516,10 @@ The enter script structure:
 
     function exitViaMessage() {
         if (window.webkit && window.webkit.messageHandlers &&
-            window.webkit.messageHandlers.mollotov3DSnapshot) {
-            window.webkit.messageHandlers.mollotov3DSnapshot.postMessage({action: 'exit'});
+            window.webkit.messageHandlers.kelpie3DSnapshot) {
+            window.webkit.messageHandlers.kelpie3DSnapshot.postMessage({action: 'exit'});
         } else {
-            console.log('__mollotov_3d_exit__');
+            console.log('__kelpie_3d_exit__');
         }
     }
 
@@ -628,7 +628,7 @@ Hold both scripts as `static let enterScript: String` and `static let exitScript
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Handlers/Snapshot3DBridge.swift
+git add apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift
 git commit -m "feat(macos): 3D DOM inspector JavaScript engine"
 ```
 
@@ -639,8 +639,8 @@ git commit -m "feat(macos): 3D DOM inspector JavaScript engine"
 The 3D inspector is behind a feature flag. Hidden by default, enabled via Settings toggle or environment variable for testing.
 
 **Files:**
-- Create: `apps/macos/Mollotov/Browser/FeatureFlags.swift`
-- Modify: `apps/macos/Mollotov/Views/SettingsView.swift`
+- Create: `apps/macos/Kelpie/Browser/FeatureFlags.swift`
+- Modify: `apps/macos/Kelpie/Views/SettingsView.swift`
 
 **Step 1: Create `FeatureFlags.swift`**
 
@@ -649,12 +649,12 @@ import Foundation
 
 enum FeatureFlags {
     /// 3D DOM Inspector — experimental, behind feature flag.
-    /// Enable via Settings toggle or `MOLLOTOV_3D_INSPECTOR=1` environment variable.
+    /// Enable via Settings toggle or `KELPIE_3D_INSPECTOR=1` environment variable.
     static var is3DInspectorEnabled: Bool {
         if UserDefaults.standard.bool(forKey: "enable3DInspector") {
             return true
         }
-        if ProcessInfo.processInfo.environment["MOLLOTOV_3D_INSPECTOR"] == "1" {
+        if ProcessInfo.processInfo.environment["KELPIE_3D_INSPECTOR"] == "1" {
             return true
         }
         return false
@@ -681,8 +681,8 @@ Section("Experimental") {
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Browser/FeatureFlags.swift \
-    apps/macos/Mollotov/Views/SettingsView.swift
+git add apps/macos/Kelpie/Browser/FeatureFlags.swift \
+    apps/macos/Kelpie/Views/SettingsView.swift
 git commit -m "feat(macos): feature flag for 3D DOM inspector (settings toggle + env var)"
 ```
 
@@ -691,10 +691,10 @@ git commit -m "feat(macos): feature flag for 3D DOM inspector (settings toggle +
 ### Task 3: Swift Handler — Snapshot3DHandler
 
 **Files:**
-- Create: `apps/macos/Mollotov/Handlers/Snapshot3DHandler.swift`
-- Modify: `apps/macos/Mollotov/Handlers/HandlerContext.swift`
-- Modify: `apps/macos/Mollotov/Network/Router.swift`
-- Modify: `apps/macos/Mollotov/Renderer/WKWebViewRenderer.swift`
+- Create: `apps/macos/Kelpie/Handlers/Snapshot3DHandler.swift`
+- Modify: `apps/macos/Kelpie/Handlers/HandlerContext.swift`
+- Modify: `apps/macos/Kelpie/Network/Router.swift`
+- Modify: `apps/macos/Kelpie/Renderer/WKWebViewRenderer.swift`
 
 **Step 1: Create `Snapshot3DHandler.swift`**
 
@@ -717,7 +717,7 @@ enum Snapshot3DHandler {
     @MainActor
     private static func enter(context: HandlerContext) async -> [String: Any] {
         guard FeatureFlags.is3DInspectorEnabled else {
-            return errorResponse(code: "FEATURE_DISABLED", message: "3D inspector is not enabled. Enable in Settings or set MOLLOTOV_3D_INSPECTOR=1")
+            return errorResponse(code: "FEATURE_DISABLED", message: "3D inspector is not enabled. Enable in Settings or set KELPIE_3D_INSPECTOR=1")
         }
         guard !context.isIn3DInspector else {
             return errorResponse(code: "ALREADY_ACTIVE", message: "3D inspector is already active")
@@ -758,7 +758,7 @@ enum Snapshot3DHandler {
 var isIn3DInspector = false
 
 // In handleScriptMessage(name:body:)
-case "mollotov3DSnapshot":
+case "kelpie3DSnapshot":
     if body["action"] as? String == "exit" {
         Task { @MainActor in
             try? await evaluateJS(Snapshot3DBridge.exitScript)
@@ -767,10 +767,10 @@ case "mollotov3DSnapshot":
         }
     }
 
-// In mollotovConsole handler — CEF fallback
-case "mollotovConsole":
+// In kelpieConsole handler — CEF fallback
+case "kelpieConsole":
     let message = body["message"] as? String ?? ""
-    if message == "__mollotov_3d_exit__" && isIn3DInspector {
+    if message == "__kelpie_3d_exit__" && isIn3DInspector {
         Task { @MainActor in
             try? await evaluateJS(Snapshot3DBridge.exitScript)
             isIn3DInspector = false
@@ -785,15 +785,15 @@ case "mollotovConsole":
 Add notification name:
 ```swift
 extension Notification.Name {
-    static let snapshot3DExited = Notification.Name("mollotov.snapshot3DExited")
+    static let snapshot3DExited = Notification.Name("kelpie.snapshot3DExited")
 }
 ```
 
 **Step 3: Register WKWebView message handler**
 
-In `WKWebViewRenderer.swift`, where `mollotovConsole` and `mollotovNetwork` are registered:
+In `WKWebViewRenderer.swift`, where `kelpieConsole` and `kelpieNetwork` are registered:
 ```swift
-ucc.add(self, name: "mollotov3DSnapshot")
+ucc.add(self, name: "kelpie3DSnapshot")
 ```
 
 **Step 4: Register routes in `Router.swift`**
@@ -814,10 +814,10 @@ if isIn3DInspector {
 **Step 6: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Handlers/Snapshot3DHandler.swift \
-    apps/macos/Mollotov/Handlers/HandlerContext.swift \
-    apps/macos/Mollotov/Network/Router.swift \
-    apps/macos/Mollotov/Renderer/WKWebViewRenderer.swift
+git add apps/macos/Kelpie/Handlers/Snapshot3DHandler.swift \
+    apps/macos/Kelpie/Handlers/HandlerContext.swift \
+    apps/macos/Kelpie/Network/Router.swift \
+    apps/macos/Kelpie/Renderer/WKWebViewRenderer.swift
 git commit -m "feat(macos): 3D inspector HTTP handler and bridge message routing"
 ```
 
@@ -826,8 +826,8 @@ git commit -m "feat(macos): 3D inspector HTTP handler and bridge message routing
 ### Task 4: Floating Menu Integration (gated by feature flag)
 
 **Files:**
-- Modify: `apps/macos/Mollotov/Views/FloatingMenuView.swift`
-- Modify: `apps/macos/Mollotov/Views/BrowserView.swift`
+- Modify: `apps/macos/Kelpie/Views/FloatingMenuView.swift`
+- Modify: `apps/macos/Kelpie/Views/BrowserView.swift`
 
 **Step 1: Add callback to `FloatingMenuView`**
 
@@ -883,8 +883,8 @@ Add notification listener:
 **Step 3: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Views/FloatingMenuView.swift \
-    apps/macos/Mollotov/Views/BrowserView.swift
+git add apps/macos/Kelpie/Views/FloatingMenuView.swift \
+    apps/macos/Kelpie/Views/BrowserView.swift
 git commit -m "feat(macos): 3D inspector button in floating menu"
 ```
 
@@ -892,16 +892,16 @@ git commit -m "feat(macos): 3D inspector button in floating menu"
 
 ### Task 5: Build, Launch, Verify
 
-**Step 1:** Kill any stale Mollotov instance
+**Step 1:** Kill any stale Kelpie instance
 ```bash
-pkill -f Mollotov || true
+pkill -f Kelpie || true
 ```
 
 **Step 2:** Build the macOS app in Xcode
 
 **Step 3:** Launch with the feature flag enabled via environment variable:
 ```bash
-MOLLOTOV_3D_INSPECTOR=1 open apps/macos/build/Debug/Mollotov.app
+KELPIE_3D_INSPECTOR=1 open apps/macos/build/Debug/Kelpie.app
 ```
 Or: launch normally, open Settings, toggle "3D DOM Inspector" under Experimental.
 

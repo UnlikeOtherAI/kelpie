@@ -39,91 +39,91 @@ packages/cli/tests/commands/
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov console` | `get-console-messages` |
-| `mollotov console --level error` | `get-console-messages` (filtered) |
-| `mollotov errors` | `get-js-errors` |
-| `mollotov clear-console` | `clear-console` |
-| `mollotov network` | `get-network-log` |
-| `mollotov network --type fetch --status error` | `get-network-log` (filtered) |
-| `mollotov timeline` | `get-resource-timeline` |
+| `kelpie console` | `get-console-messages` |
+| `kelpie console --level error` | `get-console-messages` (filtered) |
+| `kelpie errors` | `get-js-errors` |
+| `kelpie clear-console` | `clear-console` |
+| `kelpie network` | `get-network-log` |
+| `kelpie network --type fetch --status error` | `get-network-log` (filtered) |
+| `kelpie timeline` | `get-resource-timeline` |
 
 ### Mutations (subcommands)
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov mutations watch` | `watch-mutations` |
-| `mollotov mutations watch --selector "main"` | `watch-mutations` (scoped) |
-| `mollotov mutations get` | `get-mutations` |
-| `mollotov mutations stop` | `stop-watching` |
+| `kelpie mutations watch` | `watch-mutations` |
+| `kelpie mutations watch --selector "main"` | `watch-mutations` (scoped) |
+| `kelpie mutations get` | `get-mutations` |
+| `kelpie mutations stop` | `stop-watching` |
 
 ### Request Interception (subcommands)
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov intercept block <pattern>` | `set-request-interception` |
-| `mollotov intercept mock <url> --body <json>` | `set-request-interception` |
-| `mollotov intercept list` | `get-intercepted-requests` |
-| `mollotov intercept clear` | `clear-request-interception` |
+| `kelpie intercept block <pattern>` | `set-request-interception` |
+| `kelpie intercept mock <url> --body <json>` | `set-request-interception` |
+| `kelpie intercept list` | `get-intercepted-requests` |
+| `kelpie intercept clear` | `clear-request-interception` |
 
 ### Shadow DOM
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov shadow-roots` | `get-shadow-roots` |
-| `mollotov shadow-query <host> <selector>` | `query-shadow-dom` |
+| `kelpie shadow-roots` | `get-shadow-roots` |
+| `kelpie shadow-query <host> <selector>` | `query-shadow-dom` |
 
 ### Dialog (subcommands)
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov dialog` | `get-dialog` |
-| `mollotov dialog accept` | `handle-dialog` |
-| `mollotov dialog dismiss` | `handle-dialog` |
-| `mollotov dialog auto --action accept` | `set-dialog-auto-handler` |
+| `kelpie dialog` | `get-dialog` |
+| `kelpie dialog accept` | `handle-dialog` |
+| `kelpie dialog dismiss` | `handle-dialog` |
+| `kelpie dialog auto --action accept` | `set-dialog-auto-handler` |
 
 ### Tabs (subcommands)
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov tabs` | `get-tabs` |
-| `mollotov tab new [url]` | `new-tab` |
-| `mollotov tab switch <id>` | `switch-tab` |
-| `mollotov tab close <id>` | `close-tab` |
+| `kelpie tabs` | `get-tabs` |
+| `kelpie tab new [url]` | `new-tab` |
+| `kelpie tab switch <id>` | `switch-tab` |
+| `kelpie tab close <id>` | `close-tab` |
 
 ### Iframes (subcommands)
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov iframes` | `get-iframes` |
-| `mollotov iframe enter <id\|selector>` | `switch-to-iframe` |
-| `mollotov iframe exit` | `switch-to-main` |
-| `mollotov iframe context` | `get-iframe-context` |
+| `kelpie iframes` | `get-iframes` |
+| `kelpie iframe enter <id\|selector>` | `switch-to-iframe` |
+| `kelpie iframe exit` | `switch-to-main` |
+| `kelpie iframe context` | `get-iframe-context` |
 
 ### Cookies & Storage
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov cookies` | `get-cookies` |
-| `mollotov cookies set <name> <value>` | `set-cookie` |
-| `mollotov cookies delete` | `delete-cookies` |
-| `mollotov storage` | `get-storage` |
-| `mollotov storage set <key> <value>` | `set-storage` |
-| `mollotov storage clear` | `clear-storage` |
+| `kelpie cookies` | `get-cookies` |
+| `kelpie cookies set <name> <value>` | `set-cookie` |
+| `kelpie cookies delete` | `delete-cookies` |
+| `kelpie storage` | `get-storage` |
+| `kelpie storage set <key> <value>` | `set-storage` |
+| `kelpie storage clear` | `clear-storage` |
 
 ### Clipboard, Geo, Keyboard, Viewport
 
 | Command | API Method |
 |---------|-----------|
-| `mollotov clipboard` | `get-clipboard` |
-| `mollotov clipboard set <text>` | `set-clipboard` |
-| `mollotov geo set <lat> <lng>` | `set-geolocation` |
-| `mollotov geo clear` | `clear-geolocation` |
-| `mollotov keyboard show` | `show-keyboard` |
-| `mollotov keyboard hide` | `hide-keyboard` |
-| `mollotov keyboard state` | `get-keyboard-state` |
-| `mollotov resize <width> <height>` | `resize-viewport` |
-| `mollotov resize reset` | `reset-viewport` |
-| `mollotov obscured <selector>` | `is-element-obscured` |
+| `kelpie clipboard` | `get-clipboard` |
+| `kelpie clipboard set <text>` | `set-clipboard` |
+| `kelpie geo set <lat> <lng>` | `set-geolocation` |
+| `kelpie geo clear` | `clear-geolocation` |
+| `kelpie keyboard show` | `show-keyboard` |
+| `kelpie keyboard hide` | `hide-keyboard` |
+| `kelpie keyboard state` | `get-keyboard-state` |
+| `kelpie resize <width> <height>` | `resize-viewport` |
+| `kelpie resize reset` | `reset-viewport` |
+| `kelpie obscured <selector>` | `is-element-obscured` |
 
 ## Tests
 

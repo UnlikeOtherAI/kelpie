@@ -2,30 +2,30 @@
 
 #include <filesystem>
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gtk/gtk.h>
-#if MOLLOTOV_LINUX_HAS_FONTCONFIG
+#if KELPIE_LINUX_HAS_FONTCONFIG
 #include <fontconfig/fontconfig.h>
 #endif
 #endif
 
-namespace mollotov::linuxapp::ui {
+namespace kelpie::linuxapp::ui {
 
 namespace {
 
 constexpr const char* kCss = R"CSS(
-.mollotov-window {
+.kelpie-window {
   background: #f6f2ed;
 }
 
-.mollotov-toolbar {
+.kelpie-toolbar {
   background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid rgba(83, 68, 53, 0.10);
   padding: 10px 14px;
 }
 
-.mollotov-nav-button {
+.kelpie-nav-button {
   background: #ebe6df;
   border-radius: 10px;
   border: 1px solid rgba(83, 68, 53, 0.08);
@@ -35,22 +35,22 @@ constexpr const char* kCss = R"CSS(
   padding: 0;
 }
 
-.mollotov-nav-button:hover {
+.kelpie-nav-button:hover {
   background: #e3ddd6;
 }
 
-.mollotov-nav-button:disabled {
+.kelpie-nav-button:disabled {
   color: rgba(68, 51, 39, 0.35);
 }
 
-.mollotov-url-shell {
+.kelpie-url-shell {
   background: rgba(255, 255, 255, 0.96);
   border-radius: 16px;
   border: 1px solid rgba(83, 68, 53, 0.10);
   padding: 6px 10px;
 }
 
-.mollotov-brand-pill {
+.kelpie-brand-pill {
   background: #efe9e2;
   border-radius: 10px;
   color: #5b4a3d;
@@ -58,12 +58,12 @@ constexpr const char* kCss = R"CSS(
   min-height: 28px;
 }
 
-.mollotov-brand-icon {
+.kelpie-brand-icon {
   color: #5b4a3d;
 }
 
-.mollotov-url-entry,
-.mollotov-url-entry entry {
+.kelpie-url-entry,
+.kelpie-url-entry entry {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -71,7 +71,7 @@ constexpr const char* kCss = R"CSS(
   font-size: 14px;
 }
 
-.mollotov-fab {
+.kelpie-fab {
   background: #f4b078;
   border-radius: 999px;
   border: none;
@@ -81,33 +81,33 @@ constexpr const char* kCss = R"CSS(
   padding: 0;
 }
 
-.mollotov-fab:hover {
+.kelpie-fab:hover {
   background: #f1a96d;
 }
 
-.mollotov-fab-label {
+.kelpie-fab-label {
   color: #ffffff;
   font-size: 20px;
 }
 
-.mollotov-menu-popover {
+.kelpie-menu-popover {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 18px;
   padding: 8px;
 }
 
-.mollotov-menu-row {
+.kelpie-menu-row {
   background: transparent;
   border: none;
   border-radius: 14px;
   padding: 6px 8px;
 }
 
-.mollotov-menu-row:hover {
+.kelpie-menu-row:hover {
   background: rgba(240, 148, 90, 0.10);
 }
 
-.mollotov-menu-chip {
+.kelpie-menu-chip {
   background: #f0945a;
   border-radius: 999px;
   color: #ffffff;
@@ -116,13 +116,13 @@ constexpr const char* kCss = R"CSS(
   padding: 0;
 }
 
-.mollotov-menu-label {
+.kelpie-menu-label {
   color: #403126;
   font-weight: 600;
 }
  )CSS";
 
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
 void AddCssClass(GtkWidget* widget, const char* class_name) {
   gtk_style_context_add_class(gtk_widget_get_style_context(widget), class_name);
 }
@@ -145,7 +145,7 @@ GdkPixbuf* LoadScaledPixbuf(const std::filesystem::path& path, int size) {
 }
 
 void RegisterFontAwesomeBrands() {
-#if MOLLOTOV_LINUX_HAS_FONTCONFIG
+#if KELPIE_LINUX_HAS_FONTCONFIG
   static bool registered = false;
   if (registered) {
     return;
@@ -164,7 +164,7 @@ void RegisterFontAwesomeBrands() {
 }  // namespace
 
 void InstallTheme() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   static bool installed = false;
   if (installed) {
     return;
@@ -182,12 +182,12 @@ void InstallTheme() {
 }
 
 GtkWidget* CreateSymbolButton(const char* icon_name, const char* tooltip_text) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   auto* button = gtk_button_new();
   auto* image = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_BUTTON);
   gtk_button_set_image(GTK_BUTTON(button), image);
   gtk_widget_set_tooltip_text(button, tooltip_text);
-  AddCssClass(button, "mollotov-nav-button");
+  AddCssClass(button, "kelpie-nav-button");
   return button;
 #else
   (void)icon_name;
@@ -197,15 +197,15 @@ GtkWidget* CreateSymbolButton(const char* icon_name, const char* tooltip_text) {
 }
 
 GtkWidget* CreateBrandBadge(const char* icon_text, const char* tooltip_text) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   auto* frame = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   auto* label = gtk_label_new(icon_text);
   gtk_widget_set_tooltip_text(frame, tooltip_text);
   gtk_label_set_xalign(GTK_LABEL(label), 0.5f);
   gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
   gtk_widget_set_valign(label, GTK_ALIGN_CENTER);
-  AddCssClass(frame, "mollotov-brand-pill");
-  AddCssClass(label, "mollotov-brand-icon");
+  AddCssClass(frame, "kelpie-brand-pill");
+  AddCssClass(label, "kelpie-brand-icon");
   PangoAttrList* attrs = pango_attr_list_new();
   pango_attr_list_insert(attrs, pango_attr_family_new("Font Awesome 6 Brands"));
   pango_attr_list_insert(attrs, pango_attr_size_new_absolute(14 * PANGO_SCALE));
@@ -221,7 +221,7 @@ GtkWidget* CreateBrandBadge(const char* icon_text, const char* tooltip_text) {
 }
 
 GtkWidget* CreateFabChild() {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   auto* drawing = gtk_drawing_area_new();
   gtk_widget_set_size_request(drawing, 24, 24);
   g_signal_connect(
@@ -269,7 +269,7 @@ GtkWidget* CreateFabChild() {
 }
 
 GtkWidget* CreateMenuRow(const char* icon_name, const char* label_text) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
   auto* chip = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   auto* icon = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_BUTTON);
@@ -281,8 +281,8 @@ GtkWidget* CreateMenuRow(const char* icon_name, const char* label_text) {
   gtk_box_pack_start(GTK_BOX(row), chip, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(row), label, TRUE, TRUE, 0);
 
-  AddCssClass(chip, "mollotov-menu-chip");
-  AddCssClass(label, "mollotov-menu-label");
+  AddCssClass(chip, "kelpie-menu-chip");
+  AddCssClass(label, "kelpie-menu-label");
   return row;
 #else
   (void)icon_name;
@@ -292,7 +292,7 @@ GtkWidget* CreateMenuRow(const char* icon_name, const char* label_text) {
 }
 
 bool ApplyWindowIcon(GtkWindow* window) {
-#if MOLLOTOV_LINUX_HAS_GTK
+#if KELPIE_LINUX_HAS_GTK
   if (window == nullptr) {
     return false;
   }
@@ -308,4 +308,4 @@ bool ApplyWindowIcon(GtkWindow* window) {
 #endif
 }
 
-}  // namespace mollotov::linuxapp::ui
+}  // namespace kelpie::linuxapp::ui

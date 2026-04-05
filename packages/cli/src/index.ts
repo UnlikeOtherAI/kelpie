@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { DEFAULT_PORT } from "@unlikeotherai/mollotov-shared";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import { registerAllCommands } from "./commands/index.js";
 
 const program = new Command();
 
 program
-  .name("mollotov")
+  .name("kelpie")
   .description("LLM-first browser automation CLI for iOS and Android")
   .version("0.1.0")
   .option("--device <id|name|ip>", "Target a specific device by ID, name, or IP")

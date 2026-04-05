@@ -1,4 +1,4 @@
-# Mollotov — Feature Catalogue
+# Kelpie — Feature Catalogue
 
 Every user-facing feature is described here. When adding or changing a feature, update this file in the same commit.
 
@@ -8,13 +8,13 @@ For information about browser engine availability by platform and Apple's regula
 
 ## How It Works
 
-Mollotov has two parts: **native browser apps** (iOS, Android, macOS, Linux, and an in-progress Windows shell) and a **Node.js CLI**. The apps run real browsers with embedded HTTP and MCP servers. The CLI discovers them on the local network via mDNS and sends commands. An LLM can control everything through the CLI's MCP server — or talk to device MCP servers directly.
+Kelpie has two parts: **native browser apps** (iOS, Android, macOS, Linux, and an in-progress Windows shell) and a **Node.js CLI**. The apps run real browsers with embedded HTTP and MCP servers. The CLI discovers them on the local network via mDNS and sends commands. An LLM can control everything through the CLI's MCP server — or talk to device MCP servers directly.
 
 No emulators, no cloud, no persistent scripts. Real browsers on real devices, fully controllable by language models.
 
 ## Device Discovery
 
-Every running Mollotov app advertises itself via mDNS (`_mollotov._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose.
+Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose.
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
 
@@ -36,11 +36,11 @@ One-tap login using the device's saved passwords. On iOS, opens an ASWebAuthenti
 
 Switch between Safari (WebKit), Chrome (Chromium/CEF), and Firefox (Gecko) rendering engines at runtime. Available via the UI segmented control and the `set-renderer` / `get-renderer` HTTP endpoints. Cookies are migrated automatically when switching to preserve login sessions.
 
-Gecko uses a Firefox runtime bundled inside Mollotov.app (`Frameworks/MollotovGeckoHelper.app`) — no external Firefox installation required. Run `make gecko-runtime` once during setup to download and strip the runtime. The bundled binary is driven headless via the Firefox Remote Protocol (CDP-compatible WebSocket). The live view shows the Firefox-rendered page via screenshots at ~5fps.
+Gecko uses a Firefox runtime bundled inside Kelpie.app (`Frameworks/KelpieGeckoHelper.app`) — no external Firefox installation required. Run `make gecko-runtime` once during setup to download and strip the runtime. The bundled binary is driven headless via the Firefox Remote Protocol (CDP-compatible WebSocket). The live view shows the Firefox-rendered page via screenshots at ~5fps.
 
 ## External Display — Apple TV (iOS)
 
-When an iPhone or iPad running Mollotov connects to an Apple TV via AirPlay, the app automatically detects the external screen and displays a fullscreen WKWebView on it. This external browser appears as a separate device in mDNS discovery with the name "{device} (TV)" on port 8421, fully controllable from the CLI independently of the main device. No UI chrome — just the web content, controlled entirely via the API. The phone UI also exposes a sync control that mirrors the phone browser onto the TV: page URL, cookies, storage-backed session state, and scroll position all stay aligned so the TV follows the same browsing session instead of acting like a separate login context. A landscape touchpad remote with a visible cursor and inertial swipe scrolling is also available. When the AirPlay connection drops, the external server and window are torn down automatically.
+When an iPhone or iPad running Kelpie connects to an Apple TV via AirPlay, the app automatically detects the external screen and displays a fullscreen WKWebView on it. This external browser appears as a separate device in mDNS discovery with the name "{device} (TV)" on port 8421, fully controllable from the CLI independently of the main device. No UI chrome — just the web content, controlled entirely via the API. The phone UI also exposes a sync control that mirrors the phone browser onto the TV: page URL, cookies, storage-backed session state, and scroll position all stay aligned so the TV follows the same browsing session instead of acting like a separate login context. A landscape touchpad remote with a visible cursor and inertial swipe scrolling is also available. When the AirPlay connection drops, the external server and window are torn down automatically.
 
 ## Screenshots
 
@@ -96,7 +96,7 @@ API: `network-list`, `network-detail`, `network-select`, `network-current`, `net
 
 ## 3D DOM Inspector
 
-**Experimental**. On iOS and Android the 3D inspector is visible by default and can be turned off in Settings. On macOS it stays opt-in until enabled in Settings (Experimental section) or with `MOLLOTOV_3D_INSPECTOR=1`. No restart required.
+**Experimental**. On iOS and Android the 3D inspector is visible by default and can be turned off in Settings. On macOS it stays opt-in until enabled in Settings (Experimental section) or with `KELPIE_3D_INSPECTOR=1`. No restart required.
 
 A visual debugging tool for inspecting element stacking and layer order. Click the 3D button in the floating menu (or call the `snapshot-3d-enter` endpoint) to explode the page DOM into a 3D layered view. Every element is pushed along the Z-axis based on its depth in the DOM tree, making it easy to see which elements overlap, identify invisible overlays blocking interaction, and understand the page structure.
 
@@ -147,7 +147,7 @@ Purpose-built methods that return semantic data instead of raw HTML:
 
 On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`) and corresponding MCP tools let language models query local AI without sending data to the cloud. On iOS and Android, AI remains available from the browser shell while the visible URL-bar shortcut is reserved for the 3D inspector.
 
-**macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`mollotov ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
+**macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`kelpie ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
 
 **iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) is the default backend on supported hardware. Text-only until the iOS 26 SDK is linked. Users can switch to a remote Ollama model for vision-capable inference.
 
@@ -159,7 +159,7 @@ On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, 
 
 **Shared AI Library (`native/core-ai`):** Model catalog, fitness evaluation, HF token management, authenticated downloads, Ollama HTTP client, and HF cloud inference live in a shared C++ library. All platforms link it: macOS and desktop get full HTTP support (cpp-httplib with SSL), mobile platforms use only the catalog/fitness/token functions and handle HTTPS via their native stacks.
 
-**CLI model management:** `mollotov ai list` shows approved models and their download status, plus any locally running Ollama models. `mollotov ai pull/rm` manage downloads. `mollotov ai load/unload/status/ask` control inference on devices. All available as MCP tools (`mollotov_ai_models`, `mollotov_ai_pull`, `mollotov_ai_remove`, `mollotov_ai_status`, `mollotov_ai_load`, `mollotov_ai_unload`, `mollotov_ai_ask`, `mollotov_ai_record`).
+**CLI model management:** `kelpie ai list` shows approved models and their download status, plus any locally running Ollama models. `kelpie ai pull/rm` manage downloads. `kelpie ai load/unload/status/ask` control inference on devices. All available as MCP tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`, `kelpie_ai_status`, `kelpie_ai_load`, `kelpie_ai_unload`, `kelpie_ai_ask`, `kelpie_ai_record`).
 
 ## Annotated Screenshot Workflow
 
@@ -202,15 +202,15 @@ Show or hide the soft keyboard, check its state, and see how it affects the visi
 
 On iPad and Android tablets, the browser shell also has a floating-menu phone viewport picker that stages the live browser view inside a centered device-class viewport instead of stretching edge to edge. The staged viewport honors the current tablet orientation: portrait uses a portrait frame, landscape uses a landscape frame, and the preset list only shows the shared phone, tablet, and laptop sizes that fit the current device geometry. When staged mode is active, a persistent black close button with a white border sits outside the browser frame at the upper-left, and a centered black summary pill sits above the viewport with clear spacing and shows the simulated inches band and pixel range.
 
-On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native titlebar uses the current page title, shows the live viewport resolution in a pill on the right, persists the user-resized shell window size across launches, and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets, sorted by screen size: `Flip Fold (Cover)`, `Compact / Base`, `Standard / Pro`, `Book Fold (Cover)`, `Large / Plus`, `Flip Fold (Internal)`, `Ultra / Pro Max`, `Book Fold (Internal)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Mollotov clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Mollotov website, the GitHub repository, and `unlikeotherai.com`. The floating menu shows custom short hover pills beside each action instead of native macOS tooltip strings, and its settings, bookmarks, history, and network entries now open native macOS sheets backed by the same stores and inspector data as iOS. The macOS bookmarks, history, and network sheets now use full-row hit targets rather than narrow text-only rows.
+On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native titlebar uses the current page title, shows the live viewport resolution in a pill on the right, persists the user-resized shell window size across launches, and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets, sorted by screen size: `Flip Fold (Cover)`, `Compact / Base`, `Standard / Pro`, `Book Fold (Cover)`, `Large / Plus`, `Flip Fold (Internal)`, `Ultra / Pro Max`, `Book Fold (Internal)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Kelpie clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`. The floating menu shows custom short hover pills beside each action instead of native macOS tooltip strings, and its settings, bookmarks, history, and network entries now open native macOS sheets backed by the same stores and inspector data as iOS. The macOS bookmarks, history, and network sheets now use full-row hit targets rather than narrow text-only rows.
 
-The browser HTTP API and MCP now expose named viewport presets directly via `get-viewport-presets` / `set-viewport-preset` and `mollotov_get_viewport_presets` / `mollotov_set_viewport_preset`, so an LLM can inspect the current preset catalog and activate one of the shared device classes remotely. Linux does not support named viewport presets yet.
+The browser HTTP API and MCP now expose named viewport presets directly via `get-viewport-presets` / `set-viewport-preset` and `kelpie_get_viewport_presets` / `kelpie_set_viewport_preset`, so an LLM can inspect the current preset catalog and activate one of the shared device classes remotely. Linux does not support named viewport presets yet.
 
 ## Orientation Control
 
 Lock the device to portrait, landscape, or auto-rotate. Query the current orientation and lock state.
 
-On macOS this applies to the staged viewport only, not the native window. A named viewport preset must be active before orientation can change, and the toolbar hides the portrait/landscape toggle unless such a preset is active. If automation asks for orientation while macOS is in `Full` mode or raw `Custom` viewport mode, Mollotov now returns an explicit explanatory error instead of pretending the feature is unsupported.
+On macOS this applies to the staged viewport only, not the native window. A named viewport preset must be active before orientation can change, and the toolbar hides the portrait/landscape toggle unless such a preset is active. If automation asks for orientation while macOS is in `Full` mode or raw `Custom` viewport mode, Kelpie now returns an explicit explanatory error instead of pretending the feature is unsupported.
 
 ## Device Info
 
@@ -235,21 +235,21 @@ The CLI runs as an MCP server (stdio or HTTP/SSE transport) exposing 100+ tools 
 ```json
 {
   "mcpServers": {
-    "mollotov": {
-      "command": "mollotov",
+    "kelpie": {
+      "command": "kelpie",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-All MCP tools use the `mollotov_` prefix and include JSON schemas with descriptions.
+All MCP tools use the `kelpie_` prefix and include JSON schemas with descriptions.
 
 ## LLM Help System
 
-Every CLI command supports `--llm-help` for machine-readable documentation. `mollotov --llm-help` outputs the complete reference. `mollotov explain <command>` gives natural-language explanations. Designed so an LLM can teach itself the tool without human guidance.
+Every CLI command supports `--llm-help` for machine-readable documentation. `kelpie --llm-help` outputs the complete reference. `kelpie explain <command>` gives natural-language explanations. Designed so an LLM can teach itself the tool without human guidance.
 
-The CLI also manages local macOS browser aliases under `~/.mollotov`. `mollotov browser register <name>` creates a reusable local alias, `mollotov browser launch <name>` starts a fresh Mollotov.app instance for that alias on an explicit or auto-assigned port, and the rest of the CLI can target that launched instance via `--device <name>` without relying on network discovery alone. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
+The CLI also manages local macOS browser aliases under `~/.kelpie`. `kelpie browser register <name>` creates a reusable local alias, `kelpie browser launch <name>` starts a fresh Kelpie.app instance for that alias on an explicit or auto-assigned port, and the rest of the CLI can target that launched instance via `--device <name>` without relying on network discovery alone. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
 Published GitHub releases also build Android release artifacts and publish the CLI packages to npm automatically, so the release page and npm stay aligned with the tagged version.
 
@@ -257,7 +257,7 @@ Published GitHub releases also build Android release artifacts and publish the C
 
 Slides in from the floating menu. Shows device info (name, model, platform, OS, resolution), connection status (IP, port, mDNS advertising, HTTP server running), and copyable connection URLs. Port and device name are editable.
 
-On iOS and Android, the settings sheet also includes a `Help` section with the same support actions exposed on macOS: `Show Welcome Screen`, `Open Mollotov Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI`. `Show Welcome Screen` is an explicit help action and still opens the welcome card even if the user previously chose not to show it automatically on launch.
+On iOS and Android, the settings sheet also includes a `Help` section with the same support actions exposed on macOS: `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI`. `Show Welcome Screen` is an explicit help action and still opens the welcome card even if the user previously chose not to show it automatically on launch.
 
 On iPad, those same actions are also exposed directly from the app menu, immediately under the app `Settings` item, so keyboard-and-menu users do not need to open the settings sheet first. The iPad app also adds a `View` menu that lists the currently available staged phone, tablet, and laptop viewport presets plus `Full Width`, and those menu items are sourced from the same native preset catalog used by the floating menu and MCP APIs.
 

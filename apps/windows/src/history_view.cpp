@@ -6,7 +6,7 @@
 
 #include "../resources/resource.h"
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 namespace {
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -33,7 +33,7 @@ bool HistoryView::EnsureCreated(HINSTANCE instance, HWND owner) {
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = &HistoryView::WindowProc;
   window_class.hInstance = instance_;
-  window_class.lpszClassName = L"MollotovHistoryView";
+  window_class.lpszClassName = L"KelpieHistoryView";
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   RegisterClassW(&window_class);
 
@@ -142,4 +142,4 @@ void HistoryView::Populate() {
   }
 }
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

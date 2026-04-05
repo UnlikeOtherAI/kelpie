@@ -10,15 +10,15 @@
 #include "headless_shell.h"
 #include "linux_app_internal.h"
 
-#if MOLLOTOV_LINUX_HAS_CEF
+#if KELPIE_LINUX_HAS_CEF
 #include "include/cef_app.h"
 #endif
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 namespace {
 
-constexpr const char* kDefaultHomeUrl = "https://unlikeotherai.github.io/mollotov";
+constexpr const char* kDefaultHomeUrl = "https://unlikeotherai.github.io/kelpie";
 
 std::filesystem::path CurrentExecutablePath() {
   std::error_code error;
@@ -54,12 +54,12 @@ std::string InitialUrl(const AppConfig& config) {
   return NormalizeHomeUrl(config.url);
 }
 
-#if MOLLOTOV_LINUX_HAS_CEF
-mollotov::DesktopEngine::Config BuildDesktopEngineConfig(const AppConfig& config,
+#if KELPIE_LINUX_HAS_CEF
+kelpie::DesktopEngine::Config BuildDesktopEngineConfig(const AppConfig& config,
                                                          int argc,
                                                          char** argv,
-                                                         mollotov::DesktopEngine::Mode mode) {
-  mollotov::DesktopEngine::Config engine_config;
+                                                         kelpie::DesktopEngine::Mode mode) {
+  kelpie::DesktopEngine::Config engine_config;
   const std::filesystem::path executable_path = CurrentExecutablePath();
   const std::filesystem::path executable_dir = executable_path.parent_path();
   engine_config.mode = mode;
@@ -146,11 +146,11 @@ LinuxApp::LinuxApp(AppConfig config, int argc, char* argv[])
 LinuxApp::~LinuxApp() = default;
 
 int LinuxApp::Run() {
-#if MOLLOTOV_LINUX_HAS_CEF
+#if KELPIE_LINUX_HAS_CEF
   if (impl_->config.headless) {
-    mollotov::DesktopEngine::Config engine_config =
+    kelpie::DesktopEngine::Config engine_config =
         BuildDesktopEngineConfig(
-            impl_->config, impl_->argc, impl_->argv, mollotov::DesktopEngine::Mode::kOffscreen);
+            impl_->config, impl_->argc, impl_->argv, kelpie::DesktopEngine::Mode::kOffscreen);
     if (impl_->desktop_engine.Initialize(engine_config)) {
       impl_->renderer = &impl_->desktop_engine.renderer();
       impl_->handler_context.SetRenderer(impl_->renderer);
@@ -228,16 +228,16 @@ void LinuxApp::PumpBrowser() {
 }
 
 bool LinuxApp::AttachBrowserHost(std::uintptr_t parent_window, int width, int height) {
-#if MOLLOTOV_LINUX_HAS_CEF
+#if KELPIE_LINUX_HAS_CEF
   (void)parent_window;
   if (impl_->browser_initialized) {
     ResizeBrowserHost(width, height);
     return true;
   }
 
-  mollotov::DesktopEngine::Config engine_config =
+  kelpie::DesktopEngine::Config engine_config =
       BuildDesktopEngineConfig(
-          impl_->config, impl_->argc, impl_->argv, mollotov::DesktopEngine::Mode::kOffscreen);
+          impl_->config, impl_->argc, impl_->argv, kelpie::DesktopEngine::Mode::kOffscreen);
   engine_config.viewport.width = std::max(1, width);
   engine_config.viewport.height = std::max(1, height);
 
@@ -324,7 +324,7 @@ int LinuxApp::port() const {
 }
 
 bool LinuxApp::GuiAvailable() const {
-  return MOLLOTOV_LINUX_HAS_GTK;
+  return KELPIE_LINUX_HAS_GTK;
 }
 
 bool LinuxApp::MdnsActive() const {
@@ -448,4 +448,4 @@ std::string LinuxApp::ConsumeToast() {
   return message;
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

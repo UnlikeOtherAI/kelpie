@@ -10,7 +10,7 @@
 #include <sstream>
 #include <string_view>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 namespace {
 
 using json = nlohmann::json;
@@ -230,4 +230,4 @@ void HttpServer::AcceptLoop() {
   }
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

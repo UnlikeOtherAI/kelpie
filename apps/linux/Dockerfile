@@ -1,12 +1,12 @@
-# Mollotov Linux Headless Browser — Development Build
+# Kelpie Linux Headless Browser — Development Build
 #
 # Multi-stage build:
 #   Stage 1: Build the C++ app with CEF
 #   Stage 2: Slim runtime image
 #
 # Usage:
-#   docker build -t mollotov-linux -f apps/linux/Dockerfile .
-#   docker run -p 8420:8420 mollotov-linux
+#   docker build -t kelpie-linux -f apps/linux/Dockerfile .
+#   docker run -p 8420:8420 kelpie-linux
 
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
 FROM ubuntu:22.04 AS builder
@@ -77,17 +77,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy built app and CEF runtime
-COPY --from=builder /src/apps/linux/build/mollotov-linux /opt/mollotov/mollotov-linux
-COPY --from=builder /opt/cef/Release/ /opt/mollotov/
-COPY --from=builder /opt/cef/Resources/ /opt/mollotov/
+COPY --from=builder /src/apps/linux/build/kelpie-linux /opt/kelpie/kelpie-linux
+COPY --from=builder /opt/cef/Release/ /opt/kelpie/
+COPY --from=builder /opt/cef/Resources/ /opt/kelpie/
 
-WORKDIR /opt/mollotov
+WORKDIR /opt/kelpie
 
 # Create profile directory
-RUN mkdir -p /data/mollotov
+RUN mkdir -p /data/kelpie
 
 ENV DISPLAY=:99
-ENV MOLLOTOV_PROFILE_DIR=/data/mollotov
+ENV KELPIE_PROFILE_DIR=/data/kelpie
 EXPOSE 8420
 
 # Start Xvfb for offscreen rendering, dbus for avahi, then the browser
@@ -96,5 +96,5 @@ CMD ["sh", "-c", "\
   avahi-daemon --daemonize --no-chroot 2>/dev/null; \
   Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp & \
   sleep 1 && \
-  exec ./mollotov-linux --headless --port 8420 --profile-dir /data/mollotov \
+  exec ./kelpie-linux --headless --port 8420 --profile-dir /data/kelpie \
 "]

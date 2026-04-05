@@ -88,21 +88,21 @@ If 3D inspector exits for any reason, native state resets back to `rotate` so th
 
 ### macOS
 
-- Update `apps/macos/Mollotov/Handlers/Snapshot3DBridge.swift`
-- Update `apps/macos/Mollotov/Views/BrowserView.swift`
-- Update `apps/macos/Mollotov/Views/URLBarView.swift`
+- Update `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift`
+- Update `apps/macos/Kelpie/Views/BrowserView.swift`
+- Update `apps/macos/Kelpie/Views/URLBarView.swift`
 
 ### iOS
 
-- Update `apps/ios/Mollotov/Views/BrowserView.swift`
-- Add native 3D control strip view under `apps/ios/Mollotov/Views/`
-- Reuse shared `apps/macos/Mollotov/Handlers/Snapshot3DBridge.swift`
+- Update `apps/ios/Kelpie/Views/BrowserView.swift`
+- Add native 3D control strip view under `apps/ios/Kelpie/Views/`
+- Reuse shared `apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift`
 
 ### Android
 
-- Update `apps/android/app/src/main/java/com/mollotov/browser/handlers/Snapshot3DBridge.kt`
-- Update `apps/android/app/src/main/java/com/mollotov/browser/ui/BrowserScreen.kt`
-- Add native 3D control strip view under `apps/android/app/src/main/java/com/mollotov/browser/ui/`
+- Update `apps/android/app/src/main/java/com/kelpie/browser/handlers/Snapshot3DBridge.kt`
+- Update `apps/android/app/src/main/java/com/kelpie/browser/ui/BrowserScreen.kt`
+- Add native 3D control strip view under `apps/android/app/src/main/java/com/kelpie/browser/ui/`
 
 ## Non-Goals
 

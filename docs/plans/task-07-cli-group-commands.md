@@ -17,7 +17,7 @@ packages/cli/src/
     filter.ts                 # --platform, --include, --exclude filtering
     smart-response.ts         # found/notFound aggregation for smart queries
   commands/
-    group.ts                  # mollotov group <command> [args]
+    group.ts                  # kelpie group <command> [args]
 ```
 
 ```
@@ -65,7 +65,7 @@ For query commands (findButton, findElement, etc.):
 
 ### Group Command (`commands/group.ts`)
 
-`mollotov group <command> [args]` — routes to the appropriate individual command handler but through the orchestrator.
+`kelpie group <command> [args]` — routes to the appropriate individual command handler but through the orchestrator.
 
 Supported group commands (from docs/api/README.md):
 

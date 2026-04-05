@@ -1,4 +1,4 @@
-#include "mollotov/state_c_api.h"
+#include "kelpie/state_c_api.h"
 
 #include <optional>
 #include <string>
@@ -7,44 +7,44 @@
 
 extern "C" {
 
-void mollotov_free_string(char* str) {
+void kelpie_free_string(char* str) {
   delete[] str;
 }
 
-MollotovBookmarkStoreRef mollotov_bookmark_store_create(void) {
+KelpieBookmarkStoreRef kelpie_bookmark_store_create(void) {
   try {
-    return new MollotovBookmarkStore();
+    return new KelpieBookmarkStore();
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_bookmark_store_destroy(MollotovBookmarkStoreRef store) {
+void kelpie_bookmark_store_destroy(KelpieBookmarkStoreRef store) {
   delete store;
 }
 
-void mollotov_bookmark_store_add(MollotovBookmarkStoreRef store, const char* title, const char* url) {
+void kelpie_bookmark_store_add(KelpieBookmarkStoreRef store, const char* title, const char* url) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.Add(mollotov::state_c_api_internal::SafeCString(title),
-                     mollotov::state_c_api_internal::SafeCString(url));
+    store->store.Add(kelpie::state_c_api_internal::SafeCString(title),
+                     kelpie::state_c_api_internal::SafeCString(url));
   } catch (...) {
   }
 }
 
-void mollotov_bookmark_store_remove(MollotovBookmarkStoreRef store, const char* id) {
+void kelpie_bookmark_store_remove(KelpieBookmarkStoreRef store, const char* id) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.Remove(mollotov::state_c_api_internal::SafeCString(id));
+    store->store.Remove(kelpie::state_c_api_internal::SafeCString(id));
   } catch (...) {
   }
 }
 
-void mollotov_bookmark_store_remove_all(MollotovBookmarkStoreRef store) {
+void kelpie_bookmark_store_remove_all(KelpieBookmarkStoreRef store) {
   if (store == nullptr) {
     return;
   }
@@ -54,18 +54,18 @@ void mollotov_bookmark_store_remove_all(MollotovBookmarkStoreRef store) {
   }
 }
 
-char* mollotov_bookmark_store_to_json(MollotovBookmarkStoreRef store) {
+char* kelpie_bookmark_store_to_json(KelpieBookmarkStoreRef store) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
-    return mollotov::state_c_api_internal::CopyString(store->store.ToJson());
+    return kelpie::state_c_api_internal::CopyString(store->store.ToJson());
   } catch (...) {
     return nullptr;
   }
 }
 
-int32_t mollotov_bookmark_store_count(MollotovBookmarkStoreRef store) {
+int32_t kelpie_bookmark_store_count(KelpieBookmarkStoreRef store) {
   if (store == nullptr) {
     return 0;
   }
@@ -76,40 +76,40 @@ int32_t mollotov_bookmark_store_count(MollotovBookmarkStoreRef store) {
   }
 }
 
-void mollotov_bookmark_store_load_json(MollotovBookmarkStoreRef store, const char* json_text) {
+void kelpie_bookmark_store_load_json(KelpieBookmarkStoreRef store, const char* json_text) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.LoadJson(mollotov::state_c_api_internal::SafeCString(json_text));
+    store->store.LoadJson(kelpie::state_c_api_internal::SafeCString(json_text));
   } catch (...) {
   }
 }
 
-MollotovHistoryStoreRef mollotov_history_store_create(void) {
+KelpieHistoryStoreRef kelpie_history_store_create(void) {
   try {
-    return new MollotovHistoryStore();
+    return new KelpieHistoryStore();
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_history_store_destroy(MollotovHistoryStoreRef store) {
+void kelpie_history_store_destroy(KelpieHistoryStoreRef store) {
   delete store;
 }
 
-void mollotov_history_store_record(MollotovHistoryStoreRef store, const char* url, const char* title) {
+void kelpie_history_store_record(KelpieHistoryStoreRef store, const char* url, const char* title) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.Record(mollotov::state_c_api_internal::SafeCString(url),
-                        mollotov::state_c_api_internal::SafeCString(title));
+    store->store.Record(kelpie::state_c_api_internal::SafeCString(url),
+                        kelpie::state_c_api_internal::SafeCString(title));
   } catch (...) {
   }
 }
 
-void mollotov_history_store_clear(MollotovHistoryStoreRef store) {
+void kelpie_history_store_clear(KelpieHistoryStoreRef store) {
   if (store == nullptr) {
     return;
   }
@@ -119,31 +119,31 @@ void mollotov_history_store_clear(MollotovHistoryStoreRef store) {
   }
 }
 
-void mollotov_history_store_update_latest_title(MollotovHistoryStoreRef store,
+void kelpie_history_store_update_latest_title(KelpieHistoryStoreRef store,
                                                 const char* url,
                                                 const char* title) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.UpdateLatestTitle(mollotov::state_c_api_internal::SafeCString(url),
-                                   mollotov::state_c_api_internal::SafeCString(title));
+    store->store.UpdateLatestTitle(kelpie::state_c_api_internal::SafeCString(url),
+                                   kelpie::state_c_api_internal::SafeCString(title));
   } catch (...) {
   }
 }
 
-char* mollotov_history_store_to_json(MollotovHistoryStoreRef store) {
+char* kelpie_history_store_to_json(KelpieHistoryStoreRef store) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
-    return mollotov::state_c_api_internal::CopyString(store->store.ToJson());
+    return kelpie::state_c_api_internal::CopyString(store->store.ToJson());
   } catch (...) {
     return nullptr;
   }
 }
 
-int32_t mollotov_history_store_count(MollotovHistoryStoreRef store) {
+int32_t kelpie_history_store_count(KelpieHistoryStoreRef store) {
   if (store == nullptr) {
     return 0;
   }
@@ -154,36 +154,36 @@ int32_t mollotov_history_store_count(MollotovHistoryStoreRef store) {
   }
 }
 
-void mollotov_history_store_load_json(MollotovHistoryStoreRef store, const char* json_text) {
+void kelpie_history_store_load_json(KelpieHistoryStoreRef store, const char* json_text) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.LoadJson(mollotov::state_c_api_internal::SafeCString(json_text));
+    store->store.LoadJson(kelpie::state_c_api_internal::SafeCString(json_text));
   } catch (...) {
   }
 }
 
-MollotovNetworkTrafficStoreRef mollotov_network_traffic_store_create(void) {
+KelpieNetworkTrafficStoreRef kelpie_network_traffic_store_create(void) {
   try {
-    return new MollotovNetworkTrafficStore();
+    return new KelpieNetworkTrafficStore();
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_network_traffic_store_destroy(MollotovNetworkTrafficStoreRef store) {
+void kelpie_network_traffic_store_destroy(KelpieNetworkTrafficStoreRef store) {
   delete store;
 }
 
-int32_t mollotov_network_traffic_store_append_json(MollotovNetworkTrafficStoreRef store,
+int32_t kelpie_network_traffic_store_append_json(KelpieNetworkTrafficStoreRef store,
                                                    const char* entry_json) {
   if (store == nullptr) {
     return 0;
   }
   try {
-    const std::optional<mollotov::TrafficEntry> entry =
-        mollotov::state_c_api_internal::ParseTrafficEntry(entry_json);
+    const std::optional<kelpie::TrafficEntry> entry =
+        kelpie::state_c_api_internal::ParseTrafficEntry(entry_json);
     if (!entry.has_value()) {
       return 0;
     }
@@ -194,8 +194,8 @@ int32_t mollotov_network_traffic_store_append_json(MollotovNetworkTrafficStoreRe
   }
 }
 
-void mollotov_network_traffic_store_append_document_navigation(
-    MollotovNetworkTrafficStoreRef store,
+void kelpie_network_traffic_store_append_document_navigation(
+    KelpieNetworkTrafficStoreRef store,
     const char* url,
     int32_t status_code,
     const char* content_type,
@@ -208,15 +208,15 @@ void mollotov_network_traffic_store_append_document_navigation(
   }
   try {
     store->store.AppendDocumentNavigation(
-        mollotov::state_c_api_internal::SafeCString(url), status_code,
-        mollotov::state_c_api_internal::SafeCString(content_type),
-        mollotov::state_c_api_internal::ParseHeadersJson(response_headers_json), size,
-        mollotov::state_c_api_internal::SafeCString(start_time), duration);
+        kelpie::state_c_api_internal::SafeCString(url), status_code,
+        kelpie::state_c_api_internal::SafeCString(content_type),
+        kelpie::state_c_api_internal::ParseHeadersJson(response_headers_json), size,
+        kelpie::state_c_api_internal::SafeCString(start_time), duration);
   } catch (...) {
   }
 }
 
-void mollotov_network_traffic_store_clear(MollotovNetworkTrafficStoreRef store) {
+void kelpie_network_traffic_store_clear(KelpieNetworkTrafficStoreRef store) {
   if (store == nullptr) {
     return;
   }
@@ -226,7 +226,7 @@ void mollotov_network_traffic_store_clear(MollotovNetworkTrafficStoreRef store) 
   }
 }
 
-int32_t mollotov_network_traffic_store_select(MollotovNetworkTrafficStoreRef store, int32_t index) {
+int32_t kelpie_network_traffic_store_select(KelpieNetworkTrafficStoreRef store, int32_t index) {
   if (store == nullptr || index < 0) {
     return 0;
   }
@@ -237,7 +237,7 @@ int32_t mollotov_network_traffic_store_select(MollotovNetworkTrafficStoreRef sto
   }
 }
 
-int32_t mollotov_network_traffic_store_selected_index(MollotovNetworkTrafficStoreRef store) {
+int32_t kelpie_network_traffic_store_selected_index(KelpieNetworkTrafficStoreRef store) {
   if (store == nullptr) {
     return -1;
   }
@@ -249,30 +249,30 @@ int32_t mollotov_network_traffic_store_selected_index(MollotovNetworkTrafficStor
   }
 }
 
-char* mollotov_network_traffic_store_get_selected_json(MollotovNetworkTrafficStoreRef store) {
+char* kelpie_network_traffic_store_get_selected_json(KelpieNetworkTrafficStoreRef store) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
     const std::string payload = store->store.GetSelectedJson();
-    return payload.empty() ? nullptr : mollotov::state_c_api_internal::CopyString(payload);
+    return payload.empty() ? nullptr : kelpie::state_c_api_internal::CopyString(payload);
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_network_traffic_store_to_json(MollotovNetworkTrafficStoreRef store) {
+char* kelpie_network_traffic_store_to_json(KelpieNetworkTrafficStoreRef store) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
-    return mollotov::state_c_api_internal::CopyString(store->store.ToJson());
+    return kelpie::state_c_api_internal::CopyString(store->store.ToJson());
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_network_traffic_store_to_summary_json(MollotovNetworkTrafficStoreRef store,
+char* kelpie_network_traffic_store_to_summary_json(KelpieNetworkTrafficStoreRef store,
                                                      const char* method,
                                                      const char* category,
                                                      const char* status_range,
@@ -287,7 +287,7 @@ char* mollotov_network_traffic_store_to_summary_json(MollotovNetworkTrafficStore
       }
       return std::string(value);
     };
-    return mollotov::state_c_api_internal::CopyString(
+    return kelpie::state_c_api_internal::CopyString(
         store->store.ToSummaryJson(to_optional(method), to_optional(category),
                                    to_optional(status_range), to_optional(url_pattern)));
   } catch (...) {
@@ -295,7 +295,7 @@ char* mollotov_network_traffic_store_to_summary_json(MollotovNetworkTrafficStore
   }
 }
 
-int32_t mollotov_network_traffic_store_count(MollotovNetworkTrafficStoreRef store) {
+int32_t kelpie_network_traffic_store_count(KelpieNetworkTrafficStoreRef store) {
   if (store == nullptr) {
     return 0;
   }
@@ -306,35 +306,35 @@ int32_t mollotov_network_traffic_store_count(MollotovNetworkTrafficStoreRef stor
   }
 }
 
-void mollotov_network_traffic_store_load_json(MollotovNetworkTrafficStoreRef store, const char* json_text) {
+void kelpie_network_traffic_store_load_json(KelpieNetworkTrafficStoreRef store, const char* json_text) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.LoadJson(mollotov::state_c_api_internal::SafeCString(json_text));
+    store->store.LoadJson(kelpie::state_c_api_internal::SafeCString(json_text));
   } catch (...) {
   }
 }
 
-MollotovConsoleStoreRef mollotov_console_store_create(void) {
+KelpieConsoleStoreRef kelpie_console_store_create(void) {
   try {
-    return new MollotovConsoleStore();
+    return new KelpieConsoleStore();
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_console_store_destroy(MollotovConsoleStoreRef store) {
+void kelpie_console_store_destroy(KelpieConsoleStoreRef store) {
   delete store;
 }
 
-int32_t mollotov_console_store_append_json(MollotovConsoleStoreRef store, const char* entry_json) {
+int32_t kelpie_console_store_append_json(KelpieConsoleStoreRef store, const char* entry_json) {
   if (store == nullptr) {
     return 0;
   }
   try {
-    const std::optional<mollotov::ConsoleEntry> entry =
-        mollotov::state_c_api_internal::ParseConsoleEntry(entry_json);
+    const std::optional<kelpie::ConsoleEntry> entry =
+        kelpie::state_c_api_internal::ParseConsoleEntry(entry_json);
     if (!entry.has_value()) {
       return 0;
     }
@@ -345,7 +345,7 @@ int32_t mollotov_console_store_append_json(MollotovConsoleStoreRef store, const 
   }
 }
 
-void mollotov_console_store_clear(MollotovConsoleStoreRef store) {
+void kelpie_console_store_clear(KelpieConsoleStoreRef store) {
   if (store == nullptr) {
     return;
   }
@@ -355,32 +355,32 @@ void mollotov_console_store_clear(MollotovConsoleStoreRef store) {
   }
 }
 
-char* mollotov_console_store_to_json(MollotovConsoleStoreRef store, const char* level_filter) {
+char* kelpie_console_store_to_json(KelpieConsoleStoreRef store, const char* level_filter) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
     if (level_filter == nullptr || level_filter[0] == '\0') {
-      return mollotov::state_c_api_internal::CopyString(store->store.ToJson());
+      return kelpie::state_c_api_internal::CopyString(store->store.ToJson());
     }
-    return mollotov::state_c_api_internal::CopyString(store->store.ToJson(std::string(level_filter)));
+    return kelpie::state_c_api_internal::CopyString(store->store.ToJson(std::string(level_filter)));
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_console_store_get_errors_only(MollotovConsoleStoreRef store) {
+char* kelpie_console_store_get_errors_only(KelpieConsoleStoreRef store) {
   if (store == nullptr) {
     return nullptr;
   }
   try {
-    return mollotov::state_c_api_internal::CopyString(store->store.GetErrorsOnly());
+    return kelpie::state_c_api_internal::CopyString(store->store.GetErrorsOnly());
   } catch (...) {
     return nullptr;
   }
 }
 
-int32_t mollotov_console_store_count(MollotovConsoleStoreRef store) {
+int32_t kelpie_console_store_count(KelpieConsoleStoreRef store) {
   if (store == nullptr) {
     return 0;
   }
@@ -391,12 +391,12 @@ int32_t mollotov_console_store_count(MollotovConsoleStoreRef store) {
   }
 }
 
-void mollotov_console_store_load_json(MollotovConsoleStoreRef store, const char* json_text) {
+void kelpie_console_store_load_json(KelpieConsoleStoreRef store, const char* json_text) {
   if (store == nullptr) {
     return;
   }
   try {
-    store->store.LoadJson(mollotov::state_c_api_internal::SafeCString(json_text));
+    store->store.LoadJson(kelpie::state_c_api_internal::SafeCString(json_text));
   } catch (...) {
   }
 }

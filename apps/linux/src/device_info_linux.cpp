@@ -10,7 +10,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 namespace {
 
 std::string Trim(std::string value) {
@@ -56,7 +56,7 @@ std::string EnsureDeviceId(const std::filesystem::path& profile_dir) {
 std::string Hostname() {
   char buffer[256] = {};
   if (gethostname(buffer, sizeof(buffer) - 1) != 0) {
-    return "Mollotov Linux";
+    return "Kelpie Linux";
   }
   return buffer;
 }
@@ -175,7 +175,7 @@ nlohmann::json DeviceInfoLinux::ToJson(const DeviceInfoSnapshot& snapshot,
 
   const json ip_val = snapshot.ip.empty() ? json(nullptr) : json(snapshot.ip);
   const json mdns_val = mdns_name.empty() ? json(nullptr) : json(mdns_name);
-  const json engine_version = MOLLOTOV_LINUX_HAS_CEF ? json("embedded") : json(nullptr);
+  const json engine_version = KELPIE_LINUX_HAS_CEF ? json("embedded") : json(nullptr);
 
   const char* lang_env = std::getenv("LANG");
   const json locale_val = lang_env != nullptr ? json(lang_env) : json(nullptr);
@@ -213,7 +213,7 @@ nlohmann::json DeviceInfoLinux::ToJson(const DeviceInfoSnapshot& snapshot,
   result["browser"] = {
       {"engine", snapshot.engine},
       {"engineVersion", engine_version},
-      {"userAgent", "Mollotov Linux Chromium"},
+      {"userAgent", "Kelpie Linux Chromium"},
       {"viewportWidth", width},
       {"viewportHeight", height}};
   result["app"] = {
@@ -234,4 +234,4 @@ nlohmann::json DeviceInfoLinux::ToJson(const DeviceInfoSnapshot& snapshot,
   return result;
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

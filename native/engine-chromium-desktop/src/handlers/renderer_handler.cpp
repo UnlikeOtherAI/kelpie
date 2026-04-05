@@ -1,6 +1,6 @@
 #include "renderer_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 RendererHandler::RendererHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -20,4 +20,4 @@ nlohmann::json RendererHandler::SetRenderer() const {
   return Unsupported("set-renderer");
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

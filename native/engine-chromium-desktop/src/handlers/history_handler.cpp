@@ -1,6 +1,6 @@
 #include "history_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 HistoryHandler::HistoryHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -31,4 +31,4 @@ nlohmann::json HistoryHandler::Clear() const {
   return SuccessResponse({{"cleared", true}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

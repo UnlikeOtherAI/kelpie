@@ -6,7 +6,7 @@
 
 #include "linux_app.h"
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 namespace {
 
 LinuxApp* g_signal_app = nullptr;
@@ -26,7 +26,7 @@ int HeadlessShell::Run() {
   std::signal(SIGINT, HandleSignal);
   std::signal(SIGTERM, HandleSignal);
 
-  std::cout << "Mollotov headless browser running on port " << app_.port() << '\n';
+  std::cout << "Kelpie headless browser running on port " << app_.port() << '\n';
   while (app_.IsRunning()) {
     app_.PumpBrowser();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -35,4 +35,4 @@ int HeadlessShell::Run() {
   return 0;
 }
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

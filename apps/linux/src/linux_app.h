@@ -9,7 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 struct AppConfig {
   bool headless = false;
@@ -87,4 +87,4 @@ class LinuxApp {
   std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

@@ -42,5 +42,5 @@ No new endpoint is added. Existing endpoint semantics become accurate.
 External Codex review findings:
 
 - Fixing only `set-orientation` is incomplete because macOS `get-orientation` currently lies with a hard-coded `landscape` value while `get-viewport` already reports the real derived orientation.
-- Shared MCP metadata already treats `mollotov_set_orientation` and `mollotov_get_orientation` as available on macOS, but the native MCP registry still marks them mobile-only. Leaving that mismatch would keep HTTP, CLI, and native MCP inconsistent.
+- Shared MCP metadata already treats `kelpie_set_orientation` and `kelpie_get_orientation` as available on macOS, but the native MCP registry still marks them mobile-only. Leaving that mismatch would keep HTTP, CLI, and native MCP inconsistent.
 - The minimum-complexity fix is still the proposed one, but it must include `get-orientation` correctness and MCP registry alignment, not just the explanatory `set-orientation` error.

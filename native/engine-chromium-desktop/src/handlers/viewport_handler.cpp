@@ -1,6 +1,6 @@
 #include "viewport_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 ViewportHandler::ViewportHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -39,4 +39,4 @@ nlohmann::json ViewportHandler::ResetViewport() const {
   return SuccessResponse({{"viewport", runtime_.viewport_supplier()}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

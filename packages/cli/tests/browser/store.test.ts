@@ -15,7 +15,7 @@ describe("browser store", () => {
   let homeDir = "";
 
   beforeEach(async () => {
-    homeDir = await mkdtemp(path.join(os.tmpdir(), "mollotov-browser-store-"));
+    homeDir = await mkdtemp(path.join(os.tmpdir(), "kelpie-browser-store-"));
     process.env.HOME = homeDir;
   });
 
@@ -24,10 +24,10 @@ describe("browser store", () => {
     await rm(homeDir, { recursive: true, force: true });
   });
 
-  it("persists aliases and running state under ~/.mollotov", async () => {
+  it("persists aliases and running state under ~/.kelpie", async () => {
     await upsertBrowserAlias("claude-a", {
       platform: "macos",
-      appPath: "/Applications/Mollotov.app",
+      appPath: "/Applications/Kelpie.app",
     });
     await setRunningBrowser("claude-a", {
       port: 8427,
@@ -35,7 +35,7 @@ describe("browser store", () => {
     });
 
     const store = await loadBrowserStore();
-    expect(store.aliases["claude-a"]?.appPath).toBe("/Applications/Mollotov.app");
+    expect(store.aliases["claude-a"]?.appPath).toBe("/Applications/Kelpie.app");
     expect(store.running["claude-a"]?.port).toBe(8427);
   });
 

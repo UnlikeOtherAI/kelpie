@@ -1,8 +1,8 @@
-# Mollotov — Browser Engines & Platform Availability
+# Kelpie — Browser Engines & Platform Availability
 
 ## Overview
 
-Mollotov is an LLM-controlled testing browser that needs to support multiple rendering engines across iOS, Android, macOS, and future desktop platforms. This document outlines which engines are available on each platform, the legal/regulatory constraints (especially Apple's 2026 regional restrictions), and the technical compliance requirements.
+Kelpie is an LLM-controlled testing browser that needs to support multiple rendering engines across iOS, Android, macOS, and future desktop platforms. This document outlines which engines are available on each platform, the legal/regulatory constraints (especially Apple's 2026 regional restrictions), and the technical compliance requirements.
 
 ---
 
@@ -63,7 +63,7 @@ Mollotov is an LLM-controlled testing browser that needs to support multiple ren
 
 ### Regional Access Control
 
-As of April 1, 2026, Apple legally requires allowing alternative browser engines (Gecko, Chromium/Blink) in **specific regions only**. Mollotov must respect these boundaries.
+As of April 1, 2026, Apple legally requires allowing alternative browser engines (Gecko, Chromium/Blink) in **specific regions only**. Kelpie must respect these boundaries.
 
 #### Eligible Regions for Alternative Engines
 
@@ -85,7 +85,7 @@ As of April 1, 2026, Apple legally requires allowing alternative browser engines
 To use Gecko or Chromium on iOS in eligible regions, you must obtain one of these entitlements from Apple:
 
 1. **Web Browser Engine Entitlement** — For dedicated browser apps (full-featured web browsers)
-2. **Embedded Browser Engine Entitlement** — For apps that embed a browser (like Mollotov, a testing tool)
+2. **Embedded Browser Engine Entitlement** — For apps that embed a browser (like Kelpie, a testing tool)
 
 Both entitlements require:
 
@@ -110,26 +110,26 @@ Apple can still reject your app if:
 
 ---
 
-## Mollotov's Compliance Strategy
+## Kelpie's Compliance Strategy
 
 ### Entitlement Application
 
-For Mollotov to use Gecko or Chromium on iOS in EU/Japan/UK regions:
+For Kelpie to use Gecko or Chromium on iOS in EU/Japan/UK regions:
 
 1. **Request the Embedded Browser Engine Entitlement** via Apple Developer Portal
-2. **Publish a Security/Vulnerability Policy** on Mollotov's website; include:
+2. **Publish a Security/Vulnerability Policy** on Kelpie's website; include:
    - How security flaws are reported (email, HackerOne, etc.)
    - Expected response timeline (e.g., "Critical: 5 days, High: 15 days")
    - Confirmation that patches will be submitted to App Review within 15 days of upstream release
 3. **Demonstrate Compliance in App Review Notes:**
-   - Explain that Mollotov is an LLM-controlled testing tool for developers
+   - Explain that Kelpie is an LLM-controlled testing tool for developers
    - State that the app is region-gated: alternative engines only activate in EU/Japan/UK
    - Show video evidence of the app working with both WebKit (US mode) and Gecko/Chromium (EU mode)
    - Reference the public monitoring dashboard (see below) proving active engine maintenance
 
 ### Region-Gating Implementation
 
-Mollotov must programmatically check device region and conditionally enable alternative engines:
+Kelpie must programmatically check device region and conditionally enable alternative engines:
 
 ```swift
 // Pseudocode for iOS
@@ -158,7 +158,7 @@ func detectAvailableEngines() -> AvailableEngines {
 
 ### Automated Maintenance (15-Day Update Rule)
 
-Since Mollotov uses Claude + Codex to automate browser engine updates, the compliance pipeline must:
+Since Kelpie uses Claude + Codex to automate browser engine updates, the compliance pipeline must:
 
 1. **Monitor Official Release Channels:**
    - Chromium: [Chromium Dash](https://chromiumdash.appspot.com/) + [Chrome Releases Blog](https://chromereleases.googleblog.com/)
@@ -201,23 +201,23 @@ Both Gecko and Chromium already pass 90%+ of WPT by default. However, verify on 
 # This is Apple's test suite; confirm no regressions from your wrapper
 ```
 
-Mollotov's "wrapper" (MCP control layer, LLM orchestration) must not degrade WPT scores. If it does, Apple will reject the app.
+Kelpie's "wrapper" (MCP control layer, LLM orchestration) must not degrade WPT scores. If it does, Apple will reject the app.
 
 ### Test262 (JavaScript Conformance)
 
-Gecko and Chromium both pass 80%+ of Test262. Again, verify no regressions from the Mollotov layer.
+Gecko and Chromium both pass 80%+ of Test262. Again, verify no regressions from the Kelpie layer.
 
 ### Info.plist Entries (iOS)
 
 ```xml
 <!-- Required for Embedded Browser Engine Entitlement -->
 <key>NSLocalNetworkUsageDescription</key>
-<string>Mollotov connects to your development machine over the local network to receive automated testing and MCP commands.</string>
+<string>Kelpie connects to your development machine over the local network to receive automated testing and MCP commands.</string>
 
 <!-- For alternative engine support -->
 <key>NSBonjourServices</key>
 <array>
-  <string>_mollotov._tcp</string>
+  <string>_kelpie._tcp</string>
 </array>
 
 <!-- If using Chromium/Gecko -->
@@ -233,16 +233,16 @@ Apple provides special APIs for high-performance JIT:
 
 ---
 
-## Mollotov's Monitoring & Compliance Dashboard
+## Kelpie's Monitoring & Compliance Dashboard
 
-To satisfy Apple's requirement for "active maintenance," Mollotov will have a public dashboard. For the full service architecture and API specification, see [engine-monitoring.md](engine-monitoring.md).
+To satisfy Apple's requirement for "active maintenance," Kelpie will have a public dashboard. For the full service architecture and API specification, see [engine-monitoring.md](engine-monitoring.md).
 
 The dashboard will show:
 
 1. **Current Engine Status**
    - Upstream Gecko latest version
    - Upstream Chromium latest version
-   - Mollotov's currently shipped version
+   - Kelpie's currently shipped version
 
 2. **Update Pipeline Status**
    - "Scanning for updates..." (automated)
@@ -297,7 +297,7 @@ This dashboard is **public-facing** (for App Review transparency) and **not behi
 
 If a user travels outside EU/Japan/UK for more than 30 days:
 - Apple may revert their device to WebKit-only mode
-- Mollotov will fall back to WKWebView automatically
+- Kelpie will fall back to WKWebView automatically
 - No data loss, but MCP automation may degrade slightly (some features may be WKWebView-only)
 
 ### TestFlight Testing
@@ -305,12 +305,12 @@ If a user travels outside EU/Japan/UK for more than 30 days:
 For early testing with developers outside eligible regions:
 - Standard TestFlight (90-day builds) does not support alternative engines outside EU/Japan/UK
 - Exception: Apple may grant "browser vendor" status for global TestFlight testing if you can prove you're an established browser project
-- Mollotov likely doesn't qualify; recommend testing with TestFlight only in EU region
+- Kelpie likely doesn't qualify; recommend testing with TestFlight only in EU region
 
 ### App Store Review Edge Cases
 
 Apple may reject if:
-- The app's "core functionality" (e.g., web testing) is unusable without the alternative engine (Mollotov works fine with WebKit, so this is not a risk)
+- The app's "core functionality" (e.g., web testing) is unusable without the alternative engine (Kelpie works fine with WebKit, so this is not a risk)
 - The app attempts to download and run engines outside the Apple-approved distribution channel (always use the Embedded entitlement, never try to sideload engines)
 - The app fails to gate engines by region (most common reason for rejection)
 

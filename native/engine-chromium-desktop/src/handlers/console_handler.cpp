@@ -1,6 +1,6 @@
 #include "console_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 ConsoleHandler::ConsoleHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
@@ -52,4 +52,4 @@ nlohmann::json ConsoleHandler::ClearConsole() const {
   return SuccessResponse({{"cleared", count}});
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

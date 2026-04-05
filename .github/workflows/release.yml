@@ -142,13 +142,13 @@ jobs:
                 --build-label "${DISTRO_NAME}" \
                 --output-dir "${bundle_root}"
 
-              tar -C "${bundle_root}" -czf "${package_root}/mollotov-linux-${VERSION}-${DISTRO_NAME}-x86_64.tar.gz" mollotov-linux
+              tar -C "${bundle_root}" -czf "${package_root}/kelpie-linux-${VERSION}-${DISTRO_NAME}-x86_64.tar.gz" kelpie-linux
 
               case "${PACKAGE_KIND}" in
                 deb)
                   bash scripts/package-linux-deb.sh \
                     --version "${VERSION}" \
-                    --bundle-dir "${bundle_root}/mollotov-linux" \
+                    --bundle-dir "${bundle_root}/kelpie-linux" \
                     --output-dir "${package_root}"
 
                   if [ "${BUILD_APPIMAGE}" = "true" ]; then
@@ -157,7 +157,7 @@ jobs:
                     APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage --appimage-extract >/dev/null
                     bash scripts/package-linux-appimage.sh \
                       --version "${VERSION}" \
-                      --bundle-dir "${bundle_root}/mollotov-linux" \
+                      --bundle-dir "${bundle_root}/kelpie-linux" \
                       --output-dir "${package_root}" \
                       --appimagetool "/tmp/squashfs-root/AppRun"
                   fi
@@ -165,7 +165,7 @@ jobs:
                 rpm)
                   bash scripts/package-linux-rpm.sh \
                     --version "${VERSION}" \
-                    --bundle-dir "${bundle_root}/mollotov-linux" \
+                    --bundle-dir "${bundle_root}/kelpie-linux" \
                     --output-dir "${package_root}"
                   ;;
               esac
@@ -236,10 +236,10 @@ jobs:
             ext="${artifact##*.}"
             case "$(basename "${artifact}")" in
               *unsigned*)
-                mv "${artifact}" "${out_dir}/mollotov-android-${release_tag}-release-unsigned.${ext}"
+                mv "${artifact}" "${out_dir}/kelpie-android-${release_tag}-release-unsigned.${ext}"
                 ;;
               *)
-                mv "${artifact}" "${out_dir}/mollotov-android-${release_tag}-release.${ext}"
+                mv "${artifact}" "${out_dir}/kelpie-android-${release_tag}-release.${ext}"
                 ;;
             esac
           done
@@ -292,17 +292,17 @@ jobs:
 
       - name: Build and test CLI packages
         run: |
-          pnpm --filter @unlikeotherai/mollotov-shared build
-          pnpm --filter @unlikeotherai/mollotov build
-          pnpm --filter @unlikeotherai/mollotov-shared test
-          pnpm --filter @unlikeotherai/mollotov test
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          pnpm --filter @unlikeotherai/kelpie build
+          pnpm --filter @unlikeotherai/kelpie-shared test
+          pnpm --filter @unlikeotherai/kelpie test
 
       - name: Pack CLI tarballs
         run: |
           set -euo pipefail
           mkdir -p dist/release/cli
-          pnpm --filter @unlikeotherai/mollotov-shared pack --pack-destination dist/release/cli
-          pnpm --filter @unlikeotherai/mollotov pack --pack-destination dist/release/cli
+          pnpm --filter @unlikeotherai/kelpie-shared pack --pack-destination dist/release/cli
+          pnpm --filter @unlikeotherai/kelpie pack --pack-destination dist/release/cli
           (
             cd dist/release/cli
             sha256sum ./*.tgz > checksums.txt
@@ -317,8 +317,8 @@ jobs:
             exit 0
           fi
           version="$(node -p "require('./packages/shared/package.json').version")"
-          if npm view "@unlikeotherai/mollotov-shared@${version}" version >/dev/null 2>&1; then
-            echo "@unlikeotherai/mollotov-shared@${version} already published"
+          if npm view "@unlikeotherai/kelpie-shared@${version}" version >/dev/null 2>&1; then
+            echo "@unlikeotherai/kelpie-shared@${version} already published"
           else
             cd packages/shared && npm publish --access public --provenance
           fi
@@ -332,8 +332,8 @@ jobs:
             exit 0
           fi
           version="$(node -p "require('./packages/cli/package.json').version")"
-          if npm view "@unlikeotherai/mollotov@${version}" version >/dev/null 2>&1; then
-            echo "@unlikeotherai/mollotov@${version} already published"
+          if npm view "@unlikeotherai/kelpie@${version}" version >/dev/null 2>&1; then
+            echo "@unlikeotherai/kelpie@${version} already published"
           else
             cd packages/cli && npm publish --access public --provenance
           fi

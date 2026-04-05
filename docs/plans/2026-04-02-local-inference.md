@@ -2,11 +2,11 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add on-device LLM inference to Mollotov — the CLI manages model downloads from Hugging Face, the macOS browser loads and runs them, and new MCP tools let LLMs ask the local model to summarise/describe/analyse the current page without sending data to the cloud.
+**Goal:** Add on-device LLM inference to Kelpie — the CLI manages model downloads from Hugging Face, the macOS browser loads and runs them, and new MCP tools let LLMs ask the local model to summarise/describe/analyse the current page without sending data to the cloud.
 
 **Architecture:** The CLI owns model lifecycle (download, list, delete) using GGUF files from Hugging Face. Each browser app exposes new HTTP endpoints for model loading/unloading and inference. The MCP server adds tools to query model status and run inference. On macOS, inference runs via `llama.cpp` as a compiled Swift package. On mobile, platform AI (Apple Intelligence on iOS, Gemini Nano on Android) is the default backend — no download needed, text-only. Mobile also supports remote Ollama as an upgrade path for vision-capable models.
 
-**Tech Stack:** llama.cpp (Swift package), Hugging Face Hub API (REST), GGUF model format, existing Mollotov HTTP/MCP patterns.
+**Tech Stack:** llama.cpp (Swift package), Hugging Face Hub API (REST), GGUF model format, existing Kelpie HTTP/MCP patterns.
 
 ---
 
@@ -15,7 +15,7 @@
 ### Model Storage
 
 ```
-~/.mollotov/models/
+~/.kelpie/models/
   registry.json            # Tracks downloaded models, metadata, source URLs
   gemma-4-e2b-q4/
     model.gguf
@@ -29,12 +29,12 @@ Mobile model storage:
 - iOS: `<app>/Documents/models/`
 - Android: `<app>/files/models/`
 
-**Shared model store (macOS).** Both the CLI and the macOS app read and write `~/.mollotov/models/`. Either can download, delete, or list models. File-level locking (`flock`) prevents concurrent writes during downloads.
+**Shared model store (macOS).** Both the CLI and the macOS app read and write `~/.kelpie/models/`. Either can download, delete, or list models. File-level locking (`flock`) prevents concurrent writes during downloads.
 
 ### Config File
 
 ```
-~/.mollotov/ai-config.json
+~/.kelpie/ai-config.json
 ```
 
 Single source of truth for the active AI state. Every browser window, the CLI, and the MCP server all read and watch this file.
@@ -59,12 +59,12 @@ Single source of truth for the active AI state. Every browser window, the CLI, a
 
 **Who writes:**
 - macOS app (any window) — when user loads/unloads via the Models tab
-- CLI — when user runs `mollotov ai load` / `mollotov ai unload`
+- CLI — when user runs `kelpie ai load` / `kelpie ai unload`
 - All writes use `flock` to prevent corruption
 
 **Who watches:**
 - Every macOS browser window watches `ai-config.json` via `DispatchSource.makeFileSystemObjectSource` (FSEvents). When the file changes, all windows update their `AIState` immediately — the brain pill, the panel's Chat tab header, and the Models tab active indicator all reflect the new model within one frame.
-- The CLI reads it on startup for `mollotov ai status` (local mode, no device needed).
+- The CLI reads it on startup for `kelpie ai status` (local mode, no device needed).
 
 **Cross-window behavior:** Switching models in one browser window writes `ai-config.json` → FSEvents fires → all other windows pick up the change. Since only one model can be loaded at a time (process-wide), all windows share the same loaded model. Each window has its own independent chat history, but the model is global.
 
@@ -76,14 +76,14 @@ Single source of truth for the active AI state. Every browser window, the CLI, a
 
 **Write-ownership rule:** Only the process that owns the `InferenceEngine` (the macOS app) may write `activeModel` and `backend` fields. The CLI must use HTTP (`POST /v1/ai-load`) to trigger model changes — it must never write `ai-config.json` directly for load/unload. Direct file edits by users or scripts are ignored for model state; the app treats them as no-ops since the in-memory engine hasn't changed.
 
-**FSEvents watching:** Watch the *directory* (`~/.mollotov/`) and filter for `ai-config.json` filename changes, not the file descriptor directly. This handles delete+recreate patterns from atomic writes. If the file is deleted, the app recreates it with `activeModel: null`.
+**FSEvents watching:** Watch the *directory* (`~/.kelpie/`) and filter for `ai-config.json` filename changes, not the file descriptor directly. This handles delete+recreate patterns from atomic writes. If the file is deleted, the app recreates it with `activeModel: null`.
 
-The macOS app also watches `~/.mollotov/models/` directory for download changes (CLI adding/removing model files). Both watches use the same FSEvents mechanism.
+The macOS app also watches `~/.kelpie/models/` directory for download changes (CLI adding/removing model files). Both watches use the same FSEvents mechanism.
 
 The CLI can also manage models on a running device remotely via HTTP:
-- `mollotov ai load <model> --device mac` → `POST /v1/ai-load`
-- `mollotov ai unload --device mac` → `POST /v1/ai-unload`
-- `mollotov ai status --device mac` → `POST /v1/ai-status`
+- `kelpie ai load <model> --device mac` → `POST /v1/ai-load`
+- `kelpie ai unload --device mac` → `POST /v1/ai-unload`
+- `kelpie ai status --device mac` → `POST /v1/ai-status`
 
 Downloads always happen locally (CLI or app write to disk) — the HTTP API only handles load/unload/status/inference.
 
@@ -148,11 +148,11 @@ On macOS via CLI, users can also specify an arbitrary Hugging Face GGUF URL to d
 
 ### Ollama Integration
 
-If the user has Ollama installed, Mollotov detects it and surfaces Ollama-managed models as a second-tier option alongside the native GGUF models.
+If the user has Ollama installed, Kelpie detects it and surfaces Ollama-managed models as a second-tier option alongside the native GGUF models.
 
 **Detection:** Check if the Ollama API is reachable at `http://localhost:11434/api/tags` (the default Ollama endpoint). This is a simple GET that returns a JSON list of installed models. No configuration needed — if Ollama is running, we find it.
 
-**Display in `mollotov ai list`:**
+**Display in `kelpie ai list`:**
 
 ```
 Native Models (GGUF via llama.cpp)
@@ -173,7 +173,7 @@ When the user loads an Ollama model, the browser doesn't load a GGUF file — in
 1. `ai-load` with an Ollama model ID sets the engine mode to `ollama` and records the model name — no file path needed, no memory consumed in the browser process
 2. `ai-infer` detects the Ollama backend and routes:
    - **In-app (brain pill / floating menu):** Uses `/api/chat` with a sliding window of recent messages (last 10 exchanges). Users can ask follow-ups.
-   - **Via MCP (`mollotov_ai_ask`):** Uses `/api/generate` with a single prompt. Stateless, no history.
+   - **Via MCP (`kelpie_ai_ask`):** Uses `/api/generate` with a single prompt. Stateless, no history.
 3. `ai-unload` clears the state and conversation history — Ollama manages its own model memory
 4. `ai-status` reports `backend: "ollama"` so the caller knows which engine is active
 
@@ -185,10 +185,10 @@ ai-infer request arrives
   → if "native": run llama.cpp inference (existing path)
   → if "ollama": POST to Ollama API with prompt + image
       → parse Ollama response
-      → return in standard Mollotov response format
+      → return in standard Kelpie response format
   → if "platform": route to platform AI (iOS: Foundation Models, Android: AI Edge SDK)
       → text-only — reject image/audio inputs with VISION_NOT_SUPPORTED / AUDIO_NOT_SUPPORTED
-      → return in standard Mollotov response format
+      → return in standard Kelpie response format
 ```
 
 **Ollama API usage:**
@@ -226,11 +226,11 @@ POST http://localhost:11434/api/chat
 
 This prefix makes it unambiguous in all commands:
 ```
-mollotov ai load ollama:llava:7b --device mac
-mollotov ai ask "describe this page" --device mac --context screenshot
+kelpie ai load ollama:llava:7b --device mac
+kelpie ai ask "describe this page" --device mac --context screenshot
 ```
 
-**No download management for Ollama:** Mollotov doesn't pull or delete Ollama models — the user manages those with `ollama pull` / `ollama rm` directly. Mollotov only reads what's available.
+**No download management for Ollama:** Kelpie doesn't pull or delete Ollama models — the user manages those with `ollama pull` / `ollama rm` directly. Kelpie only reads what's available.
 
 ### Architecture Layers
 
@@ -240,10 +240,10 @@ mollotov ai ask "describe this page" --device mac --context screenshot
 │         Uses MCP tools to interact          │
 ├─────────────────────────────────────────────┤
 │              CLI MCP Server                 │
-│  mollotov_ai_*  tools (model + inference)   │
+│  kelpie_ai_*  tools (model + inference)   │
 ├─────────────────────────────────────────────┤
 │              CLI Commands                   │
-│  mollotov ai pull / list / rm / status      │
+│  kelpie ai pull / list / rm / status      │
 ├─────────┬───────────────────────────────────┤
 │  Model  │     HTTP Client                   │
 │  Store  │  POST /v1/ai-load                 │
@@ -283,7 +283,7 @@ Load a model into memory. Only one model can be loaded at a time. Supports both 
 { "model": "gemma-4-e2b-q4" }
 
 // Request (native GGUF by absolute path — for custom models)
-{ "path": "/Users/foo/.mollotov/models/custom/model.gguf" }
+{ "path": "/Users/foo/.kelpie/models/custom/model.gguf" }
 
 // Request (Ollama model — local)
 { "model": "ollama:llava:7b" }
@@ -471,7 +471,7 @@ A 2B model cannot handle a massive context dump. Instead of loading everything u
 The harness prepends a fixed system prompt to every inference call. This prompt is embedded in the browser app, not configurable by the user.
 
 ```
-You are a browser assistant built into Mollotov. You answer questions about the web page currently loaded in the browser.
+You are a browser assistant built into Kelpie. You answer questions about the web page currently loaded in the browser.
 
 Rules:
 - Be concise. One to three sentences unless the user asks for detail.
@@ -498,7 +498,7 @@ The `{tools_block}` is injected at runtime — a compact list of available tools
 
 #### Available Tools (Harness-Side)
 
-The harness exposes a curated subset of Mollotov's handlers as tools the model can call. These are NOT the MCP tools — they're internal shortcuts that run in-process without HTTP round-trips.
+The harness exposes a curated subset of Kelpie's handlers as tools the model can call. These are NOT the MCP tools — they're internal shortcuts that run in-process without HTTP round-trips.
 
 | Tool | Description | Maps to |
 |---|---|---|
@@ -570,7 +570,7 @@ This summary is cheap to gather (runs in-process from cached state) and tells th
 
 **Ollama models — in-app (brain pill / floating menu):** Chat-capable. The app maintains a sliding window of recent exchanges within the session and sends them to Ollama's `/api/chat` endpoint. Users can ask follow-up questions ("what about the third column?") and the model has prior context. The window is capped at the last 10 exchanges to prevent unbounded growth. Session resets when the user navigates to a new page or closes the browser.
 
-**Ollama models — via MCP:** Stateless. Every `mollotov_ai_ask` call is a single prompt in, single answer out. No history is carried between MCP calls. This keeps MCP tool usage predictable for orchestrating LLMs.
+**Ollama models — via MCP:** Stateless. Every `kelpie_ai_ask` call is a single prompt in, single answer out. No history is carried between MCP calls. This keeps MCP tool usage predictable for orchestrating LLMs.
 
 **The `memory` flag:** The model registry's `memory: boolean` field controls which mode the harness uses. `false` = always stateless (native GGUFs). `true` = chat-capable in the app UI, stateless via MCP. Ollama models default to `memory: true` since Ollama handles context server-side.
 
@@ -663,43 +663,43 @@ This is an escape hatch for callers who know exactly what context is needed. The
 
 ### MCP Tools
 
-All new tools use the `mollotov_ai_` prefix.
+All new tools use the `kelpie_ai_` prefix.
 
 #### Browser Tools (per-device)
 
 | Tool | Description | Method |
 |------|-------------|--------|
-| `mollotov_ai_status` | Get the inference engine status on a device — whether a model is loaded, which model, capabilities, memory usage | `aiStatus` |
-| `mollotov_ai_load` | Load a model on a device from a file path | `aiLoad` |
-| `mollotov_ai_unload` | Unload the current model from a device, freeing memory | `aiUnload` |
-| `mollotov_ai_ask` | Ask the local model a question about the current page. Supports text prompt, voice audio (base64 WAV, max 30s), and context modes to auto-gather page data. Returns the model's response. Runs entirely on-device. | `aiInfer` |
-| `mollotov_ai_record` | Start/stop audio recording on the device microphone. Returns base64 WAV when stopped. | `aiRecord` |
+| `kelpie_ai_status` | Get the inference engine status on a device — whether a model is loaded, which model, capabilities, memory usage | `aiStatus` |
+| `kelpie_ai_load` | Load a model on a device from a file path | `aiLoad` |
+| `kelpie_ai_unload` | Unload the current model from a device, freeing memory | `aiUnload` |
+| `kelpie_ai_ask` | Ask the local model a question about the current page. Supports text prompt, voice audio (base64 WAV, max 30s), and context modes to auto-gather page data. Returns the model's response. Runs entirely on-device. | `aiInfer` |
+| `kelpie_ai_record` | Start/stop audio recording on the device microphone. Returns base64 WAV when stopped. | `aiRecord` |
 
 #### CLI Tools (model management)
 
 | Tool | Description | Kind |
 |------|-------------|------|
-| `mollotov_ai_models` | List all available models: approved registry, downloaded, and Ollama-detected. Ollama models appear with an `ollama:` prefix. | `discovery` |
-| `mollotov_ai_pull` | Download a model from Hugging Face to the local model store | `discovery` |
-| `mollotov_ai_remove` | Delete a downloaded model from the local store | `discovery` |
+| `kelpie_ai_models` | List all available models: approved registry, downloaded, and Ollama-detected. Ollama models appear with an `ollama:` prefix. | `discovery` |
+| `kelpie_ai_pull` | Download a model from Hugging Face to the local model store | `discovery` |
+| `kelpie_ai_remove` | Delete a downloaded model from the local store | `discovery` |
 
 ### CLI Commands
 
 ```
-mollotov ai pull <model-id>       Download a model (from approved list or HF URL)
-mollotov ai list                  List approved models and their download status
-mollotov ai rm <model-id>         Delete a downloaded model
-mollotov ai status [--device X]   Check what model is loaded on a device
-mollotov ai load <model-id> [--device X]    Load model on device
-mollotov ai unload [--device X]   Unload model from device
-mollotov ai ask "<prompt>" [--device X] [--context page_text|screenshot|dom|accessibility]
+kelpie ai pull <model-id>       Download a model (from approved list or HF URL)
+kelpie ai list                  List approved models and their download status
+kelpie ai rm <model-id>         Delete a downloaded model
+kelpie ai status [--device X]   Check what model is loaded on a device
+kelpie ai load <model-id> [--device X]    Load model on device
+kelpie ai unload [--device X]   Unload model from device
+kelpie ai ask "<prompt>" [--device X] [--context page_text|screenshot|dom|accessibility]
                                   Run inference on the device's loaded model
 ```
 
 The `pull` command:
 1. Resolves model-id against the approved registry
 2. If not found and it looks like a HF repo path (contains `/`), treats it as a custom HF GGUF
-3. Downloads to `~/.mollotov/models/<model-id>/model.gguf` with progress bar
+3. Downloads to `~/.kelpie/models/<model-id>/model.gguf` with progress bar
 4. Writes `metadata.json` with source info
 
 The `load` command:
@@ -712,9 +712,9 @@ The MCP tools should return clear, actionable errors:
 
 | Error Code | Meaning | Action |
 |---|---|---|
-| `NO_MODEL_LOADED` | Inference requested but no model is loaded | Use `mollotov_ai_load` first |
-| `MODEL_ALREADY_LOADED` | Load requested but a model is already active | Use `mollotov_ai_unload` first, or use the loaded model |
-| `MODEL_NOT_FOUND` | The specified model file doesn't exist locally | Use `mollotov_ai_pull` to download it |
+| `NO_MODEL_LOADED` | Inference requested but no model is loaded | Use `kelpie_ai_load` first |
+| `MODEL_ALREADY_LOADED` | Load requested but a model is already active | Use `kelpie_ai_unload` first, or use the loaded model |
+| `MODEL_NOT_FOUND` | The specified model file doesn't exist locally | Use `kelpie_ai_pull` to download it |
 | `MODEL_TOO_LARGE` | Device doesn't have enough RAM for this model | Try a smaller quantization or different model |
 | `INFERENCE_FAILED` | The model failed to generate a response | Check model compatibility, try a simpler prompt |
 | `VISION_NOT_SUPPORTED` | Screenshot context requested but model has no vision capability | Use `page_text` context instead, or load a vision-capable model |
@@ -895,7 +895,7 @@ describe("ModelStore", () => {
   let store: ModelStore;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "mollotov-models-"));
+    dir = mkdtempSync(join(tmpdir(), "kelpie-models-"));
     store = new ModelStore(dir);
   });
 
@@ -932,7 +932,7 @@ Expected: FAIL — module not found
 
 **Step 3: Write minimal implementation**
 
-`packages/cli/src/ai/store.ts` — manages `~/.mollotov/models/` directory, reads/writes `registry.json`, creates model subdirectories, returns file paths. Uses `node:fs` only.
+`packages/cli/src/ai/store.ts` — manages `~/.kelpie/models/` directory, reads/writes `registry.json`, creates model subdirectories, returns file paths. Uses `node:fs` only.
 
 Key methods:
 - `listDownloaded(): DownloadedModel[]`
@@ -1236,10 +1236,10 @@ Add to the `browserTools` array:
 
 ```ts
 // AI / Local Inference
-{ name: "mollotov_ai_status", description: "Get the local inference engine status — whether a model is loaded, which model, its capabilities, and memory usage", method: "aiStatus", schema: { device }, bodyFromArgs: passthrough },
-{ name: "mollotov_ai_load", description: "Load a model on a device for local inference. Pass a model ID (resolved to local path) or an ollama: prefixed ID. The model must be downloaded first (use mollotov_ai_pull). Only one model at a time — auto-unloads the current model.", method: "aiLoad", schema: { device, model: z.string().describe("Model ID (e.g. 'gemma-4-e2b-q4') or Ollama model (e.g. 'ollama:llava:7b')") }, bodyFromArgs: passthrough },
-{ name: "mollotov_ai_unload", description: "Unload the current model from a device, freeing memory", method: "aiUnload", schema: { device }, bodyFromArgs: passthrough },
-{ name: "mollotov_ai_ask", description: "Ask the locally-loaded model a question about the current page. Use 'context' to auto-gather page data (page_text, screenshot, dom, accessibility) or provide 'text' directly. Returns the model's response. This runs entirely on-device — no data is sent to the cloud.", method: "aiInfer", schema: { device, prompt: z.string().optional().describe("Question or instruction for the model (omit if sending audio)"), audio: z.string().optional().describe("Base64-encoded WAV audio (16kHz mono, max 30s) — requires audio-capable model"), context: z.enum(["page_text", "screenshot", "dom", "accessibility"]).optional().describe("Auto-gather page context before prompting"), text: z.string().optional().describe("Raw text input (alternative to context)"), maxTokens: z.number().optional().describe("Maximum tokens to generate (default 512)"), temperature: z.number().optional().describe("Sampling temperature (default 0.7)") }, bodyFromArgs: passthrough },
+{ name: "kelpie_ai_status", description: "Get the local inference engine status — whether a model is loaded, which model, its capabilities, and memory usage", method: "aiStatus", schema: { device }, bodyFromArgs: passthrough },
+{ name: "kelpie_ai_load", description: "Load a model on a device for local inference. Pass a model ID (resolved to local path) or an ollama: prefixed ID. The model must be downloaded first (use kelpie_ai_pull). Only one model at a time — auto-unloads the current model.", method: "aiLoad", schema: { device, model: z.string().describe("Model ID (e.g. 'gemma-4-e2b-q4') or Ollama model (e.g. 'ollama:llava:7b')") }, bodyFromArgs: passthrough },
+{ name: "kelpie_ai_unload", description: "Unload the current model from a device, freeing memory", method: "aiUnload", schema: { device }, bodyFromArgs: passthrough },
+{ name: "kelpie_ai_ask", description: "Ask the locally-loaded model a question about the current page. Use 'context' to auto-gather page data (page_text, screenshot, dom, accessibility) or provide 'text' directly. Returns the model's response. This runs entirely on-device — no data is sent to the cloud.", method: "aiInfer", schema: { device, prompt: z.string().optional().describe("Question or instruction for the model (omit if sending audio)"), audio: z.string().optional().describe("Base64-encoded WAV audio (16kHz mono, max 30s) — requires audio-capable model"), context: z.enum(["page_text", "screenshot", "dom", "accessibility"]).optional().describe("Auto-gather page context before prompting"), text: z.string().optional().describe("Raw text input (alternative to context)"), maxTokens: z.number().optional().describe("Maximum tokens to generate (default 512)"), temperature: z.number().optional().describe("Sampling temperature (default 0.7)") }, bodyFromArgs: passthrough },
 ```
 
 **Step 2: Add CLI tool definitions**
@@ -1248,52 +1248,52 @@ Add to the `cliTools` array:
 
 ```ts
 // AI Model Management
-{ name: "mollotov_ai_models", description: "List all approved models and their download status", method: "aiModels", kind: "discovery", schema: {}, bodyFromArgs: filterBody },
-{ name: "mollotov_ai_pull", description: "Download a model from HuggingFace to the local model store. Accepts a model ID from the approved list or a HuggingFace repo path.", method: "aiPull", kind: "discovery", schema: { model: z.string().describe("Model ID or HuggingFace repo path (e.g. 'gemma-4-e2b-q4' or 'owner/repo/file.gguf')") }, bodyFromArgs: filterBody },
-{ name: "mollotov_ai_remove", description: "Delete a downloaded model from the local store", method: "aiRemove", kind: "discovery", schema: { model: z.string().describe("Model ID to remove") }, bodyFromArgs: filterBody },
+{ name: "kelpie_ai_models", description: "List all approved models and their download status", method: "aiModels", kind: "discovery", schema: {}, bodyFromArgs: filterBody },
+{ name: "kelpie_ai_pull", description: "Download a model from HuggingFace to the local model store. Accepts a model ID from the approved list or a HuggingFace repo path.", method: "aiPull", kind: "discovery", schema: { model: z.string().describe("Model ID or HuggingFace repo path (e.g. 'gemma-4-e2b-q4' or 'owner/repo/file.gguf')") }, bodyFromArgs: filterBody },
+{ name: "kelpie_ai_remove", description: "Delete a downloaded model from the local store", method: "aiRemove", kind: "discovery", schema: { model: z.string().describe("Model ID to remove") }, bodyFromArgs: filterBody },
 ```
 
 **Step 3: Update `packages/shared/src/mcp-tools.ts`**
 
 Add to `BrowserMcpTools`:
 ```ts
-"mollotov_ai_status",
-"mollotov_ai_load",
-"mollotov_ai_unload",
-"mollotov_ai_ask",
-"mollotov_ai_record",
+"kelpie_ai_status",
+"kelpie_ai_load",
+"kelpie_ai_unload",
+"kelpie_ai_ask",
+"kelpie_ai_record",
 ```
 
 Add to `CliMcpTools`:
 ```ts
-"mollotov_ai_models",
-"mollotov_ai_pull",
-"mollotov_ai_remove",
+"kelpie_ai_models",
+"kelpie_ai_pull",
+"kelpie_ai_remove",
 ```
 
 Add to `httpToMcp`:
 ```ts
-"ai-status": "mollotov_ai_status",
-"ai-load": "mollotov_ai_load",
-"ai-unload": "mollotov_ai_unload",
-"ai-infer": "mollotov_ai_ask",
-"ai-record": "mollotov_ai_record",
+"ai-status": "kelpie_ai_status",
+"ai-load": "kelpie_ai_load",
+"ai-unload": "kelpie_ai_unload",
+"ai-infer": "kelpie_ai_ask",
+"ai-record": "kelpie_ai_record",
 ```
 
 Add to `BrowserToolUnsupportedPlatforms`:
 ```ts
-mollotov_ai_status: ["linux", "windows"],
-mollotov_ai_load: ["linux", "windows"],
-mollotov_ai_unload: ["linux", "windows"],
-mollotov_ai_ask: ["linux", "windows"],
-mollotov_ai_record: ["linux", "windows"],
+kelpie_ai_status: ["linux", "windows"],
+kelpie_ai_load: ["linux", "windows"],
+kelpie_ai_unload: ["linux", "windows"],
+kelpie_ai_ask: ["linux", "windows"],
+kelpie_ai_record: ["linux", "windows"],
 ```
 
 Update shared tests (`packages/shared/tests/index.test.ts`) to account for the new tool count and error codes.
 
 **Step 4: Add AI CLI tool handlers in `server.ts`**
 
-The AI CLI tools (`mollotov_ai_models`, `mollotov_ai_pull`, `mollotov_ai_remove`) are `discovery` kind but need custom handling in `handleDiscovery()` — they don't scan for devices, they manage local model state. Add a new handler branch:
+The AI CLI tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`) are `discovery` kind but need custom handling in `handleDiscovery()` — they don't scan for devices, they manage local model state. Add a new handler branch:
 
 ```ts
 if (method === "aiModels") {
@@ -1320,7 +1320,7 @@ if (method === "aiRemove") {
 }
 ```
 
-Note: `listDownloaded()` must return the absolute file path for each downloaded model so that MCP callers can pass the model ID to `mollotov_ai_load` (which resolves it to a path internally).
+Note: `listDownloaded()` must return the absolute file path for each downloaded model so that MCP callers can pass the model ID to `kelpie_ai_load` (which resolves it to a path internally).
 
 **Step 5: Build and test**
 
@@ -1339,8 +1339,8 @@ git commit -m "feat(mcp): add AI inference and model management tools"
 ### Task 7: macOS — llama.cpp Swift Package Integration
 
 **Files:**
-- Modify: `apps/macos/Mollotov.xcodeproj/project.pbxproj` — add llama.cpp SPM dependency
-- Create: `apps/macos/Mollotov/AI/InferenceEngine.swift`
+- Modify: `apps/macos/Kelpie.xcodeproj/project.pbxproj` — add llama.cpp SPM dependency
+- Create: `apps/macos/Kelpie/AI/InferenceEngine.swift`
 
 **Step 1: Add llama.cpp Swift Package**
 
@@ -1348,7 +1348,7 @@ Add the `ggerganov/llama.cpp` Swift package to the Xcode project via SPM. The pa
 
 **Step 2: Implement InferenceEngine**
 
-`apps/macos/Mollotov/AI/InferenceEngine.swift`:
+`apps/macos/Kelpie/AI/InferenceEngine.swift`:
 
 ```swift
 import Foundation
@@ -1363,7 +1363,7 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
     @MainActor @Published private(set) var modelName: String?
     @MainActor @Published private(set) var capabilities: [String] = []
 
-    private let queue = DispatchQueue(label: "com.mollotov.inference", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.kelpie.inference", qos: .userInitiated)
     private var model: OpaquePointer?  // llama_model
     private var ctx: OpaquePointer?    // llama_context
 
@@ -1420,20 +1420,20 @@ git commit -m "feat(macos): integrate llama.cpp Swift package and InferenceEngin
 ### Task 8: macOS — Inference Harness & System Prompt
 
 **Files:**
-- Create: `apps/macos/Mollotov/AI/InferenceHarness.swift`
-- Create: `apps/macos/Mollotov/AI/SystemPrompt.swift`
-- Create: `apps/macos/Mollotov/AI/PageSummary.swift`
+- Create: `apps/macos/Kelpie/AI/InferenceHarness.swift`
+- Create: `apps/macos/Kelpie/AI/SystemPrompt.swift`
+- Create: `apps/macos/Kelpie/AI/PageSummary.swift`
 
 **Step 1: Implement the system prompt**
 
-`apps/macos/Mollotov/AI/SystemPrompt.swift`:
+`apps/macos/Kelpie/AI/SystemPrompt.swift`:
 
 ```swift
 enum SystemPrompt {
     /// The fixed system prompt prepended to every inference call.
     /// {tools_block} is replaced at runtime with the available tool descriptions.
     static let template = """
-    You are a browser assistant built into Mollotov. You answer questions about the web page currently loaded in the browser.
+    You are a browser assistant built into Kelpie. You answer questions about the web page currently loaded in the browser.
 
     Rules:
     - Be concise. One to three sentences unless the user asks for detail.
@@ -1478,7 +1478,7 @@ enum SystemPrompt {
 
 **Step 2: Implement PageSummary**
 
-`apps/macos/Mollotov/AI/PageSummary.swift`:
+`apps/macos/Kelpie/AI/PageSummary.swift`:
 
 ```swift
 /// Gathers a lightweight page summary (~100 tokens) for the harness.
@@ -1517,7 +1517,7 @@ struct PageSummary {
 
 **Step 3: Implement InferenceHarness**
 
-`apps/macos/Mollotov/AI/InferenceHarness.swift`:
+`apps/macos/Kelpie/AI/InferenceHarness.swift`:
 
 The harness orchestrates the agent loop:
 1. Build prompt: system prompt + page summary + user question
@@ -1573,7 +1573,7 @@ Build macOS app, verify harness compiles.
 **Step 5: Commit**
 
 ```bash
-git add apps/macos/Mollotov/AI/
+git add apps/macos/Kelpie/AI/
 git commit -m "feat(macos): add inference harness with agent loop, system prompt, and page summary"
 ```
 
@@ -1582,12 +1582,12 @@ git commit -m "feat(macos): add inference harness with agent loop, system prompt
 ### Task 9: macOS — AIHandler HTTP Endpoints
 
 **Files:**
-- Create: `apps/macos/Mollotov/Handlers/AIHandler.swift`
-- Modify: `apps/macos/Mollotov/Network/ServerState.swift` — register AI handlers
+- Create: `apps/macos/Kelpie/Handlers/AIHandler.swift`
+- Modify: `apps/macos/Kelpie/Network/ServerState.swift` — register AI handlers
 
 **Step 1: Implement AIHandler**
 
-`apps/macos/Mollotov/Handlers/AIHandler.swift`:
+`apps/macos/Kelpie/Handlers/AIHandler.swift`:
 
 ```swift
 import Foundation
@@ -1639,7 +1639,7 @@ Build macOS app, verify new endpoints appear when calling `GET /health` or testi
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/Handlers/AIHandler.swift apps/macos/Mollotov/Network/ServerState.swift
+git add apps/macos/Kelpie/Handlers/AIHandler.swift apps/macos/Kelpie/Network/ServerState.swift
 git commit -m "feat(macos): add AI HTTP endpoints for model loading and inference"
 ```
 
@@ -1648,12 +1648,12 @@ git commit -m "feat(macos): add AI HTTP endpoints for model loading and inferenc
 ### Task 10: macOS — Apple Silicon Detection Gate
 
 **Files:**
-- Create: `apps/macos/Mollotov/AI/AIState.swift`
-- Modify: `apps/macos/Mollotov/MollotovApp.swift` — check at startup
+- Create: `apps/macos/Kelpie/AI/AIState.swift`
+- Modify: `apps/macos/Kelpie/KelpieApp.swift` — check at startup
 
 **Step 1: Implement AIState**
 
-`apps/macos/Mollotov/AI/AIState.swift`:
+`apps/macos/Kelpie/AI/AIState.swift`:
 
 ```swift
 import Foundation
@@ -1698,7 +1698,7 @@ Run: Build macOS app, verify brain pill appears on Apple Silicon.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/AI/AIState.swift apps/macos/Mollotov/MollotovApp.swift
+git add apps/macos/Kelpie/AI/AIState.swift apps/macos/Kelpie/KelpieApp.swift
 git commit -m "feat(macos): gate AI features behind Apple Silicon detection"
 ```
 
@@ -1707,12 +1707,12 @@ git commit -m "feat(macos): gate AI features behind Apple Silicon detection"
 ### Task 11: macOS — Audio Recording & ai-record Endpoint
 
 **Files:**
-- Create: `apps/macos/Mollotov/AI/AudioRecorder.swift`
-- Modify: `apps/macos/Mollotov/Handlers/AIHandler.swift` — add ai-record handler
+- Create: `apps/macos/Kelpie/AI/AudioRecorder.swift`
+- Modify: `apps/macos/Kelpie/Handlers/AIHandler.swift` — add ai-record handler
 
 **Step 1: Implement AudioRecorder**
 
-`apps/macos/Mollotov/AI/AudioRecorder.swift`:
+`apps/macos/Kelpie/AI/AudioRecorder.swift`:
 
 ```swift
 import AVFoundation
@@ -1768,7 +1768,7 @@ Build macOS app, verify `ai-record` endpoint responds.
 **Step 4: Commit**
 
 ```bash
-git add apps/macos/Mollotov/AI/AudioRecorder.swift apps/macos/Mollotov/Handlers/AIHandler.swift
+git add apps/macos/Kelpie/AI/AudioRecorder.swift apps/macos/Kelpie/Handlers/AIHandler.swift
 git commit -m "feat(macos): add audio recorder and ai-record HTTP endpoint"
 ```
 
@@ -1777,10 +1777,10 @@ git commit -m "feat(macos): add audio recorder and ai-record HTTP endpoint"
 ### Task 12: iOS — Platform AI Handler
 
 **Files:**
-- Create: `apps/ios/Mollotov/AI/AIState.swift`
-- Create: `apps/ios/Mollotov/AI/PlatformAIEngine.swift`
-- Create: `apps/ios/Mollotov/Handlers/AIHandler.swift`
-- Modify: `apps/ios/Mollotov/Network/Router.swift` — register AI routes
+- Create: `apps/ios/Kelpie/AI/AIState.swift`
+- Create: `apps/ios/Kelpie/AI/PlatformAIEngine.swift`
+- Create: `apps/ios/Kelpie/Handlers/AIHandler.swift`
+- Modify: `apps/ios/Kelpie/Network/Router.swift` — register AI routes
 
 **Step 1: Implement PlatformAIEngine**
 
@@ -1835,7 +1835,7 @@ Build iOS app, verify AI endpoints respond with platform backend.
 **Step 5: Commit**
 
 ```bash
-git add apps/ios/Mollotov/AI/ apps/ios/Mollotov/Handlers/AIHandler.swift apps/ios/Mollotov/Network/Router.swift
+git add apps/ios/Kelpie/AI/ apps/ios/Kelpie/Handlers/AIHandler.swift apps/ios/Kelpie/Network/Router.swift
 git commit -m "feat(ios): add platform AI (Apple Intelligence) as default backend"
 ```
 
@@ -1855,10 +1855,10 @@ git commit -m "feat(ios): add platform AI (Apple Intelligence) as default backen
 ### Task 13: Android — Platform AI Handler
 
 **Files:**
-- Create: `apps/android/app/src/main/java/com/mollotov/browser/ai/AIState.kt`
-- Create: `apps/android/app/src/main/java/com/mollotov/browser/ai/PlatformAIEngine.kt`
-- Create: `apps/android/app/src/main/java/com/mollotov/browser/ai/AIHandler.kt`
-- Modify: `apps/android/app/src/main/java/com/mollotov/browser/network/Router.kt` — register AI routes
+- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIState.kt`
+- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/PlatformAIEngine.kt`
+- Create: `apps/android/app/src/main/java/com/kelpie/browser/ai/AIHandler.kt`
+- Modify: `apps/android/app/src/main/java/com/kelpie/browser/network/Router.kt` — register AI routes
 
 **Step 1: Add AI Edge SDK dependency**
 
@@ -1910,7 +1910,7 @@ git commit -m "feat(android): add platform AI (Gemini Nano) as default backend"
 **Step 1: Write integration tests**
 
 Test the full CLI flow:
-1. `mollotov ai list` — shows approved models, none downloaded
+1. `kelpie ai list` — shows approved models, none downloaded
 2. Model store operations — register, remove (unit-level but with real filesystem)
 3. MCP tool schemas — verify all AI tools are registered with correct schemas
 

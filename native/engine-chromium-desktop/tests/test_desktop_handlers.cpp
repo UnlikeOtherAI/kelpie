@@ -1,9 +1,9 @@
-#include "mollotov/cef_renderer.h"
+#include "kelpie/cef_renderer.h"
 
 #include <cassert>
 
-#include "mollotov/desktop_router.h"
-#include "mollotov/handler_context.h"
+#include "kelpie/desktop_router.h"
+#include "kelpie/handler_context.h"
 #include "handlers/bookmark_handler.h"
 #include "handlers/history_handler.h"
 #include "handlers/renderer_handler.h"
@@ -11,31 +11,31 @@
 
 namespace {
 
-class StubDeviceInfoProvider final : public mollotov::DeviceInfoProvider {
+class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
  public:
   nlohmann::json GetDeviceInfo() const override { return {{"name", "Stub Desktop"}}; }
-  mollotov::StringMap GetMdnsMetadata() const override { return {{"name", "Stub Desktop"}}; }
+  kelpie::StringMap GetMdnsMetadata() const override { return {{"name", "Stub Desktop"}}; }
 };
 
 }  // namespace
 
 int main() {
-  mollotov::CefRenderer renderer;
-  mollotov::HandlerContext context(&renderer);
-  mollotov::BookmarkStore bookmarks;
-  mollotov::HistoryStore history;
+  kelpie::CefRenderer renderer;
+  kelpie::HandlerContext context(&renderer);
+  kelpie::BookmarkStore bookmarks;
+  kelpie::HistoryStore history;
   StubDeviceInfoProvider device_info;
 
   int width = 1280;
   int height = 720;
 
-  mollotov::DesktopHandlerRuntime runtime;
+  kelpie::DesktopHandlerRuntime runtime;
   runtime.handler_context = &context;
   runtime.bookmark_store = &bookmarks;
   runtime.history_store = &history;
   runtime.device_info_provider = &device_info;
   runtime.renderer_supplier = []() {
-    return mollotov::SuccessResponse({{"current", "chromium"}, {"available", {"chromium"}}});
+    return kelpie::SuccessResponse({{"current", "chromium"}, {"available", {"chromium"}}});
   };
   runtime.viewport_supplier = [&]() {
     return nlohmann::json{{"width", width}, {"height", height}, {"devicePixelRatio", 1.0}};
@@ -50,11 +50,11 @@ int main() {
     height = 720;
   };
 
-  mollotov::DesktopRouter router;
-  mollotov::BookmarkHandler bookmark_handler(runtime);
-  mollotov::HistoryHandler history_handler(runtime);
-  mollotov::RendererHandler renderer_handler(runtime);
-  mollotov::ViewportHandler viewport_handler(runtime);
+  kelpie::DesktopRouter router;
+  kelpie::BookmarkHandler bookmark_handler(runtime);
+  kelpie::HistoryHandler history_handler(runtime);
+  kelpie::RendererHandler renderer_handler(runtime);
+  kelpie::ViewportHandler viewport_handler(runtime);
   bookmark_handler.Register(router);
   history_handler.Register(router);
   renderer_handler.Register(router);

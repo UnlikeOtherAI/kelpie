@@ -1,8 +1,8 @@
-# Mollotov Engine Monitoring Service
+# Kelpie Engine Monitoring Service
 
 ## Overview
 
-The Engine Monitoring Service is a public-facing dashboard and API that tracks Gecko and Chromium upstream releases, monitors Mollotov's update pipeline, and provides compliance visibility to Apple App Review teams.
+The Engine Monitoring Service is a public-facing dashboard and API that tracks Gecko and Chromium upstream releases, monitors Kelpie's update pipeline, and provides compliance visibility to Apple App Review teams.
 
 This service is the external proof of "active maintenance" required by Apple's Embedded Browser Engine Entitlement (see [browser-engines.md](browser-engines.md)).
 
@@ -32,7 +32,7 @@ This service is the external proof of "active maintenance" required by Apple's E
 ### URL
 
 ```
-https://monitor.mollotov.dev/
+https://monitor.kelpie.dev/
 ```
 
 (or subdomain on main website)
@@ -50,14 +50,14 @@ https://monitor.mollotov.dev/
 │  ├─ Latest Upstream:   v125.0.6422.142 (released 2026-03-28) │
 │  ├─ Current App:       v125.0.6422.138 (shipped)        │
 │  ├─ Status:            ⏳ UPDATE IN PROGRESS             │
-│  ├─ PR:                mollotov#1847 (Testing)          │
+│  ├─ PR:                kelpie#1847 (Testing)          │
 │  └─ Days to Deadline:  7 days remaining                 │
 │                                                           │
 │  Gecko (Firefox)                                        │
 │  ├─ Latest Upstream:   v128.0 (released 2026-04-01)     │
 │  ├─ Current App:       v128.0 (shipped)                 │
 │  ├─ Status:            ✅ UP TO DATE                     │
-│  ├─ PR:                mollotov#1845 (Merged)           │
+│  ├─ PR:                kelpie#1845 (Merged)           │
 │  └─ Days Since Update: 0 days                           │
 │                                                           │
 └─────────────────────────────────────────────────────────┘
@@ -91,9 +91,9 @@ https://monitor.mollotov.dev/
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  CHROMIUM v125.0.6422.142 addresses:                   │
-│  ├─ CVE-2024-2996  (Critical) ✅ Shipped in Mollotov   │
-│  ├─ CVE-2024-3156  (High)     ✅ Shipped in Mollotov   │
-│  └─ CVE-2024-3249  (Medium)   ✅ Shipped in Mollotov   │
+│  ├─ CVE-2024-2996  (Critical) ✅ Shipped in Kelpie   │
+│  ├─ CVE-2024-3156  (High)     ✅ Shipped in Kelpie   │
+│  └─ CVE-2024-3249  (Medium)   ✅ Shipped in Kelpie   │
 │                                                           │
 │  GECKO v128.0 addresses:                                │
 │  └─ [No new CVEs since v127.0]                          │
@@ -237,7 +237,7 @@ When a new upstream release is detected:
 
 ### Webhook Monitoring
 
-Mollotov's CI/CD listens for GitHub webhook events:
+Kelpie's CI/CD listens for GitHub webhook events:
 
 - **PR created:** Auto-starts build
 - **PR merged:** Triggers app release workflow
@@ -269,9 +269,9 @@ Mollotov's CI/CD listens for GitHub webhook events:
 
 ## App Review Notes
 
-This PR is part of Mollotov's automated engine maintenance pipeline.
-Dashboard: https://monitor.mollotov.dev/
-Policy: https://mollotov.dev/security/vulnerability-disclosure
+This PR is part of Kelpie's automated engine maintenance pipeline.
+Dashboard: https://monitor.kelpie.dev/
+Policy: https://kelpie.dev/security/vulnerability-disclosure
 
 **Deadline:** 2026-04-07 (15 days from upstream release)
 ```
@@ -328,7 +328,7 @@ Every action is logged:
 
 ```
 2026-03-28 00:00 — Chromium v125.0.6422.142 released
-2026-03-28 02:15 — Mollotov monitoring detects release
+2026-03-28 02:15 — Kelpie monitoring detects release
 2026-03-28 02:30 — Claude/Codex PR #1847 created automatically
 2026-03-28 04:00 — GitHub workflow runs tests; all pass
 2026-03-28 08:30 — Human reviewer approves PR

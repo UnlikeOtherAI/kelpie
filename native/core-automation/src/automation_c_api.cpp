@@ -1,4 +1,4 @@
-#include "mollotov/automation_c_api.h"
+#include "kelpie/automation_c_api.h"
 
 #include <cstring>
 #include <new>
@@ -6,11 +6,11 @@
 
 #include <nlohmann/json.hpp>
 
-#include "mollotov/handler_context.h"
-#include "mollotov/response_helpers.h"
+#include "kelpie/handler_context.h"
+#include "kelpie/response_helpers.h"
 
-struct MollotovHandlerContext {
-  mollotov::HandlerContext context;
+struct KelpieHandlerContext {
+  kelpie::HandlerContext context;
 };
 
 namespace {
@@ -46,15 +46,15 @@ json ParseResponseObject(const char* json_data) {
 
 extern "C" {
 
-void mollotov_free_string(char* str) {
+void kelpie_free_string(char* str) {
   delete[] str;
 }
 
-MollotovHandlerContextRef mollotov_handler_context_create(void) {
-  return new (std::nothrow) MollotovHandlerContext();
+KelpieHandlerContextRef kelpie_handler_context_create(void) {
+  return new (std::nothrow) KelpieHandlerContext();
 }
 
-char* mollotov_handler_context_evaluate_js(MollotovHandlerContextRef ref,
+char* kelpie_handler_context_evaluate_js(KelpieHandlerContextRef ref,
                                            const char* script) {
   if (ref == nullptr) {
     return nullptr;
@@ -66,24 +66,24 @@ char* mollotov_handler_context_evaluate_js(MollotovHandlerContextRef ref,
   }
 }
 
-char* mollotov_success_response(const char* json_data) {
+char* kelpie_success_response(const char* json_data) {
   try {
-    return CopyString(mollotov::SuccessResponse(ParseResponseObject(json_data)).dump());
+    return CopyString(kelpie::SuccessResponse(ParseResponseObject(json_data)).dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_error_response(const char* code, const char* message) {
+char* kelpie_error_response(const char* code, const char* message) {
   try {
     return CopyString(
-        mollotov::ErrorResponse(SafeCString(code), SafeCString(message)).dump());
+        kelpie::ErrorResponse(SafeCString(code), SafeCString(message)).dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_handler_context_destroy(MollotovHandlerContextRef ref) {
+void kelpie_handler_context_destroy(KelpieHandlerContextRef ref) {
   delete ref;
 }
 

@@ -40,7 +40,7 @@ describe("browser launch helpers", () => {
     expect(port).not.toBe(8421);
   });
 
-  it("returns null when Mollotov.app is not installed", () => {
-    expect(resolveAppPath({ platform: "macos", appPath: "/does/not/exist/Mollotov.app" })).toBeNull();
+  it("returns null when Kelpie.app is not installed", () => {
+    expect(resolveAppPath({ platform: "macos", appPath: "/does/not/exist/Kelpie.app" })).toBeNull();
   });
 });

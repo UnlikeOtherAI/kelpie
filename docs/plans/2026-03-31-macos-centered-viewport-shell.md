@@ -6,7 +6,7 @@ The current macOS browser presets resize and hard-lock the whole `NSWindow`. Tha
 
 - shrinking the window breaks the browser chrome and renderer layout,
 - preset changes resize the shell instead of simulating a smaller viewport,
-- the app title remains `Mollotov` instead of reflecting the current page title,
+- the app title remains `Kelpie` instead of reflecting the current page title,
 - viewport APIs report fake values instead of the real visible viewport.
 
 The requested behavior is a fixed browser shell with a centered simulated viewport inside it.
@@ -17,7 +17,7 @@ The requested behavior is a fixed browser shell with a centered simulated viewpo
 - Stop preset buttons from resizing the whole window.
 - Render preset viewports inside a centered stage with dark grey surround and a lighter grey viewport border.
 - Keep the viewport centered horizontally and vertically as the window grows.
-- Show the current HTML page title in the standard macOS title area instead of `Mollotov`.
+- Show the current HTML page title in the standard macOS title area instead of `Kelpie`.
 - Show the current viewport resolution in the macOS browser chrome.
 - Make `/v1/get-viewport`, `/v1/resize-viewport`, and `/v1/reset-viewport` reflect the real viewport model.
 
@@ -64,8 +64,8 @@ When a named preset does not fit inside the current stage, clamp it to the large
 
 ### 4. Window title
 
-Stop hardcoding `window.title = "Mollotov"` after setup.
-Instead, update the native `NSWindow` title from `browserState.pageTitle`, falling back to the current URL host or `Mollotov` only when no page title exists yet.
+Stop hardcoding `window.title = "Kelpie"` after setup.
+Instead, update the native `NSWindow` title from `browserState.pageTitle`, falling back to the current URL host or `Kelpie` only when no page title exists yet.
 
 This keeps the title in the standard centered macOS title position without inventing a custom chrome layer.
 
@@ -79,12 +79,12 @@ The current handlers return placeholder viewport sizes. Replace that with the li
 
 ## Files Likely Touched
 
-- `apps/macos/Mollotov/Views/BrowserView.swift`
-- `apps/macos/Mollotov/Views/URLBarView.swift`
-- `apps/macos/Mollotov/MollotovApp.swift`
-- `apps/macos/Mollotov/Handlers/BrowserManagementHandler.swift`
-- `apps/macos/Mollotov/Handlers/DeviceHandler.swift`
-- `apps/macos/Mollotov/Browser/BrowserState.swift` or a new macOS viewport state file
+- `apps/macos/Kelpie/Views/BrowserView.swift`
+- `apps/macos/Kelpie/Views/URLBarView.swift`
+- `apps/macos/Kelpie/KelpieApp.swift`
+- `apps/macos/Kelpie/Handlers/BrowserManagementHandler.swift`
+- `apps/macos/Kelpie/Handlers/DeviceHandler.swift`
+- `apps/macos/Kelpie/Browser/BrowserState.swift` or a new macOS viewport state file
 
 ## Acceptance Criteria
 

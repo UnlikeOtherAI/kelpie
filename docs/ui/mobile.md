@@ -1,4 +1,4 @@
-# Mollotov Browser — Mobile UI Specification
+# Kelpie Browser — Mobile UI Specification
 
 ## Screen Inventory
 
@@ -129,7 +129,7 @@ Slides in from the right edge when the settings icon is tapped. Covers approxima
 - HTTP base URL (copyable): `http://192.168.1.42:8420/v1/`
 - MCP endpoint (copyable): `http://192.168.1.42:8420/mcp`
 - QR code encoding the HTTP base URL (for quick scanning)
-- CLI discovery command: `mollotov discover`
+- CLI discovery command: `kelpie discover`
 
 **Settings**
 - Port number (editable, requires restart)
@@ -137,7 +137,7 @@ Slides in from the right edge when the settings icon is tapped. Covers approxima
 
 **Help**
 - Show Welcome Screen
-- Open Mollotov Website
+- Open Kelpie Website
 - Open GitHub Repository
 - Open UnlikeOtherAI
 
@@ -167,7 +167,7 @@ On iPad specifically:
 
 - The first-launch welcome card should cap its width to a modal-like width instead of expanding across the whole tablet.
 - The settings help section can reopen the welcome card even when automatic launch presentation was previously disabled.
-- The app menu also exposes `Show Welcome Screen`, `Open Mollotov Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
+- The app menu also exposes `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
 - The `View` menu lists `Full Width` plus every staged phone, tablet, and laptop viewport preset that currently fits the tablet geometry.
 - The URL bar includes a `3D` shortcut beside the address field so the 3D DOM inspector is always one tap away on tablets.
 - The floating menu includes a phone icon that opens a pill picker for staged device-class viewports.

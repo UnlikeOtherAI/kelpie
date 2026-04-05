@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import type { Platform } from "@unlikeotherai/mollotov-shared";
+import type { Platform } from "@unlikeotherai/kelpie-shared";
 
 export interface BrowserAlias {
   platform: Platform;
@@ -24,7 +24,7 @@ const EMPTY_STORE: BrowserStore = {
 };
 
 function storeDir(): string {
-  return path.join(os.homedir(), ".mollotov");
+  return path.join(os.homedir(), ".kelpie");
 }
 
 function storePath(): string {

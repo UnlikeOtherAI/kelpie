@@ -7,7 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace mollotov::linuxapp {
+namespace kelpie::linuxapp {
 
 class HttpServer {
  public:
@@ -34,4 +34,4 @@ class HttpServer {
   std::thread thread_;
 };
 
-}  // namespace mollotov::linuxapp
+}  // namespace kelpie::linuxapp

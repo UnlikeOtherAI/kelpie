@@ -1,6 +1,6 @@
 #include "screenshot_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 ScreenshotHandler::ScreenshotHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -51,4 +51,4 @@ nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json&, bool annotat
   return SuccessResponse(response);
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

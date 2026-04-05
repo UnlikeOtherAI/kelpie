@@ -6,7 +6,7 @@
     "composite": false,
     "verbatimModuleSyntax": false,
     "paths": {
-      "@unlikeotherai/mollotov-shared": ["../shared/src/index.ts"]
+      "@unlikeotherai/kelpie-shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"]

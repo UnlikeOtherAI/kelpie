@@ -52,7 +52,7 @@ export function App() {
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 16px' }}>
       <header style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 600, color: '#e6edf3', marginBottom: 8 }}>
-          Mollotov Engine Monitor
+          Kelpie Engine Monitor
         </h1>
         {lastFetched && (
           <p style={{ fontSize: 13, color: '#8b949e' }}>

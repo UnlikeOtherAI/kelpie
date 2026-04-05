@@ -1,119 +1,119 @@
-#include "mollotov/ai_c_api.h"
+#include "kelpie/ai_c_api.h"
 #include "ai_c_api_internal.h"
-#if MOLLOTOV_AI_HAS_HTTPLIB
+#if KELPIE_AI_HAS_HTTPLIB
 #include "hf_cloud_client.h"
 #endif
 #include "model_catalog.h"
 
 extern "C" {
 
-MollotovAiManagerRef mollotov_ai_create(const char* models_dir) {
+KelpieAiManagerRef kelpie_ai_create(const char* models_dir) {
   try {
-    return new MollotovAiManager(
-        mollotov::ai_internal::SafeCString(models_dir));
+    return new KelpieAiManager(
+        kelpie::ai_internal::SafeCString(models_dir));
   } catch (...) {
     return nullptr;
   }
 }
 
-void mollotov_ai_destroy(MollotovAiManagerRef mgr) {
+void kelpie_ai_destroy(KelpieAiManagerRef mgr) {
   delete mgr;
 }
 
-void mollotov_ai_free_string(char* str) {
+void kelpie_ai_free_string(char* str) {
   delete[] str;
 }
 
 // --- stubs (filled in by later tasks) ---
 
-void mollotov_ai_set_hf_token(MollotovAiManagerRef mgr, const char* token) {
+void kelpie_ai_set_hf_token(KelpieAiManagerRef mgr, const char* token) {
   if (!mgr) return;
-  mgr->hf_token = mollotov::ai_internal::SafeCString(token);
+  mgr->hf_token = kelpie::ai_internal::SafeCString(token);
 }
 
-char* mollotov_ai_get_hf_token(MollotovAiManagerRef mgr) {
+char* kelpie_ai_get_hf_token(KelpieAiManagerRef mgr) {
   if (!mgr) return nullptr;
-  return mollotov::ai_internal::CopyString(mgr->hf_token);
+  return kelpie::ai_internal::CopyString(mgr->hf_token);
 }
-char* mollotov_ai_list_approved_models(MollotovAiManagerRef mgr) {
+char* kelpie_ai_list_approved_models(KelpieAiManagerRef mgr) {
   if (!mgr) return nullptr;
   try {
     nlohmann::json arr = nlohmann::json::array();
-    for (const auto& m : mollotov::ModelCatalog::approved_models()) {
+    for (const auto& m : kelpie::ModelCatalog::approved_models()) {
       arr.push_back(m.to_json());
     }
-    return mollotov::ai_internal::CopyString(arr.dump());
+    return kelpie::ai_internal::CopyString(arr.dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_ai_model_fitness(MollotovAiManagerRef mgr, const char* model_id,
+char* kelpie_ai_model_fitness(KelpieAiManagerRef mgr, const char* model_id,
                                 double total_ram_gb, double disk_free_gb) {
   if (!mgr) return nullptr;
   try {
-    const auto* model = mollotov::ModelCatalog::find(
-        mollotov::ai_internal::SafeCString(model_id));
+    const auto* model = kelpie::ModelCatalog::find(
+        kelpie::ai_internal::SafeCString(model_id));
     if (!model) return nullptr;
-    auto fit = mollotov::ModelCatalog::fitness(*model, total_ram_gb, disk_free_gb);
-    return mollotov::ai_internal::CopyString(fit.to_json().dump());
+    auto fit = kelpie::ModelCatalog::fitness(*model, total_ram_gb, disk_free_gb);
+    return kelpie::ai_internal::CopyString(fit.to_json().dump());
   } catch (...) {
     return nullptr;
   }
 }
-#if MOLLOTOV_AI_HAS_HTTPLIB
-bool mollotov_ai_is_model_downloaded(MollotovAiManagerRef mgr, const char* model_id) {
+#if KELPIE_AI_HAS_HTTPLIB
+bool kelpie_ai_is_model_downloaded(KelpieAiManagerRef mgr, const char* model_id) {
   if (!mgr) return false;
   try {
-    return mgr->store.is_downloaded(mollotov::ai_internal::SafeCString(model_id));
+    return mgr->store.is_downloaded(kelpie::ai_internal::SafeCString(model_id));
   } catch (...) {
     return false;
   }
 }
 
-char* mollotov_ai_model_path(MollotovAiManagerRef mgr, const char* model_id) {
+char* kelpie_ai_model_path(KelpieAiManagerRef mgr, const char* model_id) {
   if (!mgr) return nullptr;
   try {
-    return mollotov::ai_internal::CopyString(
-        mgr->store.model_path(mollotov::ai_internal::SafeCString(model_id)));
+    return kelpie::ai_internal::CopyString(
+        mgr->store.model_path(kelpie::ai_internal::SafeCString(model_id)));
   } catch (...) {
     return nullptr;
   }
 }
 
-bool mollotov_ai_remove_model(MollotovAiManagerRef mgr, const char* model_id) {
+bool kelpie_ai_remove_model(KelpieAiManagerRef mgr, const char* model_id) {
   if (!mgr) return false;
   try {
-    return mgr->store.remove(mollotov::ai_internal::SafeCString(model_id));
+    return mgr->store.remove(kelpie::ai_internal::SafeCString(model_id));
   } catch (...) {
     return false;
   }
 }
 
-char* mollotov_ai_download_model(MollotovAiManagerRef mgr, const char* model_id,
-                                  MollotovAiDownloadProgressCb progress_cb,
+char* kelpie_ai_download_model(KelpieAiManagerRef mgr, const char* model_id,
+                                  KelpieAiDownloadProgressCb progress_cb,
                                   void* user_data) {
   if (!mgr) return nullptr;
   try {
     auto cb = progress_cb
-        ? mollotov::DownloadProgressCb([=](int64_t dl, int64_t total) {
+        ? kelpie::DownloadProgressCb([=](int64_t dl, int64_t total) {
             progress_cb(dl, total, user_data);
           })
-        : mollotov::DownloadProgressCb{};
+        : kelpie::DownloadProgressCb{};
     std::string err = mgr->store.download(
-        mollotov::ai_internal::SafeCString(model_id), mgr->hf_token, cb);
-    return err.empty() ? nullptr : mollotov::ai_internal::CopyString(err);
+        kelpie::ai_internal::SafeCString(model_id), mgr->hf_token, cb);
+    return err.empty() ? nullptr : kelpie::ai_internal::CopyString(err);
   } catch (...) {
     return nullptr;
   }
 }
-void mollotov_ai_set_ollama_endpoint(MollotovAiManagerRef mgr, const char* endpoint) {
+void kelpie_ai_set_ollama_endpoint(KelpieAiManagerRef mgr, const char* endpoint) {
   if (!mgr) return;
-  mgr->ollama.set_endpoint(mollotov::ai_internal::SafeCString(endpoint));
+  mgr->ollama.set_endpoint(kelpie::ai_internal::SafeCString(endpoint));
   mgr->ollama_endpoint = mgr->ollama.endpoint();
 }
 
-bool mollotov_ai_ollama_reachable(MollotovAiManagerRef mgr) {
+bool kelpie_ai_ollama_reachable(KelpieAiManagerRef mgr) {
   if (!mgr) return false;
   try {
     return mgr->ollama.is_reachable();
@@ -122,54 +122,54 @@ bool mollotov_ai_ollama_reachable(MollotovAiManagerRef mgr) {
   }
 }
 
-char* mollotov_ai_ollama_list_models(MollotovAiManagerRef mgr) {
+char* kelpie_ai_ollama_list_models(KelpieAiManagerRef mgr) {
   if (!mgr) return nullptr;
   try {
     auto models = mgr->ollama.list_models();
-    return mollotov::ai_internal::CopyString(models.dump());
+    return kelpie::ai_internal::CopyString(models.dump());
   } catch (...) {
     return nullptr;
   }
 }
 
-char* mollotov_ai_ollama_infer(MollotovAiManagerRef mgr, const char* model_name,
+char* kelpie_ai_ollama_infer(KelpieAiManagerRef mgr, const char* model_name,
                                 const char* request_json) {
   if (!mgr) return nullptr;
   try {
-    auto req = nlohmann::json::parse(mollotov::ai_internal::SafeCString(request_json));
-    auto result = mgr->ollama.infer(mollotov::ai_internal::SafeCString(model_name), req);
-    return mollotov::ai_internal::CopyString(result.dump());
+    auto req = nlohmann::json::parse(kelpie::ai_internal::SafeCString(request_json));
+    auto result = mgr->ollama.infer(kelpie::ai_internal::SafeCString(model_name), req);
+    return kelpie::ai_internal::CopyString(result.dump());
   } catch (...) {
     return nullptr;
   }
 }
-char* mollotov_ai_hf_infer(MollotovAiManagerRef mgr, const char* model_id,
+char* kelpie_ai_hf_infer(KelpieAiManagerRef mgr, const char* model_id,
                             const char* request_json) {
   if (!mgr) return nullptr;
   try {
     auto req = nlohmann::json::parse(
-        mollotov::ai_internal::SafeCString(request_json));
-    mollotov::HfCloudClient client;
+        kelpie::ai_internal::SafeCString(request_json));
+    kelpie::HfCloudClient client;
     auto result = client.infer(
-        mollotov::ai_internal::SafeCString(model_id),
+        kelpie::ai_internal::SafeCString(model_id),
         mgr->hf_token, req);
-    return mollotov::ai_internal::CopyString(result.dump());
+    return kelpie::ai_internal::CopyString(result.dump());
   } catch (...) {
     return nullptr;
   }
 }
 #else
 // Stubs when httplib is disabled (Android — platform handles HTTP via OkHttp)
-bool mollotov_ai_is_model_downloaded(MollotovAiManagerRef, const char*) { return false; }
-char* mollotov_ai_model_path(MollotovAiManagerRef, const char*) { return nullptr; }
-bool mollotov_ai_remove_model(MollotovAiManagerRef, const char*) { return false; }
-char* mollotov_ai_download_model(MollotovAiManagerRef, const char*,
-                                  MollotovAiDownloadProgressCb, void*) { return nullptr; }
-void mollotov_ai_set_ollama_endpoint(MollotovAiManagerRef, const char*) {}
-bool mollotov_ai_ollama_reachable(MollotovAiManagerRef) { return false; }
-char* mollotov_ai_ollama_list_models(MollotovAiManagerRef) { return nullptr; }
-char* mollotov_ai_ollama_infer(MollotovAiManagerRef, const char*, const char*) { return nullptr; }
-char* mollotov_ai_hf_infer(MollotovAiManagerRef, const char*, const char*) { return nullptr; }
+bool kelpie_ai_is_model_downloaded(KelpieAiManagerRef, const char*) { return false; }
+char* kelpie_ai_model_path(KelpieAiManagerRef, const char*) { return nullptr; }
+bool kelpie_ai_remove_model(KelpieAiManagerRef, const char*) { return false; }
+char* kelpie_ai_download_model(KelpieAiManagerRef, const char*,
+                                  KelpieAiDownloadProgressCb, void*) { return nullptr; }
+void kelpie_ai_set_ollama_endpoint(KelpieAiManagerRef, const char*) {}
+bool kelpie_ai_ollama_reachable(KelpieAiManagerRef) { return false; }
+char* kelpie_ai_ollama_list_models(KelpieAiManagerRef) { return nullptr; }
+char* kelpie_ai_ollama_infer(KelpieAiManagerRef, const char*, const char*) { return nullptr; }
+char* kelpie_ai_hf_infer(KelpieAiManagerRef, const char*, const char*) { return nullptr; }
 #endif
 
 }  // extern "C"

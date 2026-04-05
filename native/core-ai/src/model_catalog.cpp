@@ -3,7 +3,7 @@
 #include <cmath>
 #include <sstream>
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 std::string format_gb(double value) {
@@ -150,4 +150,4 @@ ModelFitness ModelCatalog::fitness(const ApprovedModel& model,
   return ModelFitness{ModelFitness::kRecommended, ""};
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

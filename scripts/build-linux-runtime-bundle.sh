@@ -45,8 +45,8 @@ if [ ! -d "${BUILD_DIR}" ]; then
 fi
 
 mkdir -p "${OUTPUT_DIR}"
-rm -rf "${OUTPUT_DIR}/mollotov-linux"
-mkdir -p "${OUTPUT_DIR}/mollotov-linux"
+rm -rf "${OUTPUT_DIR}/kelpie-linux"
+mkdir -p "${OUTPUT_DIR}/kelpie-linux"
 
 while IFS= read -r runtime_file; do
   [ -n "${runtime_file}" ] || continue
@@ -56,19 +56,19 @@ while IFS= read -r runtime_file; do
     exit 1
   fi
 
-  cp -a "${BUILD_DIR}/${runtime_file}" "${OUTPUT_DIR}/mollotov-linux/"
+  cp -a "${BUILD_DIR}/${runtime_file}" "${OUTPUT_DIR}/kelpie-linux/"
 done < "${MANIFEST}"
 
-chmod 755 "${OUTPUT_DIR}/mollotov-linux/mollotov-linux"
-chmod 755 "${OUTPUT_DIR}/mollotov-linux/chrome-sandbox"
+chmod 755 "${OUTPUT_DIR}/kelpie-linux/kelpie-linux"
+chmod 755 "${OUTPUT_DIR}/kelpie-linux/chrome-sandbox"
 
-cat > "${OUTPUT_DIR}/mollotov-linux/README.txt" <<EOF
-Mollotov Linux release bundle
+cat > "${OUTPUT_DIR}/kelpie-linux/README.txt" <<EOF
+Kelpie Linux release bundle
 Version: ${VERSION}
 Build: ${BUILD_LABEL:-generic}
 
 Run:
-  ./mollotov-linux
+  ./kelpie-linux
 
 Notes:
 - This bundle includes the Chromium Embedded Framework runtime.

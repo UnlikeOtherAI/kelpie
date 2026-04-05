@@ -1,6 +1,6 @@
 #include "navigation_handler.h"
 
-namespace mollotov {
+namespace kelpie {
 
 NavigationHandler::NavigationHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -72,4 +72,4 @@ nlohmann::json NavigationHandler::GetCurrentUrl() const {
   };
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

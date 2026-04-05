@@ -1,4 +1,4 @@
-#include "mollotov/ai_c_api.h"
+#include "kelpie/ai_c_api.h"
 #include <cassert>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -6,14 +6,14 @@
 using json = nlohmann::json;
 
 void TestCreateDestroy() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
   assert(mgr != nullptr);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestListApprovedModels() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_list_approved_models(mgr);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_list_approved_models(mgr);
   assert(result != nullptr);
   json models = json::parse(result);
   assert(models.is_array());
@@ -24,50 +24,50 @@ void TestListApprovedModels() {
   assert(models[0].contains("size_bytes"));
   assert(models[0].contains("capabilities"));
   assert(models[0].contains("download_url"));
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessRecommended() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 50.0);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 50.0);
   assert(result != nullptr);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "recommended");
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessNoStorage() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 0.1);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 32.0, 0.1);
   assert(result != nullptr);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "no_storage");
   assert(fitness.contains("message"));
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessNotRecommended() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 4.0, 50.0);
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 4.0, 50.0);
   assert(result != nullptr);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "not_recommended");
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 void TestModelFitnessPossible() {
-  auto* mgr = mollotov_ai_create("/tmp/test_models");
+  auto* mgr = kelpie_ai_create("/tmp/test_models");
   // 12 GB RAM is below recommended 16, but above min 8
-  char* result = mollotov_ai_model_fitness(mgr, "gemma-4-e2b-q4", 12.0, 50.0);
+  char* result = kelpie_ai_model_fitness(mgr, "gemma-4-e2b-q4", 12.0, 50.0);
   assert(result != nullptr);
   json fitness = json::parse(result);
   assert(fitness["fitness"] == "possible");
-  mollotov_ai_free_string(result);
-  mollotov_ai_destroy(mgr);
+  kelpie_ai_free_string(result);
+  kelpie_ai_destroy(mgr);
 }
 
 int main() {

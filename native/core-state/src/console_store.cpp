@@ -1,4 +1,4 @@
-#include "mollotov/console_store.h"
+#include "kelpie/console_store.h"
 
 #include <algorithm>
 
@@ -6,7 +6,7 @@
 
 #include "store_support.h"
 
-namespace mollotov {
+namespace kelpie {
 namespace {
 
 using json = nlohmann::json;
@@ -151,4 +151,4 @@ const char* ConsoleStore::LevelToString(ConsoleLevel level) {
   return "log";
 }
 
-}  // namespace mollotov
+}  // namespace kelpie

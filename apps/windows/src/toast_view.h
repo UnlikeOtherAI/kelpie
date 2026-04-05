@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-namespace mollotov::windows {
+namespace kelpie::windows {
 
 class ToastView {
  public:
@@ -24,4 +24,4 @@ class ToastView {
   HWND label_ = nullptr;
 };
 
-}  // namespace mollotov::windows
+}  // namespace kelpie::windows

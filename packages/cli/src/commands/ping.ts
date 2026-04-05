@@ -28,7 +28,7 @@ export function registerPing(program: Command): void {
       } else {
         const devices = getAllDevices();
         if (devices.length === 0) {
-          print({ success: false, error: { code: "NO_DEVICES", message: "No known devices. Run 'mollotov discover' first." } }, globals.format);
+          print({ success: false, error: { code: "NO_DEVICES", message: "No known devices. Run 'kelpie discover' first." } }, globals.format);
           process.exitCode = 4;
           return;
         }
