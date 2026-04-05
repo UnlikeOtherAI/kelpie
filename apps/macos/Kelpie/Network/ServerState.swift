@@ -19,7 +19,17 @@ final class ServerState: ObservableObject {
     var rendererState: RendererState?
 
     // Renderers are created on first use and cached for instant switching
-    private(set) var wkRenderer: WKWebViewRenderer?
+    var wkRenderer: WKWebViewRenderer?
+
+    /// Called by BrowserView when the active tab changes so the tab's renderer
+    /// becomes the target for all handlers.
+    func setActiveWebKitRenderer(_ renderer: WKWebViewRenderer) {
+        renderer.onScriptMessage = { [weak self] name, body in
+            self?.handlerContext.handleScriptMessage(name: name, body: body)
+        }
+        wkRenderer = renderer
+        handlerContext.renderer = renderer
+    }
     private(set) var cefRenderer: CEFRenderer?
 
     private var httpServer: HTTPServer?
