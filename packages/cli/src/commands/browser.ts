@@ -22,7 +22,7 @@ async function isReachable(port?: number): Promise<boolean> {
     return false;
   }
   try {
-    const response = await fetch(`http://127.0.0.1:${String(port)}/health`);
+    const response = await fetch(`http://127.0.0.1:${port}/health`);
     return response.ok;
   } catch {
     return false;

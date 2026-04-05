@@ -74,7 +74,7 @@ export function formatDeviceTable(devices: DiscoveredDevice[]): string {
       d.model,
       d.ip,
       d.port,
-      `${String(d.width)}x${String(d.height)}`,
+      `${d.width}x${d.height}`,
       d.id.slice(0, 8) + "...",
     ]);
   }

@@ -50,7 +50,7 @@ function deviceMeta(d: DiscoveredDevice): DeviceMeta {
   return {
     name: d.name,
     platform: d.platform,
-    resolution: `${String(d.width)}x${String(d.height)}`,
+    resolution: `${d.width}x${d.height}`,
   };
 }
 

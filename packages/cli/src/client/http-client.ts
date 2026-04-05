@@ -22,7 +22,7 @@ export async function sendCommand<T = unknown>(
 ): Promise<HttpResponse<T>> {
   const kebabMethod = toKebabCase(method);
   const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
-  const url = `http://${host}:${String(device.port)}${API_VERSION_PREFIX}${kebabMethod}`;
+  const url = `http://${host}:${device.port}${API_VERSION_PREFIX}${kebabMethod}`;
   const controller = new AbortController();
   const timer = setTimeout(() => { controller.abort(); }, timeout);
 
@@ -43,7 +43,7 @@ export async function sendCommand<T = unknown>(
         status: 408,
         data: {
           success: false,
-          error: { code: "TIMEOUT", message: `Request timed out after ${String(timeout)}ms` },
+          error: { code: "TIMEOUT", message: `Request timed out after ${timeout}ms` },
         } as T,
       };
     }

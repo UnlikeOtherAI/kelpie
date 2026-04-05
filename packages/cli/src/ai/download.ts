@@ -131,7 +131,7 @@ export async function downloadModel(
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`DOWNLOAD_FAILED: ${String(response.status)} ${response.statusText}`);
+      throw new Error(`DOWNLOAD_FAILED: ${response.status} ${response.statusText}`);
     }
 
     fileHandle = await open(tmpPath, "w");
