@@ -389,7 +389,7 @@ struct BrowserView: View {
             Task { @MainActor in
                 // Update tab's own stored state (always, for all tabs — tab bar needs these)
                 let wasLoading = tab.isLoading
-                tab.title = tab.renderer.currentTitle.isEmpty ? "New Tab" : tab.renderer.currentTitle
+                tab.title = tab.renderer.currentTitle.isEmpty ? "Start Page" : tab.renderer.currentTitle
                 tab.currentURL = tab.renderer.currentURL?.absoluteString ?? ""
                 tab.isLoading = tab.renderer.isLoading
 
@@ -495,6 +495,21 @@ struct BrowserView: View {
         ) {
             ZStack {
                 RendererContainerView(serverState: serverState, rendererState: rendererState, tabStore: tabStore)
+
+                // Start page overlay — shown when the active tab has no URL.
+                // The WKWebView is hidden by RendererContainerView.updateNSView in
+                // this state, so SwiftUI buttons here receive mouse events normally.
+                if tabStore.activeTab?.currentURL.isEmpty == true {
+                    StartPageView(
+                        bookmarkStore: .shared,
+                        historyStore: .shared
+                    ) { urlString in
+                        guard let url = URL(string: urlString) else { return }
+                        serverState.handlerContext.load(url: url)
+                    }
+                    .transition(.opacity)
+                    .animation(.easeOut(duration: 0.15), value: tabStore.activeTab?.currentURL.isEmpty)
+                }
 
                 if rendererState.isSwitching {
                     Color.black.opacity(0.12)
@@ -1077,6 +1092,12 @@ struct RendererContainerView: NSViewRepresentable {
         }.count
         if nonCEFCount > tabStore.tabs.count {
             removeClosedTabViews(from: container)
+        }
+
+        // Hide the WKWebView when the active tab is on the start page so the
+        // SwiftUI StartPageView overlay can receive mouse events unobstructed.
+        if let activeTab = tabStore.activeTab {
+            activeTab.renderer.makeView().isHidden = activeTab.currentURL.isEmpty
         }
     }
 

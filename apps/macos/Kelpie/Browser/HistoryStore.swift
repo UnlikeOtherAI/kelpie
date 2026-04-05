@@ -99,6 +99,16 @@ final class HistoryStore: ObservableObject {
         persist()
     }
 
+    func remove(id: UUID) {
+        guard let storeHandle else { return }
+        entries.removeAll { $0.id == id }
+        persist()
+        let json = Self.makeJSONString(from: entries.map(Self.persistedJSONObject)) ?? "[]"
+        json.withCString { jsonPointer in
+            kelpie_history_store_load_json(storeHandle, jsonPointer)
+        }
+    }
+
     func updateLatestTitle(for url: String, title: String) {
         guard let storeHandle else { return }
         url.withCString { urlPointer in

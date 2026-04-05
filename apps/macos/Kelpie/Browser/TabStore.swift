@@ -7,7 +7,7 @@ final class Tab: ObservableObject, Identifiable {
     let id = UUID()
     let renderer: WKWebViewRenderer
 
-    @Published var title: String = "New Tab"
+    @Published var title: String = "Start Page"
     @Published var currentURL: String = ""
     @Published var isLoading: Bool = false
     @Published var favicon: NSImage? = nil
@@ -76,7 +76,7 @@ final class TabStore: ObservableObject {
     private func bind(_ tab: Tab) {
         tab.renderer.onStateChange = { [weak tab, weak renderer = tab.renderer] in
             guard let tab, let renderer else { return }
-            tab.title = renderer.currentTitle.isEmpty ? "New Tab" : renderer.currentTitle
+            tab.title = renderer.currentTitle.isEmpty ? "Start Page" : renderer.currentTitle
             tab.currentURL = renderer.currentURL?.absoluteString ?? ""
             tab.isLoading = renderer.isLoading
         }
