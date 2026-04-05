@@ -84,6 +84,7 @@
 		F3C599EC8FDE2FCF1792AABC /* AIStatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B6E378CD08BC024643B704 /* AIStatusPill.swift */; };
 		F448A8B2E1B3A561B2C60C92 /* ScreenshotHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852B4917F01094DFDF3771CC /* ScreenshotHandler.swift */; };
 		F6043F6FF255B6973C5D5C4F /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5F2EA8022E452E864C22E /* AIState.swift */; };
+		80E3FCFF6C284793AF422AA7 /* TabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9023467D933F4052B93093C8 /* TabBarView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -111,6 +112,7 @@
 		1DA139A3CF468F423C529E96 /* LLMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHandler.swift; sourceTree = "<group>"; };
 		223DCB7A84A6CF2A772EDD8B /* AIChatPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatPanel.swift; sourceTree = "<group>"; };
 		B1C2D3E4F5061728394A5B6C /* AppKitComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitComponents.swift; sourceTree = "<group>"; };
+		9023467D933F4052B93093C8 /* TabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarView.swift; sourceTree = "<group>"; };
 		281B211E466DC23877A0CFAA /* Chromium Embedded Framework.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = "Chromium Embedded Framework.framework"; path = "Frameworks/Chromium Embedded Framework.framework"; sourceTree = "<group>"; };
 		309E4F27B9334A3F85201824 /* Kelpie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kelpie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3165F3E062D65F1295516C83 /* SystemPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPrompt.swift; sourceTree = "<group>"; };
@@ -326,6 +328,7 @@
 				011215869B267C4C4E0A90A5 /* NetworkInspectorView.swift */,
 				4AAD0796D10DE23B652F3F43 /* SettingsView.swift */,
 				9DF73FE78326C991680045EA /* ShellToastCardView.swift */,
+				9023467D933F4052B93093C8 /* TabBarView.swift */,
 				436A6AEA38D754ACEFE7DD71 /* ToolbarView.swift */,
 				F7CB1B02A9B2992B1E4D0688 /* URLBarView.swift */,
 				1C5CB8EFBD176E045F6DBD06 /* WelcomeCardView.swift */,
@@ -652,6 +655,7 @@
 				79984F50B7743012D33A858F /* Snapshot3DBridge.swift in Sources */,
 				BF66BEB5C52D9003836BE432 /* Snapshot3DHandler.swift in Sources */,
 				C5ED3961F39583CDA49BB39A /* SystemPrompt.swift in Sources */,
+				80E3FCFF6C284793AF422AA7 /* TabBarView.swift in Sources */,
 				98ECBDAA13AB0E99D6D60C1B /* ToolbarView.swift in Sources */,
 				662663FD968E2DD3AFAA1DD0 /* URLBarView.swift in Sources */,
 				383CFB825CB94A5E8271E602 /* ViewportState.swift in Sources */,
