@@ -86,6 +86,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_scroll2", description: "Scroll to make an element visible (resolution-aware). Shows a touch indicator at the target element.", method: "scroll2", schema: { device, selector, position: z.enum(["top", "center", "bottom"]).optional().describe("Target position in viewport"), maxScrolls: z.number().optional().describe("Max scroll attempts"), message }, bodyFromArgs: passthrough },
   { name: "kelpie_scroll_to_top", description: "Scroll to the top of the page", method: "scrollToTop", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_scroll_to_bottom", description: "Scroll to the bottom of the page", method: "scrollToBottom", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_scroll_to_y", description: "Scroll to an absolute pixel offset. Works in 3D inspector mode on macOS.", method: "scrollToY", schema: { device, y: z.number().describe("Vertical pixel offset from top"), x: z.number().optional().describe("Horizontal pixel offset from left (default 0)"), message }, bodyFromArgs: passthrough },
 
   // Viewport & Device
   { name: "kelpie_get_viewport", description: "Get viewport dimensions and device pixel ratio", method: "getViewport", schema: { device }, bodyFromArgs: passthrough },

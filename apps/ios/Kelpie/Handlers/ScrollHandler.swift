@@ -9,6 +9,7 @@ struct ScrollHandler {
         router.register("scroll2") { body in await scroll2(body) }
         router.register("scroll-to-top") { _ in await scrollTo(top: true) }
         router.register("scroll-to-bottom") { _ in await scrollTo(top: false) }
+        router.register("scroll-to-y") { body in await scrollToY(body) }
     }
 
     @MainActor
@@ -55,6 +56,30 @@ struct ScrollHandler {
         let js = top
             ? "window.scrollTo(0, 0); ({scrollY: 0})"
             : "window.scrollTo(0, document.documentElement.scrollHeight); ({scrollY: window.scrollY})"
+        do {
+            let result = try await context.evaluateJSReturningJSON(js)
+            return successResponse(result)
+        } catch {
+            return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func scrollToY(_ body: [String: Any]) async -> [String: Any] {
+        guard let y = body["y"] as? Double else {
+            return errorResponse(code: "MISSING_PARAM", message: "y is required (pixel offset)")
+        }
+        let x = body["x"] as? Double ?? 0
+        let js = """
+        (function() {
+            window.scrollTo(\(x), \(y));
+            return {
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+                maxScrollY: Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+            };
+        })()
+        """
         do {
             let result = try await context.evaluateJSReturningJSON(js)
             return successResponse(result)

@@ -36,4 +36,16 @@ export function registerScroll(program: Command): void {
     .command("scroll-bottom")
     .description("Scroll to the bottom of the page")
     .action(async () => { await deviceCommand(program, "scrollToBottom"); });
+
+  program
+    .command("scroll-to")
+    .description("Scroll to an absolute pixel offset (works in 3D inspector on macOS)")
+    .requiredOption("--y <px>", "Vertical pixel offset from top")
+    .option("--x <px>", "Horizontal pixel offset from left", "0")
+    .action(async (opts: { x: string; y: string }) => {
+      await deviceCommand(program, "scrollToY", {
+        x: Number(opts.x),
+        y: Number(opts.y),
+      });
+    });
 }

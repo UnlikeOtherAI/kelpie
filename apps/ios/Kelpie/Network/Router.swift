@@ -38,7 +38,7 @@ final class Router: @unchecked Sendable {
             "screenshot", "get-dom", "query-selector", "query-selector-all",
             "get-element-text", "get-attributes", "click", "tap", "fill",
             "type", "select-option", "check", "uncheck", "scroll", "scroll2",
-            "scroll-to-top", "scroll-to-bottom", "get-viewport", "get-device-info",
+            "scroll-to-top", "scroll-to-bottom", "scroll-to-y", "get-viewport", "get-device-info",
             "get-viewport-presets", "get-capabilities", "wait-for-element", "wait-for-navigation",
             "find-element", "find-button", "find-link", "find-input",
             "evaluate", "get-console-messages", "get-js-errors",

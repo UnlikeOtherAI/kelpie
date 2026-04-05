@@ -540,6 +540,27 @@ Response:
 }
 ```
 
+### `scrollToY`
+Scroll to an absolute pixel offset. On macOS this also syncs the 3D inspector's stored scroll state so the operation works while the inspector is active.
+
+```json
+POST /v1/scroll-to-y
+{
+  "y": 800,
+  "x": 0
+}
+
+Response:
+{
+  "success": true,
+  "scrollX": 0,
+  "scrollY": 800,
+  "maxScrollY": 4200
+}
+```
+
+Errors: `MISSING_PARAM` (y is required), `EVAL_ERROR`.
+
 ---
 
 ## Viewport & Device Info

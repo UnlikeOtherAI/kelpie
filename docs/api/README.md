@@ -184,6 +184,7 @@ When exposed via MCP, methods use the `kelpie_` prefix:
 | `/v1/scroll2` | `kelpie_scroll2` |
 | `/v1/scroll-to-top` | `kelpie_scroll_to_top` |
 | `/v1/scroll-to-bottom` | `kelpie_scroll_to_bottom` |
+| `/v1/scroll-to-y` | `kelpie_scroll_to_y` |
 | `/v1/get-viewport` | `kelpie_get_viewport` |
 | `/v1/get-viewport-presets` | `kelpie_get_viewport_presets` |
 | `/v1/get-device-info` | `kelpie_get_device_info` |

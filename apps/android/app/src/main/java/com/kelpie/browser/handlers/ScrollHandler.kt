@@ -10,6 +10,7 @@ class ScrollHandler(private val ctx: HandlerContext) {
         router.register("scroll2") { scroll2(it) }
         router.register("scroll-to-top") { scrollTo(true) }
         router.register("scroll-to-bottom") { scrollTo(false) }
+        router.register("scroll-to-y") { scrollToY(it) }
     }
 
     private suspend fun scroll(body: Map<String, Any?>): Map<String, Any?> {
@@ -47,6 +48,18 @@ class ScrollHandler(private val ctx: HandlerContext) {
         } else {
             "window.scrollTo(0, document.documentElement.scrollHeight); ({scrollY: window.scrollY})"
         }
+        return try {
+            successResponse(ctx.evaluateJSReturningJSON(js))
+        } catch (e: Exception) {
+            errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
+        }
+    }
+
+    private suspend fun scrollToY(body: Map<String, Any?>): Map<String, Any?> {
+        val y = (body["y"] as? Number)?.toDouble()
+            ?: return errorResponse("MISSING_PARAM", "y is required (pixel offset)")
+        val x = (body["x"] as? Number)?.toDouble() ?: 0.0
+        val js = "(function(){window.scrollTo($x,$y);return{scrollX:window.scrollX,scrollY:window.scrollY,maxScrollY:Math.max(0,document.documentElement.scrollHeight-window.innerHeight)};})()"
         return try {
             successResponse(ctx.evaluateJSReturningJSON(js))
         } catch (e: Exception) {
