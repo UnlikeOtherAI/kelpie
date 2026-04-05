@@ -752,6 +752,18 @@ Pass `isCEFActive: rendererState.activeEngine == .chromium` from the `TabBarView
 
 Cmd+T should also be a no-op when CEF is active — in the `.onReceive(NotificationCenter…newTab)` handler, guard on `rendererState.activeEngine != .chromium`.
 
+**Animation:** the tab bar should not snap on/off. Wrap the `TabBarView` in `BrowserView` with an opacity modifier that animates:
+
+```swift
+TabBarView(...)
+    .frame(height: 34)
+    .opacity(rendererState.activeEngine == .chromium ? 0 : 1)
+    .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
+    .allowsHitTesting(rendererState.activeEngine != .chromium)
+```
+
+This fades the whole strip (including the CEF banner) in and out. No need for an explicit banner — the strip just vanishes cleanly, which is enough for a testing-only renderer. Remove the `cefBanner` from `TabBarContainerView` entirely; opacity handles the transition.
+
 ### Step 6: Add Cmd+T and Cmd+W
 
 In `KelpieApp.swift`, inside `BrowserCommands.body`, add to the `CommandGroup(after: .newItem)`:
@@ -984,6 +996,50 @@ git commit -m "feat(macos/tabs): responsive pill spreading and overflow horizont
 
 ---
 
+## Task 7 — Hide 3D Inspector button in CEF mode
+
+**Files:**
+- Modify: `apps/macos/Kelpie/Views/URLBarView.swift`
+
+The 3D Inspector relies on WKWebView JS injection and is meaningless in CEF mode. Hide it (with the same fade) when Chromium is active.
+
+### Step 1: Wrap the 3D button in URLBarView
+
+In `URLBarView.body`, the `cube.transparent` `AppKitToolbarButton` at line ~69 is always shown. Wrap it:
+
+```swift
+if rendererState.activeEngine != .chromium {
+    AppKitToolbarButton(
+        systemName: "cube.transparent",
+        accessibilityID: "browser.nav.snapshot3d",
+        accessibilityLabel: "3D Inspector",
+        isSelected: is3DActive,
+        action: onSnapshot3D
+    )
+    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+}
+```
+
+Animate the container. In `BrowserView`, the `URLBarView` call site already has `.animation` applied via the VStack — but the button removal is inside URLBarView, so add the animation there too:
+
+```swift
+// At the end of URLBarView.body VStack chain:
+.animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
+```
+
+### Step 2: Verify
+
+Switch to Chromium — 3D button fades out (0.3 s). Switch back to WebKit — fades in. Existing 3D inspector state (`is3DActive`) is irrelevant in CEF mode so no cleanup needed.
+
+### Step 3: Commit
+
+```bash
+git add apps/macos/Kelpie/Views/URLBarView.swift
+git commit -m "feat(macos): hide 3D inspector button in CEF/Chromium mode"
+```
+
+---
+
 ## How to test end-to-end
 
 1. Open Kelpie.
@@ -995,5 +1051,5 @@ git commit -m "feat(macos/tabs): responsive pill spreading and overflow horizont
 7. Narrow the window below ~480pt → pills hit min width, scroll bar appears.
 8. Cmd+W → active tab closes, adjacent tab activates.
 9. Close all-but-one tab, then Cmd+W on last tab → new blank tab replaces it (never zero tabs).
-10. Switch to Chromium renderer → tab strip disappears, "Tabs unavailable in Chromium mode" label appears. Cmd+T does nothing. Existing WebKit tabs are preserved in memory.
-11. Switch back to WebKit → all previous tabs are restored in the bar exactly as left.
+10. Switch to Chromium renderer → tab strip fades out (0.3 s), 3D Inspector button fades out simultaneously. Cmd+T does nothing. Existing WebKit tabs are preserved in memory.
+11. Switch back to WebKit → tab strip and 3D button fade back in (0.3 s), all previous tabs restored exactly as left.
