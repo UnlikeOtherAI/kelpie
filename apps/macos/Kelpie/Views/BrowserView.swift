@@ -22,6 +22,7 @@ struct BrowserView: View {
     @State private var isFloatingMenuOpen = false
     @State private var isIn3DInspector = false
     @State private var inspectorMode = "rotate"
+    @State private var hostWindow: NSWindow?
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
     @State private var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
@@ -203,6 +204,10 @@ struct BrowserView: View {
         }
         .animation(.easeOut(duration: 0.2), value: serverState.shellToastMessage != nil)
         .background(
+            WindowAccessor(window: $hostWindow)
+                .frame(width: 0, height: 0)
+        )
+        .background(
             WindowChromeBridge(
                 title: windowTitle,
                 minimumWindowSize: NSSize(
@@ -282,11 +287,13 @@ struct BrowserView: View {
             inspectorMode = "rotate"
         }
         .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in
+            guard hostWindow?.isKeyWindow == true else { return }
             guard rendererState.activeEngine != .chromium else { return }
             let tab = tabStore.addTab()
             connectNewTab(tab)
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in
+            guard hostWindow?.isKeyWindow == true else { return }
             if rendererState.activeEngine == .chromium {
                 NSApp.keyWindow?.close()
                 return
@@ -360,20 +367,22 @@ struct BrowserView: View {
         tab.renderer.onStateChange = { [weak tab, weak browserState, weak serverState] in
             guard let tab, let browserState, let serverState else { return }
             Task { @MainActor in
+                // Update tab's own stored state (always, for all tabs — tab bar needs these)
                 let wasLoading = tab.isLoading
                 tab.title = tab.renderer.currentTitle.isEmpty ? "New Tab" : tab.renderer.currentTitle
                 tab.currentURL = tab.renderer.currentURL?.absoluteString ?? ""
                 tab.isLoading = tab.renderer.isLoading
+
+                // Only sync shared browserState for the active tab
+                guard serverState.wkRenderer === tab.renderer else { return }
                 sync(browserState: browserState, from: tab.renderer)
-                // Trigger favicon fetch when load completes (stored-state transition)
+
+                // Favicon fetch on load completion (active tab only)
                 if wasLoading && !tab.isLoading, !tab.currentURL.isEmpty {
                     FaviconExtractor.extract(from: tab.renderer) { [weak tab] image in
                         tab?.favicon = image
                     }
                 }
-                // Only sync browserState when this tab is still the active renderer
-                guard serverState.wkRenderer === tab.renderer else { return }
-                sync(browserState: browserState, from: tab.renderer)
             }
         }
     }
@@ -757,6 +766,28 @@ private struct WindowBlurOverlay: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.alphaValue = opacity
+    }
+}
+
+// MARK: - Window accessor (captures NSWindow reference for key-window checks)
+
+private struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = PassThroughNSView()
+        DispatchQueue.main.async {
+            self.window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if self.window !== nsView.window {
+                self.window = nsView.window
+            }
+        }
     }
 }
 

@@ -15,6 +15,14 @@ final class Tab: ObservableObject, Identifiable {
     init() {
         self.renderer = WKWebViewRenderer()
     }
+
+    deinit {
+        // Break WKUserContentController retain cycle before the renderer is released.
+        // Tab is always created and destroyed on the main actor.
+        MainActor.assumeIsolated {
+            renderer.invalidate()
+        }
+    }
 }
 
 @MainActor

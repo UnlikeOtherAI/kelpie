@@ -55,6 +55,15 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     func makeView() -> NSView { webView }
 
+    /// Breaks the retain cycle between the renderer and WKUserContentController.
+    /// Must be called before the owning Tab is released.
+    func invalidate() {
+        let ucc = webView.configuration.userContentController
+        ucc.removeScriptMessageHandler(forName: "kelpieNetwork")
+        ucc.removeScriptMessageHandler(forName: "kelpieConsole")
+        ucc.removeScriptMessageHandler(forName: "kelpie3DSnapshot")
+    }
+
     func load(url: URL) {
         webView.load(URLRequest(url: url))
     }
