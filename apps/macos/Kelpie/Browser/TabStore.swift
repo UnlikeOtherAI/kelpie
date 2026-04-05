@@ -32,6 +32,9 @@ final class TabStore: ObservableObject {
 
     var activeTab: Tab? { tabs.first { $0.id == activeTabID } }
 
+    // Keyed by tab ID so unbind() can cancel cleanly.
+    private var faviconSinks: [UUID: AnyCancellable] = [:]
+
     init() {
         let initial = Tab()
         tabs = [initial]
@@ -80,9 +83,13 @@ final class TabStore: ObservableObject {
             tab.currentURL = renderer.currentURL?.absoluteString ?? ""
             tab.isLoading = renderer.isLoading
         }
+        faviconSinks[tab.id] = tab.$favicon
+            .dropFirst()
+            .sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     private func unbind(_ tab: Tab) {
         tab.renderer.onStateChange = nil
+        faviconSinks.removeValue(forKey: tab.id)
     }
 }
