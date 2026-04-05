@@ -12,7 +12,7 @@ excluded:
 # Promote all warnings to errors so the build fails.
 strict: true
 
-# ── Disabled rules ─────────────────────���────────────────────────────────────
+# ── Disabled rules ──────────────────────────────────────────────────────────
 disabled_rules:
   - blanket_disable_command
 
