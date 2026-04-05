@@ -26,6 +26,8 @@ struct BrowserView: View {
     @AppStorage("hideWelcomeCard") private var hideWelcome = false
     @State private var showWelcome = true
     @State private var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
+    @AppStorage("skipInsecureWarning") private var skipInsecureWarning = false
+    @State private var pendingInsecureURL: URL? = nil
 
     var body: some View {
         ZStack {
@@ -37,10 +39,7 @@ struct BrowserView: View {
                     viewportState: viewportState,
                     aiState: aiState,
                     isAIPanelOpen: isAIPanelOpen,
-                    onNavigate: { url in
-                        guard let urlObj = URL(string: url) else { return }
-                        serverState.handlerContext.load(url: urlObj)
-                    },
+                    onNavigate: navigate,
                     onBack: { serverState.handlerContext.goBack() },
                     onForward: { serverState.handlerContext.goForward() },
                     onReload: { serverState.handlerContext.reloadPage() },
@@ -243,6 +242,23 @@ struct BrowserView: View {
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
         }
+        .sheet(isPresented: Binding(
+            get: { pendingInsecureURL != nil },
+            set: { if !$0 { pendingInsecureURL = nil } }
+        )) {
+            if let url = pendingInsecureURL {
+                InsecurePageWarningView(
+                    url: url,
+                    skipInFuture: $skipInsecureWarning,
+                    onContinue: {
+                        let u = url
+                        pendingInsecureURL = nil
+                        serverState.handlerContext.load(url: u)
+                    },
+                    onCancel: { pendingInsecureURL = nil }
+                )
+            }
+        }
         .onAppear {
             connectNewTab(tabStore.tabs[0])
             // Wire TabStore into HandlerContext for MCP tab operations
@@ -413,6 +429,10 @@ struct BrowserView: View {
 
     private func navigate(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
+        if url.scheme == "http" && !skipInsecureWarning {
+            pendingInsecureURL = url
+            return
+        }
         serverState.handlerContext.load(url: url)
     }
 
@@ -502,11 +522,9 @@ struct BrowserView: View {
                 if tabStore.activeTab?.currentURL.isEmpty == true {
                     StartPageView(
                         bookmarkStore: .shared,
-                        historyStore: .shared
-                    ) { urlString in
-                        guard let url = URL(string: urlString) else { return }
-                        serverState.handlerContext.load(url: url)
-                    }
+                        historyStore: .shared,
+                        onNavigate: navigate
+                    )
                     .transition(.opacity)
                     .animation(.easeOut(duration: 0.15), value: tabStore.activeTab?.currentURL.isEmpty)
                 }
