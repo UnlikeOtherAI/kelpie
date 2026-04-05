@@ -66,18 +66,22 @@ struct URLBarView: View {
                     .fixedSize(horizontal: true, vertical: false)
                 }
 
-                AppKitToolbarButton(
-                    systemName: "cube.transparent",
-                    accessibilityID: "browser.nav.snapshot3d",
-                    accessibilityLabel: "3D Inspector",
-                    isSelected: is3DActive,
-                    action: onSnapshot3D
-                )
+                if rendererState.activeEngine != .chromium {
+                    AppKitToolbarButton(
+                        systemName: "cube.transparent",
+                        accessibilityID: "browser.nav.snapshot3d",
+                        accessibilityLabel: "3D Inspector",
+                        isSelected: is3DActive,
+                        action: onSnapshot3D
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
 
                 if !isNarrow {
                     selectorsRow
                 }
             }
+            .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
 
             if isNarrow {
                 selectorsRow
