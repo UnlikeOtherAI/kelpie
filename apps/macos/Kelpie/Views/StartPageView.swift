@@ -34,6 +34,20 @@ struct StartPageView: View {
             // Scrollable content
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 36) {
+                    // App icon header
+                    HStack {
+                        Spacer()
+                        if let img = NSImage(named: "WelcomeIcon") {
+                            Image(nsImage: img)
+                                .resizable()
+                                .frame(width: 120, height: 120)
+                                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 40)
+
                     if !bookmarkStore.bookmarks.isEmpty {
                         StartPageSection(title: "Favourites") {
                             LazyVGrid(
