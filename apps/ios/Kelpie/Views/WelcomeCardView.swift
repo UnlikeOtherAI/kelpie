@@ -71,7 +71,7 @@ struct WelcomeCardView: View {
 
     @ViewBuilder
     private var appIcon: some View {
-        if let icon = UIImage(named: "AppIcon") {
+        if let icon = UIImage(named: "WelcomeIcon") {
             Image(uiImage: icon)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
