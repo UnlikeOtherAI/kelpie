@@ -360,9 +360,17 @@ struct BrowserView: View {
         tab.renderer.onStateChange = { [weak tab, weak browserState, weak serverState] in
             guard let tab, let browserState, let serverState else { return }
             Task { @MainActor in
+                let wasLoading = tab.isLoading
                 tab.title = tab.renderer.currentTitle.isEmpty ? "New Tab" : tab.renderer.currentTitle
                 tab.currentURL = tab.renderer.currentURL?.absoluteString ?? ""
                 tab.isLoading = tab.renderer.isLoading
+                sync(browserState: browserState, from: tab.renderer)
+                // Trigger favicon fetch when load completes (stored-state transition)
+                if wasLoading && !tab.isLoading, !tab.currentURL.isEmpty {
+                    FaviconExtractor.extract(from: tab.renderer) { [weak tab] image in
+                        tab?.favicon = image
+                    }
+                }
                 // Only sync browserState when this tab is still the active renderer
                 guard serverState.wkRenderer === tab.renderer else { return }
                 sync(browserState: browserState, from: tab.renderer)

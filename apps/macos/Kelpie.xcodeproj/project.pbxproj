@@ -48,6 +48,7 @@
 		7B9AFE78B45F9BDE1376442E /* ConsoleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78906A0BAF9128FDE0823BE4 /* ConsoleHandler.swift */; };
 		7D2A8BF2E3A83FF76E052EF7 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 445AA6C28445CBA942E6BEF0 /* BookmarkStore.swift */; };
 		C4A7B8D2E9F01234567890CD /* TabStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A7B8D2E9F01234567890AB /* TabStore.swift */; };
+		FA01234567890ABCDEF01234 /* FaviconExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01234567890ABCDEF01235 /* FaviconExtractor.swift */; };
 		818EDC831C382C3B4AF0BAB6 /* AIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C572C09F8D76279F28B1342 /* AIManager.swift */; };
 		86236C1CDA2709D12451F957 /* InferenceHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B5A7BFB995417D32420CB0 /* InferenceHarness.swift */; };
 		8882FD2F27FE96A3F5F42AF8 /* DOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D3DCAD6C6B3FDA9D44E7E1 /* DOMHandler.swift */; };
@@ -122,6 +123,7 @@
 		436A6AEA38D754ACEFE7DD71 /* ToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarView.swift; sourceTree = "<group>"; };
 		445AA6C28445CBA942E6BEF0 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		C4A7B8D2E9F01234567890AB /* TabStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStore.swift; sourceTree = "<group>"; };
+		FA01234567890ABCDEF01235 /* FaviconExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaviconExtractor.swift; sourceTree = "<group>"; };
 		467404926A382E0B8297DCAA /* Snapshot3DHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snapshot3DHandler.swift; sourceTree = "<group>"; };
 		4AAD0796D10DE23B652F3F43 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		50514DB8C2D787EBE4AF3305 /* NetworkInspectorHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInspectorHandler.swift; sourceTree = "<group>"; };
@@ -359,6 +361,7 @@
 			children = (
 				445AA6C28445CBA942E6BEF0 /* BookmarkStore.swift */,
 				9BA0199ABF8A784789BDC239 /* BrowserState.swift */,
+				FA01234567890ABCDEF01235 /* FaviconExtractor.swift */,
 				C4A7B8D2E9F01234567890AB /* TabStore.swift */,
 				8D796547622B0E82229F7B64 /* FeatureFlags.swift */,
 				7FE84F648BDB15E85E794E70 /* HistoryStore.swift */,
@@ -608,6 +611,7 @@
 				3CF289177780838AFCB6222B /* BrowserManagementHandler.swift in Sources */,
 				F0288C63BFECEC5F21C7362E /* BrowserState.swift in Sources */,
 				9FEFB51796B444CA61357022 /* BrowserView.swift in Sources */,
+				FA01234567890ABCDEF01234 /* FaviconExtractor.swift in Sources */,
 				396A817DAF92EDE94E56AA76 /* CEFBridge.mm in Sources */,
 				363A13589E8CE9D028236FCE /* CEFBridgeSupport.mm in Sources */,
 				AC654CA845B3F41AF6D45CB5 /* CEFRenderer.swift in Sources */,
