@@ -93,7 +93,7 @@ fun WelcomeCard(onDismiss: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Image(
-                    painter = painterResource(R.drawable.ic_launcher_foreground),
+                    painter = painterResource(R.drawable.ic_welcome_icon),
                     contentDescription = "Kelpie",
                     modifier = Modifier
                         .size(80.dp)
