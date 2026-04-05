@@ -191,24 +191,25 @@ struct AIChatPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 CollapsibleModelSection(
-                    title: "NATIVE",
+                    title: "HUGGING FACE",
                     defaultsKey: "com.kelpie.macos.ai-section-native",
                     trailing: {
                         Spacer()
-                        Button {
-                            showHFTokenPopover = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "key.fill")
-                                    .font(.system(size: 9))
-                                Text("Set HF Token")
-                                    .font(.system(size: 10, weight: .medium))
-                            }
-                            .foregroundStyle(aiState.huggingFaceToken.isEmpty ? .orange : .secondary)
-                            .contentShape(Rectangle())
+                        HStack(spacing: 4) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 9))
+                            Text("Set HF Token")
+                                .font(.system(size: 10, weight: .medium))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("browser.ai.hf-token")
+                        .foregroundStyle(aiState.huggingFaceToken.isEmpty ? .orange : .secondary)
+                        .overlay(
+                            AppKitInvisibleButton(
+                                accessibilityID: "browser.ai.hf-token",
+                                accessibilityLabel: "Set HF Token"
+                            ) {
+                                showHFTokenPopover = true
+                            }
+                        )
                         .popover(isPresented: $showHFTokenPopover, arrowEdge: .bottom) {
                             HFTokenPopover(token: $aiState.huggingFaceToken)
                         }
