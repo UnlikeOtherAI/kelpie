@@ -82,13 +82,7 @@ final class HistoryStore: ObservableObject {
     }
 
     func record(url: String, title: String) {
-        guard let storeHandle, !url.isEmpty else { return }
-        // Remove any existing entry for this URL so it moves to the top.
-        if entries.contains(where: { $0.url == url }) {
-            entries.removeAll { $0.url == url }
-            let json = Self.makeJSONString(from: entries.map(Self.persistedJSONObject)) ?? "[]"
-            json.withCString { kelpie_history_store_load_json(storeHandle, $0) }
-        }
+        guard let storeHandle else { return }
         url.withCString { urlPointer in
             title.withCString { titlePointer in
                 kelpie_history_store_record(storeHandle, urlPointer, titlePointer)
@@ -132,7 +126,7 @@ final class HistoryStore: ObservableObject {
                 "id": entry.id.uuidString,
                 "url": entry.url,
                 "title": entry.title,
-                "timestamp": Self.iso8601Formatter.string(from: entry.timestamp),
+                "timestamp": Self.iso8601Formatter.string(from: entry.timestamp)
             ]
         }
     }
@@ -196,7 +190,7 @@ final class HistoryStore: ObservableObject {
             "id": entry.id.uuidString,
             "url": entry.url,
             "title": entry.title,
-            "timestamp": iso8601Formatter.string(from: entry.timestamp),
+            "timestamp": iso8601Formatter.string(from: entry.timestamp)
         ]
     }
 

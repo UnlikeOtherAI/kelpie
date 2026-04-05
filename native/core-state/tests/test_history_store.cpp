@@ -20,16 +20,17 @@ void TestEmptyAndClear() {
 void TestDedupAndLatestTitleUpdate() {
   kelpie::HistoryStore store;
   store.Record("https://one.test", "One");
-  store.Record("https://one.test", "Ignored duplicate");
   store.Record("https://two.test", "Two");
-  store.UpdateLatestTitle("https://two.test", "   Updated Two   ");
-  store.UpdateLatestTitle("https://one.test", "Should not apply");
+  // Revisiting one.test should remove the earlier entry and move it to top.
+  store.Record("https://one.test", "One Again");
+  store.UpdateLatestTitle("https://one.test", "   One Updated   ");
+  store.UpdateLatestTitle("https://two.test", "Should not apply");
 
   const json entries = json::parse(store.ToJson());
   assert(entries.size() == 2);
-  assert(entries[0]["url"] == "https://two.test");
-  assert(entries[0]["title"] == "Updated Two");
-  assert(entries[1]["url"] == "https://one.test");
+  assert(entries[0]["url"] == "https://one.test");
+  assert(entries[0]["title"] == "One Updated");
+  assert(entries[1]["url"] == "https://two.test");
 }
 
 void TestCapacityAndLoadJson() {
@@ -58,16 +59,18 @@ void TestCApiRoundTrip() {
   assert(store != nullptr);
 
   kelpie_history_store_record(store, "https://ffi.test/1", "One");
-  kelpie_history_store_record(store, "https://ffi.test/1", "Duplicate ignored");
   kelpie_history_store_record(store, "https://ffi.test/2", "Two");
-  kelpie_history_store_update_latest_title(store, "https://ffi.test/2", "  Updated Two  ");
+  // Revisit /1 — should move to top, leaving only 2 entries.
+  kelpie_history_store_record(store, "https://ffi.test/1", "One Again");
+  kelpie_history_store_update_latest_title(store, "https://ffi.test/1", "  Updated One  ");
 
   char* payload = kelpie_history_store_to_json(store);
   assert(payload != nullptr);
   const json entries = json::parse(payload);
   kelpie_free_string(payload);
   assert(entries.size() == 2);
-  assert(entries[0]["title"] == "Updated Two");
+  assert(entries[0]["url"] == "https://ffi.test/1");
+  assert(entries[0]["title"] == "Updated One");
 
   kelpie_history_store_destroy(store);
 }

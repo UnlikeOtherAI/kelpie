@@ -1,6 +1,7 @@
 #include "kelpie/history_store.h"
 
 #include <algorithm>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
@@ -23,10 +24,15 @@ json HistoryEntryToJson(const HistoryEntry& entry) {
 }  // namespace
 
 void HistoryStore::Record(const std::string& url, const std::string& title) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (!entries_.empty() && entries_.back().url == url) {
+  if (url.empty() || url == "about:blank") {
     return;
   }
+  std::lock_guard<std::mutex> lock(mutex_);
+  // Remove any existing entry for this URL so revisiting moves it to the top.
+  entries_.erase(
+      std::remove_if(entries_.begin(), entries_.end(),
+                     [&url](const HistoryEntry& e) { return e.url == url; }),
+      entries_.end());
 
   entries_.push_back(HistoryEntry{
       store_support::GenerateUuidV4(),
@@ -63,12 +69,14 @@ void HistoryStore::LoadJson(const std::string& json_text) {
 
   std::vector<HistoryEntry> loaded;
   if (parsed.is_array()) {
+    // JSON is exported newest-first; skipping duplicate URLs keeps the most recent visit.
+    std::unordered_set<std::string> seen_urls;
     for (const auto& item : parsed) {
       if (!item.is_object()) {
         continue;
       }
       const std::string url = store_support::StringOrDefault(item, {"url"});
-      if (url.empty()) {
+      if (url.empty() || !seen_urls.insert(url).second) {
         continue;
       }
       loaded.push_back(HistoryEntry{
