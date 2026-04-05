@@ -6,6 +6,12 @@ final class HandlerContext {
     var renderer: (any RendererEngine)?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
+
+    /// Populated by BrowserView so tab handlers can drive the full tab lifecycle.
+    var tabStore: TabStore?
+    var onNewTab: (() -> Tab)? = nil
+    var onSwitchTab: ((UUID) -> Void)? = nil
+    var onCloseTab: ((UUID) -> Void)? = nil
     private var sharedCookiePoller: Timer?
     private var lastSharedCookieSignature: String = ""
     private var lastSharedCookieModifiedAt: Date?
@@ -155,6 +161,17 @@ final class HandlerContext {
         })();
         """
         try? await evaluateJS(js)
+    }
+
+    /// Returns a structured error for any operation that requires WebKit when CEF is active.
+    func cefUnsupportedError(feature: String) -> [String: Any] {
+        errorResponse(
+            code: "WEBKIT_ONLY",
+            message: "\(feature) is not available in Chromium (CEF) mode. " +
+                "CEF is a single-renderer testing engine — \(feature) requires WebKit. " +
+                "To use this feature, switch first: " +
+                "kelpie_set_renderer({\"engine\": \"webkit\"})"
+        )
     }
 
     func load(url: URL) {

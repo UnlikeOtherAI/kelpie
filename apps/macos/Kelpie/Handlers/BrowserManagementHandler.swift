@@ -54,11 +54,11 @@ struct BrowserManagementHandler {
             successResponse(["enabled": body["enabled"] ?? true])
         }
 
-        // Tabs (stub — full implementation needs TabManager)
+        // Tabs
         router.register("get-tabs") { _ in await getTabs() }
-        router.register("new-tab") { body in successResponse(["tab": ["id": 0, "url": body["url"] ?? "", "title": "", "active": true], "tabCount": 1]) }
-        router.register("switch-tab") { _ in successResponse(["tab": ["id": 0, "url": "", "title": "", "active": true]]) }
-        router.register("close-tab") { _ in successResponse(["closed": 1, "tabCount": 1]) }
+        router.register("new-tab") { body in await newTab(body) }
+        router.register("switch-tab") { body in await switchTab(body) }
+        router.register("close-tab") { body in await closeTab(body) }
     }
 
     // MARK: - Cookies
@@ -318,8 +318,92 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func getTabs() async -> [String: Any] {
-        guard context.renderer != nil else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        let tab: [String: Any] = ["id": 0, "url": context.currentURL?.absoluteString ?? "", "title": context.currentTitle, "active": true]
-        return successResponse(["tabs": [tab], "count": 1, "activeTab": 0])
+        if context.renderer?.engineName == "chromium" {
+            return context.cefUnsupportedError(feature: "Tab management")
+        }
+        guard let store = context.tabStore else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        }
+        let tabs: [[String: Any]] = store.tabs.map { tab in
+            [
+                "id": tab.id.uuidString,
+                "url": tab.currentURL,
+                "title": tab.title,
+                "active": tab.id == store.activeTabID,
+                "isLoading": tab.isLoading
+            ]
+        }
+        return successResponse([
+            "tabs": tabs,
+            "count": tabs.count,
+            "activeTab": store.activeTabID?.uuidString ?? NSNull()
+        ])
+    }
+
+    @MainActor
+    private func newTab(_ body: [String: Any]) async -> [String: Any] {
+        if context.renderer?.engineName == "chromium" {
+            return context.cefUnsupportedError(feature: "Tab management")
+        }
+        guard let makeTab = context.onNewTab else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        }
+        let tab = makeTab()
+        if let urlString = body["url"] as? String,
+           let url = URL(string: urlString) {
+            context.load(url: url)
+        }
+        guard let store = context.tabStore else {
+            return successResponse(["tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title], "tabCount": 1])
+        }
+        return successResponse([
+            "tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title],
+            "tabCount": store.tabs.count
+        ])
+    }
+
+    @MainActor
+    private func switchTab(_ body: [String: Any]) async -> [String: Any] {
+        if context.renderer?.engineName == "chromium" {
+            return context.cefUnsupportedError(feature: "Tab switching")
+        }
+        guard let store = context.tabStore,
+              let switchFn = context.onSwitchTab else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        }
+        guard let tabIdStr = body["tabId"] as? String,
+              let tabId = UUID(uuidString: tabIdStr) else {
+            return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
+        }
+        guard store.tabs.contains(where: { $0.id == tabId }) else {
+            return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \(tabIdStr)")
+        }
+        switchFn(tabId)
+        guard let tab = store.activeTab else {
+            return errorResponse(code: "SWITCH_FAILED", message: "Tab switch failed")
+        }
+        return successResponse([
+            "tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title, "active": true]
+        ])
+    }
+
+    @MainActor
+    private func closeTab(_ body: [String: Any]) async -> [String: Any] {
+        if context.renderer?.engineName == "chromium" {
+            return context.cefUnsupportedError(feature: "Tab management")
+        }
+        guard let store = context.tabStore,
+              let closeFn = context.onCloseTab else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        }
+        guard let tabIdStr = body["tabId"] as? String,
+              let tabId = UUID(uuidString: tabIdStr) else {
+            return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
+        }
+        guard store.tabs.contains(where: { $0.id == tabId }) else {
+            return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \(tabIdStr)")
+        }
+        closeFn(tabId)
+        return successResponse(["closed": tabIdStr, "tabCount": store.tabs.count])
     }
 }

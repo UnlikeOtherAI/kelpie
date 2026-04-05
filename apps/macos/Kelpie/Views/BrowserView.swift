@@ -244,6 +244,25 @@ struct BrowserView: View {
         }
         .onAppear {
             connectNewTab(tabStore.tabs[0])
+            // Wire TabStore into HandlerContext for MCP tab operations
+            serverState.handlerContext.tabStore = tabStore
+            serverState.handlerContext.onNewTab = {
+                let tab = tabStore.addTab()
+                serverState.setActiveWebKitRenderer(tab.renderer)
+                return tab
+            }
+            serverState.handlerContext.onSwitchTab = { id in
+                tabStore.selectTab(id: id)
+                if let tab = tabStore.activeTab {
+                    serverState.setActiveWebKitRenderer(tab.renderer)
+                }
+            }
+            serverState.handlerContext.onCloseTab = { id in
+                tabStore.closeTab(id: id)
+                if let tab = tabStore.activeTab {
+                    serverState.setActiveWebKitRenderer(tab.renderer)
+                }
+            }
             // Remove focus from URL bar on launch
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)

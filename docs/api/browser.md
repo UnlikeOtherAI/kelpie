@@ -68,7 +68,19 @@ When set to `"queue"`, dialogs are captured and returned by `getDialog` instead 
 
 ## Tabs
 
-> **Implementation note:** Neither WKWebView nor Android WebView has a built-in tab system. The app manages multiple WebView instances internally — creating, switching, and destroying them. This is a significant implementation effort but provides full control over tab lifecycle and memory.
+Tab management is **WebKit-only**. In Chromium (CEF) mode, all tab endpoints return:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "WEBKIT_ONLY",
+    "message": "Tab management is not available in Chromium (CEF) mode. ..."
+  }
+}
+```
+
+Switch to WebKit first: `kelpie_set_renderer({"engine": "webkit"})`
 
 ### `getTabs`
 List all open tabs.
@@ -80,63 +92,59 @@ Response:
 {
   "success": true,
   "tabs": [
-    {"id": 0, "url": "https://example.com", "title": "Example", "active": true},
-    {"id": 1, "url": "https://example.com/about", "title": "About", "active": false}
+    {"id": "550e8400-e29b-41d4-a716-446655440000", "url": "https://example.com", "title": "Example", "active": true, "isLoading": false},
+    {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "url": "https://example.com/about", "title": "About", "active": false, "isLoading": false}
   ],
   "count": 2,
-  "activeTab": 0
+  "activeTab": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
 ### `newTab`
-Open a new tab.
+Open a new tab, optionally navigating to a URL.
 
 ```json
 POST /v1/new-tab
-{
-  "url": "https://example.com/page"  // optional, blank tab if omitted
-}
+{"url": "https://example.com/page"}  // optional
 
 Response:
 {
   "success": true,
-  "tab": {"id": 2, "url": "https://example.com/page", "title": "Page"},
+  "tab": {"id": "...", "url": "https://example.com/page", "title": ""},
   "tabCount": 3
 }
 ```
 
 ### `switchTab`
-Switch to a tab by ID.
+Switch the active tab by UUID.
 
 ```json
 POST /v1/switch-tab
-{
-  "tabId": 1
-}
+{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"}
 
 Response:
 {
   "success": true,
-  "tab": {"id": 1, "url": "https://example.com/about", "title": "About"}
+  "tab": {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "url": "https://example.com/about", "title": "About", "active": true}
 }
 ```
 
 ### `closeTab`
-Close a tab by ID.
+Close a tab by UUID.
 
 ```json
 POST /v1/close-tab
-{
-  "tabId": 1
-}
+{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"}
 
 Response:
 {
   "success": true,
-  "closed": 1,
-  "tabCount": 2
+  "closed": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "tabCount": 1
 }
 ```
+
+If the last tab is closed, a new blank tab replaces it — `tabCount` will be `1`, not `0`.
 
 ---
 
