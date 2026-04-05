@@ -157,13 +157,6 @@ final class TabBarContainerView: NSView {
         super.init(frame: frame)
         wantsLayer = true
 
-        // Bottom border
-        let border = CALayer()
-        border.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.5).cgColor
-        border.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
-        border.frame = CGRect(x: 0, y: frame.height - 1, width: frame.width, height: 1)
-        layer?.addSublayer(border)
-
         // Scroll view — no vertical scroller, clipping
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
@@ -321,6 +314,10 @@ final class TabPillView: NSView {
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
+        tab.$currentURL
+            .sink { [weak self] _ in self?.refreshContent() }
+            .store(in: &cancellables)
+
         tab.$favicon
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
@@ -339,8 +336,23 @@ final class TabPillView: NSView {
     private func refreshContent() {
         titleField.stringValue = tab.title
 
+        // Start page: show star icon instead of letter avatar
+        if tab.currentURL.isEmpty {
+            faviconView.image = NSImage(
+                systemSymbolName: "star.fill",
+                accessibilityDescription: "Start Page"
+            )?.withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+            )
+            faviconView.contentTintColor = NSColor.systemYellow
+            faviconView.isHidden = false
+            letterAvatar.isHidden = true
+            return
+        }
+
         if let favicon = tab.favicon {
             faviconView.image = favicon
+            faviconView.contentTintColor = nil
             faviconView.isHidden = false
             letterAvatar.isHidden = true
         } else {
