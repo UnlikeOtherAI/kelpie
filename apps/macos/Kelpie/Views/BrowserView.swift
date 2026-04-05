@@ -457,7 +457,7 @@ struct BrowserView: View {
             stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale
         ) {
             ZStack {
-                RendererContainerView(serverState: serverState, rendererState: rendererState)
+                RendererContainerView(serverState: serverState, rendererState: rendererState, tabStore: tabStore)
 
                 if rendererState.isSwitching {
                     Color.black.opacity(0.12)
@@ -964,6 +964,7 @@ private struct ResolutionTitlebarBadge: View {
 struct RendererContainerView: NSViewRepresentable {
     @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
+    @ObservedObject var tabStore: TabStore
 
     final class Coordinator {
         var attachedEngine: RendererState.Engine?
@@ -1012,6 +1013,25 @@ struct RendererContainerView: NSViewRepresentable {
 
     func updateNSView(_ container: NSView, context: Context) {
         attachActiveRenderer(to: container, coordinator: context.coordinator)
+        let nonCEFCount = container.subviews.filter {
+            !NSStringFromClass(type(of: $0)).contains("CEF")
+        }.count
+        if nonCEFCount > tabStore.tabs.count {
+            removeClosedTabViews(from: container)
+        }
+    }
+
+    /// Removes subviews that belong to tabs that no longer exist.
+    /// CEF views are never removed — only WKWebView subviews are eligible.
+    private func removeClosedTabViews(from container: NSView) {
+        let activeViews = Set(tabStore.tabs.map { ObjectIdentifier($0.renderer.makeView()) })
+        for subview in container.subviews {
+            let isCEF = NSStringFromClass(type(of: subview)).contains("CEF")
+            guard !isCEF else { continue }
+            if !activeViews.contains(ObjectIdentifier(subview)) {
+                subview.removeFromSuperview()
+            }
+        }
     }
 
     private func attachActiveRenderer(to container: NSView, coordinator: Coordinator) {
@@ -1025,9 +1045,11 @@ struct RendererContainerView: NSViewRepresentable {
         activeView.autoresizingMask = [.width, .height]
 
         // Add the view if it isn't already a subview.
-        // We NEVER remove renderer views from the hierarchy — removing and
-        // re-adding CEF's NSView corrupts its internal compositing state and
-        // causes a CrBrowserMain crash. Use isHidden to switch instead.
+        // Active renderer views are never removed — only hidden/shown.
+        // CEF's NSView must NEVER be removed: re-adding it corrupts
+        // its compositing state and crashes CrBrowserMain.
+        // Closed WKWebView tab views ARE removed (by removeClosedTabViews)
+        // to free memory and WKWebView process slots.
         if activeView.superview !== container {
             container.addSubview(activeView)
         }
