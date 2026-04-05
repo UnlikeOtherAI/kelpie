@@ -2,6 +2,12 @@ import chalk from "chalk";
 import Table from "cli-table3";
 import type { OutputFormat, DiscoveredDevice } from "../types.js";
 
+function stringify(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value as string | number | boolean);
+}
+
 function formatPlatform(device: DiscoveredDevice): string {
   if (device.platform === "linux" && device.runtimeMode) {
     return `${device.platform} (${device.runtimeMode})`;
@@ -25,10 +31,10 @@ function formatText(data: unknown): string {
   if (data === null || data === undefined) return "";
   if (typeof data === "object") {
     return Object.entries(data as Record<string, unknown>)
-      .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`)
+      .map(([k, v]) => `${k}: ${stringify(v)}`)
       .join("\n");
   }
-  return String(data);
+  return stringify(data);
 }
 
 function formatTable(data: unknown): string {
@@ -41,14 +47,14 @@ function formatTable(data: unknown): string {
   }
 
   if ("browsers" in (data as Record<string, unknown>)) {
-    const list = (data as { browsers: Array<Record<string, unknown>> }).browsers;
+    const list = (data as { browsers: Record<string, unknown>[] }).browsers;
     return formatBrowserTable(list);
   }
 
   // Generic object
   const table = new Table();
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    table.push({ [key]: typeof value === "object" ? JSON.stringify(value) : String(value ?? "") });
+    table.push({ [key]: stringify(value) });
   }
   return table.toString();
 }
@@ -68,7 +74,7 @@ export function formatDeviceTable(devices: DiscoveredDevice[]): string {
       d.model,
       d.ip,
       d.port,
-      `${d.width}x${d.height}`,
+      `${String(d.width)}x${String(d.height)}`,
       d.id.slice(0, 8) + "...",
     ]);
   }
@@ -76,7 +82,7 @@ export function formatDeviceTable(devices: DiscoveredDevice[]): string {
   return table.toString();
 }
 
-function formatBrowserTable(browsers: Array<Record<string, unknown>>): string {
+function formatBrowserTable(browsers: Record<string, unknown>[]): string {
   if (browsers.length === 0) return chalk.yellow("No browsers found");
 
   const table = new Table({
@@ -86,12 +92,12 @@ function formatBrowserTable(browsers: Array<Record<string, unknown>>): string {
 
   for (const browser of browsers) {
     table.push([
-      String(browser.name ?? ""),
-      String(browser.platform ?? ""),
-      String(browser.port ?? ""),
-      String(browser.reachable ?? false),
-      String(browser.appPath ?? ""),
-      String(browser.lastLaunchedAt ?? ""),
+      stringify(browser.name),
+      stringify(browser.platform),
+      stringify(browser.port),
+      stringify(browser.reachable),
+      stringify(browser.appPath),
+      stringify(browser.lastLaunchedAt),
     ]);
   }
 

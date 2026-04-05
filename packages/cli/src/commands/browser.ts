@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { Command } from "commander";
 import { print } from "../output/formatter.js";
+import type { GlobalOptions } from "../types.js";
 import {
   clearRunningBrowser,
   getBrowserAlias,
@@ -21,14 +22,14 @@ async function isReachable(port?: number): Promise<boolean> {
     return false;
   }
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/health`);
+    const response = await fetch(`http://127.0.0.1:${String(port)}/health`);
     return response.ok;
   } catch {
     return false;
   }
 }
 
-async function chooseLaunchPort(requestedPort?: string): Promise<number> {
+function chooseLaunchPort(requestedPort?: string): number {
   if (requestedPort) {
     return Number(requestedPort);
   }
@@ -43,7 +44,7 @@ export function registerBrowser(program: Command): void {
     .option("--platform <platform>", "Alias platform", os.platform() === "darwin" ? "macos" : "linux")
     .option("--app-path <path>", "Explicit app path")
     .action(async (name: string, opts: { platform: "macos" | "linux" | "windows"; appPath?: string }) => {
-      const globals = program.opts();
+      const globals = program.opts<GlobalOptions>();
       await upsertBrowserAlias(name, { platform: opts.platform, appPath: opts.appPath });
       print({ success: true, name, platform: opts.platform, appPath: opts.appPath ?? null }, globals.format);
     });
@@ -51,7 +52,7 @@ export function registerBrowser(program: Command): void {
   browser
     .command("list")
     .action(async () => {
-      const globals = program.opts();
+      const globals = program.opts<GlobalOptions>();
       const store = await loadBrowserStore();
       const browsers = await Promise.all(
         Object.entries(store.aliases).map(async ([name, alias]) => {
@@ -72,7 +73,7 @@ export function registerBrowser(program: Command): void {
   browser
     .command("inspect <name>")
     .action(async (name: string) => {
-      const globals = program.opts();
+      const globals = program.opts<GlobalOptions>();
       const store = await loadBrowserStore();
       const alias = store.aliases[name];
       if (!alias) {
@@ -94,7 +95,7 @@ export function registerBrowser(program: Command): void {
   browser
     .command("remove <name>")
     .action(async (name: string) => {
-      const globals = program.opts();
+      const globals = program.opts<GlobalOptions>();
       await removeBrowserAlias(name);
       print({ success: true, removed: name }, globals.format);
     });
@@ -103,7 +104,7 @@ export function registerBrowser(program: Command): void {
     .command("launch <name>")
     .option("--port <port>", "Port to use for the launched browser")
     .action(async (name: string, opts: { port?: string }) => {
-      const globals = program.opts();
+      const globals = program.opts<GlobalOptions>();
       const alias = await getBrowserAlias(name);
       if (!alias) {
         print({ success: false, error: { code: "BROWSER_NOT_REGISTERED", message: `No browser alias named "${name}"` } }, globals.format);
@@ -111,7 +112,7 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
-      const port = await chooseLaunchPort(opts.port);
+      const port = chooseLaunchPort(opts.port);
       if (alias.platform !== "macos") {
         await setRunningBrowser(name, { port, lastLaunchedAt: new Date().toISOString() });
         print({

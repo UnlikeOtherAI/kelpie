@@ -13,8 +13,7 @@ export function explainCommand(command: string): string {
   const mcpName = `kelpie_${command.replace(/-/g, "_")}`;
   const tool = [...browserTools, ...cliTools].find((t) => t.name === mcpName);
   if (tool) {
-    const cmd = command;
-    const m = commandMetadata[cmd];
+    const m = commandMetadata[command];
     return formatExplanation(command, m?.explanation ?? tool.description, m?.related);
   }
 

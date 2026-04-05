@@ -39,7 +39,7 @@ export async function deviceRequest(
   const url = `http://${device.ip}:${device.port}/v1/${method}`;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => { controller.abort(); }, 15000);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

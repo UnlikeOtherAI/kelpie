@@ -57,8 +57,10 @@ export async function upsertBrowserAlias(name: string, alias: BrowserAlias): Pro
 
 export async function removeBrowserAlias(name: string): Promise<void> {
   const store = await loadBrowserStore();
-  delete store.aliases[name];
-  delete store.running[name];
+  const { [name]: _alias, ...remainingAliases } = store.aliases;
+  const { [name]: _running, ...remainingRunning } = store.running;
+  store.aliases = remainingAliases;
+  store.running = remainingRunning;
   await saveBrowserStore(store);
 }
 
@@ -70,7 +72,8 @@ export async function setRunningBrowser(name: string, running: RunningBrowser): 
 
 export async function clearRunningBrowser(name: string): Promise<void> {
   const store = await loadBrowserStore();
-  delete store.running[name];
+  const { [name]: _removed, ...remaining } = store.running;
+  store.running = remaining;
   await saveBrowserStore(store);
 }
 

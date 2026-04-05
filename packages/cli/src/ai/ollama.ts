@@ -28,12 +28,12 @@ export interface OllamaGenerateResponse {
 }
 
 interface OllamaTagsResponse {
-  models?: Array<{
+  models?: {
     name: string;
     size: number;
     digest: string;
     modified_at: string;
-  }>;
+  }[];
 }
 
 interface RawOllamaGenerateResponse {
@@ -126,7 +126,7 @@ export async function ollamaGenerate(
   });
 
   if (!response.ok) {
-    throw new Error(`OLLAMA_ERROR: ${response.status} ${response.statusText}`);
+    throw new Error(`OLLAMA_ERROR: ${String(response.status)} ${response.statusText}`);
   }
 
   const data = (await response.json()) as RawOllamaGenerateResponse;

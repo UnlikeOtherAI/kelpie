@@ -18,7 +18,7 @@ export function resolveAppPath(alias: Pick<BrowserAlias, "platform" | "appPath">
 export async function allocateBrowserPort(requested?: number): Promise<number> {
   if (requested !== undefined) {
     if (RESERVED_PORTS.has(requested)) {
-      throw new Error(`Port ${requested} is reserved and cannot be used`);
+      throw new Error(`Port ${String(requested)} is reserved and cannot be used`);
     }
     return requested;
   }
@@ -34,8 +34,8 @@ export async function allocateBrowserPort(requested?: number): Promise<number> {
 function isPortFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
-    server.once("error", () => resolve(false));
-    server.once("listening", () => server.close(() => resolve(true)));
+    server.once("error", () => { resolve(false); });
+    server.once("listening", () => server.close(() => { resolve(true); }));
     server.listen(port, "127.0.0.1");
   });
 }

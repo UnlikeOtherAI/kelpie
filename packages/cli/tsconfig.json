@@ -9,5 +9,5 @@
       "@unlikeotherai/kelpie-shared": ["../shared/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

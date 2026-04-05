@@ -25,15 +25,32 @@ export interface GroupResult<T = unknown> {
 export interface SmartQueryResult<T = unknown> {
   command: string;
   deviceCount: number;
-  found: Array<{ device: DeviceMeta } & T>;
-  notFound: Array<{ device: DeviceMeta; reason: string }>;
+  found: ({ device: DeviceMeta } & T)[];
+  notFound: { device: DeviceMeta; reason: string }[];
+}
+
+function extractError(data: unknown): { code: string; message: string } | undefined {
+  if (typeof data === "object" && data !== null && "error" in data) {
+    const err = (data as { error: unknown }).error;
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      "message" in err &&
+      typeof (err as { code: unknown }).code === "string" &&
+      typeof (err as { message: unknown }).message === "string"
+    ) {
+      return err as { code: string; message: string };
+    }
+  }
+  return undefined;
 }
 
 function deviceMeta(d: DiscoveredDevice): DeviceMeta {
   return {
     name: d.name,
     platform: d.platform,
-    resolution: `${d.width}x${d.height}`,
+    resolution: `${String(d.width)}x${String(d.height)}`,
   };
 }
 
@@ -52,7 +69,7 @@ export async function executeGroup<T = unknown>(
         data: response.ok ? response.data : undefined,
         error: response.ok
           ? undefined
-          : ((response.data as Record<string, unknown>)?.error as { code: string; message: string }) ?? {
+          : extractError(response.data) ?? {
               code: "UNKNOWN",
               message: "Request failed",
             },
@@ -66,7 +83,7 @@ export async function executeGroup<T = unknown>(
       : ({
           device: { name: "unknown", platform: "unknown", resolution: "0x0" },
           success: false,
-          error: { code: "NETWORK_ERROR", message: r.reason?.message ?? "Unknown error" },
+          error: { code: "NETWORK_ERROR", message: r.reason instanceof Error ? r.reason.message : "Unknown error" },
         } as DeviceResult<T>),
   );
 
@@ -87,12 +104,12 @@ export async function executeSmartQuery<T extends Record<string, unknown>>(
 ): Promise<SmartQueryResult<T>> {
   const group = await executeGroup<T & { found?: boolean }>(devices, method, body, timeout);
 
-  const found: Array<{ device: DeviceMeta } & T> = [];
-  const notFound: Array<{ device: DeviceMeta; reason: string }> = [];
+  const found: ({ device: DeviceMeta } & T)[] = [];
+  const notFound: { device: DeviceMeta; reason: string }[] = [];
 
   for (const result of group.results) {
     if (result.success && result.data?.found) {
-      const { found: _f, ...rest } = result.data;
+      const { found: _foundFlag, ...rest } = result.data;
       found.push({ device: result.device, ...rest } as { device: DeviceMeta } & T);
     } else {
       notFound.push({

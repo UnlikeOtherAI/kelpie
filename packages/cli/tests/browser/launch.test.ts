@@ -15,7 +15,7 @@ describe("browser launch helpers", () => {
         resolve();
         return;
       }
-      busyServer.close(() => resolve());
+      busyServer.close(() => { resolve(); });
     });
   });
 
@@ -32,7 +32,7 @@ describe("browser launch helpers", () => {
   it("skips an occupied port during automatic allocation", async () => {
     busyServer = net.createServer();
     await new Promise<void>((resolve) => {
-      busyServer!.listen(8420, "127.0.0.1", () => resolve());
+      busyServer!.listen(8420, "127.0.0.1", () => { resolve(); });
     });
 
     const port = await allocateBrowserPort();

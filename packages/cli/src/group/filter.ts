@@ -1,6 +1,5 @@
 import type { DiscoveredDevice } from "../types.js";
 import type { Platform } from "@unlikeotherai/kelpie-shared";
-import { getDevice } from "../discovery/registry.js";
 
 export interface FilterOptions {
   platform?: Platform;

@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDevice, isDeviceReachable, deviceRequest, skipUnlessDevice } from "./setup.js";
+import { testDevice, isDeviceReachable, deviceRequest } from "./setup.js";
 
 describe("E2E: Discovery & Health", () => {
   const device = testDevice();
   let reachable = false;
-  let it_: typeof it | typeof it.skip;
 
   beforeAll(async () => {
     reachable = await isDeviceReachable(device);
-    it_ = skipUnlessDevice(reachable);
   });
 
   it("health endpoint returns ok", async () => {

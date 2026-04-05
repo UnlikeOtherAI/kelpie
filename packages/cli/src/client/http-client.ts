@@ -18,13 +18,13 @@ export async function sendCommand<T = unknown>(
   device: DiscoveredDevice,
   method: string,
   body?: Record<string, unknown>,
-  timeout: number = 10000,
+  timeout = 10000,
 ): Promise<HttpResponse<T>> {
   const kebabMethod = toKebabCase(method);
   const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
-  const url = `http://${host}:${device.port}${API_VERSION_PREFIX}${kebabMethod}`;
+  const url = `http://${host}:${String(device.port)}${API_VERSION_PREFIX}${kebabMethod}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
+  const timer = setTimeout(() => { controller.abort(); }, timeout);
 
   try {
     const response = await fetch(url, {
@@ -43,7 +43,7 @@ export async function sendCommand<T = unknown>(
         status: 408,
         data: {
           success: false,
-          error: { code: "TIMEOUT", message: `Request timed out after ${timeout}ms` },
+          error: { code: "TIMEOUT", message: `Request timed out after ${String(timeout)}ms` },
         } as T,
       };
     }

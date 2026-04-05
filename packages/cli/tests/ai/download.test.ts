@@ -47,7 +47,7 @@ describe("Hugging Face download", () => {
   it("downloads a file atomically and verifies checksum", async () => {
     const destPath = join(dir, "model.gguf");
     const content = "hello from kelpie";
-    const progress: Array<{ downloaded: number; total?: number }> = [];
+    const progress: { downloaded: number; total?: number }[] = [];
 
     globalThis.fetch = vi.fn(async () =>
       new Response(content, {

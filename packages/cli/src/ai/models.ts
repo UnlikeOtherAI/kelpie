@@ -24,7 +24,7 @@ export interface ApprovedModel {
   description: ModelDescription;
 }
 
-const APPROVED_MODELS: ReadonlyArray<ApprovedModel> = [
+const APPROVED_MODELS: readonly ApprovedModel[] = [
   {
     id: "gemma-4-e2b-q4",
     name: "Gemma 4 E2B Q4",

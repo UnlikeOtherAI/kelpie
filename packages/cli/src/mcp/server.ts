@@ -69,7 +69,7 @@ function registerCliTool(server: McpServer, tool: CliToolDef): void {
   });
 }
 
-async function handleDiscovery(method: string, params: Record<string, unknown>): Promise<{ content: Array<{ type: "text"; text: string }> }> {
+async function handleDiscovery(method: string, params: Record<string, unknown>): Promise<{ content: { type: "text"; text: string }[] }> {
   if (method === "aiModels") {
     const store = new ModelStore();
     const approved = getApprovedModels();
@@ -122,7 +122,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
   }
 
   if (method === "discover") {
-    const timeout = (params.timeout as number) ?? 3000;
+    const timeout = typeof params.timeout === "number" ? params.timeout : 3000;
     const found = await scanForDevices(timeout);
     addDevices(found);
     const devices = getAllDevices();

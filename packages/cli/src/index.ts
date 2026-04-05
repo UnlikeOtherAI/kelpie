@@ -30,4 +30,4 @@ if (llmHelpIdx !== -1) {
   process.exit(0);
 }
 
-program.parseAsync(process.argv);
+void program.parseAsync(process.argv);

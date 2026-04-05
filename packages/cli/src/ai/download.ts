@@ -69,7 +69,7 @@ async function acquireDownloadLock(lockPath: string, tmpPath: string): Promise<v
 
       const cleaned = await cleanupStaleArtifacts(lockPath, tmpPath);
       if (!cleaned) {
-        throw new Error("DOWNLOAD_IN_PROGRESS");
+        throw new Error("DOWNLOAD_IN_PROGRESS", { cause: error });
       }
     }
   }
@@ -123,17 +123,15 @@ export async function downloadModel(
   const modelDir = dirname(destPath);
   const lockPath = join(modelDir, LOCK_FILE);
   const tmpPath = `${destPath}.tmp`;
-  let lockAcquired = false;
   let fileHandle: Awaited<ReturnType<typeof open>> | undefined;
 
   await mkdir(modelDir, { recursive: true });
   await acquireDownloadLock(lockPath, tmpPath);
-  lockAcquired = true;
 
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`DOWNLOAD_FAILED: ${response.status} ${response.statusText}`);
+      throw new Error(`DOWNLOAD_FAILED: ${String(response.status)} ${response.statusText}`);
     }
 
     fileHandle = await open(tmpPath, "w");
@@ -144,6 +142,7 @@ export async function downloadModel(
 
     if (response.body) {
       const reader = response.body.getReader();
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
@@ -178,8 +177,6 @@ export async function downloadModel(
     await rm(tmpPath, { force: true });
     throw error;
   } finally {
-    if (lockAcquired) {
-      await rm(lockPath, { force: true });
-    }
+    await rm(lockPath, { force: true });
   }
 }

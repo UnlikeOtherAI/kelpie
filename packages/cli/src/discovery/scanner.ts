@@ -23,7 +23,7 @@ function parseRuntimeMode(value: string | undefined): RuntimeMode | undefined {
 }
 
 export async function scanForDevices(
-  duration: number = 3000,
+  duration = 3000,
 ): Promise<DiscoveredDevice[]> {
   const bonjour = new Bonjour();
   const devices: DiscoveredDevice[] = [];

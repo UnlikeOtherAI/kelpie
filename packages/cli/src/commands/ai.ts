@@ -66,7 +66,7 @@ export function registerAI(program: Command): void {
 
   ai.command("rm <model>")
     .description("Delete a downloaded model")
-    .action(async (modelId: string) => {
+    .action((modelId: string) => {
       const globals = getGlobals(program);
       const store = new ModelStore();
       if (!store.isDownloaded(modelId)) {

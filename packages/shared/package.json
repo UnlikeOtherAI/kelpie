@@ -12,9 +12,9 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "eslint src/ tests/"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

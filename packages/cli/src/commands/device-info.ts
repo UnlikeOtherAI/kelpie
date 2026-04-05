@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { deviceCommand, getGlobals } from "./helpers.js";
-import { getDevice, getAllDevices } from "../discovery/registry.js";
+import { getAllDevices } from "../discovery/registry.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 

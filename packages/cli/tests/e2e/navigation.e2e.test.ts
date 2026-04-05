@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDevice, isDeviceReachable, deviceRequest, skipUnlessDevice } from "./setup.js";
+import { testDevice, isDeviceReachable, deviceRequest } from "./setup.js";
 
 describe("E2E: Navigation", () => {
   const device = testDevice();

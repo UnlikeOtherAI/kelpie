@@ -443,7 +443,7 @@ export interface GetConsoleMessagesResponse extends SuccessResponse {
 }
 
 export interface GetJSErrorsResponse extends SuccessResponse {
-  errors: Array<ConsoleMessage & { type: string }>;
+  errors: (ConsoleMessage & { type: string })[];
   count: number;
 }
 
@@ -536,8 +536,8 @@ export interface GetMutationsRequest {
 export interface MutationRecord {
   type: "childList" | "attributes" | "characterData";
   target: string;
-  added?: Array<{ tag: string; class?: string; text?: string }>;
-  removed?: Array<{ tag: string; class?: string; text?: string }>;
+  added?: { tag: string; class?: string; text?: string }[];
+  removed?: { tag: string; class?: string; text?: string }[];
   attribute?: string;
   oldValue?: string | null;
   newValue?: string | null;
@@ -898,12 +898,12 @@ export interface DeviceMeta {
 export interface GroupResult<T = unknown> {
   command: string;
   deviceCount: number;
-  results: Array<{
+  results: {
     device: DeviceMeta;
     success: boolean;
     data?: T;
     error?: { code: string; message: string };
-  }>;
+  }[];
   succeeded: number;
   failed: number;
 }
@@ -911,6 +911,6 @@ export interface GroupResult<T = unknown> {
 export interface SmartQueryResult<T = unknown> {
   command: string;
   deviceCount: number;
-  found: Array<{ device: DeviceMeta } & T>;
-  notFound: Array<{ device: DeviceMeta; reason: string }>;
+  found: ({ device: DeviceMeta } & T)[];
+  notFound: { device: DeviceMeta; reason: string }[];
 }

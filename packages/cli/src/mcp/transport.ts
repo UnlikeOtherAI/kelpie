@@ -11,10 +11,10 @@ export async function startStdio(server: McpServer): Promise<void> {
 export async function startHttp(server: McpServer, port: number): Promise<void> {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID() });
 
-  const httpServer = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+  const httpServer = createServer((req, res) => {
+    const url = new URL(req.url ?? "/", `http://localhost:${String(port)}`);
     if (url.pathname === "/mcp") {
-      await transport.handleRequest(req, res);
+      void transport.handleRequest(req, res);
     } else if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok" }));
@@ -26,7 +26,7 @@ export async function startHttp(server: McpServer, port: number): Promise<void> 
 
   await server.connect(transport);
   httpServer.listen(port, () => {
-    console.error(`Kelpie MCP server listening on http://localhost:${port}/mcp`);
+    console.error(`Kelpie MCP server listening on http://localhost:${String(port)}/mcp`);
   });
 
   await new Promise<void>((resolve) => {

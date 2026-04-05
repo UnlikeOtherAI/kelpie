@@ -85,7 +85,8 @@ export class ModelStore {
 
   remove(id: string): void {
     const registry = this.readRegistry();
-    delete registry.models[id];
+    const { [id]: _removed, ...remaining } = registry.models;
+    registry.models = remaining;
 
     rmSync(this.modelDirPath(id), { recursive: true, force: true });
     this.writeRegistry(registry);

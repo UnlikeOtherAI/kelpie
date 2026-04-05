@@ -63,13 +63,14 @@ async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | 
     return undefined;
   }
 
+  const alias = store.aliases[query];
   return {
     id: `browser:${query}`,
     name: query,
     ip: "127.0.0.1",
     port: running.port,
-    platform: store.aliases[query]?.platform ?? "macos",
-    model: `Kelpie ${store.aliases[query]?.platform ?? "macos"}`,
+    platform: alias?.platform ?? "macos",
+    model: `Kelpie ${alias?.platform ?? "macos"}`,
     width: 0,
     height: 0,
     version: "0.0.0",
@@ -78,7 +79,7 @@ async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | 
 }
 
 function getDirectAddressDevice(query: string): DiscoveredDevice | undefined {
-  const match = query.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d+))?$/);
+  const match = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d+))?$/.exec(query);
   if (!match) {
     return undefined;
   }
