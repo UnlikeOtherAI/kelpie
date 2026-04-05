@@ -4,7 +4,7 @@
 
 **Goal:** Add a Safari-style pill tab bar above the renderer — pills spread to fill available width, scroll when dense, with a sliding active indicator, per-tab favicons (or letter avatars), and full per-tab navigation state.
 
-**Architecture:** Each tab owns a `WKWebViewRenderer` (independent WKWebView with history). `TabStore` is a `@StateObject` in `BrowserView`; when the active tab changes, `BrowserView` updates `serverState.handlerContext.renderer` so all existing handlers continue to work without modification. CEF remains a single shared renderer; tab switching while CEF is active navigates CEF to the new tab's URL. The tab bar is fully AppKit-backed (NSViewRepresentable) per the AGENTS.md WebView-in-window rule.
+**Architecture:** Each tab owns a `WKWebViewRenderer` (independent WKWebView with history). `TabStore` is a `@StateObject` in `BrowserView`; when the active tab changes, `BrowserView` updates `serverState.handlerContext.renderer` so all existing handlers continue to work without modification. **CEF is a single testing renderer — tabs are disabled in CEF mode.** When CEF is active, the add-tab button is hidden and a "Tabs unavailable in Chromium mode" label replaces the tab strip. Switching back to WebKit restores the full tab bar. The tab bar is fully AppKit-backed (NSViewRepresentable) per the AGENTS.md WebView-in-window rule.
 
 **Tech Stack:** Swift/SwiftUI/AppKit, WKWebView, `NSScrollView` for overflow, `NSAnimationContext` for active indicator slide.
 
@@ -718,7 +718,41 @@ to:
 RendererContainerView(serverState: serverState, rendererState: rendererState, tabStore: tabStore)
 ```
 
-### Step 5: Add Cmd+T and Cmd+W
+### Step 5: Disable tabs in CEF mode
+
+Add `isCEFActive: Bool` to `TabBarView`:
+```swift
+let isCEFActive: Bool
+```
+
+In `Coordinator.update`, at the very top before any pill work:
+```swift
+container.scrollView.isHidden = isCEFActive
+container.addButton.isHidden  = isCEFActive
+container.cefBanner.isHidden  = !isCEFActive
+guard !isCEFActive else { return }
+```
+
+In `TabBarContainerView`, add the banner as a hidden subview (added in `init`, centred):
+```swift
+let cefBanner: NSTextField = {
+    let f = NSTextField(labelWithString: "Tabs unavailable in Chromium mode")
+    f.font = .systemFont(ofSize: 11)
+    f.textColor = .secondaryLabelColor
+    f.alignment = .center
+    f.isEditable = false
+    f.isBordered = false
+    f.drawsBackground = false
+    f.translatesAutoresizingMaskIntoConstraints = false
+    return f
+}()
+```
+
+Pass `isCEFActive: rendererState.activeEngine == .chromium` from the `TabBarView` call site in `BrowserView`.
+
+Cmd+T should also be a no-op when CEF is active — in the `.onReceive(NotificationCenter…newTab)` handler, guard on `rendererState.activeEngine != .chromium`.
+
+### Step 6: Add Cmd+T and Cmd+W
 
 In `KelpieApp.swift`, inside `BrowserCommands.body`, add to the `CommandGroup(after: .newItem)`:
 
@@ -755,19 +789,22 @@ In `BrowserView.body`, add to the chain of `.onReceive` modifiers:
 }
 ```
 
-### Step 6: Build and verify
+### Step 7: Build and verify
 
 - Launch app: one tab shows in the bar
 - Cmd+T: new tab appears
 - Click a tab: URL bar updates to that tab's URL
 - Cmd+W: closes the current tab
+- Switch to Chromium renderer → tab strip disappears, banner reads "Tabs unavailable in Chromium mode"
+- Cmd+T while in Chromium → nothing happens
+- Switch back to WebKit → tab strip reappears with existing tabs intact
 
-### Step 7: Commit
+### Step 8: Commit
 
 ```bash
 git add apps/macos/Kelpie/Views/BrowserView.swift \
         apps/macos/Kelpie/KelpieApp.swift
-git commit -m "feat(macos/tabs): wire BrowserView to TabStore; Cmd+T/Cmd+W shortcuts"
+git commit -m "feat(macos/tabs): wire BrowserView to TabStore; disable tabs in CEF mode; Cmd+T/Cmd+W"
 ```
 
 ---
@@ -958,4 +995,5 @@ git commit -m "feat(macos/tabs): responsive pill spreading and overflow horizont
 7. Narrow the window below ~480pt → pills hit min width, scroll bar appears.
 8. Cmd+W → active tab closes, adjacent tab activates.
 9. Close all-but-one tab, then Cmd+W on last tab → new blank tab replaces it (never zero tabs).
-10. Switch to Chromium renderer → CEF view shown; tab switching navigates CEF, no crash.
+10. Switch to Chromium renderer → tab strip disappears, "Tabs unavailable in Chromium mode" label appears. Cmd+T does nothing. Existing WebKit tabs are preserved in memory.
+11. Switch back to WebKit → all previous tabs are restored in the bar exactly as left.
