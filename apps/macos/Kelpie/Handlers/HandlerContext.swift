@@ -12,6 +12,7 @@ final class HandlerContext {
     var onNewTab: (() -> Tab)? = nil
     var onSwitchTab: ((UUID) -> Void)? = nil
     var onCloseTab: ((UUID) -> Void)? = nil
+    var onWillLoad: (() -> Void)? = nil
     private var sharedCookiePoller: Timer?
     private var lastSharedCookieSignature: String = ""
     private var lastSharedCookieModifiedAt: Date?
@@ -175,6 +176,7 @@ final class HandlerContext {
     }
 
     func load(url: URL) {
+        onWillLoad?()
         reset3DInspectorForNavigation()
         renderer?.load(url: url)
     }

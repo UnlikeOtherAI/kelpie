@@ -337,7 +337,7 @@ final class TabPillView: NSView {
         titleField.stringValue = tab.title
 
         // Start page: show star icon instead of letter avatar
-        if tab.currentURL.isEmpty {
+        if tab.isStartPage {
             faviconView.image = NSImage(
                 systemSymbolName: "star.fill",
                 accessibilityDescription: "Start Page"

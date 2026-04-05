@@ -11,6 +11,7 @@ final class Tab: ObservableObject, Identifiable {
     @Published var currentURL: String = ""
     @Published var isLoading: Bool = false
     @Published var favicon: NSImage? = nil
+    @Published var isStartPage: Bool = true
 
     init() {
         self.renderer = WKWebViewRenderer()
@@ -33,7 +34,7 @@ final class TabStore: ObservableObject {
     var activeTab: Tab? { tabs.first { $0.id == activeTabID } }
 
     // Keyed by tab ID so unbind() can cancel cleanly.
-    private var faviconSinks: [UUID: AnyCancellable] = [:]
+    private var tabSinks: [UUID: AnyCancellable] = [:]
 
     init() {
         let initial = Tab()
@@ -83,13 +84,13 @@ final class TabStore: ObservableObject {
             tab.currentURL = renderer.currentURL?.absoluteString ?? ""
             tab.isLoading = renderer.isLoading
         }
-        faviconSinks[tab.id] = tab.$favicon
-            .dropFirst()
+        tabSinks[tab.id] = tab.$favicon.dropFirst().map { _ in () }
+            .merge(with: tab.$isStartPage.dropFirst().map { _ in () })
             .sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     private func unbind(_ tab: Tab) {
         tab.renderer.onStateChange = nil
-        faviconSinks.removeValue(forKey: tab.id)
+        tabSinks.removeValue(forKey: tab.id)
     }
 }

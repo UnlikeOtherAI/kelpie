@@ -280,6 +280,9 @@ struct BrowserView: View {
                     serverState.setActiveWebKitRenderer(tab.renderer)
                 }
             }
+            serverState.handlerContext.onWillLoad = { [weak tabStore] in
+                tabStore?.activeTab?.isStartPage = false
+            }
             // Remove focus from URL bar on launch
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
@@ -519,14 +522,14 @@ struct BrowserView: View {
                 // Start page overlay — shown when the active tab has no URL.
                 // The WKWebView is hidden by RendererContainerView.updateNSView in
                 // this state, so SwiftUI buttons here receive mouse events normally.
-                if tabStore.activeTab?.currentURL.isEmpty == true {
+                if tabStore.activeTab?.isStartPage == true {
                     StartPageView(
                         bookmarkStore: .shared,
                         historyStore: .shared,
                         onNavigate: navigate
                     )
                     .transition(.opacity)
-                    .animation(.easeOut(duration: 0.15), value: tabStore.activeTab?.currentURL.isEmpty)
+                    .animation(.easeOut(duration: 0.15), value: tabStore.activeTab?.isStartPage)
                 }
 
                 if rendererState.isSwitching {
@@ -1115,7 +1118,7 @@ struct RendererContainerView: NSViewRepresentable {
         // Hide the WKWebView when the active tab is on the start page so the
         // SwiftUI StartPageView overlay can receive mouse events unobstructed.
         if let activeTab = tabStore.activeTab {
-            activeTab.renderer.makeView().isHidden = activeTab.currentURL.isEmpty
+            activeTab.renderer.makeView().isHidden = activeTab.isStartPage
         }
     }
 
