@@ -27,11 +27,16 @@ void HistoryStore::Record(const std::string& url, const std::string& title) {
   if (url.empty() || url == "about:blank") {
     return;
   }
+  const std::string normalized = store_support::NormalizeUrl(url);
   std::lock_guard<std::mutex> lock(mutex_);
   // Remove any existing entry for this URL so revisiting moves it to the top.
+  // Use normalized form so that trailing-slash, empty-query, and empty-fragment
+  // variants are treated as the same URL.
   entries_.erase(
       std::remove_if(entries_.begin(), entries_.end(),
-                     [&url](const HistoryEntry& e) { return e.url == url; }),
+                     [&normalized](const HistoryEntry& e) {
+                       return store_support::NormalizeUrl(e.url) == normalized;
+                     }),
       entries_.end());
 
   entries_.push_back(HistoryEntry{
@@ -76,7 +81,11 @@ void HistoryStore::LoadJson(const std::string& json_text) {
         continue;
       }
       const std::string url = store_support::StringOrDefault(item, {"url"});
-      if (url.empty() || !seen_urls.insert(url).second) {
+      if (url.empty()) {
+        continue;
+      }
+      const std::string normalized = store_support::NormalizeUrl(url);
+      if (!seen_urls.insert(normalized).second) {
         continue;
       }
       loaded.push_back(HistoryEntry{

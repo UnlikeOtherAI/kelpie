@@ -135,4 +135,87 @@ inline std::optional<T> OptionalValue(const json& object, const char* key) {
   return it->get<T>();
 }
 
+// Normalizes a URL for equality comparison used in dedup.
+//
+// Applies only safe, lossless transformations:
+// - strips a trailing slash from the path (unless the path is "/" alone)
+// - removes an empty query string (? with no parameters)
+// - removes an empty fragment (# with no value)
+//
+// The original URL is always preserved; this function is only used for
+// keying dedup lookups so that equivalent URLs collapse correctly.
+inline std::string NormalizeUrl(std::string_view url) {
+  if (url.empty()) {
+    return std::string();
+  }
+
+  // Find the first '?' or '#' to split base from query/fragment.
+  std::size_t sep = std::string_view::npos;
+  std::size_t query_pos = url.find('?');
+  std::size_t fragment_pos = url.find('#');
+  if (query_pos != std::string_view::npos && fragment_pos != std::string_view::npos) {
+    sep = std::min(query_pos, fragment_pos);
+  } else if (query_pos != std::string_view::npos) {
+    sep = query_pos;
+  } else {
+    sep = fragment_pos;
+  }
+
+  std::string result;
+  if (sep == std::string_view::npos) {
+    // No query or fragment — normalize in-place.
+    result.assign(url);
+  } else {
+    result.assign(url.substr(0, sep));
+  }
+
+  // Strip trailing slash only if there is content before it.
+  // This keeps "https://host/" as "https://host" but leaves "/" as "/".
+  if (result.size() >= 2 && result.back() == '/') {
+    bool has_content_before = false;
+    for (std::size_t i = 0; i < result.size() - 1; ++i) {
+      if (result[i] != '/') {
+        has_content_before = true;
+        break;
+      }
+    }
+    if (has_content_before) {
+      result.pop_back();
+    }
+  }
+
+  if (sep == std::string_view::npos) {
+    return result;
+  }
+
+  // Walk the query/fragment portion, building non-empty components.
+  std::string query_part;
+  std::string fragment_part;
+  std::size_t i = 0;
+
+  while (i < url.size()) {
+    if (url[i] == '?') {
+      std::size_t end = url.find('#', i + 1);
+      if (end == std::string_view::npos) {
+        end = url.size();
+      }
+      if (end > i + 1) {
+        query_part.assign(url.data() + i, end - i);
+      }
+      i = end;
+    } else if (url[i] == '#') {
+      if (url.size() > i + 1) {
+        fragment_part.assign(url.data() + i, url.size() - i);
+      }
+      break;
+    } else {
+      ++i;
+    }
+  }
+
+  result.append(query_part);
+  result.append(fragment_part);
+  return result;
+}
+
 }  // namespace kelpie::store_support
