@@ -49,7 +49,8 @@ struct DeviceInfo {
             "width": String(width),
             "height": String(height),
             "port": String(port),
-            "version": version
+            "version": version,
+            "engine": "webkit"
         ]
     }
 

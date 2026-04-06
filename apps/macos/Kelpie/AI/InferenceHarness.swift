@@ -421,26 +421,35 @@ struct InferenceHarness {
     }
 
     private func parseJSONObject(from text: String) -> [String: Any]? {
-        guard let start = text.firstIndex(of: "{") else { return nil }
+        guard let startIdx = text.firstIndex(of: "{") else { return nil }
         var depth = 0
-        var end: String.Index?
-        for index in text.indices[start...] {
-            switch text[index] {
+        var inString = false
+        var prevWasBackslash = false
+        for i in text.indices[startIdx...] {
+            let ch = text[i]
+            if inString {
+                if ch == "\\" && !prevWasBackslash {
+                    prevWasBackslash = true
+                    continue
+                }
+                if ch == "\"" && !prevWasBackslash { inString = false }
+                prevWasBackslash = false
+                continue
+            }
+            switch ch {
+            case "\"": inString = true
             case "{": depth += 1
             case "}":
                 depth -= 1
-                if depth == 0 { end = index; break }
+                if depth == 0 {
+                    let json = String(text[startIdx...i])
+                    guard let data = json.data(using: .utf8) else { return nil }
+                    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                }
             default: break
             }
-            if end != nil { break }
         }
-        guard let end else { return nil }
-        let json = String(text[start...end])
-        guard let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return object
+        return nil
     }
 
     private func extractTranscription(from text: String) -> String? {

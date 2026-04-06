@@ -21,7 +21,7 @@ struct InteractionHandler {
         }
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
             el.scrollIntoView({block: 'center'});
             el.click();
@@ -64,18 +64,17 @@ struct InteractionHandler {
         guard let selector = body["selector"] as? String, let value = body["value"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "selector and value are required")
         }
-        let escapedValue = value.replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
             el.focus();
             var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-            if (nativeSetter) nativeSetter.call(el, '\(escapedValue)');
-            else el.value = '\(escapedValue)';
+            if (nativeSetter) nativeSetter.call(el, '\(JSEscape.string(value))');
+            else el.value = '\(JSEscape.string(value))';
             el.dispatchEvent(new Event('input', {bubbles: true}));
             el.dispatchEvent(new Event('change', {bubbles: true}));
-            return {selector: '\(selector.replacingOccurrences(of: "'", with: "\\'"))', value: '\(escapedValue)'};
+            return {selector: '\(JSEscape.string(selector))', value: '\(JSEscape.string(value))'};
         })()
         """
         do {
@@ -94,22 +93,23 @@ struct InteractionHandler {
             return errorResponse(code: "MISSING_PARAM", message: "text is required")
         }
         if let selector = body["selector"] as? String {
-            let focusJS = "document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))')?.focus()"
+            let focusJS = "document.querySelector('\(JSEscape.string(selector))')?.focus()"
             _ = try? await context.evaluateJS(focusJS)
         }
         let delay = body["delay"] as? Int ?? 50
         for char in text {
+            let escapedChar = JSEscape.string(String(char))
             let charJS = """
             (function() {
                 var el = document.activeElement;
                 if (!el) return;
-                el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(char)', bubbles: true}));
-                el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(char)', bubbles: true}));
+                el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(escapedChar)', bubbles: true}));
+                el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(escapedChar)', bubbles: true}));
                 var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                if (nativeSetter) nativeSetter.call(el, el.value + '\(char)');
-                else el.value += '\(char)';
+                if (nativeSetter) nativeSetter.call(el, el.value + '\(escapedChar)');
+                else el.value += '\(escapedChar)';
                 el.dispatchEvent(new Event('input', {bubbles: true}));
-                el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(char)', bubbles: true}));
+                el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(escapedChar)', bubbles: true}));
             })()
             """
             _ = try? await context.evaluateJS(charJS)
@@ -125,9 +125,9 @@ struct InteractionHandler {
         }
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
-            el.value = '\(value.replacingOccurrences(of: "'", with: "\\'"))';
+            el.value = '\(JSEscape.string(value))';
             el.dispatchEvent(new Event('change', {bubbles: true}));
             var opt = el.options?.[el.selectedIndex];
             return {selected: {value: el.value, text: opt ? opt.text : el.value}};
@@ -149,7 +149,7 @@ struct InteractionHandler {
         }
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
             el.checked = \(checked);
             el.dispatchEvent(new Event('change', {bubbles: true}));

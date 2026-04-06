@@ -36,7 +36,7 @@ struct EvaluateHandler {
         for _ in 0..<iterations {
             let js = """
             (function() {
-                var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+                var el = document.querySelector('\(JSEscape.string(selector))');
                 if (!el) return null;
                 var rect = el.getBoundingClientRect();
                 var visible = rect.width > 0 && rect.height > 0;

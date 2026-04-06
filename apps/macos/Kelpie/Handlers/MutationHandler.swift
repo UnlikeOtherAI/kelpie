@@ -18,12 +18,12 @@ struct MutationHandler {
         let childList = body["childList"] as? Bool ?? true
         let subtree = body["subtree"] as? Bool ?? true
         let characterData = body["characterData"] as? Bool ?? false
-        let safeSelector = selector.replacingOccurrences(of: "'", with: "\\'")
+        let safeSelector = JSEscape.string(selector)
 
         let js = """
         (function(){
             if (!window.__kelpieMutations) window.__kelpieMutations = {};
-            var id = 'mut_' + Date.now();
+            var id = 'mut_' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '_' + Math.random().toString(36).slice(2));
             var buffer = [];
             var target = document.querySelector('\(safeSelector)');
             if (!target) return null;
@@ -80,7 +80,7 @@ struct MutationHandler {
             return errorResponse(code: "MISSING_PARAM", message: "watchId is required")
         }
         let clear = body["clear"] as? Bool ?? true
-        let safeId = watchId.replacingOccurrences(of: "'", with: "\\'")
+        let safeId = JSEscape.string(watchId)
         let js = """
         (function(){
             var w = (window.__kelpieMutations || {})['\(safeId)'];
@@ -104,7 +104,7 @@ struct MutationHandler {
         guard let watchId = body["watchId"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "watchId is required")
         }
-        let safeId = watchId.replacingOccurrences(of: "'", with: "\\'")
+        let safeId = JSEscape.string(watchId)
         let js = """
         (function(){
             var w = (window.__kelpieMutations || {})['\(safeId)'];

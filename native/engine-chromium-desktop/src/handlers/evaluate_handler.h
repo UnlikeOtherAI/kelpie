@@ -13,6 +13,8 @@ class EvaluateHandler {
 
  private:
   nlohmann::json Evaluate(const nlohmann::json& params) const;
+  nlohmann::json WaitForElement(const nlohmann::json& params) const;
+  nlohmann::json WaitForNavigation(const nlohmann::json& params) const;
 
   DesktopHandlerRuntime runtime_;
 };

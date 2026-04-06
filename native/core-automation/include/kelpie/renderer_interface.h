@@ -22,6 +22,10 @@ class RendererInterface {
   virtual void GoBack() = 0;
   virtual void GoForward() = 0;
   virtual void Reload() = 0;
+
+  virtual std::string GetCookiesJson() { return "[]"; }
+  virtual void SetCookieString(const std::string& /* cookie */) {}
+  virtual void DeleteAllCookies() {}
 };
 
 }  // namespace kelpie

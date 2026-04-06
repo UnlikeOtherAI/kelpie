@@ -59,6 +59,7 @@ final class Router: @unchecked Sendable {
             "toast", "safari-auth",
             "set-orientation", "get-orientation",
             "snapshot-3d-enter", "snapshot-3d-exit", "snapshot-3d-status",
+            "snapshot-3d-set-mode", "snapshot-3d-zoom", "snapshot-3d-reset-view",
             "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record"
         ]
         for method in methods where routes[method] == nil {

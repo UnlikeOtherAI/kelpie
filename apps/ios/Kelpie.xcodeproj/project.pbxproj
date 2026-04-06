@@ -35,6 +35,7 @@
 		A100000022 /* ScreenshotHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000022 /* ScreenshotHandler.swift */; };
 		A100000023 /* DOMHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000023 /* DOMHandler.swift */; };
 		A100000024 /* InteractionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000024 /* InteractionHandler.swift */; };
+		JSE0000003 /* JSEscape.swift in Sources */ = {isa = PBXBuildFile; fileRef = JSE0000004 /* JSEscape.swift */; };
 		A100000025 /* ScrollHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000025 /* ScrollHandler.swift */; };
 		A100000026 /* DeviceHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000026 /* DeviceHandler.swift */; };
 		A100000027 /* EvaluateHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000027 /* EvaluateHandler.swift */; };
@@ -80,7 +81,7 @@
 		B100000006 /* BrowserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserState.swift; sourceTree = "<group>"; };
 		B100000055 /* FeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlags.swift; sourceTree = "<group>"; };
 		B100000056 /* Snapshot3DBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot3DBridge.swift; path = ../macos/Kelpie/Handlers/Snapshot3DBridge.swift; sourceTree = SOURCE_ROOT; };
-		B100000057 /* Snapshot3DHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot3DHandler.swift; path = ../macos/Kelpie/Handlers/Snapshot3DHandler.swift; sourceTree = SOURCE_ROOT; };
+		B100000057 /* Snapshot3DHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snapshot3DHandler.swift; sourceTree = "<group>"; };
 		B100000007 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
 		B100000008 /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
 		B100000009 /* MDNSAdvertiser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MDNSAdvertiser.swift; sourceTree = "<group>"; };
@@ -95,6 +96,7 @@
 		B100000022 /* ScreenshotHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotHandler.swift; sourceTree = "<group>"; };
 		B100000023 /* DOMHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DOMHandler.swift; sourceTree = "<group>"; };
 		B100000024 /* InteractionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionHandler.swift; sourceTree = "<group>"; };
+		JSE0000004 /* JSEscape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSEscape.swift; sourceTree = "<group>"; };
 		B100000025 /* ScrollHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollHandler.swift; sourceTree = "<group>"; };
 		B100000026 /* DeviceHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceHandler.swift; sourceTree = "<group>"; };
 		B100000027 /* EvaluateHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvaluateHandler.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				B100000022 /* ScreenshotHandler.swift */,
 				B100000023 /* DOMHandler.swift */,
 				B100000024 /* InteractionHandler.swift */,
+				JSE0000004 /* JSEscape.swift */,
 				B100000025 /* ScrollHandler.swift */,
 				B100000026 /* DeviceHandler.swift */,
 				B100000027 /* EvaluateHandler.swift */,
@@ -371,6 +374,7 @@
 				A100000022 /* ScreenshotHandler.swift in Sources */,
 				A100000023 /* DOMHandler.swift in Sources */,
 				A100000024 /* InteractionHandler.swift in Sources */,
+				JSE0000003 /* JSEscape.swift in Sources */,
 				A100000025 /* ScrollHandler.swift in Sources */,
 				A100000026 /* DeviceHandler.swift in Sources */,
 				A100000027 /* EvaluateHandler.swift in Sources */,

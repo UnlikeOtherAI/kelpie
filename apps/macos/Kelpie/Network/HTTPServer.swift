@@ -6,10 +6,19 @@ import Network
 final class HTTPServer: @unchecked Sendable {
     let port: UInt16
     let router: Router
+    private let lock = NSLock()
     private var listener: NWListener?
     private var bonjourService: NWListener.Service?
-    var onBonjourStateChange: ((Bool) -> Void)?
-    var onStateChange: ((Bool) -> Void)?
+    var onBonjourStateChange: ((Bool) -> Void)? {
+        get { lock.withLock { _onBonjourStateChange } }
+        set { lock.withLock { _onBonjourStateChange = newValue } }
+    }
+    var onStateChange: ((Bool) -> Void)? {
+        get { lock.withLock { _onStateChange } }
+        set { lock.withLock { _onStateChange = newValue } }
+    }
+    private var _onBonjourStateChange: ((Bool) -> Void)?
+    private var _onStateChange: ((Bool) -> Void)?
 
     init(port: UInt16 = 8420, router: Router) {
         self.port = port
@@ -21,24 +30,32 @@ final class HTTPServer: @unchecked Sendable {
         type: String,
         txtRecord: NWTXTRecord
     ) {
+        lock.lock()
+        defer { lock.unlock() }
         bonjourService = NWListener.Service(name: name, type: type, txtRecord: txtRecord)
         listener?.service = bonjourService
     }
 
     func start() {
+        let newListener: NWListener
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
             // swiftlint:disable:next force_unwrapping
-            listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+            newListener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
         } catch {
             print("[HTTPServer] Failed to create listener: \(error)")
             onBonjourStateChange?(false)
             return
         }
 
-        listener?.service = bonjourService
-        listener?.serviceRegistrationUpdateHandler = { [weak self] change in
+        lock.lock()
+        listener = newListener
+        let svc = bonjourService
+        lock.unlock()
+
+        newListener.service = svc
+        newListener.serviceRegistrationUpdateHandler = { [weak self] change in
             guard let self else { return }
             switch change {
             case .add(let endpoint):
@@ -52,10 +69,11 @@ final class HTTPServer: @unchecked Sendable {
             }
         }
 
-        listener?.newConnectionHandler = { [weak self] connection in
+        newListener.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection)
         }
-        listener?.stateUpdateHandler = { state in
+        newListener.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
@@ -71,12 +89,15 @@ final class HTTPServer: @unchecked Sendable {
                 break
             }
         }
-        listener?.start(queue: .global(qos: .userInitiated))
+        newListener.start(queue: .global(qos: .userInitiated))
     }
 
     func stop() {
-        listener?.cancel()
+        lock.lock()
+        let current = listener
         listener = nil
+        lock.unlock()
+        current?.cancel()
         onBonjourStateChange?(false)
         onStateChange?(false)
     }
@@ -102,10 +123,11 @@ final class HTTPServer: @unchecked Sendable {
                 let bodyStart = headerEnd.upperBound
                 let bodyReceived = accumulated.distance(from: bodyStart, to: accumulated.endIndex)
 
-                if bodyReceived >= contentLength {
-                    Task {
-                        await self.processRequest(connection: connection, data: accumulated)
-                    }
+                if let contentLength, bodyReceived >= contentLength {
+                    Task { await self.processRequest(connection: connection, data: accumulated) }
+                } else if contentLength == nil {
+                    // No Content-Length: process what we have
+                    Task { await self.processRequest(connection: connection, data: accumulated) }
                 } else {
                     self.receiveData(connection: connection, buffer: accumulated)
                 }
@@ -115,12 +137,12 @@ final class HTTPServer: @unchecked Sendable {
         }
     }
 
-    private func parseContentLength(_ headers: String) -> Int {
+    private func parseContentLength(_ headers: String) -> Int? {
         for line in headers.components(separatedBy: "\r\n") where line.lowercased().hasPrefix("content-length:") {
             let value = line.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)
             return Int(value) ?? 0
         }
-        return 0
+        return nil
     }
 
     private func processRequest(connection: NWConnection, data: Data) async {

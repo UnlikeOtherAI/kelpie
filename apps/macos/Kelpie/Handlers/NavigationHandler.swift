@@ -18,6 +18,8 @@ struct NavigationHandler {
     private func navigate(_ body: [String: Any]) async -> [String: Any] {
         guard let urlString = body["url"] as? String,
               let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
               context.renderer != nil else {
             return errorResponse(code: "INVALID_URL", message: "Missing or invalid URL")
         }

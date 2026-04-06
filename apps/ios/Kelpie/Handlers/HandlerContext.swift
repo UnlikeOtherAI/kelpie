@@ -102,7 +102,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     func showTouchIndicatorForElement(_ selector: String) async {
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return JSON.stringify(null);
             var r = el.getBoundingClientRect();
             return JSON.stringify({x: r.left + r.width/2, y: r.top + r.height/2});

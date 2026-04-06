@@ -69,6 +69,7 @@
 		AA359890FDBB332BDC0573D3 /* DeviceHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC3FD06DEFCCD993A28E73D /* DeviceHandler.swift */; };
 		AC654CA845B3F41AF6D45CB5 /* CEFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516AA2CAF4E775E3EC89BF80 /* CEFRenderer.swift */; };
 		ADD06DFD9092FE2E691350CD /* InteractionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662BA4F09CBAA5588D63C01C /* InteractionHandler.swift */; };
+		JSE0000001 /* JSEscape.swift in Sources */ = {isa = PBXBuildFile; fileRef = JSE0000002 /* JSEscape.swift */; };
 		AFF490F9BBDA0CCCC5DEB31C /* ScrollHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8EF32C2FF0EEDCEF69F7500 /* ScrollHandler.swift */; };
 		B9418B2ED3FC60A43675184F /* FloatingMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF87ABB3FE3E6A86205ACC2C /* FloatingMenuView.swift */; };
 		BF66BEB5C52D9003836BE432 /* Snapshot3DHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 467404926A382E0B8297DCAA /* Snapshot3DHandler.swift */; };
@@ -140,6 +141,7 @@
 		579641287CEF21D4E959F84D /* CookieMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieMigrator.swift; sourceTree = "<group>"; };
 		63A8E784B0595FFB37EFB3AB /* NetworkHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkHandler.swift; sourceTree = "<group>"; };
 		662BA4F09CBAA5588D63C01C /* InteractionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionHandler.swift; sourceTree = "<group>"; };
+		JSE0000002 /* JSEscape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSEscape.swift; sourceTree = "<group>"; };
 		673AB1372CF10C69A6129E14 /* CEFBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CEFBridge.mm; sourceTree = "<group>"; };
 		7214F2ECA9672C277FEA029F /* CEFBridgeSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CEFBridgeSupport.h; sourceTree = "<group>"; };
 		76E5AABD4653BD12BB4E2123 /* KelpieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelpieApp.swift; sourceTree = "<group>"; };
@@ -296,6 +298,7 @@
 				162978C8F601CE6E2D0F6240 /* HandlerContext.swift */,
 				8E98BF1291FC4D3F61C4FA60 /* HistoryHandler.swift */,
 				662BA4F09CBAA5588D63C01C /* InteractionHandler.swift */,
+				JSE0000002 /* JSEscape.swift */,
 				56127AD5A3662A6031D9923B /* MutationHandler.swift */,
 				E0EBDA54AD4B7D66D0679B16 /* NavigationHandler.swift */,
 				1C431FE8672453FA02398A35 /* NetworkBridge.swift */,
@@ -639,6 +642,7 @@
 				E7141A48689A12C8FD52CC10 /* InferenceEngine.swift in Sources */,
 				86236C1CDA2709D12451F957 /* InferenceHarness.swift in Sources */,
 				ADD06DFD9092FE2E691350CD /* InteractionHandler.swift in Sources */,
+				JSE0000001 /* JSEscape.swift in Sources */,
 				D5A592B57370DE31F56E2989 /* LLMHandler.swift in Sources */,
 				DBD1B5EC65CAC78C7DC5DFEC /* MDNSAdvertiser.swift in Sources */,
 				208357A716B18227409295C4 /* KelpieApp.swift in Sources */,

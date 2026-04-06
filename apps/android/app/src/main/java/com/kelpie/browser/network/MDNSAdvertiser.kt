@@ -56,6 +56,7 @@ class MDNSAdvertiser(
                 setAttribute("height", deviceInfo.height.toString())
                 setAttribute("port", deviceInfo.port.toString())
                 setAttribute("version", deviceInfo.version)
+                setAttribute("engine", "webview")
             }
 
         nsdManager =

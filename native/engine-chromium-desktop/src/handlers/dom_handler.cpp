@@ -26,9 +26,8 @@ nlohmann::json DomHandler::QuerySelector(const nlohmann::json& params, bool all)
         "const mapped = nodes.map(node => ({"
         "  tag: (node.tagName || '').toLowerCase(),"
         "  id: node.id || undefined,"
-        "  text: (node.innerText || node.textContent || '').trim(),"
+        "  text: (node.textContent || '').trim(),"
         "  classes: Array.from(node.classList || []),"
-        "  attributes: Array.from(node.attributes || []).reduce((acc, attr) => { acc[attr.name] = attr.value; return acc; }, {}),"
         "  rect: (() => { const r = node.getBoundingClientRect(); return {x: r.x, y: r.y, width: r.width, height: r.height}; })(),"
         "  visible: !!(node.offsetWidth || node.offsetHeight || node.getClientRects().length)"
         "}));"
@@ -57,7 +56,7 @@ nlohmann::json DomHandler::GetElementText(const nlohmann::json& params) const {
     const std::string selector = RequireString(params, "selector");
     const std::string script =
         "(() => { const node = document.querySelector(" + JsStringLiteral(selector) +
-        "); return node ? {found: true, text: (node.innerText || node.textContent || '').trim()} : {found: false}; })()";
+        "); return node ? {found: true, text: (node.textContent || '').trim()} : {found: false}; })()";
     const nlohmann::json result = context.EvaluateJsReturningJson(script);
     if (!result.value("found", false)) {
       return ErrorResponse(ErrorCode::kElementNotFound,

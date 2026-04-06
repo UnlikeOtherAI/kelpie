@@ -1,5 +1,8 @@
 #include "navigation_handler.h"
 
+#include <chrono>
+#include <thread>
+
 namespace kelpie {
 
 NavigationHandler::NavigationHandler(DesktopHandlerRuntime runtime)
@@ -20,6 +23,12 @@ nlohmann::json NavigationHandler::Navigate(const nlohmann::json& params) const {
     const std::int64_t started = NowMillis();
     HandlerContext& context = RequireHandlerContext(runtime_);
     context.Renderer()->LoadUrl(url);
+
+    const int timeout_ms = 10000;
+    const int poll_ms = 100;
+    while (context.Renderer()->IsLoading() && (NowMillis() - started) < timeout_ms) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
+    }
 
     const std::string current_url = context.Renderer()->CurrentUrl();
     const std::string title = context.Renderer()->CurrentTitle();
