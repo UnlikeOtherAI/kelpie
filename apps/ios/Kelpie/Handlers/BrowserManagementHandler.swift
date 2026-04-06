@@ -266,12 +266,44 @@ struct BrowserManagementHandler {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
         let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return null;var r=el.getBoundingClientRect();return{element:{selector:'\(selector)',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},obscured:false,reason:null,keyboardOverlap:null,suggestion:null};})()
+        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return null;var r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};})()
         """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found") }
-            return successResponse(result)
+            let rect = try await context.evaluateJSReturningJSON(js)
+            if rect.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found") }
+
+            let elementBottom = rect["bottom"] as? Double ?? 0
+            let kb = context.keyboardObserver
+            let visibleHeight = Double(kb.visibleViewportHeight)
+
+            let element: [String: Any] = [
+                "selector": selector,
+                "rect": [
+                    "x": rect["x"] ?? 0,
+                    "y": rect["y"] ?? 0,
+                    "width": rect["width"] ?? 0,
+                    "height": rect["height"] ?? 0
+                ]
+            ]
+
+            if kb.isVisible && elementBottom > visibleHeight {
+                let overlap = Int(elementBottom - visibleHeight)
+                return successResponse([
+                    "element": element,
+                    "obscured": true,
+                    "reason": "keyboard",
+                    "keyboardOverlap": overlap,
+                    "suggestion": "scroll-into-view"
+                ])
+            }
+
+            return successResponse([
+                "element": element,
+                "obscured": false,
+                "reason": NSNull(),
+                "keyboardOverlap": NSNull(),
+                "suggestion": NSNull()
+            ])
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
