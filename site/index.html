@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kelpie — LLM-First Mobile Browser</title>
-<meta name="description" content="Control real mobile browsers with language models. Native iOS and Android apps with mDNS discovery, HTTP API, and MCP.">
+<meta name="description" content="Control real browsers with language models and record support walkthrough videos. Native iOS, Android, and macOS apps with mDNS discovery, HTTP API, and MCP.">
 <style>
   :root {
     --orange: #f4b078;
@@ -230,7 +230,7 @@
 <div class="hero">
   <img src="icon-1024.png" alt="Kelpie icon" width="120" height="120">
   <h1>Kelpie</h1>
-  <p class="tagline">The mobile browser built for the age of agents. Real devices, real browsers, fully controllable by LLMs.</p>
+  <p class="tagline">The browser for agents, support teams, and demos. Drive real devices with LLMs, record a clean walkthrough, and send clients exactly where to click.</p>
   <div class="hero-buttons">
     <a href="https://github.com/UnlikeOtherAI/kelpie" class="btn btn-primary">GitHub</a>
     <a href="https://github.com/UnlikeOtherAI/kelpie/tree/main/docs" class="btn btn-secondary">Documentation</a>
@@ -261,6 +261,10 @@
     <div class="feature">
       <h3>HTTP + MCP API</h3>
       <p>Every device runs an HTTP and MCP server. Navigate, screenshot, read DOM, click, fill forms, scroll, evaluate JS — all via structured API calls.</p>
+    </div>
+    <div class="feature">
+      <h3>Support walkthrough videos</h3>
+      <p>Record a scripted browser session for support and presentation work. Show a client the exact clicks to reach a page, setting, or flow, then send the walkthrough instead of typing instructions.</p>
     </div>
     <div class="feature">
       <h3>Group commands</h3>
@@ -376,11 +380,21 @@ graph TD
       <p>Drop-in Swift package that turns any iOS app into an MCP-controllable agent. Exposes 44 tools: screenshot, tap, get DOM, fill forms, navigate, inspect view hierarchy. Discovered via mDNS, accessed over streamable HTTP. Used by Kelpie for debug integration and automated testing.</p>
       <a href="https://github.com/UnlikeOtherAI/AppReveal" class="btn btn-secondary">View on GitHub</a>
     </div>
+    <div class="project-card">
+      <h3><a href="https://github.com/UnlikeOtherAI/selkie">Selkie</a></h3>
+      <p>Zero-trust network layer for device enrollment, session brokering, NAT traversal, and self-hosted infrastructure around the wider UnlikeOtherAI ecosystem.</p>
+      <a href="https://github.com/UnlikeOtherAI/selkie" class="btn btn-secondary">View on GitHub</a>
+    </div>
+    <div class="project-card">
+      <h3><a href="https://github.com/UnlikeOtherAI/Nessie">Nessie</a></h3>
+      <p>Voice-first personal AI agent for macOS with a local orchestrator, MCP surface, native app shell, and sub-agent workflow for research and file work.</p>
+      <a href="https://github.com/UnlikeOtherAI/Nessie" class="btn btn-secondary">View on GitHub</a>
+    </div>
   </div>
 </section>
 
 <footer>
-  <p>Built by <a href="https://github.com/UnlikeOtherAI">Unlike Other AI</a></p>
+  <p>Built by <a href="https://github.com/UnlikeOtherAI">UnlikeOtherAI</a></p>
 </footer>
 
 <script type="module">

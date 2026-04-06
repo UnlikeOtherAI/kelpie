@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kelpie — LLM-First Mobile Browser</title>
-  <meta name="description" content="Control real mobile browsers with AI. Native macOS, iOS, Android and Linux apps — dual-engine WebKit and Chromium — with mDNS discovery, HTTP API, MCP, and on-device AI.">
+  <meta name="description" content="Control real browsers with AI and record scripted walkthrough videos. Native macOS, iOS, Android and Linux apps with mDNS discovery, HTTP API, MCP, and on-device AI.">
   <meta property="og:title" content="Kelpie — LLM-First Mobile Browser">
-  <meta property="og:description" content="Language models controlling real mobile devices. 10× faster than Playwright. Native, dual-engine, MCP-ready.">
+  <meta property="og:description" content="Language models controlling real devices, plus scripted walkthrough video recording for support and presentations. Native, dual-engine, MCP-ready.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,700&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -608,6 +608,12 @@
     .eco-card.nessie .eco-bullets li::before { background: var(--green); }
     .eco-chips { display: flex; gap: 7px; flex-wrap: wrap; }
     .chip { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 3px 9px; background: rgba(255,255,255,0.025); }
+    .eco-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+    .eco-actions .btn-primary,
+    .eco-actions .btn-ghost {
+      padding: 11px 18px;
+      font-size: 0.82rem;
+    }
 
     /* ── CTA ── */
     .cta-band { padding: 80px 0; border-top: 1px solid var(--border); }
@@ -704,9 +710,9 @@
         <li><a href="#local-ai">Local AI</a></li>
         <li><a href="#selkie">Selkie</a></li>
         <li><a href="#nessie">Nessie</a></li>
-        <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+        <li><a href="https://github.com/UnlikeOtherAI">GitHub</a></li>
       </ul>
-      <a href="https://github.com/unlikeotherai/kelpie" class="nav-cta">Get started →</a>
+      <a href="https://github.com/UnlikeOtherAI/kelpie" class="nav-cta">Get started →</a>
     </div>
   </nav>
 
@@ -725,7 +731,7 @@
             <em>Real AI control.</em>
           </h1>
           <p class="hero-desc">
-            Kelpie is an LLM-first browser for macOS, iOS, Android, and Linux. Language models discover and orchestrate real devices on the local network — no emulators, no persistent scripts, no desktop required.
+            Kelpie is an LLM-first browser for macOS, iOS, Android, and Linux. Language models discover and orchestrate real devices on the local network, then can turn a few clicks into a clean walkthrough video for support teams, demos, and client handoffs.
           </p>
 
           <div class="store-section">
@@ -1071,9 +1077,9 @@
           <p><code>findButton("Submit")</code> returns only the devices where it exists. Let the model decide what to do with the ones that don't.</p>
         </div>
         <div class="feat-card reveal reveal-delay-2">
-          <div class="feat-icon">📐</div>
-          <h3>Resolution-Aware</h3>
-          <p>Commands like <code>scroll2</code> adapt per device viewport. One instruction works correctly across every screen size in a heterogeneous fleet.</p>
+          <div class="feat-icon">🎬</div>
+          <h3>Scripted Walkthrough Video</h3>
+          <p>Run a timed script that hides the chrome, highlights the right controls, overlays commentary, and records a polished browser walkthrough for support and presentation work.</p>
         </div>
       </div>
     </div>
@@ -1104,6 +1110,9 @@
             <span class="chip">PostgreSQL</span>
             <span class="chip">Self-hosted</span>
           </div>
+          <div class="eco-actions">
+            <a href="https://github.com/UnlikeOtherAI/selkie" class="btn-primary">GitHub repo</a>
+          </div>
         </div>
 
         <div class="eco-card nessie reveal reveal-delay-1" id="nessie">
@@ -1125,6 +1134,10 @@
             <span class="chip">Voice</span>
             <span class="chip">MCP</span>
           </div>
+          <div class="eco-actions">
+            <a href="https://github.com/UnlikeOtherAI/Nessie" class="btn-primary">GitHub repo</a>
+            <a href="https://github.com/UnlikeOtherAI/Nessie/tree/main/docs" class="btn-ghost">Docs</a>
+          </div>
         </div>
       </div>
     </div>
@@ -1139,8 +1152,8 @@
           <p>Install the CLI, launch Kelpie on a device, start issuing commands.</p>
         </div>
         <div style="display:flex;gap:12px;flex-shrink:0;flex-wrap:wrap;">
-          <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">Read the docs →</a>
-          <a href="https://github.com/unlikeotherai" class="btn-ghost">All projects</a>
+          <a href="https://github.com/UnlikeOtherAI/kelpie" class="btn-primary">Read the docs →</a>
+          <a href="https://github.com/UnlikeOtherAI" class="btn-ghost">All projects</a>
         </div>
       </div>
     </div>
@@ -1155,10 +1168,10 @@
           Kelpie, Selkie &amp; Nessie are open-source projects by Ondrej Rafaj and <a href="https://unlikeotherai.com" style="color:var(--blue);text-decoration:underline;text-underline-offset:3px;">UnlikeOtherAI</a>.
         </div>
         <ul class="footer-nav">
-          <li><a href="https://github.com/unlikeotherai/kelpie">Kelpie</a></li>
-          <li><a href="https://github.com/unlikeotherai/selkie">Selkie</a></li>
-          <li><a href="https://github.com/unlikeotherai/nessie">Nessie</a></li>
-          <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/kelpie">Kelpie</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/selkie">Selkie</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI/Nessie">Nessie</a></li>
+          <li><a href="https://github.com/UnlikeOtherAI">GitHub</a></li>
         </ul>
       </div>
     </div>
