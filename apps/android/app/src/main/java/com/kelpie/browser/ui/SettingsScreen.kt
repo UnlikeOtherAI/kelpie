@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,8 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.kelpie.browser.FeatureFlags
+import com.kelpie.browser.ai.AIState
 import com.kelpie.browser.device.DeviceInfo
 
 @Composable
@@ -31,9 +35,12 @@ fun SettingsScreen(
     isServerRunning: Boolean,
     isMDNSAdvertising: Boolean,
     onShowWelcome: () -> Unit,
+    onNavigate: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     var enable3DInspector by remember { mutableStateOf(FeatureFlags.is3DInspectorEnabled(context)) }
+    var showHfTokenDialog by remember { mutableStateOf(false) }
+    var hfToken by remember { mutableStateOf(AIState.huggingFaceToken) }
 
     Column(
         modifier =
@@ -63,6 +70,16 @@ fun SettingsScreen(
         SectionHeader("Display")
         InfoRow("Width", "${deviceInfo.width}px")
         InfoRow("Height", "${deviceInfo.height}px")
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        HuggingFaceSection(
+            hasToken = hfToken.isNotEmpty(),
+            onSetApiKey = { showHfTokenDialog = true },
+            onOpenTokensPage = {
+                onNavigate("https://huggingface.co/settings/tokens")
+            },
+        )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -98,6 +115,79 @@ fun SettingsScreen(
         InfoRow("Version", deviceInfo.version)
         Spacer(Modifier.height(24.dp))
     }
+
+    if (showHfTokenDialog) {
+        HuggingFaceTokenDialog(
+            currentToken = hfToken,
+            onDismiss = { showHfTokenDialog = false },
+            onSave = { newToken ->
+                AIState.huggingFaceToken = newToken
+                hfToken = newToken
+                showHfTokenDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun HuggingFaceSection(
+    hasToken: Boolean,
+    onSetApiKey: () -> Unit,
+    onOpenTokensPage: () -> Unit,
+) {
+    SectionHeader("HuggingFace")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("API Key", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = if (hasToken) "Set" else "Not set",
+            color =
+                if (hasToken) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+    HelpActionRow("Set API Key", onClick = onSetApiKey)
+    HelpActionRow("Open HuggingFace Tokens Page", onClick = onOpenTokensPage)
+}
+
+@Composable
+private fun HuggingFaceTokenDialog(
+    currentToken: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var tokenInput by remember { mutableStateOf(currentToken) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("HuggingFace API Key") },
+        text = {
+            TextField(
+                value = tokenInput,
+                onValueChange = { tokenInput = it },
+                label = { Text("API Key") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(tokenInput.trim()) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable

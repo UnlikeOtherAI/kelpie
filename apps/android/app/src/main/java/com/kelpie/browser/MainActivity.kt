@@ -14,17 +14,22 @@ import com.kelpie.browser.devtools.MutationHandler
 import com.kelpie.browser.devtools.NetworkLogHandler
 import com.kelpie.browser.handlers.BookmarkHandler
 import com.kelpie.browser.handlers.BrowserManagementHandler
+import com.kelpie.browser.handlers.CommentaryHandler
 import com.kelpie.browser.handlers.DOMHandler
 import com.kelpie.browser.handlers.DeviceHandler
 import com.kelpie.browser.handlers.EvaluateHandler
 import com.kelpie.browser.handlers.HandlerContext
+import com.kelpie.browser.handlers.HighlightHandler
 import com.kelpie.browser.handlers.HistoryHandler
 import com.kelpie.browser.handlers.InteractionHandler
 import com.kelpie.browser.handlers.NavigationHandler
 import com.kelpie.browser.handlers.NetworkInspectorHandler
 import com.kelpie.browser.handlers.ScreenshotHandler
+import com.kelpie.browser.handlers.ScriptHandler
+import com.kelpie.browser.handlers.ScriptPlaybackState
 import com.kelpie.browser.handlers.ScrollHandler
 import com.kelpie.browser.handlers.Snapshot3DHandler
+import com.kelpie.browser.handlers.SwipeHandler
 import com.kelpie.browser.llm.LLMHandler
 import com.kelpie.browser.network.HTTPServer
 import com.kelpie.browser.network.MDNSAdvertiser
@@ -37,6 +42,7 @@ import com.kelpie.browser.ui.theme.KelpieTheme
 class MainActivity : ComponentActivity() {
     private val router = Router()
     private val handlerContext = HandlerContext()
+    private val scriptPlaybackState = ScriptPlaybackState()
     private var httpServer: HTTPServer? = null
     private var mdnsAdvertiser: MDNSAdvertiser? = null
 
@@ -55,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     deviceInfo = deviceInfo,
                     router = router,
                     handlerContext = handlerContext,
+                    scriptPlaybackState = scriptPlaybackState,
                     activity = this@MainActivity,
                     isServerRunning = httpServer?.isRunning == true,
                     isMDNSAdvertising = mdnsAdvertiser?.isRegistered == true,
@@ -68,6 +75,8 @@ class MainActivity : ComponentActivity() {
 
     private fun registerHandlers(deviceInfo: DeviceInfo) {
         router.handlerContext = handlerContext
+        router.scriptPlaybackState = scriptPlaybackState
+        handlerContext.scriptPlaybackState = scriptPlaybackState
 
         NavigationHandler(handlerContext).register(router)
         ScreenshotHandler(handlerContext).register(router)
@@ -81,8 +90,12 @@ class MainActivity : ComponentActivity() {
         MutationHandler(handlerContext).register(router)
         BrowserManagementHandler(handlerContext, applicationContext).register(router)
         LLMHandler(handlerContext).register(router)
-        AIHandler(applicationContext).register(router)
+        AIHandler(applicationContext, handlerContext).register(router)
         Snapshot3DHandler(handlerContext) { FeatureFlags.is3DInspectorEnabled(applicationContext) }.register(router)
+        CommentaryHandler(handlerContext).register(router)
+        HighlightHandler(handlerContext).register(router)
+        SwipeHandler(handlerContext).register(router)
+        ScriptHandler(handlerContext, router, scriptPlaybackState).register(router)
         BookmarkHandler(handlerContext).register(router)
         HistoryHandler(handlerContext).register(router)
         NetworkInspectorHandler(handlerContext).register(router)

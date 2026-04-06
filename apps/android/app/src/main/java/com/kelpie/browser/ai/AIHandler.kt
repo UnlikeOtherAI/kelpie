@@ -2,6 +2,7 @@ package com.kelpie.browser.ai
 
 import android.content.Context
 import android.os.SystemClock
+import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
@@ -32,6 +33,7 @@ private val aiJson =
 
 class AIHandler(
     private val appContext: Context,
+    private val ctx: HandlerContext,
 ) {
     private val platformEngine by lazy { PlatformAIEngine(appContext) }
     private val recorder by lazy { AudioRecorder(appContext) }
@@ -87,6 +89,14 @@ class AIHandler(
         }
 
         if (!requestedModel.startsWith("ollama:")) {
+            val token = AIState.huggingFaceToken
+            if (token.isEmpty()) {
+                return errorResponse(
+                    "AUTH_REQUIRED",
+                    "HuggingFace API key required. Set it in Settings before downloading models.",
+                )
+            }
+            ctx.aiManager?.hfToken = token
             return errorResponse(
                 "MODEL_NOT_FOUND",
                 "Android supports the platform backend or ollama: model IDs",

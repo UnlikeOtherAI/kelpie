@@ -5,6 +5,7 @@ import android.os.Looper
 import android.webkit.WebView
 import com.kelpie.browser.browser.DialogState
 import com.kelpie.browser.browser.KeyboardObserver
+import com.kelpie.browser.nativecore.AiManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -22,9 +23,15 @@ private val json =
 private val mainHandler = Handler(Looper.getMainLooper())
 
 class HandlerContext {
-    val dialogState = DialogState()
+    companion object {
+        const val DEFAULT_OVERLAY_RGB = "59,130,246"
+    }
+
     var webView: WebView? = null
     var keyboardObserver: KeyboardObserver? = null
+    var scriptPlaybackState: ScriptPlaybackState? = null
+    var aiManager: AiManager? = null
+    val dialogState = DialogState()
     val chromeAuth =
         com.kelpie.browser.browser
             .ChromeAuthHelper()
@@ -115,6 +122,7 @@ class HandlerContext {
     suspend fun showTouchIndicator(
         x: Double,
         y: Double,
+        color: String = DEFAULT_OVERLAY_RGB,
     ) {
         val js =
             """
@@ -122,13 +130,13 @@ class HandlerContext {
                 var dot = document.createElement('div');
                 dot.style.cssText = 'position:fixed;left:${x}px;top:${y}px;width:36px;height:36px;' +
                     'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                    'background:rgba(59,130,246,0.7);pointer-events:none;z-index:2147483647;' +
+                    'background:rgba(${JSEscape.string(color)},0.7);pointer-events:none;z-index:2147483647;' +
                     'transition:transform 0.5s ease-out, opacity 0.5s ease-out;transform:scale(1);opacity:1;';
                 document.body.appendChild(dot);
                 var ripple = document.createElement('div');
                 ripple.style.cssText = 'position:fixed;left:${x}px;top:${y}px;width:36px;height:36px;' +
                     'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                    'border:2px solid rgba(59,130,246,0.7);pointer-events:none;z-index:2147483647;' +
+                    'border:2px solid rgba(${JSEscape.string(color)},0.7);pointer-events:none;z-index:2147483647;' +
                     'transition:transform 0.6s ease-out, opacity 0.6s ease-out;transform:scale(1);opacity:1;';
                 document.body.appendChild(ripple);
                 requestAnimationFrame(function() {
@@ -148,12 +156,14 @@ class HandlerContext {
         }
     }
 
-    suspend fun showTouchIndicatorForElement(selector: String) {
-        val escaped = selector.replace("'", "\\'")
+    suspend fun showTouchIndicatorForElement(
+        selector: String,
+        color: String = DEFAULT_OVERLAY_RGB,
+    ) {
         val js =
             """
             (function() {
-                var el = document.querySelector('$escaped');
+                var el = document.querySelector('${JSEscape.string(selector)}');
                 if (!el) return JSON.stringify(null);
                 var r = el.getBoundingClientRect();
                 return JSON.stringify({x: r.left + r.width/2, y: r.top + r.height/2});
@@ -171,14 +181,13 @@ class HandlerContext {
                 val pos = json.parseToJsonElement(unescaped).jsonObject
                 val px = pos["x"]?.toString()?.toDoubleOrNull()
                 val py = pos["y"]?.toString()?.toDoubleOrNull()
-                if (px != null && py != null) showTouchIndicator(px, py)
+                if (px != null && py != null) showTouchIndicator(px, py, color)
             }
         } catch (_: Exception) {
         }
     }
 
     suspend fun showToast(message: String) {
-        val escaped = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
         val js =
             """
             (function() {
@@ -186,7 +195,7 @@ class HandlerContext {
                 if (existing) existing.remove();
                 var toast = document.createElement('div');
                 toast.id = '__kelpie_toast';
-                toast.textContent = '$escaped';
+                toast.textContent = '${JSEscape.string(message)}';
                 toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
                     'max-width:390px;width:calc(100% - 32px);padding:14px 22px;border-radius:16px;' +
                     'background:rgba(0,0,0,0.5);color:#fff;font:15px/1.4 -apple-system,system-ui,sans-serif;' +
@@ -222,4 +231,6 @@ class HandlerContext {
             is kotlinx.serialization.json.JsonObject -> element.entries.associate { (k, v) -> k to jsonElementToAny(v) }
             is kotlinx.serialization.json.JsonArray -> element.map { jsonElementToAny(it) }
         }
+
+    fun overlayColor(body: Map<String, Any?>): String = JSEscape.hexToRGB(body["color"] as? String)
 }

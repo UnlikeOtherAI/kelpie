@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,7 @@ import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.WebViewContainer
 import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
+import com.kelpie.browser.handlers.ScriptPlaybackState
 import com.kelpie.browser.handlers.Snapshot3DBridge
 import com.kelpie.browser.network.Router
 import kotlinx.coroutines.launch
@@ -63,6 +65,7 @@ fun BrowserScreen(
     deviceInfo: DeviceInfo,
     router: Router,
     handlerContext: HandlerContext,
+    scriptPlaybackState: ScriptPlaybackState,
     activity: Activity,
     isServerRunning: Boolean,
     isMDNSAdvertising: Boolean,
@@ -91,6 +94,7 @@ fun BrowserScreen(
     val tabletMobileStagePresetId by TabletViewportPresetStore.selectedPresetId.collectAsState()
     var availableTabletViewportPresets by remember { mutableStateOf(TABLET_VIEWPORT_PRESETS) }
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
+    val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
 
@@ -149,26 +153,28 @@ fun BrowserScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (isLoading) {
+            if (isLoading && !isScriptRecording) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            URLBar(
-                currentUrl = currentUrl,
-                canGoBack = canGoBack,
-                canGoForward = canGoForward,
-                onNavigate = { url -> webView?.loadUrl(url) },
-                onBack = { webView?.goBack() },
-                onForward = { webView?.goForward() },
-                showAI = com.kelpie.browser.ai.AIState.isAvailable,
-                onAI = { showAI = true },
-                onSnapshot3D = {
-                    coroutineScope.launch { toggle3DInspector() }
-                },
-            )
+            if (!isScriptRecording) {
+                URLBar(
+                    currentUrl = currentUrl,
+                    canGoBack = canGoBack,
+                    canGoForward = canGoForward,
+                    onNavigate = { url -> webView?.loadUrl(url) },
+                    onBack = { webView?.goBack() },
+                    onForward = { webView?.goForward() },
+                    showAI = com.kelpie.browser.ai.AIState.isAvailable,
+                    onAI = { showAI = true },
+                    onSnapshot3D = {
+                        coroutineScope.launch { toggle3DInspector() }
+                    },
+                )
+            }
 
             BoxWithConstraints(
                 modifier =
@@ -241,7 +247,7 @@ fun BrowserScreen(
             }
         }
 
-        if (showWelcome && (forceShowWelcome || shouldShowWelcome(context))) {
+        if (!isScriptRecording && showWelcome && (forceShowWelcome || shouldShowWelcome(context))) {
             WelcomeCard(
                 onDismiss = {
                     showWelcome = false
@@ -251,35 +257,37 @@ fun BrowserScreen(
         }
 
         // Floating action menu overlay
-        FloatingMenu(
-            onReload = { webView?.reload() },
-            onChromeAuth = {
-                webView?.let { wv ->
-                    handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
-                }
-            },
-            onSettings = { showSettings = true },
-            onBookmarks = { showBookmarks = true },
-            onHistory = { showHistory = true },
-            onNetworkInspector = { showNetworkInspector = true },
-            onAI = { showAI = true },
-            onSnapshot3D = {
-                coroutineScope.launch { toggle3DInspector() }
-            },
-            show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
-            showMobileViewportToggle = isTablet,
-            mobileViewportPresets = availableTabletViewportPresets,
-            selectedMobileViewportPresetId =
-                availableTabletViewportPresets
-                    .firstOrNull { it.id == tabletMobileStagePresetId }
-                    ?.id,
-            onSelectMobileViewportPreset = { presetId ->
-                val nextPresetId = if (tabletMobileStagePresetId == presetId) null else presetId
-                TabletViewportPresetStore.setSelectedPresetId(nextPresetId)
-            },
-        )
+        if (!isScriptRecording) {
+            FloatingMenu(
+                onReload = { webView?.reload() },
+                onChromeAuth = {
+                    webView?.let { wv ->
+                        handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
+                    }
+                },
+                onSettings = { showSettings = true },
+                onBookmarks = { showBookmarks = true },
+                onHistory = { showHistory = true },
+                onNetworkInspector = { showNetworkInspector = true },
+                onAI = { showAI = true },
+                onSnapshot3D = {
+                    coroutineScope.launch { toggle3DInspector() }
+                },
+                show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
+                showMobileViewportToggle = isTablet,
+                mobileViewportPresets = availableTabletViewportPresets,
+                selectedMobileViewportPresetId =
+                    availableTabletViewportPresets
+                        .firstOrNull { it.id == tabletMobileStagePresetId }
+                        ?.id,
+                onSelectMobileViewportPreset = { presetId ->
+                    val nextPresetId = if (tabletMobileStagePresetId == presetId) null else presetId
+                    TabletViewportPresetStore.setSelectedPresetId(nextPresetId)
+                },
+            )
+        }
 
-        if (isIn3DInspector) {
+        if (isIn3DInspector && !isScriptRecording) {
             Box(
                 modifier =
                     Modifier
@@ -307,11 +315,39 @@ fun BrowserScreen(
                 )
             }
         }
+
+        if (isScriptRecording) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .padding(top = 12.dp, end = 12.dp),
+                contentAlignment = Alignment.TopEnd,
+            ) {
+                RecordingStopButton(
+                    onClick = { scriptPlaybackState.requestAbort() },
+                )
+            }
+        }
     }
 
     LaunchedEffect(isIn3DInspector) {
         if (!isIn3DInspector) {
             inspectorMode = "rotate"
+        }
+    }
+
+    LaunchedEffect(isScriptRecording) {
+        if (isScriptRecording) {
+            showSettings = false
+            showBookmarks = false
+            showHistory = false
+            showNetworkInspector = false
+            showAI = false
+            pendingWelcomeFromHelp = false
+            forceShowWelcome = false
+            showWelcome = false
         }
     }
 
@@ -327,6 +363,10 @@ fun BrowserScreen(
                 onShowWelcome = {
                     showSettings = false
                     pendingWelcomeFromHelp = true
+                },
+                onNavigate = { url ->
+                    showSettings = false
+                    webView?.loadUrl(url)
                 },
             )
         }
