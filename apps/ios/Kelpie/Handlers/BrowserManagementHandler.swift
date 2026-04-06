@@ -166,18 +166,36 @@ struct BrowserManagementHandler {
         if let selector = body["selector"] as? String {
             _ = try? await context.evaluateJS("document.querySelector('\(selector)')?.focus()")
         }
-        return successResponse(["keyboardVisible": true, "keyboardHeight": 300, "visibleViewport": ["width": 390, "height": 544]])
+        let kb = context.keyboardObserver
+        let bounds = kb.screenBounds
+        return successResponse([
+            "keyboardVisible": true,
+            "keyboardHeight": Int(kb.height),
+            "visibleViewport": ["width": Int(bounds.width), "height": Int(kb.visibleViewportHeight)]
+        ])
     }
 
     @MainActor
     private func hideKeyboard() async -> [String: Any] {
         _ = try? await context.evaluateJS("document.activeElement?.blur()")
-        return successResponse(["keyboardVisible": false, "visibleViewport": ["width": 390, "height": 844]])
+        let bounds = context.keyboardObserver.screenBounds
+        return successResponse([
+            "keyboardVisible": false,
+            "visibleViewport": ["width": Int(bounds.width), "height": Int(bounds.height)]
+        ])
     }
 
     @MainActor
     private func getKeyboardState() async -> [String: Any] {
-        successResponse(["visible": false, "height": 0, "type": "default", "visibleViewport": ["width": 390, "height": 844], "focusedElement": NSNull()])
+        let kb = context.keyboardObserver
+        let bounds = kb.screenBounds
+        return successResponse([
+            "visible": kb.isVisible,
+            "height": Int(kb.height),
+            "type": "default",
+            "visibleViewport": ["width": Int(bounds.width), "height": Int(kb.visibleViewportHeight)],
+            "focusedElement": NSNull()
+        ])
     }
 
     // MARK: - Viewport

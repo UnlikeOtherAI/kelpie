@@ -20,6 +20,7 @@
 		A100000005 /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000005 /* WebViewCoordinator.swift */; };
 		A100000006 /* BrowserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000006 /* BrowserState.swift */; };
 		A100000067 /* DialogState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000067 /* DialogState.swift */; };
+		A100000100 /* KeyboardObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000100 /* KeyboardObserver.swift */; };
 		A100000055 /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000055 /* FeatureFlags.swift */; };
 		A100000056 /* Snapshot3DBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000056 /* Snapshot3DBridge.swift */; };
 		A100000057 /* Snapshot3DHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000057 /* Snapshot3DHandler.swift */; };
@@ -87,6 +88,7 @@
 		B100000005 /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
 		B100000006 /* BrowserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserState.swift; sourceTree = "<group>"; };
 		B100000067 /* DialogState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogState.swift; sourceTree = "<group>"; };
+		B100000100 /* KeyboardObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardObserver.swift; sourceTree = "<group>"; };
 		B100000055 /* FeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureFlags.swift; sourceTree = "<group>"; };
 		B100000056 /* Snapshot3DBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot3DBridge.swift; path = ../macos/Kelpie/Handlers/Snapshot3DBridge.swift; sourceTree = SOURCE_ROOT; };
 		B100000057 /* Snapshot3DHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Snapshot3DHandler.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 				B100000005 /* WebViewCoordinator.swift */,
 				B100000006 /* BrowserState.swift */,
 				B100000067 /* DialogState.swift */,
+				B100000100 /* KeyboardObserver.swift */,
 				B100000055 /* FeatureFlags.swift */,
 				B100000034 /* SafariAuthHelper.swift */,
 				4372587B096643C1AE55184F /* BookmarkStore.swift */,
@@ -383,6 +386,7 @@
 				A100000005 /* WebViewCoordinator.swift in Sources */,
 				A100000006 /* BrowserState.swift in Sources */,
 				A100000067 /* DialogState.swift in Sources */,
+				A100000100 /* KeyboardObserver.swift in Sources */,
 				A100000055 /* FeatureFlags.swift in Sources */,
 				A100000007 /* HTTPServer.swift in Sources */,
 				A100000008 /* Router.swift in Sources */,
