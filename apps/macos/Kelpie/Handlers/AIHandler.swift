@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 
 private actor AIBackendStore {
@@ -161,6 +162,7 @@ struct AIHandler {
         return successResponse()
     }
 
+    // swiftlint:disable:next function_body_length
     private func infer(_ body: [String: Any]) async -> [String: Any] {
         let backendState = await backendStore.snapshot()
         let nativeLoaded = await MainActor.run { engine.isLoaded }

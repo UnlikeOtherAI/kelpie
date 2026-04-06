@@ -1,7 +1,6 @@
+// swiftlint:disable file_length
 import SwiftUI
 import AppKit
-
-// swiftlint:disable line_length
 
 /// App icon background color — warm peach/orange.
 private let kelpieOrange = NSColor(calibratedRed: 244 / 255, green: 176 / 255, blue: 120 / 255, alpha: 1)
@@ -81,7 +80,13 @@ struct FloatingMenuView: View {
             .init(id: "safari-auth", icon: "safari", accessibilityID: "browser.floating-menu.safari", tooltip: "Safari Auth", action: onSafariAuth),
             .init(id: "bookmarks", icon: "bookmark.fill", accessibilityID: "browser.floating-menu.bookmark-fill", tooltip: "Bookmarks", action: onBookmarks),
             .init(id: "history", icon: "clock.arrow.circlepath", accessibilityID: "browser.floating-menu.clock-arrow-circlepath", tooltip: "History", action: onHistory),
-            .init(id: "network-inspector", icon: "antenna.radiowaves.left.and.right", accessibilityID: "browser.floating-menu.antenna-radiowaves-left-and-right", tooltip: "Network", action: onNetworkInspector),
+            .init(
+                id: "network-inspector",
+                icon: "antenna.radiowaves.left.and.right",
+                accessibilityID: "browser.floating-menu.antenna-radiowaves-left-and-right",
+                tooltip: "Network",
+                action: onNetworkInspector
+            ),
             .init(id: "ai", icon: "brain", accessibilityID: "browser.floating-menu.brain", tooltip: "AI", action: onAI),
             .init(id: "settings", icon: "gear", accessibilityID: "browser.floating-menu.gear", tooltip: "Settings", action: onSettings)
         ]

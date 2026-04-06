@@ -121,6 +121,7 @@ struct DeviceHandler {
     }
 
     @MainActor
+    // swiftlint:disable:next function_body_length
     private func debugScreens() async -> [String: Any] {
         let screens = UIScreen.screens
         let scenes = UIApplication.shared.connectedScenes.map { scene -> [String: Any] in
@@ -212,14 +213,14 @@ struct DeviceHandler {
 
         return successResponse([
             "screenCount": screens.count,
-            "screens": screens.enumerated().map { i, s in
+            "screens": screens.enumerated().map { i, screen in
                 [
                     "index": i,
-                    "width": s.bounds.width,
-                    "height": s.bounds.height,
-                    "scale": s.scale,
-                    "nativeScale": s.nativeScale,
-                    "mirrored": s.mirrored != nil
+                    "width": screen.bounds.width,
+                    "height": screen.bounds.height,
+                    "scale": screen.scale,
+                    "nativeScale": screen.nativeScale,
+                    "mirrored": screen.mirrored != nil
                 ]
             },
             "scenes": scenes,

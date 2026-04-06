@@ -81,8 +81,8 @@ struct Snapshot3DHandler {
             return errorResponse(code: "NOT_ACTIVE", message: "3D inspector is not active")
         }
         let delta: Double
-        if let d = body["delta"] as? Double {
-            delta = d
+        if let value = body["delta"] as? Double {
+            delta = value
         } else if let direction = body["direction"] as? String {
             switch direction.lowercased() {
             case "in": delta = 0.1

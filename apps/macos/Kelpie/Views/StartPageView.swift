@@ -10,10 +10,10 @@ struct StartPageView: View {
         guard let img = NSImage(named: "WelcomeIcon"),
               let tiff = img.tiffRepresentation,
               let rep = NSBitmapImageRep(data: tiff),
-              let c = rep.colorAt(x: 0, y: 0) else {
+              let pixel = rep.colorAt(x: 0, y: 0) else {
             return Color(red: 232 / 255, green: 241 / 255, blue: 249 / 255)
         }
-        return Color(nsColor: c)
+        return Color(nsColor: pixel)
     }
 
     var body: some View {

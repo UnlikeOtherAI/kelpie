@@ -41,19 +41,19 @@ private func loadPresetsFromNative()
     var laptops: [DesktopViewportPreset] = []
     let count = Int(kelpie_viewport_preset_count())
     for i in 0 ..< count {
-        guard let p = kelpie_viewport_preset_get(Int32(i))?.pointee else { continue }
-        let kind: DeviceKind = p.kind == KELPIE_DEVICE_KIND_TABLET ? .tablet
-                             : p.kind == KELPIE_DEVICE_KIND_LAPTOP ? .laptop
+        guard let presetData = kelpie_viewport_preset_get(Int32(i))?.pointee else { continue }
+        let kind: DeviceKind = presetData.kind == KELPIE_DEVICE_KIND_TABLET ? .tablet
+                             : presetData.kind == KELPIE_DEVICE_KIND_LAPTOP ? .laptop
                              : .phone
         let preset = DesktopViewportPreset(
-            id: cstr(p.id),
-            name: cstr(p.name),
-            label: cstr(p.label),
-            menuLabel: cstr(p.menu_label),
+            id: cstr(presetData.id),
+            name: cstr(presetData.name),
+            label: cstr(presetData.label),
+            menuLabel: cstr(presetData.menu_label),
             kind: kind,
-            displaySizeLabel: cstr(p.display_size_label),
-            pixelResolutionLabel: cstr(p.pixel_resolution_label),
-            portraitSize: CGSize(width: CGFloat(p.portrait_width), height: CGFloat(p.portrait_height))
+            displaySizeLabel: cstr(presetData.display_size_label),
+            pixelResolutionLabel: cstr(presetData.pixel_resolution_label),
+            portraitSize: CGSize(width: CGFloat(presetData.portrait_width), height: CGFloat(presetData.portrait_height))
         )
         switch kind {
         case .tablet: tablets.append(preset)
@@ -221,8 +221,8 @@ final class ViewportState: ObservableObject {
     }
 
     var fullStageDimensions: (width: Int, height: Int) {
-        let s = Self.integralSize(stageSize)
-        return (Int(s.width), Int(s.height))
+        let size = Self.integralSize(stageSize)
+        return (Int(size.width), Int(size.height))
     }
 
     // MARK: - Mode selection
@@ -310,8 +310,8 @@ final class ViewportState: ObservableObject {
         case .custom: return requestedCustomViewportSize ?? stageSize
         case let .preset(id):
             guard let preset = allMacViewportPresets.first(where: { $0.id == id }) else { return stageSize }
-            let p = preset.portraitSize
-            return orientation == .landscape ? CGSize(width: p.height, height: p.width) : p
+            let portraitSize = preset.portraitSize
+            return orientation == .landscape ? CGSize(width: portraitSize.height, height: portraitSize.width) : portraitSize
         }
     }
 

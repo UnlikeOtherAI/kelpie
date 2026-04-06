@@ -67,10 +67,10 @@ struct BrowserManagementHandler {
         let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
         let name = body["name"] as? String
         let filtered = name != nil ? cookies.filter { $0.name == name } : cookies
-        let cookieList = filtered.map { c -> [String: Any] in
-            ["name": c.name, "value": c.value, "domain": c.domain, "path": c.path,
-             "expires": c.expiresDate?.description ?? NSNull(), "httpOnly": c.isHTTPOnly,
-             "secure": c.isSecure, "sameSite": c.sameSitePolicy?.rawValue ?? ""]
+        let cookieList = filtered.map { cookie -> [String: Any] in
+            ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
+             "expires": cookie.expiresDate?.description ?? NSNull(), "httpOnly": cookie.isHTTPOnly,
+             "secure": cookie.isSecure, "sameSite": cookie.sameSitePolicy?.rawValue ?? ""]
         }
         return successResponse(["cookies": cookieList, "count": cookieList.count])
     }

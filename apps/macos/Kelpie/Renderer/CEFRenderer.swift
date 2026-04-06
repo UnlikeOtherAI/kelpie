@@ -347,11 +347,11 @@ final class CEFRenderer: RendererEngine {
         var js = ""
         for cookie in cookies {
             if cookie.isHTTPOnly { continue }
-            let d = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            guard host == d || host.hasSuffix(".\(d)") else { continue }
-            let n = cookie.name.replacingOccurrences(of: "'", with: "\\'")
-            let v = cookie.value.replacingOccurrences(of: "'", with: "\\'")
-            var parts = "\(n)=\(v)"
+            let domain = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            guard host == domain || host.hasSuffix(".\(domain)") else { continue }
+            let cookieName = cookie.name.replacingOccurrences(of: "'", with: "\\'")
+            let cookieValue = cookie.value.replacingOccurrences(of: "'", with: "\\'")
+            var parts = "\(cookieName)=\(cookieValue)"
             if !cookie.path.isEmpty { parts += "; path=\(cookie.path)" }
             if !cookie.domain.isEmpty { parts += "; domain=\(cookie.domain)" }
             if cookie.isSecure { parts += "; secure" }
@@ -409,17 +409,17 @@ final class CEFRenderer: RendererEngine {
     private func injectCookiesViaJS(_ cookies: [HTTPCookie]) {
         guard let bridge, let host = currentURL?.host else { return }
         let matching = cookies.filter { cookie in
-            let d = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            return host == d || host.hasSuffix(".\(d)")
+            let domain = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return host == domain || host.hasSuffix(".\(domain)")
         }
         guard !matching.isEmpty else { return }
         NSLog("[CEFRenderer] injecting %d cookies via JS for host=%@", matching.count, host)
         var js = ""
         for cookie in matching {
             if cookie.isHTTPOnly { continue }
-            let n = cookie.name.replacingOccurrences(of: "'", with: "\\'")
-            let v = cookie.value.replacingOccurrences(of: "'", with: "\\'")
-            var parts = "\(n)=\(v)"
+            let cookieName = cookie.name.replacingOccurrences(of: "'", with: "\\'")
+            let cookieValue = cookie.value.replacingOccurrences(of: "'", with: "\\'")
+            var parts = "\(cookieName)=\(cookieValue)"
             if !cookie.path.isEmpty { parts += "; path=\(cookie.path)" }
             if !cookie.domain.isEmpty { parts += "; domain=\(cookie.domain)" }
             if cookie.isSecure { parts += "; secure" }

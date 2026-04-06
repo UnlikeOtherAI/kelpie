@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import SwiftUI
 import WebKit
 
@@ -40,15 +41,15 @@ let tabletViewportPresets: [TabletViewportPreset] = {
     var result: [TabletViewportPreset] = []
     let count = Int(kelpie_viewport_preset_count())
     for i in 0 ..< count {
-        guard let p = kelpie_viewport_preset_get(Int32(i))?.pointee else { continue }
+        guard let preset = kelpie_viewport_preset_get(Int32(i))?.pointee else { continue }
         result.append(TabletViewportPreset(
-            id: _cstr(p.id),
-            name: _cstr(p.name),
-            label: _cstr(p.label),
-            menuLabel: _cstr(p.menu_label),
-            displaySizeLabel: _cstr(p.display_size_label),
-            pixelResolutionLabel: _cstr(p.pixel_resolution_label),
-            portraitSize: CGSize(width: CGFloat(p.portrait_width), height: CGFloat(p.portrait_height))
+            id: _cstr(preset.id),
+            name: _cstr(preset.name),
+            label: _cstr(preset.label),
+            menuLabel: _cstr(preset.menu_label),
+            displaySizeLabel: _cstr(preset.display_size_label),
+            pixelResolutionLabel: _cstr(preset.pixel_resolution_label),
+            portraitSize: CGSize(width: CGFloat(preset.portrait_width), height: CGFloat(preset.portrait_height))
         ))
     }
     return result.sorted {
@@ -589,9 +590,12 @@ struct BrowserView: View {
         let mgr = ExternalDisplayManager.shared
         var lines: [String] = []
 
-        for (i, s) in screens.enumerated() {
-            let o = s.bounds.origin
-            lines.append("scr[\(i)] \(Int(o.x)),\(Int(o.y)) \(Int(s.bounds.width))x\(Int(s.bounds.height)) @\(Int(s.scale))x nat=\(Int(s.nativeScale))x mir=\(s.mirrored != nil)")
+        for (i, screen) in screens.enumerated() {
+            let origin = screen.bounds.origin
+            let wx = Int(origin.x), wy = Int(origin.y)
+            let ww = Int(screen.bounds.width), wh = Int(screen.bounds.height)
+            let sc = Int(screen.scale), nat = Int(screen.nativeScale)
+            lines.append("scr[\(i)] \(wx),\(wy) \(ww)x\(wh) @\(sc)x nat=\(nat)x mir=\(screen.mirrored != nil)")
         }
 
         lines.append("ext: \(mgr.isConnected ? "ON" : "off") sync=\(mgr.isSyncEnabled)")
@@ -601,8 +605,8 @@ struct BrowserView: View {
             lines.append("win: \(Int(wf.width))x\(Int(wf.height))")
         }
         if let wv = mgr.serverState?.handlerContext.webView {
-            let b = wv.bounds
-            lines.append("wv: \(Int(b.width))x\(Int(b.height)) csf=\(String(format: "%.0f", wv.contentScaleFactor))")
+            let bounds = wv.bounds
+            lines.append("wv: \(Int(bounds.width))x\(Int(bounds.height)) csf=\(String(format: "%.0f", wv.contentScaleFactor))")
         }
 
         lines.append("phone: port \(serverState.deviceInfo.port)")

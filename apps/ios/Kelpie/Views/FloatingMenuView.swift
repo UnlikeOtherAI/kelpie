@@ -238,6 +238,7 @@ struct FloatingMenuView: View {
     }
 
     @ViewBuilder
+    // swiftlint:disable:next function_parameter_count
     private func menuItemView(
         icon: String,
         elementId: String,

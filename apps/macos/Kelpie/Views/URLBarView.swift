@@ -315,8 +315,8 @@ struct URLBarView: View {
             accessibilityID: "browser.orientation.switch",
             isEnabled: viewportState.supportsOrientationSelection,
             onSelect: { id in
-                guard let o = ViewportOrientation(rawValue: id) else { return }
-                viewportState.selectOrientation(o)
+                guard let orientation = ViewportOrientation(rawValue: id) else { return }
+                viewportState.selectOrientation(orientation)
             }
         )
         .frame(width: 90, height: 34)

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 enum Snapshot3DBridge {
 
 // swiftlint:disable line_length

@@ -73,20 +73,20 @@ line_length:
   error: 300
 
 file_length:
-  warning: 1200
-  error: 1500
+  warning: 600
+  error: 800
 
 type_body_length:
   warning: 800
   error: 1000
 
 function_body_length:
-  warning: 250
-  error: 400
+  warning: 80
+  error: 150
 
 function_parameter_count:
-  warning: 15
-  error: 20
+  warning: 8
+  error: 12
 
 cyclomatic_complexity:
   warning: 15
@@ -120,18 +120,8 @@ identifier_name:
     - i
     - w
     - h
-    - v
-    - c
-    - s
-    - p
-    - d
-    - n
     - k
-    - o
-    - t
-    - u
-    - m
-    - b
+    - v
   allowed_symbols:
     - _
 

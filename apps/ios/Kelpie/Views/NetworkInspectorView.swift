@@ -57,8 +57,8 @@ struct NetworkInspectorView: View {
 
     private var filteredEntries: [EnumeratedSequence<[NetworkTrafficStore.TrafficEntry]>.Element] {
         var result = Array(store.entries.enumerated())
-        if let m = methodFilter { result = result.filter { $0.element.method == m } }
-        if let c = categoryFilter { result = result.filter { $0.element.category == c } }
+        if let method = methodFilter { result = result.filter { $0.element.method == method } }
+        if let category = categoryFilter { result = result.filter { $0.element.category == category } }
         if let i = initiatorFilter { result = result.filter { $0.element.initiator == i } }
         if !searchText.isEmpty { result = result.filter { $0.element.url.localizedCaseInsensitiveContains(searchText) } }
         return result

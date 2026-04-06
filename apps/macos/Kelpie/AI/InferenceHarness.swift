@@ -106,6 +106,7 @@ struct InferenceHarness {
     }
 
     @MainActor
+    // swiftlint:disable:next function_body_length
     func executeTool(_ name: String, args: [String: String]) async -> String {
         let payload: Any
 

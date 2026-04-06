@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import SwiftUI
 
 /// Main browser window: toolbar + renderer view + floating menu overlay.
@@ -251,9 +252,9 @@ struct BrowserView: View {
                     url: url,
                     skipInFuture: $skipInsecureWarning,
                     onContinue: {
-                        let u = url
+                        let targetURL = url
                         pendingInsecureURL = nil
-                        serverState.handlerContext.load(url: u)
+                        serverState.handlerContext.load(url: targetURL)
                     },
                     onCancel: { pendingInsecureURL = nil }
                 )
@@ -910,29 +911,29 @@ private final class ResizeHandleView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let t = trackingArea { removeTrackingArea(t) }
-        let t = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(t)
-        trackingArea = t
+        if let area = trackingArea { removeTrackingArea(area) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
     }
 
     override func mouseEntered(with event: NSEvent) { NSCursor.resizeLeftRight.push() }
     override func mouseExited(with event: NSEvent) { NSCursor.pop() }
 
     override func mouseDown(with event: NSEvent) {
-        guard let c = coordinator else { return }
-        c.dragStartWidth = c.panelWidth
-        c.dragStartX = event.locationInWindow.x
+        guard let coord = coordinator else { return }
+        coord.dragStartWidth = coord.panelWidth
+        coord.dragStartX = event.locationInWindow.x
         NSCursor.resizeLeftRight.push()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let c = coordinator,
-              let startWidth = c.dragStartWidth,
-              let startX = c.dragStartX else { return }
+        guard let coord = coordinator,
+              let startWidth = coord.dragStartWidth,
+              let startX = coord.dragStartX else { return }
         let dx = startX - event.locationInWindow.x
         let newWidth = min(max(startWidth + dx, 200), 500)
-        c.panelWidth = newWidth
+        coord.panelWidth = newWidth
     }
 
     override func mouseUp(with event: NSEvent) {

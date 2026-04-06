@@ -426,8 +426,8 @@ final class SegmentedTooltipView: NSView {
     func setText(_ text: String) { label.stringValue = text; layoutSubtreeIfNeeded() }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override var fittingSize: NSSize {
-        let s = label.fittingSize
-        return NSSize(width: s.width + 20, height: max(s.height + 12, 28))
+        let size = label.fittingSize
+        return NSSize(width: size.width + 20, height: max(size.height + 12, 28))
     }
 }
 
