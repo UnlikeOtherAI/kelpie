@@ -20,7 +20,7 @@ struct DOMHandler {
         let depth = body["depth"] as? Int ?? 10
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return JSON.stringify({found: false});
             var html = el.outerHTML;
             return JSON.stringify({found: true, html: html, nodeCount: el.querySelectorAll('*').length + 1});
@@ -44,7 +44,7 @@ struct DOMHandler {
         }
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return {found: false};
             var rect = el.getBoundingClientRect();
             return {found: true, element: {tag: el.tagName.toLowerCase(), id: el.id || undefined, text: (el.textContent || '').trim().substring(0, 200), classes: Array.from(el.classList), rect: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}, visible: rect.width > 0 && rect.height > 0}};
@@ -65,7 +65,7 @@ struct DOMHandler {
         }
         let js = """
         (function() {
-            var els = document.querySelectorAll('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var els = document.querySelectorAll('\(JSEscape.string(selector))');
             return {count: els.length, elements: Array.from(els).slice(0, 100).map(function(el) {
                 var rect = el.getBoundingClientRect();
                 return {tag: el.tagName.toLowerCase(), id: el.id || undefined, text: (el.textContent || '').trim().substring(0, 200), rect: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}};
@@ -85,7 +85,7 @@ struct DOMHandler {
         guard let selector = body["selector"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
-        let js = "(document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))')?.textContent || '')"
+        let js = "(document.querySelector('\(JSEscape.string(selector))')?.textContent || '')"
         do {
             let text = try await context.evaluateJSReturningString(js)
             return successResponse(["text": text.trimmingCharacters(in: .whitespacesAndNewlines)])
@@ -101,7 +101,7 @@ struct DOMHandler {
         }
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
             var attrs = {};
             for (var i = 0; i < el.attributes.length; i++) attrs[el.attributes[i].name] = el.attributes[i].value;

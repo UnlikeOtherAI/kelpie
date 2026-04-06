@@ -476,12 +476,7 @@ struct InferenceHarness {
     }
 
     private func escapeForJavaScript(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
+        JSEscape.string(value)
     }
 
     private func elapsedMs(since startedAt: DispatchTime) -> Int {

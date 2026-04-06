@@ -55,7 +55,7 @@ struct ScrollHandler {
         let maxScrolls = body["maxScrolls"] as? Int ?? 10
         let js = """
         (function() {
-            var el = document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');
+            var el = document.querySelector('\(JSEscape.string(selector))');
             if (!el) return null;
             el.scrollIntoView({block: '\(position)', behavior: 'smooth'});
             \(Self.sync3DStateJS)

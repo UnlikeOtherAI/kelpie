@@ -349,8 +349,8 @@ final class CEFRenderer: RendererEngine {
             if cookie.isHTTPOnly { continue }
             let domain = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
             guard host == domain || host.hasSuffix(".\(domain)") else { continue }
-            let cookieName = cookie.name.replacingOccurrences(of: "'", with: "\\'")
-            let cookieValue = cookie.value.replacingOccurrences(of: "'", with: "\\'")
+            let cookieName = JSEscape.string(cookie.name)
+            let cookieValue = JSEscape.string(cookie.value)
             var parts = "\(cookieName)=\(cookieValue)"
             if !cookie.path.isEmpty { parts += "; path=\(cookie.path)" }
             if !cookie.domain.isEmpty { parts += "; domain=\(cookie.domain)" }
@@ -417,8 +417,8 @@ final class CEFRenderer: RendererEngine {
         var js = ""
         for cookie in matching {
             if cookie.isHTTPOnly { continue }
-            let cookieName = cookie.name.replacingOccurrences(of: "'", with: "\\'")
-            let cookieValue = cookie.value.replacingOccurrences(of: "'", with: "\\'")
+            let cookieName = JSEscape.string(cookie.name)
+            let cookieValue = JSEscape.string(cookie.value)
             var parts = "\(cookieName)=\(cookieValue)"
             if !cookie.path.isEmpty { parts += "; path=\(cookie.path)" }
             if !cookie.domain.isEmpty { parts += "; domain=\(cookie.domain)" }

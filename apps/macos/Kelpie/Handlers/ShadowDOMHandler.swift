@@ -16,8 +16,8 @@ struct ShadowDOMHandler {
         }
         let shadowSelector = body["shadowSelector"] as? String ?? "*"
         let pierce = body["pierce"] as? Bool ?? true
-        let safeHost = hostSelector.replacingOccurrences(of: "'", with: "\\'")
-        let safeShadow = shadowSelector.replacingOccurrences(of: "'", with: "\\'")
+        let safeHost = JSEscape.string(hostSelector)
+        let safeShadow = JSEscape.string(shadowSelector)
 
         let js = """
         (function(){

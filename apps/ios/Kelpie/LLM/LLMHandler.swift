@@ -26,7 +26,7 @@ struct LLMHandler {
         let interactableOnly = body["interactableOnly"] as? Bool ?? false
         let maxDepth = body["maxDepth"] as? Int ?? 5
         let js = """
-        (function(){function walk(el,depth){if(depth>"\(maxDepth)")return null;var role=el.getAttribute('role')||el.tagName.toLowerCase();var name=el.getAttribute('aria-label')||el.textContent?.trim().substring(0,50)||'';var node={role:role,name:name};if(el.getAttribute('aria-checked'))node.checked=el.getAttribute('aria-checked')==='true';if(el.disabled)node.disabled=true;if(document.activeElement===el)node.focused=true;var children=[];for(var c of el.children){var cn=walk(c,depth+1);if(cn)children.push(cn);}if(children.length)node.children=children;return node;}var root=document.querySelector('\(root.replacingOccurrences(of: "'", with: "\\'"))');if(!root)return{tree:{role:'none'},nodeCount:0};var tree=walk(root,0);var count=root.querySelectorAll('*').length;return{tree:tree,nodeCount:count};})()
+        (function(){function walk(el,depth){if(depth>"\(maxDepth)")return null;var role=el.getAttribute('role')||el.tagName.toLowerCase();var name=el.getAttribute('aria-label')||el.textContent?.trim().substring(0,50)||'';var node={role:role,name:name};if(el.getAttribute('aria-checked'))node.checked=el.getAttribute('aria-checked')==='true';if(el.disabled)node.disabled=true;if(document.activeElement===el)node.focused=true;var children=[];for(var c of el.children){var cn=walk(c,depth+1);if(cn)children.push(cn);}if(children.length)node.children=children;return node;}var root=document.querySelector('\(JSEscape.string(root))');if(!root)return{tree:{role:'none'},nodeCount:0};var tree=walk(root,0);var count=root.querySelectorAll('*').length;return{tree:tree,nodeCount:count};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)
@@ -55,7 +55,7 @@ struct LLMHandler {
         let mode = body["mode"] as? String ?? "readable"
         let selector = body["selector"] as? String ?? "body"
         let js = """
-        (function(){var el=document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim(),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
+        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim(),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)
@@ -106,7 +106,7 @@ struct LLMHandler {
     private func findInput(_ body: [String: Any]) async -> [String: Any] {
         let label = body["label"] as? String ?? ""
         let js = """
-        (function(){var inputs=document.querySelectorAll('input,select,textarea');for(var el of inputs){var lbl=el.getAttribute('aria-label')||el.placeholder||el.name||'';if(lbl.toLowerCase().includes('\(label.lowercased().replacingOccurrences(of: "'", with: "\\'"))')){var r=el.getBoundingClientRect();return{found:true,element:{tag:el.tagName.toLowerCase(),type:el.type||'text',name:el.name||'',selector:el.tagName.toLowerCase()+(el.name?'[name=\"'+el.name+'\"]':''),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()
+        (function(){var inputs=document.querySelectorAll('input,select,textarea');for(var el of inputs){var lbl=el.getAttribute('aria-label')||el.placeholder||el.name||'';if(lbl.toLowerCase().includes('\(JSEscape.string(label.lowercased()))')){var r=el.getBoundingClientRect();return{found:true,element:{tag:el.tagName.toLowerCase(),type:el.type||'text',name:el.name||'',selector:el.tagName.toLowerCase()+(el.name?'[name=\"'+el.name+'\"]':''),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)
@@ -119,7 +119,7 @@ struct LLMHandler {
     @MainActor
     private func findByText(_ text: String, filter: String) async -> [String: Any] {
         let js = """
-        (function(){var all=document.querySelectorAll('*');for(var el of all){if(!(\(filter)))continue;var t=(el.textContent||'').trim();if(t.toLowerCase().includes('\(text.lowercased().replacingOccurrences(of: "'", with: "\\'"))')){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0)return{found:true,element:{tag:el.tagName.toLowerCase(),text:t.substring(0,100),selector:el.tagName.toLowerCase()+(el.id?'#'+el.id:''),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()
+        (function(){var all=document.querySelectorAll('*');for(var el of all){if(!(\(filter)))continue;var t=(el.textContent||'').trim();if(t.toLowerCase().includes('\(JSEscape.string(text.lowercased()))')){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0)return{found:true,element:{tag:el.tagName.toLowerCase(),text:t.substring(0,100),selector:el.tagName.toLowerCase()+(el.id?'#'+el.id:''),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()
         """
         do {
             return try await context.evaluateJSReturningJSON(js)
@@ -181,7 +181,7 @@ struct LLMHandler {
             return errorResponse(code: "MISSING_PARAM", message: "index and value are required")
         }
         let js = """
-        (function(){var els=document.querySelectorAll('input,select,textarea');var el=Array.from(els).filter(function(e){var r=e.getBoundingClientRect();return r.width>0&&r.height>0;})[\(index)];if(!el)return null;el.focus();el.value='\(value.replacingOccurrences(of: "'", with: "\\'"))';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return{role:el.getAttribute('role')||el.tagName.toLowerCase(),name:(el.placeholder||el.name||'').trim(),selector:el.tagName.toLowerCase()+(el.id?'#'+el.id:'')};})()
+        (function(){var els=document.querySelectorAll('input,select,textarea');var el=Array.from(els).filter(function(e){var r=e.getBoundingClientRect();return r.width>0&&r.height>0;})[\(index)];if(!el)return null;el.focus();el.value='\(JSEscape.string(value))';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return{role:el.getAttribute('role')||el.tagName.toLowerCase(),name:(el.placeholder||el.name||'').trim(),selector:el.tagName.toLowerCase()+(el.id?'#'+el.id:'')};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)

@@ -281,7 +281,7 @@ struct BrowserManagementHandler {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
         let js = """
-        (function(){var el=document.querySelector('\(selector.replacingOccurrences(of: "'", with: "\\'"))');if(!el)return null;var r=el.getBoundingClientRect();return{element:{selector:'\(selector)',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},obscured:false,reason:null,keyboardOverlap:null,suggestion:null};})()
+        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return null;var r=el.getBoundingClientRect();return{element:{selector:'\(selector)',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},obscured:false,reason:null,keyboardOverlap:null,suggestion:null};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)

@@ -136,17 +136,13 @@ final class HandlerContext {
 
     /// Show a toast message overlay at the bottom of the viewport.
     func showToast(_ message: String) async {
-        let escaped = message
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
         let js = """
         (function() {
             var existing = document.getElementById('__kelpie_toast');
             if (existing) existing.remove();
             var toast = document.createElement('div');
             toast.id = '__kelpie_toast';
-            toast.textContent = '\(escaped)';
+            toast.textContent = '\(JSEscape.string(message))';
             toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
                 'max-width:390px;width:calc(100% - 32px);padding:14px 22px;border-radius:16px;' +
                 'background:rgba(0,0,0,0.5);color:#fff;font:15px/1.4 -apple-system,system-ui,sans-serif;' +
