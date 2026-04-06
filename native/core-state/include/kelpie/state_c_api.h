@@ -26,6 +26,7 @@ KelpieHistoryStoreRef kelpie_history_store_create(void);
 void kelpie_history_store_destroy(KelpieHistoryStoreRef store);
 void kelpie_history_store_record(KelpieHistoryStoreRef store, const char* url, const char* title);
 void kelpie_history_store_clear(KelpieHistoryStoreRef store);
+int32_t kelpie_history_store_remove_by_id(KelpieHistoryStoreRef store, const char* id);
 void kelpie_history_store_update_latest_title(KelpieHistoryStoreRef store,
                                                 const char* url,
                                                 const char* title);

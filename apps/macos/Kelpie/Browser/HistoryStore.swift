@@ -64,6 +64,7 @@ final class HistoryStore: ObservableObject {
 
     @Published private(set) var entries: [HistoryEntry] = []
 
+    private static let maxEntries = 500
     private let key = "kelpie_history"
     private let storeHandle = kelpie_history_store_create()
 
@@ -102,12 +103,11 @@ final class HistoryStore: ObservableObject {
 
     func remove(id: UUID) {
         guard let storeHandle else { return }
-        entries.removeAll { $0.id == id }
-        persist()
-        let json = Self.makeJSONString(from: entries.map(Self.persistedJSONObject)) ?? "[]"
-        json.withCString { jsonPointer in
-            kelpie_history_store_load_json(storeHandle, jsonPointer)
+        id.uuidString.withCString { idPointer in
+            kelpie_history_store_remove_by_id(storeHandle, idPointer)
         }
+        refreshFromCore()
+        persist()
     }
 
     func updateLatestTitle(for url: String, title: String) {
@@ -148,7 +148,10 @@ final class HistoryStore: ObservableObject {
             return
         }
 
-        let decoded = Self.decodeEntries(from: json.data(using: .utf8) ?? Data()) ?? []
+        var decoded = Self.decodeEntries(from: json.data(using: .utf8) ?? Data()) ?? []
+        if decoded.count > Self.maxEntries {
+            decoded = Array(decoded.suffix(Self.maxEntries))
+        }
         entries = Array(decoded.reversed())
     }
 

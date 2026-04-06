@@ -18,6 +18,7 @@ class HistoryStore {
  public:
   void Record(const std::string& url, const std::string& title);
   void Clear();
+  bool RemoveById(const std::string& id);
   void UpdateLatestTitle(const std::string& url, const std::string& title);
   void LoadJson(const std::string& json);
   std::string ToJson() const;

@@ -62,7 +62,13 @@ enum NetworkBridge {
 
             // --- fetch interception ---
             var origFetch = window.fetch;
+            var _pendingFetches = 0;
+            var _maxPendingFetches = 100;
             window.fetch = function(input, init) {
+                var signal = init && init.signal;
+                if (signal && signal.aborted) return origFetch.apply(this, arguments);
+                if (_pendingFetches >= _maxPendingFetches) return origFetch.apply(this, arguments);
+                _pendingFetches++;
                 var startTime = Date.now();
                 var method = (init && init.method) || 'GET';
                 var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -78,6 +84,7 @@ enum NetworkBridge {
                     ? init.body.substring(0, 10000) : null;
 
                 return origFetch.apply(this, arguments).then(function(response) {
+                    _pendingFetches--;
                     var duration = Date.now() - startTime;
                     var respHeaders = {};
                     response.headers.forEach(function(v, k) { respHeaders[k] = v; });
@@ -107,6 +114,9 @@ enum NetworkBridge {
                         } catch(e) {}
                     });
                     return response;
+                }).catch(function(err) {
+                    _pendingFetches--;
+                    throw err;
                 });
             };
         })();

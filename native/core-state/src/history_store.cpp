@@ -55,6 +55,17 @@ void HistoryStore::Clear() {
   entries_.clear();
 }
 
+bool HistoryStore::RemoveById(const std::string& id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = std::remove_if(entries_.begin(), entries_.end(),
+                           [&id](const HistoryEntry& e) { return e.id == id; });
+  if (it == entries_.end()) {
+    return false;
+  }
+  entries_.erase(it, entries_.end());
+  return true;
+}
+
 void HistoryStore::UpdateLatestTitle(const std::string& url, const std::string& title) {
   const std::string trimmed_title = store_support::Trim(title);
 

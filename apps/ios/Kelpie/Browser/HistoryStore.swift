@@ -29,6 +29,7 @@ final class HistoryStore: ObservableObject {
 
     @Published private(set) var entries: [HistoryEntry] = []
 
+    private static let maxEntries = 500
     private let key = "kelpie_history"
     private let handle: KelpieHistoryStoreRef
 
@@ -109,11 +110,14 @@ final class HistoryStore: ObservableObject {
     private func refreshPublishedEntries(from json: String?) {
         guard let json,
               let data = json.data(using: .utf8),
-              let newestFirst = decodeNewestFirstEntries(from: data) else {
+              var newestFirst = decodeNewestFirstEntries(from: data) else {
             entries = []
             return
         }
 
+        if newestFirst.count > Self.maxEntries {
+            newestFirst = Array(newestFirst.prefix(Self.maxEntries))
+        }
         entries = Array(newestFirst.reversed())
     }
 

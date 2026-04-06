@@ -119,6 +119,17 @@ void kelpie_history_store_clear(KelpieHistoryStoreRef store) {
   }
 }
 
+int32_t kelpie_history_store_remove_by_id(KelpieHistoryStoreRef store, const char* id) {
+  if (store == nullptr) {
+    return 0;
+  }
+  try {
+    return store->store.RemoveById(kelpie::state_c_api_internal::SafeCString(id)) ? 1 : 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
 void kelpie_history_store_update_latest_title(KelpieHistoryStoreRef store,
                                                 const char* url,
                                                 const char* title) {

@@ -27,6 +27,11 @@ class DesktopHttpServer {
   bool IsRunning() const;
   int bound_port() const;
 
+  // NOTE: The Swift HTTPServer (ServerState) implements port fallback logic
+  // (tries port+1, port+2, etc.) when the preferred port is busy. If both
+  // servers ever run simultaneously, this C++ side should also attempt fallback.
+  // Currently only one server runs at a time so this is not yet needed.
+
  private:
   class Impl;
   std::unique_ptr<Impl> impl_;

@@ -126,8 +126,18 @@ final class HTTPServer: @unchecked Sendable {
                 if let contentLength, bodyReceived >= contentLength {
                     Task { await self.processRequest(connection: connection, data: accumulated) }
                 } else if contentLength == nil {
-                    // No Content-Length: process what we have
-                    Task { await self.processRequest(connection: connection, data: accumulated) }
+                    // Reject POSTs without Content-Length; GETs never have a body.
+                    let headerString2 = String(data: accumulated[..<headerEnd.lowerBound], encoding: .utf8) ?? ""
+                    let requestLine = headerString2.components(separatedBy: "\r\n").first ?? ""
+                    if requestLine.hasPrefix("POST ") {
+                        let body = Data("""
+                        {"error":"Content-Length required"}
+                        """.utf8)
+                        let response = self.buildHTTPResponse(statusCode: 411, body: body)
+                        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+                    } else {
+                        Task { await self.processRequest(connection: connection, data: accumulated) }
+                    }
                 } else {
                     self.receiveData(connection: connection, buffer: accumulated)
                 }
@@ -198,6 +208,7 @@ final class HTTPServer: @unchecked Sendable {
         switch statusCode {
         case 200: statusText = "OK"
         case 400: statusText = "Bad Request"
+        case 411: statusText = "Length Required"
         case 404: statusText = "Not Found"
         case 500: statusText = "Internal Server Error"
         default: statusText = "Unknown"
