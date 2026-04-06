@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kelpie — LLM-First Mobile Browser</title>
+  <meta name="description" content="Control real mobile browsers with AI. Native iOS and Android apps with mDNS discovery, HTTP API, and MCP. Part of the UnlikeOtherAI ecosystem.">
+  <meta property="og:title" content="Kelpie — LLM-First Mobile Browser">
+  <meta property="og:description" content="Language models controlling real mobile devices on your local network.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,700&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:         #060a13;
+      --surface:    #0d1525;
+      --surface2:   #111c2e;
+      --border:     rgba(61, 142, 255, 0.10);
+      --border2:    rgba(61, 142, 255, 0.22);
+      --blue:       #3d8eff;
+      --blue-glow:  rgba(61, 142, 255, 0.28);
+      --teal:       #00e5b0;
+      --teal-dim:   rgba(0, 229, 176, 0.65);
+      --green:      #22c55e;
+      --green-glow: rgba(34, 197, 94, 0.28);
+      --text:       #dce6f8;
+      --text2:      #8a9bbf;
+      --muted:      #3d4f6a;
+      --serif:      'Fraunces', Georgia, serif;
+      --sans:       'Bricolage Grotesque', system-ui, sans-serif;
+      --mono:       'Fira Code', 'Courier New', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.85em;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--teal);
+    }
+
+    /* ── Depth background ── */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-canvas::before {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background:
+        radial-gradient(ellipse 65% 45% at 15% 65%, rgba(45, 100, 255, 0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 65% at 85% 20%, rgba(0, 200, 155, 0.04) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 38% at 55% 90%, rgba(45, 100, 255, 0.05) 0%, transparent 60%);
+      animation: depth-a 28s ease-in-out infinite alternate;
+    }
+    .bg-canvas::after {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background:
+        radial-gradient(ellipse 42% 55% at 75% 45%, rgba(34, 197, 94, 0.025) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 32% at 28% 78%, rgba(61, 142, 255, 0.05) 0%, transparent 62%);
+      animation: depth-b 35s ease-in-out infinite alternate;
+    }
+
+    @keyframes depth-a {
+      from { transform: scale(1) translate(0,0); }
+      to   { transform: scale(1.12) translate(3%,-4%); }
+    }
+    @keyframes depth-b {
+      from { transform: scale(1.08) translate(-2%,2%); }
+      to   { transform: scale(1) translate(3%,-3%); }
+    }
+
+    /* ── Layout ── */
+    .layer { position: relative; z-index: 1; }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: rgba(6, 10, 19, 0.82);
+      backdrop-filter: blur(24px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+    .nav-brand {
+      font-family: var(--sans);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text2);
+    }
+    .nav-brand strong { color: var(--blue); }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--text2);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--blue);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 5px 14px;
+      transition: background 0.2s;
+    }
+    .nav-cta:hover { background: rgba(61, 142, 255, 0.08); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 0 60px;
+    }
+    .hero-inner {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 72px;
+      align-items: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--border2);
+      border-radius: 999px;
+      padding: 5px 16px 5px 9px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--teal-dim);
+      margin-bottom: 32px;
+      width: fit-content;
+    }
+    .badge-pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+      animation: blink 2.4s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(3.2rem, 5.5vw, 6rem);
+      font-weight: 700;
+      line-height: 0.96;
+      letter-spacing: -0.025em;
+      color: #fff;
+      margin-bottom: 28px;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--blue);
+      display: block;
+    }
+
+    .hero-desc {
+      font-size: 1.08rem;
+      font-weight: 300;
+      color: var(--text2);
+      max-width: 460px;
+      line-height: 1.75;
+      margin-bottom: 40px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--blue);
+      color: #fff;
+      border-radius: 9px;
+      padding: 13px 26px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 0 28px var(--blue-glow);
+    }
+    .btn-primary:hover {
+      background: #5ba3ff;
+      box-shadow: 0 0 48px var(--blue-glow);
+      transform: translateY(-2px);
+    }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      padding: 13px 26px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 400;
+      transition: all 0.2s;
+    }
+    .btn-ghost:hover {
+      background: rgba(61, 142, 255, 0.06);
+      border-color: rgba(61, 142, 255, 0.38);
+    }
+
+    .install-strip {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 11px 16px;
+    }
+    .install-prompt {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .install-cmd {
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      color: var(--teal);
+    }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted);
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--border2); }
+
+    /* ── Hero logo ── */
+    .hero-visual {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-orb {
+      position: relative;
+    }
+    .logo-halo {
+      position: absolute;
+      inset: -30px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(45, 100, 255, 0.22) 0%, transparent 70%);
+      animation: halo 5s ease-in-out infinite alternate;
+    }
+    @keyframes halo {
+      from { transform: scale(0.88); opacity: 0.6; }
+      to   { transform: scale(1.12); opacity: 1; }
+    }
+    .logo-ring {
+      position: absolute;
+      inset: -16px;
+      border-radius: 50%;
+      border: 1px solid rgba(61, 142, 255, 0.18);
+      animation: ring-spin 18s linear infinite;
+    }
+    .logo-ring::before {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      background: var(--blue);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--blue);
+      transform: translateX(-50%);
+    }
+    @keyframes ring-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    .hero-logo-img {
+      width: 240px;
+      height: 240px;
+      border-radius: 36px;
+      display: block;
+      position: relative;
+      z-index: 2;
+      filter: drop-shadow(0 8px 40px rgba(45, 100, 255, 0.35));
+      animation: float 7s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-14px); }
+    }
+
+    /* ── Rule line ── */
+    .rule {
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        var(--border2) 25%,
+        var(--border2) 75%,
+        transparent 100%
+      );
+      position: relative;
+      margin: 0;
+    }
+    .rule-gem {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: var(--blue);
+      border-radius: 50%;
+      box-shadow: 0 0 14px var(--blue);
+    }
+
+    /* ── Stats strip ── */
+    .stats-strip {
+      padding: 52px 0;
+    }
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .stat-cell {
+      padding: 28px 24px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-num {
+      font-family: var(--serif);
+      font-size: 2.8rem;
+      font-weight: 700;
+      line-height: 1;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .stat-num sup { font-size: 1.4rem; color: var(--blue); }
+    .stat-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Features ── */
+    .features { padding: 80px 0; }
+
+    .section-eyebrow {
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 14px;
+    }
+    .section-h {
+      font-family: var(--serif);
+      font-size: clamp(1.9rem, 3.2vw, 3rem);
+      font-weight: 400;
+      color: #fff;
+      line-height: 1.15;
+      margin-bottom: 52px;
+    }
+    .section-h em {
+      font-style: italic;
+      color: var(--text2);
+    }
+
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--border);
+    }
+    .feat-card {
+      background: var(--surface);
+      padding: 32px 28px;
+      position: relative;
+      transition: background 0.25s;
+    }
+    .feat-card:hover { background: var(--surface2); }
+
+    .feat-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      background: rgba(61, 142, 255, 0.08);
+      border: 1px solid rgba(61, 142, 255, 0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      margin-bottom: 18px;
+    }
+    .feat-card h3 {
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 9px;
+    }
+    .feat-card p {
+      font-size: 0.85rem;
+      font-weight: 300;
+      color: var(--text2);
+      line-height: 1.65;
+    }
+
+    /* ── Ecosystem ── */
+    .ecosystem { padding: 96px 0; }
+
+    .eco-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .eco-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 44px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.35s cubic-bezier(.22,.68,0,1.2), border-color 0.3s;
+    }
+    .eco-card::after {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+    .eco-card:hover { transform: translateY(-6px); }
+    .eco-card:hover::after { opacity: 1; }
+
+    .eco-card.silkie { border-color: rgba(61, 142, 255, 0.13); }
+    .eco-card.silkie::after { background: radial-gradient(circle, rgba(61, 142, 255, 0.13) 0%, transparent 70%); }
+    .eco-card.silkie:hover { border-color: rgba(61, 142, 255, 0.32); }
+
+    .eco-card.nessie { border-color: rgba(34, 197, 94, 0.13); }
+    .eco-card.nessie::after { background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%); }
+    .eco-card.nessie:hover { border-color: rgba(34, 197, 94, 0.32); }
+
+    .eco-logo-wrap { margin-bottom: 26px; }
+    .eco-logo {
+      width: 84px;
+      height: 84px;
+      border-radius: 20px;
+      display: block;
+    }
+    .eco-card.silkie .eco-logo {
+      filter: drop-shadow(0 4px 20px rgba(45, 100, 255, 0.38));
+    }
+    .eco-card.nessie .eco-logo {
+      filter: drop-shadow(0 4px 20px rgba(34, 197, 94, 0.38));
+    }
+
+    .eco-card h2 {
+      font-family: var(--serif);
+      font-size: 2.2rem;
+      font-weight: 400;
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .eco-tag {
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .eco-card.silkie .eco-tag { color: var(--blue); }
+    .eco-card.nessie .eco-tag { color: var(--green); }
+
+    .eco-card p {
+      font-size: 0.875rem;
+      font-weight: 300;
+      color: var(--text2);
+      line-height: 1.72;
+      margin-bottom: 28px;
+    }
+
+    .eco-bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 28px;
+    }
+    .eco-bullets li {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 0.84rem;
+      color: var(--text2);
+    }
+    .eco-bullets li::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      position: relative;
+      top: -1px;
+    }
+    .eco-card.silkie .eco-bullets li::before { background: var(--blue); }
+    .eco-card.nessie .eco-bullets li::before { background: var(--green); }
+
+    .eco-chips {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 9px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    /* ── CTA banner ── */
+    .cta-band {
+      padding: 80px 0;
+      border-top: 1px solid var(--border);
+    }
+    .cta-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 40px;
+    }
+    .cta-text h2 {
+      font-family: var(--serif);
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+      line-height: 1.1;
+    }
+    .cta-text p {
+      font-size: 0.95rem;
+      font-weight: 300;
+      color: var(--text2);
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+    }
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .footer-brand {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .footer-brand strong { color: var(--text2); }
+    .footer-nav {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+    .footer-nav a {
+      font-size: 0.8rem;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .footer-nav a:hover { color: var(--text2); }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .reveal.in { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .hero-inner { grid-template-columns: 1fr; text-align: center; }
+      .hero-visual { margin: 0 auto; order: -1; }
+      .hero-badge { margin: 0 auto 32px; }
+      .hero-desc { margin: 0 auto 40px; }
+      .hero-actions { justify-content: center; }
+      .install-strip { margin: 0 auto; }
+      .hero-logo-img { width: 180px; height: 180px; }
+      .feat-grid { grid-template-columns: 1fr 1fr; }
+      .eco-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .stat-cell:nth-child(2) { border-right: none; }
+      .stat-cell:nth-child(3) { border-top: 1px solid var(--border); }
+      .cta-inner { flex-direction: column; text-align: center; }
+      .footer-row { flex-direction: column; text-align: center; }
+    }
+    @media (max-width: 560px) {
+      .feat-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-canvas"></div>
+
+  <div class="layer">
+    <!-- ── Nav ── -->
+    <nav>
+      <div class="nav-row">
+        <span class="nav-brand">Unlike<strong>Other</strong>AI</span>
+        <ul class="nav-links">
+          <li><a href="#kelpie">Kelpie</a></li>
+          <li><a href="#silkie">Silkie</a></li>
+          <li><a href="#nessie">Nessie</a></li>
+          <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+        </ul>
+        <a href="https://github.com/unlikeotherai/kelpie" class="nav-cta">Get started →</a>
+      </div>
+    </nav>
+
+    <!-- ── Hero ── -->
+    <section class="hero" id="kelpie">
+      <div class="container">
+        <div class="hero-inner">
+          <div class="hero-text">
+            <div class="hero-badge">
+              <span class="badge-pulse"></span>
+              Open source · Available now
+            </div>
+            <h1>
+              Real mobile.<br>
+              Real browsers.<br>
+              <em>Real AI control.</em>
+            </h1>
+            <p class="hero-desc">
+              Kelpie is an LLM-first browser for iOS and Android. Language models discover and orchestrate real mobile devices on the local network — no emulators, no persistent scripts, no desktop required.
+            </p>
+            <div class="hero-actions">
+              <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                View on GitHub
+              </a>
+              <a href="https://www.npmjs.com/package/@unlikeotherai/kelpie" class="btn-ghost">
+                npm package →
+              </a>
+            </div>
+            <div class="install-strip">
+              <span class="install-prompt">$</span>
+              <span class="install-cmd" id="cmd-text">npm i -g @unlikeotherai/kelpie</span>
+              <button class="copy-btn" id="copy-btn" onclick="copyInstall()" title="Copy to clipboard">copy</button>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <div class="logo-orb">
+              <div class="logo-halo"></div>
+              <div class="logo-ring"></div>
+              <img src="assets/kelpie.png" alt="Kelpie — LLM-first mobile browser" class="hero-logo-img">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stats ── -->
+    <div class="container">
+      <div class="rule"><div class="rule-gem"></div></div>
+      <div class="stats-strip">
+        <div class="stats-row reveal">
+          <div class="stat-cell">
+            <div class="stat-num">2<sup>×</sup></div>
+            <div class="stat-label">Platforms</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num">60<sup>+</sup></div>
+            <div class="stat-label">API Methods</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num">∞</div>
+            <div class="stat-label">Devices</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num">0<sup>ms</sup></div>
+            <div class="stat-label">Cold Start</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Features ── -->
+    <section class="features">
+      <div class="container">
+        <div class="section-eyebrow">Capabilities</div>
+        <div class="section-h reveal">Everything your LLM<br>needs to command <em>the mobile web.</em></div>
+        <div class="feat-grid">
+          <div class="feat-card reveal">
+            <div class="feat-icon">📡</div>
+            <h3>mDNS Auto-Discovery</h3>
+            <p>Browsers advertise themselves as <code>_kelpie._tcp</code> on the local network. The CLI finds every device — no IPs, no manual config, no pairing.</p>
+          </div>
+          <div class="feat-card reveal reveal-delay-1">
+            <div class="feat-icon">⚡</div>
+            <h3>Group Commands</h3>
+            <p>Navigate, click, and fill forms across an entire fleet simultaneously. One instruction, every device, in parallel — with per-device result aggregation.</p>
+          </div>
+          <div class="feat-card reveal reveal-delay-2">
+            <div class="feat-icon">🔌</div>
+            <h3>Native MCP</h3>
+            <p>Full Model Context Protocol support in both the browser and the CLI. Any MCP client connects directly — no translation layer, no proxy overhead.</p>
+          </div>
+          <div class="feat-card reveal">
+            <div class="feat-icon">📸</div>
+            <h3>Native Capture</h3>
+            <p>Screenshots, DOM trees, console logs — all through platform WebView APIs and CDP. No content scripts, no CSP conflicts, no detection risk.</p>
+          </div>
+          <div class="feat-card reveal reveal-delay-1">
+            <div class="feat-icon">🧠</div>
+            <h3>Smart Queries</h3>
+            <p><code>findButton("Submit")</code> returns only the devices where it exists. Let the model decide what to do with the ones that don't.</p>
+          </div>
+          <div class="feat-card reveal reveal-delay-2">
+            <div class="feat-icon">📐</div>
+            <h3>Resolution-Aware</h3>
+            <p>Commands like <code>scroll2</code> adapt per device viewport. One instruction works correctly across a heterogeneous fleet of screen sizes and densities.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Ecosystem ── -->
+    <section class="ecosystem" id="ecosystem">
+      <div class="container">
+        <div class="section-eyebrow">The ecosystem</div>
+        <div class="section-h reveal">Built alongside Kelpie.<br><em>Separate, complementary, open.</em></div>
+        <div class="eco-grid">
+
+          <!-- Silkie -->
+          <div class="eco-card silkie reveal" id="silkie">
+            <div class="eco-logo-wrap">
+              <img src="assets/silkie.png" alt="Silkie" class="eco-logo">
+            </div>
+            <h2>Silkie</h2>
+            <div class="eco-tag">Zero-Trust Network</div>
+            <p>
+              A self-hosted management and administration layer for a WireGuard overlay network.
+              Device enrollment, session brokering, STUN/TURN NAT traversal, and a clean admin UI —
+              your private network, your infrastructure, no cloud required.
+            </p>
+            <ul class="eco-bullets">
+              <li>Device enrollment for macOS, Linux, iOS & Android</li>
+              <li>ICE/STUN/TURN-assisted NAT traversal</li>
+              <li>Short-lived session tokens, zero long-lived secrets</li>
+              <li>Service catalog with per-device port reporting</li>
+              <li>OIDC-based auth with SSO support</li>
+            </ul>
+            <div class="eco-chips">
+              <span class="chip">Go</span>
+              <span class="chip">WireGuard</span>
+              <span class="chip">PostgreSQL</span>
+              <span class="chip">Redis</span>
+              <span class="chip">Self-hosted</span>
+            </div>
+          </div>
+
+          <!-- Nessie -->
+          <div class="eco-card nessie reveal reveal-delay-1" id="nessie">
+            <div class="eco-logo-wrap">
+              <img src="assets/nessie.png" alt="Nessie" class="eco-logo">
+            </div>
+            <h2>Nessie</h2>
+            <div class="eco-tag">Personal AI Agent</div>
+            <p>
+              A voice-first personal AI agent that lives on your Mac. Talk to it, it talks back.
+              Spawn sub-agents for deep research. Inject text into any active application.
+              Ambient, always-on, always ready — Jarvis meets terminal.
+            </p>
+            <ul class="eco-bullets">
+              <li>Real-time voice I/O via OpenAI Realtime API</li>
+              <li>Native keyboard injection into any macOS app</li>
+              <li>Parallel sub-agents for research and file work</li>
+              <li>Persistent memory across sessions</li>
+              <li>MCP tool access for orchestrated tasks</li>
+            </ul>
+            <div class="eco-chips">
+              <span class="chip">TypeScript</span>
+              <span class="chip">macOS</span>
+              <span class="chip">Voice</span>
+              <span class="chip">MCP</span>
+              <span class="chip">Minimax</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CTA ── -->
+    <div class="cta-band">
+      <div class="container">
+        <div class="cta-inner reveal">
+          <div class="cta-text">
+            <h2>Start automating<br>mobile browsers today.</h2>
+            <p>Install the CLI, launch Kelpie on a device, and start issuing commands.</p>
+          </div>
+          <div style="display:flex;gap:12px;flex-shrink:0;flex-wrap:wrap;">
+            <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">
+              Read the docs →
+            </a>
+            <a href="https://github.com/unlikeotherai" class="btn-ghost">
+              All projects
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <footer>
+      <div class="container">
+        <div class="footer-row">
+          <div class="footer-brand">
+            <strong>UnlikeOtherAI</strong> &nbsp;·&nbsp;
+            Kelpie, Silkie &amp; Nessie are open-source projects by Ondrej Rafaj.
+          </div>
+          <ul class="footer-nav">
+            <li><a href="https://github.com/unlikeotherai/kelpie">Kelpie</a></li>
+            <li><a href="https://github.com/unlikeotherai/silkie">Silkie</a></li>
+            <li><a href="https://github.com/unlikeotherai/nessie">Nessie</a></li>
+            <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Scroll reveal
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+    // Copy install command
+    function copyInstall() {
+      const cmd = document.getElementById('cmd-text').textContent;
+      const btn = document.getElementById('copy-btn');
+      navigator.clipboard.writeText(cmd).then(() => {
+        btn.textContent = 'copied!';
+        btn.style.color = 'var(--teal)';
+        setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
