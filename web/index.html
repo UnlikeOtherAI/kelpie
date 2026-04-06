@@ -4,18 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kelpie — LLM-First Mobile Browser</title>
-  <meta name="description" content="Control real mobile browsers with AI. Native iOS and Android apps with mDNS discovery, HTTP API, and MCP. Part of the UnlikeOtherAI ecosystem.">
+  <meta name="description" content="Control real mobile browsers with AI. Native macOS, iOS, Android and Linux apps — dual-engine WebKit and Chromium — with mDNS discovery, HTTP API, MCP, and on-device AI.">
   <meta property="og:title" content="Kelpie — LLM-First Mobile Browser">
-  <meta property="og:description" content="Language models controlling real mobile devices on your local network.">
+  <meta property="og:description" content="Language models controlling real mobile devices. 10× faster than Playwright. Native, dual-engine, MCP-ready.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,700&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 
   <style>
     :root {
       --bg:         #060a13;
       --surface:    #0d1525;
       --surface2:   #111c2e;
+      --surface3:   #162030;
       --border:     rgba(61, 142, 255, 0.10);
       --border2:    rgba(61, 142, 255, 0.22);
       --blue:       #3d8eff;
@@ -24,6 +26,7 @@
       --teal-dim:   rgba(0, 229, 176, 0.65);
       --green:      #22c55e;
       --green-glow: rgba(34, 197, 94, 0.28);
+      --amber:      #f59e0b;
       --text:       #dce6f8;
       --text2:      #8a9bbf;
       --muted:      #3d4f6a;
@@ -56,12 +59,7 @@
     }
 
     /* ── Depth background ── */
-    .bg-canvas {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-    }
+    .bg-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
     .bg-canvas::before {
       content: '';
       position: absolute;
@@ -81,7 +79,6 @@
         radial-gradient(ellipse 50% 32% at 28% 78%, rgba(61, 142, 255, 0.05) 0%, transparent 62%);
       animation: depth-b 35s ease-in-out infinite alternate;
     }
-
     @keyframes depth-a {
       from { transform: scale(1) translate(0,0); }
       to   { transform: scale(1.12) translate(3%,-4%); }
@@ -93,14 +90,14 @@
 
     /* ── Layout ── */
     .layer { position: relative; z-index: 1; }
-    .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
 
     /* ── Nav ── */
     nav {
       position: sticky;
       top: 0;
       z-index: 200;
-      background: rgba(6, 10, 19, 0.82);
+      background: rgba(6, 10, 19, 0.85);
       backdrop-filter: blur(24px) saturate(180%);
       border-bottom: 1px solid var(--border);
     }
@@ -109,7 +106,7 @@
       align-items: center;
       justify-content: space-between;
       height: 58px;
-      max-width: 1080px;
+      max-width: 1100px;
       margin: 0 auto;
       padding: 0 32px;
     }
@@ -122,17 +119,8 @@
       color: var(--text2);
     }
     .nav-brand strong { color: var(--blue); }
-    .nav-links {
-      display: flex;
-      gap: 28px;
-      list-style: none;
-    }
-    .nav-links a {
-      font-size: 0.85rem;
-      font-weight: 400;
-      color: var(--text2);
-      transition: color 0.2s;
-    }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a { font-size: 0.85rem; color: var(--text2); transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
     .nav-cta {
       font-size: 0.8rem;
@@ -146,19 +134,8 @@
     .nav-cta:hover { background: rgba(61, 142, 255, 0.08); }
 
     /* ── Hero ── */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 80px 0 60px;
-    }
-    .hero-inner {
-      display: grid;
-      grid-template-columns: 1fr 280px;
-      gap: 72px;
-      align-items: center;
-    }
+    .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 80px 0 60px; }
+    .hero-inner { display: grid; grid-template-columns: 1fr 300px; gap: 72px; align-items: center; }
 
     .hero-badge {
       display: inline-flex;
@@ -175,88 +152,91 @@
       margin-bottom: 32px;
       width: fit-content;
     }
-    .badge-pulse {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--teal);
-      box-shadow: 0 0 8px var(--teal);
-      animation: blink 2.4s ease-in-out infinite;
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
-    }
+    .badge-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); animation: blink 2.4s ease-in-out infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
     .hero h1 {
       font-family: var(--serif);
-      font-size: clamp(3.2rem, 5.5vw, 6rem);
+      font-size: clamp(3rem, 5vw, 5.6rem);
       font-weight: 700;
       line-height: 0.96;
       letter-spacing: -0.025em;
       color: #fff;
       margin-bottom: 28px;
     }
-    .hero h1 em {
-      font-style: italic;
-      color: var(--blue);
-      display: block;
-    }
+    .hero h1 em { font-style: italic; color: var(--blue); display: block; }
 
     .hero-desc {
-      font-size: 1.08rem;
+      font-size: 1.05rem;
       font-weight: 300;
       color: var(--text2);
-      max-width: 460px;
+      max-width: 480px;
       line-height: 1.75;
-      margin-bottom: 40px;
+      margin-bottom: 32px;
     }
 
-    .hero-actions {
+    /* ── Store badges ── */
+    .store-section { margin-bottom: 32px; }
+    .store-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .store-badges {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin-bottom: 36px;
     }
-
-    .btn-primary {
+    .store-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      background: var(--blue);
-      color: #fff;
-      border-radius: 9px;
-      padding: 13px 26px;
-      font-family: var(--sans);
-      font-size: 0.9rem;
-      font-weight: 600;
-      transition: all 0.2s;
-      box-shadow: 0 0 28px var(--blue-glow);
-    }
-    .btn-primary:hover {
-      background: #5ba3ff;
-      box-shadow: 0 0 48px var(--blue-glow);
-      transform: translateY(-2px);
-    }
-    .btn-ghost {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: transparent;
-      color: var(--text);
+      gap: 14px;
+      background: var(--surface);
       border: 1px solid var(--border2);
-      border-radius: 9px;
-      padding: 13px 26px;
-      font-family: var(--sans);
-      font-size: 0.9rem;
-      font-weight: 400;
-      transition: all 0.2s;
+      border-radius: 14px;
+      padding: 14px 20px;
+      position: relative;
+      cursor: default;
+      transition: background 0.2s, border-color 0.2s;
+      min-width: 180px;
     }
-    .btn-ghost:hover {
-      background: rgba(61, 142, 255, 0.06);
-      border-color: rgba(61, 142, 255, 0.38);
+    .store-badge:hover {
+      background: var(--surface2);
+      border-color: rgba(61, 142, 255, 0.3);
+    }
+    .store-badge .fa-brands {
+      font-size: 44px;
+      color: var(--text2);
+      width: 44px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .store-badge-text { display: flex; flex-direction: column; }
+    .store-badge-soon {
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .store-badge-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .store-badge-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 300;
     }
 
+    /* ── Install strip ── */
     .install-strip {
       display: inline-flex;
       align-items: center;
@@ -266,16 +246,8 @@
       border-radius: 9px;
       padding: 11px 16px;
     }
-    .install-prompt {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--muted);
-    }
-    .install-cmd {
-      font-family: var(--mono);
-      font-size: 0.88rem;
-      color: var(--teal);
-    }
+    .install-prompt { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+    .install-cmd { font-family: var(--mono); font-size: 0.88rem; color: var(--teal); }
     .copy-btn {
       background: none;
       border: 1px solid var(--border);
@@ -289,55 +261,9 @@
     }
     .copy-btn:hover { color: var(--text); border-color: var(--border2); }
 
-    /* ── Store buttons ── */
-    .store-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 28px;
-    }
-    .store-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 16px;
-      font-family: var(--sans);
-      position: relative;
-      cursor: default;
-      opacity: 0.55;
-      transition: opacity 0.2s;
-    }
-    .store-btn:hover { opacity: 0.7; }
-    .store-btn-icon { font-size: 1.3rem; line-height: 1; }
-    .store-btn-text { display: flex; flex-direction: column; }
-    .store-btn-soon {
-      font-size: 0.6rem;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--teal);
-      line-height: 1;
-      margin-bottom: 2px;
-    }
-    .store-btn-name {
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--text);
-      line-height: 1;
-    }
-
     /* ── Hero logo ── */
-    .hero-visual {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .logo-orb {
-      position: relative;
-    }
+    .hero-visual { display: flex; align-items: center; justify-content: center; }
+    .logo-orb { position: relative; }
     .logo-halo {
       position: absolute;
       inset: -30px;
@@ -345,10 +271,7 @@
       background: radial-gradient(circle, rgba(45, 100, 255, 0.22) 0%, transparent 70%);
       animation: halo 5s ease-in-out infinite alternate;
     }
-    @keyframes halo {
-      from { transform: scale(0.88); opacity: 0.6; }
-      to   { transform: scale(1.12); opacity: 1; }
-    }
+    @keyframes halo { from { transform: scale(0.88); opacity: 0.6; } to { transform: scale(1.12); opacity: 1; } }
     .logo-ring {
       position: absolute;
       inset: -16px;
@@ -368,10 +291,7 @@
       box-shadow: 0 0 10px var(--blue);
       transform: translateX(-50%);
     }
-    @keyframes ring-spin {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
+    @keyframes ring-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .hero-logo-img {
       width: 240px;
       height: 240px;
@@ -382,92 +302,244 @@
       filter: drop-shadow(0 8px 40px rgba(45, 100, 255, 0.35));
       animation: float 7s ease-in-out infinite;
     }
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50%       { transform: translateY(-14px); }
-    }
+    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-14px); } }
 
-    /* ── Rule line ── */
-    .rule {
-      height: 1px;
-      background: linear-gradient(90deg,
-        transparent 0%,
-        var(--border2) 25%,
-        var(--border2) 75%,
-        transparent 100%
-      );
-      position: relative;
-      margin: 0;
-    }
-    .rule-gem {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 8px;
-      height: 8px;
-      background: var(--blue);
-      border-radius: 50%;
-      box-shadow: 0 0 14px var(--blue);
-    }
+    /* ── Rule ── */
+    .rule { height: 1px; background: linear-gradient(90deg, transparent, var(--border2) 25%, var(--border2) 75%, transparent); position: relative; }
+    .rule-gem { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; background: var(--blue); border-radius: 50%; box-shadow: 0 0 14px var(--blue); }
 
-    /* ── Stats strip ── */
-    .stats-strip {
-      padding: 52px 0;
-    }
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-    }
-    .stat-cell {
-      padding: 28px 24px;
-      text-align: center;
-      border-right: 1px solid var(--border);
-    }
+    /* ── Stats ── */
+    .stats-strip { padding: 52px 0; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .stat-cell { padding: 28px 24px; text-align: center; border-right: 1px solid var(--border); }
     .stat-cell:last-child { border-right: none; }
-    .stat-num {
+    .stat-num { font-family: var(--serif); font-size: 2.8rem; font-weight: 700; line-height: 1; color: #fff; margin-bottom: 6px; }
+    .stat-num sup { font-size: 1.4rem; color: var(--blue); }
+    .stat-label { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .stat-sub { font-size: 0.68rem; color: var(--muted); opacity: 0.7; margin-top: 3px; }
+
+    /* ── Section headers ── */
+    .section-eyebrow { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); margin-bottom: 14px; }
+    .section-h { font-family: var(--serif); font-size: clamp(1.9rem, 3.2vw, 3rem); font-weight: 400; color: #fff; line-height: 1.15; margin-bottom: 52px; }
+    .section-h em { font-style: italic; color: var(--text2); }
+
+    /* ── Dual engine ── */
+    .dual-engine { padding: 80px 0; }
+    .engine-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--border); margin-bottom: 24px; }
+    .engine-card { background: var(--surface); padding: 36px 32px; }
+    .engine-icon { font-size: 2rem; margin-bottom: 16px; }
+    .engine-card h3 { font-family: var(--serif); font-size: 1.5rem; font-weight: 400; color: #fff; margin-bottom: 4px; }
+    .engine-tag { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; color: var(--blue); margin-bottom: 14px; }
+    .engine-card p { font-size: 0.88rem; font-weight: 300; color: var(--text2); line-height: 1.7; }
+    .engine-switch {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .engine-switch code { color: var(--teal); }
+
+    /* ── Speed section ── */
+    .speed-section { padding: 80px 0; border-top: 1px solid var(--border); }
+    .speed-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .speed-number {
       font-family: var(--serif);
-      font-size: 2.8rem;
+      font-size: clamp(5rem, 10vw, 9rem);
       font-weight: 700;
       line-height: 1;
       color: #fff;
-      margin-bottom: 6px;
     }
-    .stat-num sup { font-size: 1.4rem; color: var(--blue); }
-    .stat-label {
+    .speed-number span { color: var(--blue); }
+    .speed-label { font-size: 1.1rem; color: var(--text2); font-weight: 300; margin-top: 8px; }
+    .speed-points { display: flex; flex-direction: column; gap: 20px; }
+    .speed-point { display: flex; gap: 16px; }
+    .speed-point-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(61, 142, 255, 0.08);
+      border: 1px solid rgba(61, 142, 255, 0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .speed-point h4 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .speed-point p { font-size: 0.84rem; font-weight: 300; color: var(--text2); line-height: 1.6; }
+
+    /* ── Screenshots ── */
+    .screenshots { padding: 80px 0; border-top: 1px solid var(--border); }
+
+    /* Mac frame */
+    .mac-frame {
+      background: #1c1c1e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
+    }
+    .mac-titlebar {
+      height: 32px;
+      background: #2a2a2d;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mac-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .mac-dot.red    { background: #ff5f57; }
+    .mac-dot.yellow { background: #febc2e; }
+    .mac-dot.green  { background: #28c840; }
+    .mac-url-bar {
+      flex: 1;
+      margin: 0 12px;
+      height: 18px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 4px;
+    }
+    .mac-frame img { width: 100%; display: block; }
+
+    /* iPhone frame */
+    .iphone-outer {
+      width: 260px;
+      background: #1a1a1a;
+      border-radius: 48px;
+      padding: 10px;
+      box-shadow: 0 0 0 1px #3a3a3c, 0 0 0 3px #1a1a1a, 0 0 0 4px #444, 0 30px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+    .iphone-inner {
+      border-radius: 40px;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+    }
+    .iphone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 32px;
+      background: #1a1a1a;
+      border-radius: 0 0 20px 20px;
+      z-index: 2;
+    }
+    .iphone-inner img {
+      width: 100%;
+      aspect-ratio: 9/19.5;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+    }
+
+    /* iPad frame */
+    .ipad-outer {
+      background: #1a1a1a;
+      border-radius: 24px;
+      padding: 10px 10px 20px;
+      box-shadow: 0 0 0 1px #3a3a3c, 0 0 0 3px #1a1a1a, 0 0 0 4px #444, 0 30px 60px rgba(0,0,0,0.6);
+      width: 340px;
+    }
+    .ipad-camera {
+      width: 8px;
+      height: 8px;
+      background: #3a3a3c;
+      border-radius: 50%;
+      margin: 0 auto 8px;
+    }
+    .ipad-inner { border-radius: 8px; overflow: hidden; background: #000; }
+    .ipad-inner img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; object-position: top; }
+
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 48px;
+    }
+    .screenshot-item { display: flex; flex-direction: column; gap: 16px; }
+    .screenshot-label {
       font-size: 0.75rem;
+      font-weight: 500;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--muted);
     }
+    .screenshot-label strong { color: var(--text2); font-weight: 600; }
+    .screenshot-caption { font-size: 0.82rem; color: var(--text2); font-weight: 300; }
 
-    /* ── Features ── */
-    .features { padding: 80px 0; }
-
-    .section-eyebrow {
-      font-size: 0.72rem;
-      font-weight: 500;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--blue);
-      margin-bottom: 14px;
+    .screenshots-mobile {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      align-items: flex-end;
+      padding: 20px 0;
     }
-    .section-h {
+    .mobile-item { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .mobile-label { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+    .mobile-label strong { color: var(--text2); display: block; }
+
+    /* ── Local AI ── */
+    .local-ai { padding: 80px 0; border-top: 1px solid var(--border); }
+    .local-ai-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+    .ai-stat-row { display: flex; gap: 24px; margin-bottom: 32px; }
+    .ai-stat { text-align: center; }
+    .ai-stat-num {
       font-family: var(--serif);
-      font-size: clamp(1.9rem, 3.2vw, 3rem);
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .ai-stat-num span { color: var(--green); }
+    .ai-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .ai-points { display: flex; flex-direction: column; gap: 16px; }
+    .ai-point { display: flex; gap: 12px; align-items: flex-start; }
+    .ai-point-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); flex-shrink: 0; margin-top: 8px; }
+    .ai-point p { font-size: 0.88rem; font-weight: 300; color: var(--text2); line-height: 1.65; }
+    .ai-point p strong { color: var(--text); font-weight: 500; }
+    .ai-card {
+      background: var(--surface);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      border-radius: 16px;
+      padding: 32px;
+    }
+    .ai-card-title {
+      font-family: var(--serif);
+      font-size: 1.4rem;
       font-weight: 400;
       color: #fff;
-      line-height: 1.15;
-      margin-bottom: 52px;
+      margin-bottom: 20px;
     }
-    .section-h em {
-      font-style: italic;
-      color: var(--text2);
+    .ai-model-list { display: flex; flex-direction: column; gap: 12px; }
+    .ai-model {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
     }
+    .ai-model-name { font-family: var(--mono); font-size: 0.8rem; color: var(--text); }
+    .ai-model-tag {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .ai-model-tag.local { background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .ai-model-tag.remote { background: rgba(61, 142, 255, 0.15); color: var(--blue); border: 1px solid rgba(61,142,255,0.25); }
+    .ai-card-note { font-size: 0.78rem; color: var(--muted); margin-top: 16px; font-weight: 300; }
 
+    /* ── Features ── */
+    .features { padding: 80px 0; border-top: 1px solid var(--border); }
     .feat-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -477,14 +549,8 @@
       overflow: hidden;
       background: var(--border);
     }
-    .feat-card {
-      background: var(--surface);
-      padding: 32px 28px;
-      position: relative;
-      transition: background 0.25s;
-    }
+    .feat-card { background: var(--surface); padding: 32px 28px; transition: background 0.25s; }
     .feat-card:hover { background: var(--surface2); }
-
     .feat-icon {
       width: 42px;
       height: 42px;
@@ -497,28 +563,12 @@
       font-size: 1.25rem;
       margin-bottom: 18px;
     }
-    .feat-card h3 {
-      font-size: 0.98rem;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 9px;
-    }
-    .feat-card p {
-      font-size: 0.85rem;
-      font-weight: 300;
-      color: var(--text2);
-      line-height: 1.65;
-    }
+    .feat-card h3 { font-size: 0.98rem; font-weight: 600; color: #fff; margin-bottom: 9px; }
+    .feat-card p { font-size: 0.85rem; font-weight: 300; color: var(--text2); line-height: 1.65; }
 
     /* ── Ecosystem ── */
-    .ecosystem { padding: 96px 0; }
-
-    .eco-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
+    .ecosystem { padding: 96px 0; border-top: 1px solid var(--border); }
+    .eco-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .eco-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -528,474 +578,580 @@
       overflow: hidden;
       transition: transform 0.35s cubic-bezier(.22,.68,0,1.2), border-color 0.3s;
     }
-    .eco-card::after {
-      content: '';
-      position: absolute;
-      top: -100px;
-      right: -100px;
-      width: 240px;
-      height: 240px;
-      border-radius: 50%;
-      opacity: 0;
-      transition: opacity 0.4s;
-      pointer-events: none;
-    }
+    .eco-card::after { content: ''; position: absolute; top: -100px; right: -100px; width: 240px; height: 240px; border-radius: 50%; opacity: 0; transition: opacity 0.4s; pointer-events: none; }
     .eco-card:hover { transform: translateY(-6px); }
     .eco-card:hover::after { opacity: 1; }
-
     .eco-card.silkie { border-color: rgba(61, 142, 255, 0.13); }
     .eco-card.silkie::after { background: radial-gradient(circle, rgba(61, 142, 255, 0.13) 0%, transparent 70%); }
     .eco-card.silkie:hover { border-color: rgba(61, 142, 255, 0.32); }
-
     .eco-card.nessie { border-color: rgba(34, 197, 94, 0.13); }
     .eco-card.nessie::after { background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%); }
     .eco-card.nessie:hover { border-color: rgba(34, 197, 94, 0.32); }
-
     .eco-logo-wrap { margin-bottom: 26px; }
-    .eco-logo {
-      width: 84px;
-      height: 84px;
-      border-radius: 20px;
-      display: block;
-    }
-    .eco-card.silkie .eco-logo {
-      filter: drop-shadow(0 4px 20px rgba(45, 100, 255, 0.38));
-    }
-    .eco-card.nessie .eco-logo {
-      filter: drop-shadow(0 4px 20px rgba(34, 197, 94, 0.38));
-    }
-
-    .eco-card h2 {
-      font-family: var(--serif);
-      font-size: 2.2rem;
-      font-weight: 400;
-      color: #fff;
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-    .eco-tag {
-      font-size: 0.72rem;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
+    .eco-logo { width: 84px; height: 84px; border-radius: 20px; display: block; }
+    .eco-card.silkie .eco-logo { filter: drop-shadow(0 4px 20px rgba(45, 100, 255, 0.38)); }
+    .eco-card.nessie .eco-logo { filter: drop-shadow(0 4px 20px rgba(34, 197, 94, 0.38)); }
+    .eco-card h2 { font-family: var(--serif); font-size: 2.2rem; font-weight: 400; color: #fff; line-height: 1; margin-bottom: 6px; }
+    .eco-tag { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 20px; }
     .eco-card.silkie .eco-tag { color: var(--blue); }
     .eco-card.nessie .eco-tag { color: var(--green); }
-
-    .eco-card p {
-      font-size: 0.875rem;
-      font-weight: 300;
-      color: var(--text2);
-      line-height: 1.72;
-      margin-bottom: 28px;
-    }
-
-    .eco-bullets {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      margin-bottom: 28px;
-    }
-    .eco-bullets li {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      font-size: 0.84rem;
-      color: var(--text2);
-    }
-    .eco-bullets li::before {
-      content: '';
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      position: relative;
-      top: -1px;
-    }
+    .eco-card p { font-size: 0.875rem; font-weight: 300; color: var(--text2); line-height: 1.72; margin-bottom: 28px; }
+    .eco-bullets { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 28px; }
+    .eco-bullets li { display: flex; align-items: baseline; gap: 10px; font-size: 0.84rem; color: var(--text2); }
+    .eco-bullets li::before { content: ''; width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; position: relative; top: -1px; }
     .eco-card.silkie .eco-bullets li::before { background: var(--blue); }
     .eco-card.nessie .eco-bullets li::before { background: var(--green); }
+    .eco-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+    .chip { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 3px 9px; background: rgba(255,255,255,0.025); }
 
-    .eco-chips {
-      display: flex;
-      gap: 7px;
-      flex-wrap: wrap;
-    }
-    .chip {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 3px 9px;
-      background: rgba(255,255,255,0.025);
-    }
+    /* ── CTA ── */
+    .cta-band { padding: 80px 0; border-top: 1px solid var(--border); }
+    .cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; }
+    .cta-text h2 { font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.8rem); font-weight: 700; color: #fff; margin-bottom: 10px; line-height: 1.1; }
+    .cta-text p { font-size: 0.95rem; font-weight: 300; color: var(--text2); }
 
-    /* ── CTA banner ── */
-    .cta-band {
-      padding: 80px 0;
-      border-top: 1px solid var(--border);
-    }
-    .cta-inner {
-      display: flex;
+    /* ── Buttons ── */
+    .btn-primary {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 40px;
-    }
-    .cta-text h2 {
-      font-family: var(--serif);
-      font-size: clamp(1.8rem, 3vw, 2.8rem);
-      font-weight: 700;
+      gap: 8px;
+      background: var(--blue);
       color: #fff;
-      margin-bottom: 10px;
-      line-height: 1.1;
+      border-radius: 9px;
+      padding: 13px 26px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 0 28px var(--blue-glow);
     }
-    .cta-text p {
-      font-size: 0.95rem;
-      font-weight: 300;
-      color: var(--text2);
+    .btn-primary:hover { background: #5ba3ff; box-shadow: 0 0 48px var(--blue-glow); transform: translateY(-2px); }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      padding: 13px 26px;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      font-weight: 400;
+      transition: all 0.2s;
     }
+    .btn-ghost:hover { background: rgba(61, 142, 255, 0.06); border-color: rgba(61, 142, 255, 0.38); }
 
     /* ── Footer ── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 40px 0;
-    }
-    .footer-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-    .footer-brand {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
+    footer { border-top: 1px solid var(--border); padding: 40px 0; }
+    .footer-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .footer-brand { font-size: 0.82rem; color: var(--muted); }
     .footer-brand strong { color: var(--text2); }
-    .footer-nav {
-      display: flex;
-      gap: 24px;
-      list-style: none;
-    }
-    .footer-nav a {
-      font-size: 0.8rem;
-      color: var(--muted);
-      transition: color 0.2s;
-    }
+    .footer-nav { display: flex; gap: 24px; list-style: none; }
+    .footer-nav a { font-size: 0.8rem; color: var(--muted); transition: color 0.2s; }
     .footer-nav a:hover { color: var(--text2); }
 
-    /* ── Scroll reveal ── */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.65s ease, transform 0.65s ease;
-    }
+    /* ── Reveal ── */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s ease, transform 0.65s ease; }
     .reveal.in { opacity: 1; transform: translateY(0); }
     .reveal-delay-1 { transition-delay: 0.1s; }
     .reveal-delay-2 { transition-delay: 0.2s; }
     .reveal-delay-3 { transition-delay: 0.3s; }
 
     /* ── Responsive ── */
-    @media (max-width: 860px) {
+    @media (max-width: 900px) {
       .hero-inner { grid-template-columns: 1fr; text-align: center; }
       .hero-visual { margin: 0 auto; order: -1; }
-      .hero-badge { margin: 0 auto 32px; }
-      .hero-desc { margin: 0 auto 40px; }
-      .hero-actions { justify-content: center; }
-      .store-row { justify-content: center; }
-      .install-strip { margin: 0 auto; }
-      .hero-logo-img { width: 180px; height: 180px; }
-      .feat-grid { grid-template-columns: 1fr 1fr; }
+      .hero-badge, .install-strip { margin-left: auto; margin-right: auto; }
+      .hero-desc { margin-left: auto; margin-right: auto; }
+      .store-badges { justify-content: center; }
+      .engine-grid { grid-template-columns: 1fr; }
+      .speed-inner { grid-template-columns: 1fr; }
+      .screenshots-grid { grid-template-columns: 1fr; }
+      .screenshots-mobile { flex-wrap: wrap; }
+      .ipad-outer { width: 100%; max-width: 340px; }
+      .local-ai-inner { grid-template-columns: 1fr; }
       .eco-grid { grid-template-columns: 1fr; }
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .stat-cell:nth-child(2) { border-right: none; }
-      .stat-cell:nth-child(3) { border-top: 1px solid var(--border); }
       .cta-inner { flex-direction: column; text-align: center; }
       .footer-row { flex-direction: column; text-align: center; }
     }
-    @media (max-width: 560px) {
+    @media (max-width: 680px) {
       .feat-grid { grid-template-columns: 1fr; }
-      .stats-row { grid-template-columns: 1fr 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .stat-cell:nth-child(2) { border-right: none; }
+      .stat-cell:nth-child(3) { border-top: 1px solid var(--border); }
+      .store-badge { min-width: 0; flex: 1; }
       .nav-links { display: none; }
     }
   </style>
 </head>
 <body>
+<div class="bg-canvas"></div>
+<div class="layer">
 
-  <div class="bg-canvas"></div>
+  <!-- ── Nav ── -->
+  <nav>
+    <div class="nav-row">
+      <span class="nav-brand">Unlike<strong>Other</strong>AI</span>
+      <ul class="nav-links">
+        <li><a href="#kelpie">Kelpie</a></li>
+        <li><a href="#screenshots">Screenshots</a></li>
+        <li><a href="#local-ai">Local AI</a></li>
+        <li><a href="#silkie">Silkie</a></li>
+        <li><a href="#nessie">Nessie</a></li>
+        <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+      </ul>
+      <a href="https://github.com/unlikeotherai/kelpie" class="nav-cta">Get started →</a>
+    </div>
+  </nav>
 
-  <div class="layer">
-    <!-- ── Nav ── -->
-    <nav>
-      <div class="nav-row">
-        <span class="nav-brand">Unlike<strong>Other</strong>AI</span>
-        <ul class="nav-links">
-          <li><a href="#kelpie">Kelpie</a></li>
-          <li><a href="#silkie">Silkie</a></li>
-          <li><a href="#nessie">Nessie</a></li>
-          <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
-        </ul>
-        <a href="https://github.com/unlikeotherai/kelpie" class="nav-cta">Get started →</a>
-      </div>
-    </nav>
-
-    <!-- ── Hero ── -->
-    <section class="hero" id="kelpie">
-      <div class="container">
-        <div class="hero-inner">
-          <div class="hero-text">
-            <div class="hero-badge">
-              <span class="badge-pulse"></span>
-              Open source · Available now
-            </div>
-            <h1>
-              Real mobile.<br>
-              Real browsers.<br>
-              <em>Real AI control.</em>
-            </h1>
-            <p class="hero-desc">
-              Kelpie is an LLM-first browser for iOS and Android. Language models discover and orchestrate real mobile devices on the local network — no emulators, no persistent scripts, no desktop required.
-            </p>
-            <div class="hero-actions">
-              <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                View on GitHub
-              </a>
-              <a href="https://www.npmjs.com/package/@unlikeotherai/kelpie" class="btn-ghost">
-                npm package →
-              </a>
-            </div>
-            <div class="install-strip">
-              <span class="install-prompt">$</span>
-              <span class="install-cmd" id="cmd-text">npm i -g @unlikeotherai/kelpie</span>
-              <button class="copy-btn" id="copy-btn" onclick="copyInstall()" title="Copy to clipboard">copy</button>
-            </div>
-            <div class="store-row">
-              <span class="store-btn" title="Coming soon">
-                <span class="store-btn-icon">🍎</span>
-                <span class="store-btn-text">
-                  <span class="store-btn-soon">Coming soon</span>
-                  <span class="store-btn-name">Mac App Store</span>
-                </span>
-              </span>
-              <span class="store-btn" title="Coming soon">
-                <span class="store-btn-icon"></span>
-                <span class="store-btn-text">
-                  <span class="store-btn-soon">Coming soon</span>
-                  <span class="store-btn-name">App Store</span>
-                </span>
-              </span>
-              <span class="store-btn" title="Coming soon">
-                <span class="store-btn-icon">▶</span>
-                <span class="store-btn-text">
-                  <span class="store-btn-soon">Coming soon</span>
-                  <span class="store-btn-name">Google Play</span>
-                </span>
-              </span>
-            </div>
-          </div>
-
-          <div class="hero-visual">
-            <div class="logo-orb">
-              <div class="logo-halo"></div>
-              <div class="logo-ring"></div>
-              <img src="assets/kelpie.png" alt="Kelpie — LLM-first mobile browser" class="hero-logo-img">
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Stats ── -->
+  <!-- ── Hero ── -->
+  <section class="hero" id="kelpie">
     <div class="container">
-      <div class="rule"><div class="rule-gem"></div></div>
-      <div class="stats-strip">
-        <div class="stats-row reveal">
-          <div class="stat-cell">
-            <div class="stat-num">2<sup>×</sup></div>
-            <div class="stat-label">Platforms</div>
+      <div class="hero-inner">
+        <div class="hero-text">
+          <div class="hero-badge">
+            <span class="badge-pulse"></span>
+            Open source · Available now
           </div>
-          <div class="stat-cell">
-            <div class="stat-num">60<sup>+</sup></div>
-            <div class="stat-label">API Methods</div>
+          <h1>
+            Real mobile.<br>
+            Real browsers.<br>
+            <em>Real AI control.</em>
+          </h1>
+          <p class="hero-desc">
+            Kelpie is an LLM-first browser for macOS, iOS, Android, and Linux. Language models discover and orchestrate real devices on the local network — no emulators, no persistent scripts, no desktop required.
+          </p>
+
+          <div class="store-section">
+            <div class="store-label">Download</div>
+            <div class="store-badges">
+              <span class="store-badge" title="Coming soon">
+                <i class="fa-brands fa-apple"></i>
+                <span class="store-badge-text">
+                  <span class="store-badge-soon">Coming soon</span>
+                  <span class="store-badge-name">Mac App Store</span>
+                  <span class="store-badge-sub">macOS 14+</span>
+                </span>
+              </span>
+              <span class="store-badge" title="Coming soon">
+                <i class="fa-brands fa-apple"></i>
+                <span class="store-badge-text">
+                  <span class="store-badge-soon">Coming soon</span>
+                  <span class="store-badge-name">App Store</span>
+                  <span class="store-badge-sub">iOS &amp; iPadOS 17+</span>
+                </span>
+              </span>
+              <span class="store-badge" title="Coming soon">
+                <i class="fa-brands fa-android"></i>
+                <span class="store-badge-text">
+                  <span class="store-badge-soon">Coming soon</span>
+                  <span class="store-badge-name">Google Play</span>
+                  <span class="store-badge-sub">Android 10+</span>
+                </span>
+              </span>
+              <span class="store-badge" title="Install via package manager">
+                <i class="fa-brands fa-linux"></i>
+                <span class="store-badge-text">
+                  <span class="store-badge-soon">Available</span>
+                  <span class="store-badge-name">Linux</span>
+                  <span class="store-badge-sub">apt / snap / AppImage</span>
+                </span>
+              </span>
+            </div>
           </div>
-          <div class="stat-cell">
-            <div class="stat-num">∞</div>
-            <div class="stat-label">Devices</div>
+
+          <div class="install-strip">
+            <span class="install-prompt">$</span>
+            <span class="install-cmd" id="cmd-text">npm i -g @unlikeotherai/kelpie</span>
+            <button class="copy-btn" id="copy-btn" onclick="copyInstall()">copy</button>
           </div>
-          <div class="stat-cell">
-            <div class="stat-num">0<sup>ms</sup></div>
-            <div class="stat-label">Cold Start</div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="logo-orb">
+            <div class="logo-halo"></div>
+            <div class="logo-ring"></div>
+            <img src="assets/kelpie.png" alt="Kelpie" class="hero-logo-img">
           </div>
         </div>
       </div>
     </div>
+  </section>
 
-    <!-- ── Features ── -->
-    <section class="features">
-      <div class="container">
-        <div class="section-eyebrow">Capabilities</div>
-        <div class="section-h reveal">Everything your LLM<br>needs to command <em>the mobile web.</em></div>
-        <div class="feat-grid">
-          <div class="feat-card reveal">
-            <div class="feat-icon">📡</div>
-            <h3>mDNS Auto-Discovery</h3>
-            <p>Browsers advertise themselves as <code>_kelpie._tcp</code> on the local network. The CLI finds every device — no IPs, no manual config, no pairing.</p>
-          </div>
-          <div class="feat-card reveal reveal-delay-1">
-            <div class="feat-icon">⚡</div>
-            <h3>Group Commands</h3>
-            <p>Navigate, click, and fill forms across an entire fleet simultaneously. One instruction, every device, in parallel — with per-device result aggregation.</p>
-          </div>
-          <div class="feat-card reveal reveal-delay-2">
-            <div class="feat-icon">🔌</div>
-            <h3>Native MCP</h3>
-            <p>Full Model Context Protocol support in both the browser and the CLI. Any MCP client connects directly — no translation layer, no proxy overhead.</p>
-          </div>
-          <div class="feat-card reveal">
-            <div class="feat-icon">📸</div>
-            <h3>Native Capture</h3>
-            <p>Screenshots, DOM trees, console logs — all through platform WebView APIs and CDP. No content scripts, no CSP conflicts, no detection risk.</p>
-          </div>
-          <div class="feat-card reveal reveal-delay-1">
-            <div class="feat-icon">🧠</div>
-            <h3>Smart Queries</h3>
-            <p><code>findButton("Submit")</code> returns only the devices where it exists. Let the model decide what to do with the ones that don't.</p>
-          </div>
-          <div class="feat-card reveal reveal-delay-2">
-            <div class="feat-icon">📐</div>
-            <h3>Resolution-Aware</h3>
-            <p>Commands like <code>scroll2</code> adapt per device viewport. One instruction works correctly across a heterogeneous fleet of screen sizes and densities.</p>
-          </div>
+  <!-- ── Stats ── -->
+  <div class="container">
+    <div class="rule"><div class="rule-gem"></div></div>
+    <div class="stats-strip">
+      <div class="stats-row reveal">
+        <div class="stat-cell">
+          <div class="stat-num">4<sup>×</sup></div>
+          <div class="stat-label">Platforms</div>
+          <div class="stat-sub">macOS · iOS · Android · Linux</div>
         </div>
-      </div>
-    </section>
-
-    <!-- ── Ecosystem ── -->
-    <section class="ecosystem" id="ecosystem">
-      <div class="container">
-        <div class="section-eyebrow">The ecosystem</div>
-        <div class="section-h reveal">Built alongside Kelpie.<br><em>Separate, complementary, open.</em></div>
-        <div class="eco-grid">
-
-          <!-- Silkie -->
-          <div class="eco-card silkie reveal" id="silkie">
-            <div class="eco-logo-wrap">
-              <img src="assets/silkie.png" alt="Silkie" class="eco-logo">
-            </div>
-            <h2>Silkie</h2>
-            <div class="eco-tag">Zero-Trust Network</div>
-            <p>
-              A self-hosted management and administration layer for a WireGuard overlay network.
-              Device enrollment, session brokering, STUN/TURN NAT traversal, and a clean admin UI —
-              your private network, your infrastructure, no cloud required.
-            </p>
-            <ul class="eco-bullets">
-              <li>Device enrollment for macOS, Linux, iOS & Android</li>
-              <li>ICE/STUN/TURN-assisted NAT traversal</li>
-              <li>Short-lived session tokens, zero long-lived secrets</li>
-              <li>Service catalog with per-device port reporting</li>
-              <li>OIDC-based auth with SSO support</li>
-            </ul>
-            <div class="eco-chips">
-              <span class="chip">Go</span>
-              <span class="chip">WireGuard</span>
-              <span class="chip">PostgreSQL</span>
-              <span class="chip">Redis</span>
-              <span class="chip">Self-hosted</span>
-            </div>
-          </div>
-
-          <!-- Nessie -->
-          <div class="eco-card nessie reveal reveal-delay-1" id="nessie">
-            <div class="eco-logo-wrap">
-              <img src="assets/nessie.png" alt="Nessie" class="eco-logo">
-            </div>
-            <h2>Nessie</h2>
-            <div class="eco-tag">Personal AI Agent</div>
-            <p>
-              A voice-first personal AI agent that lives on your Mac. Talk to it, it talks back.
-              Spawn sub-agents for deep research. Inject text into any active application.
-              Ambient, always-on, always ready — Jarvis meets terminal.
-            </p>
-            <ul class="eco-bullets">
-              <li>Real-time voice I/O via OpenAI Realtime API</li>
-              <li>Native keyboard injection into any macOS app</li>
-              <li>Parallel sub-agents for research and file work</li>
-              <li>Persistent memory across sessions</li>
-              <li>MCP tool access for orchestrated tasks</li>
-            </ul>
-            <div class="eco-chips">
-              <span class="chip">TypeScript</span>
-              <span class="chip">macOS</span>
-              <span class="chip">Voice</span>
-              <span class="chip">MCP</span>
-              <span class="chip">Minimax</span>
-            </div>
-          </div>
-
+        <div class="stat-cell">
+          <div class="stat-num">2<sup>×</sup></div>
+          <div class="stat-label">Engines (macOS)</div>
+          <div class="stat-sub">WebKit + Chromium in one</div>
         </div>
-      </div>
-    </section>
-
-    <!-- ── CTA ── -->
-    <div class="cta-band">
-      <div class="container">
-        <div class="cta-inner reveal">
-          <div class="cta-text">
-            <h2>Start automating<br>mobile browsers today.</h2>
-            <p>Install the CLI, launch Kelpie on a device, and start issuing commands.</p>
-          </div>
-          <div style="display:flex;gap:12px;flex-shrink:0;flex-wrap:wrap;">
-            <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">
-              Read the docs →
-            </a>
-            <a href="https://github.com/unlikeotherai" class="btn-ghost">
-              All projects
-            </a>
-          </div>
+        <div class="stat-cell">
+          <div class="stat-num">10<sup>×</sup></div>
+          <div class="stat-label">Faster than Playwright</div>
+          <div class="stat-sub">native, no emulation</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num">60<sup>+</sup></div>
+          <div class="stat-label">API Methods</div>
+          <div class="stat-sub">HTTP · MCP · CLI</div>
         </div>
       </div>
     </div>
-
-    <!-- ── Footer ── -->
-    <footer>
-      <div class="container">
-        <div class="footer-row">
-          <div class="footer-brand">
-            <strong>UnlikeOtherAI</strong> &nbsp;·&nbsp;
-            Kelpie, Silkie &amp; Nessie are open-source projects by Ondrej Rafaj and <a href="https://unlikeotherai.com" style="color:var(--blue);text-decoration:underline;text-underline-offset:3px;">UnlikeOtherAI</a>.
-          </div>
-          <ul class="footer-nav">
-            <li><a href="https://github.com/unlikeotherai/kelpie">Kelpie</a></li>
-            <li><a href="https://github.com/unlikeotherai/silkie">Silkie</a></li>
-            <li><a href="https://github.com/unlikeotherai/nessie">Nessie</a></li>
-            <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
-          </ul>
-        </div>
-      </div>
-    </footer>
   </div>
 
-  <script>
-    // Scroll reveal
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
-    }, { threshold: 0.08 });
-    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+  <!-- ── Dual Engine ── -->
+  <section class="dual-engine" id="engines">
+    <div class="container">
+      <div class="section-eyebrow">macOS exclusive</div>
+      <div class="section-h reveal">Two engines.<br><em>One browser. Zero compromises.</em></div>
+      <div class="engine-grid reveal">
+        <div class="engine-card">
+          <div class="engine-icon">🧭</div>
+          <h3>WebKit</h3>
+          <div class="engine-tag">Safari · Apple's renderer</div>
+          <p>Test exactly how Safari renders — same engine, same quirks, same performance characteristics. Ideal for validating iOS-equivalent rendering behaviour without leaving your desk. Every WebKit-specific CSS feature, font rendering decision, and scroll behaviour is faithfully reproduced.</p>
+        </div>
+        <div class="engine-card">
+          <div class="engine-icon">⬡</div>
+          <h3>Chromium</h3>
+          <div class="engine-tag">Chrome · Full CDP support</div>
+          <p>The complete Chrome DevTools Protocol surface — request interception, performance timelines, JS coverage, cross-origin iframe access. Kelpie embeds a real Chromium engine via CEF, not a headless binary. Switch renderers on the fly; cookies migrate automatically.</p>
+        </div>
+      </div>
+      <div class="engine-switch reveal">
+        Switch engines at runtime via MCP: <code>kelpie_set_renderer engine=chromium</code> &nbsp;·&nbsp; Cookies migrate automatically. No reload required.
+      </div>
+    </div>
+  </section>
 
-    // Copy install command
-    function copyInstall() {
-      const cmd = document.getElementById('cmd-text').textContent;
-      const btn = document.getElementById('copy-btn');
-      navigator.clipboard.writeText(cmd).then(() => {
-        btn.textContent = 'copied!';
-        btn.style.color = 'var(--teal)';
-        setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
-      });
-    }
-  </script>
+  <!-- ── Screenshots ── -->
+  <section class="screenshots" id="screenshots">
+    <div class="container">
+      <div class="section-eyebrow">In action</div>
+      <div class="section-h reveal">See what<br><em>Kelpie actually looks like.</em></div>
+
+      <div class="screenshots-grid">
+        <div class="screenshot-item reveal">
+          <div class="screenshot-label"><strong>macOS · 3D DOM Inspector</strong></div>
+          <div class="mac-frame">
+            <div class="mac-titlebar">
+              <span class="mac-dot red"></span>
+              <span class="mac-dot yellow"></span>
+              <span class="mac-dot green"></span>
+              <div class="mac-url-bar"></div>
+            </div>
+            <img src="assets/screenshots/mac-3d.png" alt="Kelpie 3D DOM inspector on macOS — Wikipedia page exploded into 3D layers" loading="lazy">
+          </div>
+          <div class="screenshot-caption">The 3D DOM inspector explodes every page element along the Z-axis by nesting depth. Spot invisible overlays blocking interaction, understand stacking, debug layout in 3D. Works on WebKit and Chromium.</div>
+        </div>
+        <div class="screenshot-item reveal reveal-delay-1">
+          <div class="screenshot-label"><strong>macOS · Chromium (Chrome) Engine</strong></div>
+          <div class="mac-frame">
+            <div class="mac-titlebar">
+              <span class="mac-dot red"></span>
+              <span class="mac-dot yellow"></span>
+              <span class="mac-dot green"></span>
+              <div class="mac-url-bar"></div>
+            </div>
+            <img src="assets/screenshots/mac-chromium.png" alt="Kelpie macOS browser in Chromium mode showing GitHub" loading="lazy">
+          </div>
+          <div class="screenshot-caption">Chromium renderer active — full Chrome DevTools Protocol available. Every element, network request, console message, and resource timeline is accessible via MCP or HTTP API.</div>
+        </div>
+      </div>
+
+      <div class="screenshots-mobile reveal">
+        <div class="mobile-item">
+          <div class="iphone-outer">
+            <div class="iphone-inner">
+              <div class="iphone-notch"></div>
+              <img src="assets/screenshots/mac-3d.png" alt="Kelpie on iPhone" loading="lazy">
+            </div>
+          </div>
+          <div class="mobile-label"><strong>iPhone</strong>iOS 17+</div>
+        </div>
+        <div class="mobile-item">
+          <div class="ipad-outer">
+            <div class="ipad-camera"></div>
+            <div class="ipad-inner">
+              <img src="assets/screenshots/mac-webkit.png" alt="Kelpie on iPad" loading="lazy">
+            </div>
+          </div>
+          <div class="mobile-label"><strong>iPad</strong>iPadOS 17+</div>
+        </div>
+        <div class="mobile-item">
+          <div class="iphone-outer">
+            <div class="iphone-inner">
+              <div class="iphone-notch"></div>
+              <img src="assets/screenshots/mac-webkit.png" alt="Kelpie on Android" loading="lazy">
+            </div>
+          </div>
+          <div class="mobile-label"><strong>Android</strong>Android 10+</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Speed ── -->
+  <section class="speed-section" id="performance">
+    <div class="container">
+      <div class="speed-inner">
+        <div>
+          <div class="section-eyebrow">Native advantage</div>
+          <div class="speed-number">10<span>×</span></div>
+          <div class="speed-label">faster than Playwright on real devices</div>
+        </div>
+        <div class="speed-points reveal">
+          <div class="speed-point">
+            <div class="speed-point-icon">⚙️</div>
+            <div>
+              <h4>Native WebView APIs — no bridge overhead</h4>
+              <p>Playwright controls browsers through CDP over a WebSocket. Kelpie calls iOS WebKit and Android WebView APIs directly in-process. No external process, no protocol hop, no serialisation round-trip.</p>
+            </div>
+          </div>
+          <div class="speed-point">
+            <div class="speed-point-icon">📱</div>
+            <div>
+              <h4>Real hardware, real rendering</h4>
+              <p>Running on an actual iPhone or Android phone means real GPU rendering, real network stack, real iOS fonts and scroll physics. Playwright on desktop cannot replicate mobile platform behaviour.</p>
+            </div>
+          </div>
+          <div class="speed-point">
+            <div class="speed-point-icon">🔗</div>
+            <div>
+              <h4>Everything you can tap — controllable by MCP</h4>
+              <p>Click, swipe, type, scroll, fill forms, take screenshots, read the DOM, intercept network, observe mutations — every interaction a human user can perform is exposed as a first-class MCP tool. If you can tap it, an LLM can too.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Local AI ── -->
+  <section class="local-ai" id="local-ai">
+    <div class="container">
+      <div class="section-eyebrow">On-device AI</div>
+      <div class="section-h reveal">Run AI locally.<br><em>Save credits. Stay private.</em></div>
+      <div class="local-ai-inner">
+        <div>
+          <div class="ai-stat-row">
+            <div class="ai-stat">
+              <div class="ai-stat-num"><span>$0</span></div>
+              <div class="ai-stat-label">per inference</div>
+            </div>
+            <div class="ai-stat">
+              <div class="ai-stat-num">100<span>%</span></div>
+              <div class="ai-stat-label">on-device</div>
+            </div>
+            <div class="ai-stat">
+              <div class="ai-stat-num"><span>∞</span></div>
+              <div class="ai-stat-label">no rate limit</div>
+            </div>
+          </div>
+          <div class="ai-points reveal">
+            <div class="ai-point">
+              <div class="ai-point-dot"></div>
+              <p><strong>Install a small local model directly in the browser.</strong> Kelpie ships five AI endpoints — load, unload, infer, status, and audio recording — available on macOS, iOS, and Android via the same HTTP and MCP interface.</p>
+            </div>
+            <div class="ai-point">
+              <div class="ai-point-dot"></div>
+              <p><strong>Extract and evaluate page content without touching a cloud API.</strong> Use a local model to parse a page, classify elements, or summarise content — all inference stays on the device. Perfect for high-volume scraping or privacy-sensitive content.</p>
+            </div>
+            <div class="ai-point">
+              <div class="ai-point-dot"></div>
+              <p><strong>Switch seamlessly between local and remote.</strong> Use the local model for cheap extraction tasks, then hand off to a larger cloud model only when reasoning quality matters. Mix strategies per task, per device, via a single API.</p>
+            </div>
+            <div class="ai-point">
+              <div class="ai-point-dot"></div>
+              <p><strong>macOS uses native GGUF models or Ollama.</strong> iOS and Android default to platform AI frameworks (Core ML / NNAPI) on supported hardware, with optional remote Ollama fallback.</p>
+            </div>
+          </div>
+        </div>
+        <div class="ai-card reveal reveal-delay-1">
+          <div class="ai-card-title">Inference backends</div>
+          <div class="ai-model-list">
+            <div class="ai-model">
+              <span class="ai-model-name">Llama 3.2 3B (GGUF)</span>
+              <span class="ai-model-tag local">local</span>
+            </div>
+            <div class="ai-model">
+              <span class="ai-model-name">Phi-3 Mini (GGUF)</span>
+              <span class="ai-model-tag local">local</span>
+            </div>
+            <div class="ai-model">
+              <span class="ai-model-name">Gemma 2 2B (GGUF)</span>
+              <span class="ai-model-tag local">local</span>
+            </div>
+            <div class="ai-model">
+              <span class="ai-model-name">Ollama (any model)</span>
+              <span class="ai-model-tag remote">remote</span>
+            </div>
+            <div class="ai-model">
+              <span class="ai-model-name">OpenAI-compat API</span>
+              <span class="ai-model-tag remote">remote</span>
+            </div>
+          </div>
+          <div class="ai-card-note">
+            All five endpoints — <code>ai-status</code>, <code>ai-load</code>, <code>ai-unload</code>, <code>ai-infer</code>, <code>ai-record</code> — are available via HTTP and MCP on every platform.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ── -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-eyebrow">Capabilities</div>
+      <div class="section-h reveal">Everything an LLM needs<br><em>to command the mobile web.</em></div>
+      <div class="feat-grid">
+        <div class="feat-card reveal">
+          <div class="feat-icon">📡</div>
+          <h3>mDNS Auto-Discovery</h3>
+          <p>Browsers advertise <code>_kelpie._tcp</code> on the local network. The CLI finds every device — no IPs, no manual config, no pairing.</p>
+        </div>
+        <div class="feat-card reveal reveal-delay-1">
+          <div class="feat-icon">⚡</div>
+          <h3>Group Commands</h3>
+          <p>Navigate, click, and fill forms across an entire fleet simultaneously. One instruction, every device, in parallel — with per-device result aggregation.</p>
+        </div>
+        <div class="feat-card reveal reveal-delay-2">
+          <div class="feat-icon">🔌</div>
+          <h3>Native MCP</h3>
+          <p>Full Model Context Protocol in both the browser and CLI. Any MCP client connects directly — no translation layer, no proxy overhead.</p>
+        </div>
+        <div class="feat-card reveal">
+          <div class="feat-icon">📸</div>
+          <h3>Native Capture</h3>
+          <p>Screenshots, DOM trees, console logs, network timelines — all via platform WebView APIs and CDP. No content scripts, no CSP conflicts.</p>
+        </div>
+        <div class="feat-card reveal reveal-delay-1">
+          <div class="feat-icon">🧠</div>
+          <h3>Smart Queries</h3>
+          <p><code>findButton("Submit")</code> returns only the devices where it exists. Let the model decide what to do with the ones that don't.</p>
+        </div>
+        <div class="feat-card reveal reveal-delay-2">
+          <div class="feat-icon">📐</div>
+          <h3>Resolution-Aware</h3>
+          <p>Commands like <code>scroll2</code> adapt per device viewport. One instruction works correctly across every screen size in a heterogeneous fleet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Ecosystem ── -->
+  <section class="ecosystem" id="ecosystem">
+    <div class="container">
+      <div class="section-eyebrow">The ecosystem</div>
+      <div class="section-h reveal">Built alongside Kelpie.<br><em>Separate, complementary, open.</em></div>
+      <div class="eco-grid">
+        <div class="eco-card silkie reveal" id="silkie">
+          <div class="eco-logo-wrap">
+            <img src="assets/silkie.png" alt="Silkie" class="eco-logo">
+          </div>
+          <h2>Silkie</h2>
+          <div class="eco-tag">Zero-Trust Network</div>
+          <p>A self-hosted management layer for a WireGuard overlay network. Device enrollment, session brokering, STUN/TURN NAT traversal, and a clean admin UI — your private network, your infrastructure, no cloud required.</p>
+          <ul class="eco-bullets">
+            <li>Device enrollment for macOS, Linux, iOS &amp; Android</li>
+            <li>ICE/STUN/TURN-assisted NAT traversal</li>
+            <li>Short-lived session tokens, zero long-lived secrets</li>
+            <li>OIDC-based auth with SSO support</li>
+          </ul>
+          <div class="eco-chips">
+            <span class="chip">Go</span>
+            <span class="chip">WireGuard</span>
+            <span class="chip">PostgreSQL</span>
+            <span class="chip">Self-hosted</span>
+          </div>
+        </div>
+
+        <div class="eco-card nessie reveal reveal-delay-1" id="nessie">
+          <div class="eco-logo-wrap">
+            <img src="assets/nessie.png" alt="Nessie" class="eco-logo">
+          </div>
+          <h2>Nessie</h2>
+          <div class="eco-tag">Personal AI Agent</div>
+          <p>A voice-first personal AI agent that lives on your Mac. Talk to it, it talks back. Spawn sub-agents for deep research. Inject text into any active application. Ambient, always-on, always ready.</p>
+          <ul class="eco-bullets">
+            <li>Real-time voice I/O via OpenAI Realtime API</li>
+            <li>Native keyboard injection into any macOS app</li>
+            <li>Parallel sub-agents for research and file work</li>
+            <li>Persistent memory across sessions</li>
+          </ul>
+          <div class="eco-chips">
+            <span class="chip">TypeScript</span>
+            <span class="chip">macOS</span>
+            <span class="chip">Voice</span>
+            <span class="chip">MCP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ── -->
+  <div class="cta-band">
+    <div class="container">
+      <div class="cta-inner reveal">
+        <div class="cta-text">
+          <h2>Start automating<br>mobile browsers today.</h2>
+          <p>Install the CLI, launch Kelpie on a device, start issuing commands.</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-shrink:0;flex-wrap:wrap;">
+          <a href="https://github.com/unlikeotherai/kelpie" class="btn-primary">Read the docs →</a>
+          <a href="https://github.com/unlikeotherai" class="btn-ghost">All projects</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="container">
+      <div class="footer-row">
+        <div class="footer-brand">
+          <strong>UnlikeOtherAI</strong> &nbsp;·&nbsp;
+          Kelpie, Silkie &amp; Nessie are open-source projects by Ondrej Rafaj and <a href="https://unlikeotherai.com" style="color:var(--blue);text-decoration:underline;text-underline-offset:3px;">UnlikeOtherAI</a>.
+        </div>
+        <ul class="footer-nav">
+          <li><a href="https://github.com/unlikeotherai/kelpie">Kelpie</a></li>
+          <li><a href="https://github.com/unlikeotherai/silkie">Silkie</a></li>
+          <li><a href="https://github.com/unlikeotherai/nessie">Nessie</a></li>
+          <li><a href="https://github.com/unlikeotherai">GitHub</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Scroll reveal
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.06 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+  // Copy install command
+  function copyInstall() {
+    const cmd = document.getElementById('cmd-text').textContent;
+    const btn = document.getElementById('copy-btn');
+    navigator.clipboard.writeText(cmd).then(() => {
+      btn.textContent = 'copied!';
+      btn.style.color = 'var(--teal)';
+      setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+    });
+  }
+</script>
 </body>
 </html>
