@@ -10,6 +10,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
     let safariAuth = SafariAuthHelper()
+    let dialogState = DialogState()
 
     override nonisolated init() { super.init() }
 

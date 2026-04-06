@@ -141,6 +141,39 @@ struct WebViewContainer: UIViewRepresentable {
             return nil
         }
 
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            guard let dialogState = handlerContext?.dialogState else {
+                completionHandler()
+                return
+            }
+            let dialog = DialogState.PendingDialog(type: .alert, message: message, defaultText: nil) { _ in
+                completionHandler()
+            }
+            dialogState.enqueue(dialog)
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            guard let dialogState = handlerContext?.dialogState else {
+                completionHandler(false)
+                return
+            }
+            let dialog = DialogState.PendingDialog(type: .confirm, message: message, defaultText: nil) { result in
+                completionHandler(result != nil)
+            }
+            dialogState.enqueue(dialog)
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
+            guard let dialogState = handlerContext?.dialogState else {
+                completionHandler(nil)
+                return
+            }
+            let dialog = DialogState.PendingDialog(type: .prompt, message: prompt, defaultText: defaultText) { result in
+                completionHandler(result)
+            }
+            dialogState.enqueue(dialog)
+        }
+
         private func recordMainDocumentResponse(_ navigationResponse: WKNavigationResponse) {
             guard navigationResponse.isForMainFrame,
                   let response = navigationResponse.response as? HTTPURLResponse,

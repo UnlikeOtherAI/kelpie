@@ -44,13 +44,9 @@ struct BrowserManagementHandler {
         router.register("get-iframe-context") { _ in successResponse(["context": "main"]) }
 
         // Dialogs
-        router.register("get-dialog") { _ in successResponse(["showing": false, "dialog": NSNull()]) }
-        router.register("handle-dialog") { body in
-            successResponse(["action": body["action"] ?? "accept", "dialogType": "none"])
-        }
-        router.register("set-dialog-auto-handler") { body in
-            successResponse(["enabled": body["enabled"] ?? true])
-        }
+        router.register("get-dialog") { _ in await getDialog() }
+        router.register("handle-dialog") { body in await handleDialog(body) }
+        router.register("set-dialog-auto-handler") { body in await setDialogAutoHandler(body) }
 
         // Tabs (stub — full implementation needs TabManager)
         router.register("get-tabs") { _ in await getTabs() }
@@ -282,6 +278,57 @@ struct BrowserManagementHandler {
     private func switchToIframe(_ body: [String: Any]) async -> [String: Any] {
         let id = body["iframeId"] as? Int ?? 0
         return successResponse(["iframe": ["id": id, "src": ""], "context": "iframe"])
+    }
+
+    // MARK: - Dialogs
+
+    @MainActor
+    private func getDialog() async -> [String: Any] {
+        let state = context.dialogState
+        guard let dialog = state.current else {
+            return successResponse(["showing": false, "dialog": NSNull()])
+        }
+        var info: [String: Any] = [
+            "type": dialog.type.rawValue,
+            "message": dialog.message
+        ]
+        if let defaultText = dialog.defaultText {
+            info["defaultValue"] = defaultText
+        } else {
+            info["defaultValue"] = NSNull()
+        }
+        return successResponse(["showing": true, "dialog": info])
+    }
+
+    @MainActor
+    private func handleDialog(_ body: [String: Any]) async -> [String: Any] {
+        let action = body["action"] as? String ?? "accept"
+        let text = body["promptText"] as? String ?? body["text"] as? String
+        let result = context.dialogState.handle(action: action, text: text)
+        guard result.handled else {
+            return errorResponse(code: "NO_DIALOG", message: "No dialog is currently showing")
+        }
+        return successResponse(["action": action, "dialogType": result.type.rawValue])
+    }
+
+    @MainActor
+    private func setDialogAutoHandler(_ body: [String: Any]) async -> [String: Any] {
+        let state = context.dialogState
+        let enabled = body["enabled"] as? Bool ?? true
+        let defaultAction = body["defaultAction"] as? String ?? "accept"
+
+        if enabled {
+            if defaultAction == "queue" {
+                state.autoHandler = nil
+            } else {
+                state.autoHandler = defaultAction
+            }
+        } else {
+            state.autoHandler = nil
+        }
+
+        state.autoPromptText = body["promptText"] as? String ?? ""
+        return successResponse(["enabled": enabled])
     }
 
     // MARK: - Tabs
