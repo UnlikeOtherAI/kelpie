@@ -475,13 +475,15 @@ Response:
 ```
 
 ### `fill`
-Fill a form field with text. Clears existing content first.
+Fill a form field with text. Clears existing content first. Supports two modes: `instant` (default) sets the value immediately, `typing` types character by character with configurable delay.
 
 ```json
 POST /v1/fill
 {
   "selector": "#email-input",
   "value": "user@example.com",
+  "mode": "instant",          // optional: "instant" (default) or "typing"
+  "delay": 50,                // optional: ms between keystrokes when mode is "typing" (default 50)
   "timeout": 5000             // optional
 }
 
@@ -492,6 +494,8 @@ Response:
   "value": "user@example.com"
 }
 ```
+
+When `mode` is `"typing"`, the field is cleared first, then each character is typed with `keydown`, `keypress`, `input`, and `keyup` events. The action blocks until all characters are typed. Speed guidelines for `delay`: 30 = fast, 50 = natural (default), 80-100 = deliberate, 150+ = dramatic.
 
 ### `type`
 Type text character by character (triggers key events).

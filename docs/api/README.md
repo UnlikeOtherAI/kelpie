@@ -102,6 +102,7 @@ All errors follow the same format:
 | `WATCH_NOT_FOUND` | 404 | Mutation watch ID does not exist |
 | `ANNOTATION_EXPIRED` | 400 | Annotation index references a stale screenshotAnnotated result (invalidated by navigation or DOM change) |
 | `RECORDING_IN_PROGRESS` | 409 | A script is currently playing; only `abort-script` and `get-script-status` are allowed |
+| `SCRIPT_PARTIAL_FAILURE` | 200 | Script completed but one or more actions failed (when `continueOnError` is true) |
 | `PLATFORM_NOT_SUPPORTED` | 501 | Method not available on this platform (e.g., request interception on iOS) |
 | `PERMISSION_REQUIRED` | 403 | Operation requires user gesture or OS permission (e.g., clipboard read on iOS) |
 | `SHADOW_ROOT_CLOSED` | 403 | Cannot traverse a closed shadow root |
