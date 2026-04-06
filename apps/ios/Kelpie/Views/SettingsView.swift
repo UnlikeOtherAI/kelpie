@@ -6,7 +6,11 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @AppStorage("debugOverlay") private var debugOverlay = false
+    @ObservedObject private var aiState = AIState.shared
+    @State private var showTokenField = false
+    @State private var tokenInput = ""
     let onShowWelcome: () -> Void
+    var onNavigate: ((String) -> Void)?
 
     var body: some View {
         NavigationView {
@@ -32,6 +36,56 @@ struct SettingsView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.blue)
                         .textSelection(.enabled)
+                }
+
+                Section("HuggingFace") {
+                    HStack {
+                        if aiState.huggingFaceToken.isEmpty {
+                            Image(systemName: "key")
+                                .foregroundColor(.orange)
+                            Text("No API Key")
+                                .foregroundColor(.orange)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("API Key Set")
+                                .foregroundColor(.primary)
+                        }
+                    }
+
+                    Button(showTokenField ? "Hide API Key Field" : "Set API Key") {
+                        showTokenField.toggle()
+                        if showTokenField {
+                            tokenInput = ""
+                        }
+                    }
+
+                    if showTokenField {
+                        SecureField("HuggingFace Token", text: $tokenInput)
+                            .textContentType(.password)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+
+                        Button("Save") {
+                            aiState.huggingFaceToken = tokenInput
+                            tokenInput = ""
+                            showTokenField = false
+                        }
+                        .disabled(tokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    if !aiState.huggingFaceToken.isEmpty {
+                        Button("Clear", role: .destructive) {
+                            aiState.huggingFaceToken = ""
+                            tokenInput = ""
+                            showTokenField = false
+                        }
+                    }
+
+                    Button("Open HuggingFace Tokens Page") {
+                        dismiss()
+                        onNavigate?("https://huggingface.co/settings/tokens")
+                    }
                 }
 
                 Section("Debug") {

@@ -9,11 +9,18 @@ final class AIState: ObservableObject {
         static let backend = "ai.backend"
         static let activeModel = "ai.activeModel"
         static let ollamaEndpoint = "ai.ollamaEndpoint"
+        static let huggingFaceToken = "huggingFaceToken"
     }
 
     nonisolated static let defaultOllamaEndpoint = "http://localhost:11434"
 
     let isAvailable: Bool
+
+    @Published var huggingFaceToken: String {
+        didSet {
+            UserDefaults.standard.set(huggingFaceToken, forKey: DefaultsKey.huggingFaceToken)
+        }
+    }
 
     @Published var backend: String {
         didSet {
@@ -74,6 +81,7 @@ final class AIState: ObservableObject {
         isAvailable = PlatformAIEngine.isAvailable
 
         let defaults = UserDefaults.standard
+        huggingFaceToken = defaults.string(forKey: DefaultsKey.huggingFaceToken) ?? ""
         let storedModel = defaults.string(forKey: DefaultsKey.activeModel)
         let storedBackend = defaults.string(forKey: DefaultsKey.backend) ?? "platform"
 

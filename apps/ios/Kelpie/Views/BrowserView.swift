@@ -302,7 +302,13 @@ struct BrowserView: View {
             inspectorMode = "rotate"
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(serverState: serverState, onShowWelcome: presentWelcomeFromHelp)
+            SettingsView(
+                serverState: serverState,
+                onShowWelcome: presentWelcomeFromHelp,
+                onNavigate: { url in
+                    navigate(url)
+                }
+            )
         }
         .sheet(isPresented: $showBookmarks) {
             BookmarksView(
