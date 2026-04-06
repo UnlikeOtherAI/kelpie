@@ -18,12 +18,12 @@ C++17 static library providing all shareable AI logic across Kelpie platforms.
 
 | Platform | Linking | HTTPS |
 |----------|---------|-------|
-| macOS | Static `.a` via bridging header | cpp-httplib + OpenSSL |
+| macOS | Static `.a` via bridging header | Disabled in `core-ai` — URLSession handles HTTPS |
 | Linux | Static `.a` via direct C calls | cpp-httplib + OpenSSL |
 | Android | Static via JNI (`kelpie_jni.so`) | Disabled — OkHttp handles HTTPS |
 | iOS | Static `.a` via bridging header | Disabled — URLSession handles HTTPS |
 
-On mobile, build with `-DKELPIE_AI_USE_HTTPLIB=OFF` to exclude HTTP-dependent code. Catalog, fitness, and token functions remain available.
+On Apple platforms and Android, build with `-DKELPIE_AI_USE_HTTPLIB=OFF` to exclude HTTP-dependent code. Catalog, fitness, token, and model-store helpers remain available.
 
 ## Build
 

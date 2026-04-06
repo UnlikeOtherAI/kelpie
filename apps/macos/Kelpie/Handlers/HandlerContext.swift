@@ -3,6 +3,8 @@ import AppKit
 /// Shared context providing access to the active renderer for all handlers.
 @MainActor
 final class HandlerContext {
+    nonisolated static let defaultOverlayRGB = "59,130,246"
+
     var renderer: (any RendererEngine)?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
@@ -83,20 +85,20 @@ final class HandlerContext {
         return json
     }
 
-    /// Show a blue touch indicator at viewport coordinates with a ripple animation.
-    func showTouchIndicator(x: Double, y: Double) async {
+    /// Show a touch indicator at viewport coordinates with a ripple animation.
+    func showTouchIndicator(x: Double, y: Double, color: String = HandlerContext.defaultOverlayRGB) async {
         let js = """
         (function() {
             var dot = document.createElement('div');
             dot.style.cssText = 'position:fixed;left:\(x)px;top:\(y)px;width:36px;height:36px;' +
                 'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                'background:rgba(59,130,246,0.7);pointer-events:none;z-index:2147483647;' +
+                'background:rgba(\(JSEscape.string(color)),0.7);pointer-events:none;z-index:2147483647;' +
                 'transition:transform 0.5s ease-out, opacity 0.5s ease-out;transform:scale(1);opacity:1;';
             document.body.appendChild(dot);
             var ripple = document.createElement('div');
             ripple.style.cssText = 'position:fixed;left:\(x)px;top:\(y)px;width:36px;height:36px;' +
                 'margin-left:-18px;margin-top:-18px;border-radius:50%;' +
-                'border:2px solid rgba(59,130,246,0.7);pointer-events:none;z-index:2147483647;' +
+                'border:2px solid rgba(\(JSEscape.string(color)),0.7);pointer-events:none;z-index:2147483647;' +
                 'transition:transform 0.6s ease-out, opacity 0.6s ease-out;transform:scale(1);opacity:1;';
             document.body.appendChild(ripple);
             requestAnimationFrame(function() {
@@ -113,11 +115,11 @@ final class HandlerContext {
             }, 1100);
         })();
         """
-        try? await evaluateJS(js)
+        _ = try? await evaluateJS(js)
     }
 
     /// Show touch indicator at an element's center by selector.
-    func showTouchIndicatorForElement(_ selector: String) async {
+    func showTouchIndicatorForElement(_ selector: String, color: String = HandlerContext.defaultOverlayRGB) async {
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');
@@ -130,7 +132,7 @@ final class HandlerContext {
            let data = result.data(using: .utf8),
            let pos = try? JSONSerialization.jsonObject(with: data) as? [String: Double],
            let x = pos["x"], let y = pos["y"] {
-            await showTouchIndicator(x: x, y: y)
+            await showTouchIndicator(x: x, y: y, color: color)
         }
     }
 
@@ -157,7 +159,7 @@ final class HandlerContext {
             }, 3000);
         })();
         """
-        try? await evaluateJS(js)
+        _ = try? await evaluateJS(js)
     }
 
     /// Returns a structured error for any operation that requires WebKit when CEF is active.
@@ -286,6 +288,17 @@ final class HandlerContext {
         await persistRendererCookiesToSharedJar()
     }
 
+    nonisolated static func hexToRGB(_ hex: String) -> String {
+        let normalized = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard normalized.count == 6,
+              let red = UInt8(normalized.prefix(2), radix: 16),
+              let green = UInt8(normalized.dropFirst(2).prefix(2), radix: 16),
+              let blue = UInt8(normalized.dropFirst(4).prefix(2), radix: 16) else {
+            return defaultOverlayRGB
+        }
+        return "\(red),\(green),\(blue)"
+    }
+
     func deleteAllCookies() async {
         guard let renderer else { return }
         await renderer.deleteAllCookies()
@@ -362,7 +375,7 @@ final class HandlerContext {
 
     func exit3DInspectorIfNeeded(notify: Bool) async {
         guard isIn3DInspector else { return }
-        try? await evaluateJS(Snapshot3DBridge.exitScript)
+        _ = try? await evaluateJS(Snapshot3DBridge.exitScript)
         mark3DInspectorInactive(notify: notify)
     }
 

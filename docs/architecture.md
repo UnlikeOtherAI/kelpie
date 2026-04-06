@@ -99,10 +99,10 @@ Cross-platform C++17 static libraries with C ABI, shared by all platforms via br
 | `core-state` | Bookmarks, history, network traffic, console stores |
 | `core-automation` | Viewport presets and device fitting |
 | `core-mcp` | MCP protocol types |
-| `core-ai` | AI model catalog, HF token + authenticated downloads, Ollama HTTP client, HF cloud inference |
+| `core-ai` | AI model catalog, device fitness evaluation, HF token, and shared AI metadata/store helpers |
 | `engine-chromium-desktop` | CEF integration (macOS/Linux only) |
 
-**`core-ai`** manages all shareable AI logic: the approved model catalog (Gemma 4 E2B Q4/Q8), device fitness evaluation, HF token storage, model downloads with `Authorization: Bearer` headers, model store (is_downloaded/remove), Ollama HTTP client (reachable/list/infer), and HF Inference API cloud calls. Platforms keep only UI code and local inference engines (llama.cpp/Metal on macOS, Apple Foundation Models on iOS, Google AI Edge on Android). On mobile, cpp-httplib is disabled at build time — HTTPS operations (downloads, HF cloud) are handled by platform HTTP stacks (URLSession/OkHttp).
+**`core-ai`** manages the shareable AI catalog and storage primitives: the approved model catalog (Gemma 4 E2B Q4/Q8), device fitness evaluation, HF token storage, and model-store helpers. Platform networking stays native: Apple apps use URLSession for downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
 
 ### 2. CLI
 

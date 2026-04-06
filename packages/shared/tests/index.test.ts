@@ -43,6 +43,7 @@ describe("error codes", () => {
       "IFRAME_ACCESS_DENIED",
       "WATCH_NOT_FOUND",
       "ANNOTATION_EXPIRED",
+      "RECORDING_IN_PROGRESS",
       "PLATFORM_NOT_SUPPORTED",
       "PERMISSION_REQUIRED",
       "SHADOW_ROOT_CLOSED",
@@ -71,7 +72,7 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(104);
+    expect(BrowserMcpTools.length).toBe(112);
   });
 
   it("has correct count of CLI tools", () => {

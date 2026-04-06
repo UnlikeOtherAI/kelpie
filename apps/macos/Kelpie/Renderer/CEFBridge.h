@@ -2,6 +2,8 @@
 
 /// Objective-C wrapper around CEF's C API for Swift interop.
 /// This is intentionally thin — only the functionality we need.
+NS_ASSUME_NONNULL_BEGIN
+
 @interface CEFBridge : NSObject
 
 /// Initialize CEF. Must be called once at app startup.
@@ -56,10 +58,10 @@
 /// Evaluate JavaScript and return the result via callback.
 /// The callback receives the result as a JSON string, or nil on error.
 - (void)evaluateJavaScript:(NSString *)script
-                completion:(void (^)(NSString * _Nullable result, NSError * _Nullable error))completion;
+                completion:(void (^ _Nonnull)(NSString * _Nullable result, NSError * _Nullable error))completion;
 
 /// Get all cookies as an array of dictionaries.
-- (void)getAllCookiesWithCompletion:(void (^)(NSArray<NSDictionary *> *cookies))completion;
+- (void)getAllCookiesWithCompletion:(void (^ _Nonnull)(NSArray<NSDictionary *> *cookies))completion;
 
 /// Set a cookie.
 - (void)setCookieName:(NSString *)name
@@ -70,16 +72,16 @@
              httpOnly:(BOOL)httpOnly
                secure:(BOOL)secure
               expires:(NSDate * _Nullable)expires
-           completion:(void (^)(BOOL success))completion;
+           completion:(void (^ _Nonnull)(BOOL success))completion;
 
 /// Delete all cookies.
-- (void)deleteAllCookiesWithCompletion:(void (^)(NSInteger deleted))completion;
+- (void)deleteAllCookiesWithCompletion:(void (^ _Nonnull)(NSInteger deleted))completion;
 
 /// Flush the cookie store to ensure all pending set/delete operations are committed.
-- (void)flushCookieStoreWithCompletion:(void (^)(void))completion;
+- (void)flushCookieStoreWithCompletion:(void (^ _Nonnull)(void))completion;
 
 /// Take a screenshot. Returns PNG data via callback.
-- (void)takeScreenshotWithCompletion:(void (^)(NSData * _Nullable pngData))completion;
+- (void)takeScreenshotWithCompletion:(void (^ _Nonnull)(NSData * _Nullable pngData))completion;
 
 /// Close the browser and pump the CEF message loop until the close
 /// completes. Must be called before releasing the bridge to avoid
@@ -102,3 +104,5 @@
 @property (nonatomic, copy, nullable) void (^onConsoleMessage)(NSDictionary *message);
 
 @end
+
+NS_ASSUME_NONNULL_END

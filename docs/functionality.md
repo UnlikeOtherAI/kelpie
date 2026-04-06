@@ -58,6 +58,16 @@ Full read access to the page DOM. Query elements by CSS selector, get their text
 
 Click elements by selector or tap at specific coordinates. Fill form inputs, type text character-by-character (simulating human typing with per-character delays), select dropdown options, check/uncheck checkboxes. Every interaction shows a blue touch indicator animation on the device so you can see what happened.
 
+Swipe gestures are first-class too: give Kelpie start and end viewport coordinates and it renders a visible swipe trail while driving the matching page movement.
+
+## Scripted Video Recording
+
+Kelpie can run a whole walkthrough as one timed script instead of one command at a time. A script enters recording mode, hides the browser chrome, locks the normal controls, and leaves only a stop button visible while it plays. Actions can mix navigation, taps, typing, swipes, waits, screenshots, viewport changes, commentary pills, and element highlights.
+
+The main use case is support and presentation work: record a few clean steps that show a customer exactly where to click, how to reach a setting, or how to complete a workflow, then hand over the resulting walkthrough video instead of writing a long email.
+
+The feature is exposed through `play-script`, `abort-script`, and `get-script-status`, with matching CLI commands (`kelpie script run`, `kelpie script status`, `kelpie script abort`) and MCP tools. Commentary and highlight overlays are also available as standalone commands and tools, so an LLM can narrate or spotlight a page without running a full script.
+
 ## Scrolling
 
 Scroll by pixel deltas, scroll a specific element into view (with configurable alignment: top/center/bottom), or jump to the top or bottom of the page. The `scroll2` method is resolution-aware — it adapts its behavior based on the device's viewport size.
@@ -157,7 +167,7 @@ On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, 
 
 **HF Cloud Inference:** When a HF token is set, models available on the HF Inference API can be queried remotely without downloading. The cloud client posts to `api-inference.huggingface.co/models/{id}` and returns the generated text with timing metadata. Supports prompt, chat-message, and raw HF input formats.
 
-**Shared AI Library (`native/core-ai`):** Model catalog, fitness evaluation, HF token management, authenticated downloads, Ollama HTTP client, and HF cloud inference live in a shared C++ library. All platforms link it: macOS and desktop get full HTTP support (cpp-httplib with SSL), mobile platforms use only the catalog/fitness/token functions and handle HTTPS via their native stacks.
+**Shared AI Library (`native/core-ai`):** Model catalog, fitness evaluation, HF token management, and shared model-store helpers live in a shared C++ library. Apple apps use URLSession for authenticated downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
 
 **CLI model management:** `kelpie ai list` shows approved models and their download status, plus any locally running Ollama models. `kelpie ai pull/rm` manage downloads. `kelpie ai load/unload/status/ask` control inference on devices. All available as MCP tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`, `kelpie_ai_status`, `kelpie_ai_load`, `kelpie_ai_unload`, `kelpie_ai_ask`, `kelpie_ai_record`).
 

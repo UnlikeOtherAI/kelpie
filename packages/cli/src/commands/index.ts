@@ -35,6 +35,7 @@ import { registerExplain } from "./explain.js";
 import { registerHome } from "./home.js";
 import { registerBrowser } from "./browser.js";
 import { registerAI } from "./ai.js";
+import { registerScript } from "./script.js";
 
 export function registerAllCommands(program: Command): void {
   // Discovery
@@ -51,6 +52,7 @@ export function registerAllCommands(program: Command): void {
 
   // Interaction + Scroll + Wait
   registerInteraction(program);
+  registerScript(program);
   registerScroll(program);
   registerWait(program);
   registerDeviceInfo(program);

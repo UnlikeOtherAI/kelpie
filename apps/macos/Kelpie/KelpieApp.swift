@@ -107,24 +107,30 @@ struct BrowserCommandBridge: NSViewRepresentable {
                 object: window,
                 queue: .main
             ) { [weak self, weak window] _ in
-                guard let self, let window, let actions = self.actions else { return }
-                BrowserCommandRouter.shared.activate(window: window, actions: actions)
+                Task { @MainActor [weak self, weak window] in
+                    guard let self, let window, let actions = self.actions else { return }
+                    BrowserCommandRouter.shared.activate(window: window, actions: actions)
+                }
             }
             didResignKeyObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didResignKeyNotification,
                 object: window,
                 queue: .main
             ) { [weak window] _ in
-                guard let window else { return }
-                BrowserCommandRouter.shared.deactivate(window: window)
+                Task { @MainActor [weak window] in
+                    guard let window else { return }
+                    BrowserCommandRouter.shared.deactivate(window: window)
+                }
             }
             willCloseObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification,
                 object: window,
                 queue: .main
             ) { [weak window] _ in
-                guard let window else { return }
-                BrowserCommandRouter.shared.deactivate(window: window)
+                Task { @MainActor [weak window] in
+                    guard let window else { return }
+                    BrowserCommandRouter.shared.deactivate(window: window)
+                }
             }
         }
 
@@ -140,22 +146,27 @@ struct BrowserCommandBridge: NSViewRepresentable {
 }
 
 private struct BrowserCommands: Commands {
+    @ObservedObject var serverState: ServerState
+
     var body: some Commands {
         CommandGroup(after: .newItem) {
             Button("New Tab") {
                 NotificationCenter.default.post(name: .newTab, object: nil)
             }
             .keyboardShortcut("t", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
 
             Button("Close Tab") {
                 NotificationCenter.default.post(name: .closeTab, object: nil)
             }
             .keyboardShortcut("w", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
 
             Button("New Window") {
                 openNewWindow()
             }
             .keyboardShortcut("n", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
         }
 
         CommandGroup(after: .toolbar) {
@@ -163,6 +174,7 @@ private struct BrowserCommands: Commands {
                 BrowserCommandRouter.shared.hardReload()
             }
             .keyboardShortcut("r", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
         }
 
         CommandGroup(after: .windowArrangement) {
@@ -170,6 +182,7 @@ private struct BrowserCommands: Commands {
                 toggleFullScreenForActiveWindow()
             }
             .keyboardShortcut("f", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
         }
 
         CommandGroup(after: .help) {
@@ -179,20 +192,24 @@ private struct BrowserCommands: Commands {
                     object: WelcomeCardPresentationSource.helpMenu.rawValue
                 )
             }
+            .disabled(serverState.isScriptRecording)
 
             Divider()
 
             Button("Open Kelpie Website") {
                 openHelpURL("https://unlikeotherai.github.io/kelpie")
             }
+            .disabled(serverState.isScriptRecording)
 
             Button("Open GitHub Repository") {
                 openHelpURL("https://github.com/UnlikeOtherAI/kelpie")
             }
+            .disabled(serverState.isScriptRecording)
 
             Button("Open UnlikeOtherAI") {
                 openHelpURL("https://unlikeotherai.com")
             }
+            .disabled(serverState.isScriptRecording)
         }
     }
 
@@ -236,7 +253,7 @@ struct KelpieApp: App {
             )
         }
         .commands {
-            BrowserCommands()
+            BrowserCommands(serverState: serverState)
         }
     }
 

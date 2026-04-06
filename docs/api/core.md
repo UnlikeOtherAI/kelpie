@@ -83,6 +83,96 @@ Response:
 
 ---
 
+## Scripted Recording
+
+### `swipe`
+Swipe between two viewport coordinates and render a visible swipe trail. This dispatches synthetic pointer events to the page for JS-driven drag targets; it does not guarantee native browser scrolling or OS gesture behavior.
+
+```json
+POST /v1/swipe
+{
+  "from": { "x": 200, "y": 700 },
+  "to": { "x": 200, "y": 200 },
+  "durationMs": 500,
+  "steps": 20,
+  "color": "#3B82F6"
+}
+```
+
+### `show-commentary` / `hide-commentary`
+Show or hide a commentary pill inside the page viewport.
+
+```json
+POST /v1/show-commentary
+{
+  "text": "Watch the signup button",
+  "position": "bottom",
+  "durationMs": 0
+}
+```
+
+```json
+POST /v1/hide-commentary
+```
+
+### `highlight` / `hide-highlight`
+Draw or remove a highlight ring around an element.
+
+```json
+POST /v1/highlight
+{
+  "selector": "#signup",
+  "color": "#EF4444",
+  "thickness": 3,
+  "padding": 6,
+  "animation": "draw",
+  "durationMs": 2000
+}
+```
+
+```json
+POST /v1/hide-highlight
+```
+
+### `play-script`
+Run a timed walkthrough script. While it is active, every request except `abort-script` and `get-script-status` is rejected with `RECORDING_IN_PROGRESS`.
+
+```json
+POST /v1/play-script
+{
+  "overlayColor": "#3B82F6",
+  "defaultWaitBetweenActions": 500,
+  "continueOnError": false,
+  "actions": [
+    { "action": "commentary", "text": "Welcome", "durationMs": 0 },
+    { "action": "wait", "ms": 1500 },
+    { "action": "hide-commentary" },
+    { "action": "highlight", "selector": "#signup", "animation": "draw" },
+    { "action": "click", "selector": "#signup" }
+  ]
+}
+```
+
+Successful responses return `actionsExecuted`, `totalDurationMs`, `errors`, and any screenshot temp-file paths captured during playback.
+
+Inside a script, action names follow the recording-script contract rather than the raw endpoint names. For example, use `commentary` to show commentary and `hide-commentary` to dismiss it.
+
+### `abort-script`
+Abort the active script and return the partial playback result collected so far.
+
+```json
+POST /v1/abort-script
+```
+
+### `get-script-status`
+Return whether a script is playing, the current action index, and the elapsed playback time.
+
+```json
+POST /v1/get-script-status
+```
+
+---
+
 ## External Display Debug
 
 These methods exist to verify the iOS external-display sync flow without a real AirPlay target.

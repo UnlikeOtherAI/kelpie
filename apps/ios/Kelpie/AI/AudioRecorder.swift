@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 
 @MainActor
@@ -101,13 +101,16 @@ final class AudioRecorder {
 
         isRecording = true
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
-            guard let self else {
-                timer.invalidate()
-                return
-            }
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
 
-            if let startedAt = self.startedAt, Date().timeIntervalSince(startedAt) >= self.maxDuration {
-                _ = self.finalizeRecording()
+                guard let startedAt = self.startedAt else { return }
+                if Date().timeIntervalSince(startedAt) >= self.maxDuration {
+                    _ = self.finalizeRecording()
+                }
             }
         }
     }

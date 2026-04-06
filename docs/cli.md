@@ -258,6 +258,48 @@ kelpie select "#country" "us" --device "My iPhone"
 kelpie check "#agree-terms" --device "My iPhone"
 ```
 
+### `kelpie swipe <fromX> <fromY> <toX> <toY>`
+
+```bash
+kelpie swipe 200 700 200 200 --device "My iPhone" --duration 500 --color "#3B82F6"
+```
+
+### `kelpie commentary show <text>` / `kelpie commentary hide`
+
+```bash
+kelpie commentary show "Watch this button" --device "My iPhone" --position bottom --duration 0
+kelpie commentary hide --device "My iPhone"
+```
+
+### `kelpie highlight show <selector>` / `kelpie highlight hide`
+
+```bash
+kelpie highlight show "#signup" --device "My iPhone" --animation draw --color "#EF4444"
+kelpie highlight hide --device "My iPhone"
+```
+
+---
+
+## Scripted Recording
+
+### `kelpie script run <file>`
+
+```bash
+kelpie script run ./demo-script.json --device "My iPhone"
+```
+
+### `kelpie script status`
+
+```bash
+kelpie script status --device "My iPhone"
+```
+
+### `kelpie script abort`
+
+```bash
+kelpie script abort --device "My iPhone"
+```
+
 ---
 
 ## Scroll Commands

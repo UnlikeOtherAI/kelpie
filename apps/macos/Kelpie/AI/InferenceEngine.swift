@@ -131,7 +131,7 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
     ) async throws -> InferenceResult {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
             queue.async {
-                guard let model = self.model, let ctx = self.ctx, let vocab = self.vocab else {
+                guard self.model != nil, let ctx = self.ctx, let vocab = self.vocab else {
                     continuation.resume(throwing: InferenceError.noModelLoaded)
                     return
                 }

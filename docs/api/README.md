@@ -101,6 +101,7 @@ All errors follow the same format:
 | `IFRAME_ACCESS_DENIED` | 403 | Cannot access closed shadow root or cross-origin iframe |
 | `WATCH_NOT_FOUND` | 404 | Mutation watch ID does not exist |
 | `ANNOTATION_EXPIRED` | 400 | Annotation index references a stale screenshotAnnotated result (invalidated by navigation or DOM change) |
+| `RECORDING_IN_PROGRESS` | 409 | A script is currently playing; only `abort-script` and `get-script-status` are allowed |
 | `PLATFORM_NOT_SUPPORTED` | 501 | Method not available on this platform (e.g., request interception on iOS) |
 | `PERMISSION_REQUIRED` | 403 | Operation requires user gesture or OS permission (e.g., clipboard read on iOS) |
 | `SHADOW_ROOT_CLOSED` | 403 | Cannot traverse a closed shadow root |
@@ -180,6 +181,14 @@ When exposed via MCP, methods use the `kelpie_` prefix:
 | `/v1/select-option` | `kelpie_select_option` |
 | `/v1/check` | `kelpie_check` |
 | `/v1/uncheck` | `kelpie_uncheck` |
+| `/v1/swipe` | `kelpie_swipe` |
+| `/v1/show-commentary` | `kelpie_show_commentary` |
+| `/v1/hide-commentary` | `kelpie_hide_commentary` |
+| `/v1/highlight` | `kelpie_highlight` |
+| `/v1/hide-highlight` | `kelpie_hide_highlight` |
+| `/v1/play-script` | `kelpie_play_script` |
+| `/v1/abort-script` | `kelpie_abort_script` |
+| `/v1/get-script-status` | `kelpie_get_script_status` |
 | `/v1/scroll` | `kelpie_scroll` |
 | `/v1/scroll2` | `kelpie_scroll2` |
 | `/v1/scroll-to-top` | `kelpie_scroll_to_top` |

@@ -838,8 +838,6 @@
 					"$(PROJECT_DIR)/../../native/.build/core-mcp",
 					"$(PROJECT_DIR)/../../native/.build/core-ai",
 					"$(PROJECT_DIR)/vendor/llama.cpp/lib",
-					/opt/homebrew/opt/openssl/lib,
-					/opt/homebrew/opt/brotli/lib,
 				);
 				OTHER_LDFLAGS = (
 					"-lkelpie_core_state",
@@ -847,11 +845,6 @@
 					"-lkelpie_core_automation",
 					"-lkelpie_core_mcp",
 					"-lkelpie_core_ai",
-					"-lssl",
-					"-lcrypto",
-					"-lz",
-					"-lbrotlidec",
-					"-lbrotlicommon",
 					"-lllama",
 					"-lggml",
 					"-lggml-base",
@@ -976,8 +969,6 @@
 					"$(PROJECT_DIR)/../../native/.build/core-mcp",
 					"$(PROJECT_DIR)/../../native/.build/core-ai",
 					"$(PROJECT_DIR)/vendor/llama.cpp/lib",
-					/opt/homebrew/opt/openssl/lib,
-					/opt/homebrew/opt/brotli/lib,
 				);
 				OTHER_LDFLAGS = (
 					"-lkelpie_core_state",
@@ -985,11 +976,6 @@
 					"-lkelpie_core_automation",
 					"-lkelpie_core_mcp",
 					"-lkelpie_core_ai",
-					"-lssl",
-					"-lcrypto",
-					"-lz",
-					"-lbrotlidec",
-					"-lbrotlicommon",
 					"-lllama",
 					"-lggml",
 					"-lggml-base",

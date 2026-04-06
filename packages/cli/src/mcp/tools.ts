@@ -9,6 +9,10 @@ const selector = z.string().describe("CSS selector");
 const url = z.string().describe("URL");
 const timeout = z.number().optional().describe("Timeout in milliseconds");
 const message = z.string().optional().describe("Optional message to show on device screen as a toast overlay while this action runs. Use this to narrate what you are doing, e.g. 'Clicking the login button' or 'Scrolling to pricing section'. The toast appears at the bottom of the viewport with a semi-transparent background.");
+const point = z.object({
+  x: z.number().describe("Viewport X coordinate"),
+  y: z.number().describe("Viewport Y coordinate"),
+});
 
 const filterProps = {
   platform: z.enum(platforms).optional().describe("Filter by platform"),
@@ -80,6 +84,14 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_select_option", description: "Select an option from a dropdown", method: "selectOption", schema: { device, selector, value: z.string().describe("Option value to select") }, bodyFromArgs: passthrough },
   { name: "kelpie_check", description: "Check a checkbox", method: "check", schema: { device, selector }, bodyFromArgs: passthrough },
   { name: "kelpie_uncheck", description: "Uncheck a checkbox", method: "uncheck", schema: { device, selector }, bodyFromArgs: passthrough },
+  { name: "kelpie_swipe", description: "Swipe between two viewport coordinates with a visible trail overlay", method: "swipe", schema: { device, from: point.describe("Swipe start point"), to: point.describe("Swipe end point"), durationMs: z.number().optional().describe("Swipe duration in milliseconds"), steps: z.number().optional().describe("Interpolation steps for the swipe"), color: z.string().optional().describe("Swipe overlay color, e.g. #3B82F6") }, bodyFromArgs: passthrough },
+  { name: "kelpie_show_commentary", description: "Show a commentary text pill overlay inside the page viewport", method: "showCommentary", schema: { device, text: z.string().describe("Commentary text to display"), durationMs: z.number().optional().describe("How long to show the commentary. Use 0 to keep it visible until hidden."), position: z.enum(["top", "center", "bottom"]).optional().describe("Commentary position") }, bodyFromArgs: passthrough },
+  { name: "kelpie_hide_commentary", description: "Hide the active commentary overlay", method: "hideCommentary", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_highlight", description: "Draw a colored highlight ring around an element", method: "highlight", schema: { device, selector, color: z.string().optional().describe("Highlight color, e.g. #EF4444"), thickness: z.number().optional().describe("Highlight stroke width in pixels"), padding: z.number().optional().describe("Padding around the highlighted element in pixels"), animation: z.enum(["appear", "draw"]).optional().describe("Highlight animation style"), durationMs: z.number().optional().describe("How long to keep the highlight visible. Use 0 to keep it until hidden.") }, bodyFromArgs: passthrough },
+  { name: "kelpie_hide_highlight", description: "Hide the active highlight overlay", method: "hideHighlight", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_play_script", description: "Run a timed recording script made of navigation, interaction, overlay, and wait actions", method: "playScript", schema: { device, actions: z.array(z.record(z.string(), z.any())).describe("Ordered list of script action objects"), overlayColor: z.string().optional().describe("Default overlay color for taps, typing, and swipes"), defaultWaitBetweenActions: z.number().optional().describe("Implicit wait inserted between actions in milliseconds"), continueOnError: z.boolean().optional().describe("Continue script playback after non-fatal action failures") }, bodyFromArgs: passthrough },
+  { name: "kelpie_abort_script", description: "Abort the currently running recording script", method: "abortScript", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_script_status", description: "Get the current recording script playback status", method: "getScriptStatus", schema: { device }, bodyFromArgs: passthrough },
 
   // Scrolling
   { name: "kelpie_scroll", description: "Scroll by pixel delta", method: "scroll", schema: { device, deltaX: z.number().describe("Horizontal pixels"), deltaY: z.number().describe("Vertical pixels"), message }, bodyFromArgs: passthrough },

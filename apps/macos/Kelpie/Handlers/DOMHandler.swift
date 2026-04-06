@@ -17,7 +17,6 @@ struct DOMHandler {
     @MainActor
     private func getDOM(_ body: [String: Any]) async -> [String: Any] {
         let selector = body["selector"] as? String ?? "html"
-        let depth = body["depth"] as? Int ?? 10
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');

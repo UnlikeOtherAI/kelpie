@@ -54,6 +54,12 @@
 		A100000044 /* TVControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000044 /* TVControlsView.swift */; };
 		A100000045 /* TouchpadOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000045 /* TouchpadOverlayView.swift */; };
 		A100000058 /* Inspector3DControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000058 /* Inspector3DControlsView.swift */; };
+		A100000061 /* RecordingStopButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000061 /* RecordingStopButton.swift */; };
+		A100000062 /* ScriptPlaybackState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000062 /* ScriptPlaybackState.swift */; };
+		A100000063 /* CommentaryHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000063 /* CommentaryHandler.swift */; };
+		A100000064 /* HighlightHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000064 /* HighlightHandler.swift */; };
+		A100000065 /* SwipeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000065 /* SwipeHandler.swift */; };
+		A100000066 /* ScriptHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000066 /* ScriptHandler.swift */; };
 		A100000051 /* AIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000051 /* AIState.swift */; };
 		A100000052 /* PlatformAIEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000052 /* PlatformAIEngine.swift */; };
 		A100000053 /* AIHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000053 /* AIHandler.swift */; };
@@ -115,6 +121,12 @@
 		B100000044 /* TVControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVControlsView.swift; sourceTree = "<group>"; };
 		B100000045 /* TouchpadOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchpadOverlayView.swift; sourceTree = "<group>"; };
 		B100000058 /* Inspector3DControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inspector3DControlsView.swift; sourceTree = "<group>"; };
+		B100000061 /* RecordingStopButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStopButton.swift; sourceTree = "<group>"; };
+		B100000062 /* ScriptPlaybackState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptPlaybackState.swift; sourceTree = "<group>"; };
+		B100000063 /* CommentaryHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentaryHandler.swift; sourceTree = "<group>"; };
+		B100000064 /* HighlightHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighlightHandler.swift; sourceTree = "<group>"; };
+		B100000065 /* SwipeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeHandler.swift; sourceTree = "<group>"; };
+		B100000066 /* ScriptHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptHandler.swift; sourceTree = "<group>"; };
 		B100000051 /* AIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIState.swift; sourceTree = "<group>"; };
 		B100000052 /* PlatformAIEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformAIEngine.swift; sourceTree = "<group>"; };
 		B100000053 /* AIHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIHandler.swift; sourceTree = "<group>"; };
@@ -178,6 +190,7 @@
 				B100000044 /* TVControlsView.swift */,
 				B100000045 /* TouchpadOverlayView.swift */,
 				B100000058 /* Inspector3DControlsView.swift */,
+				B100000061 /* RecordingStopButton.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -259,6 +272,11 @@
 				B100000053 /* AIHandler.swift */,
 				B100000057 /* Snapshot3DHandler.swift */,
 				B100000056 /* Snapshot3DBridge.swift */,
+				B100000062 /* ScriptPlaybackState.swift */,
+				B100000063 /* CommentaryHandler.swift */,
+				B100000064 /* HighlightHandler.swift */,
+				B100000065 /* SwipeHandler.swift */,
+				B100000066 /* ScriptHandler.swift */,
 				B100000040 /* NetworkBridge.swift */,
 			);
 			path = Handlers;
@@ -393,6 +411,7 @@
 				A100000044 /* TVControlsView.swift in Sources */,
 				A100000045 /* TouchpadOverlayView.swift in Sources */,
 				A100000058 /* Inspector3DControlsView.swift in Sources */,
+				A100000061 /* RecordingStopButton.swift in Sources */,
 				A100000051 /* AIState.swift in Sources */,
 				A100000052 /* PlatformAIEngine.swift in Sources */,
 				A100000053 /* AIHandler.swift in Sources */,
@@ -400,6 +419,11 @@
 				A100000060 /* AIManager.swift in Sources */,
 				A100000056 /* Snapshot3DBridge.swift in Sources */,
 				A100000057 /* Snapshot3DHandler.swift in Sources */,
+				A100000062 /* ScriptPlaybackState.swift in Sources */,
+				A100000063 /* CommentaryHandler.swift in Sources */,
+				A100000064 /* HighlightHandler.swift in Sources */,
+				A100000065 /* SwipeHandler.swift in Sources */,
+				A100000066 /* ScriptHandler.swift in Sources */,
 				DFDB1F217CF14213A9FB5CCE /* BookmarkStore.swift in Sources */,
 				557BEEFEC864450EB89DE351 /* HistoryStore.swift in Sources */,
 				D2474B135EE9443A9A60289B /* NetworkTrafficStore.swift in Sources */,
@@ -466,9 +490,10 @@
 		G100000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING = NO;
+					GENERATE_APP_INTENTS_METADATA = NO;
+					CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = G42HP8BM2N;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -506,6 +531,8 @@
 					"-lkelpie_core_automation",
 					"-lkelpie_core_mcp",
 					"-lkelpie_core_ai",
+					"-framework",
+					"AppIntents",
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.unlikeotherai.kelpie;
@@ -520,9 +547,10 @@
 		G100000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING = NO;
+					GENERATE_APP_INTENTS_METADATA = NO;
+					CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = G42HP8BM2N;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -560,6 +588,8 @@
 					"-lkelpie_core_automation",
 					"-lkelpie_core_mcp",
 					"-lkelpie_core_ai",
+					"-framework",
+					"AppIntents",
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.unlikeotherai.kelpie;

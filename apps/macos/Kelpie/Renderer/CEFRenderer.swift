@@ -4,7 +4,7 @@ import AppKit
 /// Wraps CEFBridge (Obj-C++) and bridges callbacks to async/await.
 @MainActor
 final class CEFRenderer: RendererEngine {
-    private final class CookieContinuationState {
+    private final class CookieContinuationState: @unchecked Sendable {
         var didResume = false
     }
 
@@ -133,14 +133,11 @@ final class CEFRenderer: RendererEngine {
             pendingURL?.absoluteString ?? "nil"
         )
 
-        guard let bridge = CEFBridge(
+        let bridge = CEFBridge(
             parentView: containerView,
             url: "about:blank",
             identifier: "main"
-        ) else {
-            NSLog("[CEFRenderer] Failed to create CEFBridge")
-            return
-        }
+        )
         configureBridge(bridge)
         self.bridge = bridge
         bridge.resize(to: containerView.bounds.size)
@@ -294,7 +291,7 @@ final class CEFRenderer: RendererEngine {
                 }
                 state.didResume = true
 
-                let cookies = (cookieDicts ?? []).compactMap { dict -> HTTPCookie? in
+                let cookies = cookieDicts.compactMap { dict -> HTTPCookie? in
                     guard let dict = dict as? [String: Any],
                           let name = dict["name"] as? String,
                           let value = dict["value"] as? String,
@@ -324,7 +321,7 @@ final class CEFRenderer: RendererEngine {
     }
 
     func setCookies(_ cookies: [HTTPCookie]) async {
-        guard let bridge else {
+        guard bridge != nil else {
             if pendingDeleteAllCookies {
                 pendingCookies.removeAll()
             }
@@ -438,7 +435,9 @@ final class CEFRenderer: RendererEngine {
                 NSLog("[CEFRenderer] JS cookie injection error: %@", error.localizedDescription)
             } else {
                 NSLog("[CEFRenderer] JS cookies injected, reloading")
-                self?.bridge?.reload()
+                Task { @MainActor [weak self] in
+                    self?.bridge?.reload()
+                }
             }
         }
     }

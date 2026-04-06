@@ -23,7 +23,6 @@ struct LLMHandler {
     @MainActor
     private func getAccessibilityTree(_ body: [String: Any]) async -> [String: Any] {
         let root = body["root"] as? String ?? "body"
-        let interactableOnly = body["interactableOnly"] as? Bool ?? false
         let maxDepth = body["maxDepth"] as? Int ?? 5
         let js = """
         (function(){function walk(el,depth){if(depth>"\(maxDepth)")return null;var role=el.getAttribute('role')||el.tagName.toLowerCase();var name=el.getAttribute('aria-label')||el.textContent?.trim().substring(0,50)||'';var node={role:role,name:name};if(el.getAttribute('aria-checked'))node.checked=el.getAttribute('aria-checked')==='true';if(el.disabled)node.disabled=true;if(document.activeElement===el)node.focused=true;var children=[];for(var c of el.children){var cn=walk(c,depth+1);if(cn)children.push(cn);}if(children.length)node.children=children;return node;}var root=document.querySelector('\(JSEscape.string(root))');if(!root)return{tree:{role:'none'},nodeCount:0};var tree=walk(root,0);var count=root.querySelectorAll('*').length;return{tree:tree,nodeCount:count};})()
@@ -52,7 +51,6 @@ struct LLMHandler {
 
     @MainActor
     private func getPageText(_ body: [String: Any]) async -> [String: Any] {
-        let mode = body["mode"] as? String ?? "readable"
         let selector = body["selector"] as? String ?? "body"
         let js = """
         (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim(),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()

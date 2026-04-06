@@ -25,7 +25,7 @@ struct Snapshot3DHandler {
         }
 
         do {
-            try await context.evaluateJS(Snapshot3DBridge.enterScript)
+            _ = try await context.evaluateJS(Snapshot3DBridge.enterScript)
             let active = try await context.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
             if active == "true" {
                 context.isIn3DInspector = true
@@ -44,7 +44,7 @@ struct Snapshot3DHandler {
         }
 
         do {
-            try await context.evaluateJS(Snapshot3DBridge.exitScript)
+            _ = try await context.evaluateJS(Snapshot3DBridge.exitScript)
             context.mark3DInspectorInactive(notify: true)
             return successResponse()
         } catch {
@@ -94,7 +94,7 @@ struct Snapshot3DHandler {
             return errorResponse(code: "MISSING_PARAM", message: "Provide 'delta' (number) or 'direction' ('in'|'out')")
         }
         do {
-            try await context.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
+            _ = try await context.evaluateJS(Snapshot3DBridge.zoomByScript(delta))
             return successResponse(["delta": delta])
         } catch {
             return errorResponse(code: "JS_ERROR", message: error.localizedDescription)
@@ -107,7 +107,7 @@ struct Snapshot3DHandler {
             return errorResponse(code: "NOT_ACTIVE", message: "3D inspector is not active")
         }
         do {
-            try await context.evaluateJS(Snapshot3DBridge.resetViewScript)
+            _ = try await context.evaluateJS(Snapshot3DBridge.resetViewScript)
             return successResponse()
         } catch {
             return errorResponse(code: "JS_ERROR", message: error.localizedDescription)

@@ -188,8 +188,9 @@ final class AIState: ObservableObject {
                 }
             }
 
-            let error = await Task.detached { [weak self] in
-                self?.aiManager.downloadModel(id: id, progress: nil)
+            let aiManager = self.aiManager
+            let error = await Task.detached {
+                aiManager.downloadModel(id: id, progress: nil)
             }.value
 
             if let error {
@@ -214,7 +215,8 @@ final class AIState: ObservableObject {
     func removeNativeModel(id: String) {
         Task { [weak self] in
             guard let self else { return }
-            _ = await Task.detached { self.aiManager.removeModel(id: id) }.value
+            let aiManager = self.aiManager
+            _ = await Task.detached { aiManager.removeModel(id: id) }.value
             await self.refresh()
         }
     }
@@ -297,8 +299,9 @@ final class AIState: ObservableObject {
     private func refreshOllamaModels() async {
         aiManager.setOllamaEndpoint(ollamaEndpoint)
 
-        let reachable = await Task.detached { [weak self] in
-            self?.aiManager.ollamaReachable() ?? false
+        let aiManager = self.aiManager
+        let reachable = await Task.detached {
+            aiManager.ollamaReachable()
         }.value
 
         guard reachable else {
@@ -307,8 +310,8 @@ final class AIState: ObservableObject {
             return
         }
 
-        let modelsJSON = await Task.detached { [weak self] in
-            self?.aiManager.ollamaListModels() ?? []
+        let modelsJSON = await Task.detached {
+            aiManager.ollamaListModels()
         }.value
 
         ollamaModels = modelsJSON

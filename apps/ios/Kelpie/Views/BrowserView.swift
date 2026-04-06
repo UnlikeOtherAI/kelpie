@@ -153,24 +153,26 @@ struct BrowserView: View {
     private var browserContent: some View {
         ZStack {
             VStack(spacing: 0) {
-                if browserState.isLoading {
+                if browserState.isLoading && !serverState.isScriptRecording {
                     ProgressView(value: browserState.progress)
                         .progressViewStyle(.linear)
                 }
 
-                URLBarView(
-                    browserState: browserState,
-                    onNavigate: navigate,
-                    onBack: goBack,
-                    onForward: goForward,
-                    showAI: AIState.shared.isAvailable,
-                    onAI: { showAI = true },
-                    onSnapshot3D: {
-                        Task { @MainActor in
-                            await toggle3DInspector()
+                if !serverState.isScriptRecording {
+                    URLBarView(
+                        browserState: browserState,
+                        onNavigate: navigate,
+                        onBack: goBack,
+                        onForward: goForward,
+                        showAI: AIState.shared.isAvailable,
+                        onAI: { showAI = true },
+                        onSnapshot3D: {
+                            Task { @MainActor in
+                                await toggle3DInspector()
+                            }
                         }
-                    }
-                )
+                    )
+                }
 
                 browserViewport
             }
@@ -184,28 +186,30 @@ struct BrowserView: View {
                     .zIndex(10)
             }
 
-            FloatingMenuView(
-                onReload: reload,
-                onSafariAuth: authenticateInSafari,
-                onSettings: { showSettings = true },
-                onBookmarks: { showBookmarks = true },
-                onHistory: { showHistory = true },
-                onNetworkInspector: { showNetworkInspector = true },
-                onAI: { showAI = true },
-                onSnapshot3D: {
-                    Task { @MainActor in
-                        await toggle3DInspector()
-                    }
-                },
-                show3DInspector: FeatureFlags.is3DInspectorEnabled,
-                showMobileViewportToggle: isPad,
-                mobileViewportPresets: availableTabletViewportPresetOptions,
-                selectedMobileViewportPresetID: activeTabletViewportPreset?.id,
-                onSelectMobileViewportPreset: toggleTabletViewportPreset,
-                side: $fabSide
-            )
+            if !serverState.isScriptRecording {
+                FloatingMenuView(
+                    onReload: reload,
+                    onSafariAuth: authenticateInSafari,
+                    onSettings: { showSettings = true },
+                    onBookmarks: { showBookmarks = true },
+                    onHistory: { showHistory = true },
+                    onNetworkInspector: { showNetworkInspector = true },
+                    onAI: { showAI = true },
+                    onSnapshot3D: {
+                        Task { @MainActor in
+                            await toggle3DInspector()
+                        }
+                    },
+                    show3DInspector: FeatureFlags.is3DInspectorEnabled,
+                    showMobileViewportToggle: isPad,
+                    mobileViewportPresets: availableTabletViewportPresetOptions,
+                    selectedMobileViewportPresetID: activeTabletViewportPreset?.id,
+                    onSelectMobileViewportPreset: toggleTabletViewportPreset,
+                    side: $fabSide
+                )
+            }
 
-            if externalDisplayManager.isConnected {
+            if externalDisplayManager.isConnected && !serverState.isScriptRecording {
                 TVControlsView(
                     fabSide: fabSide,
                     syncEnabled: Binding(
@@ -216,7 +220,7 @@ struct BrowserView: View {
                 )
             }
 
-            if isIn3DInspector {
+            if isIn3DInspector && !serverState.isScriptRecording {
                 VStack {
                     Spacer()
                     Inspector3DControlsView(
@@ -251,6 +255,21 @@ struct BrowserView: View {
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            if serverState.isScriptRecording {
+                VStack {
+                    HStack {
+                        Spacer()
+                        RecordingStopButton {
+                            serverState.requestScriptAbort()
+                        }
+                        .padding(.top, 12)
+                        .padding(.trailing, 12)
+                    }
+                    Spacer()
+                }
+                .zIndex(40)
+            }
         }
         .overlay(alignment: .bottomLeading) {
             if debugOverlayEnabled {
@@ -266,7 +285,8 @@ struct BrowserView: View {
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
         .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
-        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.container, edges: serverState.isScriptRecording ? [.top, .bottom] : .bottom)
+        .statusBarHidden(serverState.isScriptRecording)
         .onChange(of: browserState.currentURL) { newURL in
             HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
             externalDisplayManager.triggerSyncPass()
@@ -335,6 +355,16 @@ struct BrowserView: View {
             guard presetID.isEmpty || availableIPadViewportPresetIDs.contains(presetID) else { return }
             setTabletViewportPreset(presetID)
         }
+        .onChange(of: serverState.isScriptRecording) { isRecording in
+            guard isRecording else { return }
+            showSettings = false
+            showBookmarks = false
+            showHistory = false
+            showNetworkInspector = false
+            showAI = false
+            showWelcome = false
+            touchpadMode = false
+        }
     }
 
     private var shouldShowWelcomeCard: Bool {
@@ -369,9 +399,11 @@ struct BrowserView: View {
                         preset: selectedPreset,
                         stageSize: stageSize
                     )
+                    .allowsHitTesting(!serverState.isScriptRecording)
                 } else {
                     webViewContainer
                         .frame(width: geometry.size.width, height: geometry.size.height)
+                        .allowsHitTesting(!serverState.isScriptRecording)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -403,50 +435,55 @@ struct BrowserView: View {
 
     @ViewBuilder
     private func stagedWebViewContainer(preset: TabletViewportPreset, stageSize: CGSize) -> some View {
-        VStack(spacing: 10) {
-            ZStack {
-                Text(stageSummary(for: preset))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.9))
-                    .clipShape(Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(Color.white.opacity(0.9), lineWidth: 1)
-                    }
-                    .accessibilityIdentifier("browser.viewport.summary")
-            }
-            .frame(width: stageSize.width, height: 38)
-            .overlay(alignment: .leading) {
-                Button {
-                    setTabletViewportPreset("")
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(Color.black.opacity(0.9))
-                        .clipShape(Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(Color.white.opacity(0.9), lineWidth: 1)
-                        }
-                }
-                .accessibilityIdentifier("browser.viewport.close")
-            }
-
+        if serverState.isScriptRecording {
             webViewContainer
                 .frame(width: stageSize.width, height: stageSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .stroke(Color.white.opacity(0.7), lineWidth: 1)
+        } else {
+            VStack(spacing: 10) {
+                ZStack {
+                    Text(stageSummary(for: preset))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.9))
+                        .clipShape(Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                        }
+                        .accessibilityIdentifier("browser.viewport.summary")
                 }
-                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+                .frame(width: stageSize.width, height: 38)
+                .overlay(alignment: .leading) {
+                    Button {
+                        setTabletViewportPreset("")
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                            .background(Color.black.opacity(0.9))
+                            .clipShape(Circle())
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                            }
+                    }
+                    .accessibilityIdentifier("browser.viewport.close")
+                }
+
+                webViewContainer
+                    .frame(width: stageSize.width, height: stageSize.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                            .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+            }
+            .frame(width: stageSize.width, height: stageSize.height + tabletViewportStageTopChromeHeight)
         }
-        .frame(width: stageSize.width, height: stageSize.height + tabletViewportStageTopChromeHeight)
     }
 
     private var activeTabletViewportPreset: TabletViewportPreset? {
@@ -586,7 +623,14 @@ struct BrowserView: View {
     // MARK: - Debug Overlay
 
     private func updateDebug() {
-        let screens = UIScreen.screens
+        let connectedScreens = UIApplication.shared.connectedScenes.compactMap { scene in
+            (scene as? UIWindowScene)?.screen
+        }
+        var screensByID: [ObjectIdentifier: UIScreen] = [:]
+        for screen in connectedScreens + [UIScreen.main] {
+            screensByID[ObjectIdentifier(screen)] = screen
+        }
+        let screens = Array(screensByID.values)
         let mgr = ExternalDisplayManager.shared
         var lines: [String] = []
 

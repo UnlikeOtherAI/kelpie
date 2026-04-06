@@ -19,6 +19,7 @@ struct InteractionHandler {
         guard let selector = body["selector"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
+        let color = overlayColor(from: body)
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');
@@ -31,7 +32,7 @@ struct InteractionHandler {
         do {
             let result = try await context.evaluateJSReturningJSON(js)
             if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
-            await context.showTouchIndicatorForElement(selector)
+            await context.showTouchIndicatorForElement(selector, color: color)
             return successResponse(["element": result])
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
@@ -43,7 +44,7 @@ struct InteractionHandler {
         guard let x = body["x"] as? Double, let y = body["y"] as? Double else {
             return errorResponse(code: "MISSING_PARAM", message: "x and y are required")
         }
-        await context.showTouchIndicator(x: x, y: y)
+        await context.showTouchIndicator(x: x, y: y, color: overlayColor(from: body))
         let js = """
         (function() {
             var el = document.elementFromPoint(\(x), \(y));
@@ -64,6 +65,41 @@ struct InteractionHandler {
         guard let selector = body["selector"] as? String, let value = body["value"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "selector and value are required")
         }
+        let color = overlayColor(from: body)
+        let mode = (body["mode"] as? String ?? "instant").lowercased()
+        let delay = body["delay"] as? Int ?? 50
+
+        if mode == "typing" {
+            let focusJS = "document.querySelector('\(JSEscape.string(selector))')?.focus()"
+            _ = try? await context.evaluateJS(focusJS)
+            let clearJS = """
+            (function() {
+                var el = document.querySelector('\(JSEscape.string(selector))');
+                if (!el) return null;
+                el.focus();
+                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
+                    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                if (setter) setter.call(el, '');
+                else el.value = '';
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+                return {selector: '\(JSEscape.string(selector))'};
+            })()
+            """
+            do {
+                let focusResult = try await context.evaluateJSReturningJSON(clearJS)
+                if focusResult.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
+                return await typeText([
+                    "selector": selector,
+                    "text": value,
+                    "delay": delay,
+                    "color": body["color"] as Any
+                ].compactMapValues { $0 })
+            } catch {
+                return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+            }
+        }
+
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');
@@ -80,7 +116,7 @@ struct InteractionHandler {
         do {
             let result = try await context.evaluateJSReturningJSON(js)
             if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
-            await context.showTouchIndicatorForElement(selector)
+            await context.showTouchIndicatorForElement(selector, color: color)
             return successResponse(result)
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
@@ -92,9 +128,11 @@ struct InteractionHandler {
         guard let text = body["text"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "text is required")
         }
+        let color = overlayColor(from: body)
         if let selector = body["selector"] as? String {
             let focusJS = "document.querySelector('\(JSEscape.string(selector))')?.focus()"
             _ = try? await context.evaluateJS(focusJS)
+            await context.showTouchIndicatorForElement(selector, color: color)
         }
         let delay = body["delay"] as? Int ?? 50
         for char in text {
@@ -105,8 +143,9 @@ struct InteractionHandler {
                 if (!el) return;
                 el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(escapedChar)', bubbles: true}));
                 el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(escapedChar)', bubbles: true}));
-                var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                if (nativeSetter) nativeSetter.call(el, el.value + '\(escapedChar)');
+                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
+                    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                if (setter) setter.call(el, (el.value || '') + '\(escapedChar)');
                 else el.value += '\(escapedChar)';
                 el.dispatchEvent(new Event('input', {bubbles: true}));
                 el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(escapedChar)', bubbles: true}));
@@ -136,6 +175,7 @@ struct InteractionHandler {
         do {
             let result = try await context.evaluateJSReturningJSON(js)
             if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
+            await context.showTouchIndicatorForElement(selector, color: overlayColor(from: body))
             return successResponse(result)
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
@@ -159,9 +199,14 @@ struct InteractionHandler {
         do {
             let result = try await context.evaluateJSReturningJSON(js)
             if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
+            await context.showTouchIndicatorForElement(selector, color: overlayColor(from: body))
             return successResponse(result)
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
+    }
+
+    private func overlayColor(from body: [String: Any]) -> String {
+        HandlerContext.hexToRGB(body["color"] as? String ?? "#3B82F6")
     }
 }

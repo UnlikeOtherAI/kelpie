@@ -1,6 +1,15 @@
 include(FetchContent)
 
-option(KELPIE_AI_USE_HTTPLIB "Enable cpp-httplib for HTTP clients (Ollama, HF download/cloud)" ON)
+set(KELPIE_AI_USE_HTTPLIB_DEFAULT ON)
+if(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+  set(KELPIE_AI_USE_HTTPLIB_DEFAULT OFF)
+endif()
+
+option(
+  KELPIE_AI_USE_HTTPLIB
+  "Enable cpp-httplib for HTTP clients (Ollama, HF download/cloud)"
+  ${KELPIE_AI_USE_HTTPLIB_DEFAULT}
+)
 
 set(CORE_AI_SOURCES
   src/ai_c_api.cpp

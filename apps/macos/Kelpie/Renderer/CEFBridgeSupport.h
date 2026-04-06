@@ -18,14 +18,16 @@
 #include "include/capi/cef_registration_capi.h"
 #include "include/internal/cef_time.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 typedef struct BridgeClient BridgeClient;
 
 cef_main_args_t CEFBridgeMainArgs(void);
 cef_string_t CEFBridgeStringCreate(NSString *value);
 void CEFBridgeStringClear(cef_string_t *value);
-NSString *CEFBridgeStringFromUserFree(cef_string_userfree_t value);
-NSString *CEFBridgeJSONStringForValue(id value);
-cef_basetime_t CEFBridgeBaseTimeFromDate(NSDate *value);
+NSString *CEFBridgeStringFromUserFree(cef_string_userfree_t _Nullable value);
+NSString *CEFBridgeJSONStringForValue(id _Nullable value);
+cef_basetime_t CEFBridgeBaseTimeFromDate(NSDate * _Nullable value);
 
 BridgeClient *CEFBridgeCreateClient(CEFBridge *owner);
 cef_client_t *CEFBridgeClientHandle(BridgeClient *client);
@@ -33,7 +35,7 @@ void CEFBridgeNullifyClientOwner(BridgeClient *client);
 void CEFBridgeReleaseClient(BridgeClient *client);
 
 cef_cookie_manager_t *CEFBridgeCookieManagerFromBrowser(cef_browser_t *browser);
-void CEFBridgeVisitAllCookies(cef_cookie_manager_t *manager, void (^completion)(NSArray<NSDictionary *> *cookies));
+void CEFBridgeVisitAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSArray<NSDictionary *> *cookies));
 void CEFBridgeSetCookie(cef_cookie_manager_t *manager,
                         NSString *name,
                         NSString *value,
@@ -42,13 +44,13 @@ void CEFBridgeSetCookie(cef_cookie_manager_t *manager,
                         NSString *path,
                         BOOL httpOnly,
                         BOOL secure,
-                        NSDate *expires,
-                        void (^completion)(BOOL success));
-void CEFBridgeDeleteAllCookies(cef_cookie_manager_t *manager, void (^completion)(NSInteger deleted));
-void CEFBridgeFlushCookieStore(cef_cookie_manager_t *manager, void (^completion)(void));
+                        NSDate * _Nullable expires,
+                        void (^ _Nullable completion)(BOOL success));
+void CEFBridgeDeleteAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSInteger deleted));
+void CEFBridgeFlushCookieStore(cef_cookie_manager_t *manager, void (^ _Nullable completion)(void));
 void CEFBridgeCaptureScreenshot(cef_browser_host_t *host,
                                 CGSize logicalSize,
-                                void (^completion)(NSData * _Nullable pngData));
+                                void (^ _Nullable completion)(NSData * _Nullable pngData));
 void CEFBridgeInvalidateScreenshotCapture(cef_browser_t *browser);
 
 @interface CEFBridge (SupportCallbacks)
@@ -64,3 +66,5 @@ void CEFBridgeInvalidateScreenshotCapture(cef_browser_t *browser);
                                source:(NSString *)source
                                  line:(NSInteger)line;
 @end
+
+NS_ASSUME_NONNULL_END

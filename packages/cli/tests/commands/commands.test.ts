@@ -71,6 +71,43 @@ describe("command API method mapping", () => {
     expect(capturedBody()).toEqual({ selector: "#submit" });
   });
 
+  it("playScript sends to /v1/play-script", async () => {
+    mockFetch({ success: true, actionsExecuted: 1, totalDurationMs: 100, errors: [], screenshots: [] });
+    await sendCommand(device, "playScript", { actions: [{ action: "wait", ms: 100 }] });
+    expect(capturedUrl()).toContain("/v1/play-script");
+    expect(capturedBody()).toEqual({ actions: [{ action: "wait", ms: 100 }] });
+  });
+
+  it("playScript preserves script action shorthands like commentary", async () => {
+    mockFetch({ success: true, actionsExecuted: 2, totalDurationMs: 100, errors: [], screenshots: [] });
+    await sendCommand(device, "playScript", {
+      actions: [
+        { action: "commentary", text: "Welcome", durationMs: 0 },
+        { action: "hide-commentary" },
+      ],
+    });
+    expect(capturedUrl()).toContain("/v1/play-script");
+    expect(capturedBody()).toEqual({
+      actions: [
+        { action: "commentary", text: "Welcome", durationMs: 0 },
+        { action: "hide-commentary" },
+      ],
+    });
+  });
+
+  it("showCommentary converts to show-commentary", async () => {
+    mockFetch({ success: true, text: "hello" });
+    await sendCommand(device, "showCommentary", { text: "hello", durationMs: 0 });
+    expect(capturedUrl()).toContain("/v1/show-commentary");
+    expect(capturedBody()).toEqual({ text: "hello", durationMs: 0 });
+  });
+
+  it("getScriptStatus converts to get-script-status", async () => {
+    mockFetch({ playing: false });
+    await sendCommand(device, "getScriptStatus");
+    expect(capturedUrl()).toContain("/v1/get-script-status");
+  });
+
   it("fill sends selector and value", async () => {
     mockFetch({ success: true });
     await sendCommand(device, "fill", { selector: "#email", value: "test@test.com" });

@@ -31,29 +31,22 @@ final class ExternalDisplayManager: ObservableObject {
     private init() {}
 
     func startMonitoring() {
-        scanForExternalScene()
+        refreshExternalSceneState()
 
         NotificationCenter.default.addObserver(
-            forName: UIScreen.didConnectNotification, object: nil, queue: .main
+            forName: UIScene.willConnectNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.scanForExternalScene() }
+            Task { @MainActor in self?.refreshExternalSceneState() }
         }
         NotificationCenter.default.addObserver(
-            forName: UIScreen.didDisconnectNotification, object: nil, queue: .main
+            forName: UIScene.didActivateNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.detach() }
+            Task { @MainActor in self?.refreshExternalSceneState() }
         }
-    }
-
-    private func scanForExternalScene() {
-        guard !isConnected else { return }
-
-        for scene in UIApplication.shared.connectedScenes {
-            if scene.session.role == .windowExternalDisplayNonInteractive,
-               let windowScene = scene as? UIWindowScene {
-                attach(to: windowScene)
-                return
-            }
+        NotificationCenter.default.addObserver(
+            forName: UIScene.didDisconnectNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshExternalSceneState() }
         }
     }
 
@@ -168,7 +161,6 @@ final class ExternalDisplayManager: ObservableObject {
     private func makeTVWebViewConfiguration(serverState: ServerState) -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
-        config.processPool = WebViewDefaults.sharedProcessPool
         config.websiteDataStore = WebViewDefaults.sharedWebsiteDataStore
 
         let ucc = config.userContentController
@@ -209,6 +201,27 @@ final class ExternalDisplayManager: ObservableObject {
         let coordinator = TVWebViewObserver(browserState: browserState)
         webView.navigationDelegate = coordinator
         objc_setAssociatedObject(webView, &tvObserverKey, coordinator, .OBJC_ASSOCIATION_RETAIN)
+    }
+
+    private func refreshExternalSceneState() {
+        if let windowScene = findExternalWindowScene() {
+            guard !isConnected else { return }
+            attach(to: windowScene)
+            return
+        }
+
+        if externalWindow != nil {
+            detach()
+        }
+    }
+
+    private func findExternalWindowScene() -> UIWindowScene? {
+        UIApplication.shared.connectedScenes.compactMap { scene in
+            guard scene.session.role == .windowExternalDisplayNonInteractive else {
+                return nil
+            }
+            return scene as? UIWindowScene
+        }.first
     }
 
     private func startSyncLoopIfNeeded() {

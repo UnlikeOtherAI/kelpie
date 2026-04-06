@@ -14,7 +14,6 @@ struct WebViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
-        config.processPool = WebViewDefaults.sharedProcessPool
         config.websiteDataStore = WebViewDefaults.sharedWebsiteDataStore
 
         // Inject bridge scripts — network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)

@@ -68,7 +68,7 @@ final class HistoryStore: ObservableObject {
     private let key = "kelpie_history"
     private let storeHandle = kelpie_history_store_create()
 
-    fileprivate static let iso8601Formatter: ISO8601DateFormatter = {
+    nonisolated(unsafe) fileprivate static let iso8601Formatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
@@ -103,7 +103,7 @@ final class HistoryStore: ObservableObject {
 
     func remove(id: UUID) {
         guard let storeHandle else { return }
-        id.uuidString.withCString { idPointer in
+        _ = id.uuidString.withCString { idPointer in
             kelpie_history_store_remove_by_id(storeHandle, idPointer)
         }
         refreshFromCore()

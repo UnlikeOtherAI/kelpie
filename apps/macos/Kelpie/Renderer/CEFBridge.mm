@@ -96,12 +96,18 @@ static NSData *WindowCropPNGData(NSView *view, NSWindow *window, BOOL *fullyCapt
         return nil;
     }
 
+    // ScreenCaptureKit is not a drop-in replacement for synchronous crop capture
+    // of CEF's accelerated surface, so keep the legacy call scoped and silenced
+    // until the screenshot path is migrated end-to-end.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     CGImageRef windowImage = CGWindowListCreateImage(
         CGRectNull,
         kCGWindowListOptionIncludingWindow,
         (CGWindowID)window.windowNumber,
         kCGWindowImageBoundsIgnoreFraming | kCGWindowImageBestResolution
     );
+#pragma clang diagnostic pop
     if (windowImage == nullptr) {
         return nil;
     }

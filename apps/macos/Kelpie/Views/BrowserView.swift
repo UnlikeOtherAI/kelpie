@@ -33,81 +33,83 @@ struct BrowserView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // URL bar — above all overlays so buttons are always clickable
-                URLBarView(
-                    browserState: browserState,
-                    rendererState: rendererState,
-                    viewportState: viewportState,
-                    aiState: aiState,
-                    isAIPanelOpen: isAIPanelOpen,
-                    onNavigate: navigate,
-                    onBack: { serverState.handlerContext.goBack() },
-                    onForward: { serverState.handlerContext.goForward() },
-                    onReload: { serverState.handlerContext.reloadPage() },
-                    onAIToggle: handleAIPillTap,
-                    onSnapshot3D: {
-                        Task { @MainActor in
-                            await toggle3DInspector()
+                if !serverState.isScriptRecording {
+                    // URL bar — above all overlays so buttons are always clickable
+                    URLBarView(
+                        browserState: browserState,
+                        rendererState: rendererState,
+                        viewportState: viewportState,
+                        aiState: aiState,
+                        isAIPanelOpen: isAIPanelOpen,
+                        onNavigate: navigate,
+                        onBack: { serverState.handlerContext.goBack() },
+                        onForward: { serverState.handlerContext.goForward() },
+                        onReload: { serverState.handlerContext.reloadPage() },
+                        onAIToggle: handleAIPillTap,
+                        onSnapshot3D: {
+                            Task { @MainActor in
+                                await toggle3DInspector()
+                            }
+                        },
+                        is3DActive: isIn3DInspector,
+                        show3DControls: isIn3DInspector,
+                        inspectorMode: inspectorMode,
+                        onSetInspectorMode: { mode in
+                            Task { @MainActor in
+                                await set3DInspectorMode(mode)
+                            }
+                        },
+                        onInspectorExit: {
+                            Task { @MainActor in
+                                await exit3DInspector()
+                            }
+                        },
+                        onInspectorZoomIn: {
+                            Task { @MainActor in
+                                await zoom3DInspector(by: 0.12)
+                            }
+                        },
+                        onInspectorZoomOut: {
+                            Task { @MainActor in
+                                await zoom3DInspector(by: -0.12)
+                            }
+                        },
+                        onInspectorReset: {
+                            Task { @MainActor in
+                                await reset3DInspectorView()
+                            }
+                        },
+                        onSwitchRenderer: { engine in
+                            Task {
+                                await serverState.switchRenderer(to: engine)
+                            }
                         }
-                    },
-                    is3DActive: isIn3DInspector,
-                    show3DControls: isIn3DInspector,
-                    inspectorMode: inspectorMode,
-                    onSetInspectorMode: { mode in
-                        Task { @MainActor in
-                            await set3DInspectorMode(mode)
-                        }
-                    },
-                    onInspectorExit: {
-                        Task { @MainActor in
-                            await exit3DInspector()
-                        }
-                    },
-                    onInspectorZoomIn: {
-                        Task { @MainActor in
-                            await zoom3DInspector(by: 0.12)
-                        }
-                    },
-                    onInspectorZoomOut: {
-                        Task { @MainActor in
-                            await zoom3DInspector(by: -0.12)
-                        }
-                    },
-                    onInspectorReset: {
-                        Task { @MainActor in
-                            await reset3DInspectorView()
-                        }
-                    },
-                    onSwitchRenderer: { engine in
-                        Task {
-                            await serverState.switchRenderer(to: engine)
-                        }
-                    }
-                )
-                .fixedSize(horizontal: false, vertical: true)
-                .layoutPriority(1)
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
 
-                TabBarView(
-                    tabStore: tabStore,
-                    onNewTab: {
-                        let tab = tabStore.addTab()
-                        connectNewTab(tab)
-                    },
-                    onCloseTab: { id in
-                        let wasActive = tabStore.activeTabID == id
-                        tabStore.closeTab(id: id)
-                        if wasActive, let next = tabStore.activeTab { activateTab(next) }
-                    },
-                    onSelectTab: { id in
-                        tabStore.selectTab(id: id)
-                        if let tab = tabStore.activeTab { activateTab(tab) }
-                    }
-                )
-                .frame(height: tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 34 : 0)
-                .opacity(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 1 : 0)
-                .allowsHitTesting(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium)
-                .animation(.easeOut(duration: 0.3), value: tabStore.tabs.count > 1)
-                .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
+                    TabBarView(
+                        tabStore: tabStore,
+                        onNewTab: {
+                            let tab = tabStore.addTab()
+                            connectNewTab(tab)
+                        },
+                        onCloseTab: { id in
+                            let wasActive = tabStore.activeTabID == id
+                            tabStore.closeTab(id: id)
+                            if wasActive, let next = tabStore.activeTab { activateTab(next) }
+                        },
+                        onSelectTab: { id in
+                            tabStore.selectTab(id: id)
+                            if let tab = tabStore.activeTab { activateTab(tab) }
+                        }
+                    )
+                    .frame(height: tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 34 : 0)
+                    .opacity(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 1 : 0)
+                    .allowsHitTesting(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium)
+                    .animation(.easeOut(duration: 0.3), value: tabStore.tabs.count > 1)
+                    .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
+                }
 
                 HStack(spacing: 0) {
                     // Renderer with overlays — FloatingMenuView only covers this area
@@ -119,36 +121,38 @@ struct BrowserView: View {
                                 .zIndex(10)
                         }
 
-                        if isFloatingMenuOpen {
+                        if isFloatingMenuOpen && !serverState.isScriptRecording {
                             WindowBlurOverlay(opacity: 0.5)
                                 .ignoresSafeArea()
                                 .allowsHitTesting(false)
                         }
 
-                        FloatingMenuView(
-                            isOpen: $isFloatingMenuOpen,
-                            onReload: { serverState.handlerContext.reloadPage() },
-                            onSafariAuth: {
-                                if let url = serverState.handlerContext.currentURL {
-                                    let helper = SafariAuthHelper()
-                                    helper.handlerContext = serverState.handlerContext
-                                    helper.authenticate(url: url)
+                        if !serverState.isScriptRecording {
+                            FloatingMenuView(
+                                isOpen: $isFloatingMenuOpen,
+                                onReload: { serverState.handlerContext.reloadPage() },
+                                onSafariAuth: {
+                                    if let url = serverState.handlerContext.currentURL {
+                                        let helper = SafariAuthHelper()
+                                        helper.handlerContext = serverState.handlerContext
+                                        helper.authenticate(url: url)
+                                    }
+                                },
+                                onSettings: { showSettings = true },
+                                onBookmarks: { showBookmarks = true },
+                                onHistory: { showHistory = true },
+                                onNetworkInspector: { showNetworkInspector = true },
+                                onAI: openAIFromMenu,
+                                onSnapshot3D: {
+                                    Task { @MainActor in
+                                        await toggle3DInspector()
+                                    }
                                 }
-                            },
-                            onSettings: { showSettings = true },
-                            onBookmarks: { showBookmarks = true },
-                            onHistory: { showHistory = true },
-                            onNetworkInspector: { showNetworkInspector = true },
-                            onAI: openAIFromMenu,
-                            onSnapshot3D: {
-                                Task { @MainActor in
-                                    await toggle3DInspector()
-                                }
-                            }
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                            )
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                        }
 
-                        if let message = serverState.shellToastMessage {
+                        if let message = serverState.shellToastMessage, !serverState.isScriptRecording {
                             VStack {
                                 Spacer()
                                 ShellToastCardView(message: message)
@@ -159,10 +163,26 @@ struct BrowserView: View {
                             .allowsHitTesting(false)
                             .zIndex(20)
                         }
+
+                        if serverState.isScriptRecording {
+                            VStack {
+                                HStack {
+                                    Spacer()
+                                    RecordingStopButton {
+                                        serverState.requestScriptAbort()
+                                    }
+                                    .padding(.top, 12)
+                                    .padding(.trailing, 12)
+                                }
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .zIndex(30)
+                        }
                     }
 
                     // AI panel — outside the overlay ZStack so buttons are always clickable
-                    if isAIPanelOpen {
+                    if isAIPanelOpen && !serverState.isScriptRecording {
                         AppKitResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
                         AIChatPanel(
                             aiState: aiState,
@@ -327,12 +347,14 @@ struct BrowserView: View {
             inspectorMode = "rotate"
         }
         .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in
+            guard !serverState.isScriptRecording else { return }
             guard hostWindow?.isKeyWindow == true else { return }
             guard rendererState.activeEngine != .chromium else { return }
             let tab = tabStore.addTab()
             connectNewTab(tab)
         }
         .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in
+            guard !serverState.isScriptRecording else { return }
             guard hostWindow?.isKeyWindow == true else { return }
             if rendererState.activeEngine == .chromium {
                 NSApp.keyWindow?.close()
@@ -344,6 +366,17 @@ struct BrowserView: View {
         }
         .onChange(of: isAIPanelOpen) { _, open in
             UserDefaults.standard.set(open, forKey: "com.kelpie.macos.ai-panel-open")
+        }
+        .onChange(of: serverState.isScriptRecording) { _, isRecording in
+            guard isRecording else { return }
+            showSettings = false
+            showBookmarks = false
+            showHistory = false
+            showNetworkInspector = false
+            showWelcome = false
+            pendingInsecureURL = nil
+            isAIPanelOpen = false
+            isFloatingMenuOpen = false
         }
     }
 
@@ -470,7 +503,7 @@ struct BrowserView: View {
             return
         }
 
-        try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.enterScript)
         // Use a JS string expression so WebKit returns a String rather than NSNumber,
         // avoiding the "1" vs "true" mismatch from evaluateJSReturningString.
         let active = try? await serverState.handlerContext.evaluateJSReturningString("window.__m3d ? 'true' : 'false'")
@@ -485,7 +518,7 @@ struct BrowserView: View {
     @MainActor
     private func exit3DInspector() async {
         guard serverState.handlerContext.isIn3DInspector || isIn3DInspector else { return }
-        try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.exitScript)
+        _ = try? await serverState.handlerContext.evaluateJS(Snapshot3DBridge.exitScript)
         serverState.handlerContext.mark3DInspectorInactive(notify: true)
         isIn3DInspector = false
         inspectorMode = "rotate"
@@ -515,7 +548,8 @@ struct BrowserView: View {
     private var rendererSurface: some View {
         ViewportStageView(
             viewportState: viewportState,
-            stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale
+            stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale,
+            showsStageChrome: !serverState.isScriptRecording && viewportState.showsViewportStageChrome
         ) {
             ZStack {
                 RendererContainerView(serverState: serverState, rendererState: rendererState, tabStore: tabStore)
@@ -543,6 +577,7 @@ struct BrowserView: View {
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
+            .allowsHitTesting(!serverState.isScriptRecording)
         }
     }
 }
@@ -550,6 +585,7 @@ struct BrowserView: View {
 private struct ViewportStageView<Content: View>: View {
     @ObservedObject var viewportState: ViewportState
     let stageScale: Double
+    let showsStageChrome: Bool
     let content: () -> Content
 
     private let stageColor = Color(nsColor: NSColor(calibratedWhite: 0.17, alpha: 1))
@@ -558,10 +594,12 @@ private struct ViewportStageView<Content: View>: View {
     init(
         viewportState: ViewportState,
         stageScale: Double,
+        showsStageChrome: Bool,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.viewportState = viewportState
         self.stageScale = stageScale
+        self.showsStageChrome = showsStageChrome
         self.content = content
     }
 
@@ -570,10 +608,12 @@ private struct ViewportStageView<Content: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let vp     = viewportState.viewportSize
-            let chrome = viewportState.showsViewportStageChrome
-            // Scale only applies in preset/custom mode — Full always fills the stage.
-            let scale  = chrome ? stageScale : 1.0
+            let vp = viewportState.viewportSize
+            let staged = viewportState.showsViewportStageChrome
+            let chrome = showsStageChrome
+            let stageDecorationRadius: CGFloat = chrome ? 16 : 0
+            // Scale applies whenever the viewport is staged, even if the header is hidden.
+            let scale = staged ? stageScale : 1.0
 
             // Visual size of the viewport after applying scale.
             let scaledW = (vp.width * scale).rounded(.down)
@@ -607,9 +647,9 @@ private struct ViewportStageView<Content: View>: View {
                                     .padding(.horizontal, -(vp.width * (1 - scale)) / 2)
                                     .padding(.vertical, -(vp.height * (1 - scale)) / 2)
                                     .background(Color.black)
-                                    .clipShape(RoundedRectangle(cornerRadius: chrome ? 16 : 0, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: stageDecorationRadius, style: .continuous))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: chrome ? 16 : 0, style: .continuous)
+                                        RoundedRectangle(cornerRadius: stageDecorationRadius, style: .continuous)
                                             .stroke(chrome ? viewportBorderColor : .clear, lineWidth: 1)
                                     )
                                     .shadow(color: chrome ? Color.black.opacity(0.22) : .clear, radius: 14, y: 6)
@@ -733,7 +773,9 @@ private struct WindowChromeBridge: NSViewRepresentable {
             ) { _ in
                 guard !window.styleMask.contains(.fullScreen) else { return }
                 let contentSize = window.contentRect(forFrameRect: window.frame).size
-                ViewportState.persistShellWindowSize(contentSize)
+                Task { @MainActor in
+                    ViewportState.persistShellWindowSize(contentSize)
+                }
             }
         }
 

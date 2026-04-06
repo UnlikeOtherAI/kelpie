@@ -112,6 +112,7 @@ targets:
         basedOnDependencyAnalysis: false
     settings:
       base:
+        CLANG_CXX_LANGUAGE_STANDARD: gnu++17
         SWIFT_OBJC_BRIDGING_HEADER: Kelpie/Kelpie-Bridging-Header.h
         FRAMEWORK_SEARCH_PATHS: "$(PROJECT_DIR)/Frameworks"
         HEADER_SEARCH_PATHS:
@@ -129,25 +130,20 @@ targets:
           - "$(PROJECT_DIR)/../../native/.build/core-mcp"
           - "$(PROJECT_DIR)/../../native/.build/core-ai"
           - "$(PROJECT_DIR)/vendor/llama.cpp/lib"
-          - "/opt/homebrew/opt/openssl/lib"
-          - "/opt/homebrew/opt/brotli/lib"
         OTHER_LDFLAGS:
           - "-lkelpie_core_state"
           - "-lkelpie_core_protocol"
           - "-lkelpie_core_automation"
           - "-lkelpie_core_mcp"
           - "-lkelpie_core_ai"
-          - "-lssl"
-          - "-lcrypto"
-          - "-lz"
-          - "-lbrotlidec"
-          - "-lbrotlicommon"
           - "-lllama"
           - "-lggml"
           - "-lggml-base"
           - "-lggml-cpu"
           - "-lggml-metal"
           - "-lggml-blas"
+          - "-framework"
+          - "AppIntents"
           - "-lc++"
           - "-framework Metal"
           - "-framework Accelerate"
@@ -157,6 +153,8 @@ targets:
         INFOPLIST_FILE: Kelpie/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.kelpie.browser.macos
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING: NO
+        GENERATE_APP_INTENTS_METADATA: NO
         ENABLE_APP_SANDBOX: false
         VALIDATE_PRODUCT: false
     entitlements:

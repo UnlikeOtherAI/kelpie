@@ -7,17 +7,25 @@ typealias RouteHandler = @Sendable ([String: Any]) async -> [String: Any]
 final class Router: @unchecked Sendable {
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
+    var scriptPlaybackState: ScriptPlaybackState?
 
     func register(_ method: String, handler: @escaping RouteHandler) {
         routes[method] = handler
     }
 
-    func handle(method: String, body: [String: Any]) async -> (statusCode: Int, json: [String: Any]) {
+    func handle(
+        method: String,
+        body: [String: Any],
+        bypassRecordingGate: Bool = false
+    ) async -> (statusCode: Int, json: [String: Any]) {
         guard let handler = routes[method] else {
             return (404, [
                 "success": false,
                 "error": ["code": "NOT_FOUND", "message": "Unknown method: \(method)"]
             ])
+        }
+        if !bypassRecordingGate, let gateError = scriptPlaybackState?.recordingError(for: method) {
+            return (409, gateError)
         }
         let result = await handler(body)
         let success = result["success"] as? Bool ?? false
@@ -58,6 +66,8 @@ final class Router: @unchecked Sendable {
             "resize-viewport", "reset-viewport", "set-viewport-preset", "is-element-obscured",
             "toast", "safari-auth",
             "set-orientation", "get-orientation",
+            "show-commentary", "hide-commentary", "highlight", "hide-highlight",
+            "swipe", "play-script", "abort-script", "get-script-status",
             "snapshot-3d-enter", "snapshot-3d-exit", "snapshot-3d-status",
             "snapshot-3d-set-mode", "snapshot-3d-zoom", "snapshot-3d-reset-view",
             "ai-status", "ai-load", "ai-unload", "ai-infer", "ai-record"

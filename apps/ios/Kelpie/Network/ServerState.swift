@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import WebKit
 
 /// Observable state for the HTTP server and mDNS advertiser.
@@ -6,16 +7,19 @@ final class ServerState: ObservableObject {
     @Published var isServerRunning = false
     @Published var isMDNSAdvertising = false
     @Published var ipAddress: String = "0.0.0.0"
+    @Published var isScriptRecording = false
     /// Set by the `show-panel` debug endpoint to open a UI panel programmatically.
     @Published var activePanel: String?
 
     let deviceInfo: DeviceInfo
     let router = Router()
     let handlerContext = HandlerContext()
+    let scriptPlaybackState = ScriptPlaybackState()
     weak var webView: WKWebView?
 
     private var httpServer: HTTPServer?
     private var mdnsAdvertiser: MDNSAdvertiser?
+    private var preScriptOrientationLock: UIInterfaceOrientationMask?
 
     init(port: UInt16 = 8420) {
         self.deviceInfo = DeviceInfo.current(port: Int(port))
@@ -40,6 +44,7 @@ final class ServerState: ObservableObject {
     private func registerHandlers() {
         let ctx = handlerContext
         router.handlerContext = ctx
+        router.scriptPlaybackState = scriptPlaybackState
 
         // Safari auth — open current URL in Safari-backed auth session
         router.register("safari-auth") { body in
@@ -66,8 +71,12 @@ final class ServerState: ObservableObject {
             return successResponse(["message": message])
         }
 
+        let setActivePanel: @MainActor (String) -> Void = { [weak self] panel in
+            self?.activePanel = panel
+        }
+
         // Debug: open a UI panel programmatically (history, bookmarks, network-inspector, settings, ai)
-        router.register("show-panel") { [weak self] body in
+        router.register("show-panel") { body in
             guard let panel = body["panel"] as? String else {
                 return errorResponse(code: "MISSING_PARAM", message: "panel is required")
             }
@@ -75,7 +84,7 @@ final class ServerState: ObservableObject {
             guard valid.contains(panel) else {
                 return errorResponse(code: "INVALID_PARAM", message: "panel must be one of: \(valid.joined(separator: ", "))")
             }
-            await MainActor.run { self?.activePanel = panel }
+            await setActivePanel(panel)
             return successResponse(["panel": panel])
         }
 
@@ -97,6 +106,53 @@ final class ServerState: ObservableObject {
         BookmarkHandler(context: ctx).register(on: router)
         HistoryHandler(context: ctx).register(on: router)
         NetworkInspectorHandler(context: ctx).register(on: router)
+        CommentaryHandler(context: ctx).register(on: router)
+        HighlightHandler(context: ctx).register(on: router)
+        SwipeHandler(context: ctx).register(on: router)
+        ScriptHandler(
+            context: ctx,
+            router: router,
+            playbackState: scriptPlaybackState,
+            setRecordingMode: { [weak self] isRecording in
+                await self?.setScriptRecording(isRecording)
+            }
+        ).register(on: router)
+    }
+
+    @MainActor
+    func setScriptRecording(_ isRecording: Bool) {
+        guard self.isScriptRecording != isRecording else { return }
+        self.isScriptRecording = isRecording
+
+        let manager = OrientationManager.shared
+        if isRecording {
+            preScriptOrientationLock = manager.lock
+            if manager.lock == .all {
+                let orientation = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.interfaceOrientation
+                let lock: UIInterfaceOrientationMask = orientation?.isLandscape == true ? .landscape : .portrait
+                manager.lock = lock
+                if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: lock))
+                    scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                }
+            }
+            return
+        }
+
+        if let previousLock = preScriptOrientationLock {
+            manager.lock = previousLock
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                if previousLock != .all {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: previousLock))
+                }
+                scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        }
+        preScriptOrientationLock = nil
+    }
+
+    func requestScriptAbort() {
+        _ = scriptPlaybackState.requestAbort()
     }
 
     func startMDNS() {

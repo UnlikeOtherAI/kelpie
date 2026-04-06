@@ -9,12 +9,14 @@ final class ServerState: ObservableObject {
     @Published var isServerRunning = false
     @Published var isMDNSAdvertising = false
     @Published var ipAddress: String = "0.0.0.0"
+    @Published var isScriptRecording = false
     @Published var shellToastMessage: String?
     @Published private(set) var deviceInfo: DeviceInfo
     let viewportState = ViewportState()
 
     let router = Router()
     let handlerContext = HandlerContext()
+    let scriptPlaybackState = ScriptPlaybackState()
 
     var rendererState: RendererState?
 
@@ -34,6 +36,8 @@ final class ServerState: ObservableObject {
 
     private var httpServer: HTTPServer?
     private var toastDismissTask: Task<Void, Never>?
+    private weak var scriptRecordingWindow: NSWindow?
+    private var scriptRecordingWasFullscreen = false
 
     init(port: UInt16 = 8420) {
         self.deviceInfo = DeviceInfo.current(port: Int(port))
@@ -83,6 +87,7 @@ final class ServerState: ObservableObject {
     private func registerHandlers() {
         let ctx = handlerContext
         router.handlerContext = ctx
+        router.scriptPlaybackState = scriptPlaybackState
 
         // Safari auth
         let safariAuth = SafariAuthHelper()
@@ -135,6 +140,17 @@ final class ServerState: ObservableObject {
         NetworkInspectorHandler(context: ctx).register(on: router)
         AIHandler(context: ctx).register(on: router)
         Snapshot3DHandler(context: ctx).register(on: router)
+        CommentaryHandler(context: ctx).register(on: router)
+        HighlightHandler(context: ctx).register(on: router)
+        SwipeHandler(context: ctx).register(on: router)
+        ScriptHandler(
+            context: ctx,
+            router: router,
+            playbackState: scriptPlaybackState,
+            setRecordingMode: { [weak self] isRecording in
+                await self?.setScriptRecording(isRecording)
+            }
+        ).register(on: router)
 
         // Renderer switching handler
         RendererHandler(
@@ -191,6 +207,32 @@ final class ServerState: ObservableObject {
 
         // Update the advertised TXT record with the active engine.
         startMDNS()
+    }
+
+    func setScriptRecording(_ isRecording: Bool) {
+        guard self.isScriptRecording != isRecording else { return }
+        self.isScriptRecording = isRecording
+
+        if isRecording {
+            let window = NSApplication.shared.keyWindow
+            scriptRecordingWindow = window
+            scriptRecordingWasFullscreen = window?.styleMask.contains(.fullScreen) ?? false
+            if let window, !scriptRecordingWasFullscreen {
+                window.toggleFullScreen(nil)
+            }
+            return
+        }
+
+        let window = scriptRecordingWindow ?? NSApplication.shared.keyWindow
+        if let window, !scriptRecordingWasFullscreen, window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+        }
+        scriptRecordingWindow = nil
+        scriptRecordingWasFullscreen = false
+    }
+
+    func requestScriptAbort() {
+        _ = scriptPlaybackState.requestAbort()
     }
 
     private func renderer(for engine: RendererState.Engine) -> any RendererEngine {

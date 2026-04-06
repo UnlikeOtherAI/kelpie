@@ -157,43 +157,35 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     // MARK: - WKScriptMessageHandler
 
-    nonisolated func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
+    func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
-        Task { @MainActor in
-            onScriptMessage?(message.name, body)
-        }
+        onScriptMessage?(message.name, body)
     }
 
     // MARK: - WKNavigationDelegate
 
-    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        Task { @MainActor in
-            self.isLoading = false
-            self.onStateChange?()
-        }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        self.isLoading = false
+        self.onStateChange?()
     }
 
-    nonisolated func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        Task { @MainActor in
-            self.documentNavigationStart = Date()
-            self.capturedDocumentResponseURL = nil
-        }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        self.documentNavigationStart = Date()
+        self.capturedDocumentResponseURL = nil
     }
 
-    nonisolated func webView(
+    func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
-        Task { @MainActor in
-            self.recordMainDocumentResponse(navigationResponse)
-            decisionHandler(.allow)
-        }
+        self.recordMainDocumentResponse(navigationResponse)
+        decisionHandler(.allow)
     }
 
     // MARK: - WKUIDelegate
 
-    nonisolated func webView(
+    func webView(
         _ webView: WKWebView,
         createWebViewWith configuration: WKWebViewConfiguration,
         for navigationAction: WKNavigationAction,

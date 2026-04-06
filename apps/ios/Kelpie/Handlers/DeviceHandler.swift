@@ -52,9 +52,10 @@ struct DeviceHandler {
         ])
     }
 
+    @MainActor
     private func getDeviceInfoResponse() async -> [String: Any] {
         let device = UIDevice.current
-        let screen = await UIScreen.main
+        let screen = UIScreen.main
         return [
             "device": [
                 "id": deviceInfo.id,
@@ -65,7 +66,7 @@ struct DeviceHandler {
             "display": [
                 "width": deviceInfo.width,
                 "height": deviceInfo.height,
-                "scale": await screen.scale
+                "scale": screen.scale
             ],
             "network": ["ip": "0.0.0.0", "port": deviceInfo.port],
             "browser": ["engine": "WebKit", "version": device.systemVersion],
@@ -123,7 +124,9 @@ struct DeviceHandler {
     @MainActor
     // swiftlint:disable:next function_body_length
     private func debugScreens() async -> [String: Any] {
-        let screens = UIScreen.screens
+        let screens = Array(Set(UIApplication.shared.connectedScenes.compactMap { scene in
+            (scene as? UIWindowScene)?.screen
+        }))
         let scenes = UIApplication.shared.connectedScenes.map { scene -> [String: Any] in
             [
                 "role": scene.session.role.rawValue,

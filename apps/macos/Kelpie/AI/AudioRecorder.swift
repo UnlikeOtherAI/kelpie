@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 
 @MainActor
@@ -72,14 +72,16 @@ final class AudioRecorder: ObservableObject {
 
         isRecording = true
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
-            guard let self else {
-                timer.invalidate()
-                return
-            }
-            guard let startedAt = self.startedAt else { return }
-            self.elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-            if Date().timeIntervalSince(startedAt) >= self.maxDuration {
-                _ = self.finalizeRecording()
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
+                guard let startedAt = self.startedAt else { return }
+                self.elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                if Date().timeIntervalSince(startedAt) >= self.maxDuration {
+                    _ = self.finalizeRecording()
+                }
             }
         }
     }

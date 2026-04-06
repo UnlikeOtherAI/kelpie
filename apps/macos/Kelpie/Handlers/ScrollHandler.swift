@@ -52,7 +52,6 @@ struct ScrollHandler {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
         let position = body["position"] as? String ?? "center"
-        let maxScrolls = body["maxScrolls"] as? Int ?? 10
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');
