@@ -456,8 +456,8 @@
 
     .screenshots-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 48px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 32px;
       margin-bottom: 48px;
     }
     .screenshot-item { display: flex; flex-direction: column; gap: 16px; }
@@ -849,11 +849,24 @@
               <span class="mac-dot green"></span>
               <div class="mac-url-bar"></div>
             </div>
-            <img src="assets/screenshots/mac-3d.png" alt="Kelpie 3D DOM inspector on macOS — Wikipedia page exploded into 3D layers" loading="lazy">
+            <img src="assets/screenshots/mac-3d.png" alt="Kelpie 3D DOM inspector on macOS — BBC News page exploded into 3D layers" loading="lazy">
           </div>
-          <div class="screenshot-caption">The 3D DOM inspector explodes every page element along the Z-axis by nesting depth. Spot invisible overlays blocking interaction, understand stacking, debug layout in 3D. Works on WebKit and Chromium.</div>
+          <div class="screenshot-caption">The 3D DOM inspector explodes every page element along the Z-axis by nesting depth. Spot invisible overlays, understand stacking, debug layout in 3D — on both WebKit and Chromium.</div>
         </div>
         <div class="screenshot-item reveal reveal-delay-1">
+          <div class="screenshot-label"><strong>macOS · WebKit (Safari) Engine</strong></div>
+          <div class="mac-frame">
+            <div class="mac-titlebar">
+              <span class="mac-dot red"></span>
+              <span class="mac-dot yellow"></span>
+              <span class="mac-dot green"></span>
+              <div class="mac-url-bar"></div>
+            </div>
+            <img src="assets/screenshots/mac-webkit.png" alt="Kelpie macOS browser in WebKit mode showing UnlikeOtherAI" loading="lazy">
+          </div>
+          <div class="screenshot-caption">WebKit renderer — the same engine that powers Safari. Full WKWebView API access means native mobile rendering, real font metrics, and accurate iOS performance simulation on macOS.</div>
+        </div>
+        <div class="screenshot-item reveal reveal-delay-2">
           <div class="screenshot-label"><strong>macOS · Chromium (Chrome) Engine</strong></div>
           <div class="mac-frame">
             <div class="mac-titlebar">
@@ -862,9 +875,9 @@
               <span class="mac-dot green"></span>
               <div class="mac-url-bar"></div>
             </div>
-            <img src="assets/screenshots/mac-chromium.png" alt="Kelpie macOS browser in Chromium mode showing GitHub" loading="lazy">
+            <img src="assets/screenshots/mac-chromium.png" alt="Kelpie macOS browser in Chromium mode showing Stripe" loading="lazy">
           </div>
-          <div class="screenshot-caption">Chromium renderer active — full Chrome DevTools Protocol available. Every element, network request, console message, and resource timeline is accessible via MCP or HTTP API.</div>
+          <div class="screenshot-caption">Chromium renderer — full Chrome DevTools Protocol. Every element, network request, console message, and resource timeline accessible via MCP or HTTP API. Switch engines with one API call.</div>
         </div>
       </div>
 
@@ -873,10 +886,10 @@
           <div class="iphone-outer">
             <div class="iphone-inner">
               <div class="iphone-notch"></div>
-              <img src="assets/screenshots/iphone.png" alt="Kelpie on iPhone — BBC News in mobile viewport" loading="lazy">
+              <img src="assets/screenshots/iphone-native.png" alt="Kelpie native iOS app — real iPhone app chrome with URL bar and Kelpie branding" loading="lazy">
             </div>
           </div>
-          <div class="mobile-label"><strong>iPhone</strong>iOS 17+</div>
+          <div class="mobile-label"><strong>iPhone</strong>iOS 17+ · native app</div>
         </div>
         <div class="mobile-item">
           <div class="ipad-outer">
@@ -891,10 +904,10 @@
           <div class="iphone-outer">
             <div class="iphone-inner">
               <div class="iphone-notch"></div>
-              <img src="assets/screenshots/iphone-3d.png" alt="Kelpie on Android — 3D DOM inspector in mobile viewport" loading="lazy">
+              <img src="assets/screenshots/iphone-3d.png" alt="Kelpie iOS 3D DOM inspector — Wikipedia in mobile viewport" loading="lazy">
             </div>
           </div>
-          <div class="mobile-label"><strong>Android</strong>3D inspector</div>
+          <div class="mobile-label"><strong>iOS · 3D inspector</strong>same feature, mobile</div>
         </div>
       </div>
     </div>
