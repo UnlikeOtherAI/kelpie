@@ -289,6 +289,46 @@
     }
     .copy-btn:hover { color: var(--text); border-color: var(--border2); }
 
+    /* ── Store buttons ── */
+    .store-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-family: var(--sans);
+      position: relative;
+      cursor: default;
+      opacity: 0.55;
+      transition: opacity 0.2s;
+    }
+    .store-btn:hover { opacity: 0.7; }
+    .store-btn-icon { font-size: 1.3rem; line-height: 1; }
+    .store-btn-text { display: flex; flex-direction: column; }
+    .store-btn-soon {
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--teal);
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+    .store-btn-name {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1;
+    }
+
     /* ── Hero logo ── */
     .hero-visual {
       display: flex;
@@ -664,6 +704,7 @@
       .hero-badge { margin: 0 auto 32px; }
       .hero-desc { margin: 0 auto 40px; }
       .hero-actions { justify-content: center; }
+      .store-row { justify-content: center; }
       .install-strip { margin: 0 auto; }
       .hero-logo-img { width: 180px; height: 180px; }
       .feat-grid { grid-template-columns: 1fr 1fr; }
@@ -730,6 +771,29 @@
               <span class="install-prompt">$</span>
               <span class="install-cmd" id="cmd-text">npm i -g @unlikeotherai/kelpie</span>
               <button class="copy-btn" id="copy-btn" onclick="copyInstall()" title="Copy to clipboard">copy</button>
+            </div>
+            <div class="store-row">
+              <span class="store-btn" title="Coming soon">
+                <span class="store-btn-icon">🍎</span>
+                <span class="store-btn-text">
+                  <span class="store-btn-soon">Coming soon</span>
+                  <span class="store-btn-name">Mac App Store</span>
+                </span>
+              </span>
+              <span class="store-btn" title="Coming soon">
+                <span class="store-btn-icon"></span>
+                <span class="store-btn-text">
+                  <span class="store-btn-soon">Coming soon</span>
+                  <span class="store-btn-name">App Store</span>
+                </span>
+              </span>
+              <span class="store-btn" title="Coming soon">
+                <span class="store-btn-icon">▶</span>
+                <span class="store-btn-text">
+                  <span class="store-btn-soon">Coming soon</span>
+                  <span class="store-btn-name">Google Play</span>
+                </span>
+              </span>
             </div>
           </div>
 
@@ -902,7 +966,7 @@
         <div class="footer-row">
           <div class="footer-brand">
             <strong>UnlikeOtherAI</strong> &nbsp;·&nbsp;
-            Kelpie, Silkie &amp; Nessie are open-source projects by Ondrej Rafaj.
+            Kelpie, Silkie &amp; Nessie are open-source projects by Ondrej Rafaj and <a href="https://unlikeotherai.com" style="color:var(--blue);text-decoration:underline;text-underline-offset:3px;">UnlikeOtherAI</a>.
           </div>
           <ul class="footer-nav">
             <li><a href="https://github.com/unlikeotherai/kelpie">Kelpie</a></li>
