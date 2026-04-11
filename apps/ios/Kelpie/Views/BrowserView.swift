@@ -287,6 +287,7 @@ struct BrowserView: View {
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
         .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
         .ignoresSafeArea(.container, edges: serverState.isScriptRecording ? [.top, .bottom] : .bottom)
+        .ignoresSafeArea(.keyboard)
         .statusBarHidden(serverState.isScriptRecording)
         .onChange(of: browserState.currentURL) { newURL in
             HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)

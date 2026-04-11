@@ -51,6 +51,8 @@ final class KeyboardObserver {
 
     private func handleShow(_ notification: Notification) {
         guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        // Floating keyboards on iPad don't anchor to the bottom edge and don't reduce the viewport.
+        guard frame.maxY >= UIScreen.main.bounds.height - 1 else { return }
         isVisible = true
         height = frame.height
     }
