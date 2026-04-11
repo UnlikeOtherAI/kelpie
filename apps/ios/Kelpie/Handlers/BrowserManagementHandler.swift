@@ -48,11 +48,11 @@ struct BrowserManagementHandler {
         router.register("handle-dialog") { body in await handleDialog(body) }
         router.register("set-dialog-auto-handler") { body in await setDialogAutoHandler(body) }
 
-        // Tabs (stub — full implementation needs TabManager)
+        // Tabs
         router.register("get-tabs") { _ in await getTabs() }
-        router.register("new-tab") { body in successResponse(["tab": ["id": 0, "url": body["url"] ?? "", "title": "", "active": true], "tabCount": 1]) }
-        router.register("switch-tab") { _ in successResponse(["tab": ["id": 0, "url": "", "title": "", "active": true]]) }
-        router.register("close-tab") { _ in successResponse(["closed": 1, "tabCount": 1]) }
+        router.register("new-tab") { body in await newTab(body) }
+        router.register("switch-tab") { body in await switchTab(body) }
+        router.register("close-tab") { body in await closeTab(body) }
     }
 
     // MARK: - Cookies
@@ -384,9 +384,59 @@ struct BrowserManagementHandler {
     // MARK: - Tabs
 
     @MainActor
+    private func tabInfo(_ tab: BrowserTab, index: Int, tabStore: TabStore) -> [String: Any] {
+        ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.pageTitle,
+         "active": tab.id == tabStore.activeBrowserTabID, "index": index]
+    }
+
+    @MainActor
     private func getTabs() async -> [String: Any] {
-        guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        let tab: [String: Any] = ["id": 0, "url": webView.url?.absoluteString ?? "", "title": webView.title ?? "", "active": true]
-        return successResponse(["tabs": [tab], "count": 1, "activeTab": 0])
+        guard let tabStore = context.tabStore else {
+            guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
+            let tab: [String: Any] = ["id": "0", "url": webView.url?.absoluteString ?? "", "title": webView.title ?? "", "active": true, "index": 0]
+            return successResponse(["tabs": [tab], "count": 1, "activeTab": 0])
+        }
+        let tabs = tabStore.tabs.enumerated().map { tabInfo($1, index: $0, tabStore: tabStore) }
+        let activeIndex = tabStore.tabs.firstIndex(where: { $0.id == tabStore.activeBrowserTabID }) ?? 0
+        return successResponse(["tabs": tabs, "count": tabs.count, "activeTab": activeIndex])
+    }
+
+    @MainActor
+    private func newTab(_ body: [String: Any]) async -> [String: Any] {
+        guard let tabStore = context.tabStore else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not available")
+        }
+        let url = body["url"] as? String
+        let tab = tabStore.addBrowserTab(url: url)
+        let index = tabStore.tabs.count - 1
+        return successResponse(["tab": tabInfo(tab, index: index, tabStore: tabStore), "tabCount": tabStore.tabs.count])
+    }
+
+    @MainActor
+    private func switchTab(_ body: [String: Any]) async -> [String: Any] {
+        guard let tabStore = context.tabStore else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not available")
+        }
+        guard let idString = body["id"] as? String, let id = UUID(uuidString: idString) else {
+            return errorResponse(code: "MISSING_PARAM", message: "id (UUID string) is required")
+        }
+        guard let index = tabStore.tabs.firstIndex(where: { $0.id == id }) else {
+            return errorResponse(code: "TAB_NOT_FOUND", message: "Tab \(idString) not found")
+        }
+        tabStore.selectBrowserTab(id: id)
+        return successResponse(["tab": tabInfo(tabStore.tabs[index], index: index, tabStore: tabStore)])
+    }
+
+    @MainActor
+    private func closeTab(_ body: [String: Any]) async -> [String: Any] {
+        guard let tabStore = context.tabStore else {
+            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not available")
+        }
+        guard let idString = body["id"] as? String, let id = UUID(uuidString: idString) else {
+            return errorResponse(code: "MISSING_PARAM", message: "id (UUID string) is required")
+        }
+        let countBefore = tabStore.tabs.count
+        tabStore.closeBrowserTab(id: id)
+        return successResponse(["closed": countBefore - tabStore.tabs.count, "tabCount": tabStore.tabs.count])
     }
 }

@@ -34,6 +34,7 @@ struct KelpieApp: App {
         let bs = BrowserState()
         let ss = ServerState()
         let ts = TabStore(handlerContext: ss.handlerContext)
+        ss.tabStore = ts
         _browserState = StateObject(wrappedValue: bs)
         _serverState = StateObject(wrappedValue: ss)
         _tabStore = StateObject(wrappedValue: ts)

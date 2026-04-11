@@ -6,6 +6,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     weak var webView: WKWebView?
+    var tabStore: TabStore?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?

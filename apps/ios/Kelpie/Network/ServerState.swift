@@ -16,6 +16,7 @@ final class ServerState: ObservableObject {
     let handlerContext = HandlerContext()
     let scriptPlaybackState = ScriptPlaybackState()
     weak var webView: WKWebView?
+    var tabStore: TabStore?
 
     private var httpServer: HTTPServer?
     private var mdnsAdvertiser: MDNSAdvertiser?
@@ -44,6 +45,7 @@ final class ServerState: ObservableObject {
     private func registerHandlers() {
         let ctx = handlerContext
         ctx.scriptPlaybackState = scriptPlaybackState
+        ctx.tabStore = tabStore
         router.handlerContext = ctx
         router.scriptPlaybackState = scriptPlaybackState
 
