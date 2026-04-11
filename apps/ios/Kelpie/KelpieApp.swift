@@ -23,6 +23,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct KelpieApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var browserState: BrowserState
     @StateObject private var serverState: ServerState
@@ -44,6 +45,9 @@ struct KelpieApp: App {
         WindowGroup {
             BrowserView(browserState: browserState, serverState: serverState, tabStore: tabStore)
                 .onAppear { startServices() }
+                .onChange(of: scenePhase) { phase in
+                    handleScenePhase(phase)
+                }
         }
         .commands {
             CommandGroup(after: .appSettings) {
@@ -103,7 +107,7 @@ struct KelpieApp: App {
 
     private func startServices() {
         serverState.startHTTPServer()
-        serverState.startMDNS()
+        serverState.ensureMDNSAdvertising()
         ExternalDisplayManager.shared.startMonitoring()
         if environment["KELPIE_DEBUG_ATTACH_LOCAL_TV"] == "1",
            !ExternalDisplayManager.shared.isConnected {
@@ -112,6 +116,20 @@ struct KelpieApp: App {
         #if DEBUG
         AppRevealSetup.configure()
         #endif
+    }
+
+    private func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            serverState.ensureMDNSAdvertising()
+        case .background:
+            serverState.stopMDNS()
+            SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeBrowserTabID)
+        case .inactive:
+            break
+        @unknown default:
+            break
+        }
     }
 
     private func openHelpURL(_ value: String) {

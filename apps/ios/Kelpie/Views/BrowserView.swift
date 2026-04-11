@@ -128,6 +128,8 @@ struct BrowserView: View {
     @State private var isIn3DInspector = false
     @State private var inspectorMode = "rotate"
     @State private var bottomBarCollapsed = false
+    @State private var showRestoreDialog = false
+    @State private var restorationTabCount = 0
     private let safariAuth = SafariAuthHelper()
     private let debugTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -155,6 +157,10 @@ struct BrowserView: View {
     private var browserContent: some View {
         ZStack {
             VStack(spacing: 0) {
+                if isPad && !serverState.isScriptRecording {
+                    Color.clear.frame(height: 22)
+                }
+
                 if browserState.isLoading && !serverState.isScriptRecording {
                     ProgressView(value: browserState.progress)
                         .progressViewStyle(.linear)
@@ -285,7 +291,19 @@ struct BrowserView: View {
         }
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
-        .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
+        .onAppear {
+            migrateLegacyTabletViewportSelectionIfNeeded()
+            if let pending = tabStore.pendingRestorationURLs {
+                restorationTabCount = pending.count
+                showRestoreDialog = true
+            }
+        }
+        .alert("Restore Previous Session?", isPresented: $showRestoreDialog) {
+            Button("Restore") { tabStore.restoreSession() }
+            Button("New Session", role: .cancel) { tabStore.discardPendingSession() }
+        } message: {
+            Text("\(restorationTabCount) \(restorationTabCount == 1 ? "tab" : "tabs") from your last session.")
+        }
         .ignoresSafeArea(.container, edges: serverState.isScriptRecording ? [.top, .bottom] : .bottom)
         .ignoresSafeArea(.keyboard)
         .statusBarHidden(serverState.isScriptRecording)

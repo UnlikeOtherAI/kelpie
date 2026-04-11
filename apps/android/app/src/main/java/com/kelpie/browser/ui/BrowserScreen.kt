@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,10 +49,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kelpie.browser.FeatureFlags
 import com.kelpie.browser.browser.BrowserState
 import com.kelpie.browser.browser.HistoryStore
 import com.kelpie.browser.browser.KeyboardObserver
+import com.kelpie.browser.browser.SessionStore
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
@@ -73,6 +79,8 @@ fun BrowserScreen(
     val browserState = remember { BrowserState() }
     val context = LocalContext.current
     val tabStore = remember { TabStore(context, handlerContext) }
+    val restorationTabCount = remember { tabStore.pendingRestorationUrls?.size ?: 0 }
+    var showRestoreDialog by remember { mutableStateOf(tabStore.pendingRestorationUrls != null) }
     val tabs by tabStore.tabs.collectAsState()
     val activeTabId by tabStore.activeTabId.collectAsState()
     val currentUrl by browserState.currentUrl.collectAsState()
@@ -109,6 +117,18 @@ fun BrowserScreen(
                 handlerContext.keyboardObserver = null
             }
         }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    SessionStore.save(context, tabStore.tabs.value, tabStore.activeTabId.value)
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     suspend fun toggle3DInspector() {
@@ -157,6 +177,10 @@ fun BrowserScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            if (isTablet && !isScriptRecording) {
+                Spacer(Modifier.height(22.dp))
+            }
+
             if (isLoading && !isScriptRecording) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
@@ -251,6 +275,33 @@ fun BrowserScreen(
                     onExpand = { bottomBarCollapsed = false },
                 )
             }
+        }
+
+        if (showRestoreDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    tabStore.discardPendingSession()
+                    showRestoreDialog = false
+                },
+                title = { Text("Restore Previous Session?") },
+                text = {
+                    Text(
+                        "$restorationTabCount ${if (restorationTabCount == 1) "tab" else "tabs"} from your last session.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        tabStore.restoreSession()
+                        showRestoreDialog = false
+                    }) { Text("Restore") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        tabStore.discardPendingSession()
+                        showRestoreDialog = false
+                    }) { Text("New Session") }
+                },
+            )
         }
 
         if (!isScriptRecording && showWelcome && (forceShowWelcome || shouldShowWelcome(context))) {

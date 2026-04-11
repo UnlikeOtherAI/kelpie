@@ -21,17 +21,43 @@ class TabStore(
     val activeTab: BrowserTab?
         get() = _tabs.value.firstOrNull { it.id == _activeTabId.value }
 
+    var pendingRestorationUrls: List<String>? = null
+        private set
+    private var pendingRestorationActiveIndex: Int = 0
+
     init {
+        val session = SessionStore.load(context)
         val showStartPage =
             !context
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_HIDE_WELCOME, false)
-        val tab = createTab(isStartPage = showStartPage)
+        val tab = createTab(isStartPage = session != null || showStartPage)
         _tabs.value = listOf(tab)
         _activeTabId.value = tab.id
-        if (!showStartPage) {
+        if (session == null && !showStartPage) {
             tab.webView.loadUrl(HomeStore.url)
         }
+        if (session != null) {
+            pendingRestorationUrls = session.first
+            pendingRestorationActiveIndex = session.second
+        }
+    }
+
+    fun restoreSession() {
+        val urls = pendingRestorationUrls ?: return
+        val activeIndex = pendingRestorationActiveIndex
+        _tabs.value.forEach { it.webView.destroy() }
+        val newTabs = urls.map { url -> createTab(isStartPage = false).also { it.webView.loadUrl(url) } }
+        _tabs.value = newTabs
+        _activeTabId.value = newTabs[minOf(activeIndex, newTabs.size - 1)].id
+        pendingRestorationUrls = null
+        pendingRestorationActiveIndex = 0
+        SessionStore.clear(context)
+    }
+
+    fun discardPendingSession() {
+        pendingRestorationUrls = null
+        SessionStore.clear(context)
     }
 
     fun addTab(url: String? = null): BrowserTab {

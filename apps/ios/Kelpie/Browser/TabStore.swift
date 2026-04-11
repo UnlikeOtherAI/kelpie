@@ -6,23 +6,54 @@ import WebKit
 final class TabStore: ObservableObject {
     @Published private(set) var tabs: [BrowserTab] = []
     @Published var activeBrowserTabID: UUID?
+    @Published private(set) var pendingRestorationURLs: [String]?
 
     var activeBrowserTab: BrowserTab? { tabs.first { $0.id == activeBrowserTabID } }
 
+    private var pendingRestorationActiveIndex: Int = 0
     private weak var handlerContext: HandlerContext?
 
     init(handlerContext: HandlerContext?) {
         self.handlerContext = handlerContext
+        let session = SessionStore.load()
         let showStartPage = !UserDefaults.standard.bool(forKey: "hideWelcomeCard")
-        let tab = createBrowserTab(isStartPage: showStartPage)
+        let tab = createBrowserTab(isStartPage: session != nil || showStartPage)
         tabs = [tab]
         activeBrowserTabID = tab.id
-        if !showStartPage {
+        if session == nil && !showStartPage {
             let homeURL = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
             if let url = URL(string: homeURL) {
                 tab.webView.load(URLRequest(url: url))
             }
         }
+        if let session {
+            pendingRestorationURLs = session.urls
+            pendingRestorationActiveIndex = session.activeIndex
+        }
+    }
+
+    func restoreSession() {
+        guard let urls = pendingRestorationURLs else { return }
+        let activeIndex = pendingRestorationActiveIndex
+        for tab in tabs { tab.invalidate() }
+        tabs = []
+        var newTabs: [BrowserTab] = []
+        for url in urls {
+            let tab = createBrowserTab(isStartPage: false)
+            if let parsed = URL(string: url) {
+                tab.webView.load(URLRequest(url: parsed))
+            }
+            newTabs.append(tab)
+        }
+        tabs = newTabs
+        activeBrowserTabID = newTabs[min(activeIndex, newTabs.count - 1)].id
+        pendingRestorationURLs = nil
+        SessionStore.clear()
+    }
+
+    func discardPendingSession() {
+        pendingRestorationURLs = nil
+        SessionStore.clear()
     }
 
     @discardableResult
