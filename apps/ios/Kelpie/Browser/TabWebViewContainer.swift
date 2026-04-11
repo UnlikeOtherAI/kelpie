@@ -39,7 +39,7 @@ struct TabWebViewContainer: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, UIScrollViewDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let browserState: BrowserState
         weak var handlerContext: HandlerContext?
         let onScrollDirectionChange: (ScrollDirection) -> Void
@@ -52,6 +52,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         private var loadingObservation: NSKeyValueObservation?
         private var backObservation: NSKeyValueObservation?
         private var forwardObservation: NSKeyValueObservation?
+        private var contentOffsetObservation: NSKeyValueObservation?
         private var documentNavigationStart: Date?
         private var capturedDocumentResponseURL: String?
         private var lastScrollOffset: CGFloat = 0
@@ -73,14 +74,12 @@ struct TabWebViewContainer: UIViewRepresentable {
             guard webView !== currentWebView else { return }
 
             currentWebView?.removeFromSuperview()
-            currentWebView?.scrollView.delegate = nil
             clearObservations()
 
             webView.frame = container.bounds
             webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             webView.navigationDelegate = self
             webView.uiDelegate = self
-            webView.scrollView.delegate = self
             container.addSubview(webView)
 
             currentWebView = webView
@@ -97,6 +96,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             loadingObservation = nil
             backObservation = nil
             forwardObservation = nil
+            contentOffsetObservation = nil
         }
 
         private func observe(_ webView: WKWebView) {
@@ -118,6 +118,20 @@ struct TabWebViewContainer: UIViewRepresentable {
             forwardObservation = webView.observe(\.canGoForward) { [weak self] wv, _ in
                 Task { @MainActor in self?.browserState.canGoForward = wv.canGoForward }
             }
+            contentOffsetObservation = webView.scrollView.observe(\.contentOffset) { [weak self] scrollView, _ in
+                guard let self else { return }
+                let offset = scrollView.contentOffset.y
+                let delta = offset - self.lastScrollOffset
+                if offset <= 0 {
+                    self.onScrollDirectionChange(.up)
+                } else if delta > 12 {
+                    self.onScrollDirectionChange(.down)
+                    self.lastScrollOffset = offset
+                } else if delta < -12 {
+                    self.onScrollDirectionChange(.up)
+                    self.lastScrollOffset = offset
+                }
+            }
         }
 
         private func syncBrowserState(from webView: WKWebView) {
@@ -128,27 +142,6 @@ struct TabWebViewContainer: UIViewRepresentable {
                 browserState.canGoBack = webView.canGoBack
                 browserState.canGoForward = webView.canGoForward
                 browserState.progress = webView.estimatedProgress
-            }
-        }
-
-        // MARK: - UIScrollViewDelegate
-
-        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            lastScrollOffset = scrollView.contentOffset.y
-        }
-
-        func scrollViewDidScroll(_ scrollView: UIScrollView) {
-            let offset = scrollView.contentOffset.y
-            let delta = offset - lastScrollOffset
-
-            if offset <= 0 {
-                onScrollDirectionChange(.up)
-            } else if delta > 12 {
-                onScrollDirectionChange(.down)
-                lastScrollOffset = offset
-            } else if delta < -12 {
-                onScrollDirectionChange(.up)
-                lastScrollOffset = offset
             }
         }
 
