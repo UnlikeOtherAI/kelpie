@@ -73,11 +73,12 @@ struct TabWebViewContainer: UIViewRepresentable {
         func install(webView: WKWebView, in container: UIView) {
             guard webView !== currentWebView else { return }
 
-            currentWebView?.removeFromSuperview()
+            let retiring = currentWebView
             clearObservations()
 
             webView.frame = container.bounds
             webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            webView.scrollView.delaysContentTouches = false
             webView.navigationDelegate = self
             webView.uiDelegate = self
             container.addSubview(webView)
@@ -87,6 +88,13 @@ struct TabWebViewContainer: UIViewRepresentable {
             observe(webView)
             syncBrowserState(from: webView)
             onWebViewReady(webView)
+
+            // Defer removal to after the current event cycle so any in-flight
+            // UIGestureRecognizer state on the retiring view is fully drained
+            // before UIKit releases the view from the hierarchy.
+            DispatchQueue.main.async {
+                retiring?.removeFromSuperview()
+            }
         }
 
         private func clearObservations() {
