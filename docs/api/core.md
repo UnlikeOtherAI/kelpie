@@ -134,6 +134,8 @@ POST /v1/highlight
 POST /v1/hide-highlight
 ```
 
+LLM workflow note: when you already know a selector but want to reason about it visually, set `durationMs` to `0`, take a `screenshot` or `screenshot-annotated`, and use the visible highlight box/ring as the anchor in the image. Hide it afterwards with `hide-highlight`.
+
 ### `play-script`
 Run a timed walkthrough script. While it is active, every request except `abort-script` and `get-script-status` is rejected with `RECORDING_IN_PROGRESS`.
 
@@ -309,7 +311,8 @@ POST /v1/screenshot
 {
   "fullPage": false,       // optional, default false
   "format": "png",         // optional, "png" | "jpeg"
-  "quality": 80            // optional, jpeg only, 1-100
+  "quality": 80,           // optional, jpeg only, 1-100
+  "resolution": "native"   // optional, "native" | "viewport"
 }
 
 Response:
@@ -318,9 +321,18 @@ Response:
   "image": "base64-encoded-image-data",
   "width": 390,
   "height": 844,
-  "format": "png"
+  "format": "png",
+  "resolution": "viewport",
+  "coordinateSpace": "viewport-css-pixels",
+  "viewportWidth": 390,
+  "viewportHeight": 844,
+  "devicePixelRatio": 3,
+  "imageScaleX": 1,
+  "imageScaleY": 1
 }
 ```
+
+`resolution: "viewport"` returns a CSS-pixel/non-retina image that lines up with the interaction coordinate system more directly and keeps image payloads smaller for LLM use. `resolution: "native"` preserves the renderer's native output detail. The extra metadata is additive: older clients can ignore it, and newer clients should use it when converting image pixels back into viewport tap coordinates.
 
 ---
 
@@ -437,7 +449,9 @@ Response:
 ## Interaction
 
 ### `click`
-Click an element.
+Click an element by selector. Prefer this over raw coordinate taps whenever you can identify the target semantically.
+
+Selectors returned from `find-element`, `find-button`, `find-link`, `find-input`, `screenshot-annotated`, and related LLM endpoints are meant to be fed back into this endpoint directly.
 
 ```json
 POST /v1/click
@@ -451,26 +465,80 @@ Response:
   "success": true,
   "element": {
     "tag": "button",
+    "role": "button",
+    "name": "Submit",
+    "selector": "button#submit-btn",
     "text": "Submit"
   }
 }
 ```
 
+Kelpie now resolves the rendered hit target at the element center and dispatches coordinate-bearing pointer and mouse events there. If the selector matches an element whose center is hidden or covered, the endpoint fails with `ELEMENT_NOT_VISIBLE` instead of silently activating the wrong target.
+
+Selectors returned by `find-element`, `find-button`, `find-link`, `find-input`, `get-form-state`, and `screenshot-annotated` are intended to be fed back into `click` directly.
+
 ### `tap`
-Tap at specific coordinates (for elements that are hard to select).
+Tap at specific coordinates as a last resort. Prefer `click` or `click-annotation` first whenever you can. If the app has saved tap calibration offsets, they are applied automatically before the event sequence is dispatched.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `x` | number | **required** | X coordinate |
+| `y` | number | **required** | Y coordinate |
+| `coordinateSpace` | string | `"viewport"` | `"viewport"` for CSS viewport pixels, `"screenshot"` for screenshot image pixels (auto-converted via devicePixelRatio) |
+
+When using coordinates read from a screenshot image, pass `"coordinateSpace": "screenshot"` so Kelpie converts from image pixels to viewport CSS pixels automatically. Without this, taps will miss on Retina/high-DPI displays because screenshot images have more pixels than the CSS viewport.
 
 ```json
 POST /v1/tap
 {
   "x": 195,
-  "y": 420
+  "y": 420,
+  "coordinateSpace": "screenshot"
 }
 
 Response:
 {
   "success": true,
   "x": 195,
-  "y": 420
+  "y": 420,
+  "appliedX": 207,
+  "appliedY": 416,
+  "offsetX": 12,
+  "offsetY": -4
+}
+```
+
+Kelpie now dispatches coordinate-bearing pointer and mouse events at the calibrated point, then performs a compatible element activation. That keeps the event location observable on the page while preserving the previous "activate the hit element" behavior.
+
+### `get-tap-calibration`
+Read the saved additive X/Y offsets used by raw `tap`. These offsets are stored in viewport CSS pixels.
+
+```json
+POST /v1/get-tap-calibration
+
+Response:
+{
+  "success": true,
+  "offsetX": 12,
+  "offsetY": -4
+}
+```
+
+### `set-tap-calibration`
+Persist additive X/Y offsets for raw `tap`. This is primarily used by the built-in coordinate calibration page at `GET /debug/coordinate-calibration`.
+
+```json
+POST /v1/set-tap-calibration
+{
+  "offsetX": 12,
+  "offsetY": -4
+}
+
+Response:
+{
+  "success": true,
+  "offsetX": 12,
+  "offsetY": -4
 }
 ```
 

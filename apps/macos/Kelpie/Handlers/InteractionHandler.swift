@@ -1,5 +1,25 @@
 import WebKit
 
+private struct TapExecution {
+    let requestedX: Double
+    let requestedY: Double
+    let appliedX: Double
+    let appliedY: Double
+    let offsetX: Double
+    let offsetY: Double
+
+    var responsePayload: [String: Any] {
+        [
+            "x": requestedX,
+            "y": requestedY,
+            "appliedX": appliedX,
+            "appliedY": appliedY,
+            "offsetX": offsetX,
+            "offsetY": offsetY
+        ]
+    }
+}
+
 /// Handles click, tap, fill, type, selectOption, check, uncheck.
 struct InteractionHandler {
     let context: HandlerContext
@@ -20,19 +40,29 @@ struct InteractionHandler {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
         let color = overlayColor(from: body)
-        let js = """
-        (function() {
-            var el = document.querySelector('\(JSEscape.string(selector))');
-            if (!el) return null;
-            el.scrollIntoView({block: 'center'});
-            el.click();
-            return {tag: el.tagName.toLowerCase(), text: (el.textContent || '').trim().substring(0, 100)};
-        })()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
-            await context.showTouchIndicatorForElement(selector, color: color)
+            let result = try await context.evaluateJSReturningJSON(selectorActivationScript(selector))
+            let diagnostics = result["diagnostics"] as? [String: Any]
+            if result.isEmpty || result["error"] as? String == "not_found" {
+                return errorResponse(
+                    code: "ELEMENT_NOT_FOUND",
+                    message: "Element not found: \(selector)",
+                    diagnostics: diagnostics
+                )
+            }
+            if result["error"] as? String == "not_visible" {
+                return errorResponse(
+                    code: "ELEMENT_NOT_VISIBLE",
+                    message: "Element is not visible or is obscured: \(selector)",
+                    diagnostics: diagnostics
+                )
+            }
+            if let center = result["center"] as? [String: Any],
+               let x = double(center["x"]), let y = double(center["y"]) {
+                await context.showTouchIndicator(x: x, y: y, color: color)
+            } else {
+                await context.showTouchIndicatorForElement(selector, color: color)
+            }
             return successResponse(["element": result])
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
@@ -41,20 +71,42 @@ struct InteractionHandler {
 
     @MainActor
     private func tap(_ body: [String: Any]) async -> [String: Any] {
-        guard let x = body["x"] as? Double, let y = body["y"] as? Double else {
+        guard var requestedX = double(body["x"]), var requestedY = double(body["y"]) else {
             return errorResponse(code: "MISSING_PARAM", message: "x and y are required")
         }
-        await context.showTouchIndicator(x: x, y: y, color: overlayColor(from: body))
-        let js = """
-        (function() {
-            var el = document.elementFromPoint(\(x), \(y));
-            if (el) el.click();
-            return {x: \(x), y: \(y)};
-        })()
-        """
+        // Convert screenshot image-pixel coordinates to CSS viewport pixels.
+        // Screenshots are captured at native resolution (points * backingScaleFactor),
+        // but elementFromPoint expects CSS viewport pixels. LLMs read pixel coords
+        // from the screenshot image, so "screenshot" is the natural input space.
+        let coordinateSpace = (body["coordinateSpace"] as? String ?? "viewport").lowercased()
+        if coordinateSpace == "screenshot" {
+            do {
+                let metrics = try await context.screenshotViewportMetrics()
+                let dpr = max(metrics.devicePixelRatio, 1)
+                requestedX /= dpr
+                requestedY /= dpr
+            } catch {
+                return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+            }
+        }
+        let execution: TapExecution
         do {
-            _ = try await context.evaluateJS(js)
-            return successResponse(["x": x, "y": y])
+            execution = try await calibratedTapExecution(
+                requestedX: requestedX,
+                requestedY: requestedY,
+                calibration: TapCalibrationStore.current()
+            )
+        } catch {
+            return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+        }
+        await context.showTouchIndicator(
+            x: execution.appliedX,
+            y: execution.appliedY,
+            color: overlayColor(from: body)
+        )
+        do {
+            let diagnostics = try await context.evaluateJSReturningJSON(tapScript(execution: execution))
+            return successResponse(execution.responsePayload.merging(["diagnostics": diagnostics]) { _, new in new })
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
@@ -72,23 +124,23 @@ struct InteractionHandler {
         if mode == "typing" {
             let focusJS = "document.querySelector('\(JSEscape.string(selector))')?.focus()"
             _ = try? await context.evaluateJS(focusJS)
-            let clearJS = """
-            (function() {
-                var el = document.querySelector('\(JSEscape.string(selector))');
-                if (!el) return null;
-                el.focus();
-                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
-                    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                if (setter) setter.call(el, '');
-                else el.value = '';
-                el.dispatchEvent(new Event('input', {bubbles: true}));
-                el.dispatchEvent(new Event('change', {bubbles: true}));
-                return {selector: '\(JSEscape.string(selector))'};
-            })()
-            """
             do {
-                let focusResult = try await context.evaluateJSReturningJSON(clearJS)
-                if focusResult.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
+                let focusResult = try await context.evaluateJSReturningJSON(fillElementScript(selector: selector, value: ""))
+                let diagnostics = focusResult["diagnostics"] as? [String: Any]
+                if focusResult.isEmpty || focusResult["error"] as? String == "not_found" {
+                    return errorResponse(
+                        code: "ELEMENT_NOT_FOUND",
+                        message: "Element not found: \(selector)",
+                        diagnostics: diagnostics
+                    )
+                }
+                if focusResult["error"] as? String == "not_editable" {
+                    return errorResponse(
+                        code: "INVALID_PARAMS",
+                        message: "Element is not an editable form control: \(selector)",
+                        diagnostics: diagnostics
+                    )
+                }
                 return await typeText([
                     "selector": selector,
                     "text": value,
@@ -100,22 +152,23 @@ struct InteractionHandler {
             }
         }
 
-        let js = """
-        (function() {
-            var el = document.querySelector('\(JSEscape.string(selector))');
-            if (!el) return null;
-            el.focus();
-            var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-            if (nativeSetter) nativeSetter.call(el, '\(JSEscape.string(value))');
-            else el.value = '\(JSEscape.string(value))';
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-            return {selector: '\(JSEscape.string(selector))', value: '\(JSEscape.string(value))'};
-        })()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            if result.isEmpty { return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Element not found: \(selector)") }
+            let result = try await context.evaluateJSReturningJSON(fillElementScript(selector: selector, value: value))
+            let diagnostics = result["diagnostics"] as? [String: Any]
+            if result.isEmpty || result["error"] as? String == "not_found" {
+                return errorResponse(
+                    code: "ELEMENT_NOT_FOUND",
+                    message: "Element not found: \(selector)",
+                    diagnostics: diagnostics
+                )
+            }
+            if result["error"] as? String == "not_editable" {
+                return errorResponse(
+                    code: "INVALID_PARAMS",
+                    message: "Element is not an editable form control: \(selector)",
+                    diagnostics: diagnostics
+                )
+            }
             await context.showTouchIndicatorForElement(selector, color: color)
             return successResponse(result)
         } catch {
@@ -140,21 +193,28 @@ struct InteractionHandler {
             let escapedChar = JSEscape.string(String(char))
             let charJS = """
             (function() {
+                \(formControlMutationScript())
                 var el = document.activeElement;
                 if (!el) return;
                 el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(escapedChar)', bubbles: true}));
                 el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(escapedChar)', bubbles: true}));
-                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set ||
-                    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                if (setter) setter.call(el, (el.value || '') + '\(escapedChar)');
-                else el.value += '\(escapedChar)';
-                el.dispatchEvent(new Event('input', {bubbles: true}));
+                kelpieWriteFormControlValue(el, kelpieReadFormControlValue(el) + '\(escapedChar)');
+                kelpieDispatchFormControlInput(el);
                 el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(escapedChar)', bubbles: true}));
             })()
             """
             _ = try? await context.evaluateJS(charJS)
             try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
         }
+        let finalizeJS = """
+        (function() {
+            \(formControlMutationScript())
+            var el = document.activeElement;
+            if (!el) return;
+            kelpieDispatchFormControlChange(el);
+        })()
+        """
+        _ = try? await context.evaluateJS(finalizeJS)
         return successResponse(["typed": text])
     }
 
@@ -209,5 +269,125 @@ struct InteractionHandler {
 
     private func overlayColor(from body: [String: Any]) -> String {
         HandlerContext.hexToRGB(body["color"] as? String ?? "#3B82F6")
+    }
+
+    private func double(_ value: Any?) -> Double? {
+        (value as? NSNumber)?.doubleValue
+    }
+
+    @MainActor
+    private func calibratedTapExecution(
+        requestedX: Double,
+        requestedY: Double,
+        calibration: TapCalibration
+    ) async throws -> TapExecution {
+        let viewport = try await viewportSize()
+        let appliedX = clamp(requestedX + calibration.offsetX, min: 0, max: max(viewport.width - 1, 0))
+        let appliedY = clamp(requestedY + calibration.offsetY, min: 0, max: max(viewport.height - 1, 0))
+        return TapExecution(
+            requestedX: requestedX,
+            requestedY: requestedY,
+            appliedX: appliedX,
+            appliedY: appliedY,
+            offsetX: calibration.offsetX,
+            offsetY: calibration.offsetY
+        )
+    }
+
+    @MainActor
+    private func viewportSize() async throws -> (width: Double, height: Double) {
+        let result = try await context.evaluateJSReturningJSON("""
+        (function() {
+            return {
+                width: Math.max(window.innerWidth || 0, 1),
+                height: Math.max(window.innerHeight || 0, 1)
+            };
+        })()
+        """)
+        let width = double(result["width"]) ?? 1
+        let height = double(result["height"]) ?? 1
+        return (width, height)
+    }
+
+    private func clamp(_ value: Double, min lower: Double, max upper: Double) -> Double {
+        guard lower <= upper else { return lower }
+        return Swift.min(Swift.max(value, lower), upper)
+    }
+
+    private func tapScript(execution: TapExecution) -> String {
+        """
+        (function() {
+            \(interactionHelpersScript())
+            var requestedX = \(execution.requestedX);
+            var requestedY = \(execution.requestedY);
+            var appliedX = \(execution.appliedX);
+            var appliedY = \(execution.appliedY);
+            var offsetX = \(execution.offsetX);
+            var offsetY = \(execution.offsetY);
+            var hook = window.__kelpieTapCalibration;
+            if (hook && typeof hook.onAutomationTap === 'function') {
+                try {
+                    hook.onAutomationTap({
+                        requestedX: requestedX,
+                        requestedY: requestedY,
+                        appliedX: appliedX,
+                        appliedY: appliedY,
+                        offsetX: offsetX,
+                        offsetY: offsetY
+                    });
+                } catch (error) {}
+            }
+            var eventTarget = document.elementFromPoint(appliedX, appliedY) || document.body || document.documentElement;
+            if (!eventTarget) {
+                return kelpieTapDiagnostics(null, requestedX, requestedY, appliedX, appliedY, offsetX, offsetY);
+            }
+            if (typeof eventTarget.focus === 'function') {
+                try { eventTarget.focus({preventScroll: true}); } catch (error) { try { eventTarget.focus(); } catch (focusError) {} }
+            }
+            function dispatchMouse(type, button, buttons) {
+                eventTarget.dispatchEvent(new MouseEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    clientX: appliedX,
+                    clientY: appliedY,
+                    screenX: appliedX,
+                    screenY: appliedY,
+                    detail: type === 'click' ? 1 : 0,
+                    button: button,
+                    buttons: buttons
+                }));
+            }
+            function dispatchPointer(type, button, buttons) {
+                if (typeof window.PointerEvent !== 'function') {
+                    return;
+                }
+                eventTarget.dispatchEvent(new PointerEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    clientX: appliedX,
+                    clientY: appliedY,
+                    screenX: appliedX,
+                    screenY: appliedY,
+                    pointerId: 1,
+                    pointerType: 'touch',
+                    isPrimary: true,
+                    button: button,
+                    buttons: buttons
+                }));
+            }
+            dispatchPointer('pointerdown', 0, 1);
+            dispatchMouse('mousedown', 0, 1);
+            dispatchPointer('pointerup', 0, 0);
+            dispatchMouse('mouseup', 0, 0);
+            if (typeof eventTarget.click === 'function') {
+                eventTarget.click();
+            } else {
+                dispatchMouse('click', 0, 0);
+            }
+            return kelpieTapDiagnostics(eventTarget, requestedX, requestedY, appliedX, appliedY, offsetX, offsetY);
+        })()
+        """
     }
 }

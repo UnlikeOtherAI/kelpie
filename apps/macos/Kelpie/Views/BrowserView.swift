@@ -206,15 +206,11 @@ struct BrowserView: View {
                 .zIndex(30)
             }
         }
-        .onChange(of: browserState.currentURL) { _, newURL in
-            HistoryStore.shared.record(url: newURL, title: browserState.pageTitle)
+        .onChange(of: browserState.currentURL) { _, _ in
             aiChatSession.reset()
             Task { @MainActor in
                 await serverState.handlerContext.persistRendererCookiesToSharedJar()
             }
-        }
-        .onChange(of: browserState.pageTitle) { _, newTitle in
-            HistoryStore.shared.updateLatestTitle(for: browserState.currentURL, title: newTitle)
         }
         .onChange(of: browserState.isLoading) { _, isLoading in
             guard isLoading else { return }
@@ -281,24 +277,28 @@ struct BrowserView: View {
             }
         }
         .onAppear {
-            connectNewTab(tabStore.tabs[0])
+            if let activeTab = tabStore.activeTab {
+                activateTab(activeTab)
+            } else {
+                connectNewTab(tabStore.tabs[0])
+            }
             // Wire TabStore into HandlerContext for MCP tab operations
             serverState.handlerContext.tabStore = tabStore
-            serverState.handlerContext.onNewTab = {
+            serverState.handlerContext.onNewTab = { [self] in
                 let tab = tabStore.addTab()
-                serverState.setActiveWebKitRenderer(tab.renderer)
+                connectNewTab(tab)
                 return tab
             }
-            serverState.handlerContext.onSwitchTab = { id in
+            serverState.handlerContext.onSwitchTab = { [self] id in
                 tabStore.selectTab(id: id)
                 if let tab = tabStore.activeTab {
-                    serverState.setActiveWebKitRenderer(tab.renderer)
+                    activateTab(tab)
                 }
             }
-            serverState.handlerContext.onCloseTab = { id in
+            serverState.handlerContext.onCloseTab = { [self] id in
                 tabStore.closeTab(id: id)
                 if let tab = tabStore.activeTab {
-                    serverState.setActiveWebKitRenderer(tab.renderer)
+                    activateTab(tab)
                 }
             }
             serverState.handlerContext.onWillLoad = { [weak tabStore] in
@@ -315,6 +315,9 @@ struct BrowserView: View {
                 }
                 await connectRendererState()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeTabID)
         }
         .onChange(of: rendererState.activeEngine) { _, _ in
             Task { @MainActor in

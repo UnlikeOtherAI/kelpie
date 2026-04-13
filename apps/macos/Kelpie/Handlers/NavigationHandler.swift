@@ -74,6 +74,11 @@ struct NavigationHandler {
 
     @MainActor
     private func getCurrentUrl() async -> [String: Any] {
+        // Prefer the active tab's own stored state — context.renderer may lag
+        // behind tab switches, returning a stale inactive tab's URL (issue #17).
+        if let tab = context.tabStore?.activeTab {
+            return ["url": tab.currentURL, "title": tab.title]
+        }
         guard context.renderer != nil else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
         return ["url": context.currentURL?.absoluteString ?? "", "title": context.currentTitle]
     }
