@@ -14,6 +14,14 @@ dist/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 
+# Tuist — generated Xcode projects (regenerate with `tuist generate`)
+apps/macos/Kelpie.xcodeproj
+apps/ios/Kelpie.xcodeproj
+Kelpie.xcworkspace
+Tuist/.build/
+.tuist-bin/
+Derived/
+
 # Build output
 build/
 .build/

@@ -104,12 +104,13 @@ SwiftUI's gesture pipeline does not forward `mouseDown` through NSViewRepresenta
 
 Only commit permanent, hand-authored files. If it can be regenerated, do not commit it.
 
-**Never commit:** build output (`dist/`, `*.tsbuildinfo`), one-off scripts, backup files, temporary notes.
+**Never commit:** build output (`dist/`, `*.tsbuildinfo`), generated Xcode projects (`*.xcodeproj`, `*.xcworkspace` — use `tuist generate`), one-off scripts, backup files, temporary notes.
 
 **Always commit:** source, config, AI config (`CLAUDE.md`, `AGENTS.md`), migrations, permanent docs.
 
 ## Verification
 
+- **Generate Xcode projects first**: `tuist generate` (requires mise + tuist — see `.mise.toml`)
 - CLI: `pnpm lint && pnpm build && pnpm test` must pass before committing
 - iOS: `make lint-swift` must pass, then Xcode build succeeds, no warnings
 - Android: `cd apps/android && ./gradlew build` succeeds (includes ktlint)
@@ -122,7 +123,7 @@ Each component owns its version in its own manifest — do not create a central 
 | Component | Version location |
 |-----------|-----------------|
 | macOS app | `apps/macos/Kelpie/Info.plist` → `CFBundleShortVersionString` |
-| iOS app   | `apps/ios/Kelpie.xcodeproj/project.pbxproj` → `MARKETING_VERSION` |
+| iOS app   | `apps/ios/Project.swift` → `MARKETING_VERSION` build setting |
 | Android   | `apps/android/app/build.gradle.kts` → `versionName` |
 | CLI       | `packages/cli/package.json` → `version` |
 
