@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { createRequire } from "module";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import { registerAllCommands } from "./commands/index.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 
 const program = new Command();
 
 program
   .name("kelpie")
   .description("LLM-first browser automation CLI for iOS and Android")
-  .version("0.1.0")
+  .version(version)
   .option("--device <id|name|ip>", "Target a specific device by ID, name, or IP")
   .option("--format <type>", "Output format: json, table, text", "json")
   .option("--timeout <ms>", "Command timeout in milliseconds", "10000")
