@@ -172,16 +172,18 @@ struct AIChatPanel: View {
                         }
                     )
 
-                Button {} label: {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(aiState.activeModel?.capabilities.contains("audio") == true ? Color.accentColor : .secondary)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(true)
-                .help("Voice input is not wired in this panel yet.")
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(aiState.activeModel?.capabilities.contains("audio") == true ? Color.accentColor : .secondary)
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        AppKitInvisibleButton(
+                            accessibilityID: "browser.ai.chat.mic",
+                            accessibilityLabel: "Voice input",
+                            isEnabled: false
+                        ) {}
+                    )
+                    .help("Voice input is not wired in this panel yet.")
             }
             .padding(12)
         }

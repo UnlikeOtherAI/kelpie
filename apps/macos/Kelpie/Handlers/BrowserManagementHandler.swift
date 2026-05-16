@@ -161,11 +161,13 @@ struct BrowserManagementHandler {
         let type = body["type"] as? String ?? "local"
         let key = body["key"] as? String
         let storage = type == "session" ? "sessionStorage" : "localStorage"
+        let escapedType = JSEscape.string(type)
         let js: String
         if let key {
-            js = "({entries: {'\(key)': \(storage).getItem('\(key)') || ''}, count: 1, type: '\(type)'})"
+            let escapedKey = JSEscape.string(key)
+            js = "({entries: {'\(escapedKey)': \(storage).getItem('\(escapedKey)') || ''}, count: 1, type: '\(escapedType)'})"
         } else {
-            js = "(function(){var e={};for(var i=0;i<\(storage).length;i++){var k=\(storage).key(i);e[k]=\(storage).getItem(k);}return {entries:e,count:\(storage).length,type:'\(type)'};})()"
+            js = "(function(){var e={};for(var i=0;i<\(storage).length;i++){var k=\(storage).key(i);e[k]=\(storage).getItem(k);}return {entries:e,count:\(storage).length,type:'\(escapedType)'};})()"
         }
         do {
             let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
@@ -184,17 +186,33 @@ struct BrowserManagementHandler {
         }
         let type = body["type"] as? String ?? "local"
         let storage = type == "session" ? "sessionStorage" : "localStorage"
-        _ = try? await context.evaluateJS("\(storage).setItem('\(key)','\(value)')", tabId: tabId)
-        return successResponse()
+        let escapedKey = JSEscape.string(key)
+        let escapedValue = JSEscape.string(value)
+        do {
+            _ = try await context.evaluateJS("\(storage).setItem('\(escapedKey)','\(escapedValue)')", tabId: tabId)
+            return successResponse()
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return tabError }
+            return errorResponse(code: "STORAGE_WRITE_FAILED", message: error.localizedDescription)
+        }
     }
 
     @MainActor
     private func clearStorage(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
         let type = body["type"] as? String ?? "both"
-        if type == "local" || type == "both" { _ = try? await context.evaluateJS("localStorage.clear()", tabId: tabId) }
-        if type == "session" || type == "both" { _ = try? await context.evaluateJS("sessionStorage.clear()", tabId: tabId) }
-        return successResponse(["cleared": type])
+        do {
+            if type == "local" || type == "both" {
+                _ = try await context.evaluateJS("localStorage.clear()", tabId: tabId)
+            }
+            if type == "session" || type == "both" {
+                _ = try await context.evaluateJS("sessionStorage.clear()", tabId: tabId)
+            }
+            return successResponse(["cleared": type])
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return tabError }
+            return errorResponse(code: "STORAGE_WRITE_FAILED", message: error.localizedDescription)
+        }
     }
 
     // MARK: - Clipboard
@@ -345,8 +363,9 @@ struct BrowserManagementHandler {
         guard let selector = body["selector"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "selector is required")
         }
+        let escapedSelector = JSEscape.string(selector)
         let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return null;var r=el.getBoundingClientRect();return{element:{selector:'\(selector)',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},obscured:false,reason:null,keyboardOverlap:null,suggestion:null};})()
+        (function(){var el=document.querySelector('\(escapedSelector)');if(!el)return null;var r=el.getBoundingClientRect();return{element:{selector:'\(escapedSelector)',rect:{x:r.x,y:r.y,width:r.width,height:r.height}},obscured:false,reason:null,keyboardOverlap:null,suggestion:null};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
@@ -408,19 +427,24 @@ struct BrowserManagementHandler {
             return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
         }
         let tabs: [[String: Any]] = store.tabs.map { tab in
-            [
-                "id": tab.id.uuidString,
-                "url": tab.currentURL,
-                "title": tab.title,
-                "active": tab.id == store.activeTabID,
-                "isLoading": tab.isLoading
-            ]
+            tabInfoPayload(for: tab, activeID: store.activeTabID)
         }
         return successResponse([
             "tabs": tabs,
             "count": tabs.count,
-            "activeTab": store.activeTabID?.uuidString ?? NSNull()
+            "activeTab": store.activeTabID?.uuidString ?? ""
         ])
+    }
+
+    @MainActor
+    private func tabInfoPayload(for tab: Tab, activeID: UUID?) -> [String: Any] {
+        [
+            "id": tab.id.uuidString,
+            "url": tab.currentURL,
+            "title": tab.title,
+            "active": tab.id == activeID,
+            "isLoading": tab.isLoading
+        ]
     }
 
     @MainActor
@@ -436,12 +460,11 @@ struct BrowserManagementHandler {
            let url = URL(string: urlString) {
             context.load(url: url)
         }
-        guard let store = context.tabStore else {
-            return successResponse(["tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title], "tabCount": 1])
-        }
+        let activeID = context.tabStore?.activeTabID ?? tab.id
+        let tabCount = context.tabStore?.tabs.count ?? 1
         return successResponse([
-            "tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title],
-            "tabCount": store.tabs.count
+            "tab": tabInfoPayload(for: tab, activeID: activeID),
+            "tabCount": tabCount
         ])
     }
 
@@ -466,7 +489,7 @@ struct BrowserManagementHandler {
             return errorResponse(code: "SWITCH_FAILED", message: "Tab switch failed")
         }
         return successResponse([
-            "tab": ["id": tab.id.uuidString, "url": tab.currentURL, "title": tab.title, "active": true]
+            "tab": tabInfoPayload(for: tab, activeID: store.activeTabID)
         ])
     }
 
@@ -487,6 +510,7 @@ struct BrowserManagementHandler {
             return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \(tabIdStr)")
         }
         closeFn(tabId)
-        return successResponse(["closed": tabIdStr, "tabCount": store.tabs.count])
+        let postCloseCount = store.tabs.count
+        return successResponse(["closed": tabIdStr, "tabCount": postCloseCount])
     }
 }
