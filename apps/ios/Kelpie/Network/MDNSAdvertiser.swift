@@ -1,77 +1,62 @@
 import Foundation
 import Network
 
-/// Advertises the Kelpie service via mDNS using Network.framework.
+/// Publishes the Kelpie Bonjour service on the live `HTTPServer` listener.
+///
+/// We deliberately avoid creating a second `NWListener` here: a standalone
+/// listener would bind an ephemeral port, and Network.framework advertises
+/// whatever port the listener actually owns — not the value stuffed into the
+/// TXT record. Attaching the `NWListener.Service` to `HTTPServer`'s listener
+/// guarantees the advertised port matches the port the API server is serving
+/// on.
 final class MDNSAdvertiser: @unchecked Sendable {
-    private var listener: NWListener?
     private let serviceType = "_kelpie._tcp"
+    private weak var httpServer: HTTPServer?
     let txtRecord: [String: String]
     var onAdvertisingChange: ((Bool) -> Void)?
     private(set) var isRunning = false
 
-    init(txtRecord: [String: String]) {
+    init(txtRecord: [String: String], httpServer: HTTPServer) {
         self.txtRecord = txtRecord
+        self.httpServer = httpServer
     }
 
     func start() {
-        stop()
-
-        do {
-            listener = try NWListener(using: .tcp)
-        } catch {
-            print("[mDNS] Failed to create listener: \(error)")
+        guard let httpServer else {
+            print("[mDNS] No HTTPServer to attach service to")
             onAdvertisingChange?(false)
             return
         }
 
-        let txt = NWTXTRecord(txtRecord)
-        listener?.service = NWListener.Service(
-            name: txtRecord["name"] ?? "Kelpie",
-            type: serviceType,
-            txtRecord: txt
-        )
-
-        listener?.serviceRegistrationUpdateHandler = { change in
+        httpServer.serviceRegistrationUpdateHandler = { [weak self] change in
+            guard let self else { return }
             switch change {
             case .add(let endpoint):
+                self.isRunning = true
+                self.onAdvertisingChange?(true)
                 print("[mDNS] Advertising: \(endpoint)")
             case .remove(let endpoint):
+                self.isRunning = false
+                self.onAdvertisingChange?(false)
                 print("[mDNS] Removed: \(endpoint)")
             @unknown default:
                 break
             }
         }
 
-        listener?.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                self.isRunning = true
-                self.onAdvertisingChange?(true)
-                print("[mDNS] Service advertised as \(self.serviceType)")
-            case .failed(let error):
-                self.isRunning = false
-                self.onAdvertisingChange?(false)
-                print("[mDNS] Advertisement failed: \(error)")
-            case .cancelled:
-                self.isRunning = false
-                self.onAdvertisingChange?(false)
-            default:
-                break
-            }
-        }
-
-        // We don't actually need to accept connections on this listener.
-        // It exists solely for mDNS advertisement.
-        listener?.newConnectionHandler = { connection in
-            connection.cancel()
-        }
-
-        listener?.start(queue: .global(qos: .utility))
+        let txt = NWTXTRecord(txtRecord)
+        let service = NWListener.Service(
+            name: txtRecord["name"] ?? "Kelpie",
+            type: serviceType,
+            txtRecord: txt
+        )
+        httpServer.attachService(service)
+        print("[mDNS] Service requested as \(serviceType) on port \(httpServer.port)")
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        httpServer?.attachService(nil)
+        httpServer?.serviceRegistrationUpdateHandler = nil
         isRunning = false
         onAdvertisingChange?(false)
     }

@@ -3,10 +3,18 @@ import Network
 
 /// Embedded HTTP server for receiving CLI commands.
 /// Uses raw NWListener since we want zero external dependencies for the server.
+///
+/// The same `NWListener` also carries the Bonjour/mDNS advertisement when one
+/// is attached via `attachService(_:)`. This keeps the published port and the
+/// listening port in lockstep — Network.framework publishes whatever port the
+/// listener is bound to, so advertising via a second standalone listener would
+/// announce an ephemeral port that no one is serving on.
 final class HTTPServer: @unchecked Sendable {
     let port: UInt16
     let router: Router
     private var listener: NWListener?
+    private var pendingService: NWListener.Service?
+    var serviceRegistrationUpdateHandler: ((NWListener.ServiceRegistrationChange) -> Void)?
 
     init(port: UInt16 = 8420, router: Router) {
         self.port = port
@@ -24,10 +32,15 @@ final class HTTPServer: @unchecked Sendable {
             return
         }
 
+        if let service = pendingService {
+            listener?.service = service
+        }
+
         listener?.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection)
         }
-        listener?.stateUpdateHandler = { state in
+        listener?.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
@@ -37,12 +50,23 @@ final class HTTPServer: @unchecked Sendable {
                 break
             }
         }
+        listener?.serviceRegistrationUpdateHandler = { [weak self] change in
+            self?.serviceRegistrationUpdateHandler?(change)
+        }
         listener?.start(queue: .global(qos: .userInitiated))
     }
 
     func stop() {
         listener?.cancel()
         listener = nil
+    }
+
+    /// Attach a Bonjour service to the listener. If the listener is already
+    /// running the service starts publishing immediately; otherwise it is held
+    /// until `start()` is called. Passing `nil` clears the service.
+    func attachService(_ service: NWListener.Service?) {
+        pendingService = service
+        listener?.service = service
     }
 
     private func handleConnection(_ connection: NWConnection) {
