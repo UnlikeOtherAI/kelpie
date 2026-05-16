@@ -29,9 +29,9 @@ enum FileProtection {
     /// cheapest way to protect everything subsequently written there
     /// (e.g. downloaded AI models, persisted feedback reports).
     static func setComplete(at url: URL) throws {
-        var values = URLResourceValues()
-        values.fileProtection = .complete
-        var mutable = url
-        try mutable.setResourceValues(values)
+        try FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.complete],
+            ofItemAtPath: url.path
+        )
     }
 }
