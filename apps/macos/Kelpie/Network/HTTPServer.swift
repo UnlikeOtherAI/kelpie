@@ -312,7 +312,7 @@ final class HTTPServer: @unchecked Sendable {
     private func sendErrorAndClose(connection: NWConnection, statusCode: Int, code: String, message: String) {
         let payload: [String: Any] = [
             "success": false,
-            "error": ["code": code, "message": message],
+            "error": ["code": code, "message": message]
         ]
         let body = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data(#"{"success":false,"error":{"code":"INTERNAL","message":"error"}}"#.utf8)
         let response = buildHTTPResponse(statusCode: statusCode, body: body, contentType: "application/json")
