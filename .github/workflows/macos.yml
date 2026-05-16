@@ -1,0 +1,48 @@
+name: macOS
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint + project generation
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise (tuist)
+        uses: jdx/mise-action@v2
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Symlink SwiftLint to /opt/homebrew/bin
+        run: |
+          set -euo pipefail
+          mkdir -p /opt/homebrew/bin
+          if [ ! -x /opt/homebrew/bin/swiftlint ]; then
+            ln -sfn "$(command -v swiftlint)" /opt/homebrew/bin/swiftlint
+          fi
+
+      - name: Lint Swift
+        run: make lint-swift
+
+      - name: Generate Xcode project (tuist)
+        working-directory: apps/macos
+        run: mise exec -- tuist generate --no-open
+
+      # NOTE: Full xcodebuild is intentionally deferred. The macOS target
+      # requires the CEF framework (downloaded via scripts/download-cef.sh)
+      # and the llama.cpp vendor tree at apps/macos/vendor/llama.cpp, which
+      # is not currently committed or scripted. Re-enable the full build
+      # below once vendor bootstrap is in place - until then, lint and
+      # project-graph validation are the meaningful CI signal we have.

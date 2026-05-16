@@ -1,0 +1,82 @@
+name: iOS
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS (simulator)
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise (tuist)
+        uses: jdx/mise-action@v2
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Symlink SwiftLint to /opt/homebrew/bin
+        # Makefile invokes /opt/homebrew/bin/swiftlint directly.
+        # On GitHub-hosted runners brew sometimes lives at /usr/local; bridge it.
+        run: |
+          set -euo pipefail
+          mkdir -p /opt/homebrew/bin
+          if [ ! -x /opt/homebrew/bin/swiftlint ]; then
+            ln -sfn "$(command -v swiftlint)" /opt/homebrew/bin/swiftlint
+          fi
+
+      - name: Lint Swift
+        run: make lint-swift
+
+      - name: Build native libraries for iOS simulator
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/.build-ios-sim \
+            -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DKELPIE_BUILD_DESKTOP_ENGINES=OFF
+          cmake --build native/.build-ios-sim --config Debug
+
+      - name: Flatten native build output to expected layout
+        # Xcode generator nests outputs under per-config dirs. The iOS
+        # Project.swift expects them at native/.build-ios-sim/<lib>/lib*.a.
+        run: |
+          set -euo pipefail
+          for lib in core-state core-protocol core-automation core-mcp core-ai; do
+            src="native/.build-ios-sim/${lib}/Debug-iphonesimulator"
+            dst="native/.build-ios-sim/${lib}"
+            if [ -d "${src}" ]; then
+              find "${src}" -maxdepth 1 -name 'lib*.a' -exec cp -a {} "${dst}/" \;
+            fi
+          done
+
+      - name: Generate Xcode project (tuist)
+        working-directory: apps/ios
+        run: mise exec -- tuist generate --no-open
+
+      - name: Build iOS scheme
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project apps/ios/Kelpie.xcodeproj \
+            -scheme Kelpie \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            -derivedDataPath apps/ios/.build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
