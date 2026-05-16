@@ -164,6 +164,7 @@ export const BrowserToolUnsupportedPlatforms = {
 export const CliMcpTools = [
   "kelpie_discover",
   "kelpie_list_devices",
+  "kelpie_pair",
   "kelpie_feedback_summary",
   "kelpie_group_navigate",
   "kelpie_group_screenshot",
