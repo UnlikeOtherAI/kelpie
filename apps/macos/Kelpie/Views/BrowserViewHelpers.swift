@@ -165,28 +165,6 @@ struct WindowBlurOverlay: NSViewRepresentable {
     }
 }
 
-// MARK: - Window accessor (captures NSWindow reference for key-window checks)
-
-struct WindowAccessor: NSViewRepresentable {
-    @Binding var window: NSWindow?
-
-    func makeNSView(context: Context) -> NSView {
-        let view = PassThroughNSView()
-        DispatchQueue.main.async {
-            self.window = view.window
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            if self.window !== nsView.window {
-                self.window = nsView.window
-            }
-        }
-    }
-}
-
 // MARK: - AppKit-backed resize handle (bypasses WebView first-responder hit-test issue)
 
 struct AppKitResizeHandle: NSViewRepresentable {

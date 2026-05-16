@@ -6,8 +6,6 @@ import Darwin
 
 extension Notification.Name {
     static let showWelcomeCard = Notification.Name("com.kelpie.browser.macos.show-welcome-card")
-    static let newTab   = Notification.Name("com.kelpie.browser.macos.new-tab")
-    static let closeTab = Notification.Name("com.kelpie.browser.macos.close-tab")
 }
 
 enum WelcomeCardPresentationSource: String {
@@ -17,6 +15,8 @@ enum WelcomeCardPresentationSource: String {
 
 struct BrowserCommandActions {
     let hardReload: () -> Void
+    let newTab: () -> Void
+    let closeTab: () -> Void
 }
 
 @MainActor
@@ -46,6 +46,14 @@ final class BrowserCommandRouter {
 
     func hardReload() {
         activeActions?.hardReload()
+    }
+
+    func newTab() {
+        activeActions?.newTab()
+    }
+
+    func closeTab() {
+        activeActions?.closeTab()
     }
 }
 
@@ -147,17 +155,20 @@ struct BrowserCommandBridge: NSViewRepresentable {
 
 private struct BrowserCommands: Commands {
     @ObservedObject var serverState: ServerState
+    let browserState: BrowserState
+    let rendererState: RendererState
+    let tabStore: TabStore
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
             Button("New Tab") {
-                NotificationCenter.default.post(name: .newTab, object: nil)
+                BrowserCommandRouter.shared.newTab()
             }
             .keyboardShortcut("t", modifiers: .command)
             .disabled(serverState.isScriptRecording)
 
             Button("Close Tab") {
-                NotificationCenter.default.post(name: .closeTab, object: nil)
+                BrowserCommandRouter.shared.closeTab()
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(serverState.isScriptRecording)
@@ -214,7 +225,12 @@ private struct BrowserCommands: Commands {
     }
 
     private func openNewWindow() {
-        KelpieApp.openNewWindow()
+        KelpieApp.openNewWindow(
+            browserState: browserState,
+            serverState: serverState,
+            rendererState: rendererState,
+            tabStore: tabStore
+        )
     }
 
     private func openHelpURL(_ value: String) {
@@ -231,6 +247,7 @@ struct KelpieApp: App {
     @StateObject private var browserState = BrowserState()
     @StateObject private var rendererState = RendererState()
     @StateObject private var serverState: ServerState
+    @StateObject private var tabStore = TabStore()
 
     init() {
         let launchPort = Self.launchPortArgument() ?? 8420
@@ -244,7 +261,8 @@ struct KelpieApp: App {
                 browserState: browserState,
                 serverState: serverState,
                 rendererState: rendererState,
-                viewportState: serverState.viewportState
+                viewportState: serverState.viewportState,
+                tabStore: tabStore
             )
             .onAppear { startServices() }
             .frame(
@@ -253,7 +271,12 @@ struct KelpieApp: App {
             )
         }
         .commands {
-            BrowserCommands(serverState: serverState)
+            BrowserCommands(
+                serverState: serverState,
+                browserState: browserState,
+                rendererState: rendererState,
+                tabStore: tabStore
+            )
         }
     }
 
@@ -269,16 +292,22 @@ struct KelpieApp: App {
         #endif
     }
 
-    fileprivate static func openNewWindow() {
-        let newBrowserState = BrowserState()
-        let newServerState = ServerState()
-        let newRendererState = RendererState()
-
+    /// Opens an additional window backed by the **same** ServerState, BrowserState,
+    /// RendererState, and TabStore as the primary window. All windows share a single
+    /// HTTP server, mDNS advertisement, and tab list — they are alternate views into
+    /// the same browser session, not isolated instances.
+    fileprivate static func openNewWindow(
+        browserState: BrowserState,
+        serverState: ServerState,
+        rendererState: RendererState,
+        tabStore: TabStore
+    ) {
         let contentView = BrowserView(
-            browserState: newBrowserState,
-            serverState: newServerState,
-            rendererState: newRendererState,
-            viewportState: newServerState.viewportState
+            browserState: browserState,
+            serverState: serverState,
+            rendererState: rendererState,
+            viewportState: serverState.viewportState,
+            tabStore: tabStore
         )
         .frame(
             minWidth: ViewportState.minimumShellSize.width,
@@ -301,10 +330,6 @@ struct KelpieApp: App {
         window.contentView = NSHostingView(rootView: contentView)
         window.center()
         window.makeKeyAndOrderFront(nil)
-
-        // Start services for the new window
-        newServerState.rendererState = newRendererState
-        newServerState.startHTTPServer()
     }
 
     fileprivate static func openHelpURL(_ value: String) {

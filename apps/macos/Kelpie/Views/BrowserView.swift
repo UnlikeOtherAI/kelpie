@@ -7,7 +7,7 @@ struct BrowserView: View {
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
     @ObservedObject var aiState = AIState.shared
-    @StateObject var tabStore = TabStore()
+    @ObservedObject var tabStore: TabStore
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
@@ -22,7 +22,6 @@ struct BrowserView: View {
     @State private var isFloatingMenuOpen = false
     @State var isIn3DInspector = false
     @State var inspectorMode = "rotate"
-    @State private var hostWindow: NSWindow?
     @AppStorage("hideWelcomeCard") var hideWelcome = false
     @State private var showWelcome = false
     @State var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
@@ -220,10 +219,6 @@ struct BrowserView: View {
         }
         .animation(.easeOut(duration: 0.2), value: serverState.shellToastMessage != nil)
         .background(
-            WindowAccessor(window: $hostWindow)
-                .frame(width: 0, height: 0)
-        )
-        .background(
             WindowChromeBridge(
                 title: windowTitle,
                 minimumWindowSize: NSSize(
@@ -237,7 +232,9 @@ struct BrowserView: View {
         .background(
             BrowserCommandBridge(
                 actions: BrowserCommandActions(
-                    hardReload: { serverState.handlerContext.hardReloadPage() }
+                    hardReload: { serverState.handlerContext.hardReloadPage() },
+                    newTab: { handleNewTabCommand() },
+                    closeTab: { handleCloseTabCommand() }
                 )
             )
             .frame(width: 0, height: 0)
@@ -347,24 +344,6 @@ struct BrowserView: View {
         .onReceive(NotificationCenter.default.publisher(for: .snapshot3DExited)) { _ in
             isIn3DInspector = false
             inspectorMode = "rotate"
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in
-            guard !serverState.isScriptRecording else { return }
-            guard hostWindow?.isKeyWindow == true else { return }
-            guard rendererState.activeEngine != .chromium else { return }
-            let tab = tabStore.addTab()
-            connectNewTab(tab)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in
-            guard !serverState.isScriptRecording else { return }
-            guard hostWindow?.isKeyWindow == true else { return }
-            if rendererState.activeEngine == .chromium {
-                NSApp.keyWindow?.close()
-                return
-            }
-            guard let id = tabStore.activeTabID else { return }
-            tabStore.closeTab(id: id)
-            if let next = tabStore.activeTab { activateTab(next) }
         }
         .onChange(of: isAIPanelOpen) { _, open in
             UserDefaults.standard.set(open, forKey: "com.kelpie.macos.ai-panel-open")

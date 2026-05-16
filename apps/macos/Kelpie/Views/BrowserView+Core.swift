@@ -85,6 +85,29 @@ extension BrowserView {
         connectNewTab(tab)
     }
 
+    /// Cmd+T handler. Routed per-window by `BrowserCommandRouter` so only the
+    /// active window opens a new tab, never every window simultaneously.
+    func handleNewTabCommand() {
+        guard !serverState.isScriptRecording else { return }
+        guard rendererState.activeEngine != .chromium else { return }
+        let tab = tabStore.addTab()
+        connectNewTab(tab)
+    }
+
+    /// Cmd+W handler. Routed per-window by `BrowserCommandRouter`. Closes the
+    /// active tab on WebKit; closes the window itself when Chromium is active
+    /// because Chromium tab management is single-tab today.
+    func handleCloseTabCommand() {
+        guard !serverState.isScriptRecording else { return }
+        if rendererState.activeEngine == .chromium {
+            NSApp.keyWindow?.close()
+            return
+        }
+        guard let id = tabStore.activeTabID else { return }
+        tabStore.closeTab(id: id)
+        if let next = tabStore.activeTab { activateTab(next) }
+    }
+
     func navigate(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
         if url.scheme == "http" && !skipInsecureWarning {
