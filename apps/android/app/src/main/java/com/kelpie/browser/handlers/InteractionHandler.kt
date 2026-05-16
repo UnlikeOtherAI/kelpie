@@ -126,7 +126,11 @@ class InteractionHandler(
                 "not_editable" -> errorResponse("INVALID_PARAMS", "Element is not an editable form control: $selector", diagnostics)
                 null -> {
                     ctx.showTouchIndicatorForElement(selector, ctx.overlayColor(body))
-                    successResponse(mapOf("element" to result))
+                    // Canonical fill shape (matches iOS/macOS and FillResponse in
+                    // shared/api-types.ts): top-level {selector, value, element}.
+                    // Spreading the script result preserves the diagnostics-style
+                    // `element` field returned by fillElementScript.
+                    successResponse(result)
                 }
 
                 else -> {
@@ -186,18 +190,21 @@ class InteractionHandler(
     private suspend fun selectOption(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
         val value = body["value"] as? String ?: return errorResponse("MISSING_PARAM", "value is required")
+        // Canonical select-option shape (matches iOS/macOS and SelectOptionResponse
+        // in shared/api-types.ts): top-level {selected: {value, text}}.
         val js =
             "(function(){var el=document.querySelector('${JSEscape.string(selector)}');" +
                 "if(!el)return null;el.value='${JSEscape.string(value)}';" +
                 "el.dispatchEvent(new Event('change',{bubbles:true}));" +
-                "return{tag:'select',value:el.value};})()"
+                "var opt=el.options?el.options[el.selectedIndex]:null;" +
+                "return{selected:{value:el.value,text:opt?opt.text:el.value}};})()"
         return try {
             val result = ctx.evaluateJSReturningJSON(js)
             if (result.isEmpty()) {
                 errorResponse("ELEMENT_NOT_FOUND", "No element matches: $selector")
             } else {
                 ctx.showTouchIndicatorForElement(selector, ctx.overlayColor(body))
-                successResponse(mapOf("element" to result))
+                successResponse(result)
             }
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
@@ -213,18 +220,20 @@ class InteractionHandler(
         checked: Boolean,
     ): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
+        // Canonical check/uncheck shape (matches iOS/macOS and CheckResponse
+        // in shared/api-types.ts): top-level {checked}.
         val js =
             "(function(){var el=document.querySelector('${JSEscape.string(selector)}');" +
                 "if(!el)return null;el.checked=$checked;" +
                 "el.dispatchEvent(new Event('change',{bubbles:true}));" +
-                "return{tag:el.tagName.toLowerCase(),checked:el.checked};})()"
+                "return{checked:el.checked};})()"
         return try {
             val result = ctx.evaluateJSReturningJSON(js)
             if (result.isEmpty()) {
                 errorResponse("ELEMENT_NOT_FOUND", "No element matches: $selector")
             } else {
                 ctx.showTouchIndicatorForElement(selector, ctx.overlayColor(body))
-                successResponse(mapOf("element" to result))
+                successResponse(result)
             }
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
