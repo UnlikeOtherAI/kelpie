@@ -306,6 +306,10 @@ struct ScriptHandler {
         let ext = format == "jpeg" ? "jpg" : "png"
         let file = FileManager.default.temporaryDirectory
             .appendingPathComponent("kelpie-script-\(index)-\(UUID().uuidString).\(ext)")
+        // Intentionally NOT NSFileProtectionComplete-tagged: these are ephemeral
+        // playback artefacts in tmp/ that iOS may delete at any time and that
+        // never outlive the playback request. Persistent screenshots go through
+        // a different path that does apply file protection.
         do {
             try data.write(to: file)
             return ScriptPlaybackScreenshot(

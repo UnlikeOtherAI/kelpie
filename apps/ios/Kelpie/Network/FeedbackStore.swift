@@ -24,8 +24,13 @@ enum FeedbackStore {
         ]) { _, new in new }
 
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-        try FileManager.default.createDirectory(at: feedbackDirectory(), withIntermediateDirectories: true)
-        try data.write(to: feedbackDirectory().appendingPathComponent("\(storedAt.replacingOccurrences(of: ":", with: "-"))-\(reportID).json"))
+        let directory = feedbackDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Mark the directory NSFileProtectionComplete so any future report
+        // inherits the protection class even if a write path forgets to set it.
+        try? FileProtection.setComplete(at: directory)
+        let file = directory.appendingPathComponent("\(storedAt.replacingOccurrences(of: ":", with: "-"))-\(reportID).json")
+        try FileProtection.write(data, to: file)
         return FeedbackRecord(reportID: reportID, storedAt: storedAt, payload: payload)
     }
 
