@@ -17,8 +17,17 @@ final class HTTPServer: @unchecked Sendable {
         get { lock.withLock { _onStateChange } }
         set { lock.withLock { _onStateChange = newValue } }
     }
+    /// Fired exactly when the underlying NWListener transitions to `.ready`.
+    /// Used by ServerState to publish mDNS only after the socket is accepting
+    /// connections — otherwise Bonjour announces a port that returns
+    /// ECONNREFUSED for the brief window before `.ready` arrives.
+    var onReady: (() -> Void)? {
+        get { lock.withLock { _onReady } }
+        set { lock.withLock { _onReady = newValue } }
+    }
     private var _onBonjourStateChange: ((Bool) -> Void)?
     private var _onStateChange: ((Bool) -> Void)?
+    private var _onReady: (() -> Void)?
 
     init(port: UInt16 = 8420, router: Router) {
         self.port = port
@@ -78,6 +87,7 @@ final class HTTPServer: @unchecked Sendable {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
                 self.onStateChange?(true)
+                self.onReady?()
             case .failed(let error):
                 print("[HTTPServer] Listener failed: \(error)")
                 self.onBonjourStateChange?(false)
@@ -96,7 +106,12 @@ final class HTTPServer: @unchecked Sendable {
         lock.lock()
         let current = listener
         listener = nil
+        bonjourService = nil
         lock.unlock()
+        // Clear the Bonjour service first so the mDNS withdrawal goes out
+        // before the listener is cancelled — clients should stop seeing the
+        // advertised endpoint slightly before the socket disappears.
+        current?.service = nil
         current?.cancel()
         onBonjourStateChange?(false)
         onStateChange?(false)

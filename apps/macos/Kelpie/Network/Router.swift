@@ -13,11 +13,6 @@ final class Router: @unchecked Sendable {
         routes[method] = handler
     }
 
-    func registerIfAbsent(_ method: String, handler: @escaping RouteHandler) {
-        guard routes[method] == nil else { return }
-        routes[method] = handler
-    }
-
     func handle(
         method: String,
         body: [String: Any],
@@ -53,33 +48,7 @@ final class Router: @unchecked Sendable {
 
         return (status, result)
     }
-
-    func registerFallbacks() {
-        let methods = [
-            "set-geolocation", "clear-geolocation", "set-request-interception",
-            "get-intercepted-requests", "clear-request-interception"
-        ]
-        for method in methods {
-            let unsupported = macosUnsupportedMethods.contains(method)
-            registerIfAbsent(method) { _ in
-                [
-                    "success": false,
-                    "error": [
-                        "code": unsupported ? "PLATFORM_NOT_SUPPORTED" : "NOT_IMPLEMENTED",
-                        "message": unsupported ? "\(method) is not supported on macOS" : "\(method) not yet implemented"
-                    ]
-                ]
-            }
-        }
-    }
 }
-
-private let macosUnsupportedMethods: Set<String> = [
-    "debug-screens", "set-debug-overlay", "get-debug-overlay",
-    "set-geolocation", "clear-geolocation",
-    "set-request-interception", "get-intercepted-requests", "clear-request-interception",
-    "show-keyboard", "hide-keyboard", "get-keyboard-state", "is-element-obscured"
-]
 
 private func statusCode(forErrorCode code: String?) -> Int {
     switch code {
