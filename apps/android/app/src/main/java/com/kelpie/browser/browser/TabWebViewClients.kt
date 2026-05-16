@@ -1,8 +1,11 @@
 package com.kelpie.browser.browser
 
 import android.graphics.Bitmap
+import android.os.Build
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.kelpie.browser.handlers.ConsoleHandler
@@ -47,6 +50,7 @@ private fun tabWebViewClient(
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()
             }
+            handlerContext.lastNavigationError = null
             tab.currentUrl = url
             tab.recordHistoryIfNeeded(url)
             tab.isLoading = true
@@ -58,6 +62,33 @@ private fun tabWebViewClient(
             }
             documentNavigationUrl = url
             didCaptureDocumentForNavigation = false
+        }
+
+        override fun onReceivedError(
+            view: WebView,
+            request: WebResourceRequest?,
+            error: WebResourceError?,
+        ) {
+            if (request?.isForMainFrame != true) return
+            val description =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    error?.description?.toString()
+                } else {
+                    null
+                }
+            handlerContext.lastNavigationError = description ?: "Navigation failed"
+        }
+
+        override fun onReceivedHttpError(
+            view: WebView,
+            request: WebResourceRequest?,
+            errorResponse: WebResourceResponse?,
+        ) {
+            if (request?.isForMainFrame != true) return
+            val code = errorResponse?.statusCode ?: return
+            if (code >= 400) {
+                handlerContext.lastNavigationError = "HTTP $code"
+            }
         }
 
         override fun onPageFinished(

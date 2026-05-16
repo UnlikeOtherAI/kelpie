@@ -3,6 +3,9 @@ package com.kelpie.browser.handlers
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.unit.dp
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
@@ -15,11 +18,13 @@ class BrowserManagementHandler(
     private val ctx: HandlerContext,
     private val appContext: Context,
 ) {
+    private val cookieHandlers = CookieHandlers(ctx)
+
     fun register(router: Router) {
-        // Cookies
-        router.register("get-cookies") { getCookies(it) }
-        router.register("set-cookie") { setCookie(it) }
-        router.register("delete-cookies") { deleteCookies(it) }
+        // Cookies (use CookieManager so HttpOnly/Secure cookies are visible)
+        router.register("get-cookies") { cookieHandlers.getCookies(it) }
+        router.register("set-cookie") { cookieHandlers.setCookie(it) }
+        router.register("delete-cookies") { cookieHandlers.deleteCookies(it) }
         // Storage
         router.register("get-storage") { getStorage(it) }
         router.register("set-storage") { setStorage(it) }
@@ -56,44 +61,6 @@ class BrowserManagementHandler(
         router.register("set-request-interception") { unsupported("set-request-interception") }
         router.register("get-intercepted-requests") { unsupported("get-intercepted-requests") }
         router.register("clear-request-interception") { unsupported("clear-request-interception") }
-    }
-
-    private suspend fun getCookies(body: Map<String, Any?>): Map<String, Any?> {
-        val name = body["name"] as? String
-        val js =
-            if (name != null) {
-                "(function(){var cookies=document.cookie.split(';').map(function(c){" +
-                    "var p=c.trim().split('=');" +
-                    "return{name:p[0],value:p.slice(1).join('='),domain:location.hostname,path:'/'};}" +
-                    ").filter(function(c){return c.name==='${name.replace("'", "\\'")}';});" +
-                    "return{cookies:cookies,count:cookies.length};})()"
-            } else {
-                "(function(){var cookies=document.cookie.split(';').filter(Boolean).map(function(c){var p=c.trim().split('=');return{name:p[0],value:p.slice(1).join('='),domain:location.hostname,path:'/'};});return{cookies:cookies,count:cookies.length};})()"
-            }
-        return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
-        } catch (e: Exception) {
-            errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
-        }
-    }
-
-    private suspend fun setCookie(body: Map<String, Any?>): Map<String, Any?> {
-        val name = body["name"] as? String ?: return errorResponse("MISSING_PARAM", "name required")
-        val value = body["value"] as? String ?: return errorResponse("MISSING_PARAM", "value required")
-        val path = body["path"] as? String ?: "/"
-        ctx.evaluateJS("document.cookie='${name.replace("'", "\\'")}=${value.replace("'", "\\'")}; path=$path'")
-        return successResponse()
-    }
-
-    private suspend fun deleteCookies(body: Map<String, Any?>): Map<String, Any?> {
-        val deleteAll = body["deleteAll"] as? Boolean ?: false
-        val name = body["name"] as? String
-        if (deleteAll) {
-            ctx.evaluateJS("document.cookie.split(';').forEach(function(c){document.cookie=c.trim().split('=')[0]+'=;expires=Thu,01 Jan 1970 00:00:00 GMT;path=/'})")
-        } else if (name != null) {
-            ctx.evaluateJS("document.cookie='${name.replace("'", "\\'")}=;expires=Thu,01 Jan 1970 00:00:00 GMT;path=/'")
-        }
-        return successResponse(mapOf("deleted" to 1))
     }
 
     private suspend fun getStorage(body: Map<String, Any?>): Map<String, Any?> {
@@ -151,6 +118,7 @@ class BrowserManagementHandler(
         if (selector != null) {
             ctx.evaluateJS("document.querySelector('${selector.replace("'", "\\'")}')?.focus()")
         }
+        toggleSoftKeyboard(show = true)
         val state = keyboardStatePayload()
         return successResponse(
             mapOf(
@@ -163,6 +131,7 @@ class BrowserManagementHandler(
 
     private suspend fun hideKeyboard(): Map<String, Any?> {
         ctx.evaluateJS("document.activeElement?.blur()")
+        toggleSoftKeyboard(show = false)
         val state = keyboardStatePayload()
         return successResponse(
             mapOf(
@@ -171,6 +140,22 @@ class BrowserManagementHandler(
                 "visibleViewport" to state["visibleViewport"],
             ),
         )
+    }
+
+    private fun toggleSoftKeyboard(show: Boolean) {
+        val wv = ctx.webView ?: return
+        val imm = appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return
+        Handler(Looper.getMainLooper()).post {
+            if (show) {
+                wv.requestFocus()
+                imm.showSoftInput(wv, InputMethodManager.SHOW_IMPLICIT)
+            } else {
+                val token = wv.windowToken
+                if (token != null) {
+                    imm.hideSoftInputFromWindow(token, 0)
+                }
+            }
+        }
     }
 
     private fun getKeyboardState(): Map<String, Any?> = successResponse(keyboardStatePayload())
