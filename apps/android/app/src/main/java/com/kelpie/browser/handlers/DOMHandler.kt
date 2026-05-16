@@ -17,7 +17,7 @@ class DOMHandler(
 
     private suspend fun getDOM(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: "html"
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js = "(function(){var el=document.querySelector('$safe');return el?{html:el.outerHTML.substring(0,50000),length:el.outerHTML.length}:{html:'',length:0};})()"
         return try {
             successResponse(ctx.evaluateJSReturningJSON(js))
@@ -28,7 +28,7 @@ class DOMHandler(
 
     private suspend fun querySelector(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js =
             "(function(){var el=document.querySelector('$safe');" +
                 "if(!el)return{found:false};var r=el.getBoundingClientRect();" +
@@ -47,7 +47,7 @@ class DOMHandler(
     private suspend fun querySelectorAll(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
         val limit = (body["limit"] as? Int) ?: 50
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js =
             "(function(){var els=document.querySelectorAll('$safe');" +
                 "return{elements:Array.from(els).slice(0,$limit).map(function(el){" +
@@ -65,7 +65,7 @@ class DOMHandler(
 
     private suspend fun getElementText(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js = "(function(){var el=document.querySelector('$safe');if(!el)return null;return{text:(el.innerText||el.textContent||'').trim(),html:el.innerHTML.substring(0,5000)};})()"
         return try {
             val result = ctx.evaluateJSReturningJSON(js)
@@ -77,7 +77,7 @@ class DOMHandler(
 
     private suspend fun getAttributes(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js =
             "(function(){var el=document.querySelector('$safe');" +
                 "if(!el)return null;var attrs={};" +

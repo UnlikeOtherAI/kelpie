@@ -779,7 +779,7 @@ enum Snapshot3DBridge {
         """
         (function() {
             if (!window.__m3d || typeof window.__m3d.setMode !== 'function') return null;
-            return window.__m3d.setMode('\(mode)');
+            return window.__m3d.setMode('\(JSEscape.string(mode))');
         })();
         """
     }

@@ -69,7 +69,7 @@ class EvaluateHandler(
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
         val timeout = (body["timeout"] as? Int) ?: 5000
         val state = body["state"] as? String ?: "visible"
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val start = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - start < timeout) {

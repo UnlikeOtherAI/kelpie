@@ -67,11 +67,13 @@ class BrowserManagementHandler(
         val type = body["type"] as? String ?: "local"
         val key = body["key"] as? String
         val storage = if (type == "session") "sessionStorage" else "localStorage"
+        val escapedType = JSEscape.string(type)
         val js =
             if (key != null) {
-                "({entries:{'${key.replace("'", "\\'")}':$storage.getItem('${key.replace("'", "\\'")}')},count:1,type:'$type'})"
+                val safeKey = JSEscape.string(key)
+                "({entries:{'$safeKey':$storage.getItem('$safeKey')||''},count:1,type:'$escapedType'})"
             } else {
-                "(function(){var e={};for(var i=0;i<$storage.length;i++){var k=$storage.key(i);e[k]=$storage.getItem(k);}return{entries:e,count:$storage.length,type:'$type'};})()"
+                "(function(){var e={};for(var i=0;i<$storage.length;i++){var k=$storage.key(i);e[k]=$storage.getItem(k);}return{entries:e,count:$storage.length,type:'$escapedType'};})()"
             }
         return try {
             successResponse(ctx.evaluateJSReturningJSON(js))
@@ -85,8 +87,14 @@ class BrowserManagementHandler(
         val value = body["value"] as? String ?: return errorResponse("MISSING_PARAM", "value required")
         val type = body["type"] as? String ?: "local"
         val storage = if (type == "session") "sessionStorage" else "localStorage"
-        ctx.evaluateJS("$storage.setItem('${key.replace("'", "\\'")}','${value.replace("'", "\\'")}')")
-        return successResponse()
+        val safeKey = JSEscape.string(key)
+        val safeValue = JSEscape.string(value)
+        return try {
+            ctx.evaluateJS("$storage.setItem('$safeKey','$safeValue')")
+            successResponse()
+        } catch (e: Exception) {
+            errorResponse("STORAGE_WRITE_FAILED", e.message ?: "Unknown error")
+        }
     }
 
     private suspend fun clearStorage(body: Map<String, Any?>): Map<String, Any?> {
@@ -116,7 +124,7 @@ class BrowserManagementHandler(
     private suspend fun showKeyboard(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String
         if (selector != null) {
-            ctx.evaluateJS("document.querySelector('${selector.replace("'", "\\'")}')?.focus()")
+            ctx.evaluateJS("document.querySelector('${JSEscape.string(selector)}')?.focus()")
         }
         toggleSoftKeyboard(show = true)
         val state = keyboardStatePayload()
@@ -263,7 +271,7 @@ class BrowserManagementHandler(
 
     private suspend fun isElementObscured(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js =
             "(function(){var el=document.querySelector('$safe');if(!el)return null;" +
                 "var r=el.getBoundingClientRect();" +

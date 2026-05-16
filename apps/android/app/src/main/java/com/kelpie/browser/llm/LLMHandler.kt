@@ -1,6 +1,7 @@
 package com.kelpie.browser.llm
 
 import com.kelpie.browser.handlers.HandlerContext
+import com.kelpie.browser.handlers.JSEscape
 import com.kelpie.browser.handlers.ScreenshotResolution
 import com.kelpie.browser.handlers.annotationActivationScript
 import com.kelpie.browser.handlers.annotationElementsScript
@@ -31,7 +32,7 @@ class LLMHandler(
     private suspend fun getAccessibilityTree(body: Map<String, Any?>): Map<String, Any?> {
         val root = body["root"] as? String ?: "body"
         val maxDepth = (body["maxDepth"] as? Int) ?: 5
-        val safe = root.replace("'", "\\'")
+        val safe = JSEscape.string(root)
         val js =
             "(function(){function walk(el,d){if(d>$maxDepth)return null;" +
                 "var role=el.getAttribute('role')||el.tagName.toLowerCase();" +
@@ -84,7 +85,7 @@ class LLMHandler(
 
     private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: "body"
-        val safe = selector.replace("'", "\\'")
+        val safe = JSEscape.string(selector)
         val js =
             "(function(){var el=document.querySelector('$safe');" +
                 "if(!el)return{title:'',content:'',wordCount:0};" +
@@ -145,7 +146,7 @@ class LLMHandler(
         text: String,
         filter: String,
     ): Map<String, Any?> {
-        val safe = text.lowercase().replace("'", "\\'")
+        val safe = JSEscape.string(text.lowercase())
         val js =
             "(function(){" + elementSelectorBuilderScript() + "var all=document.querySelectorAll('*');" +
                 "for(var el of all){if(!($filter))continue;" +
@@ -165,7 +166,7 @@ class LLMHandler(
 
     private suspend fun findInput(body: Map<String, Any?>): Map<String, Any?> {
         val label = body["label"] as? String ?: ""
-        val safe = label.lowercase().replace("'", "\\'")
+        val safe = JSEscape.string(label.lowercase())
         val js =
             "(function(){" + elementSelectorBuilderScript() + "var inputs=document.querySelectorAll('input,select,textarea');" +
                 "for(var el of inputs){" +

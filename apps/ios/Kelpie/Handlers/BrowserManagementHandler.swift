@@ -111,11 +111,13 @@ struct BrowserManagementHandler {
         let type = body["type"] as? String ?? "local"
         let key = body["key"] as? String
         let storage = type == "session" ? "sessionStorage" : "localStorage"
+        let escapedType = JSEscape.string(type)
         let js: String
         if let key {
-            js = "({entries: {'\(key)': \(storage).getItem('\(key)') || ''}, count: 1, type: '\(type)'})"
+            let escapedKey = JSEscape.string(key)
+            js = "({entries: {'\(escapedKey)': \(storage).getItem('\(escapedKey)') || ''}, count: 1, type: '\(escapedType)'})"
         } else {
-            js = "(function(){var e={};for(var i=0;i<\(storage).length;i++){var k=\(storage).key(i);e[k]=\(storage).getItem(k);}return {entries:e,count:\(storage).length,type:'\(type)'};})()"
+            js = "(function(){var e={};for(var i=0;i<\(storage).length;i++){var k=\(storage).key(i);e[k]=\(storage).getItem(k);}return {entries:e,count:\(storage).length,type:'\(escapedType)'};})()"
         }
         do {
             let result = try await context.evaluateJSReturningJSON(js)
@@ -132,8 +134,14 @@ struct BrowserManagementHandler {
         }
         let type = body["type"] as? String ?? "local"
         let storage = type == "session" ? "sessionStorage" : "localStorage"
-        _ = try? await context.evaluateJS("\(storage).setItem('\(key)','\(value)')")
-        return successResponse()
+        let escapedKey = JSEscape.string(key)
+        let escapedValue = JSEscape.string(value)
+        do {
+            _ = try await context.evaluateJS("\(storage).setItem('\(escapedKey)','\(escapedValue)')")
+            return successResponse()
+        } catch {
+            return errorResponse(code: "STORAGE_WRITE_FAILED", message: error.localizedDescription)
+        }
     }
 
     @MainActor
@@ -164,7 +172,7 @@ struct BrowserManagementHandler {
     @MainActor
     private func showKeyboard(_ body: [String: Any]) async -> [String: Any] {
         if let selector = body["selector"] as? String {
-            _ = try? await context.evaluateJS("document.querySelector('\(selector)')?.focus()")
+            _ = try? await context.evaluateJS("document.querySelector('\(JSEscape.string(selector))')?.focus()")
         }
         let kb = context.keyboardObserver
         let bounds = kb.screenBounds
