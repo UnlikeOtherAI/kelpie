@@ -18,7 +18,11 @@ final class ServerState: ObservableObject {
     let handlerContext = HandlerContext()
     let scriptPlaybackState = ScriptPlaybackState()
 
-    var rendererState: RendererState?
+    /// The renderer state is supplied to `startHTTPServer(rendererState:)`.
+    /// Optional only because the view-model is created before the view layer
+    /// constructs `RendererState`. Once HTTP serving begins, it is guaranteed
+    /// non-nil because `startHTTPServer` stores it before `registerHandlers()`.
+    private(set) var rendererState: RendererState?
 
     // Renderers are created on first use and cached for instant switching
     var wkRenderer: WKWebViewRenderer?
@@ -44,7 +48,12 @@ final class ServerState: ObservableObject {
         self.ipAddress = Self.getLocalIPAddress()
     }
 
-    func startHTTPServer() {
+    /// Starts the HTTP server and binds the supplied renderer state into
+    /// every handler that needs it. The renderer state must be supplied
+    /// here (not as a separate property assignment) so handler registration
+    /// can read it without force-unwrapping.
+    func startHTTPServer(rendererState: RendererState) {
+        self.rendererState = rendererState
         let preferredPort = UInt16(deviceInfo.port)
         let resolvedPort = Self.firstAvailablePort(startingAt: preferredPort)
         if Int(resolvedPort) != deviceInfo.port {
@@ -61,13 +70,21 @@ final class ServerState: ObservableObject {
 
         // Start only the selected renderer (browser instance). CEF is
         // initialized above but no Chromium browser is created yet.
-        let startEngine = rendererState?.activeEngine ?? .webkit
+        let startEngine = rendererState.activeEngine
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
         handlerContext.startSharedCookieSync()
 
-        registerHandlers()
-        let server = HTTPServer(port: resolvedPort, router: router)
+        registerHandlers(rendererState: rendererState)
+        let server: HTTPServer
+        do {
+            server = try HTTPServer(port: resolvedPort, router: router)
+        } catch {
+            print("[ServerState] Failed to construct HTTPServer for port \(resolvedPort): \(error)")
+            isServerRunning = false
+            isMDNSAdvertising = false
+            return
+        }
         server.onBonjourStateChange = { [weak self] isAdvertising in
             Task { @MainActor in
                 self?.isMDNSAdvertising = isAdvertising
@@ -90,7 +107,7 @@ final class ServerState: ObservableObject {
         httpServer?.start()
     }
 
-    private func registerHandlers() {
+    private func registerHandlers(rendererState: RendererState) {
         let ctx = handlerContext
         ctx.scriptPlaybackState = scriptPlaybackState
         router.handlerContext = ctx
@@ -111,8 +128,7 @@ final class ServerState: ObservableObject {
         DeviceHandler(
             context: ctx,
             deviceInfo: deviceInfo,
-            // swiftlint:disable:next force_unwrapping
-            rendererState: rendererState!,
+            rendererState: rendererState,
             viewportState: viewportState
         ).register(on: router)
         EvaluateHandler(context: ctx).register(on: router)
@@ -143,8 +159,7 @@ final class ServerState: ObservableObject {
         // Renderer switching handler
         RendererHandler(
             context: ctx,
-            // swiftlint:disable:next force_unwrapping
-            rendererState: rendererState!,
+            rendererState: rendererState,
             onSwitch: { [weak self] engine in
                 await self?.switchRenderer(to: engine)
             }

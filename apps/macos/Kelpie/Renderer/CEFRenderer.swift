@@ -240,7 +240,11 @@ final class CEFRenderer: RendererEngine {
     func hardReload() { bridge?.reloadIgnoringCache() }
 
     func evaluateJS(_ script: String) async throws -> Any? {
-        guard !containerView.isHidden else { return nil }
+        // Returning `nil` here would be silently coerced into "empty result"
+        // by the handler layer (HandlerContext.evaluateJSReturningJSON returns
+        // `[:]` for non-JSON output), making callers think the script ran when
+        // the renderer was actually hidden. Throw so the response surfaces.
+        guard !containerView.isHidden else { throw HandlerError.rendererHidden }
         guard let bridge else { throw HandlerError.noWebView }
         return try await withCheckedThrowingContinuation { continuation in
             bridge.evaluateJavaScript(script) { result, error in

@@ -415,6 +415,7 @@ extension Notification.Name {
 
 enum HandlerError: Error {
     case noWebView
+    case rendererHidden
     case elementNotFound(String)
     case screenshotFailed
     case timeout
@@ -432,6 +433,13 @@ func tabErrorResponse(from error: Error) -> [String: Any]? {
         return errorResponse(
             code: "TAB_REQUIRED",
             message: "Multiple tabs open — specify \"tabId\" in your request. Available tabs:\n\(listing)"
+        )
+    case .rendererHidden:
+        return errorResponse(
+            code: "RENDERER_HIDDEN",
+            message: "The active renderer is hidden — its view is detached or off-screen, " +
+                "so script evaluation and DOM queries are unavailable. Bring the window " +
+                "to front or switch to a renderer whose view is visible."
         )
     default:
         return nil

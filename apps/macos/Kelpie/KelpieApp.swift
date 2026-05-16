@@ -281,8 +281,7 @@ struct KelpieApp: App {
     }
 
     private func startServices() {
-        serverState.rendererState = rendererState
-        serverState.startHTTPServer()
+        serverState.startHTTPServer(rendererState: rendererState)
         #if DEBUG
         if Self.canBind(port: 8421) {
             AppReveal.start(port: 8421)

@@ -204,33 +204,41 @@ struct InteractionHandler {
             await context.showTouchIndicatorForElement(selector, color: color, tabId: tabId)
         }
         let delay = body["delay"] as? Int ?? 50
-        for char in text {
-            if context.scriptPlaybackState?.isAbortRequested() == true { break }
-            let escapedChar = JSEscape.string(String(char))
-            let charJS = """
+        do {
+            for char in text {
+                if context.scriptPlaybackState?.isAbortRequested() == true { break }
+                let escapedChar = JSEscape.string(String(char))
+                let charJS = """
+                (function() {
+                    \(formControlMutationScript())
+                    var el = document.activeElement;
+                    if (!el) return;
+                    el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(escapedChar)', bubbles: true}));
+                    el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(escapedChar)', bubbles: true}));
+                    kelpieWriteFormControlValue(el, kelpieReadFormControlValue(el) + '\(escapedChar)');
+                    kelpieDispatchFormControlInput(el);
+                    el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(escapedChar)', bubbles: true}));
+                })()
+                """
+                _ = try await context.evaluateJS(charJS, tabId: tabId)
+                try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
+            }
+            let finalizeJS = """
             (function() {
                 \(formControlMutationScript())
                 var el = document.activeElement;
                 if (!el) return;
-                el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(escapedChar)', bubbles: true}));
-                el.dispatchEvent(new KeyboardEvent('keypress', {key: '\(escapedChar)', bubbles: true}));
-                kelpieWriteFormControlValue(el, kelpieReadFormControlValue(el) + '\(escapedChar)');
-                kelpieDispatchFormControlInput(el);
-                el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(escapedChar)', bubbles: true}));
+                kelpieDispatchFormControlChange(el);
             })()
             """
-            _ = try? await context.evaluateJS(charJS, tabId: tabId)
-            try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
+            _ = try await context.evaluateJS(finalizeJS, tabId: tabId)
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return tabError }
+            return errorResponse(
+                code: "TYPING_FAILED",
+                message: "Failed to dispatch keystrokes: \(error.localizedDescription)"
+            )
         }
-        let finalizeJS = """
-        (function() {
-            \(formControlMutationScript())
-            var el = document.activeElement;
-            if (!el) return;
-            kelpieDispatchFormControlChange(el);
-        })()
-        """
-        _ = try? await context.evaluateJS(finalizeJS, tabId: tabId)
         return successResponse(["typed": text])
     }
 
