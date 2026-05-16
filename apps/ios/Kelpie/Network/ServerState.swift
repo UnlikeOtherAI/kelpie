@@ -203,7 +203,12 @@ final class ServerState: ObservableObject {
             return
         }
 
-        let advertiser = MDNSAdvertiser(txtRecord: deviceInfo.txtRecord)
+        guard let httpServer else {
+            print("[mDNS] HTTPServer not started; cannot publish service")
+            return
+        }
+
+        let advertiser = MDNSAdvertiser(txtRecord: deviceInfo.txtRecord, httpServer: httpServer)
         advertiser.onAdvertisingChange = { [weak self] isAdvertising in
             DispatchQueue.main.async {
                 self?.isMDNSAdvertising = isAdvertising
