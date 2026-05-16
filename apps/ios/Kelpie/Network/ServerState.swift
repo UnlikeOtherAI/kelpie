@@ -36,7 +36,12 @@ final class ServerState: ObservableObject {
     func startHTTPServer() {
         registerHandlers()
         router.registerFallbacks()
-        httpServer = HTTPServer(port: UInt16(deviceInfo.port), router: router)
+        do {
+            httpServer = try HTTPServer(port: UInt16(deviceInfo.port), router: router)
+        } catch {
+            print("[ServerState] Failed to construct HTTPServer: \(error)")
+            return
+        }
         httpServer?.start()
         DispatchQueue.main.async { self.isServerRunning = true }
     }

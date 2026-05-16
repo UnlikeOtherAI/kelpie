@@ -1,6 +1,18 @@
 import Foundation
 import Network
 
+/// Errors thrown by HTTPServer for unrecoverable startup conditions.
+enum HTTPServerError: Error, CustomStringConvertible {
+    case invalidPort(UInt16)
+
+    var description: String {
+        switch self {
+        case .invalidPort(let port):
+            return "Invalid HTTP server port: \(port)"
+        }
+    }
+}
+
 /// Embedded HTTP server for receiving CLI commands.
 /// Uses raw NWListener since we want zero external dependencies for the server.
 ///
@@ -10,23 +22,40 @@ import Network
 /// listener is bound to, so advertising via a second standalone listener would
 /// announce an ephemeral port that no one is serving on.
 final class HTTPServer: @unchecked Sendable {
+    /// Maximum bytes accepted for HTTP request headers before parsing must complete.
+    /// 64 KiB caps slow-loris pinning while leaving room for cookies and auth headers.
+    /// Mirrors macOS and Android.
+    static let maxHeaderBytes = 64 * 1024
+    /// Maximum request body size accepted by the server (50 MiB).
+    /// Larger bodies receive `413 Payload Too Large` and the connection is closed.
+    /// Mirrors macOS and Android.
+    static let maxBodyBytes = 50 * 1024 * 1024
+    /// Maximum lifetime of a single HTTP connection from first byte to dispatch.
+    /// Prevents slow-loris clients from pinning sockets indefinitely.
+    static let requestTimeoutSeconds: Double = 30
+
     let port: UInt16
     let router: Router
     private var listener: NWListener?
     private var pendingService: NWListener.Service?
     var serviceRegistrationUpdateHandler: ((NWListener.ServiceRegistrationChange) -> Void)?
 
-    init(port: UInt16 = 8420, router: Router) {
+    init(port: UInt16 = 8420, router: Router) throws {
+        guard port > 0 else { throw HTTPServerError.invalidPort(port) }
         self.port = port
         self.router = router
     }
 
     func start() {
+        guard let endpointPort = NWEndpoint.Port(rawValue: port) else {
+            print("[HTTPServer] Invalid port \(port) — refusing to start")
+            return
+        }
+
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
-            // swiftlint:disable:next force_unwrapping
-            listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+            listener = try NWListener(using: params, on: endpointPort)
         } catch {
             print("[HTTPServer] Failed to create listener: \(error)")
             return
@@ -71,44 +100,166 @@ final class HTTPServer: @unchecked Sendable {
 
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: .global(qos: .userInitiated))
-        receiveData(connection: connection, buffer: Data())
+        let deadline = Date().addingTimeInterval(Self.requestTimeoutSeconds)
+        receiveData(connection: connection, buffer: Data(), deadline: deadline)
     }
 
-    private func receiveData(connection: NWConnection, buffer: Data) {
+    /// Recursively drains `connection` into `buffer`, enforcing header-byte,
+    /// body-byte, and overall-deadline limits. Each invocation re-checks the
+    /// deadline before requesting more data so slow-loris clients are bounded.
+    private func receiveData(connection: NWConnection, buffer: Data, deadline: Date) {
+        if Date() >= deadline {
+            send408AndClose(connection: connection)
+            return
+        }
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, _, isComplete, error in
             guard let self else { return }
             var accumulated = buffer
             if let content { accumulated.append(content) }
 
             if isComplete || error != nil {
-                Task {
-                    await self.processRequest(connection: connection, data: accumulated)
-                }
-            } else if let headerEnd = accumulated.range(of: Data("\r\n\r\n".utf8)) {
-                let headerString = String(data: accumulated[..<headerEnd.lowerBound], encoding: .utf8) ?? ""
-                let contentLength = self.parseContentLength(headerString)
-                let bodyStart = headerEnd.upperBound
-                let bodyReceived = accumulated.distance(from: bodyStart, to: accumulated.endIndex)
-
-                if bodyReceived >= contentLength {
-                    Task {
-                        await self.processRequest(connection: connection, data: accumulated)
-                    }
-                } else {
-                    self.receiveData(connection: connection, buffer: accumulated)
-                }
-            } else {
-                self.receiveData(connection: connection, buffer: accumulated)
+                Task { await self.processRequest(connection: connection, data: accumulated) }
+                return
             }
+
+            self.continueReceive(connection: connection, accumulated: accumulated, deadline: deadline)
         }
     }
 
-    private func parseContentLength(_ headers: String) -> Int {
+    private func continueReceive(connection: NWConnection, accumulated: Data, deadline: Date) {
+        let headerSeparator = accumulated.range(of: Data("\r\n\r\n".utf8))
+
+        // Enforce header byte cap before headers complete. Closing early
+        // bounds slow-loris connections that drip a few bytes at a time.
+        if headerSeparator == nil, accumulated.count > Self.maxHeaderBytes {
+            send431HeaderAndClose(connection: connection)
+            return
+        }
+
+        guard let headerEnd = headerSeparator else {
+            receiveData(connection: connection, buffer: accumulated, deadline: deadline)
+            return
+        }
+
+        let headerByteCount = accumulated.distance(from: accumulated.startIndex, to: headerEnd.lowerBound)
+        // Reject oversized headers even when they arrive in a single chunk —
+        // the headers-complete branch above only catches drip-feed clients.
+        if headerByteCount > Self.maxHeaderBytes {
+            send431HeaderAndClose(connection: connection)
+            return
+        }
+
+        let headerString = String(data: accumulated[..<headerEnd.lowerBound], encoding: .utf8) ?? ""
+        let bodyStart = headerEnd.upperBound
+        let bodyReceived = accumulated.distance(from: bodyStart, to: accumulated.endIndex)
+
+        switch parseContentLength(headerString) {
+        case .valid(let contentLength):
+            if contentLength > Self.maxBodyBytes {
+                send413BodyAndClose(connection: connection)
+                return
+            }
+            // Guard against clients that under-declare Content-Length and then
+            // stream more bytes — drop the connection if total exceeds either
+            // the declared length or the global cap.
+            if bodyReceived > contentLength || bodyReceived > Self.maxBodyBytes {
+                send413BodyAndClose(connection: connection)
+                return
+            }
+            if bodyReceived >= contentLength {
+                Task { await self.processRequest(connection: connection, data: accumulated) }
+            } else {
+                receiveData(connection: connection, buffer: accumulated, deadline: deadline)
+            }
+        case .missing:
+            // Reject POSTs without Content-Length; GETs never have a body.
+            let requestLine = headerString.components(separatedBy: "\r\n").first ?? ""
+            if requestLine.hasPrefix("POST ") {
+                send411AndClose(connection: connection)
+            } else {
+                Task { await self.processRequest(connection: connection, data: accumulated) }
+            }
+        case .malformed:
+            send400AndClose(connection: connection, message: "Malformed Content-Length")
+        }
+    }
+
+    private enum ContentLengthParseResult {
+        case valid(Int)
+        case missing
+        case malformed
+    }
+
+    /// Strictly parses the `Content-Length` header. Rejects negatives,
+    /// non-integer values, and trailing garbage. RFC 7230 §3.3.2 requires
+    /// a non-negative decimal — a permissive parser previously let `-1`
+    /// short-circuit the read loop.
+    private func parseContentLength(_ headers: String) -> ContentLengthParseResult {
         for line in headers.components(separatedBy: "\r\n") where line.lowercased().hasPrefix("content-length:") {
             let value = line.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)
-            return Int(value) ?? 0
+            guard !value.isEmpty, value.allSatisfy({ $0.isASCII && $0.isNumber }), let parsed = Int(value) else {
+                return .malformed
+            }
+            return .valid(parsed)
         }
-        return 0
+        return .missing
+    }
+
+    private func send408AndClose(connection: NWConnection) {
+        sendErrorAndClose(
+            connection: connection,
+            statusCode: 408,
+            code: "REQUEST_TIMEOUT",
+            message: "Request timed out before completion"
+        )
+    }
+
+    private func send411AndClose(connection: NWConnection) {
+        sendErrorAndClose(
+            connection: connection,
+            statusCode: 411,
+            code: "LENGTH_REQUIRED",
+            message: "Content-Length header is required"
+        )
+    }
+
+    private func send413BodyAndClose(connection: NWConnection) {
+        let mb = Self.maxBodyBytes / (1024 * 1024)
+        sendErrorAndClose(
+            connection: connection,
+            statusCode: 413,
+            code: "PAYLOAD_TOO_LARGE",
+            message: "Request body exceeds \(mb) MB limit"
+        )
+    }
+
+    private func send431HeaderAndClose(connection: NWConnection) {
+        let kb = Self.maxHeaderBytes / 1024
+        sendErrorAndClose(
+            connection: connection,
+            statusCode: 431,
+            code: "REQUEST_HEADER_FIELDS_TOO_LARGE",
+            message: "Request headers exceed \(kb) KB limit"
+        )
+    }
+
+    private func send400AndClose(connection: NWConnection, message: String) {
+        sendErrorAndClose(
+            connection: connection,
+            statusCode: 400,
+            code: "BAD_REQUEST",
+            message: message
+        )
+    }
+
+    private func sendErrorAndClose(connection: NWConnection, statusCode: Int, code: String, message: String) {
+        let payload: [String: Any] = [
+            "success": false,
+            "error": ["code": code, "message": message]
+        ]
+        let body = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data(#"{"success":false,"error":{"code":"INTERNAL","message":"error"}}"#.utf8)
+        let response = buildHTTPResponse(statusCode: statusCode, body: body, contentType: "application/json")
+        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
     }
 
     private func processRequest(connection: NWConnection, data: Data) async {
@@ -190,6 +341,10 @@ final class HTTPServer: @unchecked Sendable {
         case 200: statusText = "OK"
         case 400: statusText = "Bad Request"
         case 404: statusText = "Not Found"
+        case 408: statusText = "Request Timeout"
+        case 411: statusText = "Length Required"
+        case 413: statusText = "Payload Too Large"
+        case 431: statusText = "Request Header Fields Too Large"
         case 500: statusText = "Internal Server Error"
         default: statusText = "Unknown"
         }
