@@ -11,6 +11,10 @@ class Router {
     var handlerContext: HandlerContext? = null
     var scriptPlaybackState: com.kelpie.browser.handlers.ScriptPlaybackState? = null
 
+    /** Snapshot of currently-registered method names. */
+    val registeredMethods: Set<String>
+        get() = routes.keys.toSet()
+
     fun register(
         method: String,
         handler: RouteHandler,
@@ -69,22 +73,43 @@ class Router {
     }
 
     fun registerFallbacks() {
-        val methods =
-            emptyList<String>()
-        for (method in methods) {
-            val unsupported = androidUnsupportedMethods.contains(method)
+        for (method in AndroidUnsupportedMethods.all) {
             registerIfAbsent(method) {
                 mapOf(
                     "success" to false,
                     "error" to
                         mapOf(
-                            "code" to if (unsupported) "PLATFORM_NOT_SUPPORTED" else "NOT_IMPLEMENTED",
-                            "message" to if (unsupported) "$method is not supported on Android" else "$method not yet implemented",
+                            "code" to "PLATFORM_NOT_SUPPORTED",
+                            "message" to "$method is not supported on Android",
                         ),
                 )
             }
         }
     }
+}
+
+/**
+ * Methods the Android app explicitly advertises as unsupported. This is the
+ * single source of truth — DeviceHandler reads it for `get-capabilities`, and
+ * the Router uses it to register fallback handlers for any method that no real
+ * handler claims.
+ */
+object AndroidUnsupportedMethods {
+    val all: Set<String> =
+        setOf(
+            "debug-screens",
+            "set-debug-overlay",
+            "get-debug-overlay",
+            "set-geolocation",
+            "clear-geolocation",
+            "set-request-interception",
+            "get-intercepted-requests",
+            "clear-request-interception",
+            "set-fullscreen",
+            "get-fullscreen",
+            "set-renderer",
+            "get-renderer",
+        )
 }
 
 fun errorResponse(
@@ -100,23 +125,6 @@ fun errorResponse(
 }
 
 fun successResponse(data: Map<String, Any?> = emptyMap()): Map<String, Any?> = mutableMapOf<String, Any?>("success" to true).apply { putAll(data) }
-
-private val androidUnsupportedMethods =
-    setOf(
-        "debug-screens",
-        "set-debug-overlay",
-        "get-debug-overlay",
-        "safari-auth",
-        "set-geolocation",
-        "clear-geolocation",
-        "set-request-interception",
-        "get-intercepted-requests",
-        "clear-request-interception",
-        "set-fullscreen",
-        "get-fullscreen",
-        "set-renderer",
-        "get-renderer",
-    )
 
 private fun statusForErrorCode(code: String?): Int =
     when (code) {

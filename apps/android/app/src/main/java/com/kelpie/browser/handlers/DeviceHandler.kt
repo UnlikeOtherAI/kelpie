@@ -3,6 +3,7 @@ package com.kelpie.browser.handlers
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import com.kelpie.browser.device.DeviceInfo
+import com.kelpie.browser.network.AndroidUnsupportedMethods
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
@@ -12,9 +13,10 @@ import com.kelpie.browser.ui.TabletViewportPresetStore
 class DeviceHandler(
     private val ctx: HandlerContext,
     private val deviceInfo: DeviceInfo,
+    private val router: Router,
     private val activity: Activity? = null,
 ) {
-    fun register(router: Router) {
+    fun register() {
         router.register("get-viewport") { getViewport() }
         router.register("get-viewport-presets") { getViewportPresets() }
         router.register("get-device-info") { getDeviceInfo() }
@@ -111,157 +113,20 @@ class DeviceHandler(
         return successResponse(mapOf("orientation" to orientation))
     }
 
-    private fun getCapabilities(): Map<String, Any?> =
-        run {
-            val unsupported =
-                setOf(
-                    "debug-screens",
-                    "set-debug-overlay",
-                    "get-debug-overlay",
-                    "safari-auth",
-                    "set-geolocation",
-                    "clear-geolocation",
-                    "set-request-interception",
-                    "get-intercepted-requests",
-                    "clear-request-interception",
-                    "set-fullscreen",
-                    "get-fullscreen",
-                    "set-renderer",
-                    "get-renderer",
-                )
-            val partial = emptySet<String>()
-            val supported = androidCapabilityMethods.filter { it !in unsupported && it !in partial }
-            successResponse(
-                mapOf(
-                    "version" to deviceInfo.version,
-                    "platform" to "android",
-                    "supported" to supported,
-                    "partial" to partial.toList().sorted(),
-                    "unsupported" to unsupported.toList().sorted(),
-                ),
-            )
-        }
+    private fun getCapabilities(): Map<String, Any?> {
+        // Derive capabilities directly from the live router so the list cannot
+        // drift away from what the device actually advertises. `unsupported`
+        // is the single canonical declaration in AndroidUnsupportedMethods.
+        val unsupported = AndroidUnsupportedMethods.all
+        val supported = router.registeredMethods.filter { it !in unsupported }.sorted()
+        return successResponse(
+            mapOf(
+                "version" to deviceInfo.version,
+                "platform" to "android",
+                "supported" to supported,
+                "partial" to emptyList<String>(),
+                "unsupported" to unsupported.toList().sorted(),
+            ),
+        )
+    }
 }
-
-private val androidCapabilityMethods =
-    listOf(
-        "navigate",
-        "back",
-        "forward",
-        "reload",
-        "get-current-url",
-        "set-home",
-        "get-home",
-        "debug-screens",
-        "set-debug-overlay",
-        "get-debug-overlay",
-        "screenshot",
-        "get-dom",
-        "query-selector",
-        "query-selector-all",
-        "get-element-text",
-        "get-attributes",
-        "click",
-        "tap",
-        "fill",
-        "type",
-        "select-option",
-        "check",
-        "uncheck",
-        "swipe",
-        "scroll",
-        "scroll2",
-        "scroll-to-top",
-        "scroll-to-bottom",
-        "scroll-to-y",
-        "get-viewport",
-        "get-device-info",
-        "get-viewport-presets",
-        "get-capabilities",
-        "report-issue",
-        "wait-for-element",
-        "wait-for-navigation",
-        "find-element",
-        "find-button",
-        "find-link",
-        "find-input",
-        "evaluate",
-        "toast",
-        "get-console-messages",
-        "get-js-errors",
-        "get-network-log",
-        "get-resource-timeline",
-        "get-websockets",
-        "get-websocket-messages",
-        "clear-console",
-        "get-accessibility-tree",
-        "screenshot-annotated",
-        "click-annotation",
-        "fill-annotation",
-        "get-visible-elements",
-        "get-page-text",
-        "get-form-state",
-        "get-dialog",
-        "handle-dialog",
-        "set-dialog-auto-handler",
-        "get-tabs",
-        "new-tab",
-        "switch-tab",
-        "close-tab",
-        "get-iframes",
-        "switch-to-iframe",
-        "switch-to-main",
-        "get-iframe-context",
-        "get-cookies",
-        "set-cookie",
-        "delete-cookies",
-        "get-storage",
-        "set-storage",
-        "clear-storage",
-        "watch-mutations",
-        "get-mutations",
-        "stop-watching",
-        "query-shadow-dom",
-        "get-shadow-roots",
-        "get-clipboard",
-        "set-clipboard",
-        "set-geolocation",
-        "clear-geolocation",
-        "set-request-interception",
-        "get-intercepted-requests",
-        "clear-request-interception",
-        "show-keyboard",
-        "hide-keyboard",
-        "get-keyboard-state",
-        "resize-viewport",
-        "reset-viewport",
-        "set-viewport-preset",
-        "is-element-obscured",
-        "safari-auth",
-        "set-orientation",
-        "get-orientation",
-        "show-commentary",
-        "hide-commentary",
-        "highlight",
-        "hide-highlight",
-        "play-script",
-        "abort-script",
-        "get-script-status",
-        "snapshot-3d-enter",
-        "snapshot-3d-exit",
-        "snapshot-3d-status",
-        "snapshot-3d-set-mode",
-        "snapshot-3d-zoom",
-        "snapshot-3d-reset-view",
-        "ai-status",
-        "ai-load",
-        "ai-unload",
-        "ai-infer",
-        "ai-record",
-        "set-fullscreen",
-        "get-fullscreen",
-        "set-renderer",
-        "get-renderer",
-        "get-tap-calibration",
-        "set-tap-calibration",
-    )

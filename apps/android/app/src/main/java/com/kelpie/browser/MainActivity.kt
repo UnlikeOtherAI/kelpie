@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
         InteractionHandler(handlerContext).register(router)
         TapCalibrationHandler().register(router)
         ScrollHandler(handlerContext).register(router)
-        DeviceHandler(handlerContext, deviceInfo, this).register(router)
+        DeviceHandler(handlerContext, deviceInfo, router, this).register()
         EvaluateHandler(handlerContext).register(router)
         ConsoleHandler(handlerContext).register(router)
         NetworkLogHandler(handlerContext).register(router)

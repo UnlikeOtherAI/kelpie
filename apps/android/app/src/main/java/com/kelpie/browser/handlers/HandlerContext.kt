@@ -44,6 +44,10 @@ class HandlerContext {
     var aiManager: AiManager? = null
     val consoleMessages = mutableListOf<Map<String, Any?>>()
     val dialogState = DialogState()
+
+    /** Most recent WebView navigation error (cleared on each new navigation). */
+    @Volatile
+    var lastNavigationError: String? = null
     val chromeAuth =
         com.kelpie.browser.browser
             .ChromeAuthHelper()
