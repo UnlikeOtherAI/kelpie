@@ -3,6 +3,7 @@ package com.kelpie.browser.network
 import android.content.Context
 import android.util.Log
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.call
@@ -40,13 +41,40 @@ class HTTPServer(
     private val router: Router,
     private val appContext: Context,
 ) {
+    companion object {
+        /**
+         * Maximum request body size accepted by the server (50 MiB).
+         * Larger bodies receive `413 Payload Too Large` and the connection is closed.
+         * Mirrors iOS and macOS.
+         */
+        const val MAX_BODY_BYTES: Long = 50L * 1024L * 1024L
+
+        /**
+         * Maximum bytes accepted for HTTP request headers before parsing must complete.
+         * 64 KiB caps slow-loris pinning while leaving room for cookies and auth headers.
+         * Mirrors iOS and macOS.
+         */
+        const val MAX_HEADER_BYTES: Int = 64 * 1024
+    }
+
     private var engine: NettyApplicationEngine? = null
     var isRunning = false
         private set
 
     fun start() {
         engine =
-            embeddedServer(Netty, port = port) {
+            embeddedServer(
+                factory = Netty,
+                port = port,
+                configure = {
+                    // Cap request line + header bytes at the Netty layer so
+                    // oversized headers never make it as far as the routing
+                    // pipeline. Netty returns 431 automatically for overflow.
+                    maxInitialLineLength = MAX_HEADER_BYTES
+                    maxHeaderSize = MAX_HEADER_BYTES
+                    maxChunkSize = 64 * 1024
+                },
+            ) {
                 install(ContentNegotiation) { json(json) }
 
                 routing {
@@ -63,8 +91,53 @@ class HTTPServer(
                     }
 
                     post("/v1/{method}") {
+                        // Validate Content-Length BEFORE reading the body to
+                        // ensure a single malicious multi-GB POST never gets
+                        // buffered. Missing Content-Length on POST is rejected.
+                        val contentLengthHeader = call.request.headers[HttpHeaders.ContentLength]
+                        val contentLength = contentLengthHeader?.toLongOrNull()
+                        if (contentLengthHeader == null) {
+                            respondError(
+                                call = call,
+                                statusCode = HttpStatusCode.LengthRequired,
+                                code = "LENGTH_REQUIRED",
+                                message = "Content-Length header is required",
+                            )
+                            return@post
+                        }
+                        if (contentLength == null || contentLength < 0) {
+                            respondError(
+                                call = call,
+                                statusCode = HttpStatusCode.BadRequest,
+                                code = "BAD_REQUEST",
+                                message = "Malformed Content-Length",
+                            )
+                            return@post
+                        }
+                        if (contentLength > MAX_BODY_BYTES) {
+                            respondError(
+                                call = call,
+                                statusCode = HttpStatusCode.PayloadTooLarge,
+                                code = "PAYLOAD_TOO_LARGE",
+                                message = "Request body exceeds ${MAX_BODY_BYTES / 1024 / 1024} MB limit",
+                            )
+                            return@post
+                        }
+
                         val method = call.parameters["method"] ?: ""
                         val bodyText = call.receiveText()
+                        // Defense-in-depth: if the client under-declared
+                        // Content-Length and streamed more bytes, reject.
+                        if (bodyText.toByteArray(Charsets.UTF_8).size.toLong() > MAX_BODY_BYTES) {
+                            respondError(
+                                call = call,
+                                statusCode = HttpStatusCode.PayloadTooLarge,
+                                code = "PAYLOAD_TOO_LARGE",
+                                message = "Request body exceeds ${MAX_BODY_BYTES / 1024 / 1024} MB limit",
+                            )
+                            return@post
+                        }
+
                         val body =
                             parseJsonBody(bodyText)
                                 ?: return@post call.respondText(
@@ -141,4 +214,17 @@ class HTTPServer(
             is List<*> -> kotlinx.serialization.json.JsonArray(value.map { anyToJsonElement(it) })
             else -> JsonPrimitive(value.toString())
         }
+
+    private suspend fun respondError(
+        call: io.ktor.server.application.ApplicationCall,
+        statusCode: HttpStatusCode,
+        code: String,
+        message: String,
+    ) {
+        call.respondText(
+            text = mapToJsonString(errorResponse(code, message)),
+            contentType = ContentType.Application.Json,
+            status = statusCode,
+        )
+    }
 }
