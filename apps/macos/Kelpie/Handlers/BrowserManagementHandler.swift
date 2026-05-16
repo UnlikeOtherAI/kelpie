@@ -3,12 +3,23 @@ import WebKit
 
 // swiftlint:disable line_length
 
-/// Handles cookies, storage, clipboard, dialogs, keyboard, viewport, and unsupported endpoints.
+/// Handles cookies, storage, clipboard, dialogs, viewport, and unsupported endpoints.
 struct BrowserManagementHandler {
     let context: HandlerContext
     let viewportState: ViewportState
 
     func register(on router: Router) {
+        // Unsupported — register stubs FIRST from the single source of truth
+        // in `DeviceHandler.unsupportedMethods`. Dedicated handlers below
+        // overwrite specific entries (e.g. `is-element-obscured`) where macOS
+        // has a real implementation despite the capability list saying
+        // otherwise.
+        for method in DeviceHandler.unsupportedMethods {
+            router.register(method) { _ in
+                errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "\(method) is not supported on macOS")
+            }
+        }
+
         // Cookies
         router.register("get-cookies") { body in await getCookies(body) }
         router.register("set-cookie") { body in await setCookie(body) }
@@ -23,23 +34,13 @@ struct BrowserManagementHandler {
         router.register("get-clipboard") { _ in await getClipboard() }
         router.register("set-clipboard") { body in await setClipboard(body) }
 
-        // Keyboard & Viewport
-        router.register("show-keyboard") { body in await showKeyboard(body) }
-        router.register("hide-keyboard") { body in await hideKeyboard(body) }
-        router.register("get-keyboard-state") { body in await getKeyboardState(body) }
+        // Viewport / Fullscreen
         router.register("set-fullscreen") { body in await setFullscreen(body) }
         router.register("get-fullscreen") { body in await getFullscreen(body) }
         router.register("resize-viewport") { body in await resizeViewport(body) }
         router.register("reset-viewport") { body in await resetViewport(body) }
         router.register("set-viewport-preset") { body in await setViewportPreset(body) }
         router.register("is-element-obscured") { body in await isElementObscured(body) }
-
-        // Unsupported
-        for method in ["set-geolocation", "clear-geolocation", "set-request-interception", "get-intercepted-requests", "clear-request-interception"] {
-            router.register(method) { _ in
-                errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "\(method) is not supported on macOS")
-            }
-        }
 
         // Iframes
         router.register("get-iframes") { body in await getIframes(body) }
@@ -232,22 +233,7 @@ struct BrowserManagementHandler {
         return successResponse()
     }
 
-    // MARK: - Keyboard
-
-    @MainActor
-    private func showKeyboard(_ body: [String: Any]) async -> [String: Any] {
-        errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "show-keyboard is not supported on macOS")
-    }
-
-    @MainActor
-    private func hideKeyboard(_ body: [String: Any]) async -> [String: Any] {
-        errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "hide-keyboard is not supported on macOS")
-    }
-
-    @MainActor
-    private func getKeyboardState(_ body: [String: Any]) async -> [String: Any] {
-        errorResponse(code: "PLATFORM_NOT_SUPPORTED", message: "get-keyboard-state is not supported on macOS")
-    }
+    // MARK: - Fullscreen
 
     @MainActor
     private func setFullscreen(_ body: [String: Any]) async -> [String: Any] {

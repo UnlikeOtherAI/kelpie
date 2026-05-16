@@ -67,7 +67,6 @@ final class ServerState: ObservableObject {
         handlerContext.startSharedCookieSync()
 
         registerHandlers()
-        router.registerFallbacks()
         let server = HTTPServer(port: resolvedPort, router: router)
         server.onBonjourStateChange = { [weak self] isAdvertising in
             Task { @MainActor in
@@ -79,8 +78,15 @@ final class ServerState: ObservableObject {
                 self?.isServerRunning = isRunning
             }
         }
+        // Publish the Bonjour TXT only after the underlying NWListener has
+        // transitioned to `.ready`. Advertising earlier races the socket and
+        // causes ECONNREFUSED for fast clients (the CLI's mDNS-resolve loop).
+        server.onReady = { [weak self] in
+            Task { @MainActor in
+                self?.startMDNS()
+            }
+        }
         httpServer = server
-        startMDNS()
         httpServer?.start()
     }
 

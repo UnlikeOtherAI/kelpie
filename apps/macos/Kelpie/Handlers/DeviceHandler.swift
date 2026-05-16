@@ -7,6 +7,26 @@ struct DeviceHandler {
     let rendererState: RendererState
     let viewportState: ViewportState
 
+    /// Canonical list of HTTP/MCP methods that macOS does not implement.
+    /// Single source of truth — `get-capabilities` reports these as
+    /// `unsupported`, and `BrowserManagementHandler.register` installs
+    /// `PLATFORM_NOT_SUPPORTED` stubs from this same list so the two never
+    /// drift out of sync.
+    static let unsupportedMethods: [String] = [
+        "debug-screens",
+        "set-debug-overlay",
+        "get-debug-overlay",
+        "set-geolocation",
+        "clear-geolocation",
+        "set-request-interception",
+        "get-intercepted-requests",
+        "clear-request-interception",
+        "show-keyboard",
+        "hide-keyboard",
+        "get-keyboard-state",
+        "is-element-obscured"
+    ]
+
     func register(on router: Router) {
         router.register("get-viewport") { _ in await getViewport() }
         router.register("get-viewport-presets") { _ in await getViewportPresets() }
@@ -91,20 +111,7 @@ struct DeviceHandler {
 
     @MainActor
     private func getCapabilities() async -> [String: Any] {
-        let unsupported = Set([
-            "debug-screens",
-            "set-debug-overlay",
-            "get-debug-overlay",
-            "set-geolocation",
-            "clear-geolocation",
-            "set-request-interception",
-            "get-intercepted-requests",
-            "clear-request-interception",
-            "show-keyboard",
-            "hide-keyboard",
-            "get-keyboard-state",
-            "is-element-obscured"
-        ])
+        let unsupported = Set(Self.unsupportedMethods)
         let partial = Set<String>()
         let supported = macosCapabilityMethods.filter { !unsupported.contains($0) && !partial.contains($0) }
         return successResponse([
