@@ -1,5 +1,6 @@
 package com.kelpie.browser.handlers
 
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import com.kelpie.browser.network.Router
@@ -24,13 +25,21 @@ class NavigationHandler(
 
     private suspend fun navigate(body: Map<String, Any?>): Map<String, Any?> {
         val url = body["url"] as? String ?: return errorResponse("MISSING_PARAM", "url is required")
+        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+        if (scheme != "http" && scheme != "https") {
+            return errorResponse("INVALID_URL", "Missing or invalid URL")
+        }
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
+        ctx.lastNavigationError = null
         mainHandler.post { wv.loadUrl(url) }
         // Wait for page to start loading then finish
         delay(100)
         val timeout = (body["timeout"] as? Int) ?: 10000
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeout) {
+            ctx.lastNavigationError?.let { err ->
+                return errorResponse("NAVIGATION_ERROR", err)
+            }
             val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
             if (result["readyState"] == "complete") {
                 return successResponse(
@@ -43,7 +52,35 @@ class NavigationHandler(
             }
             delay(100)
         }
-        return successResponse(mapOf("url" to url, "title" to "", "loadTime" to timeout))
+        // Timeout reached. If the requested page is actually fully loaded, allow
+        // success; otherwise return the last captured navigation error.
+        val finalState = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+        val finalUrl = finalState["url"] as? String
+        if (finalState["readyState"] == "complete" && finalUrl != null && urlsMatch(finalUrl, url)) {
+            return successResponse(
+                mapOf(
+                    "url" to finalUrl,
+                    "title" to (finalState["title"] ?: ""),
+                    "loadTime" to timeout,
+                ),
+            )
+        }
+        val captured = ctx.lastNavigationError
+        if (captured != null) {
+            return errorResponse("NAVIGATION_ERROR", captured)
+        }
+        return errorResponse("TIMEOUT", "Navigation did not complete within ${timeout}ms")
+    }
+
+    private fun urlsMatch(
+        actual: String,
+        requested: String,
+    ): Boolean {
+        if (actual == requested) return true
+        // Normalise trailing slash so "https://example.com" matches "https://example.com/".
+        val a = actual.trimEnd('/')
+        val r = requested.trimEnd('/')
+        return a == r
     }
 
     private suspend fun back(): Map<String, Any?> {

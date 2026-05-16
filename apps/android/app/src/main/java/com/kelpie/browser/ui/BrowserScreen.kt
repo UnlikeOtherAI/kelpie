@@ -76,7 +76,7 @@ fun BrowserScreen(
 ) {
     val browserState = remember { BrowserState() }
     val context = LocalContext.current
-    val tabStore = remember { TabStore(context, handlerContext) }
+    val tabStore = remember { TabStore(context, handlerContext, browserState) }
     val tabs by tabStore.tabs.collectAsState()
     val activeTabId by tabStore.activeTabId.collectAsState()
     val currentUrl by browserState.currentUrl.collectAsState()

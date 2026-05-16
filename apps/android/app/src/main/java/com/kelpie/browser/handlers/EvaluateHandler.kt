@@ -4,6 +4,18 @@ import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+private val evaluateJson =
+    Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
 class EvaluateHandler(
     private val ctx: HandlerContext,
@@ -17,12 +29,41 @@ class EvaluateHandler(
     private suspend fun evaluate(body: Map<String, Any?>): Map<String, Any?> {
         val expression = body["expression"] as? String ?: return errorResponse("MISSING_PARAM", "expression is required")
         return try {
+            // WebView.evaluateJavascript always returns a JSON literal (or "null").
+            // Parse it so the API matches the EvaluateResponse contract
+            // (result: unknown) instead of always returning a raw string.
             val raw = ctx.evaluateJS(expression)
-            successResponse(mapOf("result" to raw))
+            val parsed = parseEvaluateResult(raw)
+            successResponse(mapOf("result" to parsed))
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
     }
+
+    private fun parseEvaluateResult(raw: String): Any? {
+        if (raw.isBlank() || raw == "null") return null
+        return try {
+            jsonElementToAny(evaluateJson.parseToJsonElement(raw))
+        } catch (_: Exception) {
+            raw
+        }
+    }
+
+    private fun jsonElementToAny(element: JsonElement): Any? =
+        when (element) {
+            is JsonNull -> null
+            is JsonPrimitive -> {
+                when {
+                    element.isString -> element.content
+                    element.content == "true" -> true
+                    element.content == "false" -> false
+                    element.content.contains('.') -> element.content.toDoubleOrNull() ?: element.content
+                    else -> element.content.toIntOrNull() ?: element.content.toLongOrNull() ?: element.content
+                }
+            }
+            is JsonObject -> element.entries.associate { (k, v) -> k to jsonElementToAny(v) }
+            is JsonArray -> element.map { jsonElementToAny(it) }
+        }
 
     private suspend fun waitForElement(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: return errorResponse("MISSING_PARAM", "selector is required")

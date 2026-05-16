@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 class TabStore(
     private val context: Context,
     private val handlerContext: HandlerContext,
+    private val browserState: BrowserState,
 ) {
     private val _tabs = MutableStateFlow<List<BrowserTab>>(emptyList())
     val tabs: StateFlow<List<BrowserTab>> = _tabs
@@ -65,7 +66,7 @@ class TabStore(
         if (_tabs.value.size == 1) {
             val replacement = createTab()
             val currentTab = _tabs.value.first()
-            currentTab.webView.destroy()
+            destroyWebView(currentTab.webView)
             _tabs.value = listOf(replacement)
             _activeTabId.value = replacement.id
             persistSession()
@@ -74,7 +75,7 @@ class TabStore(
 
         val removed = _tabs.value[index]
         _tabs.value = _tabs.value.filterNot { it.id == id }
-        removed.webView.destroy()
+        destroyWebView(removed.webView)
         if (_activeTabId.value == id) {
             _activeTabId.value = _tabs.value[minOf(index, _tabs.value.size - 1)].id
         }
@@ -88,6 +89,17 @@ class TabStore(
         }
     }
 
+    /**
+     * Destroys every tab's WebView. Call this from the Activity's onDestroy so per-tab WebView,
+     * JavaScript interface, and WebChromeClient references do not leak across Activity recreation.
+     */
+    fun destroyAllTabs() {
+        val snapshot = _tabs.value
+        _tabs.value = emptyList()
+        _activeTabId.value = null
+        snapshot.forEach { destroyWebView(it.webView) }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun createTab(isStartPage: Boolean = true): BrowserTab {
         val webView =
@@ -99,10 +111,20 @@ class TabStore(
                 settings.setSupportMultipleWindows(false)
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.userAgentString = BROWSER_USER_AGENT
-                addJavascriptInterface(JsBridge(handlerContext), "KelpieBridge")
+                addJavascriptInterface(JsBridge(handlerContext), JS_BRIDGE_NAME)
                 WebSocketHandler.installBridge(this)
             }
-        return BrowserTab(webView = webView, isStartPage = isStartPage)
+        val tab = BrowserTab(webView = webView, isStartPage = isStartPage)
+        installTabWebViewClients(webView, tab, this, browserState, handlerContext)
+        return tab
+    }
+
+    private fun destroyWebView(webView: WebView) {
+        try {
+            webView.removeJavascriptInterface(JS_BRIDGE_NAME)
+        } catch (_: Exception) {
+        }
+        webView.destroy()
     }
 
     private fun restoredTabs(urls: List<String>): List<BrowserTab> =
@@ -120,6 +142,7 @@ class TabStore(
     companion object {
         private const val PREFS_NAME = "kelpie_prefs"
         private const val KEY_HIDE_WELCOME = "hide_welcome_card"
+        private const val JS_BRIDGE_NAME = "KelpieBridge"
         private const val BROWSER_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Version/131.0.0.0 Mobile Safari/537.36"
