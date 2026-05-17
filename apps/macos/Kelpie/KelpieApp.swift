@@ -157,7 +157,6 @@ private struct BrowserCommands: Commands {
     @ObservedObject var serverState: ServerState
     let browserState: BrowserState
     let rendererState: RendererState
-    let tabStore: TabStore
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
@@ -228,8 +227,7 @@ private struct BrowserCommands: Commands {
         KelpieApp.openNewWindow(
             browserState: browserState,
             serverState: serverState,
-            rendererState: rendererState,
-            tabStore: tabStore
+            rendererState: rendererState
         )
     }
 
@@ -247,7 +245,6 @@ struct KelpieApp: App {
     @StateObject private var browserState = BrowserState()
     @StateObject private var rendererState = RendererState()
     @StateObject private var serverState: ServerState
-    @StateObject private var tabStore = TabStore()
 
     init() {
         let launchPort = Self.launchPortArgument() ?? 8420
@@ -261,8 +258,7 @@ struct KelpieApp: App {
                 browserState: browserState,
                 serverState: serverState,
                 rendererState: rendererState,
-                viewportState: serverState.viewportState,
-                tabStore: tabStore
+                viewportState: serverState.viewportState
             )
             .onAppear { startServices() }
             .frame(
@@ -274,8 +270,7 @@ struct KelpieApp: App {
             BrowserCommands(
                 serverState: serverState,
                 browserState: browserState,
-                rendererState: rendererState,
-                tabStore: tabStore
+                rendererState: rendererState
             )
         }
     }
@@ -292,21 +287,20 @@ struct KelpieApp: App {
     }
 
     /// Opens an additional window backed by the **same** ServerState, BrowserState,
-    /// RendererState, and TabStore as the primary window. All windows share a single
-    /// HTTP server, mDNS advertisement, and tab list — they are alternate views into
-    /// the same browser session, not isolated instances.
+    /// and RendererState as the primary window, but with its **own** TabStore. All
+    /// windows share a single HTTP server and mDNS advertisement, but each owns
+    /// its tab list — HTTP handlers route `(windowId, tabId)` requests to the
+    /// right window via `WindowRegistry`.
     fileprivate static func openNewWindow(
         browserState: BrowserState,
         serverState: ServerState,
-        rendererState: RendererState,
-        tabStore: TabStore
+        rendererState: RendererState
     ) {
         let contentView = BrowserView(
             browserState: browserState,
             serverState: serverState,
             rendererState: rendererState,
-            viewportState: serverState.viewportState,
-            tabStore: tabStore
+            viewportState: serverState.viewportState
         )
         .frame(
             minWidth: ViewportState.minimumShellSize.width,

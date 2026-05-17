@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+<!--
+  KelpieHelper is the CEF (Chromium Embedded Framework) subprocess. CEF spawns
+  multiple helper processes per browser (Renderer, GPU, Plugin, Alerts) by
+  re-launching this executable with different command-line switches.
+
+  Each entitlement below is required by Chromium's subprocess model:
+
+  - allow-jit: V8 generates and executes JIT machine code at runtime. Without
+    this, every JS evaluation traps as W^X violation under hardened runtime.
+  - allow-unsigned-executable-memory: Chromium maps JIT pages as RWX before
+    transitioning them to RX. Hardened runtime blocks the initial allocation
+    unless this is set.
+  - disable-library-validation: CEF and its helper bundles ship as ad-hoc
+    signed (`codesign -s -`) frameworks loaded from the app's Frameworks
+    directory at runtime. Library validation refuses to load any framework
+    that wasn't signed with the same Team ID as the host binary. Until we ship
+    a notarised, fully Apple-signed CEF distribution, this stays on.
+  - network.client: CEF subprocesses connect back to the parent via the Mach
+    rendezvous server; the GPU helper also opens local sockets.
+
+  To verify these are still needed:
+    1. Comment one out, rebuild, then launch Kelpie and switch the renderer to
+       Chromium via the toolbar.
+    2. The helper will fail to launch and Console.app will log a clear
+       sandbox/codesign rejection naming the missing entitlement.
+    3. Re-enable and rebuild before committing.
+
+  Do NOT add any of these to the main app's `Kelpie.entitlements`. The host
+  process has no JIT or unsigned-library needs; only the CEF subprocess does.
+-->
 <dict>
-    <!-- CEF renderer subprocess: needs JIT for V8 and library validation
-         disabled to load the CEF framework. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>

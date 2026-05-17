@@ -13,47 +13,89 @@ final class HandlerContext {
     var annotationPageURL: String?
     var annotationElementCount: Int?
 
-    /// Populated by BrowserView so tab handlers can drive the full tab lifecycle.
-    var tabStore: TabStore?
-    var onNewTab: (() -> Tab)?
-    var onSwitchTab: ((UUID) -> Void)?
-    var onCloseTab: ((UUID) -> Void)?
-    var onWillLoad: (() -> Void)?
     var sharedCookiePoller: Timer?
     var lastSharedCookieSignature: String = ""
     var lastSharedCookieModifiedAt: Date?
 
     init() {}
 
-    // MARK: - Per-tab renderer resolution
+    // MARK: - Window/tab resolution
 
-    /// Resolves the renderer for a specific tab, or falls back to the active tab.
-    /// When multiple tabs exist and no tabId is provided, returns an error
-    /// so LLMs are forced to be explicit about which tab they target.
-    func resolveRenderer(tabId: String?) throws -> any RendererEngine {
+    /// Look up the window the request targets. Resolution order:
+    /// 1. `windowId` body field if present (returns `nil` for unknown ids so
+    ///    the caller can surface `WINDOW_NOT_FOUND`).
+    /// 2. The window that owns the supplied `tabId`.
+    /// 3. The current key/main window (the user's focused shell).
+    func resolveWindow(windowId: String?, tabId: String?) -> WindowRegistry.Entry? {
+        WindowRegistry.shared.resolveEntry(windowId: windowId, tabId: tabId)
+    }
+
+    /// Tab store for the window resolved from `windowId`/`tabId`.
+    func tabStore(windowId: String?, tabId: String?) -> TabStore? {
+        resolveWindow(windowId: windowId, tabId: tabId)?.tabStore
+    }
+
+    /// Resolves the renderer for a specific tab in a specific window. Multi-
+    /// tab windows reject empty `tabId` so LLMs are forced to be explicit
+    /// about which tab they target.
+    func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        if let windowId, WindowRegistry.shared.entry(for: windowId) == nil {
+            throw HandlerError.windowNotFound(windowId)
+        }
+
         guard let tabId else {
-            // No tabId: auto-select if exactly one tab, otherwise require it
-            if let store = tabStore, store.tabs.count > 1 {
+            // No tabId: auto-select if the resolved window has exactly one tab,
+            // otherwise require explicit targeting.
+            let entry = resolveWindow(windowId: windowId, tabId: nil)
+            if let store = entry?.tabStore, store.tabs.count > 1 {
                 let listing = store.tabs.map { tab in
                     "\(tab.id.uuidString)  \(tab.title)  \(tab.currentURL)"
                 }.joined(separator: "\n")
                 throw HandlerError.tabRequired(listing)
             }
+            if let tab = entry?.tabStore.activeTab {
+                return tab.renderer
+            }
             guard let renderer else { throw HandlerError.noWebView }
             return renderer
         }
+
         guard let uuid = UUID(uuidString: tabId) else {
             throw HandlerError.tabNotFound(tabId)
         }
-        guard let tab = tabStore?.tabs.first(where: { $0.id == uuid }) else {
-            throw HandlerError.tabNotFound(tabId)
+
+        // If windowId is explicit, the tab must live in that window.
+        if let windowId,
+           let entry = WindowRegistry.shared.entry(for: windowId) {
+            guard let tab = entry.tabStore.tabs.first(where: { $0.id == uuid }) else {
+                throw HandlerError.tabNotFound(tabId)
+            }
+            return tab.renderer
         }
-        return tab.renderer
+
+        // Otherwise locate the tab in any window.
+        if let entry = WindowRegistry.shared.entry(containingTabId: uuid) {
+            // swiftlint:disable:next force_unwrapping
+            return entry.tabStore.tabs.first(where: { $0.id == uuid })!.renderer
+        }
+        throw HandlerError.tabNotFound(tabId)
+    }
+
+    /// Legacy single-window form retained for handlers that have not yet been
+    /// updated to accept a `windowId`. Routes through the registry using the
+    /// front-window default.
+    func resolveRenderer(tabId: String?) throws -> any RendererEngine {
+        try resolveRenderer(windowId: nil, tabId: tabId)
     }
 
     /// Extract tabId from a request body dict.
     nonisolated static func tabId(from body: [String: Any]) -> String? {
         body["tabId"] as? String
+    }
+
+    /// Extract windowId from a request body dict.
+    nonisolated static func windowId(from body: [String: Any]) -> String? {
+        body["windowId"] as? String
     }
 
     /// Convenience: evaluate JS on a specific tab.
@@ -322,7 +364,7 @@ final class HandlerContext {
     }
 
     func load(url: URL) {
-        onWillLoad?()
+        WindowRegistry.shared.defaultEntry()?.callbacks?.onWillLoad()
         reset3DInspectorForNavigation()
         renderer?.load(url: url)
     }
@@ -422,6 +464,7 @@ enum HandlerError: Error {
     case platformNotSupported(String)
     case tabNotFound(String)
     case tabRequired(String)
+    case windowNotFound(String)
 }
 
 func tabErrorResponse(from error: Error) -> [String: Any]? {
@@ -433,6 +476,11 @@ func tabErrorResponse(from error: Error) -> [String: Any]? {
         return errorResponse(
             code: "TAB_REQUIRED",
             message: "Multiple tabs open — specify \"tabId\" in your request. Available tabs:\n\(listing)"
+        )
+    case .windowNotFound(let windowId):
+        return errorResponse(
+            code: "WINDOW_NOT_FOUND",
+            message: "No window with id \"\(windowId)\". Call get-tabs without windowId to list available windows."
         )
     case .rendererHidden:
         return errorResponse(
@@ -464,123 +512,4 @@ func successResponse(_ data: [String: Any] = [:]) -> [String: Any] {
     return result
 }
 
-// MARK: - Cookie management (cross-renderer sync)
-
-extension HandlerContext {
-    func allCookies() async -> [HTTPCookie] {
-        guard let renderer else { return [] }
-        if renderer.engineName == "chromium" {
-            return SharedCookieJar.load().cookies
-        }
-        return await renderer.allCookies()
-    }
-
-    func setCookie(_ cookie: HTTPCookie) async {
-        guard let renderer else { return }
-        await renderer.setCookies([cookie])
-
-        if renderer.engineName == "chromium" {
-            var merged = SharedCookieJar.load().cookies
-            merged.removeAll { existing in
-                existing.domain == cookie.domain &&
-                existing.path == cookie.path &&
-                existing.name == cookie.name
-            }
-            merged.append(cookie)
-            SharedCookieJar.save(cookies: merged)
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
-    }
-
-    func deleteCookie(_ cookie: HTTPCookie) async {
-        guard let renderer else { return }
-        await renderer.deleteCookie(cookie)
-
-        if renderer.engineName == "chromium" {
-            var merged = SharedCookieJar.load().cookies
-            merged.removeAll { existing in
-                existing.domain == cookie.domain &&
-                existing.path == cookie.path &&
-                existing.name == cookie.name
-            }
-            SharedCookieJar.save(cookies: merged)
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
-    }
-
-    func deleteAllCookies() async {
-        guard let renderer else { return }
-        await renderer.deleteAllCookies()
-
-        if renderer.engineName == "chromium" {
-            SharedCookieJar.save(cookies: [])
-            let snapshot = SharedCookieJar.load()
-            lastSharedCookieSignature = snapshot.signature
-            lastSharedCookieModifiedAt = snapshot.modifiedAt
-            return
-        }
-
-        await persistRendererCookiesToSharedJar()
-    }
-
-    func syncSharedCookiesIntoRenderer(force: Bool = false) async {
-        guard let renderer else { return }
-        let snapshot = SharedCookieJar.load()
-
-        if !force,
-           snapshot.signature == lastSharedCookieSignature,
-           snapshot.modifiedAt == lastSharedCookieModifiedAt {
-            return
-        }
-
-        if renderer.engineName == "chromium" && snapshot.cookies.isEmpty {
-            // CEF cookie deletion is unstable during renderer switches. The
-            // shared jar remains the source of truth, and Chromium no longer
-            // tries to wipe its store during activation.
-        } else if snapshot.modifiedAt != nil && snapshot.cookies.isEmpty {
-            await renderer.deleteAllCookies()
-        } else if !snapshot.cookies.isEmpty {
-            await renderer.setCookies(snapshot.cookies)
-        }
-        lastSharedCookieSignature = snapshot.signature
-        lastSharedCookieModifiedAt = snapshot.modifiedAt
-    }
-
-    func persistRendererCookiesToSharedJar() async {
-        guard let renderer else { return }
-        guard renderer.engineName != "chromium" else { return }
-        let cookies = await renderer.allCookies()
-        let signature = SharedCookieJar.signature(for: cookies)
-        if signature == lastSharedCookieSignature { return }
-
-        SharedCookieJar.save(cookies: cookies)
-        let snapshot = SharedCookieJar.load()
-        lastSharedCookieSignature = snapshot.signature
-        lastSharedCookieModifiedAt = snapshot.modifiedAt
-    }
-
-    func startSharedCookieSync() {
-        sharedCookiePoller?.invalidate()
-        sharedCookiePoller = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.syncSharedCookiesIntoRenderer()
-                await self?.persistRendererCookiesToSharedJar()
-            }
-        }
-    }
-
-    func stopSharedCookieSync() {
-        sharedCookiePoller?.invalidate()
-        sharedCookiePoller = nil
-    }
-}
+// Cookie sync extension lives in `HandlerContext+Cookies.swift`.

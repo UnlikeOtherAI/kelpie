@@ -395,6 +395,7 @@ struct BrowserManagementHandler {
     private func tabInfo(_ tab: BrowserTab, tabStore: TabStore) -> [String: Any] {
         [
             "id": tab.id.uuidString,
+            "windowId": "main",
             "url": tab.currentURL,
             "title": tab.pageTitle,
             "active": tab.id == tabStore.activeBrowserTabID,
@@ -408,15 +409,17 @@ struct BrowserManagementHandler {
             guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
             let tab: [String: Any] = [
                 "id": "0",
+                "windowId": "main",
                 "url": webView.url?.absoluteString ?? "",
                 "title": webView.title ?? "",
                 "active": true,
                 "isLoading": false
             ]
-            return successResponse(["tabs": [tab], "count": 1, "activeTab": "0"])
+            return successResponse(["windowId": "main", "tabs": [tab], "count": 1, "activeTab": "0"])
         }
         let tabs = tabStore.tabs.map { tabInfo($0, tabStore: tabStore) }
         return successResponse([
+            "windowId": "main",
             "tabs": tabs,
             "count": tabs.count,
             "activeTab": tabStore.activeBrowserTabID?.uuidString ?? ""
@@ -430,7 +433,12 @@ struct BrowserManagementHandler {
         }
         let url = body["url"] as? String
         let tab = tabStore.addBrowserTab(url: url)
-        return successResponse(["tab": tabInfo(tab, tabStore: tabStore), "tabCount": tabStore.tabs.count])
+        return successResponse([
+            "tabId": tab.id.uuidString,
+            "tab": tabInfo(tab, tabStore: tabStore),
+            "tabCount": tabStore.tabs.count,
+            "windowId": "main"
+        ])
     }
 
     @MainActor
@@ -448,7 +456,7 @@ struct BrowserManagementHandler {
         guard let activeTab = tabStore.activeBrowserTab else {
             return errorResponse(code: "SWITCH_FAILED", message: "Tab switch failed")
         }
-        return successResponse(["tab": tabInfo(activeTab, tabStore: tabStore)])
+        return successResponse(["tab": tabInfo(activeTab, tabStore: tabStore), "windowId": "main"])
     }
 
     @MainActor
@@ -463,7 +471,11 @@ struct BrowserManagementHandler {
             return errorResponse(code: "TAB_NOT_FOUND", message: "Tab \(idString) not found")
         }
         tabStore.closeBrowserTab(id: id)
-        return successResponse(["closed": idString, "tabCount": tabStore.tabs.count])
+        return successResponse([
+            "closed": idString,
+            "tabCount": tabStore.tabs.count,
+            "windowId": "main"
+        ])
     }
 
     private func parseTabID(_ body: [String: Any]) -> String? {

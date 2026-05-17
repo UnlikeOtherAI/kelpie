@@ -230,21 +230,52 @@ Tab management is **WebKit-only**. In Chromium (CEF) mode, all tab endpoints ret
 
 Switch to WebKit first: `kelpie_set_renderer({"engine": "webkit"})`
 
+### Per-window tab routing (macOS)
+
+macOS supports multiple browser windows that share one HTTP server. Each
+window owns its own tab list, so a `tabId` value is only unique within a
+single window. To target a specific window, include an optional `windowId`
+field in any tab-related request body.
+
+- `get-tabs` without `windowId`: returns a `windows` array containing every
+  window's tabs when more than one window is open, otherwise the single
+  window's tab list as before.
+- `get-tabs` with `windowId`: returns only that window's tabs.
+- `new-tab`, `switch-tab`, `close-tab` with `windowId`: targets that window.
+- `new-tab`, `switch-tab`, `close-tab` without `windowId`: target the
+  currently focused (key) window. If a `tabId` is supplied without a
+  `windowId`, the server locates the window that owns that tab.
+- Unknown `windowId` values respond with `WINDOW_NOT_FOUND`.
+
+iOS and Android always report `windowId: "main"` because they only support a
+single browser window.
+
 ### `getTabs`
 List all open tabs.
 
 ```json
 POST /v1/get-tabs
+{"windowId": "<uuid>"}              // optional; macOS only
 
-Response:
+Response (single window or `windowId` supplied):
 {
   "success": true,
+  "windowId": "<uuid>",
   "tabs": [
-    {"id": "550e8400-e29b-41d4-a716-446655440000", "url": "https://example.com", "title": "Example", "active": true, "isLoading": false},
-    {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "url": "https://example.com/about", "title": "About", "active": false, "isLoading": false}
+    {"id": "550e8400-e29b-41d4-a716-446655440000", "windowId": "<uuid>", "url": "https://example.com", "title": "Example", "active": true, "isLoading": false},
+    {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>", "url": "https://example.com/about", "title": "About", "active": false, "isLoading": false}
   ],
   "count": 2,
   "activeTab": "550e8400-e29b-41d4-a716-446655440000"
+}
+
+Response (macOS only, multiple windows open, no `windowId`):
+{
+  "success": true,
+  "windows": [
+    {"windowId": "<uuid-1>", "tabs": [...], "count": 1, "activeTab": "..."},
+    {"windowId": "<uuid-2>", "tabs": [...], "count": 2, "activeTab": "..."}
+  ]
 }
 ```
 
@@ -253,27 +284,32 @@ Open a new tab, optionally navigating to a URL.
 
 ```json
 POST /v1/new-tab
-{"url": "https://example.com/page"}  // optional
+{"url": "https://example.com/page", "windowId": "<uuid>"}  // both optional
 
 Response:
 {
   "success": true,
-  "tab": {"id": "...", "url": "https://example.com/page", "title": ""},
-  "tabCount": 3
+  "tabId": "...",
+  "tab": {"id": "...", "windowId": "<uuid>", "url": "https://example.com/page", "title": ""},
+  "tabCount": 3,
+  "windowId": "<uuid>"
 }
 ```
+
+`tabId` is the identifier to pass into later requests. It is the same value as `tab.id`.
 
 ### `switchTab`
 Switch the active tab by UUID.
 
 ```json
 POST /v1/switch-tab
-{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"}
+{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>"}  // windowId optional
 
 Response:
 {
   "success": true,
-  "tab": {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "url": "https://example.com/about", "title": "About", "active": true}
+  "tab": {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>", "url": "https://example.com/about", "title": "About", "active": true},
+  "windowId": "<uuid>"
 }
 ```
 
@@ -282,13 +318,14 @@ Close a tab by UUID.
 
 ```json
 POST /v1/close-tab
-{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"}
+{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>"}  // windowId optional
 
 Response:
 {
   "success": true,
   "closed": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-  "tabCount": 1
+  "tabCount": 1,
+  "windowId": "<uuid>"
 }
 ```
 

@@ -58,7 +58,7 @@ struct BrowserManagementHandler {
         }
 
         // Tabs
-        router.register("get-tabs") { _ in await getTabs() }
+        router.register("get-tabs") { body in await getTabs(body) }
         router.register("new-tab") { body in await newTab(body) }
         router.register("switch-tab") { body in await switchTab(body) }
         router.register("close-tab") { body in await closeTab(body) }
@@ -405,17 +405,44 @@ struct BrowserManagementHandler {
     // MARK: - Tabs
 
     @MainActor
-    private func getTabs() async -> [String: Any] {
+    private func getTabs(_ body: [String: Any]) async -> [String: Any] {
         if context.renderer?.engineName == "chromium" {
             return context.cefUnsupportedError(feature: "Tab management")
         }
-        guard let store = context.tabStore else {
-            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        let requestedWindowId = HandlerContext.windowId(from: body)
+
+        // Multi-window listing: when no windowId is supplied, return every
+        // window's tabs so LLMs can discover which `windowId` to target.
+        if requestedWindowId == nil {
+            let entries = WindowRegistry.shared.allEntries()
+            if entries.count > 1 {
+                let windows = entries.map { entry -> [String: Any] in
+                    let tabs = entry.tabStore.tabs.map { tab in
+                        tabInfoPayload(for: tab, activeID: entry.tabStore.activeTabID, windowId: entry.id)
+                    }
+                    return [
+                        "windowId": entry.id,
+                        "tabs": tabs,
+                        "count": tabs.count,
+                        "activeTab": entry.tabStore.activeTabID?.uuidString ?? ""
+                    ]
+                }
+                return successResponse(["windows": windows])
+            }
         }
+
+        guard let entry = WindowRegistry.shared.resolveEntry(windowId: requestedWindowId, tabId: nil) else {
+            return errorResponse(
+                code: "WINDOW_NOT_FOUND",
+                message: "No window with id \"\(requestedWindowId ?? "")\""
+            )
+        }
+        let store = entry.tabStore
         let tabs: [[String: Any]] = store.tabs.map { tab in
-            tabInfoPayload(for: tab, activeID: store.activeTabID)
+            tabInfoPayload(for: tab, activeID: store.activeTabID, windowId: entry.id)
         }
         return successResponse([
+            "windowId": entry.id,
             "tabs": tabs,
             "count": tabs.count,
             "activeTab": store.activeTabID?.uuidString ?? ""
@@ -423,9 +450,10 @@ struct BrowserManagementHandler {
     }
 
     @MainActor
-    private func tabInfoPayload(for tab: Tab, activeID: UUID?) -> [String: Any] {
+    private func tabInfoPayload(for tab: Tab, activeID: UUID?, windowId: String) -> [String: Any] {
         [
             "id": tab.id.uuidString,
+            "windowId": windowId,
             "url": tab.currentURL,
             "title": tab.title,
             "active": tab.id == activeID,
@@ -438,19 +466,26 @@ struct BrowserManagementHandler {
         if context.renderer?.engineName == "chromium" {
             return context.cefUnsupportedError(feature: "Tab management")
         }
-        guard let makeTab = context.onNewTab else {
-            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
+        let requestedWindowId = HandlerContext.windowId(from: body)
+        guard let entry = WindowRegistry.shared.resolveEntry(windowId: requestedWindowId, tabId: nil),
+              let callbacks = entry.callbacks else {
+            return errorResponse(
+                code: requestedWindowId == nil ? "NO_TAB_STORE" : "WINDOW_NOT_FOUND",
+                message: requestedWindowId == nil
+                    ? "Tab store not initialised"
+                    : "No window with id \"\(requestedWindowId ?? "")\""
+            )
         }
-        let tab = makeTab()
+        let tab = callbacks.onNewTab()
         if let urlString = body["url"] as? String,
            let url = URL(string: urlString) {
-            context.load(url: url)
+            tab.renderer.load(url: url)
         }
-        let activeID = context.tabStore?.activeTabID ?? tab.id
-        let tabCount = context.tabStore?.tabs.count ?? 1
         return successResponse([
-            "tab": tabInfoPayload(for: tab, activeID: activeID),
-            "tabCount": tabCount
+            "tabId": tab.id.uuidString,
+            "tab": tabInfoPayload(for: tab, activeID: entry.tabStore.activeTabID, windowId: entry.id),
+            "tabCount": entry.tabStore.tabs.count,
+            "windowId": entry.id
         ])
     }
 
@@ -459,23 +494,30 @@ struct BrowserManagementHandler {
         if context.renderer?.engineName == "chromium" {
             return context.cefUnsupportedError(feature: "Tab switching")
         }
-        guard let store = context.tabStore,
-              let switchFn = context.onSwitchTab else {
-            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
-        }
         guard let tabIdStr = body["tabId"] as? String,
               let tabId = UUID(uuidString: tabIdStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
         }
-        guard store.tabs.contains(where: { $0.id == tabId }) else {
+        let requestedWindowId = HandlerContext.windowId(from: body)
+        guard let entry = WindowRegistry.shared.resolveEntry(windowId: requestedWindowId, tabId: tabIdStr),
+              let callbacks = entry.callbacks else {
+            return errorResponse(
+                code: requestedWindowId == nil ? "TAB_NOT_FOUND" : "WINDOW_NOT_FOUND",
+                message: requestedWindowId == nil
+                    ? "No tab with id \(tabIdStr)"
+                    : "No window with id \"\(requestedWindowId ?? "")\""
+            )
+        }
+        guard entry.tabStore.tabs.contains(where: { $0.id == tabId }) else {
             return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \(tabIdStr)")
         }
-        switchFn(tabId)
-        guard let tab = store.activeTab else {
+        callbacks.onSwitchTab(tabId)
+        guard let tab = entry.tabStore.activeTab else {
             return errorResponse(code: "SWITCH_FAILED", message: "Tab switch failed")
         }
         return successResponse([
-            "tab": tabInfoPayload(for: tab, activeID: store.activeTabID)
+            "tab": tabInfoPayload(for: tab, activeID: entry.tabStore.activeTabID, windowId: entry.id),
+            "windowId": entry.id
         ])
     }
 
@@ -484,19 +526,28 @@ struct BrowserManagementHandler {
         if context.renderer?.engineName == "chromium" {
             return context.cefUnsupportedError(feature: "Tab management")
         }
-        guard let store = context.tabStore,
-              let closeFn = context.onCloseTab else {
-            return errorResponse(code: "NO_TAB_STORE", message: "Tab store not initialised")
-        }
         guard let tabIdStr = body["tabId"] as? String,
               let tabId = UUID(uuidString: tabIdStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "tabId (UUID string) required")
         }
-        guard store.tabs.contains(where: { $0.id == tabId }) else {
+        let requestedWindowId = HandlerContext.windowId(from: body)
+        guard let entry = WindowRegistry.shared.resolveEntry(windowId: requestedWindowId, tabId: tabIdStr),
+              let callbacks = entry.callbacks else {
+            return errorResponse(
+                code: requestedWindowId == nil ? "TAB_NOT_FOUND" : "WINDOW_NOT_FOUND",
+                message: requestedWindowId == nil
+                    ? "No tab with id \(tabIdStr)"
+                    : "No window with id \"\(requestedWindowId ?? "")\""
+            )
+        }
+        guard entry.tabStore.tabs.contains(where: { $0.id == tabId }) else {
             return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \(tabIdStr)")
         }
-        closeFn(tabId)
-        let postCloseCount = store.tabs.count
-        return successResponse(["closed": tabIdStr, "tabCount": postCloseCount])
+        callbacks.onCloseTab(tabId)
+        return successResponse([
+            "closed": tabIdStr,
+            "tabCount": entry.tabStore.tabs.count,
+            "windowId": entry.id
+        ])
     }
 }

@@ -478,11 +478,11 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
     // internal threads cleanly before this bridge is released. Without this,
     // releasing the browser handle leaves CEF's internal state half-alive,
     // and creating a new browser (on renderer switch) collides with it.
-    cef_browser_t *browser = [self activeBrowser];
-    if (browser == nullptr) { return; }
-    cef_browser_host_t *host = browser->get_host ? browser->get_host(browser) : nullptr;
+    cef_browser_host_t *host = CopyBrowserHost([self activeBrowser]);
     if (host == nullptr) { return; }
-    host->close_browser(host, 1); // force=1: skip JS unload, close immediately
+    if (host->close_browser != nullptr) {
+        host->close_browser(host, 1); // force=1: skip JS unload, close immediately
+    }
     host->base.release(&host->base);
     // Drain CEF's message queue so the close events are processed before
     // the caller releases this object.
@@ -492,9 +492,7 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
 }
 
 - (void)setHidden:(BOOL)hidden {
-    cef_browser_t *browser = [self activeBrowser];
-    if (browser == nullptr) { return; }
-    cef_browser_host_t *host = browser->get_host ? browser->get_host(browser) : nullptr;
+    cef_browser_host_t *host = CopyBrowserHost([self activeBrowser]);
     if (host == nullptr) { return; }
     if (host->was_hidden != nullptr) {
         host->was_hidden(host, hidden ? 1 : 0);

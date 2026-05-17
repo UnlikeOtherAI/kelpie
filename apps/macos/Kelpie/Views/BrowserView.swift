@@ -7,7 +7,10 @@ struct BrowserView: View {
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
     @ObservedObject var aiState = AIState.shared
-    @ObservedObject var tabStore: TabStore
+    /// Each window owns its own tab list. The app-level `KelpieApp` does NOT
+    /// inject a shared store — that was the source of the HTTP-routing bug
+    /// where `tabId=X` in one window resolved against another window's tabs.
+    @StateObject var tabStore = TabStore()
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
@@ -27,6 +30,9 @@ struct BrowserView: View {
     @State var welcomePresentationSource: WelcomeCardPresentationSource = .automatic
     @AppStorage("skipInsecureWarning") var skipInsecureWarning = false
     @State var pendingInsecureURL: URL?
+    /// Stable per-window id used by `WindowRegistry` so HTTP handlers can
+    /// route `(windowId, tabId)` requests to the correct shell.
+    @State var windowId: String = UUID().uuidString
 
     var body: some View {
         ZStack {
@@ -230,6 +236,10 @@ struct BrowserView: View {
             .frame(width: 0, height: 0)
         )
         .background(
+            WindowRegistrationBridge(windowId: windowId, tabStore: tabStore)
+                .frame(width: 0, height: 0)
+        )
+        .background(
             BrowserCommandBridge(
                 actions: BrowserCommandActions(
                     hardReload: { serverState.handlerContext.hardReloadPage() },
@@ -278,28 +288,10 @@ struct BrowserView: View {
             } else {
                 connectNewTab(tabStore.tabs[0])
             }
-            // Wire TabStore into HandlerContext for MCP tab operations
-            serverState.handlerContext.tabStore = tabStore
-            serverState.handlerContext.onNewTab = { [self] in
-                let tab = tabStore.addTab()
-                connectNewTab(tab)
-                return tab
-            }
-            serverState.handlerContext.onSwitchTab = { [self] id in
-                tabStore.selectTab(id: id)
-                if let tab = tabStore.activeTab {
-                    activateTab(tab)
-                }
-            }
-            serverState.handlerContext.onCloseTab = { [self] id in
-                tabStore.closeTab(id: id)
-                if let tab = tabStore.activeTab {
-                    activateTab(tab)
-                }
-            }
-            serverState.handlerContext.onWillLoad = { [weak tabStore] in
-                tabStore?.activeTab?.isStartPage = false
-            }
+            // Register this window with the registry and install its
+            // tab-mutation callbacks so HTTP handlers can route per-window
+            // requests here.
+            registerWindow()
             // Remove focus from URL bar on launch
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
@@ -311,6 +303,9 @@ struct BrowserView: View {
                 }
                 await connectRendererState()
             }
+        }
+        .onDisappear {
+            WindowRegistry.shared.unregister(id: windowId)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeTabID)

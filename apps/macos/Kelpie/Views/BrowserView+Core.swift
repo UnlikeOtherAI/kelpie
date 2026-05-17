@@ -117,6 +117,44 @@ extension BrowserView {
         serverState.handlerContext.load(url: url)
     }
 
+    /// Installs this window's tab-mutation callbacks in `WindowRegistry` so
+    /// HTTP handlers can drive new-tab/switch-tab/close-tab against the
+    /// correct shell. The window pointer is registered separately by the
+    /// `WindowRegistrationBridge` once SwiftUI attaches a hosting `NSWindow`.
+    /// Safe to call repeatedly; later calls overwrite any stale callbacks.
+    @MainActor
+    func registerWindow() {
+        // Ensure the entry exists even before the bridge fires so callbacks
+        // can be installed immediately. The window reference is filled in by
+        // the bridge when the NSWindow becomes available.
+        WindowRegistry.shared.register(id: windowId, window: nil, tabStore: tabStore)
+        WindowRegistry.shared.installCallbacks(
+            for: windowId,
+            callbacks: WindowRegistry.Callbacks(
+                onNewTab: { [self] in
+                    let tab = tabStore.addTab()
+                    connectNewTab(tab)
+                    return tab
+                },
+                onSwitchTab: { [self] id in
+                    tabStore.selectTab(id: id)
+                    if let tab = tabStore.activeTab {
+                        activateTab(tab)
+                    }
+                },
+                onCloseTab: { [self] id in
+                    tabStore.closeTab(id: id)
+                    if let tab = tabStore.activeTab {
+                        activateTab(tab)
+                    }
+                },
+                onWillLoad: { [weak tabStore] in
+                    tabStore?.activeTab?.isStartPage = false
+                }
+            )
+        )
+    }
+
     func openAIFromMenu() {
         aiPanelTab = aiState.activeModel == nil ? .models : .chat
         isAIPanelOpen = true

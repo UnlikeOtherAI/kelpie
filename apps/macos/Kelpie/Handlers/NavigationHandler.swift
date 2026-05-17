@@ -115,13 +115,16 @@ struct NavigationHandler {
     @MainActor
     private func getCurrentUrl(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
+        let windowId = HandlerContext.windowId(from: body)
         // Prefer the active tab's own stored state — context.renderer may lag
         // behind tab switches, returning a stale inactive tab's URL (issue #17).
-        if tabId == nil, let tab = context.tabStore?.activeTab {
+        if tabId == nil,
+           let store = context.tabStore(windowId: windowId, tabId: nil),
+           let tab = store.activeTab {
             return ["url": tab.currentURL, "title": tab.title]
         }
         do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
+            let renderer = try context.resolveRenderer(windowId: windowId, tabId: tabId)
             return ["url": renderer.currentURL?.absoluteString ?? "", "title": renderer.currentTitle]
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
