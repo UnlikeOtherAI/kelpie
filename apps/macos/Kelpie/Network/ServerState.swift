@@ -17,6 +17,8 @@ final class ServerState: ObservableObject {
     let router = Router()
     let handlerContext = HandlerContext()
     let scriptPlaybackState = ScriptPlaybackState()
+    let pairingStore = PairingStore()
+    lazy var pairingCoordinator = PairApprovalCoordinator(store: pairingStore)
 
     /// The renderer state is supplied to `startHTTPServer(rendererState:)`.
     /// Optional only because the view-model is created before the view layer
@@ -78,12 +80,20 @@ final class ServerState: ObservableObject {
         registerHandlers(rendererState: rendererState)
         let server: HTTPServer
         do {
-            server = try HTTPServer(port: resolvedPort, router: router)
+            server = try HTTPServer(
+                port: resolvedPort,
+                router: router,
+                pairingStore: pairingStore,
+                deviceInfo: deviceInfo
+            )
         } catch {
             print("[ServerState] Failed to construct HTTPServer for port \(resolvedPort): \(error)")
             isServerRunning = false
             isMDNSAdvertising = false
             return
+        }
+        server.onPendingPairChanged = { [weak self] in
+            self?.pairingCoordinator.refresh()
         }
         server.onBonjourStateChange = { [weak self] isAdvertising in
             Task { @MainActor in

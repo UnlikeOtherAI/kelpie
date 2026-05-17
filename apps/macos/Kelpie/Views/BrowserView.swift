@@ -252,6 +252,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(serverState: serverState, rendererState: rendererState, onNavigate: navigate)
         }
+        .pairingDialog(coordinator: serverState.pairingCoordinator)
         .sheet(isPresented: $showBookmarks) {
             BookmarksView(
                 currentTitle: browserState.pageTitle,

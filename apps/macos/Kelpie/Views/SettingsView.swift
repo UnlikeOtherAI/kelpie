@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showHFTokenField = false
     @State private var hfTokenDraft = ""
+    @State private var showPairedClients = false
 
     private var huggingFaceToken: String { aiState.huggingFaceToken }
 
@@ -140,6 +141,18 @@ struct SettingsView: View {
                     row("Port", String(serverState.deviceInfo.port))
                     row("HTTP Server", serverState.isServerRunning ? "Running" : "Stopped")
                     row("mDNS", serverState.isMDNSAdvertising ? "Advertising" : "Stopped")
+
+                    HStack {
+                        Text("Paired Clients").foregroundColor(.secondary)
+                        Spacer()
+                        AppKitPairingButton(
+                            title: "Manage",
+                            style: .normal,
+                            accessibilityID: "settings.paired-clients.manage",
+                            action: { showPairedClients = true }
+                        )
+                        .frame(width: 96, height: 26)
+                    }
                 }
 
                 Section("Connect") {
@@ -179,6 +192,9 @@ struct SettingsView: View {
             .padding()
         }
         .frame(width: 400, height: 600)
+        .sheet(isPresented: $showPairedClients) {
+            PairedClientsView(coordinator: serverState.pairingCoordinator)
+        }
     }
 
     private var activeModelSelection: Binding<String> {
