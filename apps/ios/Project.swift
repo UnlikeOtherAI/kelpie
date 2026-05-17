@@ -25,6 +25,7 @@ let kelpieApp = Target.target(
         .glob("Kelpie/**/*.swift"),
         // Shared from macOS — cross-project source references
         .glob("../macos/Kelpie/Handlers/Snapshot3DBridge.swift"),
+        .glob("../macos/Kelpie/Storage/SecretStore.swift"),
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),

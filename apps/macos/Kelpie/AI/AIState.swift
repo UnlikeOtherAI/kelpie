@@ -73,8 +73,23 @@ final class AIState: ObservableObject {
     @Published private(set) var nativeModelCards: [AINativeModelCard] = []
     @Published private(set) var ollamaModels: [AIOllamaModel] = []
     @Published private(set) var lastError: String?
-    @AppStorage("huggingFaceToken") var huggingFaceToken: String = ""
+    @Published var huggingFaceToken: String {
+        didSet {
+            if huggingFaceToken.isEmpty {
+                SecretStore.shared.remove(SecretKey.huggingFaceToken)
+            } else {
+                SecretStore.shared.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
+            }
+        }
+    }
     var onAuthFailureNavigate: ((URL) -> Void)?
+
+    private enum SecretKey {
+        static let huggingFaceToken = "huggingFaceToken"
+    }
+
+    /// Legacy plaintext UserDefaults key — migrated on first launch then removed.
+    private static let legacyHuggingFaceTokenKey = "huggingFaceToken"
 
     private var serverPort: UInt16?
     private var refreshTask: Task<Void, Never>?
@@ -94,10 +109,29 @@ final class AIState: ObservableObject {
         isAppleSilicon = isArm64
         deviceCapabilities = Self.currentDeviceCapabilities()
         isAvailable = isArm64
+        huggingFaceToken = Self.loadHuggingFaceTokenWithMigration()
         rebuildModelCards()
         refreshTask = Task { [weak self] in
             await self?.refreshLoop()
         }
+    }
+
+    /// Migrates any plaintext HF token previously stored in `UserDefaults`
+    /// (legacy `@AppStorage("huggingFaceToken")`) into `SecretStore` and
+    /// deletes the plaintext copy.
+    private static func loadHuggingFaceTokenWithMigration() -> String {
+        let defaults = UserDefaults.standard
+        let store = SecretStore.shared
+        if let legacy = defaults.string(forKey: legacyHuggingFaceTokenKey) {
+            defaults.removeObject(forKey: legacyHuggingFaceTokenKey)
+            if !legacy.isEmpty {
+                if store.get(SecretKey.huggingFaceToken) == nil {
+                    store.set(SecretKey.huggingFaceToken, value: legacy)
+                }
+                return legacy
+            }
+        }
+        return store.get(SecretKey.huggingFaceToken) ?? ""
     }
 
     func configure(localServerPort: UInt16) {

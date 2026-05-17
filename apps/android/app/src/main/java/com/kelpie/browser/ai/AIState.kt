@@ -1,7 +1,7 @@
 package com.kelpie.browser.ai
 
 import android.content.Context
-import android.content.SharedPreferences
+import com.kelpie.browser.storage.SecretStore
 
 object AIState {
     const val PLATFORM_BACKEND = "platform"
@@ -9,10 +9,10 @@ object AIState {
     const val PLATFORM_MODEL_ID = "platform"
     const val DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434"
 
-    private const val PREFS_NAME = "kelpie_ai"
+    private const val LEGACY_PREFS_NAME = "kelpie_ai"
     private const val KEY_HF_TOKEN = "huggingFaceToken"
 
-    private var prefs: SharedPreferences? = null
+    private var secretStore: SecretStore? = null
 
     var isAvailable: Boolean = false
         private set
@@ -21,15 +21,38 @@ object AIState {
     var ollamaEndpoint: String? = null
 
     var huggingFaceToken: String
-        get() = prefs?.getString(KEY_HF_TOKEN, "") ?: ""
+        get() = secretStore?.get(KEY_HF_TOKEN) ?: ""
         set(value) {
-            prefs?.edit()?.putString(KEY_HF_TOKEN, value)?.apply()
+            val store = secretStore ?: return
+            if (value.isEmpty()) {
+                store.remove(KEY_HF_TOKEN)
+            } else {
+                store.set(KEY_HF_TOKEN, value)
+            }
         }
 
     fun initialize(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val store = SecretStore.get(context)
+        secretStore = store
+        migrateLegacyHfToken(context, store)
         isAvailable = PlatformAIEngine.isAvailable(context)
         backend = PLATFORM_BACKEND
         activeModel = null
+    }
+
+    /**
+     * Move any plaintext HF token previously stored in `SharedPreferences("kelpie_ai")`
+     * into the encrypted [SecretStore] and remove the plaintext copy.
+     */
+    private fun migrateLegacyHfToken(
+        context: Context,
+        store: SecretStore,
+    ) {
+        val legacy = context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+        val plaintext = legacy.getString(KEY_HF_TOKEN, null) ?: return
+        if (plaintext.isNotEmpty() && store.get(KEY_HF_TOKEN) == null) {
+            store.set(KEY_HF_TOKEN, plaintext)
+        }
+        legacy.edit().remove(KEY_HF_TOKEN).apply()
     }
 }

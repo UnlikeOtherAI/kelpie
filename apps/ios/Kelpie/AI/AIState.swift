@@ -9,6 +9,11 @@ final class AIState: ObservableObject {
         static let backend = "ai.backend"
         static let activeModel = "ai.activeModel"
         static let ollamaEndpoint = "ai.ollamaEndpoint"
+        /// Legacy plaintext key — migrated into SecretStore on first launch then removed.
+        static let legacyHuggingFaceToken = "huggingFaceToken"
+    }
+
+    private enum SecretKey {
         static let huggingFaceToken = "huggingFaceToken"
     }
 
@@ -18,7 +23,11 @@ final class AIState: ObservableObject {
 
     @Published var huggingFaceToken: String {
         didSet {
-            UserDefaults.standard.set(huggingFaceToken, forKey: DefaultsKey.huggingFaceToken)
+            if huggingFaceToken.isEmpty {
+                SecretStore.shared.remove(SecretKey.huggingFaceToken)
+            } else {
+                SecretStore.shared.set(SecretKey.huggingFaceToken, value: huggingFaceToken)
+            }
         }
     }
 
@@ -81,7 +90,7 @@ final class AIState: ObservableObject {
         isAvailable = PlatformAIEngine.isAvailable
 
         let defaults = UserDefaults.standard
-        huggingFaceToken = defaults.string(forKey: DefaultsKey.huggingFaceToken) ?? ""
+        huggingFaceToken = Self.loadHuggingFaceTokenWithMigration(defaults: defaults)
         let storedModel = defaults.string(forKey: DefaultsKey.activeModel)
         let storedBackend = defaults.string(forKey: DefaultsKey.backend) ?? "platform"
 
@@ -109,5 +118,21 @@ final class AIState: ObservableObject {
         backend = "ollama"
         activeModel = model
         ollamaEndpoint = endpoint
+    }
+
+    /// Migrates any plaintext HF token previously stored in `UserDefaults`
+    /// into `SecretStore` and deletes the plaintext copy.
+    private static func loadHuggingFaceTokenWithMigration(defaults: UserDefaults) -> String {
+        let store = SecretStore.shared
+        if let legacy = defaults.string(forKey: DefaultsKey.legacyHuggingFaceToken) {
+            defaults.removeObject(forKey: DefaultsKey.legacyHuggingFaceToken)
+            if !legacy.isEmpty {
+                if store.get(SecretKey.huggingFaceToken) == nil {
+                    store.set(SecretKey.huggingFaceToken, value: legacy)
+                }
+                return legacy
+            }
+        }
+        return store.get(SecretKey.huggingFaceToken) ?? ""
     }
 }

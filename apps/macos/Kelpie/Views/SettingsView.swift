@@ -7,10 +7,11 @@ struct SettingsView: View {
     @ObservedObject var rendererState: RendererState
     var onNavigate: ((String) -> Void)?
     @ObservedObject private var aiState = AIState.shared
-    @AppStorage("huggingFaceToken") private var huggingFaceToken: String = ""
     @Environment(\.dismiss) private var dismiss
     @State private var showHFTokenField = false
     @State private var hfTokenDraft = ""
+
+    private var huggingFaceToken: String { aiState.huggingFaceToken }
 
     var body: some View {
         VStack {
@@ -94,7 +95,7 @@ struct SettingsView: View {
                         HStack {
                             if !huggingFaceToken.isEmpty {
                                 Button("Clear") {
-                                    huggingFaceToken = ""
+                                    aiState.huggingFaceToken = ""
                                     hfTokenDraft = ""
                                     showHFTokenField = false
                                 }
@@ -107,7 +108,7 @@ struct SettingsView: View {
                             }
                             .controlSize(.small)
                             Button("Save") {
-                                huggingFaceToken = hfTokenDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                aiState.huggingFaceToken = hfTokenDraft.trimmingCharacters(in: .whitespacesAndNewlines)
                                 hfTokenDraft = ""
                                 showHFTokenField = false
                             }

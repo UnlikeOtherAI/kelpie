@@ -99,6 +99,9 @@ dependencies {
     implementation("androidx.webkit:webkit:1.10.0")
     implementation("androidx.browser:browser:1.8.0")
 
+    // Encrypted credential storage (HF token etc.)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // HTTP Server (Ktor)
     implementation("io.ktor:ktor-server-netty:2.3.8")
     implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
