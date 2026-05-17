@@ -27,6 +27,12 @@ export interface SmartQueryResult<T = unknown> {
   deviceCount: number;
   found: ({ device: DeviceMeta } & T)[];
   notFound: { device: DeviceMeta; reason: string }[];
+  /**
+   * Devices whose request errored at the transport/protocol level (not just
+   * "element absent"). Surfacing these separately lets the CLI flip exit code
+   * on real failures without treating an empty page as an error.
+   */
+  errors: { device: DeviceMeta; error: { code: string; message: string } }[];
 }
 
 function extractError(data: unknown): { code: string; message: string } | undefined {
@@ -106,17 +112,20 @@ export async function executeSmartQuery<T extends Record<string, unknown>>(
 
   const found: ({ device: DeviceMeta } & T)[] = [];
   const notFound: { device: DeviceMeta; reason: string }[] = [];
+  const errors: { device: DeviceMeta; error: { code: string; message: string } }[] = [];
 
   for (const result of group.results) {
     if (result.success && result.data?.found) {
       const { found: _foundFlag, ...rest } = result.data;
       found.push({ device: result.device, ...rest } as { device: DeviceMeta } & T);
-    } else {
-      notFound.push({
-        device: result.device,
-        reason: result.error?.message ?? "Element not found",
-      });
+      continue;
     }
+    if (!result.success && result.error) {
+      errors.push({ device: result.device, error: result.error });
+      notFound.push({ device: result.device, reason: result.error.message });
+      continue;
+    }
+    notFound.push({ device: result.device, reason: "Element not found" });
   }
 
   return {
@@ -124,5 +133,6 @@ export async function executeSmartQuery<T extends Record<string, unknown>>(
     deviceCount: devices.length,
     found,
     notFound,
+    errors,
   };
 }

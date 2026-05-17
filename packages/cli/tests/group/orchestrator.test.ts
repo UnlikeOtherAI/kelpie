@@ -123,5 +123,33 @@ describe("executeSmartQuery", () => {
     expect(result.found).toHaveLength(2);
     expect(result.notFound).toHaveLength(1);
     expect(result.notFound[0].device.name).toBe("iPad");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("separates device errors from genuine not-found responses", async () => {
+    let callIndex = 0;
+    globalThis.fetch = vi.fn(async () => {
+      callIndex++;
+      if (callIndex === 1) {
+        return new Response(JSON.stringify({ found: true, element: { tag: "button" } }), { status: 200 });
+      }
+      if (callIndex === 2) {
+        // Real device error — must surface as an error, not a quiet "not found".
+        return new Response(
+          JSON.stringify({ success: false, error: { code: "WEBVIEW_OFFLINE", message: "no view" } }),
+          { status: 500 },
+        );
+      }
+      return new Response(JSON.stringify({ found: false }), { status: 200 });
+    }) as typeof fetch;
+
+    const result = await executeSmartQuery(devices, "findButton", { text: "Submit" }, 5000);
+    expect(result.found).toHaveLength(1);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].error.code).toBe("WEBVIEW_OFFLINE");
+    // The errored device also appears in notFound (with its error message as reason)
+    // so existing JSON consumers keep seeing it, but the new errors[] array is
+    // what the CLI checks to flip exit code.
+    expect(result.notFound).toHaveLength(2);
   });
 });

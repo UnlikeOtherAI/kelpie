@@ -940,6 +940,35 @@ kelpie group navigate "https://example.com" --include "a1b2c3d4,My iPhone" # onl
 
 `--include` accepts a comma-separated list of device IDs or names. When both `--include` and `--platform` are specified, only devices matching both filters are targeted.
 
+### Per-device failures and exit codes
+
+Every group command runs against the filtered set of devices in parallel and returns a structured result:
+
+```json
+{
+  "command": "navigate",
+  "deviceCount": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "results": [
+    { "device": {"name": "iPhone", "platform": "ios", "resolution": "390x844"}, "success": true,  "data": {"success": true} },
+    { "device": {"name": "Pixel",  "platform": "android", "resolution": "412x915"}, "success": false, "error": {"code": "NAVIGATION_ERROR", "message": "DNS failed"} },
+    { "device": {"name": "iPad",   "platform": "ios", "resolution": "1024x1366"}, "success": true,  "data": {"success": true} }
+  ]
+}
+```
+
+- Per-device failures appear in `results[]` as entries with `success: false` and a populated `error` envelope. They are **never** silently dropped.
+- By default, the CLI exits with status code `1` if **any** device fails — even when the rest succeeded. Use this for scripts that must treat any device failure as fatal.
+- Pass `--allow-partial` to suppress the non-zero exit and treat the run as successful as long as the orchestrator itself completed. The output payload is identical with or without the flag.
+
+```bash
+kelpie group navigate "https://example.com"                   # exit 1 if any device fails
+kelpie group navigate "https://example.com" --allow-partial   # exit 0 even if some devices fail
+```
+
+For smart queries (`find-button`, `find-element`, `find-link`, `find-input`), only **device-level errors** (transport/protocol failures) flip the exit code. A genuine "element absent" result is reported in `notFound[]` but does not set a non-zero exit, because it is the expected answer when the element is not present on that page.
+
 ---
 
 ## MCP Server
