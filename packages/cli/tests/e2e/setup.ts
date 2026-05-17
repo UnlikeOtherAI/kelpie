@@ -13,6 +13,26 @@ import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 const DEVICE_HOST = process.env.KELPIE_TEST_HOST ?? "localhost";
 const DEVICE_PORT = parseInt(process.env.KELPIE_TEST_PORT ?? String(DEFAULT_PORT), 10);
 
+/**
+ * When set to "1", absence of a reachable device is treated as a hard
+ * failure rather than a silent skip. CI must set this so platform
+ * regressions can't sneak through with green e2e jobs that secretly
+ * executed zero assertions. Local developers without a device leave it
+ * unset and the e2e tests skip with a one-time warning.
+ */
+const REQUIRE_DEVICE = process.env.KELPIE_E2E_REQUIRE_DEVICE === "1";
+
+let warnedNoDevice = false;
+function warnNoDeviceOnce(device: DiscoveredDevice): void {
+  if (warnedNoDevice) return;
+  warnedNoDevice = true;
+  const target = `http://${device.ip}:${device.port}`;
+  console.warn(
+    `[kelpie e2e] No device reachable at ${target}. Skipping device-dependent assertions. ` +
+      `Set KELPIE_E2E_REQUIRE_DEVICE=1 to make this a hard failure (recommended for CI).`,
+  );
+}
+
 /** Create a test device descriptor pointing at a real or mock server. */
 export function testDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice {
   return {
@@ -56,6 +76,21 @@ export async function deviceRequest(
 
 /** Check if a device's HTTP server is reachable. */
 export async function isDeviceReachable(device: DiscoveredDevice): Promise<boolean> {
+  const reachable = await probeDevice(device);
+  if (!reachable) {
+    if (REQUIRE_DEVICE) {
+      const target = `http://${device.ip}:${device.port}`;
+      throw new Error(
+        `[kelpie e2e] KELPIE_E2E_REQUIRE_DEVICE=1 is set but no device is reachable at ${target}. ` +
+          `Boot a Kelpie device (simulator/emulator/physical) or unset the variable to skip locally.`,
+      );
+    }
+    warnNoDeviceOnce(device);
+  }
+  return reachable;
+}
+
+async function probeDevice(device: DiscoveredDevice): Promise<boolean> {
   try {
     const res = await fetch(`http://${device.ip}:${device.port}/health`, {
       signal: AbortSignal.timeout(3000),
@@ -73,9 +108,16 @@ export async function waitForDevice(
 ): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (await isDeviceReachable(device)) return true;
+    if (await probeDevice(device)) return true;
     await new Promise((r) => setTimeout(r, 1000));
   }
+  if (REQUIRE_DEVICE) {
+    const target = `http://${device.ip}:${device.port}`;
+    throw new Error(
+      `[kelpie e2e] KELPIE_E2E_REQUIRE_DEVICE=1 is set but no device became reachable at ${target} within ${timeoutMs}ms.`,
+    );
+  }
+  warnNoDeviceOnce(device);
   return false;
 }
 
