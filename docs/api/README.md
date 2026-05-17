@@ -21,10 +21,48 @@ All methods are available via three interfaces:
 
 - Base URL: `http://{device-ip}:{port}/v1/`
 - Content-Type: `application/json`
-- Auth: None (local network only)
+- Auth: bearer token via `Authorization: Bearer <token>`. Tokens are issued by `POST /v1/pair` + on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
 - Default Port: `8420`
 - Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
 - Concurrency: Requests are queued and processed sequentially per device. Rapid-fire commands are safe but will execute in order. No rate limiting enforced — the embedded HTTP server handles one command at a time.
+
+---
+
+## Pairing & Auth
+
+The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI must obtain a bearer token via on-device approval before any automation works.
+
+### Endpoints
+
+| Method | Auth | Body | Response |
+|---|---|---|---|
+| `POST /v1/pair` | none + CSRF gate | `{clientId, clientName}` | `202 {status: "pending", requestId, expiresAt, sourceAddress}` |
+| `GET /v1/pair/status?requestId=…` | none | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?, token?}` |
+| `DELETE /v1/pair` | bearer | — | `200 {success: true}` — revokes the caller's own pairing |
+| `GET /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
+
+The CSRF gate on `POST /v1/pair` requires `Content-Type: application/json`, an absent `Origin` header, single `Authorization` / `Content-Length` headers, and no `Transfer-Encoding`. Browsers cannot satisfy these constraints; the CLI's plain `fetch` does.
+
+### Token lifecycle
+
+1. CLI generates a stable `clientId` (per-install UUID) and sends `POST /v1/pair` with a self-reported `clientName`.
+2. Device displays a modal showing `clientName` (labeled self-reported) and the socket peer address (authoritative).
+3. User picks one of `Yes once` (in-memory session), `Always allow` (persistent), or `No` (suppresses re-prompts from that source for 10 minutes).
+4. CLI polls `GET /v1/pair/status?requestId=…`. On approval, the plaintext bearer is returned **exactly once**, and the device persists only the SHA-256 hash. Token comparison on subsequent requests is constant-time over the 32-byte digest.
+
+### Source-address binding
+
+The server records the socket peer when `POST /v1/pair` is received. If a later status poll arrives from a different peer, the server returns `not_found` — the token is never disclosed to a third party even if they observe the `requestId`.
+
+### Error codes specific to pairing
+
+| Code | HTTP Status | When |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | Missing/invalid/expired bearer token |
+| `DENIED` | 403 | Pair requests from this source are currently suppressed |
+| `MISSING_PARAM` | 400 | `POST /v1/pair` missing `clientId` or status poll missing `requestId` |
+| `INVALID_JSON` | 400 | `POST /v1/pair` body was not valid JSON |
+| `CSRF_REJECTED` | 400 | `POST /v1/pair` failed Content-Type / Origin / duplicate-header checks |
 
 ---
 
@@ -325,6 +363,7 @@ CLI MCP adds additional tools:
 |---|---|
 | `kelpie_discover` | Scan network for Kelpie browsers |
 | `kelpie_list_devices` | List currently known devices |
+| `kelpie_pair` | Pair the CLI with a device (blocks until on-device approval, denial, or timeout) |
 | `kelpie_group_navigate` | Navigate all devices to a URL |
 | `kelpie_group_screenshot` | Screenshot all devices |
 | `kelpie_group_find_button` | Find button across all devices |

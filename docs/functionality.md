@@ -18,6 +18,24 @@ Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the loca
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
 
+## Pairing & Authentication
+
+Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires a bearer token issued by the on-device user.
+
+**Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, the CLI posts a pairing request to the device. The device shows a modal with the requester's self-reported client name and offers three responses:
+
+- **No** — the device denies the request. The CLI surfaces `PAIR_DENIED` and stores nothing.
+- **Yes, once** — the device issues a session-scope token. The CLI keeps it in process memory and drops it at exit. The user must re-approve on the next CLI invocation.
+- **Always** — the device issues a persistent-scope token. The CLI writes it to `~/.kelpie/tokens.json` (mode `0600`, directory `0700`) keyed by `deviceId:host:port`. Subsequent invocations reuse it transparently.
+
+The device returns the plaintext token exactly once; only a SHA-256 hash is persisted on the device. Status polling is keyed by a 32-byte CSPRNG `requestId` and bound to the source address that started the request, so a different host cannot collect the resulting token. Pinning the stored token to `deviceId:host:port` defends against mDNS TXT-record spoofing — if a device id reappears at a different socket address, the CLI refuses to send the stored token and forces re-pairing.
+
+**Paired clients list.** Every platform's settings panel shows the list of currently paired clients (name, scope, last seen) and lets the user revoke any of them, which immediately invalidates that token on the device.
+
+**MCP transport.** The CLI's `kelpie mcp --http` mode binds `127.0.0.1` by default. Binding to a non-loopback address requires the explicit `--unsafe-host` flag, which prints a warning before listening. Stdio transport is unchanged.
+
+API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; MCP: `kelpie_pair`.
+
 ## Browser Control
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.

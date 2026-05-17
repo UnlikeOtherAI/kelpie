@@ -271,17 +271,16 @@ Kelpie operates exclusively on the local network. No cloud services, no remote a
 
 ### Shared Network Risk
 
-Kelpie's HTTP API has **no authentication**. Any device on the same network can send commands. This is acceptable on a private home/office network but poses risks on shared Wi-Fi (coworking spaces, hotel networks, conferences):
+Kelpie enforces explicit, on-device pairing before any `/v1/*` automation method or `/mcp` connection is allowed. Unauthenticated traffic is denied by default; only the three discovery/pair endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`) and `/health` are reachable without a bearer token.
 
-- An attacker on the same network could discover Kelpie browsers via mDNS and send commands
-- Sensitive APIs (cookies, storage, clipboard, JS evaluation) are fully exposed
-- There is no TLS — traffic is plaintext HTTP
+- First contact: the CLI issues `POST /v1/pair` with a self-reported client id + name. The device shows a modal asking the user to allow the client — three responses: `Yes once` (in-memory), `Always allow` (persistent), `No` (suppresses re-prompts from that source for 10 minutes).
+- Token lifecycle: 32-byte CSPRNG bearer returned exactly once on the originating client's status poll. Only SHA-256 hashes are persisted on disk; comparison is constant-time. Theft of the device store does not yield usable tokens.
+- CLI side: persistent-scope tokens are stored at `~/.kelpie/tokens.json` (mode 0600), keyed by `<deviceId>:<host>:<port>` so mDNS spoofing at a new socket address forces a re-pair. Session-scope tokens live in process memory only.
+- TLS is still future work — bearer tokens travel plaintext on the LAN. Use Kelpie only on trusted networks until TLS lands.
 
-**Mitigations (planned for v2):**
-- **Pairing code**: On first CLI→browser connection, the browser displays a 6-digit code the user must enter in the CLI. The CLI and browser then exchange a shared secret used to sign subsequent requests.
-- **Allowlist mode**: The browser can restrict connections to specific IP addresses after initial pairing.
-
-**Current recommendation**: Use Kelpie only on trusted private networks. Do not use on public or shared Wi-Fi without a VPN.
+Operator-facing knobs:
+- The on-device HTTP server binds only to loopback + link-local + RFC1918 interfaces; VPN tunnels and public IPv6 addresses are excluded.
+- The CLI's `kelpie mcp --http` MCP server binds to `127.0.0.1` by default. `--bind 0.0.0.0` requires the additional `--unsafe-host` flag and emits a warning, because that mode forwards stored bearer tokens to anyone reachable on the bound interface.
 
 ---
 
