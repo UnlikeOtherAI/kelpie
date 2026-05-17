@@ -37,7 +37,10 @@ import com.kelpie.browser.handlers.WebSocketHandler
 import com.kelpie.browser.llm.LLMHandler
 import com.kelpie.browser.network.FeedbackStore
 import com.kelpie.browser.network.HTTPServer
+import com.kelpie.browser.network.KelpieNetworkService
 import com.kelpie.browser.network.MDNSAdvertiser
+import com.kelpie.browser.network.NetworkServiceStage
+import com.kelpie.browser.network.NetworkServiceState
 import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
@@ -169,18 +172,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startServer(deviceInfo: DeviceInfo) {
-        httpServer = HTTPServer(port = deviceInfo.port, router = router, appContext = applicationContext).also { it.start() }
-
-        mdnsAdvertiser =
+        val server = HTTPServer(port = deviceInfo.port, router = router, appContext = applicationContext)
+        val advertiser =
             MDNSAdvertiser(
-                context = this,
+                appContext = applicationContext,
                 deviceInfo = deviceInfo,
             )
-    }
+        httpServer = server
+        mdnsAdvertiser = advertiser
 
-    override fun onStart() {
-        super.onStart()
-        mdnsAdvertiser?.ensureRegistered()
+        // Hand off lifecycle to the foreground service so Doze cannot stall
+        // incoming HTTP requests and the user sees a persistent "reachable"
+        // notification.
+        NetworkServiceState.stage(NetworkServiceStage(server, advertiser))
+        KelpieNetworkService.start(applicationContext)
     }
 
     override fun onResume() {
@@ -188,16 +193,17 @@ class MainActivity : ComponentActivity() {
         handlerContext.chromeAuth.onResume(handlerContext.webView)
     }
 
-    override fun onStop() {
-        mdnsAdvertiser?.unregister()
-        super.onStop()
-    }
-
     override fun onDestroy() {
         handlerContext.dialogState.dismissPending()
         handlerContext.tabStore?.destroyAllTabs()
-        mdnsAdvertiser?.shutdown()
         super.onDestroy()
-        httpServer?.stop()
+        // Mirrors the previous unconditional onDestroy teardown: the network
+        // stack is tied to the Activity lifecycle. Surviving Activity
+        // recreation (rotation) without rebuilding the HTTP listener is a
+        // separate refactor — out of scope here.
+        KelpieNetworkService.stop(applicationContext)
+        NetworkServiceState.clear()
+        httpServer = null
+        mdnsAdvertiser = null
     }
 }

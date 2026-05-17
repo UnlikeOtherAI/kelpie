@@ -7,10 +7,17 @@ import android.net.wifi.WifiManager
 import android.util.Log
 import com.kelpie.browser.device.DeviceInfo
 
+/**
+ * Advertises this device on the local network via NSD. The constructor
+ * intentionally takes an Application-scoped Context — never an Activity —
+ * because the advertiser is owned by a long-lived foreground service and
+ * holding an Activity here would block GC across configuration changes.
+ */
 class MDNSAdvertiser(
-    private val context: Context,
+    appContext: Context,
     private val deviceInfo: DeviceInfo,
 ) {
+    private val context: Context = appContext.applicationContext
     private var nsdManager: NsdManager? = null
     private var activeListener: NsdManager.RegistrationListener? = null
     private var multicastLock: WifiManager.MulticastLock? = null

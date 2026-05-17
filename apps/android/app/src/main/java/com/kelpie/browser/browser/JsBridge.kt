@@ -6,12 +6,22 @@ import org.json.JSONObject
 /**
  * Android JS bridge exposed as `window.KelpieBridge`.
  * Receives console messages and network traffic events from injected scripts.
+ *
+ * Security note: every public method here is reachable from untrusted JS.
+ *   - Only methods annotated with `@JavascriptInterface` are exposed; do not
+ *     add new public members without auditing them. Methods without the
+ *     annotation are silently ignored by WebView, but adding them obscures the
+ *     contract — keep the surface area minimal.
+ *   - All inputs are strings that originate in the renderer. Parse defensively,
+ *     never pass them to filesystem, URL, or shell APIs.
+ *   - Inputs are size-capped to protect against renderer-driven OOM.
  */
 class JsBridge(
     private val handlerContext: com.kelpie.browser.handlers.HandlerContext?,
 ) {
     @JavascriptInterface
     fun onConsoleMessage(jsonString: String) {
+        if (jsonString.length > MAX_MESSAGE_BYTES) return
         try {
             val obj = JSONObject(jsonString)
             val message = obj.optString("message", obj.optString("text", ""))
@@ -34,6 +44,7 @@ class JsBridge(
 
     @JavascriptInterface
     fun on3DSnapshotEvent(jsonString: String) {
+        if (jsonString.length > MAX_MESSAGE_BYTES) return
         try {
             val obj = JSONObject(jsonString)
             if (obj.optString("action") == "exit") {
@@ -45,6 +56,7 @@ class JsBridge(
 
     @JavascriptInterface
     fun onNetworkEvent(jsonString: String) {
+        if (jsonString.length > MAX_NETWORK_EVENT_BYTES) return
         try {
             val obj = JSONObject(jsonString)
             val reqHeaders = mutableMapOf<String, String>()
@@ -75,6 +87,19 @@ class JsBridge(
     }
 
     companion object {
+        /**
+         * Hard ceiling on a single console/3D event payload. The injected scripts
+         * truncate their own fields to ~10KB each; 64KB leaves room for headers
+         * and metadata while preventing renderer-driven OOM.
+         */
+        private const val MAX_MESSAGE_BYTES = 64 * 1024
+
+        /**
+         * Network events carry request + response bodies (each truncated to
+         * 10KB in the bridge script) plus header maps; allow a larger ceiling.
+         */
+        private const val MAX_NETWORK_EVENT_BYTES = 128 * 1024
+
         /** Network traffic capture script. Intercepts XHR and fetch, posts via KelpieBridge. */
         const val NETWORK_BRIDGE_SCRIPT = """
 (function() {

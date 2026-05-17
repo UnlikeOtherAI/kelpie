@@ -36,10 +36,15 @@ private val json =
         isLenient = true
     }
 
+/**
+ * HTTP server fronting the browser router. The Context parameter must be
+ * Application-scoped; this server is started from a long-lived foreground
+ * service and an Activity reference here would block GC on config changes.
+ */
 class HTTPServer(
     private val port: Int,
     private val router: Router,
-    private val appContext: Context,
+    appContext: Context,
 ) {
     companion object {
         /**
@@ -57,6 +62,7 @@ class HTTPServer(
         const val MAX_HEADER_BYTES: Int = 64 * 1024
     }
 
+    private val appContext: Context = appContext.applicationContext
     private var engine: NettyApplicationEngine? = null
     var isRunning = false
         private set
