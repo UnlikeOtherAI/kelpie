@@ -13,6 +13,10 @@ struct AIHandler {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("models", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // AI model blobs are persistent user data; apply NSFileProtectionComplete
+        // to the directory so downloaded weights and any sidecar files inherit
+        // the strongest protection class while the device is locked.
+        try? FileProtection.setComplete(at: dir)
         return AIManager(modelsDir: dir.path)
     }()
 

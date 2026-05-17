@@ -19,12 +19,13 @@ struct WebViewContainer: UIViewRepresentable {
         // Inject bridge scripts — network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)
         if let handlerContext {
             let ucc = config.userContentController
+            let proxy = WeakScriptMessageHandler(handlerContext)
             ucc.addUserScript(NetworkBridge.bridgeScript)
-            ucc.add(handlerContext, name: "kelpieNetwork")
+            ucc.add(proxy, name: "kelpieNetwork")
             ucc.addUserScript(WebSocketBridge.bridgeScript)
             ucc.addUserScript(ConsoleHandler.bridgeScript)
-            ucc.add(handlerContext, name: "kelpieConsole")
-            ucc.add(handlerContext, name: "kelpie3DSnapshot")
+            ucc.add(proxy, name: "kelpieConsole")
+            ucc.add(proxy, name: "kelpie3DSnapshot")
         }
 
         let webView = WKWebView(frame: .zero, configuration: config)

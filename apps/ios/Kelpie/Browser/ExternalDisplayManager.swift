@@ -164,11 +164,12 @@ final class ExternalDisplayManager: ObservableObject {
         config.websiteDataStore = WebViewDefaults.sharedWebsiteDataStore
 
         let ucc = config.userContentController
+        let proxy = WeakScriptMessageHandler(serverState.handlerContext)
         ucc.addUserScript(NetworkBridge.bridgeScript)
-        ucc.add(serverState.handlerContext, name: "kelpieNetwork")
+        ucc.add(proxy, name: "kelpieNetwork")
         ucc.addUserScript(WebSocketBridge.bridgeScript)
         ucc.addUserScript(ConsoleHandler.bridgeScript)
-        ucc.add(serverState.handlerContext, name: "kelpieConsole")
+        ucc.add(proxy, name: "kelpieConsole")
 
         return config
     }

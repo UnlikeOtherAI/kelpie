@@ -93,16 +93,34 @@ final class ServerState: ObservableObject {
     @MainActor
     private func registerSafariAuthHandler(context: HandlerContext) {
         router.register("safari-auth") { body in
-            await MainActor.run {
-                guard let webView = context.webView else {
-                    return errorResponse(code: "NO_WEBVIEW", message: "No WebView")
-                }
+            let resolved: (WKWebView, URL)? = await MainActor.run {
+                guard let webView = context.webView else { return nil }
                 let urlString = body["url"] as? String
                 guard let url = urlString.flatMap({ URL(string: $0) }) ?? webView.url else {
-                    return errorResponse(code: "NO_URL", message: "No URL to authenticate")
+                    return nil
                 }
-                context.safariAuth.authenticate(url: url, webView: webView)
-                return successResponse(["started": true, "url": url.absoluteString])
+                return (webView, url)
+            }
+
+            guard let (webView, url) = resolved else {
+                if await MainActor.run(body: { context.webView }) == nil {
+                    return errorResponse(code: "NO_WEBVIEW", message: "No WebView")
+                }
+                return errorResponse(code: "NO_URL", message: "No URL to authenticate")
+            }
+
+            do {
+                try await context.safariAuth.authenticate(url: url, webView: webView)
+                return successResponse(["completed": true, "url": url.absoluteString])
+            } catch SafariAuthError.webViewUnavailable {
+                return errorResponse(code: "NO_WEBVIEW", message: "WebView released before auth completion")
+            } catch SafariAuthError.session(let underlying) {
+                return errorResponse(
+                    code: "SAFARI_AUTH_FAILED",
+                    message: underlying.localizedDescription
+                )
+            } catch {
+                return errorResponse(code: "SAFARI_AUTH_FAILED", message: error.localizedDescription)
             }
         }
     }

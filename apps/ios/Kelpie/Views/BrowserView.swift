@@ -571,7 +571,17 @@ struct BrowserView: View {
 
     private func authenticateInSafari() {
         guard let webView = browserState.webView, let url = webView.url else { return }
-        safariAuth.authenticate(url: url, webView: webView)
+        Task { @MainActor in
+            do {
+                try await safariAuth.authenticate(url: url, webView: webView)
+            } catch SafariAuthError.session(let underlying) {
+                await serverState.handlerContext.showToast("Safari sign-in failed: \(underlying.localizedDescription)")
+            } catch SafariAuthError.webViewUnavailable {
+                await serverState.handlerContext.showToast("Safari sign-in cancelled: tab closed")
+            } catch {
+                await serverState.handlerContext.showToast("Safari sign-in failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     @MainActor
