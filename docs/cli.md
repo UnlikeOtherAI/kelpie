@@ -588,8 +588,23 @@ kelpie iframe context --device "My iPhone"
 
 ## Cookie & Storage Commands
 
+### Authentication / session state
+
+To drive an app that sits behind a login, put the browser into an authenticated state **before** navigating. Kelpie owns the browser's cookie store directly, so no external proxy is needed:
+
+- **httpOnly session cookies are fully supported.** Set them with `kelpie cookies set <name> <value> --http-only` (MCP: `kelpie_set_cookie`). They are written to the native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), not via JavaScript, so the `--http-only`, `--secure`, `--same-site`, and `--expires` attributes all take effect.
+- **Do not use `eval` / `document.cookie` to set a session cookie.** JavaScript cannot create an httpOnly cookie, and reading `document.cookie` returns an empty string for httpOnly cookies — so it looks like the cookie is missing even when it is set. Use `kelpie cookies list` (which reads the native store, including httpOnly cookies) to verify instead.
+- **Non-httpOnly token schemes** that live in web storage can be primed with `kelpie storage set <key> <value>`.
+- **Interactive login** is also available: complete a sign-in once in the browser (e.g. `kelpie safari-auth <url>` on macOS/iOS), and the resulting session cookies persist.
+
+```bash
+# inject an httpOnly session cookie, then navigate authenticated
+kelpie cookies set "hw_session" "$TOKEN" --domain "app.example.com" --path "/" --http-only --secure --device admin
+kelpie navigate "https://app.example.com/dashboard" --device admin
+```
+
 ### `kelpie cookies list`
-Get cookies for the current page.
+Get cookies for the current page. Reads the native cookie store, so httpOnly cookies are included (unlike `document.cookie`).
 
 ```bash
 kelpie cookies list --device "My iPhone"
@@ -597,11 +612,12 @@ kelpie cookies list --device "My iPhone" --name "session_id"
 ```
 
 ### `kelpie cookies set <name> <value>`
-Set a cookie.
+Set a cookie. Supports `--domain`, `--path`, `--secure`, `--http-only`, `--same-site <Strict|Lax|None>`, and `--expires`.
 
 ```bash
 kelpie cookies set "session_id" "abc123" --device "My iPhone"
 kelpie cookies set "theme" "dark" --device "My iPhone" --domain "example.com" --path "/" --secure
+kelpie cookies set "hw_session" "abc123" --device "My iPhone" --domain "example.com" --path "/" --http-only --secure
 ```
 
 ### `kelpie cookies delete`

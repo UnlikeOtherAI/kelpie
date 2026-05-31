@@ -220,6 +220,8 @@ List all iframes on the page with their URLs, names, positions, and cross-origin
 
 Full read/write access to cookies (with domain, path, expiry, httpOnly, secure, sameSite attributes) and both localStorage and sessionStorage. Clear individual items or wipe everything.
 
+Cookies are read from and written to the platform's native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), not through JavaScript. This means **httpOnly cookies are fully settable and readable** — the common case for session auth — which `eval` / `document.cookie` can never do. To start automation from an authenticated session, set the session cookie with `set-cookie` (CLI `cookies set --http-only`, MCP `kelpie_set_cookie`) before navigating; no external proxy is required. See the CLI reference's "Authentication / session state" section.
+
 ## Clipboard
 
 Read and write the device clipboard. On iOS, a system permission banner appears briefly.

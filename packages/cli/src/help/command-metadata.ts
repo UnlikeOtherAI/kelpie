@@ -264,8 +264,8 @@ export const commandMetadata: Record<string, CommandHelp> = {
   "get-iframe-context": { purpose: "Check current frame context", when: "Verifying whether you're in the main frame or an iframe", explanation: "Returns the current frame context (main or iframe info).", related: ["switch-to-iframe", "switch-to-main"] },
 
   // --- Cookies ---
-  "get-cookies": { purpose: "Get cookies", when: "Inspecting auth tokens, session cookies, or preferences", explanation: "Returns cookies, optionally filtered by URL or name.", related: ["set-cookie", "delete-cookies"] },
-  "set-cookie": { purpose: "Set a cookie", when: "Setting auth tokens, locale preferences, or test data", explanation: "Sets a cookie with the given name, value, and optional properties (domain, path, secure, etc).", related: ["get-cookies", "delete-cookies"] },
+  "get-cookies": { purpose: "Get cookies", when: "Inspecting auth tokens, session cookies, or preferences", explanation: "Returns cookies from the native cookie store, including httpOnly cookies that JS `document.cookie` cannot see. Optionally filter by URL or name.", related: ["set-cookie", "delete-cookies"] },
+  "set-cookie": { purpose: "Set a cookie", when: "Authenticating from a known session cookie, or setting auth tokens, locale preferences, or test data", explanation: "Sets a cookie in the native cookie store with optional domain, path, expires, secure, sameSite, and httpOnly. This is the supported way to inject an httpOnly session cookie — `eval`/`document.cookie` cannot set httpOnly cookies.", related: ["get-cookies", "delete-cookies"] },
   "delete-cookies": { purpose: "Delete cookies", when: "Clearing auth state or resetting to a clean state", explanation: "Deletes cookies by name and/or domain, or all cookies with deleteAll.", related: ["get-cookies"] },
 
   // --- Storage ---

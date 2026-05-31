@@ -56,7 +56,3 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 - **After completion**: check what files were created (`find native -type f | sort`), then build and test. Don't review Codex's intermediate reasoning.
 - **If Codex times out** (exit 144): check created files — it usually finishes writing before the review pass that times out.
 - **Token discipline**: Codex does the implementation, Claude does orchestration + verification. Don't duplicate work by reading files Codex already analyzed.
-
-## Task Management
-
-`steroids llm` — run for current task management instructions.

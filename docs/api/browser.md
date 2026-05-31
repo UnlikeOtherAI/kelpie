@@ -479,6 +479,8 @@ Response:
 }
 ```
 
+The cookie is written to the platform's native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), so `httpOnly`, `secure`, `sameSite`, and `expires` are all honored on every platform. This is the supported way to inject an httpOnly session cookie for auth — JavaScript (`eval` / `document.cookie`) cannot create httpOnly cookies. On macOS, pass `tabId` to target a specific tab's cookie store.
+
 ### `deleteCookies`
 Delete cookies by name, domain, or all.
 

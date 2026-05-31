@@ -24,12 +24,14 @@ export function registerCookies(program: Command): void {
     .option("--secure", "Secure flag")
     .option("--http-only", "HttpOnly flag")
     .option("--same-site <val>", "SameSite: Lax, Strict, None")
+    .option("--expires <date>", "Expiry as an HTTP date string (e.g. 'Wed, 09 Jun 2027 10:18:14 GMT')")
     .action(async (name: string, value: string, opts: {
       domain?: string;
       path?: string;
       secure?: boolean;
       httpOnly?: boolean;
       sameSite?: string;
+      expires?: string;
     }) => {
       const body: Record<string, unknown> = { name, value };
       if (opts.domain) body.domain = opts.domain;
@@ -37,6 +39,7 @@ export function registerCookies(program: Command): void {
       if (opts.secure) body.secure = true;
       if (opts.httpOnly) body.httpOnly = true;
       if (opts.sameSite) body.sameSite = opts.sameSite;
+      if (opts.expires) body.expires = opts.expires;
       await deviceCommand(program, "setCookie", body);
     });
 

@@ -6,7 +6,7 @@ describe("generateLlmHelp", () => {
     const output = generateLlmHelp();
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBe(148);
+    expect(parsed.length).toBe(149);
   });
 
   it("each command entry has required fields", () => {
@@ -162,9 +162,11 @@ describe("generateLlmHelp", () => {
     expect(parsed.purpose).toContain("debug overlay");
   });
 
-  it("includes reporting guidance in the full help output", () => {
+  it("includes authentication and reporting guidance in the full help output", () => {
     const parsed = JSON.parse(generateLlmHelp());
-    expect(parsed[0].command).toBe("reporting");
-    expect(parsed[0].explanation).toContain("github.com/UnlikeOtherAI/kelpie/issues");
+    expect(parsed[0].command).toBe("authentication");
+    expect(parsed[0].explanation).toContain("httpOnly");
+    expect(parsed[1].command).toBe("reporting");
+    expect(parsed[1].explanation).toContain("github.com/UnlikeOtherAI/kelpie/issues");
   });
 });
