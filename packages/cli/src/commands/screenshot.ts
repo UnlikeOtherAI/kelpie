@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { Command } from "commander";
-import { requireDevice, getGlobals } from "./helpers.js";
+import { requireDevice, getGlobals, withGlobalTabId } from "./helpers.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 
@@ -37,7 +37,7 @@ export function registerScreenshot(program: Command): void {
         width?: number;
         height?: number;
         format?: string;
-      }>(device, "screenshot", body, globals.timeout);
+      }>(device, "screenshot", withGlobalTabId(globals, body), globals.timeout);
 
       if (!result.ok || !result.data.image) {
         print(result.data, globals.format);

@@ -21,6 +21,7 @@ kelpie <command> [options]
 | Flag | Description |
 |---|---|
 | `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
+| `--tabId <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
 | `--port <port>` | Override default port 8420 |
@@ -520,6 +521,8 @@ List all open tabs.
 
 Open tabs and their current URLs are restored automatically when the browser app restarts, so `kelpie tabs` reflects the live restored session rather than a fresh blank state after relaunch.
 
+When multiple tabs are open on macOS, pass `--tabId <uuid>` to tab-aware commands like `url`, `page-text`, `click`, `screenshot`, and `eval`.
+
 ```bash
 kelpie tabs --device "My iPhone"
 ```
@@ -531,6 +534,8 @@ Open a new tab.
 kelpie tab new "https://example.com" --device "My iPhone"
 kelpie tab new --device "My iPhone"                         # blank tab
 ```
+
+The JSON response includes `tabId` for the created tab; `tab.id` contains the same value.
 
 ### `kelpie tab switch <id>`
 Switch to a tab.

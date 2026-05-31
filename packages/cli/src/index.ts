@@ -14,6 +14,7 @@ program
   .description("LLM-first browser automation CLI for iOS and Android")
   .version(version)
   .option("--device <id|name|ip>", "Target a specific device by ID, name, or IP")
+  .option("--tabId <id>", "Target a specific tab on macOS commands that support per-tab control")
   .option("--format <type>", "Output format: json, table, text", "json")
   .option("--timeout <ms>", "Command timeout in milliseconds", "10000")
   .option("--port <port>", "Override default port", String(DEFAULT_PORT))

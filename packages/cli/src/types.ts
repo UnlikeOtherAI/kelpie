@@ -20,6 +20,7 @@ export interface GlobalOptions {
   format: "json" | "table" | "text";
   timeout: number;
   port: number;
+  tabId?: string;
 }
 
 export type OutputFormat = GlobalOptions["format"];

@@ -83,6 +83,18 @@ describe("generateLlmHelp", () => {
     );
   });
 
+  it("describes new-tab returning a reusable tabId", () => {
+    const output = generateLlmHelp("tab new");
+    const parsed = JSON.parse(output);
+    expect(parsed.command).toBe("tab new");
+    expect(parsed.explanation).toContain("tabId");
+    expect(parsed.response).toContainEqual(
+      expect.objectContaining({
+        name: "tabId",
+      }),
+    );
+  });
+
   it("marks tap as a last-resort command", () => {
     const output = generateLlmHelp("tap");
     const parsed = JSON.parse(output);

@@ -116,6 +116,24 @@ const tabsResponse: HelpField[] = [
   },
 ];
 
+const newTabResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true when the tab was created" },
+  { name: "tabId", type: "string", description: "Created tab ID. This is the value to pass back as tabId in later commands." },
+  {
+    name: "tab",
+    type: "object",
+    description: "Created tab metadata",
+    fields: [
+      { name: "id", type: "string", description: "Created tab ID. Same value as tabId." },
+      { name: "url", type: "string" },
+      { name: "title", type: "string" },
+      { name: "active", type: "boolean" },
+      { name: "isLoading", type: "boolean" },
+    ],
+  },
+  { name: "tabCount", type: "number", description: "Number of open tabs after creation" },
+];
+
 const reportIssueResponse: HelpField[] = [
   { name: "success", type: "boolean", description: "true when the report was stored" },
   { name: "reportId", type: "string", description: "Remote report identifier" },
@@ -235,7 +253,7 @@ export const commandMetadata: Record<string, CommandHelp> = {
 
   // --- Tabs ---
   "get-tabs": { purpose: "Get all open tabs", when: "Listing browser tabs or finding a specific one", explanation: "Returns all open tabs with their IDs, URLs, titles, and which is active.", related: ["new-tab", "switch-tab", "close-tab"], response: tabsResponse },
-  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab", explanation: "Opens a new browser tab, optionally navigating to a URL.", related: ["get-tabs", "switch-tab"], response: successOnlyResponse },
+  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab", explanation: "Opens a new browser tab, optionally navigating to a URL. Returns both tabId and tab.id for the created tab; they are the same identifier.", related: ["get-tabs", "switch-tab"], response: newTabResponse },
   "switch-tab": { purpose: "Switch to a tab", when: "Changing focus to a different tab", explanation: "Switches the active tab to the one with the given tab ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
   "close-tab": { purpose: "Close a tab", when: "Cleaning up tabs you no longer need", explanation: "Closes the tab with the given ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
 

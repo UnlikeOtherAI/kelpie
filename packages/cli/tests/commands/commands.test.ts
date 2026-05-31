@@ -35,6 +35,7 @@ function capturedBody(): Record<string, unknown> | undefined {
 
 // We test the helpers + http-client integration since commands just wire Commander to deviceCommand
 import { sendCommand } from "../../src/client/http-client.js";
+import { withGlobalTabId } from "../../src/commands/helpers.js";
 
 describe("command API method mapping", () => {
   const originalFetch = globalThis.fetch;
@@ -179,5 +180,25 @@ describe("command API method mapping", () => {
     await sendCommand(device, "queryShadowDOM", { hostSelector: "my-component", shadowSelector: ".btn", pierce: true });
     expect(capturedUrl()).toContain("/v1/query-shadow-dom");
     expect(capturedBody()?.hostSelector).toBe("my-component");
+  });
+
+  it("withGlobalTabId injects tabId when missing", () => {
+    expect(withGlobalTabId({
+      device: "dictator",
+      format: "json",
+      timeout: 10000,
+      port: 8420,
+      tabId: "tab-123",
+    }, { selector: "#submit" })).toEqual({ selector: "#submit", tabId: "tab-123" });
+  });
+
+  it("withGlobalTabId does not override an explicit tabId", () => {
+    expect(withGlobalTabId({
+      device: "dictator",
+      format: "json",
+      timeout: 10000,
+      port: 8420,
+      tabId: "tab-123",
+    }, { tabId: "tab-456", selector: "#submit" })).toEqual({ tabId: "tab-456", selector: "#submit" });
   });
 });

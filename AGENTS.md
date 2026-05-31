@@ -129,6 +129,8 @@ Each component owns its version in its own manifest — do not create a central 
 
 - Bump only the component(s) being released — other components stay at their current version.
 - GitHub releases use a date tag (`release/YYYY-MM-DD`). The tag description must list every component version included in that release.
+- Every pushed fix, no matter how small, requires a full release/publish cycle. Do not push a fix without releasing it.
+- The full cycle means: bump the affected component version, publish the affected artifact(s) including npm patch releases when the CLI/package changes, create the GitHub release, then install the published artifact locally and verify that installed release.
 
 ## Commits
 

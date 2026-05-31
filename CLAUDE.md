@@ -22,6 +22,11 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 - **Never manually fix state** — if the mDNS discovery, HTTP server, or MCP server is stuck, fix the code so it self-heals.
 - **Kill stale Kelpie app instances before verification** when they could block ports, AppReveal, or input testing. Debug against one known app process, not a mixture of old and new sessions.
 
+## Release Policy
+
+- Every pushed fix requires a full release/publish cycle, even if it is only a small patch.
+- The release cycle is not complete until the affected version is bumped, the affected artifact is published, the GitHub release is created, and the published artifact is installed locally and verified from that installed release.
+
 ## How to Run Parallel Adversarial Reviews
 
 When a design requires cross-provider review, dispatch two reviewers **simultaneously** by sending a single message with two tool calls.
