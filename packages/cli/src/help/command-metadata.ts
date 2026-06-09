@@ -85,6 +85,17 @@ const tapResponse: HelpField[] = [
   },
 ];
 
+const coordinateDiagnosticsResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true when diagnostics ran" },
+  { name: "inputSource", type: "string", description: "Input provenance, currently page-synthesized" },
+  { name: "inputCapabilities", type: "object", description: "Whether trusted native input is available" },
+  { name: "viewport", type: "object", description: "Viewport, scroll, DPR, and visualViewport metadata" },
+  { name: "points", type: "array", description: "elementFromPoint/elementsFromPoint samples" },
+  { name: "actions", type: "array", description: "Executed coordinate action diagnostics and event logs" },
+  { name: "eventLog", type: "array", description: "Captured pointer, mouse, touch, wheel, and scroll events" },
+  { name: "classification", type: "object", description: "pass, fail, or needs-review based on expectedSelector checks" },
+];
+
 const capabilitiesResponse: HelpField[] = [
   { name: "success", type: "boolean", description: "true when capabilities were retrieved" },
   { name: "version", type: "string", description: "App version on the device" },
@@ -187,6 +198,7 @@ export const commandMetadata: Record<string, CommandHelp> = {
   check: { purpose: "Check a checkbox", when: "Enabling a checkbox option", explanation: "Checks a checkbox element. No-op if already checked.", errors: ["ELEMENT_NOT_FOUND"], related: ["uncheck", "get-form-state"] },
   uncheck: { purpose: "Uncheck a checkbox", when: "Disabling a checkbox option", explanation: "Unchecks a checkbox element. No-op if already unchecked.", errors: ["ELEMENT_NOT_FOUND"], related: ["check"] },
   swipe: { purpose: "Swipe across the viewport", when: "You need to visually demonstrate a drag or JS-driven drag gesture", explanation: "Animates a swipe trail between two viewport coordinates and dispatches matching pointer events on the page. Useful for recording demos, carousels, and other JS-driven drags; use scroll for reliable native page scrolling.", related: ["scroll", "tap", "script"] },
+  "coordinate-diagnostics": { purpose: "Run coordinate diagnostics", when: "Debugging hit-test, sticky-scroll, visual viewport, or coordinate translation bugs", explanation: "Samples elementFromPoint/elementsFromPoint at viewport coordinates, optionally runs page-synthesized tap/swipe/scroll actions, records delivered pointer and mouse event targets, can evaluate setup/export oracle JavaScript, and can return a screenshot with viewport mapping metadata. The response reports inputSource and inputCapabilities; do not assume trusted native input.", errors: ["INVALID_PARAMS", "EVAL_ERROR", "SCREENSHOT_FAILED"], related: ["tap", "swipe", "scroll", "evaluate", "screenshot"], platforms: ["ios", "android", "macos"], response: coordinateDiagnosticsResponse },
   "commentary show": { purpose: "Show commentary text", when: "Narrating a recording or calling attention to what happens next", explanation: "Displays a commentary pill inside the viewport at the chosen position. Use duration 0 to keep it visible until you hide or replace it.", related: ["commentary hide", "script run"] },
   "commentary hide": { purpose: "Hide commentary text", when: "Clearing a persistent commentary overlay before the next shot", explanation: "Dismisses the active commentary overlay immediately.", related: ["commentary show", "script run"] },
   "highlight show": { purpose: "Highlight an element", when: "You already know the selector and want to visually pin the target before interacting with it or before taking a screenshot", explanation: "Draws a colored ring/box around the element matching the selector. Supports quick appear or draw animations and optional persistence. Use duration 0 if you want the overlay to stay visible while you capture a screenshot and ask an LLM to reason about that specific area.", related: ["highlight hide", "click", "screenshot", "screenshot-annotated", "script run"] },

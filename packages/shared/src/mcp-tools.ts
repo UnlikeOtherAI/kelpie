@@ -26,6 +26,7 @@ export const BrowserMcpTools = [
   "kelpie_check",
   "kelpie_uncheck",
   "kelpie_swipe",
+  "kelpie_coordinate_diagnostics",
   "kelpie_show_commentary",
   "kelpie_hide_commentary",
   "kelpie_highlight",
@@ -152,6 +153,7 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_snapshot_3d_set_mode: ["linux", "windows"],
   kelpie_snapshot_3d_zoom: ["linux", "windows"],
   kelpie_snapshot_3d_reset_view: ["linux", "windows"],
+  kelpie_coordinate_diagnostics: ["linux", "windows"],
   // iOS-only diagnostics: scene/external display state is iOS-specific
   kelpie_debug_screens: ["android", "macos", "linux", "windows"],
   kelpie_set_debug_overlay: ["android", "macos", "linux", "windows"],
@@ -218,6 +220,7 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "check": "kelpie_check",
   "uncheck": "kelpie_uncheck",
   "swipe": "kelpie_swipe",
+  "coordinate-diagnostics": "kelpie_coordinate_diagnostics",
   "show-commentary": "kelpie_show_commentary",
   "hide-commentary": "kelpie_hide_commentary",
   "highlight": "kelpie_highlight",

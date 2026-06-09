@@ -225,6 +225,7 @@ Internal HTTP-only debug surfaces are not exposed as MCP tools:
 | `/v1/check` | `kelpie_check` |
 | `/v1/uncheck` | `kelpie_uncheck` |
 | `/v1/swipe` | `kelpie_swipe` |
+| `/v1/coordinate-diagnostics` | `kelpie_coordinate_diagnostics` |
 | `/v1/show-commentary` | `kelpie_show_commentary` |
 | `/v1/hide-commentary` | `kelpie_hide_commentary` |
 | `/v1/highlight` | `kelpie_highlight` |

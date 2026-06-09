@@ -84,12 +84,15 @@ class KelpieNetworkService : Service() {
     private fun startForegroundWithNotification() {
         ensureNotificationChannel()
         val notification = buildNotification()
-        // minSdk is 28 (Q is 29) — pass the foregroundServiceType every call.
-        startForeground(
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun ensureNotificationChannel() {

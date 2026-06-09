@@ -66,6 +66,8 @@ For LLM-driven automation, the intended order is semantic first: read the access
 
 Swipe gestures are first-class too: give Kelpie start and end viewport coordinates and it renders a visible swipe trail while dispatching synthetic pointer events to JS-driven touch listeners. For native scrolling, use the scroll endpoints instead.
 
+For regression debugging, `coordinate-diagnostics` combines hit-test samples, page-side event logs, optional tap/swipe/scroll actions, viewport metadata, optional oracle JavaScript, and optional screenshot capture into one structured response. It reports `inputSource` and `inputCapabilities` explicitly; today the mirrored iOS, macOS, and Android implementation uses page-synthesized coordinate events, not trusted OS-level input.
+
 ## Scripted Video Recording
 
 Kelpie can run a whole walkthrough as one timed script instead of one command at a time. A script enters recording mode, hides the browser chrome, locks the normal controls, and leaves only a stop button visible while it plays. Actions can mix navigation, taps, typing, swipes, waits, screenshots, viewport changes, commentary pills, and element highlights. This scripted-recording surface is now aligned across Android and iOS, with the same HTTP, CLI, and MCP entry points.
