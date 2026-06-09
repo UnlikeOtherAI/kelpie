@@ -12,6 +12,7 @@ pnpm add -g @unlikeotherai/kelpie
 
 ```
 kelpie <command> [options]
+kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <url>`
 ```
 
 ---
@@ -21,7 +22,7 @@ kelpie <command> [options]
 | Flag | Description |
 |---|---|
 | `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
-| `--tabId <id>` | Target a specific tab for macOS commands that support per-tab control |
+| `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
 | `--port <port>` | Override default port 8420 |
@@ -124,6 +125,7 @@ kelpie browser remove claude-a
 
 ```bash
 kelpie navigate "https://example.com" --device "My iPhone"
+kelpie "https://example.com" --device "My iPhone"          # shorthand
 ```
 
 ### `kelpie back` / `kelpie forward` / `kelpie reload`
