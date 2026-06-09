@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createMcpServer } from "../../src/mcp/server.js";
+import { readFile, rm } from "node:fs/promises";
+import { createMcpServer, formatBrowserToolResult } from "../../src/mcp/server.js";
 import { addDevice, clearDevices, getDevice, getAllDevices } from "../../src/discovery/registry.js";
 import { filterDevices } from "../../src/group/filter.js";
 import { browserTools, cliTools } from "../../src/mcp/tools.js";
@@ -72,5 +73,64 @@ describe("MCP tool routing logic", () => {
     const linux = filterDevices(devices, { platform: "linux" });
     expect(linux).toHaveLength(1);
     expect(linux[0].platform).toBe("linux");
+  });
+});
+
+describe("MCP browser result formatting", () => {
+  it("saves native screenshots to a file and strips base64 from text output", async () => {
+    const image = Buffer.from("native screenshot bytes").toString("base64");
+    const result = await formatBrowserToolResult(
+      "screenshot",
+      {
+        success: true,
+        image,
+        width: 3042,
+        height: 2158,
+        format: "png",
+        resolution: "native",
+      },
+      "Test Mac",
+    );
+
+    const text = result.content.find((item) => item.type === "text");
+    expect(text).toBeDefined();
+    const metadata = JSON.parse(text!.text);
+    expect(metadata).toMatchObject({
+      success: true,
+      width: 3042,
+      height: 2158,
+      format: "png",
+      resolution: "native",
+      imageSavedToFile: true,
+      imageBytes: 23,
+    });
+    expect(metadata).not.toHaveProperty("image");
+    expect(metadata.file).toContain("test-mac-");
+
+    const resource = result.content.find((item) => item.type === "resource_link");
+    expect(resource).toMatchObject({
+      type: "resource_link",
+      uri: expect.stringMatching(/^file:\/\//),
+      mimeType: "image/png",
+      size: 23,
+    });
+    expect(result.structuredContent).toEqual(metadata);
+    await expect(readFile(metadata.file, "utf8")).resolves.toBe("native screenshot bytes");
+    await rm(metadata.file, { force: true });
+  });
+
+  it("keeps viewport screenshots on the legacy text JSON path", async () => {
+    const payload = {
+      success: true,
+      image: "abc",
+      width: 390,
+      height: 844,
+      format: "png",
+      resolution: "viewport",
+    };
+    const result = await formatBrowserToolResult("screenshot", payload, "Test Phone");
+
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify(payload) }]);
+    expect(result.structuredContent).toBeUndefined();
   });
 });
