@@ -185,7 +185,11 @@ macos-build: lint-swift
 		build
 
 macos-run:
-	@APP_PATH=$$(find apps/macos/.build -name "Kelpie.app" 2>/dev/null | head -1); \
+	@APP_PATH=$$(find apps/macos/.build $(XCODE_CUSTOM_PRODUCTS) -name "Kelpie.app" -not -path "*-iphone*" 2>/dev/null | head -1); \
+	if [ -z "$$APP_PATH" ]; then \
+		echo "✗ Kelpie.app not found. Run 'make macos-build' first."; \
+		exit 1; \
+	fi; \
 	echo "→ Launching $$APP_PATH ..."; \
 	open "$$APP_PATH"
 
