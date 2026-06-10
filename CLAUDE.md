@@ -26,6 +26,7 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 
 - Every pushed fix requires a full release/publish cycle, even if it is only a small patch.
 - The release cycle is not complete until the affected version is bumped, the affected artifact is published, the GitHub release is created, and the published artifact is installed locally and verified from that installed release.
+- **Install the latest app on this Mac after every release.** When the macOS app is part of a release, build it, replace `/Applications/Kelpie.app` with the freshly built bundle (kill any running instance first, then `ditto` the build product into `/Applications`), and relaunch from `/Applications` so the running app always matches the release. A GitHub release alone does not update the installed app.
 
 ## How to Run Parallel Adversarial Reviews
 

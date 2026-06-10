@@ -131,6 +131,7 @@ Each component owns its version in its own manifest — do not create a central 
 - GitHub releases use a date tag (`release/YYYY-MM-DD`). The tag description must list every component version included in that release.
 - Every pushed fix, no matter how small, requires a full release/publish cycle. Do not push a fix without releasing it.
 - The full cycle means: bump the affected component version, publish the affected artifact(s) including npm patch releases when the CLI/package changes, create the GitHub release, then install the published artifact locally and verify that installed release.
+- After every release that includes the macOS app, install the latest build on this Mac: kill any running instance, replace `/Applications/Kelpie.app` with the freshly built bundle (`ditto <build-product> /Applications/Kelpie.app`), and relaunch from `/Applications`. The running app on this Mac must always match the latest release — a GitHub release alone does not update the installed app.
 
 ## Commits
 
