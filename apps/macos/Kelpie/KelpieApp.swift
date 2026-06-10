@@ -321,7 +321,20 @@ struct KelpieApp: App {
         )
         window.minSize = ViewportState.minimumShellSize
         window.contentView = NSHostingView(rootView: contentView)
-        window.center()
+        // Restore the last window position if it still lands on a connected
+        // screen; otherwise fall back to centering. Size is already restored
+        // above via persistedShellWindowSize.
+        if let origin = ViewportState.persistedShellWindowOrigin {
+            var frame = window.frame
+            frame.origin = origin
+            if ViewportState.windowFrameIsUsable(frame) {
+                window.setFrameOrigin(origin)
+            } else {
+                window.center()
+            }
+        } else {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
     }
 
