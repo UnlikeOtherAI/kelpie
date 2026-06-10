@@ -474,6 +474,11 @@ struct BrowserManagementHandler {
         let tab = callbacks.onNewTab()
         if let urlString = body["url"] as? String,
            let url = URL(string: urlString) {
+            // Clear the Start Page overlay so the loaded page is visible —
+            // without this the renderer stays hidden behind the blank Start
+            // Page even though the navigation succeeds (matches `onWillLoad`).
+            tab.isStartPage = false
+            tab.currentURL = url.absoluteString
             tab.renderer.load(url: url)
         }
         return successResponse([
