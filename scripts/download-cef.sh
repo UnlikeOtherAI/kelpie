@@ -19,7 +19,7 @@ download_and_extract() {
 }
 
 install_macos_arm64() {
-    local cef_version="146.0.9+g3ca6a87+chromium-146.0.7680.165"
+    local cef_version="148.0.10+g7ee53f5+chromium-148.0.7778.218"
     local cef_platform="macosarm64"
     local outdir="apps/macos/Frameworks"
     local tarball="${TMP_ROOT}/cef-${cef_platform}.tar.bz2"
@@ -41,7 +41,12 @@ install_macos_arm64() {
     cp -R "${extracted}/Release/Chromium Embedded Framework.framework" "${outdir}/"
     cp -R "${extracted}/include" "${outdir}/cef_include"
 
-    ln -sfn "${outdir}/cef_include" "${outdir}/cef_include/include"
+    # CEF headers self-reference via `include/...` paths (e.g. cef_app_capi.h
+    # includes "include/capi/cef_base_capi.h"). Point `include` at its own
+    # directory so the search path `…/cef_include` resolves those. Must be a
+    # self-relative target (`.`) so it is correct regardless of the CWD the
+    # script runs from.
+    ln -sfn . "${outdir}/cef_include/include"
 
     local cef_fw="${outdir}/Chromium Embedded Framework.framework"
     if [ -f "${cef_fw}/Resources/Info.plist" ] && [ ! -e "${cef_fw}/Info.plist" ]; then

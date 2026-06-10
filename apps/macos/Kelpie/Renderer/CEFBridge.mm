@@ -55,6 +55,7 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     BOOL _isLoading;
     BOOL _canGoBack;
     BOOL _canGoForward;
+    NSInteger _mainFrameHTTPStatusCode;
     double _loadingProgress;
     NSInteger _nextEvalID;
     NSMutableDictionary<NSString *, id> *_pendingEvalBlocks;
@@ -884,6 +885,12 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
     _currentURL = url ?: @"";
     NotifyStateChange(self);
 }
+
+- (void)cefBridgeUpdateMainFrameHTTPStatusCode:(NSInteger)statusCode {
+    _mainFrameHTTPStatusCode = statusCode;
+}
+
+- (NSInteger)mainFrameHTTPStatusCode { return _mainFrameHTTPStatusCode; }
 
 - (void)cefBridgeUpdateCurrentTitle:(NSString *)title {
     _currentTitle = title ?: @"";

@@ -557,7 +557,7 @@ final class CEFRenderer: RendererEngine {
 
         NetworkTrafficStore.shared.appendDocumentNavigation(
             url: url,
-            statusCode: 0,
+            statusCode: bridge?.mainFrameHTTPStatusCode() ?? 0,
             contentType: "",
             startedAt: documentNavigationStart
         )
