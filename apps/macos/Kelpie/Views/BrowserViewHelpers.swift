@@ -148,23 +148,6 @@ struct FloatingProgressPill: View {
     }
 }
 
-struct WindowBlurOverlay: NSViewRepresentable {
-    let opacity: CGFloat
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .fullScreenUI
-        view.blendingMode = .withinWindow
-        view.state = .active
-        view.alphaValue = opacity
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.alphaValue = opacity
-    }
-}
-
 // MARK: - AppKit-backed resize handle (bypasses WebView first-responder hit-test issue)
 
 struct AppKitResizeHandle: NSViewRepresentable {
