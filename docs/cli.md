@@ -44,6 +44,8 @@ kelpie discover --scan-timeout 5000    # custom mDNS scan duration in ms
 
 `--scan-timeout` controls how long the mDNS scan runs. The global `--timeout` flag, by contrast, governs the per-request timeout used by individual device commands and has no effect on `discover`.
 
+mDNS announcements are racy. If the scan finds no devices, the CLI falls back to probing `127.0.0.1` directly (the recorded running ports plus `8420`–`8429`) so a Kelpie running on the same host still appears. This same localhost fallback is used whenever a command runs without `--device` and the scan comes up empty.
+
 **Output:**
 ```json
 {
@@ -90,6 +92,8 @@ kelpie browser register codex-b --app /Applications/Kelpie.app
 
 ### `kelpie browser launch <name>`
 Launch a new local macOS Kelpie app instance for a registered alias. If `--port` is omitted, the CLI auto-selects the first safe free port and skips reserved ports such as `8421` used by AppReveal and CLI MCP.
+
+If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
 
 ```bash
 kelpie browser launch claude-a
