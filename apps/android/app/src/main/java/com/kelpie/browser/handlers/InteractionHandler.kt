@@ -290,6 +290,7 @@ class InteractionHandler(
     private fun tapScript(execution: TapExecution): String =
         """
         (function() {
+            ${elementSelectorBuilderScript()}
             ${interactionHelpersScript()}
             var requestedX = ${execution.requestedX};
             var requestedY = ${execution.requestedY};
