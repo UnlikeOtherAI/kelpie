@@ -35,6 +35,12 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
   if (getAllDevices().length === 0) {
     addDevices(await scanForDevices(2500));
   }
+  // mDNS is racy; a Kelpie on this host is reachable on 127.0.0.1 even when the
+  // browse misses its announcement. Fall back to a direct localhost probe.
+  if (getAllDevices().length === 0) {
+    const { probeLocalDevices } = await import("../discovery/local-probe.js");
+    addDevices(await probeLocalDevices());
+  }
   const all = getAllDevices();
   if (all.length === 1) return all[0];
   if (all.length === 0) {

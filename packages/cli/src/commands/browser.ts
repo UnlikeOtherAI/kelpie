@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { Command } from "commander";
 import { print } from "../output/formatter.js";
+import { probeHealth } from "../discovery/local-probe.js";
 import type { GlobalOptions } from "../types.js";
 import {
   clearRunningBrowser,
@@ -17,16 +18,18 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+/** How many ports above the requested one the macOS app may fall back to. */
+const PORT_FALLBACK_RANGE = 10;
+/** How long to wait for a freshly launched instance to bind a port. */
+const LAUNCH_BIND_TIMEOUT_MS = 12_000;
+/** How often to re-probe while waiting for the launched instance to bind. */
+const LAUNCH_BIND_POLL_MS = 400;
+
 async function isReachable(port?: number): Promise<boolean> {
   if (!port) {
     return false;
   }
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/health`);
-    return response.ok;
-  } catch {
-    return false;
-  }
+  return probeHealth(port);
 }
 
 function chooseLaunchPort(requestedPort?: string): number {
@@ -34,6 +37,46 @@ function chooseLaunchPort(requestedPort?: string): number {
     return Number(requestedPort);
   }
   return DEFAULT_PORT;
+}
+
+function fallbackPorts(requestedPort: number): number[] {
+  return Array.from({ length: PORT_FALLBACK_RANGE }, (_value, index) => requestedPort + index);
+}
+
+/** Ports in the fallback range already reachable before launch (stale instances). */
+async function reachablePorts(ports: number[]): Promise<Set<number>> {
+  const checks = await Promise.all(
+    ports.map(async (port) => ({ port, reachable: await probeHealth(port) })),
+  );
+  return new Set(checks.filter((check) => check.reachable).map((check) => check.port));
+}
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The macOS app falls back to the next free port when the requested one is held
+ * by a stale instance. Poll the fallback range for a port that became reachable
+ * after launch (i.e. was not reachable before) so the store records the real
+ * bound port. Prefer the requested port when it newly comes up.
+ */
+async function waitForBoundPort(
+  requestedPort: number,
+  preLaunchReachable: Set<number>,
+): Promise<number | undefined> {
+  const ports = fallbackPorts(requestedPort);
+  const deadline = Date.now() + LAUNCH_BIND_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const nowReachable = await reachablePorts(ports);
+    const fresh = ports.filter((port) => nowReachable.has(port) && !preLaunchReachable.has(port));
+    if (fresh.includes(requestedPort)) {
+      return requestedPort;
+    }
+    if (fresh.length > 0) {
+      return fresh[0];
+    }
+    await delay(LAUNCH_BIND_POLL_MS);
+  }
+  return undefined;
 }
 
 export function registerBrowser(program: Command): void {
@@ -135,9 +178,11 @@ export function registerBrowser(program: Command): void {
       }
 
       try {
+        const preLaunchReachable = await reachablePorts(fallbackPorts(port));
         await execFileAsync("open", ["-na", appPath, "--args", "--port", String(port)]);
-        await setRunningBrowser(name, { port, lastLaunchedAt: new Date().toISOString() });
-        print({ success: true, name, platform: alias.platform, appPath, port }, globals.format);
+        const boundPort = (await waitForBoundPort(port, preLaunchReachable)) ?? port;
+        await setRunningBrowser(name, { port: boundPort, lastLaunchedAt: new Date().toISOString() });
+        print({ success: true, name, platform: alias.platform, appPath, port: boundPort }, globals.format);
       } catch (error) {
         await clearRunningBrowser(name);
         print({
