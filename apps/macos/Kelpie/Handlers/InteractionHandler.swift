@@ -346,6 +346,7 @@ struct InteractionHandler {
     private func tapScript(execution: TapExecution) -> String {
         """
         (function() {
+            \(elementSelectorBuilderScript())
             \(interactionHelpersScript())
             var requestedX = \(execution.requestedX);
             var requestedY = \(execution.requestedY);
