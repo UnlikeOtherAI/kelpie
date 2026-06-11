@@ -129,7 +129,12 @@ struct NavigationHandler {
         let windowId = HandlerContext.windowId(from: body)
         // Prefer the active tab's own stored state — context.renderer may lag
         // behind tab switches, returning a stale inactive tab's URL (issue #17).
+        // This tab-store shortcut is WebKit-only: in Chromium (CEF) mode the
+        // tab store holds a hidden about:blank WKWebViewRenderer, so reading it
+        // would report "Start Page" while CEF is on a real page (#78). CEF falls
+        // through to the live renderer via resolveRenderer below.
         if tabId == nil,
+           !context.activeEngineIsChromium,
            let store = context.tabStore(windowId: windowId, tabId: nil),
            let tab = store.activeTab {
             return ["url": tab.currentURL, "title": tab.title]
