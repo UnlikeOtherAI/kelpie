@@ -380,9 +380,18 @@ final class HandlerContext {
         )
     }
 
-    func load(url: URL) {
+    /// Side-effects every navigation must run regardless of which renderer is
+    /// driven: notify the shell (URL-bar / loading UI) and tear down the 3D
+    /// inspector. Exposed so handlers can drive the resolved renderer directly,
+    /// keeping navigate targeting the same renderer that reads resolve to even
+    /// when no window has rendered to wire `renderer` to the active tab.
+    func prepareForNavigation() {
         WindowRegistry.shared.defaultEntry()?.callbacks?.onWillLoad()
         reset3DInspectorForNavigation()
+    }
+
+    func load(url: URL) {
+        prepareForNavigation()
         renderer?.load(url: url)
     }
 
