@@ -243,13 +243,25 @@ private struct BrowserCommands: Commands {
 @main
 struct KelpieApp: App {
     @StateObject private var browserState = BrowserState()
-    @StateObject private var rendererState = RendererState()
+    @StateObject private var rendererState: RendererState
     @StateObject private var serverState: ServerState
 
     init() {
         let launchPort = Self.launchPortArgument() ?? 8420
-        _serverState = StateObject(wrappedValue: ServerState(port: UInt16(launchPort)))
+        let server = ServerState(port: UInt16(launchPort))
+        let renderer = RendererState()
+        _serverState = StateObject(wrappedValue: server)
+        _rendererState = StateObject(wrappedValue: renderer)
         _ = AIState.shared
+        // Kelpie is driven headlessly over HTTP/MCP and must be reachable
+        // whenever the process is alive, not only when a window is foregrounded.
+        // Gating server start on the window's onAppear meant a background launch
+        // never started the server, so the device never became discoverable
+        // (#75, and the NO_DEVICES reports). Start it eagerly at launch; the
+        // onAppear call below is a redundant, idempotent safety net.
+        Task { @MainActor in
+            Self.startServices(serverState: server, rendererState: renderer)
+        }
     }
 
     var body: some Scene {
@@ -260,7 +272,7 @@ struct KelpieApp: App {
                 rendererState: rendererState,
                 viewportState: serverState.viewportState
             )
-            .onAppear { startServices() }
+            .onAppear { Self.startServices(serverState: serverState, rendererState: rendererState) }
             .frame(
                 minWidth: ViewportState.minimumShellSize.width,
                 minHeight: ViewportState.minimumShellSize.height
@@ -275,10 +287,10 @@ struct KelpieApp: App {
         }
     }
 
-    private func startServices() {
+    private static func startServices(serverState: ServerState, rendererState: RendererState) {
         serverState.startHTTPServer(rendererState: rendererState)
         #if DEBUG
-        if Self.canBind(port: 8421) {
+        if canBind(port: 8421) {
             AppReveal.start(port: 8421)
         } else {
             print("[KelpieApp] Skipping AppReveal start because port 8421 is already in use")
