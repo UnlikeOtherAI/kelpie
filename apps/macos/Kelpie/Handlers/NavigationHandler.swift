@@ -26,11 +26,11 @@ struct NavigationHandler {
         do {
             let renderer = try context.resolveRenderer(tabId: tabId)
             let start = CFAbsoluteTimeGetCurrent()
-            if tabId == nil {
-                context.load(url: url)
-            } else {
-                renderer.load(url: url)
-            }
+            // Drive the SAME renderer reads resolve to, so navigate works even
+            // when no window has rendered to wire context.renderer to the active
+            // tab — i.e. headless / background, the MCP-controlled mode (#78).
+            context.prepareForNavigation()
+            renderer.load(url: url)
 
             for _ in 0..<100 {
                 try? await Task.sleep(nanoseconds: 100_000_000)
