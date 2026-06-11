@@ -38,8 +38,19 @@ struct NavigationHandler {
             }
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            let finalURL = renderer.currentURL?.absoluteString ?? ""
+            // Honest failure: a renderer still parked on about:blank / no URL after
+            // the load window means the navigation never took effect (e.g. a
+            // renderer resolution mismatch). Report it instead of a false success
+            // that leaves callers reading a blank document (#78/#79).
+            if finalURL.isEmpty || finalURL == "about:blank" {
+                return errorResponse(
+                    code: "NAVIGATION_ERROR",
+                    message: "Navigation to \(urlString) did not load — the active renderer is still blank."
+                )
+            }
             return successResponse([
-                "url": renderer.currentURL?.absoluteString ?? urlString,
+                "url": finalURL,
                 "title": renderer.currentTitle,
                 "loadTime": loadTime
             ])

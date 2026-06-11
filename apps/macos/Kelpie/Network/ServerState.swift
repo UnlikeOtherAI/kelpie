@@ -35,6 +35,7 @@ final class ServerState: ObservableObject {
         }
         wkRenderer = renderer
         handlerContext.renderer = renderer
+        handlerContext.activeEngineIsChromium = false
     }
     private(set) var cefRenderer: CEFRenderer?
 
@@ -73,6 +74,7 @@ final class ServerState: ObservableObject {
         let startEngine = rendererState.activeEngine
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
+        handlerContext.activeEngineIsChromium = (startEngine == .chromium)
         handlerContext.startSharedCookieSync()
 
         registerHandlers(rendererState: rendererState)
@@ -243,6 +245,7 @@ final class ServerState: ObservableObject {
         await handlerContext.persistRendererCookiesToSharedJar()
         await CookieMigrator.migrate(from: source, to: target)
         handlerContext.renderer = target
+        handlerContext.activeEngineIsChromium = (engine == .chromium)
         await handlerContext.syncSharedCookiesIntoRenderer(force: true)
 
         // Load the same URL in the target renderer
