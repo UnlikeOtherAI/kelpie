@@ -54,6 +54,9 @@ final class ServerState: ObservableObject {
     /// here (not as a separate property assignment) so handler registration
     /// can read it without force-unwrapping.
     func startHTTPServer(rendererState: RendererState) {
+        // Idempotent: the server is started eagerly at app launch and again from
+        // the window's onAppear safety net — only the first call binds the socket.
+        guard httpServer == nil else { return }
         self.rendererState = rendererState
         let preferredPort = UInt16(deviceInfo.port)
         let resolvedPort = Self.firstAvailablePort(startingAt: preferredPort)
