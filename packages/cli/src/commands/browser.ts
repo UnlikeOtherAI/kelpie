@@ -43,13 +43,22 @@ function fallbackPorts(requestedPort: number): number[] {
   return Array.from({ length: PORT_FALLBACK_RANGE }, (_value, index) => requestedPort + index);
 }
 
-/** Ports in the fallback range already reachable before launch (stale instances). */
-async function reachablePorts(ports: number[]): Promise<Set<number>> {
+/**
+ * Ports in the fallback range already reachable before launch (stale instances).
+ * The pre-launch snapshot uses a longer timeout so a healthy-but-busy instance
+ * holding the requested port is reliably classified as already-running — a
+ * false negative there would let waitForBoundPort mistake the old instance for
+ * the freshly launched one.
+ */
+export async function reachablePorts(ports: number[], timeoutMs = 600): Promise<Set<number>> {
   const checks = await Promise.all(
-    ports.map(async (port) => ({ port, reachable: await probeHealth(port) })),
+    ports.map(async (port) => ({ port, reachable: await probeHealth(port, timeoutMs) })),
   );
   return new Set(checks.filter((check) => check.reachable).map((check) => check.port));
 }
+
+/** Pre-launch snapshot timeout: generous so a live instance is never missed. */
+const PRE_LAUNCH_PROBE_TIMEOUT_MS = 2_000;
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -59,13 +68,14 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * after launch (i.e. was not reachable before) so the store records the real
  * bound port. Prefer the requested port when it newly comes up.
  */
-async function waitForBoundPort(
+export async function waitForBoundPort(
   requestedPort: number,
   preLaunchReachable: Set<number>,
+  now: () => number = Date.now,
 ): Promise<number | undefined> {
   const ports = fallbackPorts(requestedPort);
-  const deadline = Date.now() + LAUNCH_BIND_TIMEOUT_MS;
-  while (Date.now() < deadline) {
+  const deadline = now() + LAUNCH_BIND_TIMEOUT_MS;
+  while (now() < deadline) {
     const nowReachable = await reachablePorts(ports);
     const fresh = ports.filter((port) => nowReachable.has(port) && !preLaunchReachable.has(port));
     if (fresh.includes(requestedPort)) {
@@ -178,7 +188,7 @@ export function registerBrowser(program: Command): void {
       }
 
       try {
-        const preLaunchReachable = await reachablePorts(fallbackPorts(port));
+        const preLaunchReachable = await reachablePorts(fallbackPorts(port), PRE_LAUNCH_PROBE_TIMEOUT_MS);
         await execFileAsync("open", ["-na", appPath, "--args", "--port", String(port)]);
         const boundPort = (await waitForBoundPort(port, preLaunchReachable)) ?? port;
         await setRunningBrowser(name, { port: boundPort, lastLaunchedAt: new Date().toISOString() });
