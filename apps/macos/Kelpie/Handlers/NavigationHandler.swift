@@ -39,18 +39,21 @@ struct NavigationHandler {
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
             let finalURL = renderer.currentURL?.absoluteString ?? ""
-            // Honest failure: a renderer still parked on about:blank / no URL after
-            // the load window means the navigation never took effect (e.g. a
-            // renderer resolution mismatch). Report it instead of a false success
-            // that leaves callers reading a blank document (#78/#79).
-            if finalURL.isEmpty || finalURL == "about:blank" {
+            // Honest failure (Chromium only): after a real load CEF reports the
+            // live document URL, so a renderer still on about:blank / no URL here
+            // means the page never loaded — report it instead of a false success
+            // that leaves callers reading a blank document (#78/#79). WebKit
+            // updates currentURL asynchronously (KVO), so a blank check there
+            // would false-positive on fast or redirecting loads; keep WebKit's
+            // lenient fallback to the requested URL.
+            if context.activeEngineIsChromium, finalURL.isEmpty || finalURL == "about:blank" {
                 return errorResponse(
                     code: "NAVIGATION_ERROR",
                     message: "Navigation to \(urlString) did not load — the active renderer is still blank."
                 )
             }
             return successResponse([
-                "url": finalURL,
+                "url": finalURL.isEmpty ? urlString : finalURL,
                 "title": renderer.currentTitle,
                 "loadTime": loadTime
             ])
