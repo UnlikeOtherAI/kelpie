@@ -9,6 +9,16 @@
 static NSString *const kCEFBridgeErrorDomain = @"com.kelpie.browser.cef";
 static NSString *const kEvalConsolePrefix = @"__kelpie_eval__:";
 
+// Upper bound on how long a single evaluateJavaScript call may stay pending.
+// The eval result is delivered back through the page's console (see the wrapped
+// script in -evaluateJavaScript:completion:). That channel never fires if the
+// script returns a never-resolving promise, the frame is torn down mid-eval, or
+// the page replaces window.console.log (so Chromium's native console sink is
+// never hit). Without a bound the continuation waits forever and the request
+// hangs — see GitHub issues #23/#24. This is a safety backstop; normal evals
+// complete in milliseconds.
+static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
+
 static BOOL gCEFInitialized = NO;
 static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 
@@ -45,6 +55,7 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 
 @interface CEFBridge ()
 - (void)_finishEvalWithIdentifier:(NSString *)identifier result:(NSString *)result error:(NSError *)error;
+- (void)_failAllPendingEvalsWithError:(NSError *)error;
 @end
 
 @interface CEFBridge () {
@@ -362,6 +373,20 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
     });
 }
 
+- (void)_failAllPendingEvalsWithError:(NSError *)error {
+    NSArray *blocks = nil;
+    @synchronized (self) {
+        blocks = _pendingEvalBlocks.allValues;
+        [_pendingEvalBlocks removeAllObjects];
+    }
+    for (id block in blocks) {
+        void (^completion)(NSString *, NSError *) = block;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(nil, error);
+        });
+    }
+}
+
 + (BOOL)initializeCEF {
     if (gCEFInitialized) {
         return YES;
@@ -502,6 +527,12 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
 }
 
 - (void)dealloc {
+    // Resolve any still-pending evals so their continuations don't leak when the
+    // bridge is torn down (e.g. renderer switch) before a result arrives.
+    [self _failAllPendingEvalsWithError:[NSError
+        errorWithDomain:kCEFBridgeErrorDomain
+                   code:5
+               userInfo:@{NSLocalizedDescriptionKey: @"CEF bridge released before evaluation completed"}]];
     @synchronized (self) {
         // Nil out all owner back-pointers before releasing CEF handles.
         // The 60 Hz message-loop timer can fire cef_do_message_loop_work()
@@ -637,11 +668,33 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
         return;
     }
 
-    NSString *identifier = [NSString stringWithFormat:@"%@-%ld", _identifier ?: @"cef", (long)++_nextEvalID];
-    if (completion != nil) {
-        @synchronized (self) {
+    NSString *identifier;
+    @synchronized (self) {
+        // Both the id increment and the pending-block registration happen under
+        // the lock so the eval bookkeeping stays consistent regardless of caller
+        // thread (today every caller is on the @MainActor CEFRenderer).
+        identifier = [NSString stringWithFormat:@"%@-%ld", _identifier ?: @"cef", (long)++_nextEvalID];
+        if (completion != nil) {
             _pendingEvalBlocks[identifier] = [completion copy];
         }
+    }
+    if (completion != nil) {
+        // Backstop: if the console result channel never delivers, resolve the
+        // pending block with a timeout error so the caller's continuation can
+        // never wait forever. -_finishEvalWithIdentifier: atomically removes the
+        // block, so whichever fires first (real result or this timeout) wins and
+        // the loser is a no-op — the completion runs exactly once.
+        __weak CEFBridge *weakSelf = self;
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kEvalTimeoutSeconds * NSEC_PER_SEC)),
+            dispatch_get_main_queue(),
+            ^{
+                NSError *timeoutError = [NSError
+                    errorWithDomain:kCEFBridgeErrorDomain
+                               code:4
+                           userInfo:@{NSLocalizedDescriptionKey: @"JavaScript evaluation timed out"}];
+                [weakSelf _finishEvalWithIdentifier:identifier result:nil error:timeoutError];
+            });
     }
 
     NSString *wrapped = [NSString stringWithFormat:
@@ -846,6 +899,13 @@ static void LogBrowserHandles(const char *event, cef_browser_t *callbackBrowser,
 }
 
 - (void)cefBridgeWillCloseBrowser {
+    // The frame is going away, so any pending eval's console result can never
+    // arrive. Resolve them now instead of leaving callers blocked until the
+    // per-eval timeout fires.
+    [self _failAllPendingEvalsWithError:[NSError
+        errorWithDomain:kCEFBridgeErrorDomain
+                   code:5
+               userInfo:@{NSLocalizedDescriptionKey: @"CEF browser closed before evaluation completed"}]];
     @synchronized (self) {
         if (_callbackBrowser != nullptr) {
             CEFBridgeInvalidateScreenshotCapture(_callbackBrowser);

@@ -875,4 +875,10 @@ Response:
 }
 ```
 
+On macOS with the Chromium (CEF) renderer, each evaluation is bounded by a 30s
+safety timeout. If the result never arrives (e.g. the expression returns a
+never-resolving promise, the frame is torn down mid-evaluation, or the page has
+replaced `console.log`), the call resolves with `JavaScript evaluation timed
+out` instead of hanging the request.
+
 ---
