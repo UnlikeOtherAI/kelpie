@@ -3,6 +3,7 @@ import UIKit
 import WebKit
 
 /// Observable state for the HTTP server and mDNS advertiser.
+@MainActor
 final class ServerState: ObservableObject {
     @Published var isServerRunning = false
     @Published var isMDNSAdvertising = false
@@ -52,7 +53,9 @@ final class ServerState: ObservableObject {
                 deviceInfo: deviceInfo
             )
             server.onPendingPairChanged = { [weak self] in
-                self?.pairingCoordinator.refresh()
+                Task { @MainActor in
+                    self?.pairingCoordinator.refresh()
+                }
             }
             httpServer = server
             server.start()
