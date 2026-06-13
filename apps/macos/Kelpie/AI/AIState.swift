@@ -231,10 +231,9 @@ final class AIState: ObservableObject {
                 await MainActor.run {
                     if error.contains("auth_required") {
                         self.lastError = "This model requires a Hugging Face token."
-                        self.onAuthFailureNavigate?(
-                            // swiftlint:disable:next force_unwrapping
-                            URL(string: "https://huggingface.co/settings/tokens")!
-                        )
+                        if let tokenURL = URL(string: "https://huggingface.co/settings/tokens") {
+                            self.onAuthFailureNavigate?(tokenURL)
+                        }
                     } else {
                         self.lastError = error
                     }

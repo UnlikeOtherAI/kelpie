@@ -65,15 +65,9 @@ final class ServerState: ObservableObject {
             deviceInfo = DeviceInfo.current(port: Int(resolvedPort))
         }
 
-        // Pre-initialize CEF so the Mach port rendezvous server is registered
-        // in the clean startup run loop context. cef_initialize() installs
-        // CFRunLoop observers that only work correctly when called from a
-        // top-level event loop iteration (not from an HTTP handler async chain).
-        // Browser creation is still deferred to the first Chromium switch.
-        CEFRenderer.ensureCEFInitialized()
-
-        // Start only the selected renderer (browser instance). CEF is
-        // initialized above but no Chromium browser is created yet.
+        // Start only the selected renderer. Chromium/CEF stays fully lazy so a
+        // WebKit launch does not run CEF startup observers before they are
+        // needed; CEFRenderer initializes CEF when Chromium is selected.
         let startEngine = rendererState.activeEngine
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
@@ -134,7 +128,6 @@ final class ServerState: ObservableObject {
         DeviceHandler(
             context: ctx,
             deviceInfo: deviceInfo,
-            rendererState: rendererState,
             viewportState: viewportState
         ).register(on: router)
         EvaluateHandler(context: ctx).register(on: router)

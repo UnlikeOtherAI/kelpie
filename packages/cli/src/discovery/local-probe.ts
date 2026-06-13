@@ -1,4 +1,4 @@
-import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
+import { API_VERSION_PREFIX, DEFAULT_PORT, type Platform } from "@unlikeotherai/kelpie-shared";
 import type { DiscoveredDevice } from "../types.js";
 import { loadBrowserStore } from "../browser/store.js";
 
@@ -11,6 +11,27 @@ import { loadBrowserStore } from "../browser/store.js";
 /** How many ports above DEFAULT_PORT to sweep when probing localhost. */
 const LOCAL_PORT_SWEEP = 10;
 
+const platforms: readonly Platform[] = ["ios", "android", "macos", "linux", "windows"];
+
+interface DeviceInfoPayload {
+  device?: {
+    id?: string;
+    name?: string;
+    model?: string;
+    platform?: string;
+  };
+  display?: {
+    width?: number;
+    height?: number;
+  };
+  network?: {
+    port?: number;
+  };
+  app?: {
+    version?: string;
+  };
+}
+
 /** Probe a single localhost port's /health endpoint. Returns false on any error. */
 export async function probeHealth(port: number, timeoutMs = 600): Promise<boolean> {
   const controller = new AbortController();
@@ -22,6 +43,30 @@ export async function probeHealth(port: number, timeoutMs = 600): Promise<boolea
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function probeDeviceInfo(
+  port: number,
+  timeoutMs = 1000,
+): Promise<DeviceInfoPayload | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}${API_VERSION_PREFIX}get-device-info`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      signal: controller.signal,
+    });
+    if (!res.ok) return undefined;
+    return await res.json() as DeviceInfoPayload;
+  } catch {
+    return undefined;
   } finally {
     clearTimeout(timer);
   }
@@ -52,22 +97,28 @@ function aliasForPort(
   return undefined;
 }
 
+function parsePlatform(value: string | undefined, fallback: DiscoveredDevice["platform"]): Platform {
+  const normalized = value?.toLowerCase();
+  return platforms.find((platform) => platform === normalized) ?? fallback;
+}
+
 function localDevice(
   store: Awaited<ReturnType<typeof loadBrowserStore>>,
   port: number,
+  info: DeviceInfoPayload,
 ): DiscoveredDevice {
   const alias = aliasForPort(store, port);
-  const platform = alias?.platform ?? "macos";
+  const platform = parsePlatform(info.device?.platform, alias?.platform ?? "macos");
   return {
     id: `local:127.0.0.1:${port}`,
-    name: alias?.name ?? `localhost:${port}`,
+    name: alias?.name ?? info.device?.name ?? `localhost:${port}`,
     ip: "127.0.0.1",
     port,
     platform,
-    model: `Kelpie ${platform}`,
-    width: 0,
-    height: 0,
-    version: "0.0.0",
+    model: info.device?.model ?? `Kelpie ${platform}`,
+    width: info.display?.width ?? 0,
+    height: info.display?.height ?? 0,
+    version: info.app?.version ?? "0.0.0",
     lastSeen: Date.now(),
   };
 }
@@ -81,9 +132,14 @@ export async function probeLocalDevices(): Promise<DiscoveredDevice[]> {
   const store = await loadBrowserStore();
   const ports = candidatePorts(store);
   const results = await Promise.all(
-    ports.map(async (port) => ({ port, reachable: await probeHealth(port) })),
+    ports.map(async (port) => {
+      if (!await probeHealth(port)) {
+        return { port, info: undefined };
+      }
+      return { port, info: await probeDeviceInfo(port) };
+    }),
   );
   return results
-    .filter((result) => result.reachable)
-    .map((result) => localDevice(store, result.port));
+    .filter((result): result is { port: number; info: DeviceInfoPayload } => result.info !== undefined)
+    .map((result) => localDevice(store, result.port, result.info));
 }

@@ -4,7 +4,6 @@ import AppKit
 struct DeviceHandler {
     let context: HandlerContext
     let deviceInfo: DeviceInfo
-    let rendererState: RendererState
     let viewportState: ViewportState
 
     /// Canonical list of HTTP/MCP methods that macOS does not implement.
@@ -80,11 +79,8 @@ struct DeviceHandler {
         ])
     }
 
-    @MainActor
     private func getDeviceInfoResponse() async -> [String: Any] {
-        // swiftlint:disable:next force_unwrapping
-        let screen = NSScreen.main ?? NSScreen.screens.first!
-        return [
+        [
             "device": [
                 "id": deviceInfo.id,
                 "name": deviceInfo.name,
@@ -94,14 +90,14 @@ struct DeviceHandler {
             "display": [
                 "width": deviceInfo.width,
                 "height": deviceInfo.height,
-                "scale": screen.backingScaleFactor
+                "scale": deviceInfo.scale
             ],
             "network": ["ip": "0.0.0.0", "port": deviceInfo.port],
             "browser": [
-                "engine": rendererState.activeEngine.rawValue,
+                "engine": DeviceInfo.currentRendererEngine(),
                 "version": ProcessInfo.processInfo.operatingSystemVersionString
             ],
-            "app": ["version": deviceInfo.version, "build": "1"],
+            "app": ["version": deviceInfo.version, "build": deviceInfo.build],
             "system": [
                 "os": "macOS",
                 "osVersion": ProcessInfo.processInfo.operatingSystemVersionString
