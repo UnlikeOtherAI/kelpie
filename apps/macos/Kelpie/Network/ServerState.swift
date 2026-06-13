@@ -403,6 +403,10 @@ final class ServerState: ObservableObject {
         guard fd >= 0 else { return false }
         defer { close(fd) }
 
+        var reuseAddress: Int32 = 1
+        let optionLength = socklen_t(MemoryLayout<Int32>.size)
+        _ = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, optionLength)
+
         var address = sockaddr_in6()
         address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
         address.sin6_family = sa_family_t(AF_INET6)
