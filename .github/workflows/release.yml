@@ -163,7 +163,12 @@ jobs:
                   if [ "${BUILD_APPIMAGE}" = "true" ]; then
                     curl -L --fail -o /tmp/appimagetool.AppImage "${APPIMAGETOOL_URL}"
                     chmod 755 /tmp/appimagetool.AppImage
-                    APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage --appimage-extract >/dev/null
+                    rm -rf /tmp/squashfs-root
+                    (
+                      cd /tmp
+                      APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage --appimage-extract >/dev/null
+                    )
+                    test -x /tmp/squashfs-root/AppRun
                     bash scripts/package-linux-appimage.sh \
                       --version "${VERSION}" \
                       --bundle-dir "${bundle_root}/kelpie-linux" \
