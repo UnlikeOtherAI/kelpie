@@ -80,6 +80,24 @@ describe("MCP tool definitions", () => {
     expect(body).not.toHaveProperty("device");
   });
 
+  it("coordinate diagnostics accepts point and action schemas", () => {
+    const tool = browserTools.find((t) => t.name === "kelpie_coordinate_diagnostics")!;
+    const args = {
+      device: "iphone",
+      points: [{ label: "pay", x: 120, y: 240, expectedSelector: "#pay" }],
+      actions: [
+        { type: "tap", x: 120, y: 240, expectedSelector: "#pay" },
+        { type: "swipe", from: { x: 200, y: 600 }, to: { x: 200, y: 300 }, steps: 12 },
+        { type: "scroll", deltaX: 0, deltaY: 300 },
+      ],
+      captureScreenshot: true,
+      screenshotResolution: "viewport",
+    };
+    expect(tool.schema.points.safeParse(args.points).success).toBe(true);
+    expect(tool.schema.actions.safeParse(args.actions).success).toBe(true);
+    expect(tool.bodyFromArgs(args)).not.toHaveProperty("device");
+  });
+
   it("bodyFromArgs strips filter params from CLI tools", () => {
     const groupNav = cliTools.find((t) => t.name === "kelpie_group_navigate")!;
     const body = groupNav.bodyFromArgs({ platform: "ios", include: "iPhone", exclude: "", url: "https://example.com" });

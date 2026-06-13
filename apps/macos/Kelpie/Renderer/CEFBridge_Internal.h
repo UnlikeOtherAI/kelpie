@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
     BOOL _isLoading;
     BOOL _canGoBack;
     BOOL _canGoForward;
+    NSInteger _mainFrameHTTPStatusCode;
     double _loadingProgress;
     NSInteger _nextEvalID;
     NSMutableDictionary<NSString *, id> *_pendingEvalBlocks;
@@ -40,6 +41,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)_finishEvalWithIdentifier:(NSString *)identifier
                            result:(nullable NSString *)result
                             error:(nullable NSError *)error;
+
+/// Resolve every pending JS evaluation block with the same error.
+- (void)_failAllPendingEvalsWithError:(NSError *)error;
 
 @end
 

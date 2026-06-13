@@ -55,6 +55,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Whether the browser can go forward.
 - (BOOL)canGoForward;
 
+/// HTTP status code of the most recently completed main-frame document load,
+/// or 0 if not yet known. Captured from CEF's OnLoadEnd callback.
+- (NSInteger)mainFrameHTTPStatusCode;
+
 /// Evaluate JavaScript and return the result via callback.
 /// The callback receives the result as a JSON string, or nil on error.
 - (void)evaluateJavaScript:(NSString *)script

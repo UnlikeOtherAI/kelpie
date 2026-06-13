@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { probeLocalDevices } from "../../src/discovery/local-probe.js";
 import {
   addDevice,
   addDevices,
@@ -14,6 +15,14 @@ import {
 } from "../../src/discovery/registry.js";
 import type { DiscoveredDevice } from "../../src/types.js";
 import { setRunningBrowser, upsertBrowserAlias } from "../../src/browser/store.js";
+
+vi.mock("../../src/discovery/scanner.js", () => ({
+  scanForDevices: vi.fn(async () => []),
+}));
+
+vi.mock("../../src/discovery/local-probe.js", () => ({
+  probeLocalDevices: vi.fn(async () => []),
+}));
 
 function makeDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice {
   return {
@@ -37,6 +46,7 @@ describe("device registry", () => {
 
   beforeEach(() => {
     clearDevices();
+    vi.mocked(probeLocalDevices).mockResolvedValue([]);
   });
 
   beforeEach(async () => {
@@ -72,6 +82,22 @@ describe("device registry", () => {
 
   it("returns undefined for unknown device", async () => {
     expect(await getDevice("nonexistent")).toBeUndefined();
+  });
+
+  it("resolves named localhost devices when mDNS is empty", async () => {
+    vi.mocked(probeLocalDevices).mockResolvedValue([
+      makeDevice({
+        id: "local:127.0.0.1:8420",
+        name: "dictator",
+        ip: "127.0.0.1",
+        port: 8420,
+        platform: "macos",
+      }),
+    ]);
+
+    const device = await getDevice("dictator");
+    expect(device?.ip).toBe("127.0.0.1");
+    expect(device?.platform).toBe("macos");
   });
 
   it("prioritizes ID over name", async () => {

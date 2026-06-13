@@ -479,6 +479,8 @@ Response:
 }
 ```
 
+The cookie is written to the platform's native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), so `httpOnly`, `secure`, `sameSite`, and `expires` are all honored on every platform. This is the supported way to inject an httpOnly session cookie for auth — JavaScript (`eval` / `document.cookie`) cannot create httpOnly cookies. On macOS, pass `tabId` to target a specific tab's cookie store.
+
 ### `deleteCookies`
 Delete cookies by name, domain, or all.
 
@@ -872,5 +874,11 @@ Response:
   "result": "Example Domain"
 }
 ```
+
+On macOS with the Chromium (CEF) renderer, each evaluation is bounded by a 30s
+safety timeout. If the result never arrives (e.g. the expression returns a
+never-resolving promise, the frame is torn down mid-evaluation, or the page has
+replaced `console.log`), the call resolves with `JavaScript evaluation timed
+out` instead of hanging the request.
 
 ---

@@ -8,7 +8,7 @@ import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/kelpie-shared";
  */
 describe("E2E: MCP Tool Definitions", () => {
   it("browser MCP tools cover all expected methods", () => {
-    expect(BrowserMcpTools.length).toBe(115);
+    expect(BrowserMcpTools.length).toBe(118);
     // Spot check key tools
     expect(BrowserMcpTools).toContain("kelpie_navigate");
     expect(BrowserMcpTools).toContain("kelpie_screenshot");
@@ -19,6 +19,7 @@ describe("E2E: MCP Tool Definitions", () => {
     expect(BrowserMcpTools).toContain("kelpie_set_viewport_preset");
     expect(BrowserMcpTools).toContain("kelpie_play_script");
     expect(BrowserMcpTools).toContain("kelpie_show_commentary");
+    expect(BrowserMcpTools).toContain("kelpie_coordinate_diagnostics");
     expect(BrowserMcpTools).toContain("kelpie_report_issue");
   });
 
@@ -30,8 +31,8 @@ describe("E2E: MCP Tool Definitions", () => {
     expect(CliMcpTools).toContain("kelpie_list_devices");
   });
 
-  it("total MCP tools is 139", () => {
-    expect(BrowserMcpTools.length + CliMcpTools.length).toBe(139);
+  it("total MCP tools is 142", () => {
+    expect(BrowserMcpTools.length + CliMcpTools.length).toBe(142);
   });
 });
 

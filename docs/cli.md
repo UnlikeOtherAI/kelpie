@@ -12,6 +12,7 @@ pnpm add -g @unlikeotherai/kelpie
 
 ```
 kelpie <command> [options]
+kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <url>`
 ```
 
 ---
@@ -21,6 +22,7 @@ kelpie <command> [options]
 | Flag | Description |
 |---|---|
 | `--device <id\|name\|ip>` | Target a specific device by ID (most reliable), name, or IP |
+| `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
 | `--port <port>` | Override default port 8420 |
@@ -41,6 +43,8 @@ kelpie discover --scan-timeout 5000    # custom mDNS scan duration in ms
 ```
 
 `--scan-timeout` controls how long the mDNS scan runs. The global `--timeout` flag, by contrast, governs the per-request timeout used by individual device commands and has no effect on `discover`.
+
+mDNS announcements are racy. If the scan finds no devices, the CLI falls back to probing `127.0.0.1` directly (the recorded running ports plus `8420`–`8429`) so a Kelpie running on the same host still appears. A localhost candidate is accepted only when both `/health` and `/v1/get-device-info` respond, so a stale or non-automation process cannot turn ordinary commands into full request timeouts. This same localhost fallback is used whenever a command runs without `--device` and the scan comes up empty, and `kelpie info` uses it before reporting an empty device list.
 
 **Output:**
 ```json
@@ -89,6 +93,8 @@ kelpie browser register codex-b --app /Applications/Kelpie.app
 ### `kelpie browser launch <name>`
 Launch a new local macOS Kelpie app instance for a registered alias. If `--port` is omitted, the CLI auto-selects the first safe free port and skips reserved ports such as `8421` used by AppReveal and CLI MCP.
 
+If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
+
 ```bash
 kelpie browser launch claude-a
 kelpie browser launch codex-b --port 8450 --wait
@@ -123,6 +129,7 @@ kelpie browser remove claude-a
 
 ```bash
 kelpie navigate "https://example.com" --device "My iPhone"
+kelpie "https://example.com" --device "My iPhone"          # shorthand
 ```
 
 ### `kelpie back` / `kelpie forward` / `kelpie reload`
@@ -520,6 +527,8 @@ List all open tabs.
 
 Open tabs and their current URLs are restored automatically when the browser app restarts, so `kelpie tabs` reflects the live restored session rather than a fresh blank state after relaunch.
 
+When multiple tabs are open on macOS, pass `--tabId <uuid>` to tab-aware commands like `url`, `page-text`, `click`, `screenshot`, and `eval`.
+
 ```bash
 kelpie tabs --device "My iPhone"
 ```
@@ -531,6 +540,8 @@ Open a new tab.
 kelpie tab new "https://example.com" --device "My iPhone"
 kelpie tab new --device "My iPhone"                         # blank tab
 ```
+
+The JSON response includes `tabId` for the created tab; `tab.id` contains the same value.
 
 ### `kelpie tab switch <id>`
 Switch to a tab.
@@ -583,8 +594,23 @@ kelpie iframe context --device "My iPhone"
 
 ## Cookie & Storage Commands
 
+### Authentication / session state
+
+To drive an app that sits behind a login, put the browser into an authenticated state **before** navigating. Kelpie owns the browser's cookie store directly, so no external proxy is needed:
+
+- **httpOnly session cookies are fully supported.** Set them with `kelpie cookies set <name> <value> --http-only` (MCP: `kelpie_set_cookie`). They are written to the native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), not via JavaScript, so the `--http-only`, `--secure`, `--same-site`, and `--expires` attributes all take effect.
+- **Do not use `eval` / `document.cookie` to set a session cookie.** JavaScript cannot create an httpOnly cookie, and reading `document.cookie` returns an empty string for httpOnly cookies — so it looks like the cookie is missing even when it is set. Use `kelpie cookies list` (which reads the native store, including httpOnly cookies) to verify instead.
+- **Non-httpOnly token schemes** that live in web storage can be primed with `kelpie storage set <key> <value>`.
+- **Interactive login** is also available: complete a sign-in once in the browser (e.g. `kelpie safari-auth <url>` on macOS/iOS), and the resulting session cookies persist.
+
+```bash
+# inject an httpOnly session cookie, then navigate authenticated
+kelpie cookies set "hw_session" "$TOKEN" --domain "app.example.com" --path "/" --http-only --secure --device admin
+kelpie navigate "https://app.example.com/dashboard" --device admin
+```
+
 ### `kelpie cookies list`
-Get cookies for the current page.
+Get cookies for the current page. Reads the native cookie store, so httpOnly cookies are included (unlike `document.cookie`).
 
 ```bash
 kelpie cookies list --device "My iPhone"
@@ -592,11 +618,12 @@ kelpie cookies list --device "My iPhone" --name "session_id"
 ```
 
 ### `kelpie cookies set <name> <value>`
-Set a cookie.
+Set a cookie. Supports `--domain`, `--path`, `--secure`, `--http-only`, `--same-site <Strict|Lax|None>`, and `--expires`.
 
 ```bash
 kelpie cookies set "session_id" "abc123" --device "My iPhone"
 kelpie cookies set "theme" "dark" --device "My iPhone" --domain "example.com" --path "/" --secure
+kelpie cookies set "hw_session" "abc123" --device "My iPhone" --domain "example.com" --path "/" --http-only --secure
 ```
 
 ### `kelpie cookies delete`
@@ -861,259 +888,28 @@ kelpie viewport --device "My iPhone"
 
 ## Group Commands
 
-All group commands target every discovered device unless filtered.
+Detailed group command documentation lives in [docs/cli/group.md](cli/group.md).
 
-### `kelpie group <command> [args]`
-
-```bash
-kelpie group navigate "https://example.com"
-kelpie group screenshot --output ./screenshots/
-kelpie group fill "#email" "test@example.com"
-kelpie group click "#submit"
-kelpie group scroll2 "#footer"
-```
-
-### `kelpie group find-button <text>`
-Find a button on all devices. Returns which devices found it and which didn't.
-
-```bash
-kelpie group find-button "Submit"
-```
-
-**Output:**
-```json
-{
-  "found": [
-    {"device": "My iPhone", "element": {"tag": "button", "text": "Submit"}},
-    {"device": "Pixel 8", "element": {"tag": "button", "text": "Submit"}}
-  ],
-  "notFound": [
-    {"device": "iPad Air", "reason": "Element not found"}
-  ]
-}
-```
-
-### `kelpie group find-element <text>`
-
-```bash
-kelpie group find-element "Sign Up" --role link
-```
-
-### `kelpie group find-link <text>`
-
-```bash
-kelpie group find-link "Sign Up"
-```
-
-### `kelpie group find-input <label>`
-
-```bash
-kelpie group find-input "Email"
-```
-
-### Diagnostic group commands
-
-These mirror the per-device diagnostic and keyboard commands and apply them to every (filtered) device in one shot.
-
-```bash
-kelpie group a11y                          # accessibility tree from every device
-kelpie group dom                           # full DOM from every device
-kelpie group console                       # console messages from every device
-kelpie group errors                        # JS errors from every device
-kelpie group form-state                    # form state from every device
-kelpie group visible                       # visible elements from every device
-kelpie group eval "document.title"         # evaluate JS on every device
-kelpie group keyboard-show --platform ios  # show keyboard on iOS devices
-kelpie group keyboard-hide --platform ios  # hide keyboard on iOS devices
-```
-
-`kelpie group eval` is useful for sanity-checking environment differences across browsers. `kelpie group keyboard-show` and `kelpie group keyboard-hide` are mobile-only — combine with `--platform ios` or `--platform android` to avoid hitting unsupported desktop devices.
-
-### Group Filtering
-
-```bash
-kelpie group navigate "https://example.com" --platform ios       # only iOS devices
-kelpie group navigate "https://example.com" --platform android   # only Android
-kelpie group navigate "https://example.com" --exclude "iPad Air" # exclude specific device
-kelpie group navigate "https://example.com" --include "a1b2c3d4,My iPhone" # only these devices (by ID or name)
-```
-
-`--include` accepts a comma-separated list of device IDs or names. When both `--include` and `--platform` are specified, only devices matching both filters are targeted.
-
-### Per-device failures and exit codes
-
-Every group command runs against the filtered set of devices in parallel and returns a structured result:
-
-```json
-{
-  "command": "navigate",
-  "deviceCount": 3,
-  "succeeded": 2,
-  "failed": 1,
-  "results": [
-    { "device": {"name": "iPhone", "platform": "ios", "resolution": "390x844"}, "success": true,  "data": {"success": true} },
-    { "device": {"name": "Pixel",  "platform": "android", "resolution": "412x915"}, "success": false, "error": {"code": "NAVIGATION_ERROR", "message": "DNS failed"} },
-    { "device": {"name": "iPad",   "platform": "ios", "resolution": "1024x1366"}, "success": true,  "data": {"success": true} }
-  ]
-}
-```
-
-- Per-device failures appear in `results[]` as entries with `success: false` and a populated `error` envelope. They are **never** silently dropped.
-- By default, the CLI exits with status code `1` if **any** device fails — even when the rest succeeded. Use this for scripts that must treat any device failure as fatal.
-- Pass `--allow-partial` to suppress the non-zero exit and treat the run as successful as long as the orchestrator itself completed. The output payload is identical with or without the flag.
-
-```bash
-kelpie group navigate "https://example.com"                   # exit 1 if any device fails
-kelpie group navigate "https://example.com" --allow-partial   # exit 0 even if some devices fail
-```
-
-For smart queries (`find-button`, `find-element`, `find-link`, `find-input`), only **device-level errors** (transport/protocol failures) flip the exit code. A genuine "element absent" result is reported in `notFound[]` but does not set a non-zero exit, because it is the expected answer when the element is not present on that page.
-
----
+Command surface: `kelpie group`, `kelpie group <command> [args]`, `kelpie group navigate <url>`, `kelpie group screenshot`, `kelpie group fill <selector> <value>`, `kelpie group click <selector>`, `kelpie group scroll2 <selector>`, `kelpie group find-button <text>`, `kelpie group find-element <text>`, `kelpie group find-link <text>`, `kelpie group find-input <label>`, `kelpie group a11y`, `kelpie group dom`, `kelpie group console`, `kelpie group errors`, `kelpie group form-state`, `kelpie group visible`, `kelpie group eval <expression>`, `kelpie group keyboard-show`, and `kelpie group keyboard-hide`.
 
 ## MCP Server
 
-### `kelpie mcp`
-Start the CLI as an MCP server (stdio transport).
+Detailed MCP server documentation lives in [docs/cli/advanced.md](cli/advanced.md#mcp-server).
 
-```bash
-kelpie mcp
-```
-
-Configure in Claude Desktop / Claude Code:
-```json
-{
-  "mcpServers": {
-    "kelpie": {
-      "command": "kelpie",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-### `kelpie mcp --http`
-Start the MCP server with HTTP transport.
-
-```bash
-kelpie mcp --http --port 8421
-```
-
----
+Command surface: `kelpie mcp` and `kelpie mcp --http`.
 
 ## AI Commands
 
-### `kelpie ai list`
-List approved models, their download status, and Ollama models if available.
+Detailed AI command documentation lives in [docs/cli/advanced.md](cli/advanced.md#ai-commands).
 
-```bash
-kelpie ai list
-```
-
-### `kelpie ai pull <model>`
-Download a model from HuggingFace.
-
-```bash
-kelpie ai pull gemma-4-e2b-q4
-```
-
-### `kelpie ai rm <model>`
-Delete a downloaded model.
-
-```bash
-kelpie ai rm gemma-4-e2b-q4
-```
-
-### `kelpie ai status`
-Check inference status on a device.
-
-```bash
-kelpie ai status --device mac
-```
-
-### `kelpie ai load <model>`
-Load a model on a device. Supports native model IDs and `ollama:` prefixed IDs.
-
-```bash
-kelpie ai load gemma-4-e2b-q4 --device mac
-kelpie ai load ollama:llava:7b --device iphone
-```
-
-### `kelpie ai unload`
-Unload the current model from a device.
-
-```bash
-kelpie ai unload --device mac
-```
-
-### `kelpie ai ask <prompt>`
-Run inference on the device's loaded model.
-
-| Flag | Description |
-|---|---|
-| `-c, --context <mode>` | Context mode: `page_text`, `screenshot`, `dom`, `accessibility` |
-| `--max-tokens <n>` | Maximum tokens to generate (default: 512) |
-| `--temperature <t>` | Sampling temperature (default: 0.7) |
-
-```bash
-kelpie ai ask "summarise this page" --device mac -c page_text
-kelpie ai ask "describe what you see" --device mac -c screenshot
-```
-
----
+Command surface: `kelpie ai`, `kelpie ai list`, `kelpie ai pull <model>`, `kelpie ai rm <model>`, `kelpie ai status`, `kelpie ai load <model>`, `kelpie ai unload`, and `kelpie ai ask <prompt>`.
 
 ## LLM Help System
 
-Every command includes structured help designed for LLMs.
+Detailed LLM help documentation lives in [docs/cli/advanced.md](cli/advanced.md#llm-help-system).
 
-### `kelpie --llm-help`
-Outputs a complete machine-readable reference of all commands, their parameters, expected inputs/outputs, usage guidance, and issue-reporting instructions for unexpected failures or missing capabilities.
-
-```bash
-kelpie --llm-help                   # full reference
-kelpie click --llm-help             # help for specific command
-kelpie group --llm-help             # help for group commands
-```
-
-**LLM help includes:**
-- Command purpose and when to use it
-- Full parameter schema with types and defaults
-- Example request/response pairs
-- Common error scenarios, failure-reporting guidance, and the repo issue URL
-- Related commands and suggested workflows
-
-### `kelpie explain <command>`
-Natural language explanation of a command for LLM consumption.
-
-```bash
-kelpie explain scroll2
-```
-
-**Output:**
-```
-scroll2 scrolls the page until a target element is visible in the viewport.
-Unlike regular scroll, it adapts the scroll distance to the device's screen
-size — a phone needs more scroll steps than a tablet to reach the same element.
-
-Use scroll2 when you need to interact with an element that's below the fold.
-It will automatically verify the element is visible after scrolling.
-
-Parameters:
-  selector (required) — CSS selector of the target element
-  position (optional) — where in viewport: "top", "center" (default), "bottom"
-  maxScrolls (optional) — safety limit, default 10
-
-Returns: element position, whether it's visible, number of scrolls performed
-```
-
----
+Command surface: `kelpie --llm-help`, `kelpie click --llm-help`, `kelpie group --llm-help`, and `kelpie explain <command>`.
 
 ## Exit Codes
 
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | Command error (invalid params, element not found) |
-| 2 | Network error (device unreachable) |
-| 3 | Timeout |
-| 4 | No devices found |
+Detailed exit code documentation lives in [docs/cli/advanced.md](cli/advanced.md#exit-codes).

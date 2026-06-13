@@ -76,6 +76,22 @@ describe("HTTP client", () => {
     expect((result.data as Record<string, unknown>)).toHaveProperty("success", false);
   });
 
+  it("classifies Error-shaped aborts as timeouts", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      const error = new Error("This operation was aborted");
+      error.name = "AbortError";
+      throw error;
+    }) as typeof fetch;
+
+    const result = await sendCommand(device, "navigate", undefined, 1234);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(408);
+    expect(result.data).toEqual({
+      success: false,
+      error: { code: "TIMEOUT", message: "Request timed out after 1234ms" },
+    });
+  });
+
   it("converts camelCase to kebab-case", async () => {
     let capturedUrl = "";
     globalThis.fetch = vi.fn(async (url: string | URL | Request) => {

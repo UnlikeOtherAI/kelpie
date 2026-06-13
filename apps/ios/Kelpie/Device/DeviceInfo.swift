@@ -10,6 +10,7 @@ struct DeviceInfo {
     let height: Int
     let port: Int
     let version: String
+    let build: String
 
     static func externalDisplay(port: Int, screenSize: CGSize, scale: CGFloat) -> Self {
         let device = UIDevice.current
@@ -20,7 +21,8 @@ struct DeviceInfo {
             width: Int(screenSize.width * scale),
             height: Int(screenSize.height * scale),
             port: port,
-            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+            build: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         )
     }
 
@@ -36,7 +38,8 @@ struct DeviceInfo {
             width: Int(bounds.width * scale),
             height: Int(bounds.height * scale),
             port: port,
-            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+            build: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         )
     }
 

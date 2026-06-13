@@ -6,6 +6,12 @@ final class HandlerContext {
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     var renderer: (any RendererEngine)?
+    /// True while the Chromium (CEF) engine is active. CEF is a single-renderer
+    /// engine — it has no per-tab WebKit renderers — so renderer resolution must
+    /// target `renderer` (the live CEF instance) rather than the tab store's
+    /// hidden about:blank `WKWebViewRenderer`. Kept in sync by ServerState
+    /// wherever the active renderer changes.
+    var activeEngineIsChromium = false
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
@@ -39,6 +45,17 @@ final class HandlerContext {
     /// tab windows reject empty `tabId` so LLMs are forced to be explicit
     /// about which tab they target.
     func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
+        // WebKit, so resolving through the tab store here would return a hidden
+        // WKWebViewRenderer that never navigated (stuck on about:blank): navigate
+        // would drive the live CEF renderer while eval/dom/screenshot read the
+        // blank WebView (issues #74/#77/#78/#79). Target the live renderer
+        // directly; windowId/tabId do not apply in single-renderer mode.
+        if activeEngineIsChromium {
+            guard let renderer else { throw HandlerError.noWebView }
+            return renderer
+        }
+
         if let windowId, WindowRegistry.shared.entry(for: windowId) == nil {
             throw HandlerError.windowNotFound(windowId)
         }
@@ -363,9 +380,18 @@ final class HandlerContext {
         )
     }
 
-    func load(url: URL) {
+    /// Side-effects every navigation must run regardless of which renderer is
+    /// driven: notify the shell (URL-bar / loading UI) and tear down the 3D
+    /// inspector. Exposed so handlers can drive the resolved renderer directly,
+    /// keeping navigate targeting the same renderer that reads resolve to even
+    /// when no window has rendered to wire `renderer` to the active tab.
+    func prepareForNavigation() {
         WindowRegistry.shared.defaultEntry()?.callbacks?.onWillLoad()
         reset3DInspectorForNavigation()
+    }
+
+    func load(url: URL) {
+        prepareForNavigation()
         renderer?.load(url: url)
     }
 

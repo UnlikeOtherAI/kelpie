@@ -5,6 +5,7 @@ type ToolPlatform = (typeof platforms)[number];
 const allPlatforms = [...platforms] as readonly ToolPlatform[];
 const mobilePlatforms = ["ios", "android"] as const;
 const viewportPresetPlatforms = ["ios", "android", "macos"] as const;
+const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
 const fullscreenPlatforms = ["macos", "linux"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
@@ -29,6 +30,35 @@ const point = z.object({
   x: z.number().describe("Viewport X coordinate"),
   y: z.number().describe("Viewport Y coordinate"),
 });
+const coordinateDiagnosticsPoint = point.extend({
+  label: z.string().optional().describe("Optional label for this sampled point"),
+  expectedSelector: selector.optional().describe("Optional selector expected at this point"),
+});
+const coordinateDiagnosticsAction = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("tap"),
+    label: z.string().optional().describe("Optional action label"),
+    x: z.number().describe("Viewport X coordinate"),
+    y: z.number().describe("Viewport Y coordinate"),
+    expectedSelector: selector.optional().describe("Optional selector expected to receive the tap"),
+  }),
+  z.object({
+    type: z.literal("swipe"),
+    label: z.string().optional().describe("Optional action label"),
+    from: coordinateDiagnosticsPoint.describe("Swipe start point"),
+    to: coordinateDiagnosticsPoint.describe("Swipe end point"),
+    durationMs: z.number().optional().describe("Swipe duration in milliseconds"),
+    steps: z.number().optional().describe("Interpolation steps for the swipe"),
+    expectedSelector: selector.optional().describe("Optional selector expected after the swipe"),
+  }),
+  z.object({
+    type: z.literal("scroll"),
+    label: z.string().optional().describe("Optional action label"),
+    deltaX: z.number().optional().describe("Horizontal scroll delta in viewport CSS pixels"),
+    deltaY: z.number().optional().describe("Vertical scroll delta in viewport CSS pixels"),
+    expectedSelector: selector.optional().describe("Optional selector expected after scrolling"),
+  }),
+]);
 
 const filterProps = {
   platform: z.enum(platforms).optional().describe("Filter by platform"),
@@ -110,6 +140,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_check", description: "Check a checkbox", method: "check", schema: { device, selector, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_uncheck", description: "Uncheck a checkbox", method: "uncheck", schema: { device, selector, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_swipe", description: "Swipe between two viewport coordinates with a visible trail overlay", method: "swipe", schema: { device, from: point.describe("Swipe start point"), to: point.describe("Swipe end point"), durationMs: z.number().optional().describe("Swipe duration in milliseconds"), steps: z.number().optional().describe("Interpolation steps for the swipe"), color: z.string().optional().describe("Swipe overlay color, e.g. #3B82F6"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_coordinate_diagnostics", description: "Run a structured coordinate debugging oracle in the page. Samples elementFromPoint/elementsFromPoint, executes optional page-synthesized tap/swipe/scroll actions, captures delivered pointer/mouse event targets, and can include a screenshot with viewport mapping metadata. Current inputSource is page-synthesized; use inputCapabilities in the response before assuming trusted native input.", method: "coordinateDiagnostics", platforms: coordinateDiagnosticsPlatforms, schema: { device, points: z.array(coordinateDiagnosticsPoint).optional().describe("Viewport CSS-pixel points to sample"), actions: z.array(coordinateDiagnosticsAction).optional().describe("Ordered coordinate actions to execute"), setupExpression: z.string().optional().describe("JavaScript expression to evaluate before sampling/actions"), exportExpression: z.string().optional().describe("JavaScript expression to evaluate after actions"), captureScreenshot: z.boolean().optional().describe("Include a screenshot payload in the response"), screenshotFormat: z.enum(["png", "jpeg"]).optional().describe("Screenshot image format"), screenshotResolution, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_show_commentary", description: "Show a commentary text pill overlay inside the page viewport", method: "showCommentary", schema: { device, text: z.string().describe("Commentary text to display"), durationMs: z.number().optional().describe("How long to show the commentary. Use 0 to keep it visible until hidden."), position: z.enum(["top", "center", "bottom"]).optional().describe("Commentary position"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_hide_commentary", description: "Hide the active commentary overlay", method: "hideCommentary", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_highlight", description: "Draw a colored highlight ring/box around an element. Use this when you already know the selector and want to visually anchor that element in a screenshot before asking an LLM to reason over the image. Set durationMs=0 to keep it visible until hidden.", method: "highlight", schema: { device, selector, color: z.string().optional().describe("Highlight color, e.g. #EF4444"), thickness: z.number().optional().describe("Highlight stroke width in pixels"), padding: z.number().optional().describe("Padding around the highlighted element in pixels"), animation: z.enum(["appear", "draw"]).optional().describe("Highlight animation style"), durationMs: z.number().optional().describe("How long to keep the highlight visible. Use 0 to keep it until hidden."), tabId }, bodyFromArgs: passthrough },

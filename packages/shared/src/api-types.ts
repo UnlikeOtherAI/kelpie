@@ -715,6 +715,7 @@ export interface NewTabRequest {
 }
 
 export interface NewTabResponse extends SuccessResponse {
+  tabId: string;
   tab: TabInfo;
   tabCount: number;
 }

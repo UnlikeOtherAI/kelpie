@@ -8,6 +8,15 @@ export function getGlobals(program: Command): GlobalOptions {
   return program.opts<GlobalOptions>();
 }
 
+export function withGlobalTabId(
+  globals: GlobalOptions,
+  body?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!globals.tabId) return body;
+  if (body?.tabId) return body;
+  return { ...(body ?? {}), tabId: globals.tabId };
+}
+
 export async function requireDevice(program: Command): Promise<DiscoveredDevice | null> {
   const globals = getGlobals(program);
   if (globals.device) {
@@ -25,6 +34,12 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
   const { addDevices, getAllDevices } = await import("../discovery/registry.js");
   if (getAllDevices().length === 0) {
     addDevices(await scanForDevices(2500));
+  }
+  // mDNS is racy; a Kelpie on this host is reachable on 127.0.0.1 even when the
+  // browse misses its announcement. Fall back to a direct localhost probe.
+  if (getAllDevices().length === 0) {
+    const { probeLocalDevices } = await import("../discovery/local-probe.js");
+    addDevices(await probeLocalDevices());
   }
   const all = getAllDevices();
   if (all.length === 1) return all[0];
@@ -47,7 +62,7 @@ export async function deviceCommand(
   const globals = getGlobals(program);
   const device = await requireDevice(program);
   if (!device) return;
-  const result = await sendCommand(device, method, body, globals.timeout);
+  const result = await sendCommand(device, method, withGlobalTabId(globals, body), globals.timeout);
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
 }

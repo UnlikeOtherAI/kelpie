@@ -408,6 +408,7 @@ class BrowserManagementHandler(
         val tab = tabStore.addTab(url)
         return successResponse(
             mapOf(
+                "tabId" to tab.id,
                 "tab" to tabInfo(tab = tab, activeTabId = tabStore.activeTabId.value),
                 "tabCount" to tabStore.tabs.value.size,
             ),

@@ -56,8 +56,16 @@ extension BrowserView {
     }
 
     func connectNewTab(_ tab: Tab) {
-        serverState.setActiveWebKitRenderer(tab.renderer)
-        sync(browserState: browserState, from: tab.renderer)
+        // In Chromium mode the active handler target is the shared CEF renderer,
+        // not a tab's WebKit renderer. Re-pointing it here (e.g. from onAppear on
+        // a persisted-chromium launch) would make every HTTP/MCP call drive a
+        // hidden WebKit renderer while the visible engine is CEF, so the API
+        // appears to navigate "about:blank". Only adopt the tab's renderer as the
+        // active target when WebKit is the active engine.
+        if rendererState.activeEngine == .webkit {
+            serverState.setActiveWebKitRenderer(tab.renderer)
+            sync(browserState: browserState, from: tab.renderer)
+        }
         tab.renderer.onStateChange = { [weak tab, weak browserState, weak serverState] in
             guard let tab, let browserState, let serverState else { return }
             Task { @MainActor in

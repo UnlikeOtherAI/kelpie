@@ -116,6 +116,23 @@ const reportingGuidance: CommandHelpOutput = {
   response: defaultResponse,
 };
 
+const authenticationGuidance: CommandHelpOutput = {
+  command: "authentication",
+  purpose: "Start automation from an authenticated browser session",
+  when: "A target app is behind a login and you need the browser in a signed-in state before navigating",
+  explanation:
+    "Kelpie owns the browser's auth state through its native cookie store, so you do not need an external proxy. " +
+    "To authenticate from a known session cookie (including an httpOnly one), use `kelpie cookies set <name> <value> --domain <host> --path / --http-only --secure` " +
+    "(MCP: kelpie_set_cookie). httpOnly cookies ARE supported on iOS, Android, and macOS — they are written to the platform cookie store (WKHTTPCookieStore / CookieManager), not via JavaScript. " +
+    "Do NOT try to set a session cookie with `eval`/`document.cookie`: JavaScript cannot create httpOnly cookies, and reading `document.cookie` returns an empty string for them, so it looks like the cookie is missing even when it is set. " +
+    "Use `kelpie cookies` (kelpie_get_cookies) to read cookies including httpOnly ones, and `kelpie cookies delete --all` to reset auth state. " +
+    "For non-httpOnly token schemes, `kelpie storage set <key> <value>` (kelpie_set_storage) writes localStorage/sessionStorage. " +
+    "Alternatively, complete an interactive login in the browser once (e.g. `kelpie safari-auth <url>` on macOS/iOS).",
+  params: [],
+  related: ["set-cookie", "get-cookies", "delete-cookies", "set-storage", "safari-auth"],
+  response: defaultResponse,
+};
+
 const endpointToCliCommandAliases: Record<string, string> = {
   "get-current-url": "url",
   "get-dom": "dom",
@@ -466,7 +483,7 @@ export function generateLlmHelp(commandFilter?: string): string {
     return JSON.stringify({ error: `Unknown command: ${commandFilter}` });
   }
 
-  const allHelp = [reportingGuidance]
+  const allHelp = [authenticationGuidance, reportingGuidance]
     .concat([...browserTools, ...cliTools].map((tool) => toolToHelp(tool)))
     .concat(Object.values(manualCommandHelp));
   return JSON.stringify(allHelp, null, 2);

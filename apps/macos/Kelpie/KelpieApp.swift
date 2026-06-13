@@ -243,13 +243,25 @@ private struct BrowserCommands: Commands {
 @main
 struct KelpieApp: App {
     @StateObject private var browserState = BrowserState()
-    @StateObject private var rendererState = RendererState()
+    @StateObject private var rendererState: RendererState
     @StateObject private var serverState: ServerState
 
     init() {
         let launchPort = Self.launchPortArgument() ?? 8420
-        _serverState = StateObject(wrappedValue: ServerState(port: UInt16(launchPort)))
+        let server = ServerState(port: UInt16(launchPort))
+        let renderer = RendererState()
+        _serverState = StateObject(wrappedValue: server)
+        _rendererState = StateObject(wrappedValue: renderer)
         _ = AIState.shared
+        // Kelpie is driven headlessly over HTTP/MCP and must be reachable
+        // whenever the process is alive, not only when a window is foregrounded.
+        // Gating server start on the window's onAppear meant a background launch
+        // never started the server, so the device never became discoverable
+        // (#75, and the NO_DEVICES reports). Start it eagerly at launch; the
+        // onAppear call below is a redundant, idempotent safety net.
+        Task { @MainActor in
+            Self.startServices(serverState: server, rendererState: renderer)
+        }
     }
 
     var body: some Scene {
@@ -260,7 +272,7 @@ struct KelpieApp: App {
                 rendererState: rendererState,
                 viewportState: serverState.viewportState
             )
-            .onAppear { startServices() }
+            .onAppear { Self.startServices(serverState: serverState, rendererState: rendererState) }
             .frame(
                 minWidth: ViewportState.minimumShellSize.width,
                 minHeight: ViewportState.minimumShellSize.height
@@ -275,10 +287,10 @@ struct KelpieApp: App {
         }
     }
 
-    private func startServices() {
+    private static func startServices(serverState: ServerState, rendererState: RendererState) {
         serverState.startHTTPServer(rendererState: rendererState)
         #if DEBUG
-        if Self.canBind(port: 8421) {
+        if canBind(port: 8421) {
             AppReveal.start(port: 8421)
         } else {
             print("[KelpieApp] Skipping AppReveal start because port 8421 is already in use")
@@ -321,7 +333,20 @@ struct KelpieApp: App {
         )
         window.minSize = ViewportState.minimumShellSize
         window.contentView = NSHostingView(rootView: contentView)
-        window.center()
+        // Restore the last window position if it still lands on a connected
+        // screen; otherwise fall back to centering. Size is already restored
+        // above via persistedShellWindowSize.
+        if let origin = ViewportState.persistedShellWindowOrigin {
+            var frame = window.frame
+            frame.origin = origin
+            if ViewportState.windowFrameIsUsable(frame) {
+                window.setFrameOrigin(origin)
+            } else {
+                window.center()
+            }
+        } else {
+            window.center()
+        }
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -349,6 +374,10 @@ struct KelpieApp: App {
         let fd = socket(AF_INET6, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
         defer { close(fd) }
+
+        var reuseAddress: Int32 = 1
+        let optionLength = socklen_t(MemoryLayout<Int32>.size)
+        _ = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, optionLength)
 
         var address = sockaddr_in6()
         address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)

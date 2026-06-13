@@ -1,4 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { sendCommand } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
 import { scanForDevices } from "../discovery/scanner.js";
@@ -15,6 +21,17 @@ import { buildDownloadUrl, downloadModel } from "../ai/download.js";
 import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 import { saveFeedbackReport, summarizeFeedbackReports } from "../feedback/store.js";
 import { enrichDevicesWithCapabilities } from "../discovery/capabilities.js";
+
+type JsonObject = Record<string, unknown>;
+type ScreenshotResult = JsonObject & {
+  image: string;
+  format?: unknown;
+  resolution?: unknown;
+  success?: unknown;
+};
+
+const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
+const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
 export function createMcpServer(): McpServer {
   const server = new McpServer(
@@ -58,8 +75,96 @@ function registerBrowserTool(server: McpServer, tool: BrowserToolDef): void {
         remoteStoredAt: remote.storedAt,
       });
     }
-    return { content: [{ type: "text", text: JSON.stringify(result.data) }] };
+    return formatBrowserToolResult(tool.method, result.data, device.name);
   });
+}
+
+export async function formatBrowserToolResult(
+  method: string,
+  data: unknown,
+  deviceName?: string,
+): Promise<CallToolResult> {
+  if (!isNativeScreenshotResult(method, data)) {
+    return textToolResult(data);
+  }
+
+  return saveNativeScreenshotResult(method, data, deviceName);
+}
+
+function textToolResult(data: unknown): CallToolResult {
+  return { content: [{ type: "text", text: JSON.stringify(data) }] };
+}
+
+function isNativeScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
+  return (
+    screenshotMethods.has(method) &&
+    isJsonObject(data) &&
+    data.success === true &&
+    data.resolution === "native" &&
+    typeof data.image === "string" &&
+    data.image.length > 0
+  );
+}
+
+async function saveNativeScreenshotResult(
+  method: string,
+  result: ScreenshotResult,
+  deviceName: string | undefined,
+): Promise<CallToolResult> {
+  const format = normalizeImageFormat(result.format);
+  const extension = format === "jpeg" ? "jpg" : "png";
+  const imageBytes = Buffer.from(result.image, "base64");
+  const file = await writeMcpScreenshotFile(imageBytes, extension, method, deviceName);
+  const { image: _image, ...metadata } = result;
+  const compactResult: JsonObject = {
+    ...metadata,
+    file,
+    imageSavedToFile: true,
+    imageBytes: imageBytes.byteLength,
+  };
+
+  return {
+    content: [
+      { type: "text", text: JSON.stringify(compactResult) },
+      {
+        type: "resource_link",
+        uri: pathToFileURL(file).href,
+        name: basename(file),
+        mimeType: `image/${format}`,
+        size: imageBytes.byteLength,
+        description: "Native screenshot saved by Kelpie MCP",
+      },
+    ],
+    structuredContent: compactResult,
+  };
+}
+
+async function writeMcpScreenshotFile(
+  imageBytes: Buffer,
+  extension: "jpg" | "png",
+  method: string,
+  deviceName: string | undefined,
+): Promise<string> {
+  await mkdir(mcpScreenshotDir, { recursive: true });
+  const slug = slugify(deviceName ?? method);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const suffix = randomUUID().slice(0, 8);
+  const file = join(mcpScreenshotDir, `${slug}-${timestamp}-${suffix}.${extension}`);
+  await writeFile(file, imageBytes);
+  return file;
+}
+
+function normalizeImageFormat(raw: unknown): "jpeg" | "png" {
+  return raw === "jpeg" || raw === "jpg" ? "jpeg" : "png";
+}
+
+function slugify(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return slug.length > 0 ? slug : "screenshot";
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function registerCliTool(server: McpServer, tool: CliToolDef): void {

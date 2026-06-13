@@ -14,6 +14,7 @@ import com.kelpie.browser.handlers.BookmarkHandler
 import com.kelpie.browser.handlers.BrowserManagementHandler
 import com.kelpie.browser.handlers.CommentaryHandler
 import com.kelpie.browser.handlers.ConsoleHandler
+import com.kelpie.browser.handlers.CoordinateDiagnosticsHandler
 import com.kelpie.browser.handlers.DOMHandler
 import com.kelpie.browser.handlers.DeviceHandler
 import com.kelpie.browser.handlers.EvaluateHandler
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity() {
         InteractionHandler(handlerContext).register(router)
         TapCalibrationHandler().register(router)
         ScrollHandler(handlerContext).register(router)
+        CoordinateDiagnosticsHandler(handlerContext).register(router)
         DeviceHandler(handlerContext, deviceInfo, router, this).register()
         EvaluateHandler(handlerContext).register(router)
         ConsoleHandler(handlerContext).register(router)

@@ -240,7 +240,7 @@ struct ScriptHandler {
 
     @MainActor
     private func waitForNavigation(_ body: [String: Any]) async -> [String: Any] {
-        guard context.renderer != nil else {
+        guard let renderer = context.renderer else {
             return errorResponse(code: "NO_WEBVIEW", message: "No WebView")
         }
         let timeout = body["timeout"] as? Int ?? 10000
@@ -256,9 +256,10 @@ struct ScriptHandler {
                 observedLoading = true
             }
             if observedLoading, !isLoading {
+                let snapshot = await NavigationPageSnapshot.read(from: renderer)
                 return successResponse([
-                    "url": context.currentURL?.absoluteString ?? "",
-                    "title": context.currentTitle,
+                    "url": snapshot.url,
+                    "title": snapshot.title,
                     "loadTime": Int(Date().timeIntervalSince(start) * 1000)
                 ])
             }

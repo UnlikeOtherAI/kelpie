@@ -9,8 +9,12 @@ struct DeviceInfo {
     let platform: String = "macos"
     let width: Int
     let height: Int
+    let scale: Double
     let port: Int
     let version: String
+    let build: String
+
+    private static let rendererEngineDefaultsKey = "com.kelpie.renderer-engine"
 
     static func current(port: Int) -> Self {
         // swiftlint:disable:next force_unwrapping
@@ -23,9 +27,16 @@ struct DeviceInfo {
             model: modelIdentifier(),
             width: Int(size.width * scale),
             height: Int(size.height * scale),
+            scale: scale,
             port: port,
-            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+            build: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         )
+    }
+
+    static func currentRendererEngine() -> String {
+        let saved = UserDefaults.standard.string(forKey: rendererEngineDefaultsKey) ?? ""
+        return ["webkit", "chromium"].contains(saved) ? saved : "webkit"
     }
 
     func txtRecord(engine: String = "webkit") -> [String: String] {

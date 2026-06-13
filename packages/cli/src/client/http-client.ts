@@ -14,6 +14,11 @@ function toKebabCase(method: string): string {
     .toLowerCase();
 }
 
+function isAbortError(error: unknown): boolean {
+  return (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError");
+}
+
 export async function sendCommand<T = unknown>(
   device: DiscoveredDevice,
   method: string,
@@ -37,7 +42,7 @@ export async function sendCommand<T = unknown>(
     const data = (await response.json()) as T;
     return { ok: response.ok, status: response.status, data };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       return {
         ok: false,
         status: 408,

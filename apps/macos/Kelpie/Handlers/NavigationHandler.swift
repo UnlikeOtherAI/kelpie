@@ -26,11 +26,11 @@ struct NavigationHandler {
         do {
             let renderer = try context.resolveRenderer(tabId: tabId)
             let start = CFAbsoluteTimeGetCurrent()
-            if tabId == nil {
-                context.load(url: url)
-            } else {
-                renderer.load(url: url)
-            }
+            // Drive the SAME renderer reads resolve to, so navigate works even
+            // when no window has rendered to wire context.renderer to the active
+            // tab — i.e. headless / background, the MCP-controlled mode (#78).
+            context.prepareForNavigation()
+            renderer.load(url: url)
 
             for _ in 0..<100 {
                 try? await Task.sleep(nanoseconds: 100_000_000)
@@ -38,9 +38,24 @@ struct NavigationHandler {
             }
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            let snapshot = await NavigationPageSnapshot.read(from: renderer, fallbackURL: urlString)
+            let finalURL = snapshot.url
+            // Honest failure (Chromium only): after a real load CEF reports the
+            // live document URL, so a renderer still on about:blank / no URL here
+            // means the page never loaded — report it instead of a false success
+            // that leaves callers reading a blank document (#78/#79). WebKit
+            // updates currentURL asynchronously (KVO), so a blank check there
+            // would false-positive on fast or redirecting loads; keep WebKit's
+            // lenient fallback to the requested URL.
+            if context.activeEngineIsChromium, finalURL.isEmpty || finalURL == "about:blank" {
+                return errorResponse(
+                    code: "NAVIGATION_ERROR",
+                    message: "Navigation to \(urlString) did not load — the active renderer is still blank."
+                )
+            }
             return successResponse([
-                "url": renderer.currentURL?.absoluteString ?? urlString,
-                "title": renderer.currentTitle,
+                "url": finalURL.isEmpty ? urlString : finalURL,
+                "title": snapshot.title,
                 "loadTime": loadTime
             ])
         } catch {
@@ -60,7 +75,8 @@ struct NavigationHandler {
                 renderer.goBack()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            return successResponse(["url": renderer.currentURL?.absoluteString ?? "", "title": renderer.currentTitle])
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
@@ -78,7 +94,8 @@ struct NavigationHandler {
                 renderer.goForward()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            return successResponse(["url": renderer.currentURL?.absoluteString ?? "", "title": renderer.currentTitle])
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
@@ -101,9 +118,10 @@ struct NavigationHandler {
                 if !renderer.isLoading { break }
             }
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
             return successResponse([
-                "url": renderer.currentURL?.absoluteString ?? "",
-                "title": renderer.currentTitle,
+                "url": snapshot.url,
+                "title": snapshot.title,
                 "loadTime": loadTime
             ])
         } catch {
@@ -118,7 +136,12 @@ struct NavigationHandler {
         let windowId = HandlerContext.windowId(from: body)
         // Prefer the active tab's own stored state — context.renderer may lag
         // behind tab switches, returning a stale inactive tab's URL (issue #17).
+        // This tab-store shortcut is WebKit-only: in Chromium (CEF) mode the
+        // tab store holds a hidden about:blank WKWebViewRenderer, so reading it
+        // would report "Start Page" while CEF is on a real page (#78). CEF falls
+        // through to the live renderer via resolveRenderer below.
         if tabId == nil,
+           !context.activeEngineIsChromium,
            let store = context.tabStore(windowId: windowId, tabId: nil),
            let tab = store.activeTab {
             return ["url": tab.currentURL, "title": tab.title]

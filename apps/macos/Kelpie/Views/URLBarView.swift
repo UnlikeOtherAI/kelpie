@@ -25,6 +25,11 @@ struct URLBarView: View {
     let onInspectorZoomOut: () -> Void
     let onInspectorReset: () -> Void
     let onSwitchRenderer: (RendererState.Engine) -> Void
+    let onSafariAuth: () -> Void
+    let onBookmarks: () -> Void
+    let onHistory: () -> Void
+    let onNetworkInspector: () -> Void
+    let onSettings: () -> Void
 
     @State private var urlText: String = ""
     @State private var isNarrow = false
@@ -78,6 +83,8 @@ struct URLBarView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.85)))
                 }
 
+                actionButtons
+
                 if !isNarrow {
                     selectorsRow
                 }
@@ -105,6 +112,44 @@ struct URLBarView: View {
             guard !isAddressFieldFocused else { return }
             urlText = newURL
         }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        AppKitToolbarButton(
+            systemName: "safari",
+            accessibilityID: "browser.action.safari-auth",
+            accessibilityLabel: "Safari Auth",
+            action: onSafariAuth
+        )
+
+        AppKitToolbarButton(
+            systemName: "bookmark.fill",
+            accessibilityID: "browser.action.bookmarks",
+            accessibilityLabel: "Bookmarks",
+            action: onBookmarks
+        )
+
+        AppKitToolbarButton(
+            systemName: "clock.arrow.circlepath",
+            accessibilityID: "browser.action.history",
+            accessibilityLabel: "History",
+            action: onHistory
+        )
+
+        AppKitToolbarButton(
+            systemName: "antenna.radiowaves.left.and.right",
+            accessibilityID: "browser.action.network",
+            accessibilityLabel: "Network Inspector",
+            action: onNetworkInspector
+        )
+
+        AppKitToolbarButton(
+            systemName: "gear",
+            accessibilityID: "browser.action.settings",
+            accessibilityLabel: "Settings",
+            action: onSettings
+        )
     }
 
     @ViewBuilder
