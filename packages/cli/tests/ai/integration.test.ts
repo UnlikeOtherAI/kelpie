@@ -48,7 +48,7 @@ describe("AI integration", () => {
       .filter((t) => t.name.startsWith("kelpie_ai_"))
       .map((t) => t.name);
 
-    expect(aiToolNames.length).toBe(5);
+    expect(aiToolNames.length).toBe(7);
     for (const name of aiToolNames) {
       expect(BrowserMcpTools).toContain(name);
     }

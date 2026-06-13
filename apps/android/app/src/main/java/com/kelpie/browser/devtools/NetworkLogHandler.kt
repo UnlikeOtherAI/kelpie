@@ -16,7 +16,7 @@ class NetworkLogHandler(
 
     private suspend fun getNetworkLog(body: Map<String, Any?>): Map<String, Any?> {
         val typeFilter = body["type"] as? String
-        val statusFilter = parseStatusFilter(body["status"])
+        val statusCategory = parseStatusCategory(body["status"])
         val sinceFilter = parseSinceMillis(body["since"])
         val limit = (body["limit"] as? Int) ?: 200
         val js = """
@@ -48,8 +48,8 @@ class NetworkLogHandler(
             if (typeFilter != null) {
                 filtered = filtered.filter { (it["type"] as? String) == typeFilter }
             }
-            if (statusFilter != null) {
-                filtered = filtered.filter { entryStatus(it) == statusFilter }
+            if (statusCategory != null) {
+                filtered = filtered.filter { matchesStatusCategory(entryStatus(it), statusCategory) }
             }
             if (sinceFilter != null) {
                 filtered = filtered.filter { entryStartedMillis(it)?.let { started -> started >= sinceFilter } ?: false }
@@ -68,13 +68,26 @@ class NetworkLogHandler(
         }
     }
 
-    /** Parse a status filter param into an exact HTTP status code, or null when absent/invalid. */
-    private fun parseStatusFilter(value: Any?): Int? =
-        when (value) {
-            is Int -> value
-            is Long -> value.toInt()
-            is String -> value.trim().toIntOrNull()
+    /** Parse a `status` filter param into a category: "success", "error", or "pending"; null when absent/invalid. */
+    private fun parseStatusCategory(value: Any?): String? =
+        when (val category = (value as? String)?.trim()?.lowercase()) {
+            "success", "error", "pending" -> category
             else -> null
+        }
+
+    /**
+     * Map an entry's HTTP status code to a category and test membership.
+     * "success" = final status 200–399; "error" = status >= 400 or failed; "pending" = no final status (0/missing).
+     */
+    private fun matchesStatusCategory(
+        status: Int?,
+        category: String,
+    ): Boolean =
+        when (category) {
+            "success" -> status != null && status in 200..399
+            "error" -> status != null && status >= 400
+            "pending" -> status == null || status == 0
+            else -> false
         }
 
     /** Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or null when absent. */

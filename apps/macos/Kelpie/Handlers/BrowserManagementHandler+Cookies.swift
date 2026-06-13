@@ -18,11 +18,12 @@ extension BrowserManagementHandler {
                 cookies = await renderer.allCookies()
             }
             let name = body["name"] as? String
-            var filtered = name != nil ? cookies.filter { $0.name == name } : cookies
-            if let url = body["url"] as? String {
-                filtered = CookieScope.scoped(filtered, toURL: url)
-            }
-            let cookieList = filtered.map { cookie -> [String: Any] in
+            let filtered = name != nil ? cookies.filter { $0.name == name } : cookies
+            // Default the scope to the current page when no `url` is supplied, so
+            // `get-cookies` returns current-page cookies by default (matches Android).
+            let scopeURL = body["url"] as? String ?? renderer.currentURL?.absoluteString ?? "http://localhost/"
+            let scoped = CookieScope.scoped(filtered, toURL: scopeURL)
+            let cookieList = scoped.map { cookie -> [String: Any] in
                 ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
                  "expires": cookie.expiresDate?.description ?? NSNull(), "httpOnly": cookie.isHTTPOnly,
                  "secure": cookie.isSecure, "sameSite": cookie.sameSitePolicy?.rawValue ?? ""]

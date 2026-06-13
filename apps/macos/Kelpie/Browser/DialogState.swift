@@ -2,17 +2,15 @@ import Foundation
 
 /// Tracks pending JavaScript dialogs (alert/confirm/prompt) from WKWebView.
 ///
-/// A single shared instance mirrors iOS, where every WebView coordinator and the
-/// handler read the one `HandlerContext.dialogState`. On macOS renderers are
-/// created per-tab and decoupled from the handler context, so the renderer's
-/// WKUIDelegate enqueues into this shared store and `BrowserManagementHandler`
-/// reads the same instance.
+/// macOS supports multiple windows/tabs, each backed by its own `WKWebView`. To
+/// keep dialogs isolated per renderer, every `WKWebViewRenderer` owns its own
+/// `DialogState`: its WKUIDelegate enqueues into that instance, and
+/// `BrowserManagementHandler` resolves the same instance for the targeted
+/// (windowId, tabId) via `HandlerContext.dialogState(windowId:tabId:)`. This
+/// matches iOS, where each WebView coordinator and handler read the one
+/// `HandlerContext.dialogState` for that single WebView.
 @MainActor
 final class DialogState {
-
-    /// The process-wide dialog store shared by the active WebKit renderer and the
-    /// browser-management handler.
-    static let shared = DialogState()
 
     enum DialogType: String {
         case alert

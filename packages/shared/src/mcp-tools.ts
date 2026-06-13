@@ -120,6 +120,8 @@ export const BrowserMcpTools = [
   "kelpie_ai_unload",
   "kelpie_ai_ask",
   "kelpie_ai_record",
+  "kelpie_ai_catalog",
+  "kelpie_ai_fitness",
 ] as const;
 
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
@@ -130,6 +132,8 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_ai_unload: ["linux", "windows"],
   kelpie_ai_ask: ["linux", "windows"],
   kelpie_ai_record: ["linux", "windows"],
+  kelpie_ai_catalog: ["linux", "windows"],
+  kelpie_ai_fitness: ["linux", "windows"],
   kelpie_show_keyboard: ["macos", "linux", "windows"],
   kelpie_hide_keyboard: ["macos", "linux", "windows"],
   kelpie_get_keyboard_state: ["macos", "linux", "windows"],
@@ -309,6 +313,8 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "ai-unload": "kelpie_ai_unload",
   "ai-infer": "kelpie_ai_ask",
   "ai-record": "kelpie_ai_record",
+  "ai-catalog": "kelpie_ai_catalog",
+  "ai-fitness": "kelpie_ai_fitness",
   "snapshot-3d-enter": "kelpie_snapshot_3d_enter",
   "snapshot-3d-exit": "kelpie_snapshot_3d_exit",
   "snapshot-3d-status": "kelpie_snapshot_3d_status",

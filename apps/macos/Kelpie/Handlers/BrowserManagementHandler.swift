@@ -49,7 +49,7 @@ struct BrowserManagementHandler {
         router.register("get-iframe-context") { _ in successResponse(["context": "main"]) }
 
         // Dialogs
-        router.register("get-dialog") { _ in await getDialog() }
+        router.register("get-dialog") { body in await getDialog(body) }
         router.register("handle-dialog") { body in await handleDialog(body) }
         router.register("set-dialog-auto-handler") { body in await setDialogAutoHandler(body) }
 
@@ -271,10 +271,30 @@ struct BrowserManagementHandler {
 
     // MARK: - Dialogs
 
+    /// Resolves the per-renderer `DialogState` for the targeted (windowId, tabId),
+    /// or a tab/window error response when resolution fails. macOS routes dialogs
+    /// per renderer so a confirm() in one window is unaffected by activity in
+    /// another. A nil state with nil error means the resolved renderer cannot host
+    /// JS dialogs (CEF) — callers treat that as "no dialog".
     @MainActor
-    private func getDialog() async -> [String: Any] {
-        let state = DialogState.shared
-        guard let dialog = state.current else {
+    private func resolveDialogState(
+        _ body: [String: Any]
+    ) -> (state: DialogState?, error: [String: Any]?) {
+        let tabId = HandlerContext.tabId(from: body)
+        let windowId = HandlerContext.windowId(from: body)
+        do {
+            return (try context.dialogState(windowId: windowId, tabId: tabId), nil)
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return (nil, tabError) }
+            return (nil, errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription))
+        }
+    }
+
+    @MainActor
+    private func getDialog(_ body: [String: Any]) async -> [String: Any] {
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
+        guard let dialog = resolved.state?.current else {
             return successResponse(["showing": false, "dialog": NSNull()])
         }
         var info: [String: Any] = [
@@ -291,10 +311,11 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func handleDialog(_ body: [String: Any]) async -> [String: Any] {
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
         let action = body["action"] as? String ?? "accept"
         let text = body["promptText"] as? String ?? body["text"] as? String
-        let result = DialogState.shared.handle(action: action, text: text)
-        guard result.handled else {
+        guard let result = resolved.state?.handle(action: action, text: text), result.handled else {
             return errorResponse(code: "NO_DIALOG", message: "No dialog is currently showing")
         }
         return successResponse(["action": action, "dialogType": result.type.rawValue])
@@ -302,21 +323,19 @@ struct BrowserManagementHandler {
 
     @MainActor
     private func setDialogAutoHandler(_ body: [String: Any]) async -> [String: Any] {
-        let state = DialogState.shared
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
         let enabled = body["enabled"] as? Bool ?? true
         let defaultAction = body["defaultAction"] as? String ?? "accept"
 
-        if enabled {
-            if defaultAction == "queue" {
-                state.autoHandler = nil
+        if let state = resolved.state {
+            if enabled {
+                state.autoHandler = defaultAction == "queue" ? nil : defaultAction
             } else {
-                state.autoHandler = defaultAction
+                state.autoHandler = nil
             }
-        } else {
-            state.autoHandler = nil
+            state.autoPromptText = body["promptText"] as? String ?? ""
         }
-
-        state.autoPromptText = body["promptText"] as? String ?? ""
         return successResponse(["enabled": enabled])
     }
 

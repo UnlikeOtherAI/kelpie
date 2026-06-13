@@ -13,7 +13,7 @@ struct NetworkHandler {
     @MainActor
     private func getNetworkLog(_ body: [String: Any]) async -> [String: Any] {
         let typeFilter = body["type"] as? String
-        let statusFilter = Self.parseStatusFilter(body["status"])
+        let statusCategory = Self.parseStatusCategory(body["status"])
         let sinceFilter = Self.parseSinceMillis(body["since"])
         let limit = body["limit"] as? Int ?? 200
         let js = """
@@ -64,8 +64,8 @@ struct NetworkHandler {
             if let typeFilter {
                 filtered = filtered.filter { ($0["type"] as? String) == typeFilter }
             }
-            if let statusFilter {
-                filtered = filtered.filter { ($0["status"] as? Int) == statusFilter }
+            if let statusCategory {
+                filtered = filtered.filter { Self.matchesStatusCategory($0["status"] as? Int, statusCategory) }
             }
             if let sinceFilter {
                 filtered = filtered.filter {
@@ -156,11 +156,24 @@ struct NetworkHandler {
         ["totalRequests": 0, "totalSize": 0, "totalTransferSize": 0, "byType": [String: Int](), "errors": 0, "loadTime": 0]
     }
 
-    /// Parse a `status` filter param into an exact HTTP status code, or nil when absent/invalid.
-    private static func parseStatusFilter(_ value: Any?) -> Int? {
-        if let intValue = value as? Int { return intValue }
-        if let stringValue = value as? String { return Int(stringValue.trimmingCharacters(in: .whitespaces)) }
-        return nil
+    /// Parse a `status` filter param into a category: "success", "error", or "pending"; nil when absent/invalid.
+    private static func parseStatusCategory(_ value: Any?) -> String? {
+        guard let category = (value as? String)?.trimmingCharacters(in: .whitespaces).lowercased() else { return nil }
+        switch category {
+        case "success", "error", "pending": return category
+        default: return nil
+        }
+    }
+
+    /// Map an entry's HTTP status code to a category and test membership.
+    /// "success" = final status 200–399; "error" = status >= 400 or failed; "pending" = no final status (0/missing).
+    private static func matchesStatusCategory(_ status: Int?, _ category: String) -> Bool {
+        switch category {
+        case "success": return status.map { (200...399).contains($0) } ?? false
+        case "error": return status.map { $0 >= 400 } ?? false
+        case "pending": return status == nil || status == 0
+        default: return false
+        }
     }
 
     /// Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or nil when absent.

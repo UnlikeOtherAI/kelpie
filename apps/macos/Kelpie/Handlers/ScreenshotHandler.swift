@@ -108,6 +108,14 @@ private struct FullPageGeometry {
     let originalScrollY: Double
 }
 
+/// Result of a full-page capture: the stitched image plus the CSS-pixel height
+/// it vertically spans, used to make the response metadata's `imageScaleY`
+/// internally consistent for full-page coordinate mapping.
+private struct FullPageCapture {
+    let image: NSImage
+    let contentHeightCss: Int
+}
+
 /// Handles screenshot (viewport and full-page).
 struct ScreenshotHandler {
     let context: HandlerContext
@@ -128,21 +136,32 @@ struct ScreenshotHandler {
         do {
             _ = try context.resolveRenderer(tabId: tabId)
             let image: NSImage
+            var fullPageContentHeight: Int?
             if fullPage {
-                image = try await captureFullPage(tabId: tabId)
+                let capture = try await captureFullPage(tabId: tabId)
+                image = capture.image
+                fullPageContentHeight = capture.contentHeightCss
             } else {
                 image = try await context.takeSnapshot(tabId: tabId)
             }
             let quality = ((body["quality"] as? NSNumber)?.doubleValue ?? 80) / 100.0
-            return successResponse(
-                try await context.screenshotPayload(
-                    from: image,
-                    format: format,
-                    quality: quality,
-                    resolution: resolution,
-                    tabId: tabId
-                )
+            var payload = try await context.screenshotPayload(
+                from: image,
+                format: format,
+                quality: quality,
+                resolution: resolution,
+                tabId: tabId
             )
+            // For a full-page capture the image spans the whole document, so the
+            // shared viewport-based `imageScaleY`/`contentHeight` are meaningless.
+            // Rewrite them against the full captured CSS content height so a
+            // consumer can map full-page image pixels back to CSS coordinates.
+            if let contentHeight = fullPageContentHeight, contentHeight > 0,
+               let imageHeight = payload["height"] as? Int {
+                payload["contentHeight"] = contentHeight
+                payload["imageScaleY"] = Double(imageHeight) / Double(contentHeight)
+            }
+            return successResponse(payload)
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "SCREENSHOT_FAILED", message: error.localizedDescription)
@@ -160,7 +179,7 @@ struct ScreenshotHandler {
     /// `evaluateJS`/`takeSnapshot` surface keeps this path renderer-agnostic without
     /// reaching into either engine.
     @MainActor
-    private func captureFullPage(tabId: String?) async throws -> NSImage {
+    private func captureFullPage(tabId: String?) async throws -> FullPageCapture {
         let geometry = try await measureGeometry(tabId: tabId)
         defer {
             Task { @MainActor in
@@ -171,14 +190,17 @@ struct ScreenshotHandler {
             }
         }
 
-        // A single viewport already covers the page — no stitching needed.
+        // A single viewport already covers the page — no stitching needed. The
+        // image spans exactly one viewport, so that is its CSS content height.
         if geometry.pageHeight <= geometry.viewportHeight + 1,
            geometry.pageWidth <= geometry.viewportWidth + 1 {
-            return try await context.takeSnapshot(tabId: tabId)
+            let image = try await context.takeSnapshot(tabId: tabId)
+            return FullPageCapture(image: image, contentHeightCss: Int(geometry.viewportHeight.rounded()))
         }
 
         let tiles = planTiles(for: geometry)
-        return try await stitch(tiles: tiles, geometry: geometry, tabId: tabId)
+        let image = try await stitch(tiles: tiles, geometry: geometry, tabId: tabId)
+        return FullPageCapture(image: image, contentHeightCss: Int(geometry.pageHeight.rounded()))
     }
 
     @MainActor
@@ -252,28 +274,21 @@ struct ScreenshotHandler {
         let canvasWidth = max(Int((geometry.pageWidth * scaleX).rounded()), 1)
         let canvasHeight = max(Int((geometry.pageHeight * scaleY).rounded()), 1)
 
-        guard let canvas = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: canvasWidth,
-            pixelsHigh: canvasHeight,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
+        // Composite in a pixel-sized CGContext so every coordinate — canvas
+        // dimensions, tile origins, and per-tile CGImage extents — is in backing
+        // pixels. Drawing each snapshot's CGImage (rather than NSImage.draw, whose
+        // `from:` rect is in point space) keeps Retina (scale 2) sampling exact.
+        guard let ctx = CGContext(
+            data: nil,
+            width: canvasWidth,
+            height: canvasHeight,
+            bitsPerComponent: 8,
             bytesPerRow: 0,
-            bitsPerPixel: 0
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
             throw HandlerError.screenshotFailed
         }
-        canvas.size = NSSize(width: canvasWidth, height: canvasHeight)
-
-        NSGraphicsContext.saveGraphicsState()
-        defer { NSGraphicsContext.restoreGraphicsState() }
-        guard let ctx = NSGraphicsContext(bitmapImageRep: canvas) else {
-            throw HandlerError.screenshotFailed
-        }
-        NSGraphicsContext.current = ctx
 
         for (index, origin) in tiles.enumerated() {
             let snapshot: NSImage
@@ -283,37 +298,39 @@ struct ScreenshotHandler {
                 try await scroll(to: origin, tabId: tabId)
                 snapshot = try await context.takeSnapshot(tabId: tabId)
             }
-            draw(snapshot, at: origin, scaleX: scaleX, scaleY: scaleY, canvasHeight: canvasHeight)
+            draw(snapshot, at: origin, scaleX: scaleX, scaleY: scaleY, canvasHeight: canvasHeight, into: ctx)
         }
 
-        let result = NSImage(size: NSSize(width: canvasWidth, height: canvasHeight))
-        result.addRepresentation(canvas)
-        return result
+        guard let composited = ctx.makeImage() else {
+            throw HandlerError.screenshotFailed
+        }
+        return NSImage(cgImage: composited, size: NSSize(width: canvasWidth, height: canvasHeight))
     }
 
-    /// Draws one viewport snapshot into the stitched canvas. AppKit's image
-    /// coordinate space is bottom-left origin, so the CSS-pixel `origin.y`
-    /// (top-down) is flipped against the canvas height.
+    /// Draws one viewport snapshot into the stitched canvas in pixel coordinates.
+    /// The snapshot's `CGImage` carries its true backing-pixel extent, so source
+    /// and destination are both in pixels — no point/pixel mismatch on Retina.
+    /// `CGContext` is bottom-left origin, so the top-down `origin.y` (scaled to
+    /// pixels) is flipped against the canvas height.
     @MainActor
     private func draw(
         _ snapshot: NSImage,
         at origin: CGPoint,
         scaleX: Double,
         scaleY: Double,
-        canvasHeight: Int
+        canvasHeight: Int,
+        into ctx: CGContext
     ) {
-        guard let rep = snapshot.representations.first else { return }
-        let pixelWidth = Double(rep.pixelsWide)
-        let pixelHeight = Double(rep.pixelsHigh)
+        var proposedRect = NSRect(origin: .zero, size: snapshot.size)
+        guard let cgImage = snapshot.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            return
+        }
+        let pixelWidth = Double(cgImage.width)
+        let pixelHeight = Double(cgImage.height)
         let destX = origin.x * scaleX
         let destTop = origin.y * scaleY
         let destY = Double(canvasHeight) - destTop - pixelHeight
-        snapshot.draw(
-            in: NSRect(x: destX, y: destY, width: pixelWidth, height: pixelHeight),
-            from: NSRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight),
-            operation: .copy,
-            fraction: 1
-        )
+        ctx.draw(cgImage, in: CGRect(x: destX, y: destY, width: pixelWidth, height: pixelHeight))
     }
 
     @MainActor

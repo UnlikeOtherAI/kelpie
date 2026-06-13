@@ -212,6 +212,8 @@ When set to `"queue"`, dialogs are captured and returned by `getDialog` instead 
 
 Queued dialogs are tied to the current page. If a new navigation starts before the dialog is handled, Kelpie dismisses the pending dialog to avoid leaving the WebView blocked on a stale result.
 
+JavaScript dialog handling (`get-dialog`, `handle-dialog`, `set-dialog-auto-handler`) is fully supported on iOS, Android, and macOS. On macOS the active WebKit renderer's `WKUIDelegate` enqueues alert/confirm/prompt dialogs into a shared store that the handler reads, so queued and auto-handled dialogs behave the same as on mobile.
+
 ---
 
 ## Tabs
@@ -424,7 +426,7 @@ Read cookies for the current page.
 ```json
 POST /v1/get-cookies
 {
-  "url": null,                 // optional, specific URL — defaults to current page
+  "url": null,                 // optional, scope to cookies that would be sent to this URL
   "name": null                 // optional, filter by cookie name
 }
 
@@ -457,6 +459,8 @@ Response:
 }
 ```
 
+The `url` and `name` filters are honored on all platforms (iOS, Android, macOS). `url` scoping matches a cookie's host, path, and `Secure` flag against the URL, mirroring which cookies the browser would actually send to that URL — equivalent to Android's `CookieManager.getCookie(url)`.
+
 ### `setCookie`
 Set a cookie.
 
@@ -487,9 +491,10 @@ Delete cookies by name, domain, or all.
 ```json
 POST /v1/delete-cookies
 {
+  "url": null,                // optional, scope deletion to cookies sent to this URL
   "name": "session_id",       // optional, delete specific cookie
-  "domain": "example.com",    // optional, scope deletion
-  "deleteAll": false           // optional, delete all cookies
+  "domain": "example.com",    // optional, scope deletion to this exact domain
+  "deleteAll": false           // optional, delete all cookies in scope
 }
 
 Response:
@@ -498,6 +503,8 @@ Response:
   "deleted": 1
 }
 ```
+
+The `url`, `name`, and `domain` selectors are honored on all platforms (iOS, Android, macOS). When none of `name`, `domain`, or `deleteAll` is supplied, the call is a no-op (`deleted: 0`) rather than wiping the store. `deleteAll` only clears the full store when no `url`/`name`/`domain` narrows the scope; otherwise it deletes just the matching cookies. `domain` matching is exact and tolerant of a leading dot.
 
 ### `getStorage`
 Read localStorage or sessionStorage.

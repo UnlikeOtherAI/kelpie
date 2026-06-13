@@ -921,7 +921,9 @@ Command surface: `kelpie mcp` and `kelpie mcp --http`.
 
 Detailed AI command documentation lives in [docs/cli/advanced.md](cli/advanced.md#ai-commands).
 
-Command surface: `kelpie ai`, `kelpie ai list`, `kelpie ai pull <model>`, `kelpie ai rm <model>`, `kelpie ai status`, `kelpie ai load <model>`, `kelpie ai unload`, and `kelpie ai ask <prompt>`.
+Command surface: `kelpie ai`, `kelpie ai list`, `kelpie ai pull <model>`, `kelpie ai rm <model>`, `kelpie ai status`, `kelpie ai load <model>`, `kelpie ai unload`, `kelpie ai ask <prompt>`, `kelpie ai catalog`, and `kelpie ai fitness <model>`.
+
+`kelpie ai catalog` lists the approved on-device model catalog from a device (requires a HuggingFace token configured on the device). `kelpie ai fitness <model>` scores a catalog model against a device's resources; pass `--ram <gb>` and `--disk <gb>` to evaluate against specific RAM/disk figures. Both are supported on iOS, Android, and macOS.
 
 ## LLM Help System
 

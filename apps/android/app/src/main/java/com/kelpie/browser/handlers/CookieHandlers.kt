@@ -64,6 +64,12 @@ class CookieHandlers(
         val host = hostFromUrl(url) ?: ""
         val existing = parseCookieHeader(cm.getCookie(url).orEmpty(), defaultDomain = host)
 
+        // No selector supplied: no-op rather than wiping cookies on an empty
+        // request. Matches the iOS/macOS safe semantics.
+        if (!deleteAll && nameFilter == null && domainFilter == null) {
+            return successResponse(mapOf("deleted" to 0))
+        }
+
         if (deleteAll && nameFilter == null && domainFilter == null) {
             val pending = existing.size
             cm.removeAllCookies(null)

@@ -28,6 +28,11 @@ export interface ElementInfo {
 
 export interface NavigateRequest {
   url: string;
+  /**
+   * Max time in milliseconds to wait for the navigation to finish loading.
+   * Honored on iOS, Android, and macOS. Defaults to 10000ms when omitted.
+   */
+  timeout?: number;
 }
 
 export interface NavigateResponse extends SuccessResponse {
@@ -808,6 +813,8 @@ export interface SetCookieRequest {
 }
 
 export interface DeleteCookiesRequest {
+  /** Scope deletion to cookies that would be sent to this URL (host/path/secure match). */
+  url?: string;
   name?: string;
   domain?: string;
   deleteAll?: boolean;

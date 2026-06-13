@@ -62,6 +62,21 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     private(set) var canGoForward: Bool = false
     private(set) var estimatedProgress: Double = 0.0
 
+    /// Most recent main-frame load failure, cleared at the start of each new
+    /// provisional navigation. Read by `NavigationHandler` to surface
+    /// NAVIGATION_ERROR for DNS failures / connection-refused / interrupted
+    /// loads instead of a false success or TIMEOUT. Lives on the renderer (not
+    /// HandlerContext) because macOS has one WKWebView per tab and the
+    /// navigation delegate is the renderer itself.
+    private(set) var lastNavigationError: String?
+
+    /// Per-renderer JavaScript dialog store. macOS genuinely supports multiple
+    /// windows/tabs, each with its own WKWebView; a process-wide singleton would
+    /// let a dialog in one window dismiss a pending dialog in another. The
+    /// WKUIDelegate panels below enqueue into THIS instance, and handlers reach
+    /// it via `HandlerContext.dialogState(windowId:tabId:)`.
+    let dialogState = DialogState()
+
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
 
@@ -104,7 +119,14 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     func load(url: URL) {
+        lastNavigationError = nil
         webView.load(URLRequest(url: url))
+    }
+
+    /// Clears any captured navigation error. Used by `NavigationHandler` to start
+    /// a navigation from a clean slate before driving `load(url:)`.
+    func clearNavigationError() {
+        lastNavigationError = nil
     }
 
     func goBack() { webView.goBack() }
@@ -242,8 +264,27 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // Each new provisional navigation starts clean — clear any error captured
+        // by a superseded load so a cancelled-then-successful sequence is not fatal.
+        self.lastNavigationError = nil
         self.documentNavigationStart = Date()
         self.capturedDocumentResponseURL = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        self.recordNavigationFailure(error)
+        self.isLoading = false
+        self.onStateChange?()
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        self.recordNavigationFailure(error)
+        self.isLoading = false
+        self.onStateChange?()
     }
 
     func webView(
@@ -253,6 +294,16 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     ) {
         self.recordMainDocumentResponse(navigationResponse)
         decisionHandler(.allow)
+    }
+
+    /// Captures a real main-frame load failure, ignoring benign codes that do
+    /// not represent a navigation error: `NSURLErrorCancelled` (a superseded
+    /// load, e.g. a redirect) and `NSURLErrorFrameLoadInterrupted` (commonly
+    /// fired when a response is handed off to a download or a custom scheme).
+    private func recordNavigationFailure(_ error: Error) {
+        let ns = error as NSError
+        if ns.code == NSURLErrorCancelled || ns.code == NSURLErrorFrameLoadInterrupted { return }
+        self.lastNavigationError = error.localizedDescription
     }
 
     // MARK: - WKUIDelegate
@@ -272,10 +323,12 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     // MARK: - JavaScript dialogs
 
     // Instead of presenting a native NSAlert (which would block the WebView and
-    // require a human click), each panel is captured into the shared DialogState.
-    // The WebKit completion handler is suspended inside a PendingDialog until
-    // either an auto-handler resolves it immediately or `handle-dialog` is called
-    // over HTTP/MCP. This mirrors the iOS WebViewCoordinator semantics exactly.
+    // require a human click), each panel is captured into THIS renderer's
+    // DialogState. The WebKit completion handler is suspended inside a
+    // PendingDialog until either an auto-handler resolves it immediately or
+    // `handle-dialog` is called over HTTP/MCP for this tab. Per-renderer state
+    // keeps multi-window dialogs isolated. This mirrors the iOS
+    // WebViewCoordinator semantics exactly.
 
     func webView(
         _ webView: WKWebView,
@@ -286,7 +339,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         let dialog = DialogState.PendingDialog(type: .alert, message: message, defaultText: nil) { _ in
             completionHandler()
         }
-        DialogState.shared.enqueue(dialog)
+        dialogState.enqueue(dialog)
     }
 
     func webView(
@@ -298,7 +351,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         let dialog = DialogState.PendingDialog(type: .confirm, message: message, defaultText: nil) { result in
             completionHandler(result != nil)
         }
-        DialogState.shared.enqueue(dialog)
+        dialogState.enqueue(dialog)
     }
 
     func webView(
@@ -311,7 +364,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         let dialog = DialogState.PendingDialog(type: .prompt, message: prompt, defaultText: defaultText) { result in
             completionHandler(result)
         }
-        DialogState.shared.enqueue(dialog)
+        dialogState.enqueue(dialog)
     }
 
     // MARK: - Bridge Scripts (same JS as iOS)
