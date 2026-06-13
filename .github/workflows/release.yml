@@ -73,6 +73,7 @@ jobs:
                 curl \
                 file \
                 fontconfig-devel \
+                gcc-c++ \
                 git \
                 glib2-devel \
                 gtk3-devel \
