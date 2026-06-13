@@ -51,6 +51,17 @@ mkdir -p "${APT_ROOT}" "${RPM_ROOT}"
 mapfile -t TAGS < <(gh api --paginate "repos/${REPOSITORY}/releases" --jq '.[] | select(.draft == false) | .tag_name')
 
 for tag in "${TAGS[@]}"; do
+  has_linux_packages="$(
+    gh release view "${tag}" \
+      --repo "${REPOSITORY}" \
+      --json assets \
+      --jq 'any(.assets[].name; test("\\.(deb|rpm)$"))'
+  )"
+
+  if [ "${has_linux_packages}" != "true" ]; then
+    continue
+  fi
+
   gh release download "${tag}" \
     --repo "${REPOSITORY}" \
     --dir "${ASSET_DIR}" \
@@ -58,6 +69,15 @@ for tag in "${TAGS[@]}"; do
     --pattern '*.rpm' \
     --skip-existing
 done
+
+shopt -s nullglob
+downloaded_packages=("${ASSET_DIR}"/*.deb "${ASSET_DIR}"/*.rpm)
+shopt -u nullglob
+
+if [ "${#downloaded_packages[@]}" -eq 0 ]; then
+  echo "no .deb or .rpm assets downloaded" >&2
+  exit 1
+fi
 
 APT_POOL="${APT_ROOT}/pool/main/m/kelpie"
 APT_DIST="${APT_ROOT}/dists/stable/main/binary-amd64"
