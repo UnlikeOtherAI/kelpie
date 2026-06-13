@@ -149,6 +149,7 @@ struct BrowserView: View {
                 touchpadMode = false
             }
         }
+        .pairingDialog(coordinator: serverState.pairingCoordinator)
     }
 
     @ViewBuilder

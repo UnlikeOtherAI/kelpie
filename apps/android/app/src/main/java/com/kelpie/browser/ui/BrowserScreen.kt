@@ -60,6 +60,7 @@ import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.ScriptPlaybackState
 import com.kelpie.browser.handlers.Snapshot3DBridge
+import com.kelpie.browser.network.PairApprovalCoordinator
 import com.kelpie.browser.network.Router
 import kotlinx.coroutines.launch
 
@@ -73,7 +74,9 @@ fun BrowserScreen(
     activity: Activity,
     isServerRunning: Boolean,
     isMDNSAdvertising: Boolean,
+    pairingCoordinator: PairApprovalCoordinator,
 ) {
+    var showPairedClients by remember { mutableStateOf(false) }
     val browserState = remember { BrowserState() }
     val context = LocalContext.current
     val tabStore = remember { TabStore(context, handlerContext, browserState) }
@@ -392,9 +395,27 @@ fun BrowserScreen(
                     showSettings = false
                     webView?.loadUrl(url)
                 },
+                onShowPairedClients = {
+                    showSettings = false
+                    showPairedClients = true
+                },
             )
         }
     }
+
+    if (showPairedClients) {
+        ModalBottomSheet(
+            onDismissRequest = { showPairedClients = false },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            PairedClientsScreen(
+                coordinator = pairingCoordinator,
+                onBack = { showPairedClients = false },
+            )
+        }
+    }
+
+    PairingDialog(coordinator = pairingCoordinator)
 
     LaunchedEffect(showSettings, pendingWelcomeFromHelp) {
         if (!showSettings && pendingWelcomeFromHelp) {

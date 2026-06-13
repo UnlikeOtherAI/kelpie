@@ -3,6 +3,7 @@ import UIKit
 import WebKit
 
 /// Observable state for the HTTP server and mDNS advertiser.
+@MainActor
 final class ServerState: ObservableObject {
     @Published var isServerRunning = false
     @Published var isMDNSAdvertising = false
@@ -15,6 +16,8 @@ final class ServerState: ObservableObject {
     let router = Router()
     let handlerContext = HandlerContext()
     let scriptPlaybackState = ScriptPlaybackState()
+    let pairingStore: PairingStore
+    let pairingCoordinator: PairApprovalCoordinator
     weak var webView: WKWebView?
     var tabStore: TabStore?
 
@@ -25,11 +28,17 @@ final class ServerState: ObservableObject {
     init(port: UInt16 = 8420) {
         self.deviceInfo = DeviceInfo.current(port: Int(port))
         self.ipAddress = Self.getLocalIPAddress()
+        let store = PairingStore()
+        self.pairingStore = store
+        self.pairingCoordinator = PairApprovalCoordinator(store: store)
     }
 
     init(deviceInfo: DeviceInfo) {
         self.deviceInfo = deviceInfo
         self.ipAddress = Self.getLocalIPAddress()
+        let store = PairingStore()
+        self.pairingStore = store
+        self.pairingCoordinator = PairApprovalCoordinator(store: store)
     }
 
     @MainActor
@@ -37,12 +46,23 @@ final class ServerState: ObservableObject {
         registerHandlers()
         router.registerFallbacks()
         do {
-            httpServer = try HTTPServer(port: UInt16(deviceInfo.port), router: router)
+            let server = try HTTPServer(
+                port: UInt16(deviceInfo.port),
+                router: router,
+                pairingStore: pairingStore,
+                deviceInfo: deviceInfo
+            )
+            server.onPendingPairChanged = { [weak self] in
+                Task { @MainActor in
+                    self?.pairingCoordinator.refresh()
+                }
+            }
+            httpServer = server
+            server.start()
         } catch {
             print("[ServerState] Failed to construct HTTPServer: \(error)")
             return
         }
-        httpServer?.start()
         DispatchQueue.main.async { self.isServerRunning = true }
     }
 

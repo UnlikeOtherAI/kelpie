@@ -21,6 +21,8 @@ import { buildDownloadUrl, downloadModel } from "../ai/download.js";
 import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 import { saveFeedbackReport, summarizeFeedbackReports } from "../feedback/store.js";
 import { enrichDevicesWithCapabilities } from "../discovery/capabilities.js";
+import { pair as pairWithDevice } from "../auth/pairing.js";
+import { defaultClientName, getSessionCache, getTokenStore } from "../auth/token-store.js";
 
 type JsonObject = Record<string, unknown>;
 type ScreenshotResult = JsonObject & {
@@ -258,9 +260,81 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
     const devices = getAllDevices();
     return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
   }
+  if (method === "pair") {
+    return handlePair(params);
+  }
   // listDevices
   const devices = getAllDevices();
   return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
+}
+
+async function handlePair(
+  params: Record<string, unknown>,
+): Promise<{ content: { type: "text"; text: string }[] }> {
+  const deviceId = typeof params.device === "string" ? params.device : "";
+  const device = await getDevice(deviceId);
+  if (!device) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            success: false,
+            error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` },
+          }),
+        },
+      ],
+    };
+  }
+  const store = getTokenStore();
+  const clientId = await store.clientId();
+  const clientName = typeof params.clientName === "string" ? params.clientName : defaultClientName();
+  const overallTimeoutMs = typeof params.timeoutMs === "number" ? params.timeoutMs : 5 * 60_000;
+
+  const result = await pairWithDevice({
+    host: device.ip,
+    port: device.port,
+    clientId,
+    clientName,
+    overallTimeoutMs,
+  });
+  if (result.status !== "approved") {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify({
+            success: false,
+            error: {
+              code: result.status === "error" ? result.code : `PAIR_${result.status.toUpperCase()}`,
+              message: result.status === "error" ? result.message : `Pairing ${result.status}`,
+            },
+          }),
+        },
+      ],
+    };
+  }
+  if (result.scope === "persistent") {
+    await store.set(device.id, device.ip, device.port, result.token);
+  } else {
+    getSessionCache().set(device.id, device.ip, device.port, result.token);
+  }
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({
+          success: true,
+          deviceId: device.id,
+          deviceName: device.name,
+          host: device.ip,
+          port: device.port,
+          scope: result.scope,
+          persisted: result.scope === "persistent",
+        }),
+      },
+    ],
+  };
 }
 
 function describeTool(description: string, platforms?: readonly string[]): string {

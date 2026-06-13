@@ -36,6 +36,7 @@ fun SettingsScreen(
     isMDNSAdvertising: Boolean,
     onShowWelcome: () -> Unit,
     onNavigate: (String) -> Unit = {},
+    onShowPairedClients: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var enable3DInspector by remember { mutableStateOf(FeatureFlags.is3DInspectorEnabled(context)) }
@@ -64,6 +65,7 @@ fun SettingsScreen(
         InfoRow("Port", deviceInfo.port.toString())
         InfoRow("HTTP Server", if (isServerRunning) "Running" else "Stopped")
         InfoRow("mDNS", if (isMDNSAdvertising) "Advertising" else "Off")
+        HelpActionRow("Paired Clients", onClick = onShowPairedClients)
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 

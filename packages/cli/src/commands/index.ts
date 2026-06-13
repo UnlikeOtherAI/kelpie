@@ -44,11 +44,13 @@ import { registerToast } from "./toast.js";
 import { registerOrientation } from "./orientation.js";
 import { registerViewportPreset } from "./viewport-preset.js";
 import { registerFeedback } from "./feedback.js";
+import { registerPair } from "./pair.js";
 
 export function registerAllCommands(program: Command): void {
   // Discovery
   registerDiscover(program);
   registerPing(program);
+  registerPair(program);
   registerBrowser(program);
   registerFeedback(program);
 

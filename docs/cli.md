@@ -75,6 +75,25 @@ kelpie ping --device "My iPhone"
 kelpie ping                       # ping all
 ```
 
+### `kelpie pair`
+Pair the CLI with a device. The end-user must explicitly approve on-device. Without prior pairing, every authenticated command returns `401 UNAUTHORIZED`; the CLI auto-pairs transparently on first failure, but `kelpie pair` is also exposed as an explicit command for scripts that want to prime credentials before automation runs.
+
+```bash
+kelpie pair --device "My iPhone"
+kelpie pair --device 192.168.1.42 --client-name "ci-runner@build-host"
+kelpie pair --device "MyMac" --timeout-ms 60000   # give up after 60 s
+```
+
+The user picks one of three responses on the device prompt:
+
+| Response | Token persists across CLI invocations? | On-disk |
+|---|---|---|
+| Yes, once | No — kept in process memory only | — |
+| Always allow | Yes | `~/.kelpie/tokens.json` (mode 0600) |
+| No | n/a | suppresses re-prompts from the source for 10 min |
+
+Persistent tokens are keyed by `<deviceId>:<host>:<port>` (the *device fingerprint*). If the same `deviceId` appears at a new socket address, the CLI refuses the stored token and forces a re-pair, defending against mDNS spoofing.
+
 ### `kelpie browser`
 Manage local macOS Kelpie app aliases stored in `~/.kelpie/browsers.json`.
 

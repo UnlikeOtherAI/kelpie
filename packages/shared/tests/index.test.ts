@@ -76,7 +76,7 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of CLI tools", () => {
-    expect(CliMcpTools.length).toBe(24);
+    expect(CliMcpTools.length).toBe(25);
   });
 
   it("httpToMcp maps all browser endpoints", () => {

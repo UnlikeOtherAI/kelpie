@@ -56,9 +56,16 @@ describe("MCP tool definitions", () => {
   });
 
   it("group tools do NOT have device property", () => {
-    for (const tool of cliTools) {
+    const groupTools = cliTools.filter((t) => t.kind === "group" || t.kind === "smartQuery");
+    for (const tool of groupTools) {
       expect(tool.schema).not.toHaveProperty("device");
     }
+  });
+
+  it("kelpie_pair targets a single device", () => {
+    const pairTool = cliTools.find((t) => t.name === "kelpie_pair");
+    expect(pairTool).toBeDefined();
+    expect(pairTool!.schema).toHaveProperty("device");
   });
 
   it("all tool names use kelpie_ prefix", () => {

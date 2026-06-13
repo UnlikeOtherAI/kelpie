@@ -36,6 +36,10 @@ struct SettingsView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.blue)
                         .textSelection(.enabled)
+
+                    NavigationLink("Paired Clients") {
+                        PairedClientsView(coordinator: serverState.pairingCoordinator)
+                    }
                 }
 
                 Section("HuggingFace") {

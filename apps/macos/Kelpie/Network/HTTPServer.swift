@@ -15,6 +15,10 @@ enum HTTPServerError: Error, CustomStringConvertible {
 
 /// Embedded HTTP server for receiving CLI commands.
 /// Uses raw NWListener since we want zero external dependencies for the server.
+///
+/// All `/v1/*` routes (except the unauth allowlist enforced by `AuthMiddleware`)
+/// require a bearer token issued by the pairing flow. CORS headers are not
+/// emitted — CLI fetch is not a browser.
 final class HTTPServer: @unchecked Sendable {
     /// Maximum bytes accepted for HTTP request headers before parsing must complete.
     /// 64 KiB caps slow-loris pinning while leaving room for cookies and auth headers.
@@ -30,6 +34,8 @@ final class HTTPServer: @unchecked Sendable {
 
     let port: UInt16
     let router: Router
+    let pairingStore: PairingStore
+    let deviceInfo: DeviceInfo
     private let lock = NSLock()
     private var listener: NWListener?
     private var bonjourService: NWListener.Service?
@@ -49,11 +55,17 @@ final class HTTPServer: @unchecked Sendable {
         get { lock.withLock { _onReady } }
         set { lock.withLock { _onReady = newValue } }
     }
+    /// Invoked on the main actor after a new pending pair request is recorded.
+    var onPendingPairChanged: (@MainActor () -> Void)? {
+        get { lock.withLock { _onPendingPairChanged } }
+        set { lock.withLock { _onPendingPairChanged = newValue } }
+    }
     private var _onBonjourStateChange: ((Bool) -> Void)?
     private var _onStateChange: ((Bool) -> Void)?
     private var _onReady: (() -> Void)?
+    private var _onPendingPairChanged: (@MainActor () -> Void)?
 
-    init(port: UInt16 = 8420, router: Router) throws {
+    init(port: UInt16 = 8420, router: Router, pairingStore: PairingStore, deviceInfo: DeviceInfo) throws {
         // `UInt16` already constrains the upper bound (<= 65535); port 0 is
         // the wildcard / "any port" sentinel and is never something we want
         // to advertise via mDNS, so reject it explicitly rather than crashing
@@ -61,6 +73,8 @@ final class HTTPServer: @unchecked Sendable {
         guard port > 0 else { throw HTTPServerError.invalidPort(port) }
         self.port = port
         self.router = router
+        self.pairingStore = pairingStore
+        self.deviceInfo = deviceInfo
     }
 
     func configureBonjourService(
@@ -263,117 +277,140 @@ final class HTTPServer: @unchecked Sendable {
     }
 
     private func send408AndClose(connection: NWConnection) {
-        sendErrorAndClose(
-            connection: connection,
-            statusCode: 408,
-            code: "REQUEST_TIMEOUT",
-            message: "Request timed out before completion"
-        )
+        sendErrorAndClose(connection: connection, status: 408, code: "REQUEST_TIMEOUT", message: "Request timed out before completion")
     }
 
     private func send411AndClose(connection: NWConnection) {
-        sendErrorAndClose(
-            connection: connection,
-            statusCode: 411,
-            code: "LENGTH_REQUIRED",
-            message: "Content-Length header is required"
-        )
+        sendErrorAndClose(connection: connection, status: 411, code: "LENGTH_REQUIRED", message: "Content-Length header is required")
     }
 
     private func send413BodyAndClose(connection: NWConnection) {
         let mb = Self.maxBodyBytes / (1024 * 1024)
-        sendErrorAndClose(
-            connection: connection,
-            statusCode: 413,
-            code: "PAYLOAD_TOO_LARGE",
-            message: "Request body exceeds \(mb) MB limit"
-        )
+        sendErrorAndClose(connection: connection, status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds \(mb) MB limit")
     }
 
     private func send431HeaderAndClose(connection: NWConnection) {
         let kb = Self.maxHeaderBytes / 1024
-        sendErrorAndClose(
-            connection: connection,
-            statusCode: 431,
-            code: "REQUEST_HEADER_FIELDS_TOO_LARGE",
-            message: "Request headers exceed \(kb) KB limit"
-        )
+        sendErrorAndClose(connection: connection, status: 431, code: "REQUEST_HEADER_FIELDS_TOO_LARGE", message: "Request headers exceed \(kb) KB limit")
     }
 
     private func send400AndClose(connection: NWConnection, message: String) {
-        sendErrorAndClose(
-            connection: connection,
-            statusCode: 400,
-            code: "BAD_REQUEST",
-            message: message
-        )
+        sendErrorAndClose(connection: connection, status: 400, code: "BAD_REQUEST", message: message)
     }
 
-    private func sendErrorAndClose(connection: NWConnection, statusCode: Int, code: String, message: String) {
-        let payload: [String: Any] = [
-            "success": false,
-            "error": ["code": code, "message": message]
-        ]
-        let body = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data(#"{"success":false,"error":{"code":"INTERNAL","message":"error"}}"#.utf8)
-        let response = buildHTTPResponse(statusCode: statusCode, body: body, contentType: "application/json")
-        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+    private func sendErrorAndClose(connection: NWConnection, status: Int, code: String, message: String) {
+        let response = PairingHTTPResponse.error(status: status, code: code, message: message)
+        connection.send(content: response.render(), completion: .contentProcessed { _ in connection.cancel() })
     }
 
     private func processRequest(connection: NWConnection, data: Data) async {
-        let raw = String(data: data, encoding: .utf8) ?? ""
-        let (requestLine, body) = parseHTTPRequest(raw)
-        let parts = requestLine.split(separator: " ")
-        let httpMethod = parts.first.map(String.init) ?? "GET"
-        let path = parts.count > 1 ? String(parts[1]) : "/"
-
-        var statusCode = 200
-        var responseData = Data()
-        var contentType = "application/json"
-
-        if httpMethod == "POST", path.hasPrefix("/v1/") {
-            let method = String(path.dropFirst("/v1/".count))
-            guard let jsonBody = parseJSON(body) else {
-                statusCode = 400
-                responseData = (try? JSONSerialization.data(
-                    withJSONObject: errorResponse(code: "INVALID_JSON", message: "Request body is not valid JSON")
-                )) ?? Data("{}".utf8)
-                let response = buildHTTPResponse(statusCode: statusCode, body: responseData, contentType: contentType)
-                connection.send(content: response, completion: .contentProcessed { _ in
-                    connection.cancel()
-                })
-                return
-            }
-            let (code, result) = await router.handle(method: method, body: jsonBody)
-            statusCode = code
-            responseData = (try? JSONSerialization.data(withJSONObject: result)) ?? Data("{}".utf8)
-        } else if httpMethod == "GET", path == "/debug/coordinate-calibration" {
-            if let page = coordinateCalibrationPage() {
-                responseData = page
-                contentType = "text/html; charset=utf-8"
-            } else {
-                statusCode = 500
-                responseData = Data(#"{"error":"Coordinate calibration page missing from bundle"}"#.utf8)
-            }
-        } else if path == "/health" {
-            responseData = Data(#"{"status":"ok"}"#.utf8)
-        } else {
-            statusCode = 404
-            responseData = Data(#"{"error":"Not found"}"#.utf8)
+        let sourceAddress = HTTPRequestParser.formatSourceAddress(connection.endpoint)
+        guard let parsed = HTTPRequestParser.parse(data: data, sourceAddress: sourceAddress) else {
+            await send(connection: connection, response: PairingHTTPResponse.malformed())
+            return
         }
 
-        let response = buildHTTPResponse(statusCode: statusCode, body: responseData, contentType: contentType)
-        connection.send(content: response, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        let middleware = AuthMiddleware(store: pairingStore)
+        let decision = middleware.evaluate(parsed)
+        switch decision {
+        case let .reject(status, code, message):
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.error(status: status, code: code, message: message)
+            )
+        case .unauthenticated:
+            await routeUnauthenticated(parsed: parsed, connection: connection)
+        case let .authenticated(clientId):
+            await routeAuthenticated(parsed: parsed, clientId: clientId, connection: connection)
+        }
     }
 
-    private func parseHTTPRequest(_ raw: String) -> (requestLine: String, body: String) {
-        guard let headerEnd = raw.range(of: "\r\n\r\n") else {
-            return (raw.components(separatedBy: "\r\n").first ?? "", "")
+    private func routeUnauthenticated(parsed: ParsedHTTPRequest, connection: NWConnection) async {
+        let pairEndpoints = PairEndpoints(store: pairingStore, onPendingChanged: onPendingPairChanged)
+        switch (parsed.method, parsed.path) {
+        case ("POST", "/v1/pair"):
+            let result = pairEndpoints.handlePairPost(body: parsed.body, sourceAddress: parsed.sourceAddress)
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)
+            )
+        case ("GET", "/v1/pair/status"):
+            let result = pairEndpoints.handlePairStatus(query: parsed.query, sourceAddress: parsed.sourceAddress)
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)
+            )
+        case ("GET", "/v1/get-device-info"):
+            let result = pairEndpoints.handleGetDeviceInfo(
+                name: deviceInfo.name,
+                platform: deviceInfo.platform,
+                version: deviceInfo.version
+            )
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.json(status: result.status, json: result.json)
+            )
+        case ("GET", "/health"):
+            await send(connection: connection, response: PairingHTTPResponse.healthOk())
+        default:
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.error(status: 404, code: "NOT_FOUND", message: "Not found")
+            )
         }
-        let requestLine = raw[..<headerEnd.lowerBound].components(separatedBy: "\r\n").first ?? ""
-        let body = String(raw[headerEnd.upperBound...])
-        return (requestLine, body)
+    }
+
+    private func routeAuthenticated(parsed: ParsedHTTPRequest, clientId: String, connection: NWConnection) async {
+        let pairEndpoints = PairEndpoints(store: pairingStore, onPendingChanged: nil)
+        switch (parsed.method, parsed.path) {
+        case ("DELETE", "/v1/pair"):
+            let result = pairEndpoints.handlePairDelete(authenticatedClientId: clientId)
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)
+            )
+        case ("GET", "/debug/coordinate-calibration"):
+            if let page = coordinateCalibrationPage() {
+                await send(
+                    connection: connection,
+                    response: PairingHTTPResponse(
+                        status: 200, body: page, contentType: "text/html; charset=utf-8", noStore: false
+                    )
+                )
+            } else {
+                await send(
+                    connection: connection,
+                    response: PairingHTTPResponse.error(
+                        status: 500, code: "WEBVIEW_ERROR", message: "Coordinate calibration page missing"
+                    )
+                )
+            }
+        default:
+            if parsed.method == "POST", parsed.path.hasPrefix("/v1/") {
+                await handlePOSTv1(parsed: parsed, connection: connection)
+            } else {
+                await send(
+                    connection: connection,
+                    response: PairingHTTPResponse.error(status: 404, code: "NOT_FOUND", message: "Not found")
+                )
+            }
+        }
+    }
+
+    private func handlePOSTv1(parsed: ParsedHTTPRequest, connection: NWConnection) async {
+        let method = String(parsed.path.dropFirst("/v1/".count))
+        let bodyString = String(data: parsed.body, encoding: .utf8) ?? ""
+        guard let jsonBody = parseJSON(bodyString) else {
+            await send(
+                connection: connection,
+                response: PairingHTTPResponse.error(
+                    status: 400, code: "INVALID_JSON", message: "Request body is not valid JSON"
+                )
+            )
+            return
+        }
+        let (code, result) = await router.handle(method: method, body: jsonBody)
+        await send(connection: connection, response: PairingHTTPResponse.json(status: code, json: result))
     }
 
     private func parseJSON(_ body: String) -> [String: Any]? {
@@ -399,30 +436,9 @@ final class HTTPServer: @unchecked Sendable {
         return nil
     }
 
-    private func buildHTTPResponse(statusCode: Int, body: Data, contentType: String) -> Data {
-        let statusText: String
-        switch statusCode {
-        case 200: statusText = "OK"
-        case 400: statusText = "Bad Request"
-        case 404: statusText = "Not Found"
-        case 408: statusText = "Request Timeout"
-        case 411: statusText = "Length Required"
-        case 413: statusText = "Payload Too Large"
-        case 431: statusText = "Request Header Fields Too Large"
-        case 500: statusText = "Internal Server Error"
-        default: statusText = "Unknown"
-        }
-        let header = """
-        HTTP/1.1 \(statusCode) \(statusText)\r
-        Content-Type: \(contentType)\r
-        Content-Length: \(body.count)\r
-        Access-Control-Allow-Origin: *\r
-        Connection: close\r
-        \r
-
-        """
-        var response = Data(header.utf8)
-        response.append(body)
-        return response
+    private func send(connection: NWConnection, response: PairingHTTPResponse) async {
+        connection.send(content: response.render(), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 }

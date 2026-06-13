@@ -9,6 +9,22 @@ import {
   validatePayload,
 } from "./jsonrpc.js";
 
+/** Default bind host for `kelpie mcp --http`. Loopback only. */
+export const DEFAULT_MCP_BIND_HOST = "127.0.0.1";
+
+export interface HttpTransportOptions {
+  /** IP/host string to bind. Anything other than loopback requires opt-in. */
+  bindHost?: string;
+  /** Required when {@link bindHost} is non-loopback. */
+  unsafeHost?: boolean;
+}
+
+function isLoopback(host: string): boolean {
+  if (host === "127.0.0.1" || host === "localhost") return true;
+  if (host === "::1" || host === "[::1]") return true;
+  return false;
+}
+
 export async function startStdio(server: McpServer): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -78,7 +94,26 @@ async function handleMcpPost(
   await transport.handleRequest(req, res, parsed);
 }
 
-export async function startHttp(server: McpServer, port: number): Promise<void> {
+export async function startHttp(
+  server: McpServer,
+  port: number,
+  options: HttpTransportOptions = {},
+): Promise<void> {
+  const bindHost = options.bindHost ?? DEFAULT_MCP_BIND_HOST;
+  if (!isLoopback(bindHost) && !options.unsafeHost) {
+    throw new Error(
+      `Refusing to bind kelpie mcp --http to ${bindHost}: ` +
+        `non-loopback binding exposes stored bearer tokens to anyone on the network. ` +
+        `Pass --unsafe-host to override.`,
+    );
+  }
+  if (!isLoopback(bindHost)) {
+    process.stderr.write(
+      `WARNING: kelpie mcp --http is bound to ${bindHost}; any host reaching ` +
+        `port ${port} can drive your paired devices. Consider --bind 127.0.0.1.\n`,
+    );
+  }
+
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID() });
 
   const httpServer = createServer((req, res) => {
@@ -104,8 +139,8 @@ export async function startHttp(server: McpServer, port: number): Promise<void> 
   });
 
   await server.connect(transport);
-  httpServer.listen(port, () => {
-    console.error(`Kelpie MCP server listening on http://localhost:${port}/mcp`);
+  httpServer.listen(port, bindHost, () => {
+    console.error(`Kelpie MCP server listening on http://${bindHost}:${port}/mcp`);
   });
 
   await new Promise<void>((resolve) => {
