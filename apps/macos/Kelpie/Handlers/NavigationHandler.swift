@@ -38,7 +38,8 @@ struct NavigationHandler {
             }
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
-            let finalURL = renderer.currentURL?.absoluteString ?? ""
+            let snapshot = await NavigationPageSnapshot.read(from: renderer, fallbackURL: urlString)
+            let finalURL = snapshot.url
             // Honest failure (Chromium only): after a real load CEF reports the
             // live document URL, so a renderer still on about:blank / no URL here
             // means the page never loaded — report it instead of a false success
@@ -54,7 +55,7 @@ struct NavigationHandler {
             }
             return successResponse([
                 "url": finalURL.isEmpty ? urlString : finalURL,
-                "title": renderer.currentTitle,
+                "title": snapshot.title,
                 "loadTime": loadTime
             ])
         } catch {
@@ -74,7 +75,8 @@ struct NavigationHandler {
                 renderer.goBack()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            return successResponse(["url": renderer.currentURL?.absoluteString ?? "", "title": renderer.currentTitle])
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
@@ -92,7 +94,8 @@ struct NavigationHandler {
                 renderer.goForward()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            return successResponse(["url": renderer.currentURL?.absoluteString ?? "", "title": renderer.currentTitle])
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
@@ -115,9 +118,10 @@ struct NavigationHandler {
                 if !renderer.isLoading { break }
             }
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            let snapshot = await NavigationPageSnapshot.read(from: renderer)
             return successResponse([
-                "url": renderer.currentURL?.absoluteString ?? "",
-                "title": renderer.currentTitle,
+                "url": snapshot.url,
+                "title": snapshot.title,
                 "loadTime": loadTime
             ])
         } catch {
