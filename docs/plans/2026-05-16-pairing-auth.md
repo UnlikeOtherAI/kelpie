@@ -38,7 +38,7 @@ Everything else — including `/mcp`, `/sse`, and every other `/v1/*` method —
 | `POST /v1/pair` | none + CSRF gate | `{clientId: uuid, clientName: string}` | `202 {status: "pending", requestId: nonce, expiresAt: ms, sourceAddress: ip}` |
 | `GET /v1/pair/status?requestId=X` | none | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?: "session"\|"persistent", token?: string}` — token returned **once** then pending entry deleted |
 | `DELETE /v1/pair` | bearer (revokes self only — clientId derived from token) | — | `200 {success: true}` |
-| `GET /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
+| `GET or POST /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
 | `/mcp`, `/sse`, all other `/v1/*` | **bearer required** | unchanged | `401 {error: {code: "UNAUTHORIZED"}}` |
 
 ### Token lifecycle

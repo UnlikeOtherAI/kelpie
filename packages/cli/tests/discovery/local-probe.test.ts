@@ -20,6 +20,15 @@ function deviceInfo(port: number): object {
   };
 }
 
+function publicDeviceInfo(): object {
+  return {
+    name: "dictator",
+    platform: "macos",
+    version: "0.1.11",
+    requiresPairing: true,
+  };
+}
+
 /** Stub fetch so only the given localhost ports answer as healthy Kelpie APIs. */
 function stubReachablePorts(ports: number[], infoPorts = ports): void {
   vi.stubGlobal(
@@ -83,6 +92,24 @@ describe("local-probe", () => {
       expect(await probeDeviceInfo(DEFAULT_PORT)).toEqual(deviceInfo(DEFAULT_PORT));
     });
 
+    it("accepts the public pairing-auth device info shape", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const target = String(url);
+          if (target.includes(`:${DEFAULT_PORT}/v1/get-device-info`)) {
+            return new Response(JSON.stringify(publicDeviceInfo()), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          throw new Error("connection refused");
+        }),
+      );
+
+      expect(await probeDeviceInfo(DEFAULT_PORT)).toEqual(publicDeviceInfo());
+    });
+
     it("returns undefined when the automation endpoint does not respond", async () => {
       stubReachablePorts([DEFAULT_PORT], []);
       expect(await probeDeviceInfo(DEFAULT_PORT)).toBeUndefined();
@@ -103,6 +130,30 @@ describe("local-probe", () => {
       expect(device.version).toBe("0.1.8");
       expect(device.width).toBe(5120);
       expect(device.height).toBe(2880);
+    });
+
+    it("maps public pairing-auth device info into local fallback devices", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const target = String(url);
+          if (target.includes(`:${DEFAULT_PORT}/health`)) {
+            return new Response("ok", { status: 200 });
+          }
+          if (target.includes(`:${DEFAULT_PORT}/v1/get-device-info`)) {
+            return new Response(JSON.stringify(publicDeviceInfo()), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          throw new Error("connection refused");
+        }),
+      );
+
+      const [device] = await probeLocalDevices();
+      expect(device.name).toBe("dictator");
+      expect(device.platform).toBe("macos");
+      expect(device.version).toBe("0.1.11");
     });
 
     it("skips unreachable ports", async () => {

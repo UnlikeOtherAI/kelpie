@@ -39,7 +39,7 @@ The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI must ob
 | `POST /v1/pair` | none + CSRF gate | `{clientId, clientName}` | `202 {status: "pending", requestId, expiresAt, sourceAddress}` |
 | `GET /v1/pair/status?requestId=…` | none | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?, token?}` |
 | `DELETE /v1/pair` | bearer | — | `200 {success: true}` — revokes the caller's own pairing |
-| `GET /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
+| `GET or POST /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
 
 The CSRF gate on `POST /v1/pair` requires `Content-Type: application/json`, an absent `Origin` header, single `Authorization` / `Content-Length` headers, and no `Transfer-Encoding`. Browsers cannot satisfy these constraints; the CLI's plain `fetch` does.
 

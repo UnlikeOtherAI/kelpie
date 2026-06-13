@@ -72,7 +72,7 @@ struct PairEndpoints {
         return (200, ["success": removed])
     }
 
-    /// GET /v1/get-device-info (unauthenticated, public capability advert).
+    /// GET or POST /v1/get-device-info (unauthenticated, public capability advert).
     func handleGetDeviceInfo(name: String, platform: String, version: String) -> (status: Int, json: [String: Any]) {
         (200, [
             "name": name,

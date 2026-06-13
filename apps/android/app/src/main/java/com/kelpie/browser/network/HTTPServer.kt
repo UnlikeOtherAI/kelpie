@@ -182,19 +182,10 @@ class HTTPServer(
                             }
                         }
                         get("/get-device-info") {
-                            val parsed = parsedRequest(call)
-                            when (val decision = middleware.evaluate(parsed)) {
-                                is AuthDecision.Reject -> respondReject(call, decision)
-                                else -> {
-                                    val result =
-                                        pairEndpoints.handleGetDeviceInfo(
-                                            deviceInfo.name,
-                                            "android",
-                                            deviceInfo.version,
-                                        )
-                                    respondPairing(call, result.status, result.json, noStore = false)
-                                }
-                            }
+                            handlePublicDeviceInfo(call, middleware, pairEndpoints)
+                        }
+                        post("/get-device-info") {
+                            handlePublicDeviceInfo(call, middleware, pairEndpoints)
                         }
 
                         // --- Generic authenticated POST /v1/{method} ---
@@ -223,6 +214,26 @@ class HTTPServer(
         engine?.stop(1000, 2000)
         engine = null
         isRunning = false
+    }
+
+    private suspend fun handlePublicDeviceInfo(
+        call: ApplicationCall,
+        middleware: AuthMiddleware,
+        pairEndpoints: PairEndpoints,
+    ) {
+        val parsed = parsedRequest(call)
+        when (val decision = middleware.evaluate(parsed)) {
+            is AuthDecision.Reject -> respondReject(call, decision)
+            else -> {
+                val result =
+                    pairEndpoints.handleGetDeviceInfo(
+                        deviceInfo.name,
+                        "android",
+                        deviceInfo.version,
+                    )
+                respondPairing(call, result.status, result.json, noStore = false)
+            }
+        }
     }
 
     private suspend fun handleAuthenticatedPost(call: ApplicationCall) {

@@ -14,6 +14,9 @@ const LOCAL_PORT_SWEEP = 10;
 const platforms: readonly Platform[] = ["ios", "android", "macos", "linux", "windows"];
 
 interface DeviceInfoPayload {
+  name?: string;
+  platform?: string;
+  version?: string;
   device?: {
     id?: string;
     name?: string;
@@ -108,17 +111,17 @@ function localDevice(
   info: DeviceInfoPayload,
 ): DiscoveredDevice {
   const alias = aliasForPort(store, port);
-  const platform = parsePlatform(info.device?.platform, alias?.platform ?? "macos");
+  const platform = parsePlatform(info.device?.platform ?? info.platform, alias?.platform ?? "macos");
   return {
     id: `local:127.0.0.1:${port}`,
-    name: alias?.name ?? info.device?.name ?? `localhost:${port}`,
+    name: alias?.name ?? info.device?.name ?? info.name ?? `localhost:${port}`,
     ip: "127.0.0.1",
     port,
     platform,
     model: info.device?.model ?? `Kelpie ${platform}`,
     width: info.display?.width ?? 0,
     height: info.display?.height ?? 0,
-    version: info.app?.version ?? "0.0.0",
+    version: info.app?.version ?? info.version ?? "0.0.0",
     lastSeen: Date.now(),
   };
 }

@@ -278,7 +278,7 @@ final class HTTPServer: @unchecked Sendable {
                 connection: connection,
                 response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)
             )
-        case ("GET", "/v1/get-device-info"):
+        case ("GET", "/v1/get-device-info"), ("POST", "/v1/get-device-info"):
             let result = pairEndpoints.handleGetDeviceInfo(
                 name: deviceInfo.name,
                 platform: deviceInfo.platform,
