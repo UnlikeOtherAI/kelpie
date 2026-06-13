@@ -94,4 +94,28 @@ describe("CLI program compatibility", () => {
 
     expect(capturedBody()).toEqual({ mode: "readable", tabId: "tab-123" });
   });
+
+  it("uses --port when resolving a device by IP", async () => {
+    mockFetch({ success: true, url: "https://example.com/app", title: "Example", loadTime: 10 });
+    addDevice(device);
+    addDevice({
+      ...device,
+      id: "admin-device",
+      port: 8422,
+    });
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await makeProgram().parseAsync([
+      "node",
+      "kelpie",
+      "--device",
+      "192.168.1.42",
+      "--port",
+      "8422",
+      "navigate",
+      "https://example.com/app",
+    ]);
+
+    expect(capturedUrl()).toBe("http://192.168.1.42:8422/v1/navigate");
+  });
 });

@@ -49,7 +49,14 @@ export function getAllDevices(): DiscoveredDevice[] {
   return Array.from(devices.values());
 }
 
-export async function getDevice(query: string): Promise<DiscoveredDevice | undefined> {
+export interface DeviceLookupOptions {
+  port?: number;
+}
+
+export async function getDevice(
+  query: string,
+  options: DeviceLookupOptions = {},
+): Promise<DiscoveredDevice | undefined> {
   evictExpired();
   // Auto-scan on first use so --device works without a prior `discover` call
   if (!autoScanned && devices.size === 0) {
@@ -72,6 +79,12 @@ export async function getDevice(query: string): Promise<DiscoveredDevice | undef
 
   const all = getAllDevices();
   const lowerQuery = query.toLowerCase();
+  const addressQuery = parseAddressQuery(query, options.port);
+
+  if (addressQuery) {
+    const byAddress = all.find((d) => d.ip === addressQuery.host && d.port === addressQuery.port);
+    if (byAddress) return byAddress;
+  }
 
   const byNameExact = all.find((d) => d.name.toLowerCase() === lowerQuery);
   if (byNameExact) return byNameExact;
@@ -81,10 +94,12 @@ export async function getDevice(query: string): Promise<DiscoveredDevice | undef
   );
   if (byNameFuzzy) return byNameFuzzy;
 
-  const byIp = all.find((d) => d.ip === query);
-  if (byIp) return byIp;
+  if (!addressQuery?.explicitPort) {
+    const byIp = all.find((d) => d.ip === query);
+    if (byIp) return byIp;
+  }
 
-  const directAddress = getDirectAddressDevice(query);
+  const directAddress = getDirectAddressDevice(addressQuery);
   if (directAddress) return directAddress;
 
   return undefined;
@@ -112,16 +127,37 @@ async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | 
   };
 }
 
-function getDirectAddressDevice(query: string): DiscoveredDevice | undefined {
+interface AddressQuery {
+  host: string;
+  port: number;
+  explicitPort: boolean;
+  label: string;
+}
+
+function parseAddressQuery(query: string, preferredPort?: number): AddressQuery | undefined {
   const match = /^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d+))?$/.exec(query);
   if (!match) {
     return undefined;
   }
+  const explicitPort = match[2] !== undefined || preferredPort !== undefined;
+  const port = match[2] ? Number(match[2]) : (preferredPort ?? DEFAULT_PORT);
   return {
-    id: `direct:${query}`,
-    name: query,
-    ip: match[1],
-    port: match[2] ? Number(match[2]) : DEFAULT_PORT,
+    host: match[1],
+    port,
+    explicitPort,
+    label: match[2] ? query : `${match[1]}:${port}`,
+  };
+}
+
+function getDirectAddressDevice(address: AddressQuery | undefined): DiscoveredDevice | undefined {
+  if (!address) {
+    return undefined;
+  }
+  return {
+    id: `direct:${address.label}`,
+    name: address.label,
+    ip: address.host,
+    port: address.port,
     platform: "linux",
     model: "Kelpie Direct",
     width: 0,

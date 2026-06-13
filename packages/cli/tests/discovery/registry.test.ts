@@ -80,6 +80,28 @@ describe("device registry", () => {
     expect((await getDevice("192.168.1.42"))?.id).toBe("test-uuid-1234");
   });
 
+  it("prefers an explicit host port over stale same-IP entries", async () => {
+    addDevices([
+      makeDevice({ id: "old", ip: "192.168.1.42", port: 8420 }),
+      makeDevice({ id: "admin", ip: "192.168.1.42", port: 8422 }),
+    ]);
+
+    expect((await getDevice("192.168.1.42:8422"))?.id).toBe("admin");
+    expect((await getDevice("192.168.1.42", { port: 8422 }))?.id).toBe("admin");
+  });
+
+  it("uses the requested direct port when no discovered address matches", async () => {
+    addDevice(makeDevice({ id: "old", ip: "192.168.1.42", port: 8420 }));
+
+    const device = await getDevice("192.168.1.42", { port: 8422 });
+
+    expect(device).toMatchObject({
+      id: "direct:192.168.1.42:8422",
+      ip: "192.168.1.42",
+      port: 8422,
+    });
+  });
+
   it("returns undefined for unknown device", async () => {
     expect(await getDevice("nonexistent")).toBeUndefined();
   });

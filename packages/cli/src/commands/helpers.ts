@@ -8,6 +8,15 @@ export function getGlobals(program: Command): GlobalOptions {
   return program.opts<GlobalOptions>();
 }
 
+export function explicitGlobalPort(program: Command, globals: GlobalOptions): number | undefined {
+  if (program.getOptionValueSource("port") !== "cli") {
+    return undefined;
+  }
+  const rawPort = globals.port as unknown;
+  const port = typeof rawPort === "number" ? rawPort : Number.parseInt(String(rawPort), 10);
+  return Number.isInteger(port) && port > 0 ? port : undefined;
+}
+
 export function withGlobalTabId(
   globals: GlobalOptions,
   body?: Record<string, unknown>,
@@ -20,7 +29,9 @@ export function withGlobalTabId(
 export async function requireDevice(program: Command): Promise<DiscoveredDevice | null> {
   const globals = getGlobals(program);
   if (globals.device) {
-    const device = await getDevice(globals.device);
+    const device = await getDevice(globals.device, {
+      port: explicitGlobalPort(program, globals),
+    });
     if (!device) {
       print({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${globals.device}"` } }, globals.format);
       process.exitCode = 4;
