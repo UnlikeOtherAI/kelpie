@@ -338,12 +338,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            exit 0
-          fi
           version="$(node -p "require('./packages/shared/package.json').version")"
           if npm view "@unlikeotherai/kelpie-shared@${version}" version >/dev/null 2>&1; then
             echo "@unlikeotherai/kelpie-shared@${version} already published"
+          elif [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "NPM_TOKEN is required to publish @unlikeotherai/kelpie-shared@${version}" >&2
+            exit 1
           else
             cd packages/shared && npm publish --access public --provenance
           fi
@@ -353,12 +353,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            exit 0
-          fi
           version="$(node -p "require('./packages/cli/package.json').version")"
           if npm view "@unlikeotherai/kelpie@${version}" version >/dev/null 2>&1; then
             echo "@unlikeotherai/kelpie@${version} already published"
+          elif [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "NPM_TOKEN is required to publish @unlikeotherai/kelpie@${version}" >&2
+            exit 1
           else
             cd packages/cli && npm publish --access public --provenance
           fi
