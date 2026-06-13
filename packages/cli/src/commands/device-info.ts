@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { deviceCommand, getGlobals } from "./helpers.js";
-import { getAllDevices } from "../discovery/registry.js";
+import { addDevices, getAllDevices } from "../discovery/registry.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 
@@ -13,7 +13,17 @@ export function registerDeviceInfo(program: Command): void {
       if (globals.device) {
         await deviceCommand(program, "getDeviceInfo");
       } else {
-        const devices = getAllDevices();
+        let devices = getAllDevices();
+        if (devices.length === 0) {
+          const { scanForDevices } = await import("../discovery/scanner.js");
+          addDevices(await scanForDevices(2500));
+          devices = getAllDevices();
+        }
+        if (devices.length === 0) {
+          const { probeLocalDevices } = await import("../discovery/local-probe.js");
+          addDevices(await probeLocalDevices());
+          devices = getAllDevices();
+        }
         const results = await Promise.all(
           devices.map(async (d) => {
             const r = await sendCommand(d, "getDeviceInfo", undefined, globals.timeout);

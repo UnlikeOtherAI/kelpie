@@ -70,7 +70,7 @@ struct DeviceHandler {
             ],
             "network": ["ip": "0.0.0.0", "port": deviceInfo.port],
             "browser": ["engine": "WebKit", "version": device.systemVersion],
-            "app": ["version": deviceInfo.version, "build": "1"],
+            "app": ["version": deviceInfo.version, "build": deviceInfo.build],
             "system": ["os": "iOS", "osVersion": device.systemVersion]
         ]
     }

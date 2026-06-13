@@ -3,20 +3,41 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
-import { probeHealth, probeLocalDevices } from "../../src/discovery/local-probe.js";
+import { probeDeviceInfo, probeHealth, probeLocalDevices } from "../../src/discovery/local-probe.js";
 import { setRunningBrowser, upsertBrowserAlias } from "../../src/browser/store.js";
 
-/** Stub fetch so only the given localhost ports answer /health with 200. */
-function stubReachablePorts(ports: number[]): void {
+function deviceInfo(port: number): object {
+  return {
+    device: {
+      id: `device-${port}`,
+      name: `Kelpie ${port}`,
+      model: "Mac16,10",
+      platform: "macos",
+    },
+    display: { width: 5120, height: 2880 },
+    network: { port },
+    app: { version: "0.1.8" },
+  };
+}
+
+/** Stub fetch so only the given localhost ports answer as healthy Kelpie APIs. */
+function stubReachablePorts(ports: number[], infoPorts = ports): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string | URL | Request) => {
       const target = String(url);
-      const ok = ports.some((port) => target.includes(`:${port}/health`));
-      if (!ok) {
-        throw new Error("connection refused");
+      const healthPort = ports.find((port) => target.includes(`:${port}/health`));
+      if (healthPort) {
+        return new Response("ok", { status: 200 });
       }
-      return new Response("ok", { status: 200 });
+      const infoPort = infoPorts.find((port) => target.includes(`:${port}/v1/get-device-info`));
+      if (infoPort) {
+        return new Response(JSON.stringify(deviceInfo(infoPort)), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("connection refused");
     }),
   );
 }
@@ -56,6 +77,18 @@ describe("local-probe", () => {
     });
   });
 
+  describe("probeDeviceInfo", () => {
+    it("returns device info when the automation endpoint responds", async () => {
+      stubReachablePorts([DEFAULT_PORT]);
+      expect(await probeDeviceInfo(DEFAULT_PORT)).toEqual(deviceInfo(DEFAULT_PORT));
+    });
+
+    it("returns undefined when the automation endpoint does not respond", async () => {
+      stubReachablePorts([DEFAULT_PORT], []);
+      expect(await probeDeviceInfo(DEFAULT_PORT)).toBeUndefined();
+    });
+  });
+
   describe("probeLocalDevices", () => {
     it("returns a device for each reachable default-range port", async () => {
       stubReachablePorts([DEFAULT_PORT]);
@@ -65,12 +98,20 @@ describe("local-probe", () => {
       expect(device.id).toBe(`local:127.0.0.1:${DEFAULT_PORT}`);
       expect(device.ip).toBe("127.0.0.1");
       expect(device.port).toBe(DEFAULT_PORT);
-      expect(device.name).toBe(`localhost:${DEFAULT_PORT}`);
+      expect(device.name).toBe(`Kelpie ${DEFAULT_PORT}`);
       expect(device.platform).toBe("macos");
+      expect(device.version).toBe("0.1.8");
+      expect(device.width).toBe(5120);
+      expect(device.height).toBe(2880);
     });
 
     it("skips unreachable ports", async () => {
       stubReachablePorts([]);
+      expect(await probeLocalDevices()).toEqual([]);
+    });
+
+    it("skips ports whose health responds but automation API does not", async () => {
+      stubReachablePorts([DEFAULT_PORT], []);
       expect(await probeLocalDevices()).toEqual([]);
     });
 

@@ -44,6 +44,16 @@ describe("requireDevice localhost fallback", () => {
         if (target.includes(`:${DEFAULT_PORT}/health`)) {
           return new Response("ok", { status: 200 });
         }
+        if (target.includes(`:${DEFAULT_PORT}/v1/get-device-info`)) {
+          return new Response(JSON.stringify({
+            device: { name: "dictator", model: "Mac16,10", platform: "macos" },
+            display: { width: 5120, height: 2880 },
+            app: { version: "0.1.8" },
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         throw new Error("connection refused");
       }),
     );
@@ -53,6 +63,24 @@ describe("requireDevice localhost fallback", () => {
     expect(device?.ip).toBe("127.0.0.1");
     expect(device?.port).toBe(DEFAULT_PORT);
     expect(device?.id).toBe(`local:127.0.0.1:${DEFAULT_PORT}`);
+  });
+
+  it("does not accept localhost health without a responsive automation API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const target = String(url);
+        if (target.includes(`:${DEFAULT_PORT}/health`)) {
+          return new Response("ok", { status: 200 });
+        }
+        throw new Error("connection refused");
+      }),
+    );
+
+    const device = await requireDevice(programWithoutDevice());
+    expect(device).toBeNull();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = 0;
   });
 
   it("returns NO_DEVICES when neither mDNS nor localhost respond", async () => {

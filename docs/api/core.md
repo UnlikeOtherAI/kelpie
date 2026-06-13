@@ -857,7 +857,7 @@ Response:
   },
   "app": {
     "version": "1.0.0",
-    "build": "1",
+    "build": "100",
     "httpServerActive": true,
     "mcpServerActive": true,
     "mdnsActive": true,
