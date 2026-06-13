@@ -162,6 +162,9 @@ endif()
 set_target_properties(kelpie-linux PROPERTIES
   OUTPUT_NAME "kelpie-linux"
   BUILD_RPATH "\$ORIGIN"
+  BUILD_WITH_INSTALL_RPATH TRUE
+  INSTALL_RPATH "\$ORIGIN"
+  INSTALL_RPATH_USE_LINK_PATH FALSE
 )
 
 add_custom_command(TARGET kelpie-linux POST_BUILD
