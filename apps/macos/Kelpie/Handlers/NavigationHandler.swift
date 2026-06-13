@@ -32,7 +32,9 @@ struct NavigationHandler {
             context.prepareForNavigation()
             renderer.load(url: url)
 
-            for _ in 0..<100 {
+            let timeout = (body["timeout"] as? Int) ?? 10000
+            let iterations = max(timeout / 100, 1)
+            for _ in 0..<iterations {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 if !renderer.isLoading { break }
             }

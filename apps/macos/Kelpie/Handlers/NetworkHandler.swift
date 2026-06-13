@@ -14,6 +14,8 @@ struct NetworkHandler {
     private func getNetworkLog(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
         let typeFilter = body["type"] as? String
+        let statusFilter = Self.parseStatusFilter(body["status"])
+        let sinceFilter = Self.parseSinceMillis(body["since"])
         let limit = body["limit"] as? Int ?? 200
         let js = """
         (function(){
@@ -63,6 +65,15 @@ struct NetworkHandler {
             var filtered = array
             if let typeFilter {
                 filtered = filtered.filter { ($0["type"] as? String) == typeFilter }
+            }
+            if let statusFilter {
+                filtered = filtered.filter { ($0["status"] as? Int) == statusFilter }
+            }
+            if let sinceFilter {
+                filtered = filtered.filter {
+                    guard let started = Self.entryStartedMillis($0) else { return false }
+                    return started >= sinceFilter
+                }
             }
             let limited = Array(filtered.prefix(limit))
             return successResponse([
@@ -184,5 +195,49 @@ struct NetworkHandler {
 
     private func emptySummary() -> [String: Any] {
         ["totalRequests": 0, "totalSize": 0, "totalTransferSize": 0, "byType": [String: Int](), "errors": 0, "loadTime": 0]
+    }
+
+    /// Parse a `status` filter param into an exact HTTP status code, or nil when absent/invalid.
+    private static func parseStatusFilter(_ value: Any?) -> Int? {
+        if let intValue = value as? Int { return intValue }
+        if let stringValue = value as? String { return Int(stringValue.trimmingCharacters(in: .whitespaces)) }
+        return nil
+    }
+
+    /// Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or nil when absent.
+    private static func parseSinceMillis(_ value: Any?) -> Double? {
+        if let number = value as? Double { return number }
+        if let number = value as? Int { return Double(number) }
+        if let stringValue = value as? String {
+            let trimmed = stringValue.trimmingCharacters(in: .whitespaces)
+            if let millis = Double(trimmed) { return millis }
+            return parseISO8601Millis(trimmed)
+        }
+        return nil
+    }
+
+    /// Convert an entry's `timing.started` ISO-8601 string into epoch millis.
+    private static func entryStartedMillis(_ entry: [String: Any]) -> Double? {
+        guard let timing = entry["timing"] as? [String: Any],
+              let started = timing["started"] as? String else { return nil }
+        return parseISO8601Millis(started)
+    }
+
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601FormatterNoFraction: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static func parseISO8601Millis(_ iso: String) -> Double? {
+        if let date = iso8601Formatter.date(from: iso) { return date.timeIntervalSince1970 * 1000 }
+        if let date = iso8601FormatterNoFraction.date(from: iso) { return date.timeIntervalSince1970 * 1000 }
+        return nil
     }
 }

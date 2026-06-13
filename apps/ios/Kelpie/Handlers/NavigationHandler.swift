@@ -23,13 +23,30 @@ struct NavigationHandler {
               let webView = context.webView else {
             return errorResponse(code: "INVALID_URL", message: "Missing or invalid URL")
         }
+        let timeout = (body["timeout"] as? Int) ?? 10000
+        let iterations = max(timeout / 100, 1)
         let start = CFAbsoluteTimeGetCurrent()
+        context.lastNavigationError = nil
         webView.load(URLRequest(url: url))
 
-        // Wait for load to finish
-        for _ in 0..<100 {
+        // Wait for load to finish, bailing early on a captured navigation error.
+        var didFinish = false
+        for _ in 0..<iterations {
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            if !webView.isLoading { break }
+            if let error = context.lastNavigationError {
+                return errorResponse(code: "NAVIGATION_ERROR", message: error)
+            }
+            if !webView.isLoading {
+                didFinish = true
+                break
+            }
+        }
+
+        if !didFinish {
+            if let error = context.lastNavigationError {
+                return errorResponse(code: "NAVIGATION_ERROR", message: error)
+            }
+            return errorResponse(code: "TIMEOUT", message: "Navigation did not complete within \(timeout)ms")
         }
 
         let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)

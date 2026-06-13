@@ -172,6 +172,20 @@ struct TabWebViewContainer: UIViewRepresentable {
             syncBrowserState(from: webView)
         }
 
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            handlerContext?.lastNavigationError = error.localizedDescription
+            syncBrowserState(from: webView)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            handlerContext?.lastNavigationError = error.localizedDescription
+            syncBrowserState(from: webView)
+        }
+
         func webView(
             _ webView: WKWebView,
             decidePolicyFor navigationResponse: WKNavigationResponse,

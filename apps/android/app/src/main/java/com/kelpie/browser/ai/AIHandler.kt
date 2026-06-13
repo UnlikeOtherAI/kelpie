@@ -20,6 +20,7 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -44,6 +45,44 @@ class AIHandler(
         router.register("ai-unload") { aiUnload() }
         router.register("ai-infer") { aiInfer(it) }
         router.register("ai-record") { aiRecord(it) }
+        router.register("ai-catalog") { aiCatalog() }
+        router.register("ai-fitness") { aiFitness(it) }
+    }
+
+    private fun aiCatalog(): Map<String, Any?> {
+        val manager =
+            ctx.aiManager
+                ?: return errorResponse("AI_UNAVAILABLE", "AI manager is not initialized")
+        val token = AIState.huggingFaceToken
+        if (token.isEmpty()) {
+            return errorResponse(
+                "AUTH_REQUIRED",
+                "HuggingFace API key required. Set it in Settings before downloading models.",
+            )
+        }
+        manager.hfToken = token
+        return successResponse(mapOf("models" to parseJsonArray(manager.listApprovedModels())))
+    }
+
+    private fun aiFitness(body: Map<String, Any?>): Map<String, Any?> {
+        val modelId = (body["model"] as? String)?.trim().orEmpty()
+        if (modelId.isEmpty()) {
+            return errorResponse("MISSING_PARAM", "model is required")
+        }
+        val manager =
+            ctx.aiManager
+                ?: return errorResponse("AI_UNAVAILABLE", "AI manager is not initialized")
+        val token = AIState.huggingFaceToken
+        if (token.isEmpty()) {
+            return errorResponse(
+                "AUTH_REQUIRED",
+                "HuggingFace API key required. Set it in Settings before downloading models.",
+            )
+        }
+        manager.hfToken = token
+        val ramGB = (body["ramGB"] as? Number)?.toDouble() ?: 0.0
+        val diskGB = (body["diskGB"] as? Number)?.toDouble() ?: 0.0
+        return successResponse(parseJsonObject(manager.modelFitness(modelId, ramGB, diskGB)))
     }
 
     private fun aiStatus(): Map<String, Any?> {
@@ -506,6 +545,11 @@ class AIHandler(
         if (text.isBlank()) return emptyMap()
         val element = aiJson.parseToJsonElement(text)
         return jsonObjectToMap(element.jsonObject)
+    }
+
+    private fun parseJsonArray(text: String): List<Any?> {
+        if (text.isBlank()) return emptyList()
+        return aiJson.parseToJsonElement(text).jsonArray.map { jsonElementToAny(it) }
     }
 
     private fun jsonObjectToMap(obj: JsonObject): Map<String, Any?> = obj.entries.associate { (key, value) -> key to jsonElementToAny(value) }

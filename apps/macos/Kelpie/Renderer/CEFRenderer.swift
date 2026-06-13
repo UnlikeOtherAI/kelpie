@@ -70,6 +70,17 @@ final class CEFRenderer: RendererEngine {
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
 
+    // MARK: - JavaScript dialogs (follow-up)
+    //
+    // JS alert/confirm/prompt capture is implemented for the WebKit renderer (see
+    // WKWebViewRenderer's WKUIDelegate methods, which enqueue into DialogState.shared).
+    // CEF routes JS dialogs through CefJSDialogHandler in the Chromium layer, which
+    // CEFBridge does not currently surface to Swift — there is no dialog callback in
+    // CEFBridge.h. Wiring CEF dialogs into DialogState.shared requires adding a
+    // CefJSDialogHandler in CEFBridge.mm plus a bridged callback, tracked as a
+    // follow-up. WebKit is the priority renderer and is fully functional; in CEF
+    // mode get-dialog reports no dialog until that bridge work lands.
+
     /// Initialize CEF on a clean run loop iteration. Must be called before
     /// creating any CEFRenderer instance during a live renderer switch.
     /// Safe to call multiple times — only the first call initializes.

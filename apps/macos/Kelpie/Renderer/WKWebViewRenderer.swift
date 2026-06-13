@@ -269,6 +269,51 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         return nil
     }
 
+    // MARK: - JavaScript dialogs
+
+    // Instead of presenting a native NSAlert (which would block the WebView and
+    // require a human click), each panel is captured into the shared DialogState.
+    // The WebKit completion handler is suspended inside a PendingDialog until
+    // either an auto-handler resolves it immediately or `handle-dialog` is called
+    // over HTTP/MCP. This mirrors the iOS WebViewCoordinator semantics exactly.
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping () -> Void
+    ) {
+        let dialog = DialogState.PendingDialog(type: .alert, message: message, defaultText: nil) { _ in
+            completionHandler()
+        }
+        DialogState.shared.enqueue(dialog)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        let dialog = DialogState.PendingDialog(type: .confirm, message: message, defaultText: nil) { result in
+            completionHandler(result != nil)
+        }
+        DialogState.shared.enqueue(dialog)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (String?) -> Void
+    ) {
+        let dialog = DialogState.PendingDialog(type: .prompt, message: prompt, defaultText: defaultText) { result in
+            completionHandler(result)
+        }
+        DialogState.shared.enqueue(dialog)
+    }
+
     // MARK: - Bridge Scripts (same JS as iOS)
 
     // These are the same bridge scripts from iOS ConsoleHandler.bridgeScript

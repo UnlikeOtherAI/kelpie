@@ -57,6 +57,12 @@ struct AIHandler {
     let backendStore = AIBackendStore.shared
     @MainActor private static let recorder = AudioRecorder()
 
+    private let aiManager: AIManager = {
+        let modelsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".kelpie/models", isDirectory: true).path
+        return AIManager(modelsDir: modelsDir)
+    }()
+
     enum NativeModelResolution {
         case success(path: String, name: String, capabilities: [String])
         case failure([String: Any])
@@ -70,6 +76,42 @@ struct AIHandler {
         router.register("ai-unload") { _ in await unload() }
         router.register("ai-infer") { body in await infer(body) }
         router.register("ai-record") { body in await record(body) }
+        router.register("ai-catalog") { _ in await catalog() }
+        router.register("ai-fitness") { body in await fitness(body) }
+    }
+
+    private static let authRequiredResponse = errorResponse(
+        code: "AUTH_REQUIRED",
+        message: "HuggingFace API key required. Set it in Settings before downloading models."
+    )
+
+    private func requireHFToken() async -> String? {
+        let token = await MainActor.run { AIState.shared.huggingFaceToken }
+        guard !token.isEmpty else { return nil }
+        return token
+    }
+
+    private func catalog() async -> [String: Any] {
+        guard let token = await requireHFToken() else {
+            return Self.authRequiredResponse
+        }
+        aiManager.hfToken = token
+        let models = aiManager.listApprovedModels()
+        return successResponse(["models": models])
+    }
+
+    private func fitness(_ body: [String: Any]) async -> [String: Any] {
+        guard let modelId = body["model"] as? String, !modelId.isEmpty else {
+            return errorResponse(code: "MISSING_PARAM", message: "model is required")
+        }
+        guard let token = await requireHFToken() else {
+            return Self.authRequiredResponse
+        }
+        aiManager.hfToken = token
+        let ramGB = body["ramGB"] as? Double ?? 0
+        let diskGB = body["diskGB"] as? Double ?? 0
+        let result = aiManager.modelFitness(id: modelId, ramGB: ramGB, diskGB: diskGB)
+        return successResponse(result)
     }
 
     private func status() async -> [String: Any] {

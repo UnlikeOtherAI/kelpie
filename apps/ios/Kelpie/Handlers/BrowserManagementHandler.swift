@@ -62,7 +62,10 @@ struct BrowserManagementHandler {
         guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
         let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
         let name = body["name"] as? String
-        let filtered = name != nil ? cookies.filter { $0.name == name } : cookies
+        var filtered = name != nil ? cookies.filter { $0.name == name } : cookies
+        if let url = body["url"] as? String {
+            filtered = CookieScope.scoped(filtered, toURL: url)
+        }
         let cookieList = filtered.map { cookie -> [String: Any] in
             ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
              "expires": cookie.expiresDate?.description ?? NSNull(), "httpOnly": cookie.isHTTPOnly,
@@ -90,12 +93,31 @@ struct BrowserManagementHandler {
     private func deleteCookies(_ body: [String: Any]) async -> [String: Any] {
         guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
         let store = webView.configuration.websiteDataStore.httpCookieStore
-        let all = await store.allCookies()
+        var candidates = await store.allCookies()
+        if let url = body["url"] as? String {
+            candidates = CookieScope.scoped(candidates, toURL: url)
+        }
         let deleteAll = body["deleteAll"] as? Bool ?? false
-        let name = body["name"] as? String
+        let nameFilter = body["name"] as? String
+        let domainFilter = body["domain"] as? String
+
+        // No selector supplied: preserve prior behavior (no-op) rather than
+        // wiping the store on an empty request.
+        guard deleteAll || nameFilter != nil || domainFilter != nil else {
+            return successResponse(["deleted": 0])
+        }
+
+        // Fast path: wipe everything in scope only when no name/domain filter narrows it.
+        if deleteAll && nameFilter == nil && domainFilter == nil {
+            for cookie in candidates { await store.deleteCookie(cookie) }
+            return successResponse(["deleted": candidates.count])
+        }
+
         var deleted = 0
-        for cookie in all {
-            if deleteAll || cookie.name == name {
+        for cookie in candidates {
+            let matchesName = nameFilter == nil || cookie.name == nameFilter
+            let matchesDomain = domainFilter.map { CookieScope.domainMatches(cookie.domain, filter: $0) } ?? true
+            if matchesName && matchesDomain {
                 await store.deleteCookie(cookie)
                 deleted += 1
             }

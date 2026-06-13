@@ -106,12 +106,14 @@ class BrowserManagementHandler(
 
     private fun getClipboard(): Map<String, Any?> {
         val cm = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = cm.primaryClip
         val text =
-            cm.primaryClip
+            clip
                 ?.getItemAt(0)
                 ?.text
                 ?.toString() ?: ""
-        return successResponse(mapOf("text" to text, "hasImage" to false))
+        val hasImage = clip?.description?.hasMimeType("image/*") ?: false
+        return successResponse(mapOf("text" to text, "hasImage" to hasImage))
     }
 
     private fun setClipboard(body: Map<String, Any?>): Map<String, Any?> {
@@ -381,12 +383,15 @@ class BrowserManagementHandler(
             val tab =
                 mapOf(
                     "id" to "0",
+                    "windowId" to "main",
                     "url" to (wv?.url ?: ""),
                     "title" to (wv?.title ?: ""),
                     "active" to true,
                     "isLoading" to false,
                 )
-            return successResponse(mapOf("tabs" to listOf(tab), "count" to 1, "activeTab" to "0"))
+            return successResponse(
+                mapOf("windowId" to "main", "tabs" to listOf(tab), "count" to 1, "activeTab" to "0"),
+            )
         }
 
         val tabs =
@@ -395,6 +400,7 @@ class BrowserManagementHandler(
             }
         return successResponse(
             mapOf(
+                "windowId" to "main",
                 "tabs" to tabs,
                 "count" to tabs.size,
                 "activeTab" to (tabStore.activeTabId.value ?: ""),
@@ -411,6 +417,7 @@ class BrowserManagementHandler(
                 "tabId" to tab.id,
                 "tab" to tabInfo(tab = tab, activeTabId = tabStore.activeTabId.value),
                 "tabCount" to tabStore.tabs.value.size,
+                "windowId" to "main",
             ),
         )
     }
@@ -427,6 +434,7 @@ class BrowserManagementHandler(
         return successResponse(
             mapOf(
                 "tab" to tabInfo(tab = tab, activeTabId = tabStore.activeTabId.value),
+                "windowId" to "main",
             ),
         )
     }
@@ -445,6 +453,7 @@ class BrowserManagementHandler(
             mapOf(
                 "closed" to tabId,
                 "tabCount" to tabStore.tabs.value.size,
+                "windowId" to "main",
             ),
         )
     }
@@ -457,6 +466,7 @@ class BrowserManagementHandler(
     ): Map<String, Any?> =
         mapOf(
             "id" to tab.id,
+            "windowId" to "main",
             "url" to tab.currentUrl,
             "title" to tab.pageTitle,
             "active" to (tab.id == activeTabId),
