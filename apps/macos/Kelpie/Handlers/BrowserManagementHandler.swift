@@ -100,21 +100,16 @@ struct BrowserManagementHandler {
         }
         do {
             let renderer = try context.resolveRenderer(tabId: tabId)
-            var props: [HTTPCookiePropertyKey: Any] = [.name: name, .value: value, .path: body["path"] as? String ?? "/"]
-            if let domain = body["domain"] as? String {
-                props[.domain] = domain
+            let defaultHost = renderer.currentURL?.host ?? "localhost"
+            guard let cookie = CookieFactory.make(name: name, value: value, body: body, defaultHost: defaultHost) else {
+                return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
+            }
+            if tabId == nil {
+                await context.setCookie(cookie)
             } else {
-                props[.domain] = renderer.currentURL?.host ?? "localhost"
+                await renderer.setCookies([cookie])
             }
-            if let cookie = HTTPCookie(properties: props) {
-                if tabId == nil {
-                    await context.setCookie(cookie)
-                } else {
-                    await renderer.setCookies([cookie])
-                }
-                return successResponse()
-            }
-            return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
+            return successResponse()
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
@@ -479,6 +474,11 @@ struct BrowserManagementHandler {
         let tab = callbacks.onNewTab()
         if let urlString = body["url"] as? String,
            let url = URL(string: urlString) {
+            // Clear the Start Page overlay so the loaded page is visible —
+            // without this the renderer stays hidden behind the blank Start
+            // Page even though the navigation succeeds (matches `onWillLoad`).
+            tab.isStartPage = false
+            tab.currentURL = url.absoluteString
             tab.renderer.load(url: url)
         }
         return successResponse([

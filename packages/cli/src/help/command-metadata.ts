@@ -85,6 +85,17 @@ const tapResponse: HelpField[] = [
   },
 ];
 
+const coordinateDiagnosticsResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true when diagnostics ran" },
+  { name: "inputSource", type: "string", description: "Input provenance, currently page-synthesized" },
+  { name: "inputCapabilities", type: "object", description: "Whether trusted native input is available" },
+  { name: "viewport", type: "object", description: "Viewport, scroll, DPR, and visualViewport metadata" },
+  { name: "points", type: "array", description: "elementFromPoint/elementsFromPoint samples" },
+  { name: "actions", type: "array", description: "Executed coordinate action diagnostics and event logs" },
+  { name: "eventLog", type: "array", description: "Captured pointer, mouse, touch, wheel, and scroll events" },
+  { name: "classification", type: "object", description: "pass, fail, or needs-review based on expectedSelector checks" },
+];
+
 const capabilitiesResponse: HelpField[] = [
   { name: "success", type: "boolean", description: "true when capabilities were retrieved" },
   { name: "version", type: "string", description: "App version on the device" },
@@ -114,6 +125,24 @@ const tabsResponse: HelpField[] = [
       ],
     },
   },
+];
+
+const newTabResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true when the tab was created" },
+  { name: "tabId", type: "string", description: "Created tab ID. This is the value to pass back as tabId in later commands." },
+  {
+    name: "tab",
+    type: "object",
+    description: "Created tab metadata",
+    fields: [
+      { name: "id", type: "string", description: "Created tab ID. Same value as tabId." },
+      { name: "url", type: "string" },
+      { name: "title", type: "string" },
+      { name: "active", type: "boolean" },
+      { name: "isLoading", type: "boolean" },
+    ],
+  },
+  { name: "tabCount", type: "number", description: "Number of open tabs after creation" },
 ];
 
 const reportIssueResponse: HelpField[] = [
@@ -169,6 +198,7 @@ export const commandMetadata: Record<string, CommandHelp> = {
   check: { purpose: "Check a checkbox", when: "Enabling a checkbox option", explanation: "Checks a checkbox element. No-op if already checked.", errors: ["ELEMENT_NOT_FOUND"], related: ["uncheck", "get-form-state"] },
   uncheck: { purpose: "Uncheck a checkbox", when: "Disabling a checkbox option", explanation: "Unchecks a checkbox element. No-op if already unchecked.", errors: ["ELEMENT_NOT_FOUND"], related: ["check"] },
   swipe: { purpose: "Swipe across the viewport", when: "You need to visually demonstrate a drag or JS-driven drag gesture", explanation: "Animates a swipe trail between two viewport coordinates and dispatches matching pointer events on the page. Useful for recording demos, carousels, and other JS-driven drags; use scroll for reliable native page scrolling.", related: ["scroll", "tap", "script"] },
+  "coordinate-diagnostics": { purpose: "Run coordinate diagnostics", when: "Debugging hit-test, sticky-scroll, visual viewport, or coordinate translation bugs", explanation: "Samples elementFromPoint/elementsFromPoint at viewport coordinates, optionally runs page-synthesized tap/swipe/scroll actions, records delivered pointer and mouse event targets, can evaluate setup/export oracle JavaScript, and can return a screenshot with viewport mapping metadata. The response reports inputSource and inputCapabilities; do not assume trusted native input.", errors: ["INVALID_PARAMS", "EVAL_ERROR", "SCREENSHOT_FAILED"], related: ["tap", "swipe", "scroll", "evaluate", "screenshot"], platforms: ["ios", "android", "macos"], response: coordinateDiagnosticsResponse },
   "commentary show": { purpose: "Show commentary text", when: "Narrating a recording or calling attention to what happens next", explanation: "Displays a commentary pill inside the viewport at the chosen position. Use duration 0 to keep it visible until you hide or replace it.", related: ["commentary hide", "script run"] },
   "commentary hide": { purpose: "Hide commentary text", when: "Clearing a persistent commentary overlay before the next shot", explanation: "Dismisses the active commentary overlay immediately.", related: ["commentary show", "script run"] },
   "highlight show": { purpose: "Highlight an element", when: "You already know the selector and want to visually pin the target before interacting with it or before taking a screenshot", explanation: "Draws a colored ring/box around the element matching the selector. Supports quick appear or draw animations and optional persistence. Use duration 0 if you want the overlay to stay visible while you capture a screenshot and ask an LLM to reason about that specific area.", related: ["highlight hide", "click", "screenshot", "screenshot-annotated", "script run"] },
@@ -235,7 +265,7 @@ export const commandMetadata: Record<string, CommandHelp> = {
 
   // --- Tabs ---
   "get-tabs": { purpose: "Get all open tabs", when: "Listing browser tabs or finding a specific one", explanation: "Returns all open tabs with their IDs, URLs, titles, and which is active.", related: ["new-tab", "switch-tab", "close-tab"], response: tabsResponse },
-  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab", explanation: "Opens a new browser tab, optionally navigating to a URL.", related: ["get-tabs", "switch-tab"], response: successOnlyResponse },
+  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab", explanation: "Opens a new browser tab, optionally navigating to a URL. Returns both tabId and tab.id for the created tab; they are the same identifier.", related: ["get-tabs", "switch-tab"], response: newTabResponse },
   "switch-tab": { purpose: "Switch to a tab", when: "Changing focus to a different tab", explanation: "Switches the active tab to the one with the given tab ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
   "close-tab": { purpose: "Close a tab", when: "Cleaning up tabs you no longer need", explanation: "Closes the tab with the given ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
 
@@ -246,8 +276,8 @@ export const commandMetadata: Record<string, CommandHelp> = {
   "get-iframe-context": { purpose: "Check current frame context", when: "Verifying whether you're in the main frame or an iframe", explanation: "Returns the current frame context (main or iframe info).", related: ["switch-to-iframe", "switch-to-main"] },
 
   // --- Cookies ---
-  "get-cookies": { purpose: "Get cookies", when: "Inspecting auth tokens, session cookies, or preferences", explanation: "Returns cookies, optionally filtered by URL or name.", related: ["set-cookie", "delete-cookies"] },
-  "set-cookie": { purpose: "Set a cookie", when: "Setting auth tokens, locale preferences, or test data", explanation: "Sets a cookie with the given name, value, and optional properties (domain, path, secure, etc).", related: ["get-cookies", "delete-cookies"] },
+  "get-cookies": { purpose: "Get cookies", when: "Inspecting auth tokens, session cookies, or preferences", explanation: "Returns cookies from the native cookie store, including httpOnly cookies that JS `document.cookie` cannot see. Optionally filter by URL or name.", related: ["set-cookie", "delete-cookies"] },
+  "set-cookie": { purpose: "Set a cookie", when: "Authenticating from a known session cookie, or setting auth tokens, locale preferences, or test data", explanation: "Sets a cookie in the native cookie store with optional domain, path, expires, secure, sameSite, and httpOnly. This is the supported way to inject an httpOnly session cookie — `eval`/`document.cookie` cannot set httpOnly cookies.", related: ["get-cookies", "delete-cookies"] },
   "delete-cookies": { purpose: "Delete cookies", when: "Clearing auth state or resetting to a clean state", explanation: "Deletes cookies by name and/or domain, or all cookies with deleteAll.", related: ["get-cookies"] },
 
   // --- Storage ---

@@ -46,11 +46,15 @@ struct WindowChromeBridge: NSViewRepresentable {
         private weak var observedWindow: NSWindow?
         private weak var accessoryWindow: NSWindow?
         private var resizeObserver: NSObjectProtocol?
+        private var moveObserver: NSObjectProtocol?
         private let accessoryController = ResolutionTitlebarAccessoryController()
 
         deinit {
             if let resizeObserver {
                 NotificationCenter.default.removeObserver(resizeObserver)
+            }
+            if let moveObserver {
+                NotificationCenter.default.removeObserver(moveObserver)
             }
         }
 
@@ -59,6 +63,9 @@ struct WindowChromeBridge: NSViewRepresentable {
 
             if let resizeObserver {
                 NotificationCenter.default.removeObserver(resizeObserver)
+            }
+            if let moveObserver {
+                NotificationCenter.default.removeObserver(moveObserver)
             }
 
             observedWindow = window
@@ -70,8 +77,21 @@ struct WindowChromeBridge: NSViewRepresentable {
             ) { _ in
                 guard !window.styleMask.contains(.fullScreen) else { return }
                 let contentSize = window.contentRect(forFrameRect: window.frame).size
+                let origin = window.frame.origin
                 Task { @MainActor in
                     ViewportState.persistShellWindowSize(contentSize)
+                    ViewportState.persistShellWindowOrigin(origin)
+                }
+            }
+            moveObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didMoveNotification,
+                object: window,
+                queue: .main
+            ) { _ in
+                guard !window.styleMask.contains(.fullScreen) else { return }
+                let origin = window.frame.origin
+                Task { @MainActor in
+                    ViewportState.persistShellWindowOrigin(origin)
                 }
             }
         }
@@ -145,23 +165,6 @@ struct FloatingProgressPill: View {
         }
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.15), value: progress)
-    }
-}
-
-struct WindowBlurOverlay: NSViewRepresentable {
-    let opacity: CGFloat
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .fullScreenUI
-        view.blendingMode = .withinWindow
-        view.state = .active
-        view.alphaValue = opacity
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.alphaValue = opacity
     }
 }
 

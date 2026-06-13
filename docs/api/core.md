@@ -280,7 +280,7 @@ Response:
 ### `screenshot`
 Capture a screenshot of the current viewport. When `fullPage: true`, captures the entire scrollable page. On Android this uses CDP `Page.captureScreenshot` with `captureBeyondViewport`. On iOS, `WKWebView.takeSnapshot` only captures the visible viewport — full-page requires a scroll-and-stitch approach (slower, may have minor seam artifacts).
 
-> **CLI note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. See [cli.md](../cli.md) for `--output` and `--base64` flags.
+> **CLI/MCP note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. The CLI MCP server also saves `resolution: "native"` screenshots to a temp file and returns compact metadata plus a file resource link, preventing large native images from being streamed as tool text. See [cli.md](../cli.md) for `--output` and `--base64` flags.
 
 ```json
 POST /v1/screenshot
@@ -487,6 +487,46 @@ Response:
 ```
 
 Kelpie now dispatches coordinate-bearing pointer and mouse events at the calibrated point, then performs a compatible element activation. That keeps the event location observable on the page while preserving the previous "activate the hit element" behavior.
+
+### `coordinate-diagnostics`
+Run a coordinate debugging oracle in one structured call. The endpoint samples `elementFromPoint()` / `elementsFromPoint()`, optionally evaluates setup/export JavaScript, executes page-synthesized `tap`, `swipe`, and `scroll` actions, records delivered pointer/mouse/touch/scroll events, and can attach a screenshot with the same viewport-mapping metadata as `screenshot`.
+
+The current cross-platform input source is explicitly reported as `page-synthesized`; do not treat it as trusted OS-level touch input. Check `inputCapabilities` before assuming native input exists.
+
+```json
+POST /v1/coordinate-diagnostics
+{
+  "points": [
+    {"label": "pay-center", "x": 120, "y": 240, "expectedSelector": "#pay"}
+  ],
+  "actions": [
+    {"type": "tap", "label": "tap-pay", "x": 120, "y": 240, "expectedSelector": "#pay"},
+    {"type": "swipe", "from": {"x": 220, "y": 620}, "to": {"x": 220, "y": 260}, "steps": 12},
+    {"type": "scroll", "deltaX": 0, "deltaY": 300}
+  ],
+  "setupExpression": "window.__hitTargetOracle?.reset?.()",
+  "exportExpression": "window.__hitTargetOracle?.exportLog?.()",
+  "captureScreenshot": true,
+  "screenshotResolution": "viewport"
+}
+
+Response:
+{
+  "success": true,
+  "coordinateSpace": "viewport-css-pixels",
+  "inputSource": "page-synthesized",
+  "inputCapabilities": {"trustedNativeInput": false, "availableInputSources": ["page-synthesized"]},
+  "viewport": {"width": 390, "height": 844, "scrollX": 0, "scrollY": 128, "devicePixelRatio": 3, "visualViewport": null},
+  "points": [{"label": "pay-center", "x": 120, "y": 240, "pageX": 120, "pageY": 368, "elementFromPoint": {"tag": "button", "id": "pay"}, "elementsFromPoint": [], "matchesExpected": true}],
+  "actions": [{"type": "tap", "label": "tap-pay", "accepted": true, "events": [], "matchesExpected": true}],
+  "eventLog": [],
+  "exportResult": {},
+  "screenshot": {"image": "...base64...", "width": 390, "height": 844, "format": "png", "resolution": "viewport", "coordinateSpace": "viewport-css-pixels"},
+  "classification": {"status": "pass", "reason": "All expected selectors matched"}
+}
+```
+
+`expectedSelector` is optional. When supplied, the endpoint classifies `pass` if every expected point/action matches, `fail` if any does not, and `needs-review` when no expectation was provided.
 
 ### `get-tap-calibration`
 Read the saved additive X/Y offsets used by raw `tap`. These offsets are stored in viewport CSS pixels.
@@ -817,7 +857,7 @@ Response:
   },
   "app": {
     "version": "1.0.0",
-    "build": "1",
+    "build": "100",
     "httpServerActive": true,
     "mcpServerActive": true,
     "mdnsActive": true,

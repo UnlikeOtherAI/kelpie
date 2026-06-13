@@ -56,9 +56,10 @@ struct NetworkHandler {
         do {
             let jsonString = try await context.evaluateJSReturningString("JSON.stringify(\(js))", tabId: tabId)
             guard let data = jsonString.data(using: .utf8),
-                  let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                  let rawArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
                 return successResponse(["entries": [] as [Any], "count": 0, "hasMore": false, "summary": emptySummary()])
             }
+            let array = applyRealDocumentStatus(to: rawArray)
             var filtered = array
             if let typeFilter {
                 filtered = filtered.filter { ($0["type"] as? String) == typeFilter }
@@ -114,6 +115,42 @@ struct NetworkHandler {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
+    }
+
+    /// WebKit's Performance API does not populate `responseStatus` for main-frame
+    /// document navigations, so those entries default to 200 even on a 404. The
+    /// real status is captured from `WKNavigationResponse` in `NetworkTrafficStore`;
+    /// overlay it onto the document entries here, matched by URL.
+    @MainActor
+    private func applyRealDocumentStatus(to entries: [[String: Any]]) -> [[String: Any]] {
+        let documentStatuses = NetworkTrafficStore.shared.documentNavigationStatuses()
+        guard !documentStatuses.isEmpty else { return entries }
+        return entries.map { entry in
+            guard (entry["type"] as? String) == "document",
+                  let url = entry["url"] as? String,
+                  let status = documentStatuses[url] else {
+                return entry
+            }
+            var updated = entry
+            updated["status"] = status
+            updated["statusText"] = Self.reasonPhrase(for: status)
+            return updated
+        }
+    }
+
+    private static let reasonPhrases: [Int: String] = [
+        200: "OK", 201: "Created", 204: "No Content",
+        301: "Moved Permanently", 302: "Found", 304: "Not Modified",
+        400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+        405: "Method Not Allowed", 408: "Request Timeout", 429: "Too Many Requests",
+        500: "Internal Server Error", 502: "Bad Gateway",
+        503: "Service Unavailable", 504: "Gateway Timeout"
+    ]
+
+    /// HTTP reason phrase for a status code, used to keep `statusText` consistent
+    /// with the corrected document status.
+    private static func reasonPhrase(for status: Int) -> String {
+        reasonPhrases[status] ?? HTTPURLResponse.localizedString(forStatusCode: status).capitalized
     }
 
     private func buildSummary(_ entries: [[String: Any]]) -> [String: Any] {

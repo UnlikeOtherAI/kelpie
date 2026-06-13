@@ -80,6 +80,7 @@ void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser);
                                        canGoBack:(BOOL)canGoBack
                                     canGoForward:(BOOL)canGoForward;
 - (void)cefBridgeUpdateCurrentURL:(NSString *)url;
+- (void)cefBridgeUpdateMainFrameHTTPStatusCode:(NSInteger)statusCode;
 - (void)cefBridgeUpdateCurrentTitle:(NSString *)title;
 - (void)cefBridgeUpdateLoadingProgress:(double)progress;
 - (void)cefBridgeHandleConsoleMessage:(NSString *)message

@@ -120,6 +120,18 @@ final class NetworkTrafficStore: ObservableObject {
         persist()
     }
 
+    /// Real HTTP status codes captured from `WKNavigationResponse` for main-frame
+    /// document navigations, keyed by absolute URL (most recent navigation wins).
+    /// The Performance API does not expose `responseStatus` for document
+    /// navigations, so the network log must source document status from here.
+    func documentNavigationStatuses() -> [String: Int] {
+        var statuses: [String: Int] = [:]
+        for entry in entries where entry.initiator == "browser" && entry.statusCode > 0 {
+            statuses[entry.url] = entry.statusCode
+        }
+        return statuses
+    }
+
     func entryToJSON(_ entry: TrafficEntry) -> [String: Any] {
         [
             "id": entry.id.uuidString,

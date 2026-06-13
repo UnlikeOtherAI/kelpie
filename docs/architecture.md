@@ -208,7 +208,9 @@ All browser-CLI communication uses REST over HTTP/JSON.
 
 - Base URL: `http://{device-ip}:{port}/v1/`
 - Content-Type: `application/json`
-- Auth: None (local network only — devices must be on same network)
+- Auth: bearer token via `Authorization: Bearer <token>` for every `/v1/*`
+  endpoint except `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and
+  `/health`; tokens are issued only after on-device pairing approval.
 - Port: `8420` (default, configurable in settings)
 
 ### mDNS Service

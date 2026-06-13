@@ -1,10 +1,48 @@
 import AppKit
 import WebKit
 
+private struct WKRendererTimeoutError: LocalizedError, Sendable {
+    let operation: String
+
+    var errorDescription: String? {
+        "\(operation) timed out"
+    }
+}
+
+private struct WKRendererNilResultError: LocalizedError, Sendable {
+    let operation: String
+
+    var errorDescription: String? {
+        "\(operation) returned no result"
+    }
+}
+
+private final class WKRendererCompletion<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+    private let continuation: CheckedContinuation<T, Error>
+
+    init(_ continuation: CheckedContinuation<T, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(with result: Result<T, Error>) {
+        lock.lock()
+        guard !didResume else {
+            lock.unlock()
+            return
+        }
+        didResume = true
+        lock.unlock()
+        continuation.resume(with: result)
+    }
+}
+
 /// WKWebView-based renderer conforming to RendererEngine (Safari/WebKit).
 @MainActor
 final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     let engineName = "webkit"
+    nonisolated private static let operationTimeoutSeconds: TimeInterval = 8
 
     private let webView: WKWebView
     private var progressObservation: NSKeyValueObservation?
@@ -75,7 +113,15 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     func hardReload() { webView.reloadFromOrigin() }
 
     func evaluateJS(_ script: String) async throws -> Any? {
-        try await webView.evaluateJavaScript(script)
+        try await withWebKitTimeout("JavaScript evaluation") { completion in
+            webView.evaluateJavaScript(script) { result, error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(result))
+                }
+            }
+        }
     }
 
     func allCookies() async -> [HTTPCookie] {
@@ -112,7 +158,32 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
                 height: snapshotBounds.height.rounded()
             )
         )
-        return try await webView.takeSnapshot(configuration: config)
+        return try await withWebKitTimeout("Snapshot capture") { completion in
+            webView.takeSnapshot(with: config) { image, error in
+                if let error {
+                    completion(.failure(error))
+                } else if let image {
+                    completion(.success(image))
+                } else {
+                    completion(.failure(WKRendererNilResultError(operation: "Snapshot capture")))
+                }
+            }
+        }
+    }
+
+    private func withWebKitTimeout<T>(
+        _ operation: String,
+        _ start: (@escaping (Result<T, Error>) -> Void) -> Void
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            let completion = WKRendererCompletion(continuation)
+            start { result in
+                completion.resume(with: result)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.operationTimeoutSeconds) {
+                completion.resume(with: .failure(WKRendererTimeoutError(operation: operation)))
+            }
+        }
     }
 
     // MARK: - KVO

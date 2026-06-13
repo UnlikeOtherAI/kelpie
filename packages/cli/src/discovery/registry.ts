@@ -55,7 +55,12 @@ export async function getDevice(query: string): Promise<DiscoveredDevice | undef
   if (!autoScanned && devices.size === 0) {
     autoScanned = true;
     const { scanForDevices } = await import("./scanner.js");
-    addDevices(await scanForDevices(2500));
+    const scanned = await scanForDevices(2500);
+    addDevices(scanned);
+    if (scanned.length === 0) {
+      const { probeLocalDevices } = await import("./local-probe.js");
+      addDevices(await probeLocalDevices());
+    }
   }
 
   // Priority: ID exact > name exact > name fuzzy > IP exact
@@ -128,6 +133,7 @@ function getDirectAddressDevice(query: string): DiscoveredDevice | undefined {
 
 export function clearDevices(): void {
   devices.clear();
+  autoScanned = false;
 }
 
 export function deviceCount(): number {

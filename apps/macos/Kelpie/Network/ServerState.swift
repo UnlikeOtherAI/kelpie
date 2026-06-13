@@ -37,6 +37,7 @@ final class ServerState: ObservableObject {
         }
         wkRenderer = renderer
         handlerContext.renderer = renderer
+        handlerContext.activeEngineIsChromium = false
     }
     private(set) var cefRenderer: CEFRenderer?
 
@@ -55,6 +56,9 @@ final class ServerState: ObservableObject {
     /// here (not as a separate property assignment) so handler registration
     /// can read it without force-unwrapping.
     func startHTTPServer(rendererState: RendererState) {
+        // Idempotent: the server is started eagerly at app launch and again from
+        // the window's onAppear safety net — only the first call binds the socket.
+        guard httpServer == nil else { return }
         self.rendererState = rendererState
         let preferredPort = UInt16(deviceInfo.port)
         let resolvedPort = Self.firstAvailablePort(startingAt: preferredPort)
@@ -63,18 +67,13 @@ final class ServerState: ObservableObject {
             deviceInfo = DeviceInfo.current(port: Int(resolvedPort))
         }
 
-        // Pre-initialize CEF so the Mach port rendezvous server is registered
-        // in the clean startup run loop context. cef_initialize() installs
-        // CFRunLoop observers that only work correctly when called from a
-        // top-level event loop iteration (not from an HTTP handler async chain).
-        // Browser creation is still deferred to the first Chromium switch.
-        CEFRenderer.ensureCEFInitialized()
-
-        // Start only the selected renderer (browser instance). CEF is
-        // initialized above but no Chromium browser is created yet.
+        // Start only the selected renderer. Chromium/CEF stays fully lazy so a
+        // WebKit launch does not run CEF startup observers before they are
+        // needed; CEFRenderer initializes CEF when Chromium is selected.
         let startEngine = rendererState.activeEngine
         let activeRenderer = renderer(for: startEngine)
         handlerContext.renderer = activeRenderer
+        handlerContext.activeEngineIsChromium = (startEngine == .chromium)
         handlerContext.startSharedCookieSync()
 
         registerHandlers(rendererState: rendererState)
@@ -135,10 +134,10 @@ final class ServerState: ObservableObject {
         InteractionHandler(context: ctx).register(on: router)
         TapCalibrationHandler().register(on: router)
         ScrollHandler(context: ctx).register(on: router)
+        CoordinateDiagnosticsHandler(context: ctx).register(on: router)
         DeviceHandler(
             context: ctx,
             deviceInfo: deviceInfo,
-            rendererState: rendererState,
             viewportState: viewportState
         ).register(on: router)
         EvaluateHandler(context: ctx).register(on: router)
@@ -252,6 +251,7 @@ final class ServerState: ObservableObject {
         await handlerContext.persistRendererCookiesToSharedJar()
         await CookieMigrator.migrate(from: source, to: target)
         handlerContext.renderer = target
+        handlerContext.activeEngineIsChromium = (engine == .chromium)
         await handlerContext.syncSharedCookiesIntoRenderer(force: true)
 
         // Load the same URL in the target renderer
@@ -412,6 +412,10 @@ final class ServerState: ObservableObject {
         let fd = socket(AF_INET6, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
         defer { close(fd) }
+
+        var reuseAddress: Int32 = 1
+        let optionLength = socklen_t(MemoryLayout<Int32>.size)
+        _ = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, optionLength)
 
         var address = sockaddr_in6()
         address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)

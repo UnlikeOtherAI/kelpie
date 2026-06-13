@@ -6,6 +6,12 @@ final class HandlerContext {
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     var renderer: (any RendererEngine)?
+    /// True while the Chromium (CEF) engine is active. CEF is a single-renderer
+    /// engine — it has no per-tab WebKit renderers — so renderer resolution must
+    /// target `renderer` (the live CEF instance) rather than the tab store's
+    /// hidden about:blank `WKWebViewRenderer`. Kept in sync by ServerState
+    /// wherever the active renderer changes.
+    var activeEngineIsChromium = false
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
@@ -39,6 +45,17 @@ final class HandlerContext {
     /// tab windows reject empty `tabId` so LLMs are forced to be explicit
     /// about which tab they target.
     func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
+        // WebKit, so resolving through the tab store here would return a hidden
+        // WKWebViewRenderer that never navigated (stuck on about:blank): navigate
+        // would drive the live CEF renderer while eval/dom/screenshot read the
+        // blank WebView (issues #74/#77/#78/#79). Target the live renderer
+        // directly; windowId/tabId do not apply in single-renderer mode.
+        if activeEngineIsChromium {
+            guard let renderer else { throw HandlerError.noWebView }
+            return renderer
+        }
+
         if let windowId, WindowRegistry.shared.entry(for: windowId) == nil {
             throw HandlerError.windowNotFound(windowId)
         }
@@ -363,9 +380,18 @@ final class HandlerContext {
         )
     }
 
-    func load(url: URL) {
+    /// Side-effects every navigation must run regardless of which renderer is
+    /// driven: notify the shell (URL-bar / loading UI) and tear down the 3D
+    /// inspector. Exposed so handlers can drive the resolved renderer directly,
+    /// keeping navigate targeting the same renderer that reads resolve to even
+    /// when no window has rendered to wire `renderer` to the active tab.
+    func prepareForNavigation() {
         WindowRegistry.shared.defaultEntry()?.callbacks?.onWillLoad()
         reset3DInspectorForNavigation()
+    }
+
+    func load(url: URL) {
+        prepareForNavigation()
         renderer?.load(url: url)
     }
 
@@ -451,65 +477,5 @@ final class HandlerContext {
     }
 }
 
-extension Notification.Name {
-    static let snapshot3DExited = Notification.Name("kelpie.snapshot3DExited")
-}
-
-enum HandlerError: Error {
-    case noWebView
-    case rendererHidden
-    case elementNotFound(String)
-    case screenshotFailed
-    case timeout
-    case platformNotSupported(String)
-    case tabNotFound(String)
-    case tabRequired(String)
-    case windowNotFound(String)
-}
-
-func tabErrorResponse(from error: Error) -> [String: Any]? {
-    guard let handlerError = error as? HandlerError else { return nil }
-    switch handlerError {
-    case .tabNotFound(let tabId):
-        return errorResponse(code: "TAB_NOT_FOUND", message: "No tab with id \"\(tabId)\"")
-    case .tabRequired(let listing):
-        return errorResponse(
-            code: "TAB_REQUIRED",
-            message: "Multiple tabs open — specify \"tabId\" in your request. Available tabs:\n\(listing)"
-        )
-    case .windowNotFound(let windowId):
-        return errorResponse(
-            code: "WINDOW_NOT_FOUND",
-            message: "No window with id \"\(windowId)\". Call get-tabs without windowId to list available windows."
-        )
-    case .rendererHidden:
-        return errorResponse(
-            code: "RENDERER_HIDDEN",
-            message: "The active renderer is hidden — its view is detached or off-screen, " +
-                "so script evaluation and DOM queries are unavailable. Bring the window " +
-                "to front or switch to a renderer whose view is visible."
-        )
-    default:
-        return nil
-    }
-}
-
-func errorResponse(code: String, message: String) -> [String: Any] {
-    errorResponse(code: code, message: message, diagnostics: nil)
-}
-
-func errorResponse(code: String, message: String, diagnostics: [String: Any]?) -> [String: Any] {
-    var error: [String: Any] = ["code": code, "message": message]
-    if let diagnostics, !diagnostics.isEmpty {
-        error["diagnostics"] = diagnostics
-    }
-    return ["success": false, "error": error]
-}
-
-func successResponse(_ data: [String: Any] = [:]) -> [String: Any] {
-    var result: [String: Any] = ["success": true]
-    for (key, value) in data { result[key] = value }
-    return result
-}
-
+// Error/response helpers live in `HandlerResponses.swift`.
 // Cookie sync extension lives in `HandlerContext+Cookies.swift`.

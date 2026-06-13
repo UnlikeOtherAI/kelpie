@@ -97,6 +97,9 @@ final class ViewportState: ObservableObject {
     private static let orientationDefaultsKey      = "com.kelpie.viewport-orientation"
     private static let shellWindowWidthDefaultsKey  = "com.kelpie.macos.shell-window-width"
     private static let shellWindowHeightDefaultsKey = "com.kelpie.macos.shell-window-height"
+    private static let shellWindowOriginXDefaultsKey = "com.kelpie.macos.shell-window-origin-x"
+    private static let shellWindowOriginYDefaultsKey = "com.kelpie.macos.shell-window-origin-y"
+    private static let shellWindowOriginSetDefaultsKey = "com.kelpie.macos.shell-window-origin-set"
     private static let scaleDefaultsKey            = "com.kelpie.viewport-scale"
     private static let scaleStep: Double           = 0.1
     private static let minScale: Double            = 0.1
@@ -169,6 +172,38 @@ final class ViewportState: ObservableObject {
         )
         UserDefaults.standard.set(normalized.width, forKey: shellWindowWidthDefaultsKey)
         UserDefaults.standard.set(normalized.height, forKey: shellWindowHeightDefaultsKey)
+    }
+
+    // MARK: - Window position persistence
+
+    /// Last saved window origin (bottom-left, screen coordinates), or nil if never saved.
+    static var persistedShellWindowOrigin: NSPoint? {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: shellWindowOriginSetDefaultsKey) else { return nil }
+        return NSPoint(
+            x: defaults.double(forKey: shellWindowOriginXDefaultsKey),
+            y: defaults.double(forKey: shellWindowOriginYDefaultsKey)
+        )
+    }
+
+    static func persistShellWindowOrigin(_ origin: NSPoint) {
+        let defaults = UserDefaults.standard
+        defaults.set(origin.x, forKey: shellWindowOriginXDefaultsKey)
+        defaults.set(origin.y, forKey: shellWindowOriginYDefaultsKey)
+        defaults.set(true, forKey: shellWindowOriginSetDefaultsKey)
+    }
+
+    /// Whether `frame` lands on a still-connected screen with enough of its title
+    /// bar visible to be usable. Used to decide if a saved position can be
+    /// restored ("…as long as the place on the screen and the screen still exists").
+    static func windowFrameIsUsable(_ frame: NSRect) -> Bool {
+        for screen in NSScreen.screens {
+            let intersection = screen.visibleFrame.intersection(frame)
+            if intersection.width >= 120, intersection.height >= 40 {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Available presets

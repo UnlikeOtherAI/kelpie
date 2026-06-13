@@ -85,6 +85,7 @@ final class ServerState: ObservableObject {
         InteractionHandler(context: ctx).register(on: router)
         TapCalibrationHandler().register(on: router)
         ScrollHandler(context: ctx).register(on: router)
+        CoordinateDiagnosticsHandler(context: ctx).register(on: router)
         DeviceHandler(context: ctx, deviceInfo: deviceInfo).register(on: router)
         EvaluateHandler(context: ctx).register(on: router)
         ConsoleHandler(context: ctx).register(on: router)

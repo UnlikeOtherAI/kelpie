@@ -49,3 +49,6 @@ packages/cli/tests/output/
 
 # Legacy/archived assets
 assets/old/
+
+# Git worktrees (local only)
+.worktrees/

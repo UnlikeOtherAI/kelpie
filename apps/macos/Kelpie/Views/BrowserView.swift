@@ -22,7 +22,6 @@ struct BrowserView: View {
         let v = UserDefaults.standard.double(forKey: "com.kelpie.macos.ai-panel-width")
         return CGFloat(v >= 200 ? v : 250)
     }()
-    @State private var isFloatingMenuOpen = false
     @State var isIn3DInspector = false
     @State var inspectorMode = "rotate"
     @AppStorage("hideWelcomeCard") var hideWelcome = false
@@ -87,7 +86,18 @@ struct BrowserView: View {
                             Task {
                                 await serverState.switchRenderer(to: engine)
                             }
-                        }
+                        },
+                        onSafariAuth: {
+                            if let url = serverState.handlerContext.currentURL {
+                                let helper = SafariAuthHelper()
+                                helper.handlerContext = serverState.handlerContext
+                                helper.authenticate(url: url)
+                            }
+                        },
+                        onBookmarks: { showBookmarks = true },
+                        onHistory: { showHistory = true },
+                        onNetworkInspector: { showNetworkInspector = true },
+                        onSettings: { showSettings = true }
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)
@@ -116,44 +126,13 @@ struct BrowserView: View {
                 }
 
                 HStack(spacing: 0) {
-                    // Renderer with overlays — FloatingMenuView only covers this area
+                    // Renderer with overlays
                     ZStack {
                         rendererSurface
 
                         if browserState.isLoading {
                             FloatingProgressPill(progress: browserState.progress)
                                 .zIndex(10)
-                        }
-
-                        if isFloatingMenuOpen && !serverState.isScriptRecording {
-                            WindowBlurOverlay(opacity: 0.5)
-                                .ignoresSafeArea()
-                                .allowsHitTesting(false)
-                        }
-
-                        if !serverState.isScriptRecording {
-                            FloatingMenuView(
-                                isOpen: $isFloatingMenuOpen,
-                                onReload: { serverState.handlerContext.reloadPage() },
-                                onSafariAuth: {
-                                    if let url = serverState.handlerContext.currentURL {
-                                        let helper = SafariAuthHelper()
-                                        helper.handlerContext = serverState.handlerContext
-                                        helper.authenticate(url: url)
-                                    }
-                                },
-                                onSettings: { showSettings = true },
-                                onBookmarks: { showBookmarks = true },
-                                onHistory: { showHistory = true },
-                                onNetworkInspector: { showNetworkInspector = true },
-                                onAI: openAIFromMenu,
-                                onSnapshot3D: {
-                                    Task { @MainActor in
-                                        await toggle3DInspector()
-                                    }
-                                }
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         }
 
                         if let message = serverState.shellToastMessage, !serverState.isScriptRecording {
@@ -353,7 +332,6 @@ struct BrowserView: View {
             showWelcome = false
             pendingInsecureURL = nil
             isAIPanelOpen = false
-            isFloatingMenuOpen = false
         }
     }
 }

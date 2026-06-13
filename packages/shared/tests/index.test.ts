@@ -72,7 +72,7 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(117);
+    expect(BrowserMcpTools.length).toBe(118);
   });
 
   it("has correct count of CLI tools", () => {
@@ -101,6 +101,7 @@ describe("MCP tools", () => {
     // safari-auth: Android supports it via Chrome Custom Tabs (MainActivity registers
     // a real handler that calls chromeAuth.authenticate). Only Linux and Windows lack support.
     expect(BrowserToolUnsupportedPlatforms.kelpie_safari_auth).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_coordinate_diagnostics).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_set_geolocation).toEqual(["ios", "android", "macos", "linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_set_request_interception).toEqual(["ios", "android", "macos", "linux", "windows"]);
   });

@@ -62,7 +62,9 @@ The server records the socket peer when `POST /v1/pair` is received. If a later 
 | `DENIED` | 403 | Pair requests from this source are currently suppressed |
 | `MISSING_PARAM` | 400 | `POST /v1/pair` missing `clientId` or status poll missing `requestId` |
 | `INVALID_JSON` | 400 | `POST /v1/pair` body was not valid JSON |
-| `CSRF_REJECTED` | 400 | `POST /v1/pair` failed Content-Type / Origin / duplicate-header checks |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | `POST /v1/pair` did not use `Content-Type: application/json` |
+| `FORBIDDEN` | 403 | `POST /v1/pair` included a browser `Origin` header |
+| `BAD_REQUEST` | 400 | Duplicate `Authorization` / `Content-Length` or any `Transfer-Encoding` header |
 
 ---
 
@@ -263,6 +265,7 @@ Internal HTTP-only debug surfaces are not exposed as MCP tools:
 | `/v1/check` | `kelpie_check` |
 | `/v1/uncheck` | `kelpie_uncheck` |
 | `/v1/swipe` | `kelpie_swipe` |
+| `/v1/coordinate-diagnostics` | `kelpie_coordinate_diagnostics` |
 | `/v1/show-commentary` | `kelpie_show_commentary` |
 | `/v1/hide-commentary` | `kelpie_hide_commentary` |
 | `/v1/highlight` | `kelpie_highlight` |

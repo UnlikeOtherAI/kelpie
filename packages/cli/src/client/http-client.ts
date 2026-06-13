@@ -30,6 +30,11 @@ function toKebabCase(method: string): string {
     .toLowerCase();
 }
 
+function isAbortError(error: unknown): boolean {
+  return (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError");
+}
+
 function urlFor(device: DiscoveredDevice, method: string): string {
   const kebabMethod = toKebabCase(method);
   const host = device.ip.includes(":") ? `[${device.ip}]` : device.ip;
@@ -83,7 +88,7 @@ async function rawFetch<T>(
     const data = (await response.json()) as T;
     return { ok: response.ok, status: response.status, data };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       return {
         ok: false,
         status: 408,

@@ -6,7 +6,7 @@ describe("generateLlmHelp", () => {
     const output = generateLlmHelp();
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBe(149);
+    expect(parsed.length).toBe(151);
   });
 
   it("each command entry has required fields", () => {
@@ -83,6 +83,18 @@ describe("generateLlmHelp", () => {
     );
   });
 
+  it("describes new-tab returning a reusable tabId", () => {
+    const output = generateLlmHelp("tab new");
+    const parsed = JSON.parse(output);
+    expect(parsed.command).toBe("tab new");
+    expect(parsed.explanation).toContain("tabId");
+    expect(parsed.response).toContainEqual(
+      expect.objectContaining({
+        name: "tabId",
+      }),
+    );
+  });
+
   it("marks tap as a last-resort command", () => {
     const output = generateLlmHelp("tap");
     const parsed = JSON.parse(output);
@@ -150,9 +162,11 @@ describe("generateLlmHelp", () => {
     expect(parsed.purpose).toContain("debug overlay");
   });
 
-  it("includes reporting guidance in the full help output", () => {
+  it("includes authentication and reporting guidance in the full help output", () => {
     const parsed = JSON.parse(generateLlmHelp());
-    expect(parsed[0].command).toBe("reporting");
-    expect(parsed[0].explanation).toContain("github.com/UnlikeOtherAI/kelpie/issues");
+    expect(parsed[0].command).toBe("authentication");
+    expect(parsed[0].explanation).toContain("httpOnly");
+    expect(parsed[1].command).toBe("reporting");
+    expect(parsed[1].explanation).toContain("github.com/UnlikeOtherAI/kelpie/issues");
   });
 });

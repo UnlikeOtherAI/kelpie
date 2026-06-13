@@ -10,14 +10,13 @@
 3. Tokens are bearer tokens — opaque, per-client, revocable.
 4. CLI handles pairing transparently. End-user runs one `kelpie pair` (or it auto-prompts) and forgets about it.
 5. No regression for `kelpie discover` (mDNS browsing stays anonymous).
-6. Storage obeys `No Keychain` rule on macOS: encrypted file under app support, not Keychain.
+6. Storage obeys `No Keychain` rule on macOS: hash-only file under app support, not Keychain.
 
 ## Non-goals
 
 - Token rotation / expiry (deferred; tokens are long-lived until revoked).
 - Multi-user device accounts.
 - Transport encryption (TLS on local LAN is a separate workstream).
-- Replacing CORS — we just tighten it (no `*`, only `null` + same-origin).
 
 ## Protocol
 
@@ -29,6 +28,7 @@ The auth middleware **denies by default**. The unauth allowlist is an **exact-ma
 /v1/pair
 /v1/pair/status
 /v1/get-device-info
+/health
 ```
 
 Everything else — including `/mcp`, `/sse`, and every other `/v1/*` method — requires `Authorization: Bearer <token>`.
@@ -84,7 +84,7 @@ Server **rejects** duplicate `Authorization`, duplicate `Content-Length`, and an
 
 ### CORS
 
-Removed entirely. CLI fetch is not a browser and doesn't need it. No `Access-Control-Allow-Origin` header is sent. (Earlier draft echoing `null` was exploitable from sandboxed iframes.)
+Removed entirely. CLI fetch is not a browser and doesn't need it. No `Access-Control-Allow-Origin` header is sent. Earlier drafts echoing `null` were exploitable from sandboxed iframes.
 
 ### Network binding
 
@@ -118,14 +118,9 @@ One visible pending prompt **per source address**. A new `POST /v1/pair` from th
 ```
 
 - **Yes** — token kept in-memory; cleared on app restart.
-- **Always** — token written to encrypted storage; survives restart.
-- **No** — `clientId → denied` recorded; future `POST /v1/pair` for that clientId returns `403` immediately (no prompt spam).
+- **Always** — token hash written to persistent storage; survives restart.
+- **No** — source address suppression recorded in memory for 10 minutes; future `POST /v1/pair` from that source returns `403` immediately (no prompt spam).
 - **Expired** — pending state TTL 5 min; user must re-`POST /v1/pair`.
-
-### CORS
-
-- Replace wildcard `Access-Control-Allow-Origin: *` with explicit echo of `Origin: null` (CLI fetch) and same-origin only.
-- Preflight `OPTIONS` allowed for `Authorization` and `Content-Type` headers.
 
 ## Server-side data
 
@@ -133,7 +128,7 @@ Persistent store, **token hashes only**:
 
 ```jsonc
 // iOS:     <AppSupport>/Kelpie/pairings.json (NSFileProtectionComplete, atomic write)
-// Android: EncryptedSharedPreferences "kelpie-pairings"
+// Android: <filesDir>/pairings.json (app-private file, atomic write)
 // macOS:   <AppSupport>/Kelpie/pairings.json (POSIX 0600, atomic write — no fake AES on top)
 {
   "version": 1,
@@ -272,7 +267,7 @@ before they reach stderr / MCP tool output / logs.
 | macOS server | `Network/HTTPServer.swift`, new `Network/PairingStore.swift`, new `Network/AuthMiddleware.swift` |
 | macOS UI | new `Views/PairingAlert.swift`, settings panel paired-clients view |
 | CLI | new `src/auth/pairing.ts`, new `src/auth/token-store.ts`, `src/client/http-client.ts` (auth header + 401 retry), `src/commands/pair.ts`, `src/discovery/scanner.ts` (no auth needed) |
-| Shared | `src/api-types.ts` add `PairRequest`/`PairStatus`; `src/mcp-tools.ts` add `kelpie_pair` |
+| Shared | `src/auth-types.ts` add `PairRequest`/`PairStatus`; `src/mcp-tools.ts` add `kelpie_pair` |
 | Docs | `docs/api/`, `docs/cli.md`, `docs/functionality.md`, `docs/architecture.md` |
 
 ## Test plan

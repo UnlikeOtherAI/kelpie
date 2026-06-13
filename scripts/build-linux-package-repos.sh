@@ -48,16 +48,48 @@ mkdir -p "${ASSET_DIR}"
 rm -rf "${SITE_DIR}/packages"
 mkdir -p "${APT_ROOT}" "${RPM_ROOT}"
 
-mapfile -t TAGS < <(gh api --paginate "repos/${REPOSITORY}/releases" --jq '.[] | select(.draft == false) | .tag_name')
+PACKAGE_TAG=""
+while IFS= read -r tag; do
+  if [ -z "${tag}" ]; then
+    continue
+  fi
 
-for tag in "${TAGS[@]}"; do
-  gh release download "${tag}" \
-    --repo "${REPOSITORY}" \
-    --dir "${ASSET_DIR}" \
-    --pattern '*.deb' \
-    --pattern '*.rpm' \
-    --skip-existing
-done
+  has_linux_packages="$(
+    gh release view "${tag}" \
+      --repo "${REPOSITORY}" \
+      --json assets \
+      --jq 'any(.assets[].name; test("\\.(deb|rpm)$"))'
+  )"
+
+  if [ "${has_linux_packages}" != "true" ]; then
+    continue
+  fi
+
+  PACKAGE_TAG="${tag}"
+  break
+done < <(gh api --paginate "repos/${REPOSITORY}/releases" --jq '.[] | select(.draft == false) | .tag_name')
+
+if [ -z "${PACKAGE_TAG}" ]; then
+  echo "no release with .deb or .rpm assets found" >&2
+  exit 1
+fi
+
+echo "building package repositories from release ${PACKAGE_TAG}"
+gh release download "${PACKAGE_TAG}" \
+  --repo "${REPOSITORY}" \
+  --dir "${ASSET_DIR}" \
+  --pattern '*.deb' \
+  --pattern '*.rpm' \
+  --skip-existing
+
+shopt -s nullglob
+downloaded_packages=("${ASSET_DIR}"/*.deb "${ASSET_DIR}"/*.rpm)
+shopt -u nullglob
+
+if [ "${#downloaded_packages[@]}" -eq 0 ]; then
+  echo "no .deb or .rpm assets downloaded" >&2
+  exit 1
+fi
 
 APT_POOL="${APT_ROOT}/pool/main/m/kelpie"
 APT_DIST="${APT_ROOT}/dists/stable/main/binary-amd64"
@@ -125,7 +157,7 @@ cat > "${SITE_DIR}/packages/index.html" <<EOF
   </head>
   <body>
     <h1>Kelpie Linux Packages</h1>
-    <p>Release automation publishes Linux packages here for manual download, APT, and DNF-compatible package managers.</p>
+    <p>Release automation publishes the latest Linux packages here for APT and DNF-compatible package managers.</p>
     <h2>APT (Debian and Ubuntu)</h2>
     <pre><code>${APT_INSTALL_COMMANDS}</code></pre>
     <h2>DNF / Yum (Fedora and compatible distros)</h2>
@@ -138,7 +170,7 @@ gpgcheck=0
 repo_gpgcheck=0
 REPO
 sudo dnf install kelpie</code></pre>
-    <p>Manual downloads remain available on the GitHub release page for <code>.tar.gz</code>, <code>.deb</code>, <code>.rpm</code>, and <code>.AppImage</code>.</p>
+    <p>Manual downloads and older package versions remain available on the GitHub release pages for <code>.tar.gz</code>, <code>.deb</code>, <code>.rpm</code>, and <code>.AppImage</code>.</p>
   </body>
 </html>
 EOF

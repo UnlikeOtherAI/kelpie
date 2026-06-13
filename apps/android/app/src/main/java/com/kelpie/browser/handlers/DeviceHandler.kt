@@ -43,7 +43,7 @@ class DeviceHandler(
             "display" to mapOf("width" to deviceInfo.width, "height" to deviceInfo.height, "scale" to 1),
             "network" to mapOf("ip" to deviceInfo.ip, "port" to deviceInfo.port),
             "browser" to mapOf("engine" to "Chromium", "version" to android.os.Build.VERSION.RELEASE),
-            "app" to mapOf("version" to deviceInfo.version, "build" to "1"),
+            "app" to mapOf("version" to deviceInfo.version, "build" to deviceInfo.build),
             "system" to mapOf("os" to "Android", "osVersion" to android.os.Build.VERSION.RELEASE),
         )
 

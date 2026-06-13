@@ -78,13 +78,12 @@ struct BrowserManagementHandler {
               let value = body["value"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "name and value required")
         }
-        var props: [HTTPCookiePropertyKey: Any] = [.name: name, .value: value, .path: body["path"] as? String ?? "/"]
-        if let domain = body["domain"] as? String { props[.domain] = domain } else { props[.domain] = webView.url?.host ?? "localhost" }
-        if let cookie = HTTPCookie(properties: props) {
-            await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
-            return successResponse()
+        let defaultHost = webView.url?.host ?? "localhost"
+        guard let cookie = CookieFactory.make(name: name, value: value, body: body, defaultHost: defaultHost) else {
+            return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
         }
-        return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
+        await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
+        return successResponse()
     }
 
     @MainActor

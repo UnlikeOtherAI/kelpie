@@ -75,9 +75,10 @@ struct EvaluateHandler {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 if !renderer.isLoading {
                     let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+                    let snapshot = await NavigationPageSnapshot.read(from: renderer)
                     return successResponse([
-                        "url": renderer.currentURL?.absoluteString ?? "",
-                        "title": renderer.currentTitle,
+                        "url": snapshot.url,
+                        "title": snapshot.title,
                         "loadTime": loadTime
                     ])
                 }

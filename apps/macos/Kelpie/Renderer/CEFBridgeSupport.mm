@@ -397,14 +397,18 @@ static void OnLoadingStateChange(cef_load_handler_t *self, cef_browser_t *, int 
 
 static void OnLoadStart(cef_load_handler_t *self, cef_browser_t *, cef_frame_t *frame, cef_transition_type_t) {
     if (frame != nullptr && frame->is_main != nullptr && frame->is_main(frame)) {
-        [StructFromBase<LoadHandler>(&self->base, offsetof(LoadHandler, handler))->owner
-            cefBridgeUpdateCurrentURL:CEFBridgeStringFromUserFree(frame->get_url ? frame->get_url(frame) : nullptr)];
+        CEFBridge *owner = StructFromBase<LoadHandler>(&self->base, offsetof(LoadHandler, handler))->owner;
+        // Reset the captured status so a stale value from the previous
+        // navigation can't be recorded against this new document load.
+        [owner cefBridgeUpdateMainFrameHTTPStatusCode:0];
+        [owner cefBridgeUpdateCurrentURL:CEFBridgeStringFromUserFree(frame->get_url ? frame->get_url(frame) : nullptr)];
     }
 }
 
-static void OnLoadEnd(cef_load_handler_t *self, cef_browser_t *, cef_frame_t *frame, int) {
+static void OnLoadEnd(cef_load_handler_t *self, cef_browser_t *, cef_frame_t *frame, int httpStatusCode) {
     if (frame != nullptr && frame->is_main != nullptr && frame->is_main(frame)) {
         CEFBridge *owner = StructFromBase<LoadHandler>(&self->base, offsetof(LoadHandler, handler))->owner;
+        [owner cefBridgeUpdateMainFrameHTTPStatusCode:httpStatusCode];
         [owner cefBridgeUpdateCurrentURL:CEFBridgeStringFromUserFree(frame->get_url ? frame->get_url(frame) : nullptr)];
         [owner cefBridgeUpdateLoadingStateWithIsLoading:NO canGoBack:NO canGoForward:NO];
     }

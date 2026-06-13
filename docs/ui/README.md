@@ -25,8 +25,8 @@
 - The macOS `Help` menu also links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`.
 - The active macOS browser scene maps `Cmd+R` to a hard refresh. WebKit uses `reloadFromOrigin()`, and Chromium uses CEF's cache-bypassing reload path.
 - MCP and HTTP `toast` messages render as a native bottom card in the macOS shell, not as an injected page overlay.
-- Floating menu actions show custom black hover pills with a grey border and short labels instead of native macOS tooltips.
-- The floating menu now opens native macOS sheets for bookmarks, history, network inspection, and settings instead of leaving those actions as placeholders.
+- macOS has no floating menu: Safari/Chrome auth, bookmarks, history, network inspector, and settings are AppKit-backed icon buttons in the top toolbar, next to reload, the AI status pill, and the 3D inspector.
+- The toolbar bookmarks, history, network, and settings buttons open native macOS sheets instead of leaving those actions as placeholders.
 - The macOS bookmarks, history, and network sheets use explicit full-row hit targets, and the network sheet uses a single method dropdown above the request list instead of a dense chip row.
 - iOS and Android mirror the same network-inspector simplification: the page document is recorded in the inspector, and the in-app filter is a compact method dropdown rather than a crowded strip of category chips.
 

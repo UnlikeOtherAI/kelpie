@@ -55,56 +55,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// Whether the browser can go forward.
 - (BOOL)canGoForward;
 
+/// HTTP status code of the most recently completed main-frame document load,
+/// or 0 if not yet known. Captured from CEF's OnLoadEnd callback.
+- (NSInteger)mainFrameHTTPStatusCode;
+
 /// Evaluate JavaScript and return the result via callback.
 /// The callback receives the result as a JSON string, or nil on error.
 - (void)evaluateJavaScript:(NSString *)script
                 completion:(void (^ _Nonnull)(NSString * _Nullable result, NSError * _Nullable error))completion;
-
-/// Get all cookies as an array of dictionaries.
-- (void)getAllCookiesWithCompletion:(void (^ _Nonnull)(NSArray<NSDictionary *> *cookies))completion;
-
-/// Set a cookie.
-- (void)setCookieName:(NSString *)name
-                value:(NSString *)value
-                  url:(NSString *)url
-               domain:(NSString *)domain
-                 path:(NSString *)path
-             httpOnly:(BOOL)httpOnly
-               secure:(BOOL)secure
-              expires:(NSDate * _Nullable)expires
-           completion:(void (^ _Nonnull)(BOOL success))completion;
-
-/// Set a cookie via Chrome DevTools Protocol.
-- (void)setCookieViaCDP:(NSString *)name
-                  value:(NSString *)value
-                 domain:(NSString *)domain
-                   path:(NSString *)path
-               httpOnly:(BOOL)httpOnly
-                 secure:(BOOL)secure
-               sameSite:(NSString * _Nullable)sameSite
-                expires:(NSDate * _Nullable)expires
-             completion:(void (^ _Nonnull)(BOOL success))completion;
-
-/// Get cookies via Chrome DevTools Protocol.
-- (void)getAllCookiesViaCDPWithCompletion:(void (^ _Nonnull)(BOOL success, NSArray<NSDictionary *> *cookies))completion;
-
-/// Delete a cookie via Chrome DevTools Protocol.
-- (void)deleteCookieViaCDP:(NSString *)name
-                    domain:(NSString *)domain
-                      path:(NSString *)path
-                completion:(void (^ _Nonnull)(BOOL success))completion;
-
-/// Delete all current-context cookies via Chrome DevTools Protocol.
-- (void)deleteAllCookiesViaCDPWithCompletion:(void (^ _Nonnull)(BOOL success, NSInteger deleted))completion;
-
-/// Delete all cookies.
-- (void)deleteAllCookiesWithCompletion:(void (^ _Nonnull)(NSInteger deleted))completion;
-
-/// Flush the cookie store to ensure all pending set/delete operations are committed.
-- (void)flushCookieStoreWithCompletion:(void (^ _Nonnull)(void))completion;
-
-/// Take a screenshot. Returns PNG data via callback.
-- (void)takeScreenshotWithCompletion:(void (^ _Nonnull)(NSData * _Nullable pngData))completion;
 
 /// Close the browser and pump the CEF message loop until the close
 /// completes. Must be called before releasing the bridge to avoid
@@ -117,8 +75,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// pipeline while the view is detached and resumes it on reattach.
 - (void)setHidden:(BOOL)hidden;
 
-/// Resize the browser view.
-- (void)resizeTo:(NSSize)size;
+// Cookie operations live in CEFBridge+Cookies.h.
+// Screenshot/resize operations live in CEFBridge+Screenshot.h.
 
 /// Set callback for navigation state changes.
 @property (nonatomic, copy, nullable) void (^onStateChange)(void);

@@ -151,6 +151,17 @@ describe("E2E: Browser Management", () => {
     expect(typeof data.count).toBe("number");
   });
 
+  it("new-tab returns tabId matching tab.id", async () => {
+    if (!reachable) return;
+    const { ok, data } = await deviceRequest(device, "new-tab", { url: "https://example.com/new-tab-contract" });
+    expect(ok).toBe(true);
+    expect(data).toHaveProperty("success", true);
+    expect(data).toHaveProperty("tabId");
+    expect(data).toHaveProperty("tab");
+    expect(data).toHaveProperty("tabCount");
+    expect(data.tabId).toBe((data.tab as { id?: string }).id);
+  });
+
   // Clipboard
   it("set-clipboard and get-clipboard round trip", async () => {
     if (!reachable) return;

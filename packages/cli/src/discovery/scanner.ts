@@ -1,4 +1,4 @@
-import { Bonjour, type Service } from "bonjour-service";
+import bonjourService from "bonjour-service";
 import {
   MDNS_SERVICE_TYPE,
   type MdnsTxtRecord,
@@ -8,6 +8,26 @@ import {
 import type { DiscoveredDevice } from "../types.js";
 
 const platforms: readonly Platform[] = ["ios", "android", "macos", "linux", "windows"];
+interface BonjourServiceRecord {
+  txt?: Partial<MdnsTxtRecord>;
+  addresses?: string[];
+  referer?: { address?: string };
+  name: string;
+  port: number;
+}
+
+interface BonjourBrowser {
+  on(event: "up", listener: (service: BonjourServiceRecord) => void): void;
+  stop(): void;
+}
+
+interface BonjourClient {
+  find(opts: { type: string }): BonjourBrowser;
+  destroy(): void;
+}
+
+type BonjourConstructor = new () => BonjourClient;
+type BonjourModule = BonjourConstructor | { Bonjour?: BonjourConstructor; default?: BonjourConstructor };
 
 function parsePlatform(value: string | undefined): Platform {
   const normalized = value?.toLowerCase();
@@ -25,14 +45,14 @@ function parseRuntimeMode(value: string | undefined): RuntimeMode | undefined {
 export async function scanForDevices(
   duration = 3000,
 ): Promise<DiscoveredDevice[]> {
-  const bonjour = new Bonjour();
+  const bonjour = createBonjour();
   const devices: DiscoveredDevice[] = [];
   const seen = new Set<string>();
 
   return new Promise((resolve) => {
     const browser = bonjour.find({ type: MDNS_SERVICE_TYPE.replace("_", "").replace("._tcp", "") });
 
-    browser.on("up", (service: Service) => {
+    browser.on("up", (service) => {
       const device = parseService(service);
       if (device && !seen.has(device.id)) {
         seen.add(device.id);
@@ -48,6 +68,15 @@ export async function scanForDevices(
   });
 }
 
+function createBonjour(): BonjourClient {
+  const module = bonjourService as unknown as BonjourModule;
+  const Bonjour = typeof module === "function" ? module : module.Bonjour ?? module.default;
+  if (!Bonjour) {
+    throw new TypeError("bonjour-service did not expose a Bonjour constructor");
+  }
+  return new Bonjour();
+}
+
 /** Prefer IPv4, then global IPv6, then link-local IPv6 as last resort. */
 function pickAddress(addresses: string[], fallback?: string): string | undefined {
   const all = fallback ? [...addresses, fallback] : addresses;
@@ -58,8 +87,8 @@ function pickAddress(addresses: string[], fallback?: string): string | undefined
   return all[0];
 }
 
-function parseService(service: Service): DiscoveredDevice | null {
-  const txt = service.txt as Partial<MdnsTxtRecord> | undefined;
+function parseService(service: BonjourServiceRecord): DiscoveredDevice | null {
+  const txt = service.txt;
   if (!txt?.id) return null;
 
   const ip = pickAddress(service.addresses ?? [], service.referer?.address);

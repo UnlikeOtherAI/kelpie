@@ -17,6 +17,7 @@ data class DeviceInfo(
     val ip: String,
     val port: Int,
     val version: String,
+    val build: String,
 ) {
     companion object {
         fun collect(
@@ -41,6 +42,7 @@ data class DeviceInfo(
                 ip = getLocalIpAddress(),
                 port = port,
                 version = BuildConfig.VERSION_NAME,
+                build = BuildConfig.VERSION_CODE.toString(),
             )
         }
 

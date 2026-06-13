@@ -22,6 +22,12 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 - **Never manually fix state** — if the mDNS discovery, HTTP server, or MCP server is stuck, fix the code so it self-heals.
 - **Kill stale Kelpie app instances before verification** when they could block ports, AppReveal, or input testing. Debug against one known app process, not a mixture of old and new sessions.
 
+## Release Policy
+
+- Every pushed fix requires a full release/publish cycle, even if it is only a small patch.
+- The release cycle is not complete until the affected version is bumped, the affected artifact is published, the GitHub release is created, and the published artifact is installed locally and verified from that installed release.
+- **Install the latest app on this Mac after every release.** When the macOS app is part of a release, build it, replace `/Applications/Kelpie.app` with the freshly built bundle (kill any running instance first, then `ditto` the build product into `/Applications`), and relaunch from `/Applications` so the running app always matches the release. A GitHub release alone does not update the installed app.
+
 ## How to Run Parallel Adversarial Reviews
 
 When a design requires cross-provider review, dispatch two reviewers **simultaneously** by sending a single message with two tool calls.
@@ -51,7 +57,3 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 - **After completion**: check what files were created (`find native -type f | sort`), then build and test. Don't review Codex's intermediate reasoning.
 - **If Codex times out** (exit 144): check created files — it usually finishes writing before the review pass that times out.
 - **Token discipline**: Codex does the implementation, Claude does orchestration + verification. Don't duplicate work by reading files Codex already analyzed.
-
-## Task Management
-
-`steroids llm` — run for current task management instructions.
