@@ -112,7 +112,14 @@ jobs:
           APPIMAGETOOL_URL: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#v}"
+          version="$(
+            printf '%s' "${RELEASE_TAG}" \
+              | sed -E 's#^v##; s#^release/##; s#[^0-9A-Za-z.+~]+#.#g'
+          )"
+          release_label="$(
+            printf '%s' "${RELEASE_TAG}" \
+              | sed -E 's#[^0-9A-Za-z._-]+#-#g'
+          )"
 
           docker pull "${DISTRO_IMAGE}"
 
@@ -122,6 +129,7 @@ jobs:
             -e PACKAGE_KIND="${PACKAGE_KIND}" \
             -e BUILD_APPIMAGE="${BUILD_APPIMAGE}" \
             -e VERSION="${version}" \
+            -e RELEASE_LABEL="${release_label}" \
             -e APPIMAGETOOL_URL="${APPIMAGETOOL_URL}" \
             -v "${PWD}:/workspace" \
             -w /workspace \
@@ -142,7 +150,7 @@ jobs:
                 --build-label "${DISTRO_NAME}" \
                 --output-dir "${bundle_root}"
 
-              tar -C "${bundle_root}" -czf "${package_root}/kelpie-linux-${VERSION}-${DISTRO_NAME}-x86_64.tar.gz" kelpie-linux
+              tar -C "${bundle_root}" -czf "${package_root}/kelpie-linux-${RELEASE_LABEL}-${DISTRO_NAME}-x86_64.tar.gz" kelpie-linux
 
               case "${PACKAGE_KIND}" in
                 deb)
@@ -224,7 +232,7 @@ jobs:
 
           ./gradlew assembleRelease bundleRelease "${SIGNING_ARGS[@]}"
 
-          release_tag="${GITHUB_REF_NAME#v}"
+          release_label="$(printf '%s' "${GITHUB_REF_NAME}" | sed -E 's#[^0-9A-Za-z._-]+#-#g')"
           out_dir="../../dist/release/android"
           mkdir -p "${out_dir}"
 
@@ -236,10 +244,10 @@ jobs:
             ext="${artifact##*.}"
             case "$(basename "${artifact}")" in
               *unsigned*)
-                mv "${artifact}" "${out_dir}/kelpie-android-${release_tag}-release-unsigned.${ext}"
+                mv "${artifact}" "${out_dir}/kelpie-android-${release_label}-release-unsigned.${ext}"
                 ;;
               *)
-                mv "${artifact}" "${out_dir}/kelpie-android-${release_tag}-release.${ext}"
+                mv "${artifact}" "${out_dir}/kelpie-android-${release_label}-release.${ext}"
                 ;;
             esac
           done
@@ -280,15 +288,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify release version matches CLI package
+      - name: Verify CLI release tag
         run: |
           set -euo pipefail
           cli_version="$(node -p "require('./packages/cli/package.json').version")"
-          release_version="${GITHUB_REF_NAME#v}"
-          if [ "${cli_version}" != "${release_version}" ]; then
-            echo "Release tag ${release_version} does not match CLI version ${cli_version}" >&2
-            exit 1
-          fi
+          case "${GITHUB_REF_NAME}" in
+            v*)
+              release_version="${GITHUB_REF_NAME#v}"
+              if [ "${cli_version}" != "${release_version}" ]; then
+                echo "Release tag ${release_version} does not match CLI version ${cli_version}" >&2
+                exit 1
+              fi
+              ;;
+            release/*)
+              echo "Date-tagged release ${GITHUB_REF_NAME}; publishing CLI package version ${cli_version}"
+              ;;
+            *)
+              echo "Unsupported release tag ${GITHUB_REF_NAME}; expected v<version> or release/<date>" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Build and test CLI packages
         run: |
