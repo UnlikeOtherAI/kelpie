@@ -1,7 +1,6 @@
-// swiftlint:disable file_length
 import Foundation
 
-private actor AIBackendStore {
+actor AIBackendStore {
     static let shared = AIBackendStore()
 
     struct Snapshot {
@@ -42,17 +41,28 @@ private actor AIBackendStore {
     }
 }
 
+/// AI inference + audio-recording HTTP request handler.
+///
+/// Implementation is split across three files along functional seams:
+/// - this file holds the type, request dispatch (`register`), and the
+///   short-bodied request handlers (`status`, `load`, `unload`, `record`)
+///   plus the error-mapping helpers shared by every backend;
+/// - `AIHandler+Inference.swift` holds the `infer` flow, native-model
+///   resolution, page-context preloading, and screenshot capture;
+/// - `AIHandler+Ollama.swift` holds the Ollama transport layer.
 struct AIHandler {
     let context: HandlerContext
 
-    private let engine = InferenceEngine.shared
-    private let backendStore = AIBackendStore.shared
+    let engine = InferenceEngine.shared
+    let backendStore = AIBackendStore.shared
     @MainActor private static let recorder = AudioRecorder()
 
-    private enum NativeModelResolution {
+    enum NativeModelResolution {
         case success(path: String, name: String, capabilities: [String])
         case failure([String: Any])
     }
+
+    let defaultOllamaEndpoint = "http://localhost:11434"
 
     func register(on router: Router) {
         router.register("ai-status") { _ in await status() }
@@ -162,124 +172,6 @@ struct AIHandler {
         return successResponse()
     }
 
-    // swiftlint:disable:next function_body_length
-    private func infer(_ body: [String: Any]) async -> [String: Any] {
-        let backendState = await backendStore.snapshot()
-        let nativeLoaded = await MainActor.run { engine.isLoaded }
-        guard nativeLoaded || backendState.backend == "ollama" else {
-            return errorResponse(code: "NO_MODEL_LOADED", message: "Load a model first with ai-load")
-        }
-
-        let tabId = HandlerContext.tabId(from: body)
-        let maxTokens = body["maxTokens"] as? Int ?? 512
-        let temperature = body["temperature"] as? Double ?? 0.7
-        let prompt = body["prompt"] as? String ?? ""
-        let explicitText = body["text"] as? String
-        let contextMode = body["context"] as? String
-        let audio = decodeBase64Field(body["audio"])
-        let messages = body["messages"] as? [[String: Any]]
-
-        if backendState.backend == "ollama" {
-            guard let model = backendState.model else {
-                return errorResponse(code: "NO_MODEL_LOADED", message: "Load a model first with ai-load")
-            }
-            guard audio == nil else {
-                return errorResponse(
-                    code: "AUDIO_NOT_SUPPORTED",
-                    message: "Model does not support audio. Transcribe via platform STT and resend as text."
-                )
-            }
-
-            do {
-                let image = contextMode == "screenshot" ? try await screenshotData(tabId: tabId) : nil
-                let result: InferenceEngine.InferenceResult
-                if let messages {
-                    result = try await inferWithOllamaAgentLoop(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        historyMessages: messages,
-                        image: image
-                    )
-                } else {
-                    let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-                    result = try await inferWithOllama(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        messages: nil,
-                        contextText: explicitText ?? fallbackContext,
-                        image: image
-                    )
-                }
-                return successResponse([
-                    "response": result.text,
-                    "tokensUsed": result.tokensUsed,
-                    "inferenceTimeMs": result.inferenceTimeMs
-                ])
-            } catch {
-                return errorResponse(code: "OLLAMA_DISCONNECTED", message: error.localizedDescription)
-            }
-        }
-
-        let capabilities = await MainActor.run { engine.capabilities }
-        if audio != nil && !capabilities.contains("audio") {
-            return errorResponse(
-                code: "AUDIO_NOT_SUPPORTED",
-                message: "Model does not support audio. Transcribe via platform STT and resend as text."
-            )
-        }
-
-        if contextMode == "screenshot" {
-            do {
-                let image = try await screenshotData(tabId: tabId)
-                let nativePrompt = buildNativeSingleShotPrompt(prompt: prompt, extraContext: nil)
-                let result = try await engine.infer(
-                    prompt: nativePrompt,
-                    audio: audio,
-                    image: image,
-                    maxTokens: maxTokens,
-                    temperature: Float(temperature)
-                )
-                let parsed = parseResponseJSON(result.text)
-                var response = successResponse([
-                    "response": parsed.answer,
-                    "tokensUsed": result.tokensUsed,
-                    "inferenceTimeMs": result.inferenceTimeMs
-                ])
-                if let transcription = parsed.transcription {
-                    response["transcription"] = transcription
-                }
-                return response
-            } catch let error as InferenceEngine.InferenceError {
-                return mapInferenceError(error)
-            } catch {
-                return errorResponse(code: "INFERENCE_FAILED", message: error.localizedDescription)
-            }
-        }
-
-        do {
-            let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-            let preloaded = explicitText ?? fallbackContext
-            let harness = InferenceHarness(context: context)
-            let result = try await harness.run(prompt: prompt, audio: audio, preloadedContext: preloaded)
-
-            var response = successResponse([
-                "response": result.answer,
-                "tokensUsed": result.totalTokens,
-                "inferenceTimeMs": result.totalTimeMs
-            ])
-            if let transcription = result.transcription {
-                response["transcription"] = transcription
-            }
-            return response
-        } catch let error as InferenceEngine.InferenceError {
-            return mapInferenceError(error)
-        } catch {
-            return errorResponse(code: "INFERENCE_FAILED", message: error.localizedDescription)
-        }
-    }
-
     private func record(_ body: [String: Any]) async -> [String: Any] {
         let action = body["action"] as? String ?? "status"
 
@@ -337,313 +229,9 @@ struct AIHandler {
         }
     }
 
-    private func resolveNativeModel(from body: [String: Any]) -> NativeModelResolution {
-        if let path = body["path"] as? String, !path.isEmpty {
-            let url = URL(fileURLWithPath: path)
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                return .failure(errorResponse(code: "MODEL_NOT_FOUND", message: "No GGUF file at specified path"))
-            }
+    // MARK: - Error mapping + shared utilities
 
-            let metadata = nativeMetadata(forModelAt: url)
-            let name = metadata.name ?? url.deletingPathExtension().lastPathComponent
-            return .success(path: url.path, name: name, capabilities: metadata.capabilities)
-        }
-
-        guard let model = body["model"] as? String, !model.isEmpty else {
-            return .failure(errorResponse(code: "MISSING_PARAM", message: "model or path is required"))
-        }
-
-        let modelURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".kelpie/models/\(model)/model.gguf")
-        guard FileManager.default.fileExists(atPath: modelURL.path) else {
-            return .failure(errorResponse(code: "MODEL_NOT_FOUND", message: "No GGUF file at specified path"))
-        }
-
-        let metadata = nativeMetadata(forModelAt: modelURL)
-        return .success(path: modelURL.path, name: metadata.name ?? model, capabilities: metadata.capabilities)
-    }
-
-    private func nativeMetadata(forModelAt url: URL) -> (name: String?, capabilities: [String]) {
-        let metadataURL = url.deletingLastPathComponent().appendingPathComponent("metadata.json")
-        guard let data = try? Data(contentsOf: metadataURL),
-              let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return (nil, ["text"])
-        }
-        let name = raw["name"] as? String
-        let capabilities = raw["capabilities"] as? [String] ?? ["text"]
-        return (name, capabilities.isEmpty ? ["text"] : capabilities)
-    }
-
-    @MainActor
-    private func preloadedContext(mode: String?, tabId: String?) async -> String? {
-        switch mode {
-        case nil:
-            return nil
-
-        case "page_text":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    var text = (el?.innerText || el?.textContent || '').trim();
-                    return {
-                        title: document.title || '',
-                        url: location.href || '',
-                        content: text,
-                        wordCount: text ? text.split(/\\s+/).length : 0
-                    };
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "dom":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    return { html: el ? el.outerHTML : '', selector: 'body' };
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "accessibility":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    function walk(node, depth) {
-                        if (!node || depth > 3) return null;
-                        var entry = {
-                            role: node.getAttribute('role') || node.tagName.toLowerCase(),
-                            name: (node.getAttribute('aria-label') || node.textContent || '').trim().substring(0, 80)
-                        };
-                        var children = [];
-                        for (var child of node.children) {
-                            var childResult = walk(child, depth + 1);
-                            if (childResult) children.push(childResult);
-                        }
-                        if (children.length) entry.children = children;
-                        return entry;
-                    }
-                    return walk(document.body, 0);
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "screenshot":
-            return nil
-
-        default:
-            return nil
-        }
-    }
-
-    @MainActor
-    private func screenshotData(tabId: String?) async throws -> Data {
-        let image = try await context.takeSnapshot(tabId: tabId)
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else {
-            throw NSError(domain: "AIHandler", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"])
-        }
-        return png
-    }
-
-    private func inferWithOllamaAgentLoop(
-        endpoint: String,
-        model: String,
-        prompt: String,
-        historyMessages: [[String: Any]],
-        image: Data?
-    ) async throws -> InferenceEngine.InferenceResult {
-        let startedAt = DispatchTime.now()
-        let harness = InferenceHarness(context: context)
-        let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
-
-        // Pre-fetch page text — fast JS call, works with every model
-        let pageText = await harness.executeTool("get_text", args: [:])
-        let summary = await PageSummary.gather(from: context)
-        let systemContent = """
-        You are a browser assistant built into Kelpie. Answer questions about the current web page.
-        Be concise. Only state facts present in the page content below. Never guess or make up content.
-
-        Page: "\(summary.title)"
-        URL: \(summary.url)
-
-        Page content:
-        \(pageText)
-        """
-        let systemMessage: [String: Any] = ["role": "system", "content": systemContent]
-        var messages: [[String: Any]] = [systemMessage] + historyMessages
-        var userMessage: [String: Any] = ["role": "user", "content": prompt]
-        if let image {
-            userMessage["images"] = [image.base64EncodedString()]
-        }
-        messages.append(userMessage)
-
-        let payload: [String: Any] = ["model": model, "messages": messages, "stream": false]
-        let response = try await postJSON(url: url, payload: payload)
-        let content = ((response["message"] as? [String: Any])?["content"] as? String ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let totalTokens = response["eval_count"] as? Int ?? approximateTokens(for: content)
-        return InferenceEngine.InferenceResult(
-            text: content.isEmpty ? "No response." : content,
-            tokensUsed: totalTokens,
-            inferenceTimeMs: parseDurationMs(response["total_duration"]) ?? elapsedMs(since: startedAt)
-        )
-    }
-
-    private func inferWithOllama(
-        endpoint: String,
-        model: String,
-        prompt: String,
-        messages: [[String: Any]]?,
-        contextText: String?,
-        image: Data?
-    ) async throws -> InferenceEngine.InferenceResult {
-        let startedAt = DispatchTime.now()
-        let userPrompt = merge(prompt: prompt, contextText: contextText)
-
-        if let messages, !messages.isEmpty {
-            let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
-            var requestMessages = messages
-            var userMessage: [String: Any] = ["role": "user", "content": userPrompt]
-            if let image {
-                userMessage["images"] = [image.base64EncodedString()]
-            }
-            requestMessages.append(userMessage)
-
-            let payload: [String: Any] = [
-                "model": model,
-                "messages": requestMessages,
-                "stream": false
-            ]
-            let response = try await postJSON(url: url, payload: payload)
-            let message = response["message"] as? [String: Any]
-            let text = message?["content"] as? String ?? ""
-            let duration = parseDurationMs(response["total_duration"])
-            return InferenceEngine.InferenceResult(
-                text: text,
-                tokensUsed: response["eval_count"] as? Int ?? approximateTokens(for: text),
-                inferenceTimeMs: duration ?? elapsedMs(since: startedAt)
-            )
-        }
-
-        let url = try ollamaURL(endpoint: endpoint, path: "/api/generate")
-        var payload: [String: Any] = [
-            "model": model,
-            "prompt": userPrompt,
-            "stream": false
-        ]
-        if let image {
-            payload["images"] = [image.base64EncodedString()]
-        }
-        let response = try await postJSON(url: url, payload: payload)
-        let text = response["response"] as? String ?? ""
-        let duration = parseDurationMs(response["total_duration"])
-        return InferenceEngine.InferenceResult(
-            text: text,
-            tokensUsed: response["eval_count"] as? Int ?? approximateTokens(for: text),
-            inferenceTimeMs: duration ?? elapsedMs(since: startedAt)
-        )
-    }
-
-    private func postJSON(url: URL, payload: [String: Any]) async throws -> [String: Any] {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        request.timeoutInterval = 300
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
-            throw NSError(domain: "AIHandler", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Lost connection to Ollama during inference"
-            ])
-        }
-
-        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
-    }
-
-    private func isOllamaReachable(endpoint: String) async -> Bool {
-        guard let url = try? ollamaURL(endpoint: endpoint, path: "/api/tags") else {
-            return false
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-
-        do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return false }
-            return 200..<300 ~= http.statusCode
-        } catch {
-            return false
-        }
-    }
-
-    private func ollamaURL(endpoint: String, path: String) throws -> URL {
-        guard let base = URL(string: endpoint) else {
-            throw NSError(domain: "AIHandler", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid Ollama endpoint"])
-        }
-        return base.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
-    }
-
-    private func ollamaCapabilities(for model: String) -> [String] {
-        let lowercased = model.lowercased()
-        if lowercased.contains("llava") || lowercased.contains("bakllava") || lowercased.contains("moondream") {
-            return ["text", "vision"]
-        }
-        return ["text"]
-    }
-
-    private func buildNativeSingleShotPrompt(prompt: String, extraContext: String?) -> String {
-        var sections = [SystemPrompt.build()]
-        if let extraContext, !extraContext.isEmpty {
-            sections.append("")
-            sections.append("Context:")
-            sections.append(extraContext)
-        }
-        sections.append("")
-        sections.append("User question:")
-        sections.append(prompt)
-        return sections.joined(separator: "\n")
-    }
-
-    private func merge(prompt: String, contextText: String?) -> String {
-        guard let contextText, !contextText.isEmpty else { return prompt }
-        return """
-        \(prompt)
-
-        Context:
-        \(contextText)
-        """
-    }
-
-    private func parseResponseJSON(_ text: String) -> (answer: String, transcription: String?) {
-        guard let start = text.firstIndex(of: "{") else { return (text, nil) }
-        var depth = 0
-        var end: String.Index?
-        for index in text.indices[start...] {
-            switch text[index] {
-            case "{": depth += 1
-            case "}":
-                depth -= 1
-                if depth == 0 { end = index; break }
-            default: break
-            }
-            if end != nil { break }
-        }
-        guard let end,
-              let data = String(text[start...end]).data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return (text, nil)
-        }
-        return (
-            object["answer"] as? String ?? object["response"] as? String ?? text,
-            object["transcription"] as? String
-        )
-    }
-
-    private func mapInferenceError(_ error: InferenceEngine.InferenceError) -> [String: Any] {
+    func mapInferenceError(_ error: InferenceEngine.InferenceError) -> [String: Any] {
         switch error {
         case .noModelLoaded:
             return errorResponse(code: "NO_MODEL_LOADED", message: "Load a model first with ai-load")
@@ -674,28 +262,12 @@ struct AIHandler {
         }
     }
 
-    private func decodeBase64Field(_ value: Any?) -> Data? {
+    func decodeBase64Field(_ value: Any?) -> Data? {
         guard let string = value as? String else { return nil }
         return Data(base64Encoded: string)
     }
 
-    private func parseDurationMs(_ value: Any?) -> Int? {
-        if let intValue = value as? Int {
-            return intValue > 1_000_000 ? intValue / 1_000_000 : intValue
-        }
-        if let doubleValue = value as? Double {
-            return doubleValue > 1_000_000 ? Int(doubleValue / 1_000_000.0) : Int(doubleValue)
-        }
-        return nil
-    }
-
-    private func approximateTokens(for text: String) -> Int {
-        max(1, text.count / 4)
-    }
-
-    private func elapsedMs(since startedAt: DispatchTime) -> Int {
+    func elapsedMs(since startedAt: DispatchTime) -> Int {
         Int((DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000)
     }
-
-    private let defaultOllamaEndpoint = "http://localhost:11434"
 }

@@ -84,6 +84,9 @@ class KelpieNetworkService : Service() {
     private fun startForegroundWithNotification() {
         ensureNotificationChannel()
         val notification = buildNotification()
+        // The 3-arg form (with foregroundServiceType) is API 29+; the 2-arg
+        // form is the supported path on API 28. The manifest still declares
+        // foregroundServiceType=connectedDevice so API 29+ honours it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
