@@ -323,10 +323,10 @@ On iPad, the same help actions are also exposed directly from the app menu, imme
 
 Detect, accept, or dismiss JavaScript alerts, confirms, and prompts. Configure auto-handling (always accept, always dismiss, or queue for manual decision). Queued dialogs are cleared if a new navigation starts so the browser never stays blocked on a stale native dialog callback. Dialog handling now has full parity across iOS, Android, and macOS — the macOS WebKit renderer enqueues dialogs into a shared store the handler reads, so it is no longer a stub.
 
-## Request Interception (Android)
+## Request Interception
 
-Block requests matching a URL pattern, or mock responses with custom bodies and status codes. List active rules, clear them. Android-only via Chrome DevTools Protocol.
+Blocking requests by URL pattern and mocking responses (custom bodies and status codes) is part of the API surface, but is **not currently implemented on any platform** — `set-request-interception`, `get-intercepted-requests`, and `clear-request-interception` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.
 
-## Geolocation Override (Android)
+## Geolocation Override
 
-Set a fake GPS location (latitude, longitude, accuracy). Clear to restore real location. Android-only via CDP.
+Overriding the device GPS location (latitude, longitude, accuracy) is part of the API surface, but is **not currently implemented on any platform** — `set-geolocation` and `clear-geolocation` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.

@@ -283,9 +283,11 @@ Response:
 ### `screenshot`
 Capture a screenshot of the current viewport. When `fullPage: true`, captures the entire scrollable page. Full-page capture is supported on iOS, Android, and macOS, each using its renderer's native mechanism:
 
-- **iOS:** `WKWebView.takeSnapshot` with no clipping rect, letting WebKit render the full content bounds in a single pass.
-- **Android:** sizes a bitmap to the full content height and lets `WebView.draw` paint the entire document into it in one pass (no CDP, no seams).
-- **macOS:** scroll-and-stitch — scrolls the page viewport-by-viewport and stitches each snapshot into one image. This path is renderer-agnostic and works for both the WebKit and Chromium (CEF) renderers, since both are viewport-clipped at the snapshot layer. It is slower and may show minor seam artifacts on pages with sticky/animated elements.
+- **iOS:** scroll-and-stitch — scrolls the page viewport-by-viewport and stitches each `WKWebView.takeSnapshot` into one image (WebKit's snapshot is viewport-clipped, so a single pass cannot capture beyond the visible viewport).
+- **Android:** scroll-and-stitch — scrolls the `WebView` viewport-by-viewport, drawing each band into one bitmap, with a height cap (`MAX_FULL_PAGE_PX`, plus a heap-derived bound) so very tall pages degrade gracefully rather than risk `OutOfMemoryError` (no CDP).
+- **macOS:** scroll-and-stitch — scrolls the page viewport-by-viewport and stitches each snapshot into one image. This path is renderer-agnostic and works for both the WebKit and Chromium (CEF) renderers, since both are viewport-clipped at the snapshot layer.
+
+All three platforms now use scroll-and-stitch and may show minor seam artifacts on pages with sticky/animated elements; the full-page response adds a `contentHeight` field and a page-relative `imageScaleY` so image pixels map back to CSS coordinates across the whole page.
 
 > **CLI/MCP note:** The HTTP API always returns base64. The CLI wraps this — it auto-saves to a file and returns the file path instead, so LLMs never handle raw base64 in conversation. The CLI MCP server also saves `resolution: "native"` screenshots to a temp file and returns compact metadata plus a file resource link, preventing large native images from being streamed as tool text. See [cli.md](../cli.md) for `--output` and `--base64` flags.
 

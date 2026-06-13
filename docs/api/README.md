@@ -113,7 +113,7 @@ Not all methods have identical implementations on Android, iOS, and macOS. Andro
 | Network log | CDP `Network.*` | Partial | Partial | iOS: top-level nav via `WKNavigationDelegate`; macOS support depends on the active renderer, but the API surface stays the same |
 | Resource timeline | CDP `Performance.*` | Partial | Partial | iOS is limited to `WKNavigationDelegate` events + `PerformanceObserver`; macOS mirrors the active renderer's capabilities |
 | WebSocket monitoring (`get-websockets`, `get-websocket-messages`) | Bridge | Bridge | Renderer-dependent | Implemented by wrapping `window.WebSocket` at document start; macOS requires the WebKit renderer |
-| Request interception | CDP `Fetch.*` | Not supported | Not supported | iOS `WKURLSchemeHandler` only works for custom schemes, not HTTP/HTTPS |
+| Request interception | Not supported | Not supported | Not supported | Not implemented on any platform — returns `PLATFORM_NOT_SUPPORTED`; iOS `WKURLSchemeHandler` only works for custom schemes, not HTTP/HTTPS |
 | Mutation observation | CDP `DOM.*` | Bridge | Renderer-dependent | iOS requires `MutationObserver` bridge script |
 | Accessibility tree | CDP `Accessibility.*` | Bridge | Renderer-dependent | iOS requires DOM traversal bridge script querying ARIA attributes |
 | Page text extraction | CDP + Readability | Bridge | Bridge | Both Apple-platform WebKit implementations rely on a Readability-style extraction path |
