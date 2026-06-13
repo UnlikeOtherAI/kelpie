@@ -142,12 +142,11 @@ struct WebViewContainer: UIViewRepresentable {
         }
 
         /// Records a navigation error, ignoring benign cancellations. WKWebView reports
-        /// `NSURLErrorCancelled` (-999) and `NSURLErrorFrameLoadInterrupted` on superseded or
-        /// duplicate loads, http→https upgrades, and interrupting redirects — none of which are
-        /// real load failures.
+        /// `NSURLErrorCancelled` (-999) on superseded or duplicate loads, http→https
+        /// upgrades, and interrupting redirects — none of which are real load failures.
         private func recordNavigationError(_ error: Error) {
             let ns = error as NSError
-            if ns.code == NSURLErrorCancelled || ns.code == NSURLErrorFrameLoadInterrupted {
+            if ns.code == NSURLErrorCancelled {
                 return
             }
             handlerContext?.lastNavigationError = error.localizedDescription

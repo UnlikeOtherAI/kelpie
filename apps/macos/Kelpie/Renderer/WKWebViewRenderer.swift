@@ -296,13 +296,13 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         decisionHandler(.allow)
     }
 
-    /// Captures a real main-frame load failure, ignoring benign codes that do
-    /// not represent a navigation error: `NSURLErrorCancelled` (a superseded
-    /// load, e.g. a redirect) and `NSURLErrorFrameLoadInterrupted` (commonly
-    /// fired when a response is handed off to a download or a custom scheme).
+    /// Captures a real main-frame load failure, ignoring benign cancellations
+    /// that do not represent a navigation error: `NSURLErrorCancelled` (-999)
+    /// is fired for a superseded load (e.g. a redirect, an http→https upgrade,
+    /// or a programmatic stopLoading), not an actual failure to load.
     private func recordNavigationFailure(_ error: Error) {
         let ns = error as NSError
-        if ns.code == NSURLErrorCancelled || ns.code == NSURLErrorFrameLoadInterrupted { return }
+        if ns.code == NSURLErrorCancelled { return }
         self.lastNavigationError = error.localizedDescription
     }
 
