@@ -64,6 +64,9 @@ struct ScreenshotHandler {
                let imageHeight = payload["height"] as? Int {
                 payload["contentHeight"] = contentHeight
                 payload["imageScaleY"] = Double(imageHeight) / Double(contentHeight)
+                // iOS stitches the whole page (no height cap), so it never truncates;
+                // emit the key for full-page response-shape parity with Android.
+                payload["truncated"] = false
             }
             return successResponse(payload)
         } catch {

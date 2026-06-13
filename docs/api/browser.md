@@ -601,7 +601,7 @@ Response:
 
 ## Geolocation
 
-> **Platform caveat:** Android supports geolocation override via CDP `Emulation.setGeolocationOverride`. iOS has no public WKWebView API for this — would require a bridge script overriding `navigator.geolocation`. Returns `PLATFORM_NOT_SUPPORTED` on iOS until a bridge implementation is added.
+> **Platform caveat:** Geolocation override is **not implemented on any platform**. `setGeolocation` and `clearGeolocation` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS. (A future implementation would use CDP `Emulation.setGeolocationOverride` on Android and a bridge script overriding `navigator.geolocation` on iOS/macOS — none are currently wired up.)
 
 ### `setGeolocation`
 Override the browser's geolocation. Useful for testing location-dependent content without physical movement.
