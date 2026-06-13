@@ -25,7 +25,7 @@ kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <ur
 | `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
-| `--port <port>` | Override default port 8420 |
+| `--port <port>` | Override default port 8420. With `--device <ip>`, targets the matching `<ip>:<port>` device before any stale same-IP entry. |
 | `--help` | Show help for any command |
 | `--version` | Show CLI version |
 | `--llm-help` | Show detailed LLM-oriented help with schemas and examples |

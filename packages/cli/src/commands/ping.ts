@@ -3,6 +3,7 @@ import { getDevice, getAllDevices } from "../discovery/registry.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
 import type { GlobalOptions, DiscoveredDevice } from "../types.js";
+import { explicitGlobalPort } from "./helpers.js";
 
 export function registerPing(program: Command): void {
   program
@@ -13,7 +14,9 @@ export function registerPing(program: Command): void {
       const timeout = globals.timeout;
 
       if (globals.device) {
-        const device = await getDevice(globals.device);
+        const device = await getDevice(globals.device, {
+          port: explicitGlobalPort(program, globals),
+        });
         if (!device) {
           print(
             { success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${globals.device}"` } },
