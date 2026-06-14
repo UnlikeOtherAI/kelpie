@@ -1,6 +1,6 @@
 import Foundation
 
-/// Tracks pending JavaScript dialogs (alert/confirm/prompt) from WKWebView.
+/// Tracks pending JavaScript dialogs (alert/confirm/prompt) from WebKit/CEF.
 ///
 /// macOS supports multiple windows/tabs, each backed by its own `WKWebView`. To
 /// keep dialogs isolated per renderer, every `WKWebViewRenderer` owns its own
@@ -66,6 +66,13 @@ final class DialogState {
             dialog.completion(nil)
         }
         return (dialog.type, true)
+    }
+
+    /// Cancel the current dialog, if any, so the renderer is not left waiting.
+    func cancelCurrent() {
+        guard let dialog = current else { return }
+        current = nil
+        dialog.completion(nil)
     }
 
     // MARK: - Private

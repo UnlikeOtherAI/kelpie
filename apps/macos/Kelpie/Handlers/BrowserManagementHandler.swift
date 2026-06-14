@@ -275,7 +275,7 @@ struct BrowserManagementHandler {
     /// or a tab/window error response when resolution fails. macOS routes dialogs
     /// per renderer so a confirm() in one window is unaffected by activity in
     /// another. A nil state with nil error means the resolved renderer cannot host
-    /// JS dialogs (CEF) — callers treat that as "no dialog".
+    /// JS dialogs — callers treat that as "no dialog".
     @MainActor
     private func resolveDialogState(
         _ body: [String: Any]

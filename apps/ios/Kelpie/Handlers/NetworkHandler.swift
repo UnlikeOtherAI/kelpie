@@ -157,7 +157,7 @@ struct NetworkHandler {
     }
 
     /// Parse a `status` filter param into a category: "success", "error", or "pending"; nil when absent/invalid.
-    private static func parseStatusCategory(_ value: Any?) -> String? {
+    static func parseStatusCategory(_ value: Any?) -> String? {
         guard let category = (value as? String)?.trimmingCharacters(in: .whitespaces).lowercased() else { return nil }
         switch category {
         case "success", "error", "pending": return category
@@ -167,7 +167,7 @@ struct NetworkHandler {
 
     /// Map an entry's HTTP status code to a category and test membership.
     /// "success" = final status 200–399; "error" = status >= 400 or failed; "pending" = no final status (0/missing).
-    private static func matchesStatusCategory(_ status: Int?, _ category: String) -> Bool {
+    static func matchesStatusCategory(_ status: Int?, _ category: String) -> Bool {
         switch category {
         case "success": return status.map { (200...399).contains($0) } ?? false
         case "error": return status.map { $0 >= 400 } ?? false
@@ -177,7 +177,7 @@ struct NetworkHandler {
     }
 
     /// Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or nil when absent.
-    private static func parseSinceMillis(_ value: Any?) -> Double? {
+    static func parseSinceMillis(_ value: Any?) -> Double? {
         if let number = value as? Double { return number }
         if let number = value as? Int { return Double(number) }
         if let stringValue = value as? String {
@@ -207,7 +207,7 @@ struct NetworkHandler {
         return formatter
     }()
 
-    private static func parseISO8601Millis(_ iso: String) -> Double? {
+    static func parseISO8601Millis(_ iso: String) -> Double? {
         if let date = iso8601Formatter.date(from: iso) { return date.timeIntervalSince1970 * 1000 }
         if let date = iso8601FormatterNoFraction.date(from: iso) { return date.timeIntervalSince1970 * 1000 }
         return nil

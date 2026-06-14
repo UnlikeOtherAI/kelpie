@@ -25,30 +25,6 @@ final class HandlerContext {
 
     init() {}
 
-    // MARK: - Per-renderer dialog / navigation-error resolution
-
-    /// Resolves the per-renderer `DialogState` for the targeted (windowId, tabId).
-    /// Each `WKWebViewRenderer` owns its own store, so dialog get/handle/auto
-    /// operate on the correct WebView in multi-window setups. Returns `nil` when
-    /// the resolved renderer is not a WKWebViewRenderer (e.g. CEF, which has no
-    /// JS-dialog capture); the throwing resolve surfaces window/tab errors.
-    func dialogState(windowId: String?, tabId: String?) throws -> DialogState? {
-        let renderer = try resolveRenderer(windowId: windowId, tabId: tabId)
-        return (renderer as? WKWebViewRenderer)?.dialogState
-    }
-
-    /// Most recent main-frame navigation error captured by the targeted renderer,
-    /// or `nil` when there was none / the renderer cannot report failures (CEF).
-    func navigationError(windowId: String?, tabId: String?) -> String? {
-        guard let renderer = try? resolveRenderer(windowId: windowId, tabId: tabId) else { return nil }
-        return (renderer as? WKWebViewRenderer)?.lastNavigationError
-    }
-
-    /// Legacy single-window form of `navigationError(windowId:tabId:)`.
-    func navigationError(tabId: String?) -> String? {
-        navigationError(windowId: nil, tabId: tabId)
-    }
-
     // MARK: - Window/tab resolution
 
     /// Look up the window the request targets. Resolution order:

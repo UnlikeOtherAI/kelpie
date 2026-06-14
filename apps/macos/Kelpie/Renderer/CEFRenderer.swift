@@ -69,17 +69,7 @@ final class CEFRenderer: RendererEngine {
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
-
-    // MARK: - JavaScript dialogs (follow-up)
-    //
-    // JS alert/confirm/prompt capture is implemented for the WebKit renderer (see
-    // WKWebViewRenderer's WKUIDelegate methods, which enqueue into the renderer's
-    // own per-instance DialogState). CEF routes JS dialogs through CefJSDialogHandler
-    // in the Chromium layer, which CEFBridge does not currently surface to Swift —
-    // there is no dialog callback in CEFBridge.h. Wiring CEF dialogs into a DialogState requires adding a
-    // CefJSDialogHandler in CEFBridge.mm plus a bridged callback, tracked as a
-    // follow-up. WebKit is the priority renderer and is fully functional; in CEF
-    // mode get-dialog reports no dialog until that bridge work lands.
+    let dialogState = DialogState()
 
     /// Initialize CEF on a clean run loop iteration. Must be called before
     /// creating any CEFRenderer instance during a live renderer switch.
@@ -181,6 +171,36 @@ final class CEFRenderer: RendererEngine {
                 self?.onScriptMessage?("kelpieConsole", message as? [String: Any] ?? [:])
             }
         }
+
+        bridge.onJavaScriptDialog = { [weak self] type, message, defaultText, resolve in
+            Task { @MainActor in
+                self?.enqueueJavaScriptDialog(
+                    type: type,
+                    message: message,
+                    defaultText: defaultText,
+                    resolve: resolve
+                )
+            }
+        }
+
+        bridge.onJavaScriptDialogReset = { [weak self] in
+            Task { @MainActor in
+                self?.dialogState.cancelCurrent()
+            }
+        }
+    }
+
+    private func enqueueJavaScriptDialog(
+        type: String,
+        message: String,
+        defaultText: String?,
+        resolve: @escaping (Bool, String?) -> Void
+    ) {
+        let dialogType = DialogState.DialogType(rawValue: type) ?? .alert
+        let dialog = DialogState.PendingDialog(type: dialogType, message: message, defaultText: defaultText) { result in
+            resolve(result != nil, result)
+        }
+        dialogState.enqueue(dialog)
     }
 
     private func syncState() {

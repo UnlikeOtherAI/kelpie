@@ -2,6 +2,7 @@ package com.kelpie.browser.llm
 
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.JSEscape
+import com.kelpie.browser.handlers.ScreenshotHandler
 import com.kelpie.browser.handlers.ScreenshotResolution
 import com.kelpie.browser.handlers.annotationActivationScript
 import com.kelpie.browser.handlers.annotationElementsScript
@@ -186,14 +187,21 @@ class LLMHandler(
 
     private suspend fun screenshotAnnotated(body: Map<String, Any?>): Map<String, Any?> {
         val format = body["format"] as? String ?: "png"
+        val quality = (body["quality"] as? Int) ?: 80
+        val fullPage = body["fullPage"] as? Boolean ?: false
         val resolution =
             ScreenshotResolution.parse(body["resolution"] ?: "viewport")
                 ?: return errorResponse("INVALID_PARAMS", "resolution must be 'native' or 'viewport'")
         return try {
             val annotations = ctx.evaluateJSReturningArray(annotationElementsScript())
+            // Reuse the regular screenshot handler's scroll-and-stitch capture so the
+            // annotated full-page image spans the whole document, not just the viewport.
             val payload =
-                ctx.captureScreenshotPayload(format = format, resolution = resolution)
-                    ?: return errorResponse("SCREENSHOT_FAILED", "Failed to capture annotated screenshot")
+                if (fullPage) {
+                    ScreenshotHandler(ctx).captureFullPagePayload(format, quality, resolution)
+                } else {
+                    ctx.captureScreenshotPayload(format = format, quality = quality, resolution = resolution)
+                } ?: return errorResponse("SCREENSHOT_FAILED", "Failed to capture annotated screenshot")
             val sessionId = UUID.randomUUID().toString().lowercase()
             ctx.annotationSessionId = sessionId
             ctx.annotationPageURL = ctx.webView?.url

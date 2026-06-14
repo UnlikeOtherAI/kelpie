@@ -14,9 +14,22 @@ private struct FullPageGeometry {
 /// Result of a full-page capture: the stitched image plus the CSS-pixel height
 /// it vertically spans, used to make the response metadata's `imageScaleY`
 /// internally consistent for full-page coordinate mapping.
-private struct FullPageCapture {
+struct FullPageCapture {
     let image: UIImage
     let contentHeightCss: Int
+}
+
+/// Rewrites a viewport-based screenshot payload so its `imageScaleY` and
+/// `contentHeight` describe the full captured document instead of one viewport.
+/// Shared by the regular and annotated full-page paths so both emit identical
+/// full-page metadata. `truncated` is always false on iOS, which stitches the
+/// whole page (no height cap); the key is emitted for response-shape parity
+/// with Android.
+func applyFullPageMetadata(to payload: inout [String: Any], contentHeightCss: Int) {
+    guard contentHeightCss > 0, let imageHeight = payload["height"] as? Int else { return }
+    payload["contentHeight"] = contentHeightCss
+    payload["imageScaleY"] = Double(imageHeight) / Double(contentHeightCss)
+    payload["truncated"] = false
 }
 
 /// Handles screenshot (viewport and full-page).
@@ -60,13 +73,8 @@ struct ScreenshotHandler {
             // shared viewport-based `imageScaleY`/`contentHeight` are meaningless.
             // Rewrite them against the full captured CSS content height so a
             // consumer can map full-page image pixels back to CSS coordinates.
-            if let contentHeight = fullPageContentHeight, contentHeight > 0,
-               let imageHeight = payload["height"] as? Int {
-                payload["contentHeight"] = contentHeight
-                payload["imageScaleY"] = Double(imageHeight) / Double(contentHeight)
-                // iOS stitches the whole page (no height cap), so it never truncates;
-                // emit the key for full-page response-shape parity with Android.
-                payload["truncated"] = false
+            if let contentHeight = fullPageContentHeight {
+                applyFullPageMetadata(to: &payload, contentHeightCss: contentHeight)
             }
             return successResponse(payload)
         } catch {
@@ -93,7 +101,7 @@ struct ScreenshotHandler {
     /// captures the full document the same way macOS does, keeping the two
     /// platforms in parity.
     @MainActor
-    private func captureFullPage(webView: WKWebView) async throws -> FullPageCapture {
+    func captureFullPage(webView: WKWebView) async throws -> FullPageCapture {
         let geometry = try await measureGeometry()
         defer {
             Task { @MainActor in

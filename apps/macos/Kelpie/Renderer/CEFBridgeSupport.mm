@@ -173,6 +173,7 @@ struct BridgeClient {
     LoadHandler *load;
     DisplayHandler *display;
     FrameHandler *frame;
+    cef_jsdialog_handler_t *jsDialog;
 };
 
 struct CookieVisitor {
@@ -327,6 +328,15 @@ static cef_frame_handler_t *GetFrameHandler(cef_client_t *self) {
     return &client->frame->handler;
 }
 
+static cef_jsdialog_handler_t *GetJSDialogHandler(cef_client_t *self) {
+    BridgeClient *client = StructFromBase<BridgeClient>(&self->base, offsetof(BridgeClient, client));
+    if (client->jsDialog == nullptr) {
+        return nullptr;
+    }
+    client->jsDialog->base.add_ref(&client->jsDialog->base);
+    return client->jsDialog;
+}
+
 static void ClientAddRef(cef_base_ref_counted_t *base) {
     AddRefImpl<BridgeClient>(base, offsetof(BridgeClient, client));
 }
@@ -349,6 +359,10 @@ static int ClientRelease(cef_base_ref_counted_t *base) {
         if (client->frame != nullptr) {
             client->frame->handler.base.release(&client->frame->handler.base);
             client->frame = nullptr;
+        }
+        if (client->jsDialog != nullptr) {
+            client->jsDialog->base.release(&client->jsDialog->base);
+            client->jsDialog = nullptr;
         }
         delete client;
         return 1;
@@ -501,6 +515,7 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->client.get_load_handler = GetLoadHandler;
     client->client.get_display_handler = GetDisplayHandler;
     client->client.get_frame_handler = GetFrameHandler;
+    client->client.get_jsdialog_handler = GetJSDialogHandler;
 
     client->lifeSpan = CreateHandler<LifeSpanHandler>(owner);
     client->lifeSpan->handler.base.add_ref = LifeSpanAddRef;
@@ -541,6 +556,8 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner) {
     client->frame->handler.on_frame_attached = OnFrameAttached;
     client->frame->handler.on_frame_detached = OnFrameDetached;
     client->frame->handler.on_main_frame_changed = OnMainFrameChanged;
+
+    client->jsDialog = CEFBridgeCreateJSDialogHandler(owner);
     return client;
 }
 
@@ -555,6 +572,7 @@ void CEFBridgeNullifyClientOwner(BridgeClient *client) {
     if (client->load     != nullptr) { client->load->owner     = nil; }
     if (client->display  != nullptr) { client->display->owner  = nil; }
     if (client->frame    != nullptr) { client->frame->owner    = nil; }
+    if (client->jsDialog != nullptr) { CEFBridgeNullifyJSDialogHandler(client->jsDialog); }
 }
 
 void CEFBridgeReleaseClient(BridgeClient *client) {

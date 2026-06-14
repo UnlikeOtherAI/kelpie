@@ -68,37 +68,51 @@ class NetworkLogHandler(
         }
     }
 
-    /** Parse a `status` filter param into a category: "success", "error", or "pending"; null when absent/invalid. */
-    private fun parseStatusCategory(value: Any?): String? =
-        when (val category = (value as? String)?.trim()?.lowercase()) {
-            "success", "error", "pending" -> category
-            else -> null
-        }
-
     /**
-     * Map an entry's HTTP status code to a category and test membership.
-     * "success" = final status 200–399; "error" = status >= 400 or failed; "pending" = no final status (0/missing).
+     * Pure status/`since` parsing helpers. Kept in a companion object so they are
+     * testable on the plain JVM (`testDebugUnitTest`) without constructing a
+     * `HandlerContext`, which requires the Android runtime.
      */
-    private fun matchesStatusCategory(
-        status: Int?,
-        category: String,
-    ): Boolean =
-        when (category) {
-            "success" -> status != null && status in 200..399
-            "error" -> status != null && status >= 400
-            "pending" -> status == null || status == 0
-            else -> false
-        }
+    companion object {
+        /** Parse a `status` filter param into a category: "success", "error", or "pending"; null when absent/invalid. */
+        internal fun parseStatusCategory(value: Any?): String? =
+            when (val category = (value as? String)?.trim()?.lowercase()) {
+                "success", "error", "pending" -> category
+                else -> null
+            }
 
-    /** Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or null when absent. */
-    private fun parseSinceMillis(value: Any?): Long? =
-        when (value) {
-            is Long -> value
-            is Int -> value.toLong()
-            is Double -> value.toLong()
-            is String -> value.trim().toLongOrNull() ?: parseIso8601Millis(value.trim())
-            else -> null
-        }
+        /**
+         * Map an entry's HTTP status code to a category and test membership.
+         * "success" = final status 200–399; "error" = status >= 400 or failed; "pending" = no final status (0/missing).
+         */
+        internal fun matchesStatusCategory(
+            status: Int?,
+            category: String,
+        ): Boolean =
+            when (category) {
+                "success" -> status != null && status in 200..399
+                "error" -> status != null && status >= 400
+                "pending" -> status == null || status == 0
+                else -> false
+            }
+
+        /** Parse a `since` param (epoch millis number or ISO-8601 string) into epoch millis, or null when absent. */
+        internal fun parseSinceMillis(value: Any?): Long? =
+            when (value) {
+                is Long -> value
+                is Int -> value.toLong()
+                is Double -> value.toLong()
+                is String -> value.trim().toLongOrNull() ?: parseIso8601Millis(value.trim())
+                else -> null
+            }
+
+        internal fun parseIso8601Millis(iso: String): Long? =
+            try {
+                Instant.parse(iso).toEpochMilli()
+            } catch (_: Exception) {
+                null
+            }
+    }
 
     private fun entryStatus(entry: Map<String, Any?>): Int? =
         when (val s = entry["status"]) {
@@ -113,13 +127,6 @@ class NetworkLogHandler(
         val started = timing["started"] as? String ?: return null
         return parseIso8601Millis(started)
     }
-
-    private fun parseIso8601Millis(iso: String): Long? =
-        try {
-            Instant.parse(iso).toEpochMilli()
-        } catch (_: Exception) {
-            null
-        }
 
     /** Aggregate totals/byType/errors/loadTime over the filtered entries, mirroring iOS/macOS. */
     private fun buildSummary(entries: List<Map<String, Any?>>): Map<String, Any?> {

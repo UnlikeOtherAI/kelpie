@@ -114,7 +114,7 @@ class ScreenshotHandler(
      * the response metadata block mirror the viewport path in
      * [HandlerContext.captureScreenshotPayload].
      */
-    private suspend fun captureFullPagePayload(
+    suspend fun captureFullPagePayload(
         format: String,
         quality: Int,
         resolution: ScreenshotResolution,

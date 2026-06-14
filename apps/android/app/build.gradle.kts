@@ -114,4 +114,7 @@ dependencies {
 
     // Gemini Nano (AI Edge) — accessed via reflection in PlatformAIEngine to avoid hard dependency.
     // Uncomment when the SDK stabilizes: implementation("com.google.ai.edge.aicore:aicore:0.0.1-exp02")
+
+    // Unit tests (plain JVM, no Android runtime)
+    testImplementation("junit:junit:4.13.2")
 }

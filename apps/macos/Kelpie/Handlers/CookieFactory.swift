@@ -64,7 +64,7 @@ enum CookieScope {
         stripDot(cookieDomain) == stripDot(filter)
     }
 
-    private static func hostMatches(_ host: String, cookieDomain: String) -> Bool {
+    static func hostMatches(_ host: String, cookieDomain: String) -> Bool {
         let cleanHost = host.lowercased()
         let cleanDomain = stripDot(cookieDomain).lowercased()
         if cleanHost == cleanDomain { return true }
@@ -75,7 +75,7 @@ enum CookieScope {
         return false
     }
 
-    private static func pathMatches(_ requestPath: String, cookiePath: String) -> Bool {
+    static func pathMatches(_ requestPath: String, cookiePath: String) -> Bool {
         let cookiePath = cookiePath.isEmpty ? "/" : cookiePath
         if requestPath == cookiePath { return true }
         if requestPath.hasPrefix(cookiePath) {
