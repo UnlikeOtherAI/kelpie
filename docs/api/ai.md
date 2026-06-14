@@ -115,6 +115,61 @@ Audio capture control for chat input flows.
 
 The current iOS implementation is a transport stub backed by `AVAudioEngine` structure only. It preserves the endpoint contract while native recording is wired later.
 
+### `POST /v1/ai-catalog`
+
+Lists the approved on-device model catalog with download URLs and per-model metadata. Supported on iOS, Android, and macOS. Requires a HuggingFace token configured on the device (set in Settings); without one it returns `AUTH_REQUIRED`.
+
+Request: no parameters.
+
+```json
+{
+  "success": true,
+  "models": [
+    {
+      "id": "gemma-4-e2b-q4",
+      "name": "Gemma 4 E2B Q4",
+      "hugging_face_repo": "bartowski/gemma-4-E2B-it-GGUF",
+      "hugging_face_file": "gemma-4-E2B-it-Q4_K_M.gguf",
+      "size_bytes": 2500000000,
+      "ram_when_loaded_gb": 3.8,
+      "capabilities": ["text", "vision", "audio"],
+      "min_ram_gb": 8.0,
+      "recommended_ram_gb": 16.0,
+      "quantization": "Q4_K_M",
+      "context_window": 8192,
+      "summary": "Understands text, images, and speech for local page analysis.",
+      "best_for": "General local browsing assistance with text, vision, and audio input",
+      "speed_rating": "moderate",
+      "download_url": "https://huggingface.co/bartowski/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"
+    }
+  ]
+}
+```
+
+### `POST /v1/ai-fitness`
+
+Scores a catalog model against a device's resources. Supported on iOS, Android, and macOS. Requires a HuggingFace token configured on the device (`AUTH_REQUIRED` otherwise).
+
+```json
+{
+  "model": "gemma-4-e2b-q4",   // required, catalog model ID
+  "ramGB": 32,                  // optional, total device RAM in GB to score against
+  "diskGB": 50                  // optional, free disk space in GB to score against
+}
+```
+
+Response — `fitness` is one of `recommended`, `possible`, `not_recommended`, or `no_storage`, with a human-readable `message` (empty when `recommended`):
+
+```json
+{
+  "success": true,
+  "fitness": "recommended",
+  "message": ""
+}
+```
+
+Fitness levels: `no_storage` (free disk is below the download size), `not_recommended` (RAM is below the model's minimum), `possible` (RAM is below the recommended value or disk headroom is tight — may run slowly), `recommended` (comfortably fits).
+
 ## Error Codes
 
 | Code | Meaning |
@@ -127,3 +182,6 @@ The current iOS implementation is a transport stub backed by `AVAudioEngine` str
 | `VISION_NOT_SUPPORTED` | The active backend does not accept image input |
 | `RECORDING_ALREADY_ACTIVE` | `ai-record` start was called while already recording |
 | `NO_RECORDING_ACTIVE` | `ai-record` stop was called without an active recording |
+| `AUTH_REQUIRED` | `ai-catalog`/`ai-fitness` need a HuggingFace token configured on the device |
+| `AI_UNAVAILABLE` | The device's AI manager is not initialized |
+| `MISSING_PARAM` | `ai-fitness` was called without the required `model` |

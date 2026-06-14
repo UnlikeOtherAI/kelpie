@@ -33,6 +33,8 @@ BridgeClient *CEFBridgeCreateClient(CEFBridge *owner);
 cef_client_t *CEFBridgeClientHandle(BridgeClient *client);
 void CEFBridgeNullifyClientOwner(BridgeClient *client);
 void CEFBridgeReleaseClient(BridgeClient *client);
+cef_jsdialog_handler_t *CEFBridgeCreateJSDialogHandler(CEFBridge *owner);
+void CEFBridgeNullifyJSDialogHandler(cef_jsdialog_handler_t *handler);
 
 cef_cookie_manager_t *CEFBridgeCookieManagerFromBrowser(cef_browser_t *browser);
 void CEFBridgeVisitAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSArray<NSDictionary *> *cookies));

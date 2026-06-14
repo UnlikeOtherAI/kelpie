@@ -208,6 +208,35 @@ let kelpieHelper = Target.target(
     )
 )
 
+let kelpieTests = Target.target(
+    name: "KelpieTests",
+    destinations: .macOS,
+    product: .unitTests,
+    bundleId: "com.kelpie.browser.macos.tests",
+    deploymentTargets: .macOS("14.0"),
+    infoPlist: .default,
+    sources: [
+        .glob("Tests/**/*.swift"),
+    ],
+    dependencies: [
+        .target(name: "Kelpie"),
+    ],
+    settings: .settings(
+        base: [
+            "SWIFT_VERSION": "5.0",
+        ]
+    )
+)
+
+// MARK: - Schemes
+
+let kelpieScheme = Scheme.scheme(
+    name: "Kelpie",
+    shared: true,
+    buildAction: .buildAction(targets: ["Kelpie"]),
+    testAction: .targets(["KelpieTests"])
+)
+
 // MARK: - Project
 
 let project = Project(
@@ -218,5 +247,9 @@ let project = Project(
     targets: [
         kelpieApp,
         kelpieHelper,
+        kelpieTests,
+    ],
+    schemes: [
+        kelpieScheme,
     ]
 )

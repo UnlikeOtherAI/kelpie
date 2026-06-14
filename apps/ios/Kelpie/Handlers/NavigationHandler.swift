@@ -23,21 +23,45 @@ struct NavigationHandler {
               let webView = context.webView else {
             return errorResponse(code: "INVALID_URL", message: "Missing or invalid URL")
         }
+        let timeout = (body["timeout"] as? Int) ?? 10000
+        let iterations = max(timeout / 100, 1)
         let start = CFAbsoluteTimeGetCurrent()
+        context.lastNavigationError = nil
         webView.load(URLRequest(url: url))
 
-        // Wait for load to finish
-        for _ in 0..<100 {
+        // Wait for the load to finish. A captured error is only fatal once the page is no
+        // longer loading — while `isLoading` is true a superseded/redirecting load may have
+        // recorded a stale error that the genuine load will clear on its next start.
+        var didFinish = false
+        for _ in 0..<iterations {
             try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            if !webView.isLoading { break }
+            if !webView.isLoading {
+                didFinish = true
+                break
+            }
         }
 
-        let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
-        return successResponse([
-            "url": webView.url?.absoluteString ?? urlString,
-            "title": webView.title ?? "",
-            "loadTime": loadTime
-        ])
+        // The page settled: report success unless a genuine load failure was captured. An error
+        // alongside a finished, non-loading page (e.g. a real DNS/TLS failure) is a true error;
+        // benign cancellations were already filtered out in the navigation delegate.
+        if didFinish {
+            if let error = context.lastNavigationError {
+                return errorResponse(code: "NAVIGATION_ERROR", message: error)
+            }
+            let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            return successResponse([
+                "url": webView.url?.absoluteString ?? urlString,
+                "title": webView.title ?? "",
+                "loadTime": loadTime
+            ])
+        }
+
+        // Loop expired without the page settling. Surface a captured error if one exists,
+        // otherwise treat the unfinished load as a timeout.
+        if let error = context.lastNavigationError {
+            return errorResponse(code: "NAVIGATION_ERROR", message: error)
+        }
+        return errorResponse(code: "TIMEOUT", message: "Navigation did not complete within \(timeout)ms")
     }
 
     @MainActor

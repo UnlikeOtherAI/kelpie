@@ -113,7 +113,7 @@ Not all methods have identical implementations on Android, iOS, and macOS. Andro
 | Network log | CDP `Network.*` | Partial | Partial | iOS: top-level nav via `WKNavigationDelegate`; macOS support depends on the active renderer, but the API surface stays the same |
 | Resource timeline | CDP `Performance.*` | Partial | Partial | iOS is limited to `WKNavigationDelegate` events + `PerformanceObserver`; macOS mirrors the active renderer's capabilities |
 | WebSocket monitoring (`get-websockets`, `get-websocket-messages`) | Bridge | Bridge | Renderer-dependent | Implemented by wrapping `window.WebSocket` at document start; macOS requires the WebKit renderer |
-| Request interception | CDP `Fetch.*` | Not supported | Not supported | iOS `WKURLSchemeHandler` only works for custom schemes, not HTTP/HTTPS |
+| Request interception | Not supported | Not supported | Not supported | Not implemented on any platform — returns `PLATFORM_NOT_SUPPORTED`; iOS `WKURLSchemeHandler` only works for custom schemes, not HTTP/HTTPS |
 | Mutation observation | CDP `DOM.*` | Bridge | Renderer-dependent | iOS requires `MutationObserver` bridge script |
 | Accessibility tree | CDP `Accessibility.*` | Bridge | Renderer-dependent | iOS requires DOM traversal bridge script querying ARIA attributes |
 | Page text extraction | CDP + Readability | Bridge | Bridge | Both Apple-platform WebKit implementations rely on a Readability-style extraction path |
@@ -125,7 +125,7 @@ Not all methods have identical implementations on Android, iOS, and macOS. Andro
 | Storage (local/session) | CDP/evaluate | Bridge | Native | macOS storage access goes through the active renderer |
 | Clipboard read | Native | Restricted | Native | iOS shows a system paste permission banner; Android 10+ restricts background access |
 | Clipboard write | Native | Native | Native | |
-| Geolocation override | CDP `Emulation.*` | Not supported | Not supported | No public WKWebView API; macOS does not expose a supported override path |
+| Geolocation override | Not supported | Not supported | Not supported | Not implemented on any platform — returns `PLATFORM_NOT_SUPPORTED` (would need CDP `Emulation.*` on Android; no public WKWebView API on iOS/macOS) |
 | Dialog handling | Native | Native | Native | All platforms have native dialog delegation APIs |
 | Keyboard simulation | Native | Native | Not supported | macOS has no soft keyboard equivalent to show or hide |
 | Named viewport presets (`get-viewport-presets`, `set-viewport-preset`) | Native (tablet only) | Native (iPad only) | Native | Linux does not support named viewport presets yet; phones return no preset support |

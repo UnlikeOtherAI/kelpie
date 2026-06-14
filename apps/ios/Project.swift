@@ -54,7 +54,7 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.2",
+            "MARKETING_VERSION": "0.1.3",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "G42HP8BM2N",
             // Conditional native build dir — device vs simulator
@@ -62,6 +62,35 @@ let kelpieApp = Target.target(
             "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../native/.build-ios-sim",
         ]
     )
+)
+
+let kelpieTests = Target.target(
+    name: "KelpieTests",
+    destinations: [.iPhone, .iPad],
+    product: .unitTests,
+    bundleId: "com.unlikeotherai.kelpie.tests",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [
+        .glob("Tests/**/*.swift"),
+    ],
+    dependencies: [
+        .target(name: "Kelpie"),
+    ],
+    settings: .settings(
+        base: [
+            "SWIFT_VERSION": "5.0",
+        ]
+    )
+)
+
+// MARK: - Schemes
+
+let kelpieScheme = Scheme.scheme(
+    name: "Kelpie",
+    shared: true,
+    buildAction: .buildAction(targets: ["Kelpie"]),
+    testAction: .targets(["KelpieTests"])
 )
 
 // MARK: - Project
@@ -73,5 +102,9 @@ let project = Project(
     ],
     targets: [
         kelpieApp,
+        kelpieTests,
+    ],
+    schemes: [
+        kelpieScheme,
     ]
 )

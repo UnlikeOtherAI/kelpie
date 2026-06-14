@@ -49,104 +49,15 @@ struct BrowserManagementHandler {
         router.register("get-iframe-context") { _ in successResponse(["context": "main"]) }
 
         // Dialogs
-        router.register("get-dialog") { _ in successResponse(["showing": false, "dialog": NSNull()]) }
-        router.register("handle-dialog") { body in
-            successResponse(["action": body["action"] ?? "accept", "dialogType": "none"])
-        }
-        router.register("set-dialog-auto-handler") { body in
-            successResponse(["enabled": body["enabled"] ?? true])
-        }
+        router.register("get-dialog") { body in await getDialog(body) }
+        router.register("handle-dialog") { body in await handleDialog(body) }
+        router.register("set-dialog-auto-handler") { body in await setDialogAutoHandler(body) }
 
         // Tabs
         router.register("get-tabs") { body in await getTabs(body) }
         router.register("new-tab") { body in await newTab(body) }
         router.register("switch-tab") { body in await switchTab(body) }
         router.register("close-tab") { body in await closeTab(body) }
-    }
-
-    // MARK: - Cookies
-
-    @MainActor
-    private func getCookies(_ body: [String: Any]) async -> [String: Any] {
-        let tabId = HandlerContext.tabId(from: body)
-        do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
-            let cookies: [HTTPCookie]
-            if tabId == nil {
-                cookies = await context.allCookies()
-            } else {
-                cookies = await renderer.allCookies()
-            }
-            let name = body["name"] as? String
-            let filtered = name != nil ? cookies.filter { $0.name == name } : cookies
-            let cookieList = filtered.map { cookie -> [String: Any] in
-                ["name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
-                 "expires": cookie.expiresDate?.description ?? NSNull(), "httpOnly": cookie.isHTTPOnly,
-                 "secure": cookie.isSecure, "sameSite": cookie.sameSitePolicy?.rawValue ?? ""]
-            }
-            return successResponse(["cookies": cookieList, "count": cookieList.count])
-        } catch {
-            if let tabError = tabErrorResponse(from: error) { return tabError }
-            return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
-        }
-    }
-
-    @MainActor
-    private func setCookie(_ body: [String: Any]) async -> [String: Any] {
-        let tabId = HandlerContext.tabId(from: body)
-        guard let name = body["name"] as? String,
-              let value = body["value"] as? String else {
-            return errorResponse(code: "MISSING_PARAM", message: "name and value required")
-        }
-        do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
-            let defaultHost = renderer.currentURL?.host ?? "localhost"
-            guard let cookie = CookieFactory.make(name: name, value: value, body: body, defaultHost: defaultHost) else {
-                return errorResponse(code: "COOKIE_ERROR", message: "Failed to create cookie")
-            }
-            if tabId == nil {
-                await context.setCookie(cookie)
-            } else {
-                await renderer.setCookies([cookie])
-            }
-            return successResponse()
-        } catch {
-            if let tabError = tabErrorResponse(from: error) { return tabError }
-            return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
-        }
-    }
-
-    @MainActor
-    private func deleteCookies(_ body: [String: Any]) async -> [String: Any] {
-        let tabId = HandlerContext.tabId(from: body)
-        do {
-            let renderer = try context.resolveRenderer(tabId: tabId)
-            let all = await renderer.allCookies()
-            let deleteAll = body["deleteAll"] as? Bool ?? false
-            let name = body["name"] as? String
-            var deleted = 0
-            if deleteAll {
-                deleted = all.count
-                if tabId == nil {
-                    await context.deleteAllCookies()
-                } else {
-                    await renderer.deleteAllCookies()
-                }
-                return successResponse(["deleted": deleted])
-            }
-            for cookie in all where cookie.name == name {
-                if tabId == nil {
-                    await context.deleteCookie(cookie)
-                } else {
-                    await renderer.deleteCookie(cookie)
-                }
-                deleted += 1
-            }
-            return successResponse(["deleted": deleted])
-        } catch {
-            if let tabError = tabErrorResponse(from: error) { return tabError }
-            return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
-        }
     }
 
     // MARK: - Storage
@@ -356,6 +267,76 @@ struct BrowserManagementHandler {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
+    }
+
+    // MARK: - Dialogs
+
+    /// Resolves the per-renderer `DialogState` for the targeted (windowId, tabId),
+    /// or a tab/window error response when resolution fails. macOS routes dialogs
+    /// per renderer so a confirm() in one window is unaffected by activity in
+    /// another. A nil state with nil error means the resolved renderer cannot host
+    /// JS dialogs — callers treat that as "no dialog".
+    @MainActor
+    private func resolveDialogState(
+        _ body: [String: Any]
+    ) -> (state: DialogState?, error: [String: Any]?) {
+        let tabId = HandlerContext.tabId(from: body)
+        let windowId = HandlerContext.windowId(from: body)
+        do {
+            return (try context.dialogState(windowId: windowId, tabId: tabId), nil)
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return (nil, tabError) }
+            return (nil, errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription))
+        }
+    }
+
+    @MainActor
+    private func getDialog(_ body: [String: Any]) async -> [String: Any] {
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
+        guard let dialog = resolved.state?.current else {
+            return successResponse(["showing": false, "dialog": NSNull()])
+        }
+        var info: [String: Any] = [
+            "type": dialog.type.rawValue,
+            "message": dialog.message
+        ]
+        if let defaultText = dialog.defaultText {
+            info["defaultValue"] = defaultText
+        } else {
+            info["defaultValue"] = NSNull()
+        }
+        return successResponse(["showing": true, "dialog": info])
+    }
+
+    @MainActor
+    private func handleDialog(_ body: [String: Any]) async -> [String: Any] {
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
+        let action = body["action"] as? String ?? "accept"
+        let text = body["promptText"] as? String ?? body["text"] as? String
+        guard let result = resolved.state?.handle(action: action, text: text), result.handled else {
+            return errorResponse(code: "NO_DIALOG", message: "No dialog is currently showing")
+        }
+        return successResponse(["action": action, "dialogType": result.type.rawValue])
+    }
+
+    @MainActor
+    private func setDialogAutoHandler(_ body: [String: Any]) async -> [String: Any] {
+        let resolved = resolveDialogState(body)
+        if let error = resolved.error { return error }
+        let enabled = body["enabled"] as? Bool ?? true
+        let defaultAction = body["defaultAction"] as? String ?? "accept"
+
+        if let state = resolved.state {
+            if enabled {
+                state.autoHandler = defaultAction == "queue" ? nil : defaultAction
+            } else {
+                state.autoHandler = nil
+            }
+            state.autoPromptText = body["promptText"] as? String ?? ""
+        }
+        return successResponse(["enabled": enabled])
     }
 
     // MARK: - Iframes

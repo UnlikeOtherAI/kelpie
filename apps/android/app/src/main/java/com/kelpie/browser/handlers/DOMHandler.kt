@@ -82,7 +82,7 @@ class DOMHandler(
             "(function(){var el=document.querySelector('$safe');" +
                 "if(!el)return null;var attrs={};" +
                 "for(var a of el.attributes){attrs[a.name]=a.value;}" +
-                "return{attributes:attrs,count:el.attributes.length};})()"
+                "return{attributes:attrs};})()"
         return try {
             val result = ctx.evaluateJSReturningJSON(js)
             if (result.isEmpty()) errorResponse("ELEMENT_NOT_FOUND", "No element matches: $selector") else successResponse(result)

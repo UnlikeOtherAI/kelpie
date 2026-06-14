@@ -36,3 +36,55 @@ enum CookieFactory {
         return HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": header], for: url).first
     }
 }
+
+/// Scopes a set of `HTTPCookie`s to a request `url` / `domain`, mirroring how
+/// Android's `CookieManager.getCookie(url)` and the `delete-cookies` domain
+/// filter behave, so `get-cookies`/`delete-cookies` return parity across
+/// platforms.
+enum CookieScope {
+    /// Returns only the cookies that would be sent to `urlString`: the URL host
+    /// must domain-match the cookie, the URL path must be within the cookie
+    /// path, and a `Secure` cookie requires an `https` URL. An unparseable URL
+    /// yields an empty set (matching Android, which scopes to that URL's host).
+    static func scoped(_ cookies: [HTTPCookie], toURL urlString: String) -> [HTTPCookie] {
+        guard let url = URL(string: urlString), let host = url.host else { return [] }
+        let path = url.path.isEmpty ? "/" : url.path
+        let isSecureScheme = url.scheme?.lowercased() == "https"
+        return cookies.filter { cookie in
+            guard hostMatches(host, cookieDomain: cookie.domain) else { return false }
+            guard pathMatches(path, cookiePath: cookie.path) else { return false }
+            if cookie.isSecure && !isSecureScheme { return false }
+            return true
+        }
+    }
+
+    /// Exact domain filter for `delete-cookies`, tolerant of a leading dot on
+    /// either side (WebKit may store `.example.com`; callers pass `example.com`).
+    static func domainMatches(_ cookieDomain: String, filter: String) -> Bool {
+        stripDot(cookieDomain) == stripDot(filter)
+    }
+
+    static func hostMatches(_ host: String, cookieDomain: String) -> Bool {
+        let cleanHost = host.lowercased()
+        let cleanDomain = stripDot(cookieDomain).lowercased()
+        if cleanHost == cleanDomain { return true }
+        // A dotted cookie domain matches the host and any subdomain of it.
+        if cookieDomain.hasPrefix(".") {
+            return cleanHost.hasSuffix("." + cleanDomain)
+        }
+        return false
+    }
+
+    static func pathMatches(_ requestPath: String, cookiePath: String) -> Bool {
+        let cookiePath = cookiePath.isEmpty ? "/" : cookiePath
+        if requestPath == cookiePath { return true }
+        if requestPath.hasPrefix(cookiePath) {
+            return cookiePath.hasSuffix("/") || requestPath.dropFirst(cookiePath.count).hasPrefix("/")
+        }
+        return false
+    }
+
+    private static func stripDot(_ value: String) -> String {
+        value.hasPrefix(".") ? String(value.dropFirst()) : value
+    }
+}

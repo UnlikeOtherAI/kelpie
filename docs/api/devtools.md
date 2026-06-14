@@ -2,7 +2,7 @@
 
 Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception.
 
-> **iOS parity note:** Many DevTools features on iOS use ephemeral bridge scripts since WKWebView lacks CDP. See the [Platform Support Matrix](README.md) for per-method details. Network logging and request interception are the most limited on iOS.
+> **iOS parity note:** Many DevTools features on iOS use ephemeral bridge scripts since WKWebView lacks CDP. See the [Platform Support Matrix](README.md) for per-method details. Network logging now reaches parity across iOS, Android, and macOS (filters and summary). Request interception is unimplemented on every platform (see below).
 
 For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
@@ -92,14 +92,14 @@ Response:
 ```
 
 ### `getNetworkLog`
-Get the full network activity log — every resource the page loaded, with timing data. Uses CDP `Network.*` events on Android and `WKNavigationDelegate` + resource tracking on iOS.
+Get the full network activity log — every resource the page loaded, with timing data. Entries are derived from the page's Resource Timing API on all platforms.
 
 ```json
 POST /v1/get-network-log
 {
   "type": null,               // optional filter: "document" | "script" | "stylesheet" | "image" | "font" | "xhr" | "fetch" | "websocket" | "other"
-  "status": null,             // optional filter: "success" | "error" | "pending"
-  "since": null,              // optional, ISO timestamp
+  "status": null,             // optional filter: "success" (2xx–3xx), "error" (>=400 or failed), or "pending" (in-flight)
+  "since": null,              // optional, epoch millis or ISO-8601 timestamp — only entries started at/after this time
   "limit": 200                // optional, max entries
 }
 
@@ -191,6 +191,8 @@ Response:
   }
 }
 ```
+
+The `type`, `status`, and `since` filters are now honored on all platforms (iOS, Android, macOS), and all three return the `summary` aggregate (`totalRequests`, `totalSize`, `totalTransferSize`, `byType`, `errors`, `loadTime`) computed over the filtered entries. `hasMore` reflects whether the filtered set exceeded `limit`.
 
 ---
 
@@ -641,7 +643,7 @@ Note: Closed shadow roots cannot be traversed — `childCount` is `null` for clo
 
 ## Request Interception
 
-> **Android only.** Uses CDP `Fetch.*` domain. iOS returns `PLATFORM_NOT_SUPPORTED` — WKWebView's `WKURLSchemeHandler` only works for custom URL schemes, not HTTP/HTTPS.
+> **Not implemented on any platform.** `set-request-interception`, `get-intercepted-requests`, and `clear-request-interception` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS. These tools are marked unsupported for every platform in the shared MCP catalog (`BrowserToolUnsupportedPlatforms`) and their MCP tools declare an empty supported-platforms list. The request/response shapes below describe the intended contract for when interception lands; do not rely on them today.
 
 ### `setRequestInterception`
 Configure rules to block, modify, or mock outgoing network requests. Useful for blocking ads, mocking APIs, or testing error scenarios.

@@ -102,8 +102,30 @@ class NavigationHandler(
     private suspend fun reload(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
         mainHandler.post { wv.reload() }
-        delay(200)
-        return successResponse(mapOf("url" to (wv.url ?: ""), "title" to (wv.title ?: "")))
+        delay(100)
+        val timeout = 10000
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < timeout) {
+            val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+            if (result["readyState"] == "complete") {
+                return successResponse(
+                    mapOf(
+                        "url" to (result["url"] ?: wv.url ?: ""),
+                        "title" to (result["title"] ?: wv.title ?: ""),
+                        "loadTime" to (System.currentTimeMillis() - start),
+                    ),
+                )
+            }
+            delay(100)
+        }
+        val finalState = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        return successResponse(
+            mapOf(
+                "url" to (finalState["url"] ?: wv.url ?: ""),
+                "title" to (finalState["title"] ?: wv.title ?: ""),
+                "loadTime" to timeout,
+            ),
+        )
     }
 
     private suspend fun getCurrentUrl(): Map<String, Any?> {

@@ -29,12 +29,33 @@ struct NavigationHandler {
             // Drive the SAME renderer reads resolve to, so navigate works even
             // when no window has rendered to wire context.renderer to the active
             // tab — i.e. headless / background, the MCP-controlled mode (#78).
+            // Start from a clean slate so a prior failure can't be misread as
+            // this navigation's result (`load(url:)` also clears it, but reset
+            // here too for an explicit, race-free start — mirrors iOS/Android).
+            (renderer as? WKWebViewRenderer)?.clearNavigationError()
             context.prepareForNavigation()
             renderer.load(url: url)
 
-            for _ in 0..<100 {
+            // Wait for the load to finish, bailing early on a captured failure.
+            // Real load-failure capture (WebKit path): the WKNavigationDelegate
+            // records DNS failures / connection-refused / interrupted loads onto
+            // the renderer. Unlike the async-KVO URL read, the didFail event is
+            // reliable and has no false-positive problem (benign cancelled /
+            // frame-interrupted codes are filtered at capture), so report it
+            // directly the moment it appears — this avoids a false success that
+            // would otherwise fall through reading the previous page's URL.
+            let timeout = (body["timeout"] as? Int) ?? 10000
+            let iterations = max(timeout / 100, 1)
+            var didFinish = false
+            for _ in 0..<iterations {
                 try? await Task.sleep(nanoseconds: 100_000_000)
-                if !renderer.isLoading { break }
+                if let navError = context.navigationError(tabId: tabId) {
+                    return errorResponse(code: "NAVIGATION_ERROR", message: navError)
+                }
+                if !renderer.isLoading {
+                    didFinish = true
+                    break
+                }
             }
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
@@ -51,6 +72,12 @@ struct NavigationHandler {
                 return errorResponse(
                     code: "NAVIGATION_ERROR",
                     message: "Navigation to \(urlString) did not load — the active renderer is still blank."
+                )
+            }
+            if !didFinish {
+                return errorResponse(
+                    code: "TIMEOUT",
+                    message: "Navigation did not complete within \(timeout)ms"
                 )
             }
             return successResponse([

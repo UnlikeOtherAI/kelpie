@@ -66,7 +66,7 @@ When an iPhone or iPad running Kelpie connects to an Apple TV via AirPlay, the a
 
 ## Screenshots
 
-Capture viewport or full-page screenshots on demand in PNG or JPEG. Full-page mode stitches together the entire scrollable page. Quality is adjustable for JPEG. Screenshot responses now include explicit viewport-mapping metadata: viewport width and height, device pixel ratio, and computed image-to-viewport scale factors. That makes the coordinate space visible to LLMs instead of forcing them to guess from image size alone.
+Capture viewport or full-page screenshots on demand in PNG or JPEG. Full-page mode now works across iOS, Android, and macOS, each using its renderer's native mechanism: iOS takes an unclipped `WKWebView` snapshot of the full content, Android paints the whole document into a full-height bitmap via `WebView.draw`, and macOS scrolls-and-stitches the page viewport-by-viewport (covering both the WebKit and Chromium renderers). Quality is adjustable for JPEG. Screenshot responses now include explicit viewport-mapping metadata: viewport width and height, device pixel ratio, and computed image-to-viewport scale factors. That makes the coordinate space visible to LLMs instead of forcing them to guess from image size alone.
 
 ### Annotated Screenshots
 
@@ -114,7 +114,7 @@ Read console output (log, warn, error, info, debug) from the page. Get JavaScrip
 
 Two levels of network visibility:
 
-**Performance timeline** — uses the browser's Performance API to get resource loading data: URLs, methods, status codes, MIME types, sizes, and detailed timing breakdowns (DNS, TCP, TLS, waiting, download).
+**Performance timeline** — uses the browser's Performance API to get resource loading data: URLs, methods, status codes, MIME types, sizes, and detailed timing breakdowns (DNS, TCP, TLS, waiting, download). The `get-network-log` `type`, `status`, and `since` filters and the aggregate `summary` block are now honored consistently across iOS, Android, and macOS.
 
 **WebSocket monitoring** — tracks active WebSocket connections created by the page, including URL, ready state, negotiated protocol, sent/received message counters, and a bounded recent-message buffer with timestamps and direction. The monitoring data is best-effort page observability rather than an authoritative packet trace, and on macOS it is available on the WebKit renderer path.
 
@@ -187,7 +187,7 @@ When those semantic methods are not enough, Kelpie also provides an annotated sc
 
 ## Local AI
 
-On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`) and corresponding MCP tools let language models query local AI without sending data to the cloud. On iOS and Android, AI remains available from the browser shell while the visible URL-bar shortcut is reserved for the 3D inspector.
+On-device LLM inference across all platforms. Seven HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`, `ai-catalog`, `ai-fitness`) and corresponding MCP tools let language models query local AI without sending data to the cloud. `ai-catalog` returns the approved on-device model catalog and `ai-fitness` scores a model against a device's RAM/disk — both are supported on iOS, Android, and macOS and require a HuggingFace token configured on the device. On iOS and Android, AI remains available from the browser shell while the visible URL-bar shortcut is reserved for the 3D inspector.
 
 **macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`kelpie ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
 
@@ -201,7 +201,7 @@ On-device LLM inference across all platforms. Five HTTP endpoints (`ai-status`, 
 
 **Shared AI Library (`native/core-ai`):** Model catalog, fitness evaluation, HF token management, and shared model-store helpers live in a shared C++ library. Apple apps use URLSession for authenticated downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
 
-**CLI model management:** `kelpie ai list` shows approved models and their download status, plus any locally running Ollama models. `kelpie ai pull/rm` manage downloads. `kelpie ai load/unload/status/ask` control inference on devices. All available as MCP tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`, `kelpie_ai_status`, `kelpie_ai_load`, `kelpie_ai_unload`, `kelpie_ai_ask`, `kelpie_ai_record`).
+**CLI model management:** `kelpie ai list` shows approved models and their download status, plus any locally running Ollama models. `kelpie ai pull/rm` manage downloads. `kelpie ai load/unload/status/ask` control inference on devices. `kelpie ai catalog` lists a device's approved model catalog and `kelpie ai fitness <model>` scores a model against a device's RAM/disk. All available as MCP tools (`kelpie_ai_models`, `kelpie_ai_pull`, `kelpie_ai_remove`, `kelpie_ai_status`, `kelpie_ai_load`, `kelpie_ai_unload`, `kelpie_ai_ask`, `kelpie_ai_record`, `kelpie_ai_catalog`, `kelpie_ai_fitness`).
 
 ## Annotated Screenshot Workflow
 
@@ -268,7 +268,7 @@ On macOS this applies to the staged viewport only, not the native window. A name
 
 ## Device Info
 
-Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., Android supports request interception, iOS does not).
+Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., on-screen keyboard control is mobile-only; renderer switching is macOS-only).
 
 ## Toast Messages
 
@@ -321,12 +321,12 @@ On iPad, the same help actions are also exposed directly from the app menu, imme
 
 ## Dialogs
 
-Detect, accept, or dismiss JavaScript alerts, confirms, and prompts. Configure auto-handling (always accept, always dismiss, or queue for manual decision). Queued dialogs are cleared if a new navigation starts so the browser never stays blocked on a stale native dialog callback.
+Detect, accept, or dismiss JavaScript alerts, confirms, and prompts. Configure auto-handling (always accept, always dismiss, or queue for manual decision). Queued dialogs are cleared if a new navigation starts so the browser never stays blocked on a stale native dialog callback. Dialog handling now has full parity across iOS, Android, and macOS — the macOS WebKit renderer enqueues dialogs into a shared store the handler reads, so it is no longer a stub.
 
-## Request Interception (Android)
+## Request Interception
 
-Block requests matching a URL pattern, or mock responses with custom bodies and status codes. List active rules, clear them. Android-only via Chrome DevTools Protocol.
+Blocking requests by URL pattern and mocking responses (custom bodies and status codes) is part of the API surface, but is **not currently implemented on any platform** — `set-request-interception`, `get-intercepted-requests`, and `clear-request-interception` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.
 
-## Geolocation Override (Android)
+## Geolocation Override
 
-Set a fake GPS location (latitude, longitude, accuracy). Clear to restore real location. Android-only via CDP.
+Overriding the device GPS location (latitude, longitude, accuracy) is part of the API surface, but is **not currently implemented on any platform** — `set-geolocation` and `clear-geolocation` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.

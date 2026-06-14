@@ -104,4 +104,19 @@ export function registerAI(program: Command): void {
       if (opts.temperature) body.temperature = parseFloat(opts.temperature);
       await deviceCommand(program, "ai-infer", body);
     });
+
+  ai.command("catalog")
+    .description("List the approved on-device model catalog from a device (requires a HuggingFace token on the device)")
+    .action(async () => { await deviceCommand(program, "ai-catalog"); });
+
+  ai.command("fitness <model>")
+    .description("Check whether a catalog model fits a device's RAM and disk")
+    .option("--ram <gb>", "Total device RAM in GB to score against")
+    .option("--disk <gb>", "Free disk space in GB to score against")
+    .action(async (model: string, opts: { ram?: string; disk?: string }) => {
+      const body: Record<string, unknown> = { model };
+      if (opts.ram) body.ramGB = parseFloat(opts.ram);
+      if (opts.disk) body.diskGB = parseFloat(opts.disk);
+      await deviceCommand(program, "ai-fitness", body);
+    });
 }

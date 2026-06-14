@@ -69,6 +69,7 @@ final class CEFRenderer: RendererEngine {
 
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
+    let dialogState = DialogState()
 
     /// Initialize CEF on a clean run loop iteration. Must be called before
     /// creating any CEFRenderer instance during a live renderer switch.
@@ -170,6 +171,36 @@ final class CEFRenderer: RendererEngine {
                 self?.onScriptMessage?("kelpieConsole", message as? [String: Any] ?? [:])
             }
         }
+
+        bridge.onJavaScriptDialog = { [weak self] type, message, defaultText, resolve in
+            Task { @MainActor in
+                self?.enqueueJavaScriptDialog(
+                    type: type,
+                    message: message,
+                    defaultText: defaultText,
+                    resolve: resolve
+                )
+            }
+        }
+
+        bridge.onJavaScriptDialogReset = { [weak self] in
+            Task { @MainActor in
+                self?.dialogState.cancelCurrent()
+            }
+        }
+    }
+
+    private func enqueueJavaScriptDialog(
+        type: String,
+        message: String,
+        defaultText: String?,
+        resolve: @escaping (Bool, String?) -> Void
+    ) {
+        let dialogType = DialogState.DialogType(rawValue: type) ?? .alert
+        let dialog = DialogState.PendingDialog(type: dialogType, message: message, defaultText: defaultText) { result in
+            resolve(result != nil, result)
+        }
+        dialogState.enqueue(dialog)
     }
 
     private func syncState() {

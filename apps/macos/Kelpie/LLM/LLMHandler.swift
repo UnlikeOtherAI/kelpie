@@ -156,8 +156,20 @@ struct LLMHandler {
         }
         do {
             let renderer = try context.resolveRenderer(tabId: tabId)
-            let image = try await context.takeSnapshot(tabId: tabId)
             let annotations = try await context.evaluateJSReturningArray(annotationElementsScript(), tabId: tabId)
+            // Reuse the regular screenshot handler's scroll-and-stitch capture so
+            // the annotated full-page image spans the whole document, not just the
+            // viewport. `takeSnapshot` clips to the visible bounds.
+            let fullPage = body["fullPage"] as? Bool ?? false
+            let image: NSImage
+            var fullPageContentHeight: Int?
+            if fullPage {
+                let capture = try await ScreenshotHandler(context: context).captureFullPage(tabId: tabId)
+                image = capture.image
+                fullPageContentHeight = capture.contentHeightCss
+            } else {
+                image = try await context.takeSnapshot(tabId: tabId)
+            }
             var payload = try await context.screenshotPayload(
                 from: image,
                 format: body["format"] as? String ?? "png",
@@ -165,6 +177,9 @@ struct LLMHandler {
                 resolution: resolution,
                 tabId: tabId
             )
+            if let contentHeight = fullPageContentHeight {
+                applyFullPageMetadata(to: &payload, contentHeightCss: contentHeight)
+            }
             let sessionId = UUID().uuidString.lowercased()
             context.annotationSessionId = sessionId
             context.annotationPageURL = renderer.currentURL?.absoluteString

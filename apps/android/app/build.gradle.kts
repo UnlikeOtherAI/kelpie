@@ -20,8 +20,8 @@ android {
         applicationId = "com.kelpie.browser"
         minSdk = 28
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.2"
+        versionCode = 3
+        versionName = "0.1.3"
 
         externalNativeBuild {
             cmake {
@@ -114,4 +114,7 @@ dependencies {
 
     // Gemini Nano (AI Edge) — accessed via reflection in PlatformAIEngine to avoid hard dependency.
     // Uncomment when the SDK stabilizes: implementation("com.google.ai.edge.aicore:aicore:0.0.1-exp02")
+
+    // Unit tests (plain JVM, no Android runtime)
+    testImplementation("junit:junit:4.13.2")
 }

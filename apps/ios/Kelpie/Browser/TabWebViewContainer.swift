@@ -159,6 +159,9 @@ struct TabWebViewContainer: UIViewRepresentable {
             _ webView: WKWebView,
             didStartProvisionalNavigation navigation: WKNavigation!
         ) {
+            // Each new provisional navigation starts clean — clear any error captured
+            // by a superseded load so a cancelled-then-successful sequence is not fatal.
+            handlerContext?.lastNavigationError = nil
             handlerContext?.mark3DInspectorInactive(notify: false)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
@@ -170,6 +173,31 @@ struct TabWebViewContainer: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
             syncBrowserState(from: webView)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            recordNavigationError(error)
+            syncBrowserState(from: webView)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            recordNavigationError(error)
+            syncBrowserState(from: webView)
+        }
+
+        /// Records a navigation error, ignoring benign cancellations. WKWebView reports
+        /// `NSURLErrorCancelled` (-999) on superseded or duplicate loads, http→https
+        /// upgrades, and interrupting redirects — none of which are real load failures.
+        private func recordNavigationError(_ error: Error) {
+            let ns = error as NSError
+            if ns.code == NSURLErrorCancelled {
+                return
+            }
+            handlerContext?.lastNavigationError = error.localizedDescription
         }
 
         func webView(

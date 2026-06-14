@@ -91,6 +91,25 @@ kelpie ai ask "summarise this page" --device mac -c page_text
 kelpie ai ask "describe what you see" --device mac -c screenshot
 ```
 
+### `kelpie ai catalog`
+List the approved on-device model catalog from a device, including download URLs and per-model metadata (size, min/recommended RAM, capabilities, quantization). Requires a HuggingFace token configured on the device. Supported on iOS, Android, and macOS.
+
+```bash
+kelpie ai catalog --device mac
+```
+
+### `kelpie ai fitness <model>`
+Score a catalog model against a device's resources. Returns a fitness level (`recommended`, `possible`, `not_recommended`, `no_storage`) with an explanatory message. Supported on iOS, Android, and macOS.
+
+| Flag | Description |
+|---|---|
+| `--ram <gb>` | Total device RAM in GB to score against |
+| `--disk <gb>` | Free disk space in GB to score against |
+
+```bash
+kelpie ai fitness gemma-4-e2b-q4 --device mac --ram 32 --disk 50
+```
+
 ---
 
 ## LLM Help System

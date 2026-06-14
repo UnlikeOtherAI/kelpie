@@ -72,7 +72,7 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(118);
+    expect(BrowserMcpTools.length).toBe(120);
   });
 
   it("has correct count of CLI tools", () => {
@@ -93,6 +93,8 @@ describe("MCP tools", () => {
     expect(BrowserToolUnsupportedPlatforms.kelpie_ai_unload).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_ai_ask).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_ai_record).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_catalog).toEqual(["linux", "windows"]);
+    expect(BrowserToolUnsupportedPlatforms.kelpie_ai_fitness).toEqual(["linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_show_keyboard).toEqual(["macos", "linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_hide_keyboard).toEqual(["macos", "linux", "windows"]);
     expect(BrowserToolUnsupportedPlatforms.kelpie_get_viewport_presets).toEqual(["linux", "windows"]);

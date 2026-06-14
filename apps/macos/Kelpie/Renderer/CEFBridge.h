@@ -4,6 +4,15 @@
 /// This is intentionally thin — only the functionality we need.
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^CEFBridgeJavaScriptDialogResolution)(BOOL accepted, NSString * _Nullable promptText);
+
+typedef void (^CEFBridgeJavaScriptDialogHandler)(
+    NSString *type,
+    NSString *message,
+    NSString * _Nullable defaultPromptText,
+    CEFBridgeJavaScriptDialogResolution resolve
+);
+
 @interface CEFBridge : NSObject
 
 /// Initialize CEF. Must be called once at app startup.
@@ -83,6 +92,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Set callback for console messages from the page.
 @property (nonatomic, copy, nullable) void (^onConsoleMessage)(NSDictionary *message);
+
+/// Set callback for JavaScript alert/confirm/prompt dialogs.
+@property (nonatomic, copy, nullable) CEFBridgeJavaScriptDialogHandler onJavaScriptDialog;
+
+/// Set callback for CEF dialog-state resets such as navigation cancellation.
+@property (nonatomic, copy, nullable) void (^onJavaScriptDialogReset)(void);
 
 @end
 
