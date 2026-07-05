@@ -19,7 +19,7 @@ download_and_extract() {
 }
 
 install_macos_arm64() {
-    local cef_version="148.0.10+g7ee53f5+chromium-148.0.7778.218"
+    local cef_version="149.0.6+g0d0eeb6+chromium-149.0.7827.201"
     local cef_platform="macosarm64"
     local outdir="apps/macos/Frameworks"
     local tarball="${TMP_ROOT}/cef-${cef_platform}.tar.bz2"
