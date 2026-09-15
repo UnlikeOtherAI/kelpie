@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -7,6 +7,7 @@ import {
   loadBrowserStore,
   removeBrowserAlias,
   setRunningBrowser,
+  readLocalReadiness,
   upsertBrowserAlias,
 } from "../../src/browser/store.js";
 
@@ -24,6 +25,15 @@ describe("browser store", () => {
     await rm(homeDir, { recursive: true, force: true });
   });
 
+  it("rejects readiness whose HTTP capability is not the literal boolean true", async () => {
+    const file = path.join(homeDir, "readiness.json");
+    await writeFile(file, JSON.stringify({
+      version: 1, launchId: "launch", deviceId: "device", port: 8420,
+      token: "a".repeat(32), controlMode: "loopback",
+      mcp: { http: "true", stdio: false, endpoint: "/mcp" },
+    }));
+    await expect(readLocalReadiness(file)).resolves.toBeUndefined();
+  });
   it("persists aliases and running state under ~/.kelpie", async () => {
     await upsertBrowserAlias("claude-a", {
       platform: "macos",

@@ -1,18 +1,36 @@
 #include "kelpie/desktop_mcp_server.h"
 
 #include <cassert>
+#include <set>
+#include <string>
 
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
 
 int main() {
   kelpie::DesktopRouter router;
-  router.Register("navigate", [](const nlohmann::json& params) {
-    return nlohmann::json{{"success", true}, {"url", params.value("url", std::string())}};
-  });
-  router.Register("press-key", [](const nlohmann::json&) {
-    return nlohmann::json{{"success", true}};
-  });
+  // This is the Windows desktop callable catalogue. Keeping the endpoint list
+  // here makes registry/handler drift fail tools/list instead of advertising a placeholder.
+  const std::set<std::string> endpoints = {
+      "navigate", "back", "forward", "reload", "get-current-url", "set-home", "get-home",
+      "close-browser", "bookmarks-list", "bookmarks-add", "bookmarks-remove", "bookmarks-clear",
+      "history-list", "history-clear", "screenshot", "get-dom", "query-selector",
+      "query-selector-all", "get-element-text", "get-attributes", "click", "fill", "type",
+      "press-key", "select-option", "check", "uncheck", "scroll", "scroll-to-top",
+      "scroll-to-bottom", "get-viewport", "get-device-info", "get-capabilities",
+      "wait-for-element", "wait-for-navigation", "find-element", "find-button", "find-link",
+      "find-input", "evaluate", "toast", "get-console-messages", "get-js-errors",
+      "get-network-log", "clear-network-log", "clear-console", "get-accessibility-tree",
+      "get-visible-elements", "get-page-text", "get-form-state", "get-dialog", "handle-dialog",
+      "get-tabs", "new-tab", "switch-tab", "close-tab", "get-cookies", "set-cookie",
+      "delete-cookies", "clear-cookies", "get-storage", "set-storage", "clear-storage",
+      "resize-viewport", "reset-viewport", "set-fullscreen", "get-fullscreen",
+  };
+  for (const auto& endpoint : endpoints) {
+    router.Register(endpoint, [](const nlohmann::json& params) {
+      return nlohmann::json{{"success", true}, {"params", params}};
+    });
+  }
 
   kelpie::McpRegistry registry;
   kelpie::DesktopMcpServer server;
@@ -20,7 +38,7 @@ int main() {
   server.SetRegistry(&registry);
 
   kelpie::DesktopMcpServer::Config config;
-  config.platform = kelpie::Platform::kLinux;
+  config.platform = kelpie::Platform::kWindows;
   config.engine = "chromium";
 
   const auto init = server.HandleRequest(
@@ -31,26 +49,40 @@ int main() {
 
   const auto tools = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/list"}}, config);
   const auto& listed = tools["result"]["tools"];
-  bool found_navigate = false;
-  bool found_safari_auth = false;
+  std::set<std::string> expected_names;
+  for (const auto& tool : registry.all_tools()) {
+    if (endpoints.find(tool.http_endpoint) != endpoints.end()) expected_names.insert(tool.name);
+  }
+  std::set<std::string> actual_names;
   for (const auto& tool : listed) {
-    found_navigate = found_navigate || tool["name"] == "kelpie_navigate";
-    found_safari_auth = found_safari_auth || tool["name"] == "kelpie_safari_auth";
+    actual_names.insert(tool["name"].get<std::string>());
+    const auto& schema = tool["inputSchema"];
+    assert(schema["type"] == "object");
+    assert(schema["additionalProperties"] == false);
+    assert(schema["properties"].is_object());
+    assert(schema["required"].is_array());
   }
-  assert(found_navigate);
-  assert(!found_safari_auth);
+  assert(actual_names == expected_names);
+  assert(actual_names.find("kelpie_bookmarks_list") != actual_names.end());
+  assert(actual_names.find("kelpie_history_list") != actual_names.end());
+  assert(actual_names.find("kelpie_clear_cookies") != actual_names.end());
+  assert(actual_names.find("kelpie_screenshot_annotated") == actual_names.end());
 
-  config.platform = kelpie::Platform::kWindows;
-  const auto windows_tools = server.HandleRequest(
-      {{"jsonrpc", "2.0"}, {"id", 21}, {"method", "tools/list"}}, config);
-  bool found_press_key = false;
-  for (const auto& tool : windows_tools["result"]["tools"]) {
-    if (tool["name"] == "kelpie_press_key") {
-      found_press_key = tool["inputSchema"]["required"] == nlohmann::json::array({"key"});
-    }
-  }
-  assert(found_press_key);
-  config.platform = kelpie::Platform::kLinux;
+  const auto schema_for = [&listed](const char* name) -> const nlohmann::json& {
+    for (const auto& tool : listed) if (tool["name"] == name) return tool["inputSchema"];
+    assert(false); return listed[0]["inputSchema"];
+  };
+  const auto& fill = schema_for("kelpie_fill");
+  assert(fill["required"] == nlohmann::json::array({"selector", "value"}));
+  assert(fill["properties"]["value"]["minLength"] == 0);
+  const auto& screenshot = schema_for("kelpie_screenshot");
+  assert(screenshot["properties"]["format"]["const"] == "png");
+  assert(!screenshot["properties"].contains("fullPage"));
+  const auto& viewport = schema_for("kelpie_resize_viewport");
+  assert(viewport["required"] == nlohmann::json::array({"width", "height"}));
+  assert(viewport["properties"]["width"]["minimum"] == 1);
+  const auto& bookmark_remove = schema_for("kelpie_bookmarks_remove");
+  assert(bookmark_remove["required"] == nlohmann::json::array({"id"}));
 
   const auto notification = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}}, config);
@@ -60,15 +92,18 @@ int main() {
       {{"jsonrpc", "2.0"}, {"id", 7}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_navigate"}, {"arguments", "bad"}}}}, config);
   assert(bad_arguments["error"]["code"] == -32602);
-
-  const auto call = server.HandleRequest(
-      {{"jsonrpc", "2.0"},
-       {"id", 3},
-       {"method", "tools/call"},
-       {"params", {{"name", "kelpie_navigate"}, {"arguments", {{"url", "https://example.com"}}}}}},
-      config);
-  assert(call["result"]["isError"] == false);
-  assert(call["result"]["structuredContent"]["url"] == "https://example.com");
+  const auto missing_fill = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 8}, {"method", "tools/call"},
+       {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}}}}}}, config);
+  assert(missing_fill["error"]["code"] == -32602);
+  const auto invalid_screenshot = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 9}, {"method", "tools/call"},
+       {"params", {{"name", "kelpie_screenshot"}, {"arguments", {{"format", "jpeg"}}}}}}, config);
+  assert(invalid_screenshot["error"]["code"] == -32602);
+  const auto empty_fill = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
+       {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);
+  assert(empty_fill["result"]["isError"] == false);
 
   return 0;
 }

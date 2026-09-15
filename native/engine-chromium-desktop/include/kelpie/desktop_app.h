@@ -43,6 +43,11 @@ class DesktopApp {
     std::function<BrowserControlResult(std::string url)> set_home;
     std::function<BrowserControlResult(std::string* url)> get_home;
     std::function<BrowserControlResult(std::string message)> show_native_toast;
+    // Browser-wide viewport operations. Windows supplies these callbacks from
+    // its owner thread; the shared fallback is for non-Windows test shells.
+    std::function<nlohmann::json()> viewport_supplier;
+    std::function<bool(int width, int height)> resize_viewport;
+    std::function<void()> reset_viewport;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;

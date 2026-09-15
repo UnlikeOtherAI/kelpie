@@ -204,6 +204,7 @@ export function registerBrowser(program: Command): void {
           process.exitCode = 5;
           return;
         }
+        let launched = false;
         try {
           await access(appPath);
           const previous = await readLocalReadiness(readinessFile);
@@ -211,13 +212,14 @@ export function registerBrowser(program: Command): void {
             throw new Error("A live browser already owns this profile; attach to its alias or stop it first");
           }
           const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir], { detached: true, stdio: "ignore" });
+          launched = true;
           child.unref();
           const readiness = await waitForReadiness(readinessFile, previous?.launchId, child);
           if (!readiness) throw new Error("Kelpie did not publish a valid local readiness file");
           await setRunningBrowser(name, { port: readiness.port, lastLaunchedAt: new Date().toISOString(), pid: child.pid, launchId: readiness.launchId, readinessFile, deviceId: readiness.deviceId });
           print({ success: true, name, platform: alias.platform, appPath, profileDir: alias.profileDir, port: readiness.port, deviceId: readiness.deviceId, launchId: readiness.launchId }, globals.format);
         } catch (error) {
-          await clearRunningBrowser(name);
+          if (launched) await clearRunningBrowser(name);
           print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser" } }, globals.format);
           process.exitCode = 6;
         }

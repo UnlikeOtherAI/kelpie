@@ -7,13 +7,14 @@ ConsoleHandler::ConsoleHandler(DesktopHandlerRuntime runtime) : runtime_(std::mo
 void ConsoleHandler::Register(DesktopRouter& router) const {
   router.Register("get-console-messages",
                   [this](const nlohmann::json& params) { return GetConsoleMessages(params); });
-  router.Register("get-js-errors", [this](const nlohmann::json&) { return GetJsErrors(); });
-  router.Register("clear-console", [this](const nlohmann::json&) { return ClearConsole(); });
+  router.Register("get-js-errors", [this](const nlohmann::json& p) { if (const auto invalid = RejectBrowserWideTab(p)) return *invalid; return GetJsErrors(); });
+  router.Register("clear-console", [this](const nlohmann::json& p) { if (const auto invalid = RejectBrowserWideTab(p)) return *invalid; return ClearConsole(); });
 }
 
 nlohmann::json ConsoleHandler::GetConsoleMessages(const nlohmann::json& params) const {
+  if (const auto invalid = RejectBrowserWideTab(params)) return *invalid;
   if (runtime_.console_store == nullptr) {
-    return SuccessResponse({{"messages", nlohmann::json::array()}, {"count", 0}, {"hasMore", false}});
+    return Unsupported("get-console-messages");
   }
   const auto level_it = params.find("level");
   const std::optional<std::string> level =
@@ -34,7 +35,7 @@ nlohmann::json ConsoleHandler::GetConsoleMessages(const nlohmann::json& params) 
 
 nlohmann::json ConsoleHandler::GetJsErrors() const {
   if (runtime_.console_store == nullptr) {
-    return SuccessResponse({{"errors", nlohmann::json::array()}, {"count", 0}});
+    return Unsupported("get-js-errors");
   }
   nlohmann::json errors = ParseJsonText(runtime_.console_store->GetErrorsOnly());
   for (auto& entry : errors) {
@@ -45,7 +46,7 @@ nlohmann::json ConsoleHandler::GetJsErrors() const {
 
 nlohmann::json ConsoleHandler::ClearConsole() const {
   if (runtime_.console_store == nullptr) {
-    return SuccessResponse({{"cleared", 0}});
+    return Unsupported("clear-console");
   }
   const int count = runtime_.console_store->Count();
   runtime_.console_store->Clear();

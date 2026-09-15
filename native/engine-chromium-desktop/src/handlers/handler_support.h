@@ -27,6 +27,8 @@ namespace kelpie {
 struct DesktopHandlerRuntime {
   using json = nlohmann::json;
   using JsonSupplier = std::function<json()>;
+  // Implementations marshal this browser-wide operation to the native window
+  // owner thread before touching CEF or shell state.
   using ResizeViewport = std::function<bool(int, int)>;
   using VoidAction = std::function<void()>;
 
@@ -106,9 +108,9 @@ inline nlohmann::json ControlError(const BrowserControlResult& result) {
                                                         : nlohmann::json::object());
 }
 
-inline std::string RequireString(const nlohmann::json& params, const char* key) {
+inline std::string RequireString(const nlohmann::json& params, const char* key, bool allow_empty = false) {
   const auto it = params.find(key);
-  if (it == params.end() || !it->is_string() || it->get<std::string>().empty()) {
+  if (it == params.end() || !it->is_string() || (!allow_empty && it->get<std::string>().empty())) {
     throw std::invalid_argument(std::string(key) + " is required");
   }
   return it->get<std::string>();
@@ -120,6 +122,28 @@ inline int IntOrDefault(const nlohmann::json& params, const char* key, int defau
     return default_value;
   }
   return it->get<int>();
+}
+
+inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, int minimum,
+                                 int maximum) {
+  const auto it = params.find(key);
+  if (it == params.end() || !it->is_number_integer()) {
+    throw std::invalid_argument(std::string(key) + " must be an integer");
+  }
+  const int value = it->get<int>();
+  if (value < minimum || value > maximum) {
+    throw std::invalid_argument(std::string(key) + " must be between " + std::to_string(minimum) +
+                                " and " + std::to_string(maximum));
+  }
+  return value;
+}
+
+inline std::optional<nlohmann::json> RejectBrowserWideTab(const nlohmann::json& params) {
+  if (params.contains("tabId") || params.contains("generation")) {
+    return ErrorResponse(ErrorCode::kInvalidParams,
+                         "This browser-wide method does not accept tabId or generation");
+  }
+  return std::nullopt;
 }
 
 inline DesktopBrowserControl::Timeout ControlTimeout(const nlohmann::json& params) {

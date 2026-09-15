@@ -11,10 +11,15 @@ void ScreenshotHandler::Register(DesktopRouter& router) const {
   router.Register("screenshot",
                   [this](const nlohmann::json& params) { return Screenshot(params, false); });
   router.Register("screenshot-annotated",
-                  [this](const nlohmann::json& params) { return Screenshot(params, true); });
+                  [this](const nlohmann::json& params) { return Screenshot(params, true); }, false);
 }
 
 nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool annotated) const {
+  if (params.contains("fullPage")) return InvalidParams("fullPage screenshots are not supported");
+  if (const auto format = params.find("format"); format != params.end() &&
+      (!format->is_string() || format->get<std::string>() != "png")) {
+    return InvalidParams("format must be png");
+  }
   TabLease lease;
   auto result = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
   if (!result.ok) return ControlError(result);

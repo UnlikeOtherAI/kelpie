@@ -4,6 +4,12 @@ Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evalu
 
 For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
+On Windows, `get-viewport`, `resize-viewport`, `reset-viewport`, console, and
+network-log methods describe browser-wide shell state and reject `tabId` or
+`generation`. Tab-scoped methods return the resolved tab lease. Windows
+`screenshot` emits PNG viewport images only; JPEG, full-page, and annotated
+screenshots are not available.
+
 ---
 
 ## Bookmarks
