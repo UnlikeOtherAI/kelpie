@@ -69,15 +69,44 @@ const PRE_LAUNCH_PROBE_TIMEOUT_MS = 2_000;
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForReadiness(file: string, previousLaunchId?: string, child?: ReturnType<typeof spawn>): Promise<Awaited<ReturnType<typeof readLocalReadiness>>> {
-  const deadline = Date.now() + LAUNCH_BIND_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const readiness = await readLocalReadiness(file);
-    if (child?.exitCode !== null) throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
-    if (readiness && readiness.launchId !== previousLaunchId) return readiness;
-    await delay(LAUNCH_BIND_POLL_MS);
+export interface LaunchChild {
+  exitCode: number | null;
+  once(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "error", listener: (error: Error) => void): unknown;
+}
+
+export interface ReadinessWaitOptions {
+  timeoutMs?: number;
+  pollMs?: number;
+  sleep?: (milliseconds: number) => Promise<void>;
+}
+
+export async function waitForReadiness(
+  file: string,
+  previousLaunchId?: string,
+  child?: LaunchChild,
+  options: ReadinessWaitOptions = {},
+): Promise<Awaited<ReturnType<typeof readLocalReadiness>>> {
+  let launchError: Error | undefined;
+  const onError = (error: Error) => { launchError = error; };
+  child?.once("error", onError);
+  const deadline = Date.now() + (options.timeoutMs ?? LAUNCH_BIND_TIMEOUT_MS);
+  const pollMs = options.pollMs ?? LAUNCH_BIND_POLL_MS;
+  const sleep = options.sleep ?? delay;
+  try {
+    while (Date.now() < deadline) {
+      if (launchError) throw new Error(`Kelpie failed to start: ${launchError.message}`);
+      if (child && child.exitCode !== null) {
+        throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
+      }
+      const readiness = await readLocalReadiness(file);
+      if (readiness && readiness.launchId !== previousLaunchId) return readiness;
+      await sleep(pollMs);
+    }
+    return undefined;
+  } finally {
+    child?.removeListener("error", onError);
   }
-  return undefined;
 }
 
 /**

@@ -32,11 +32,17 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
   try {
     const std::string selector = RequireString(params, "selector");
     const int timeout_ms = static_cast<int>(ControlTimeout(params).count());
+    const std::string state = params.value("state", std::string("visible"));
+    if (state != "attached" && state != "visible" && state != "hidden") {
+      return InvalidParams("state must be attached, visible, or hidden");
+    }
     const int poll_ms = 100;
     const std::int64_t started = NowMillis();
     const std::string script =
         "(() => { const el = document.querySelector(" + JsStringLiteral(selector) + ");"
-        "return {found: !!el}; })()";
+        "if (!el) return {attached:false,visible:false}; const style=getComputedStyle(el);"
+        "const rect=el.getBoundingClientRect(); return {attached:true,visible:style.display !== 'none' && "
+        "style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0}; })()";
     TabLease lease;
     BrowserControlResult resolved = RequireBrowserControl(runtime_).ResolveTab(
         OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
@@ -46,8 +52,11 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
       const BrowserControlResult control = RequireBrowserControl(runtime_).Evaluate(
           lease, script, &result, ControlTimeout(params));
       if (!control.ok) return ControlError(control);
-      if (result.value("found", false)) {
-        return SuccessResponse({{"selector", selector}});
+      const bool attached = result.value("attached", result.value("found", false));
+      const bool visible = result.value("visible", attached);
+      const bool matched = state == "attached" ? attached : state == "visible" ? visible : !visible;
+      if (matched) {
+        return SuccessResponse({{"selector", selector}, {"state", state}});
       }
       if ((NowMillis() - started) >= timeout_ms) {
         return ErrorResponse(ErrorCode::kTimeout,

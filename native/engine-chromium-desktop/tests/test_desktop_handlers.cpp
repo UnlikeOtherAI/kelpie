@@ -30,7 +30,7 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
-  kelpie::TabLease last_lease; bool stale = false; bool timeout_eval = false;
+  kelpie::TabLease last_lease; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false;
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
@@ -45,7 +45,7 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Back(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
-  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
+  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
   kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override { last_lease=lease; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
@@ -53,7 +53,11 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"trusted",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetDialog(kelpie::TabLease lease, Json* out, Timeout) override { last_lease=lease; *out={{"open",true},{"type","alert"}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult HandleDialog(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"handled",true}}; return kelpie::BrowserControlResult::Success(second); }
-  kelpie::BrowserControlResult DevTools(kelpie::TabLease lease, std::string, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::object(); return kelpie::BrowserControlResult::Success(second); }
+  kelpie::BrowserControlResult DevTools(kelpie::TabLease lease, std::string method, const Json& params, Json* out, Timeout) override {
+    last_lease=lease; last_devtools_method=std::move(method); last_devtools_params=params;
+    *out={{"nodes", nlohmann::json::array({{{"nodeId","root"}, {"role", {{"value","button"}}}}})}};
+    return kelpie::BrowserControlResult::Success(second);
+  }
 };
 }  // namespace
 
@@ -81,6 +85,13 @@ int main() {
   assert(router.Dispatch("get-console-messages",{{"tabId","second"}}).status_code==400); assert(router.Dispatch("get-network-log",{{"generation",9}}).status_code==400);
   auto bad_generation=router.Dispatch("get-page-text",{{"generation","nine"}}); assert(bad_generation.status_code==400);
   auto bad_storage=router.Dispatch("get-storage",{{"type",7}}); assert(bad_storage.status_code==400);
+  assert(router.Dispatch("resize-viewport", {{"width", 4294967297ULL}, {"height", 720}}).status_code == 400);
+  assert(router.Dispatch("get-console-messages", {{"limit", "many"}}).status_code == 400);
+  assert(router.Dispatch("wait-for-element", {{"selector", "#ready"}, {"state", "visible"}, {"tabId", "second"}, {"generation", 9}}).body["state"] == "visible");
+  auto a11y=router.Dispatch("get-accessibility-tree", {{"tabId", "second"}, {"generation", 9}, {"interactableOnly", true}, {"maxDepth", 2}});
+  assert(a11y.status_code == 200 && control.last_devtools_method == "Accessibility.getFullAXTree" && a11y.body["count"] == 1);
+  assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}, {"placeholder", "Email"}}).status_code == 200);
+  assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}}).status_code == 400);
   control.stale=true; auto stale=router.Dispatch("get-dialog",second); assert(stale.body["error"]["code"]=="TAB_STALE"); control.stale=false;
   control.timeout_eval=true; auto timeout=router.Dispatch("get-page-text",second); assert(timeout.status_code==408 && timeout.body["error"]["code"]=="TIMEOUT");
   return 0;

@@ -104,6 +104,30 @@ int main() {
       {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);
   assert(empty_fill["result"]["isError"] == false);
+  const std::vector<std::pair<std::string, nlohmann::json>> parameter_fixtures = {
+      {"kelpie_wait_for_element", {{"selector", "#ready"}, {"state", "visible"}, {"tabId", "second"}, {"generation", 9}, {"timeout", 1000}}},
+      {"kelpie_find_element", {{"text", "Save"}, {"role", "button"}, {"selector", "button"}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_find_input", {{"label", "Email"}, {"placeholder", "Email"}, {"name", "email"}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_get_accessibility_tree", {{"root", "#app"}, {"interactableOnly", true}, {"maxDepth", 3}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_get_visible_elements", {{"interactableOnly", true}, {"includeText", false}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_get_page_text", {{"mode", "readable"}, {"selector", "main"}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_get_form_state", {{"selector", "form"}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_press_key", {{"key", "K"}, {"code", "KeyK"}, {"modifiers", {"Control", "Shift"}}, {"tabId", "second"}, {"generation", 9}}},
+  };
+  int fixture_id = 11;
+  for (const auto& [name, arguments] : parameter_fixtures) {
+    const auto reply = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", fixture_id++}, {"method", "tools/call"},
+        {"params", {{"name", name}, {"arguments", arguments}}}}, config);
+    assert(reply.contains("result"));
+  }
+  const auto bad_modifier = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 99}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_press_key"}, {"arguments", {{"key", "K"}, {"modifiers", {"Bogus"}}}}}}}, config);
+  assert(bad_modifier.contains("error"));
+  assert(bad_modifier.at("error").at("code") == -32602);
+  const auto huge_viewport = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 100}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_resize_viewport"}, {"arguments", {{"width", 4294967297ULL}, {"height", 720}}}}}}, config);
+  assert(huge_viewport.contains("error"));
+  assert(huge_viewport.at("error").at("code") == -32602);
 
   return 0;
 }
