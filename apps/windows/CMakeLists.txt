@@ -59,6 +59,8 @@ FetchContent_MakeAvailable(cpp_httplib)
 
 set(WINDOWS_APP_SOURCES
   src/main.cpp
+  src/native_window_control.cpp
+  src/owner_task_queue.cpp
   src/cef_pump_deadline.cpp
   src/windows_app.cpp
   src/win32_shell.cpp
@@ -77,6 +79,8 @@ set(WINDOWS_APP_SOURCES
 
 set(WINDOWS_APP_HEADERS
   src/windows_app.h
+  src/native_window_control.h
+  src/owner_task_queue.h
   src/cef_pump_deadline.h
   src/win32_shell.h
   src/win32_browser_view.h
@@ -216,6 +220,10 @@ if(BUILD_TESTING)
   target_include_directories(kelpie_windows_cef_pump_deadline_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_compile_options(kelpie_windows_cef_pump_deadline_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_cef_pump_deadline_test COMMAND kelpie_windows_cef_pump_deadline_test)
+  add_executable(kelpie_windows_owner_task_queue_test tests/owner_task_queue_test.cpp src/owner_task_queue.cpp)
+  target_include_directories(kelpie_windows_owner_task_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_compile_options(kelpie_windows_owner_task_queue_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_owner_task_queue_test COMMAND kelpie_windows_owner_task_queue_test)
 endif()
 
 if(MINGW)

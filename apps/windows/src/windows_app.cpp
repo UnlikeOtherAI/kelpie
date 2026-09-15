@@ -390,6 +390,7 @@ bool WindowsApp::InitializeCommonControls() const {
 }
 
 bool WindowsApp::InitializeDesktopRuntime() {
+  if (!native_control_.Create(instance_, browser_view_->hwnd(), config_.width, config_.height)) return false;
   if (!CreateCefPumpWindow(instance_)) return false;
   SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
     // CEF may schedule work from a callback. Post it to the owner queue so the
@@ -426,32 +427,28 @@ bool WindowsApp::InitializeDesktopRuntime() {
     return BrowserControlResult::Success();
   };
   runtime.show_native_toast = [this](std::string message) {
-    if (shell_ == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
-    shell_->ShowToast(utf::Utf8ToWideDisplay(message));
-    return BrowserControlResult::Success();
+    return native_control_.Invoke([this, message = std::move(message)] { shell_->ShowToast(utf::Utf8ToWideDisplay(message)); }, std::chrono::seconds(2)) ? BrowserControlResult::Success() : BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
   };
   runtime.set_native_fullscreen = [this](bool enabled) {
-    if (shell_ == nullptr || shell_->hwnd() == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
-    ShowWindow(shell_->hwnd(), enabled ? SW_MAXIMIZE : SW_RESTORE);
-    return BrowserControlResult::Success();
+    const bool complete = native_control_.Invoke([this, enabled] { native_control_.SetFullscreen(enabled); }, std::chrono::seconds(2));
+    return complete ? BrowserControlResult::Success() : BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
   };
   runtime.get_native_fullscreen = [this](bool* enabled) {
-    if (enabled == nullptr || shell_ == nullptr || shell_->hwnd() == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
-    *enabled = IsZoomed(shell_->hwnd()) != FALSE;
-    return BrowserControlResult::Success();
+    if (enabled == nullptr) return BrowserControlResult::Failure("INTERNAL", "fullscreen result is required");
+    auto result = std::make_shared<bool>(false);
+    const bool complete = native_control_.Invoke([this, result] { *result = native_control_.fullscreen(); }, std::chrono::seconds(2));
+    if (!complete) return BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
+    *enabled = *result; return BrowserControlResult::Success();
   };
   runtime.viewport_supplier = [this]() {
-    RECT rect{};
-    if (browser_view_ != nullptr && browser_view_->hwnd() != nullptr) GetClientRect(browser_view_->hwnd(), &rect);
-    return nlohmann::json{{"width", rect.right - rect.left}, {"height", rect.bottom - rect.top},
-                          {"devicePixelRatio", 1.0}, {"platform", "windows"}};
+    auto result = std::make_shared<RECT>();
+    if (!native_control_.Invoke([this, result] { *result = native_control_.viewport(); }, std::chrono::seconds(2))) return nlohmann::json::object();
+    return nlohmann::json{{"width", result->right-result->left}, {"height", result->bottom-result->top}, {"devicePixelRatio",1.0}, {"platform","windows"}};
   };
   runtime.resize_viewport = [this](int width, int height) {
-    return desktop_app_ != nullptr && desktop_app_->engine().ResizeViewport(width, height);
+    return native_control_.Invoke([this,width,height] { native_control_.Resize(width,height); }, std::chrono::seconds(2));
   };
-  runtime.reset_viewport = [this]() {
-    if (desktop_app_ != nullptr) desktop_app_->engine().ResizeViewport(config_.width, config_.height);
-  };
+  runtime.reset_viewport = [this]() { native_control_.Invoke([this] { native_control_.ResetViewport(); }, std::chrono::seconds(2)); };
   runtime.request_shutdown = [this]() {
     if (shell_ == nullptr || shell_->hwnd() == nullptr) {
       return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
@@ -504,6 +501,7 @@ void WindowsApp::ShutdownDesktopRuntime() {
     desktop_app_->Stop();
     desktop_app_.reset();
   }
+  native_control_.Shutdown();
   if (g_cef_pump_window != nullptr) {
     KillTimer(g_cef_pump_window, kCefPumpTimerId);
     DestroyWindow(g_cef_pump_window);

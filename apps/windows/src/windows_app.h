@@ -23,6 +23,7 @@
 
 #include "device_info_windows.h"
 #include "profile_session.h"
+#include "native_window_control.h"
 #include "session_snapshot.h"
 #include "settings_view.h"
 #include "win32_browser_view.h"
@@ -102,6 +103,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::mutex shell_state_mutex_;
   std::string home_url_;
 
+  NativeWindowControl native_control_;
   std::unique_ptr<Win32Shell> shell_;
   std::unique_ptr<Win32BrowserView> browser_view_;
   std::unique_ptr<SettingsView> settings_view_;
