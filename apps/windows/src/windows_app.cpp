@@ -38,6 +38,8 @@ void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
     CefDoMessageLoopWork();
   } else if (const auto due = g_cef_deadline.due_ms()) {
     SetTimer(hwnd, timer_id, static_cast<UINT>(std::max<std::int64_t>(1, *due - PumpNow())), &PumpCefTimer);
+  } else {
+    KillTimer(hwnd, timer_id);
   }
 #endif
 }
@@ -53,7 +55,10 @@ LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARA
     return 0;
   }
   if (message == kScheduleCefPumpMessage + 1) {
-    if (g_cef_deadline.ConsumeIfDue(PumpNow())) CefDoMessageLoopWork();
+    if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
+      KillTimer(hwnd, kCefPumpTimerId);
+      CefDoMessageLoopWork();
+    }
     return 0;
   }
   return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -427,28 +432,28 @@ bool WindowsApp::InitializeDesktopRuntime() {
     return BrowserControlResult::Success();
   };
   runtime.show_native_toast = [this](std::string message) {
-    return native_control_.Invoke([this, message = std::move(message)] { shell_->ShowToast(utf::Utf8ToWideDisplay(message)); }, std::chrono::seconds(2)) ? BrowserControlResult::Success() : BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
+    return native_control_.Invoke([this, message = std::move(message)] { shell_->ShowToast(utf::Utf8ToWideDisplay(message)); return true; }, std::chrono::seconds(2)) ? BrowserControlResult::Success() : BrowserControlResult::Failure("WEBVIEW_ERROR", "Native control did not show the toast");
   };
   runtime.set_native_fullscreen = [this](bool enabled) {
-    const bool complete = native_control_.Invoke([this, enabled] { native_control_.SetFullscreen(enabled); }, std::chrono::seconds(2));
-    return complete ? BrowserControlResult::Success() : BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
+    const bool complete = native_control_.Invoke([this, enabled] { return native_control_.SetFullscreen(enabled); }, std::chrono::seconds(2));
+    return complete ? BrowserControlResult::Success() : BrowserControlResult::Failure("WEBVIEW_ERROR", "Native fullscreen operation failed");
   };
   runtime.get_native_fullscreen = [this](bool* enabled) {
     if (enabled == nullptr) return BrowserControlResult::Failure("INTERNAL", "fullscreen result is required");
     auto result = std::make_shared<bool>(false);
-    const bool complete = native_control_.Invoke([this, result] { *result = native_control_.fullscreen(); }, std::chrono::seconds(2));
-    if (!complete) return BrowserControlResult::Failure("TIMEOUT", "Native control timed out");
+    const bool complete = native_control_.Invoke([this, result] { *result = native_control_.fullscreen(); return true; }, std::chrono::seconds(2));
+    if (!complete) return BrowserControlResult::Failure("WEBVIEW_ERROR", "Native fullscreen query failed");
     *enabled = *result; return BrowserControlResult::Success();
   };
   runtime.viewport_supplier = [this]() {
-    auto result = std::make_shared<RECT>();
-    if (!native_control_.Invoke([this, result] { *result = native_control_.viewport(); }, std::chrono::seconds(2))) return nlohmann::json::object();
-    return nlohmann::json{{"width", result->right-result->left}, {"height", result->bottom-result->top}, {"devicePixelRatio",1.0}, {"platform","windows"}};
+    auto result = std::make_shared<std::optional<RECT>>();
+    if (!native_control_.Invoke([this, result] { *result = native_control_.viewport(); return result->has_value(); }, std::chrono::seconds(2)) || !*result) return nlohmann::json();
+    return nlohmann::json{{"width", (*result)->right-(*result)->left}, {"height", (*result)->bottom-(*result)->top}, {"devicePixelRatio",1.0}, {"platform","windows"}};
   };
   runtime.resize_viewport = [this](int width, int height) {
-    return native_control_.Invoke([this,width,height] { native_control_.Resize(width,height); }, std::chrono::seconds(2));
+    return native_control_.Invoke([this,width,height] { return native_control_.Resize(width,height); }, std::chrono::seconds(2));
   };
-  runtime.reset_viewport = [this]() { native_control_.Invoke([this] { native_control_.ResetViewport(); }, std::chrono::seconds(2)); };
+  runtime.reset_viewport = [this]() { return native_control_.Invoke([this] { return native_control_.ResetViewport(); }, std::chrono::seconds(2)); };
   runtime.request_shutdown = [this]() {
     if (shell_ == nullptr || shell_->hwnd() == nullptr) {
       return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");

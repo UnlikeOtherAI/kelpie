@@ -55,17 +55,18 @@ void Win32BrowserView::Resize(const RECT& bounds) {
   }
   SetWindowPos(hwnd_, nullptr, bounds.left, bounds.top, bounds.right - bounds.left,
                bounds.bottom - bounds.top, SWP_NOZORDER);
-  EnumChildWindows(hwnd_, [](HWND child, LPARAM value) {
-    const auto* size = reinterpret_cast<const RECT*>(value);
-    SetWindowPos(child, nullptr, 0, 0, size->right - size->left, size->bottom - size->top, SWP_NOZORDER);
-    return TRUE;
-  }, reinterpret_cast<LPARAM>(&bounds));
+  for (HWND child = GetWindow(hwnd_, GW_CHILD); child != nullptr; child = GetWindow(child, GW_HWNDNEXT)) {
+    SetWindowPos(child, nullptr, 0, 0, bounds.right - bounds.left, bounds.bottom - bounds.top, SWP_NOZORDER);
+  }
 }
 
 void Win32BrowserView::Focus() {
   if (hwnd_ != nullptr) {
-    HWND child = GetWindow(hwnd_, GW_CHILD);
-    SetFocus(child != nullptr ? child : hwnd_);
+    HWND focus = hwnd_;
+    for (HWND child = GetWindow(hwnd_, GW_CHILD); child != nullptr; child = GetWindow(child, GW_HWNDNEXT)) {
+      if (IsWindowVisible(child)) { focus = child; break; }
+    }
+    SetFocus(focus);
   }
 }
 

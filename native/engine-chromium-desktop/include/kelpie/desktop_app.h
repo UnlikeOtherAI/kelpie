@@ -50,7 +50,7 @@ class DesktopApp {
     // its owner thread; the shared fallback is for non-Windows test shells.
     std::function<nlohmann::json()> viewport_supplier;
     std::function<bool(int width, int height)> resize_viewport;
-    std::function<void()> reset_viewport;
+    std::function<bool()> reset_viewport;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;

@@ -44,7 +44,7 @@ struct DesktopHandlerRuntime {
   JsonSupplier capabilities_supplier;
   JsonSupplier renderer_supplier;
   ResizeViewport resize_viewport;
-  VoidAction reset_viewport;
+  std::function<bool()> reset_viewport;
   std::function<BrowserControlResult(bool)> set_native_fullscreen;
   std::function<BrowserControlResult(bool*)> get_native_fullscreen;
   std::function<BrowserControlResult()> request_shutdown;

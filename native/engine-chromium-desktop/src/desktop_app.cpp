@@ -194,6 +194,7 @@ class DesktopApp::Impl {
     } else if (config.platform != Platform::kWindows) {
       runtime.reset_viewport = [this]() {
         engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
+        return true;
       };
     }
     runtime.set_native_fullscreen = config.set_native_fullscreen;
