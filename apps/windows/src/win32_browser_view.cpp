@@ -55,15 +55,17 @@ void Win32BrowserView::Resize(const RECT& bounds) {
   }
   SetWindowPos(hwnd_, nullptr, bounds.left, bounds.top, bounds.right - bounds.left,
                bounds.bottom - bounds.top, SWP_NOZORDER);
-  if (fallback_label_ != nullptr) {
-    SetWindowPos(fallback_label_, nullptr, 0, 0, bounds.right - bounds.left, bounds.bottom - bounds.top,
-                 SWP_NOZORDER);
-  }
+  EnumChildWindows(hwnd_, [](HWND child, LPARAM value) {
+    const auto* size = reinterpret_cast<const RECT*>(value);
+    SetWindowPos(child, nullptr, 0, 0, size->right - size->left, size->bottom - size->top, SWP_NOZORDER);
+    return TRUE;
+  }, reinterpret_cast<LPARAM>(&bounds));
 }
 
 void Win32BrowserView::Focus() {
   if (hwnd_ != nullptr) {
-    SetFocus(hwnd_);
+    HWND child = GetWindow(hwnd_, GW_CHILD);
+    SetFocus(child != nullptr ? child : hwnd_);
   }
 }
 
@@ -72,53 +74,6 @@ BrowserState Win32BrowserView::state() const {
   return state_;
 }
 
-bool Win32BrowserView::HasNativeBrowser() const { return false; }
-
-std::string Win32BrowserView::EvaluateJs(const std::string&) {
-  return {};
-}
-
-std::vector<std::uint8_t> Win32BrowserView::TakeSnapshot() {
-  return {};
-}
-
-void Win32BrowserView::LoadUrl(const std::string& url) {
-  BrowserState next = state();
-  next.url = url;
-  next.title = url;
-  next.is_loading = false;
-  UpdateState(next);
-  UpdateFallbackText(utf::Utf8ToWideDisplay(url));
-}
-
-std::string Win32BrowserView::CurrentUrl() const {
-  return state().url;
-}
-
-std::string Win32BrowserView::CurrentTitle() const {
-  return state().title;
-}
-
-bool Win32BrowserView::IsLoading() const {
-  return state().is_loading;
-}
-
-bool Win32BrowserView::CanGoBack() const {
-  return state().can_go_back;
-}
-
-bool Win32BrowserView::CanGoForward() const {
-  return state().can_go_forward;
-}
-
-void Win32BrowserView::GoBack() {
-}
-
-void Win32BrowserView::GoForward() {
-}
-
-void Win32BrowserView::Reload() {
-}
 
 void Win32BrowserView::UpdateState(BrowserState state) {
   BrowserState snapshot;
