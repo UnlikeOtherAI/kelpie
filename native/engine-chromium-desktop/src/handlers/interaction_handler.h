@@ -17,6 +17,7 @@ class InteractionHandler {
   nlohmann::json Type(const nlohmann::json& params) const;
   nlohmann::json SelectOption(const nlohmann::json& params) const;
   nlohmann::json Check(const nlohmann::json& params, bool checked) const;
+  nlohmann::json PressKey(const nlohmann::json& params) const;
 
   DesktopHandlerRuntime runtime_;
 };

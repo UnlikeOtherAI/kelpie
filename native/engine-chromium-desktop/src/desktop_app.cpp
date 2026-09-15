@@ -18,11 +18,13 @@
 #include "handlers/browser_mgmt_handler.h"
 #include "handlers/console_handler.h"
 #include "handlers/cookie_handler.h"
+#include "handlers/dialog_handler.h"
 #include "handlers/device_handler.h"
 #include "handlers/dom_handler.h"
 #include "handlers/evaluate_handler.h"
 #include "handlers/history_handler.h"
 #include "handlers/interaction_handler.h"
+#include "handlers/inspection_handler.h"
 #include "handlers/navigation_handler.h"
 #include "handlers/network_handler.h"
 #include "handlers/renderer_handler.h"
@@ -74,11 +76,8 @@ std::vector<std::string> UnsupportedMethods() {
   return {
       "set-home",           "get-home",           "debug-screens",
       "set-debug-overlay",  "get-debug-overlay",  "tap",
-      "find-element",       "find-button",        "find-link",
-      "find-input",         "toast",              "get-accessibility-tree",
-      "click-annotation",   "fill-annotation",    "get-visible-elements",
-      "get-page-text",      "get-form-state",     "get-dialog",
-      "handle-dialog",      "set-dialog-auto-handler",
+      "toast",              "click-annotation",   "fill-annotation",
+      "set-dialog-auto-handler",
       "get-iframes",        "switch-to-iframe",   "switch-to-main",
       "get-iframe-context", "watch-mutations",    "get-mutations",
       "stop-watching",      "query-shadow-dom",   "get-shadow-roots",
@@ -127,6 +126,8 @@ class DesktopApp::Impl {
   std::unique_ptr<RendererHandler> renderer_handler;
   std::unique_ptr<ViewportHandler> viewport_handler;
   std::unique_ptr<CookieHandler> cookie_handler;
+  std::unique_ptr<DialogHandler> dialog_handler;
+  std::unique_ptr<InspectionHandler> inspection_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
     DesktopHandlerRuntime runtime;
@@ -195,6 +196,8 @@ class DesktopApp::Impl {
     renderer_handler = std::make_unique<RendererHandler>(runtime);
     viewport_handler = std::make_unique<ViewportHandler>(runtime);
     cookie_handler = std::make_unique<CookieHandler>(runtime);
+    dialog_handler = std::make_unique<DialogHandler>(runtime);
+    inspection_handler = std::make_unique<InspectionHandler>(runtime);
 
     navigation_handler->Register(router);
     interaction_handler->Register(router);
@@ -211,6 +214,8 @@ class DesktopApp::Impl {
     renderer_handler->Register(router);
     viewport_handler->Register(router);
     cookie_handler->Register(router);
+    dialog_handler->Register(router);
+    inspection_handler->Register(router);
 
     for (const std::string& method : UnsupportedMethods()) {
       if (!router.Has(method)) {
