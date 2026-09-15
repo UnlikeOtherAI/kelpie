@@ -68,6 +68,7 @@ set(WINDOWS_APP_SOURCES
   src/history_view.cpp
   src/network_inspector.cpp
   src/profile_session.cpp
+  src/session_snapshot.cpp
   src/toast_view.cpp
   src/device_info_windows.cpp
   src/mdns_windows.cpp
@@ -83,6 +84,7 @@ set(WINDOWS_APP_HEADERS
   src/history_view.h
   src/network_inspector.h
   src/profile_session.h
+  src/session_snapshot.h
   src/toast_view.h
   src/device_info_windows.h
   src/mdns_windows.h
@@ -199,6 +201,14 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_utf_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_utf_test COMMAND kelpie_windows_utf_test)
+  add_executable(kelpie_windows_session_snapshot_test tests/session_snapshot_test.cpp src/session_snapshot.cpp)
+  target_include_directories(kelpie_windows_session_snapshot_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  if(MSVC)
+    target_compile_options(kelpie_windows_session_snapshot_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_session_snapshot_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_session_snapshot_test COMMAND kelpie_windows_session_snapshot_test)
 endif()
 
 if(MINGW)

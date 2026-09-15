@@ -24,6 +24,12 @@ class DesktopEngine final : public DesktopBrowserControl {
     int height = 720;
   };
 
+  struct RestoredTab {
+    std::string id;
+    std::string url;
+    bool active = false;
+  };
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
@@ -36,6 +42,8 @@ class DesktopEngine final : public DesktopBrowserControl {
     int argc = 0;
     char** argv = nullptr;
     std::string initial_url;
+    std::vector<RestoredTab> restored_tabs;
+    std::uint64_t restored_next_tab_id = 1;
     std::string cache_path;
     std::string user_agent;
     std::string browser_subprocess_path;

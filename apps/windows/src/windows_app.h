@@ -23,6 +23,7 @@
 
 #include "device_info_windows.h"
 #include "profile_session.h"
+#include "session_snapshot.h"
 #include "settings_view.h"
 #include "win32_browser_view.h"
 #include "win32_shell.h"
@@ -78,6 +79,8 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void LoadSettings();
   void SaveSettings() const;
   void LoadStores();
+  void LoadSession();
+  void SaveSession();
   void SaveStores();
   void ApplySettings(const SettingsValues& settings);
   bool InitializeCommonControls() const;
@@ -95,6 +98,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   DeviceInfoWindows device_info_provider_;
   BrowserState browser_state_;
   std::uint64_t persistence_epoch_ = 0;
+  SessionSnapshot session_snapshot_;
   std::mutex shell_state_mutex_;
   std::string home_url_;
 

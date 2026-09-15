@@ -142,6 +142,7 @@ int WindowsApp::Run(int show_command) {
   std::string session_error;
   if (!profile_session_.Open(config_.profile_dir, config_.readiness_path, &session_error)) return 1;
   LoadSettings();
+  LoadSession();
   if (!InitializeCommonControls()) return 1;
   if (!CreateShell(show_command)) return 1;
   if (!InitializeDesktopRuntime()) return 1;
@@ -157,6 +158,7 @@ int WindowsApp::Run(int show_command) {
     UpdateBrowserStateFromRuntime();
   }
 
+  SaveSession();
   SaveStores();
   SaveSettings();
   ShutdownDesktopRuntime();
@@ -241,19 +243,21 @@ void WindowsApp::OnCreateTabRequested() {
   if (!desktop_app_) return;
   TabSnapshot tab;
   const auto result = desktop_app_->engine().CreateTab("about:blank", &tab, std::chrono::seconds(5));
-  if (result.ok) desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2));
+  if (result.ok) { desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2)); SaveSession(); }
   else if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnActivateTabRequested(std::string id, std::uint64_t generation) {
   if (!desktop_app_) return;
   const auto result = desktop_app_->engine().ActivateTab({std::move(id), generation}, std::chrono::seconds(2));
+  if (result.ok) SaveSession();
   if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnCloseTabRequested(std::string id, std::uint64_t generation) {
   if (!desktop_app_) return;
   const auto result = desktop_app_->engine().CloseTab({std::move(id), generation}, std::chrono::seconds(5));
+  if (result.ok) SaveSession();
   if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
@@ -300,6 +304,28 @@ void WindowsApp::SaveSettings() const {
   SaveJsonFileAtomically(config_.profile_dir / "settings.json",
                          {{"port", config_.port}, {"profile_dir", config_.profile_dir.u8string()},
                           {"startup_url", config_.initial_url}}, persistence_epoch_ + 1);
+}
+
+
+void WindowsApp::LoadSession() {
+  nlohmann::json value;
+  if (!LoadJsonFile(config_.profile_dir / "session.json", value)) return;
+  SessionSnapshot parsed;
+  if (ParseSessionSnapshot(value, &parsed)) session_snapshot_ = std::move(parsed);
+}
+
+void WindowsApp::SaveSession() {
+  if (!desktop_app_) return;
+  std::vector<TabSnapshot> tabs;
+  if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok || tabs.empty()) return;
+  SessionSnapshot next;
+  next.epoch = session_snapshot_.epoch + 1;
+  next.next_tab_id = 1;
+  for (const auto& tab : tabs) {
+    next.tabs.push_back({tab.id, tab.url, tab.active});
+    if (tab.id.rfind("tab-", 0) == 0) { try { next.next_tab_id = std::max(next.next_tab_id, std::stoull(tab.id.substr(4)) + 1); } catch (...) {} }
+  }
+  if (SaveJsonFileAtomically(config_.profile_dir / "session.json", SerializeSessionSnapshot(next), next.epoch)) session_snapshot_ = std::move(next);
 }
 
 void WindowsApp::LoadStores() {
@@ -423,6 +449,10 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine.process_instance = config_.cef_process_instance;
   runtime.engine.sandbox_info = config_.sandbox_info;
   runtime.engine.initial_url = config_.initial_url;
+  if (!config_.url_overridden && !session_snapshot_.tabs.empty()) {
+    runtime.engine.restored_next_tab_id = session_snapshot_.next_tab_id;
+    for (const auto& tab : session_snapshot_.tabs) runtime.engine.restored_tabs.push_back({tab.id, tab.url, tab.active});
+  }
   runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
   runtime.engine.configure_window_info = [this](void* raw_info) {
     auto* info = static_cast<CefWindowInfo*>(raw_info);

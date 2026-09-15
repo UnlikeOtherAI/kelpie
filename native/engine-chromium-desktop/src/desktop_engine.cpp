@@ -156,20 +156,27 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   CefBrowserSettings browser_settings;
+  const std::string first_url = config.restored_tabs.empty() ?
+      (config.initial_url.empty() ? "about:blank" : config.initial_url) : config.restored_tabs.front().url;
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),
-      config.initial_url.empty() ? "about:blank" : config.initial_url,
+      first_url,
       browser_settings,
       nullptr,
       nullptr);
   if (browser) {
     Tab initial;
-    initial.id = "tab-1";
+    initial.id = config.restored_tabs.empty() ? "tab-1" : config.restored_tabs.front().id;
     initial.browser = browser;
     initial.devtools = new DesktopDevToolsSession();
-    initial.url = config.initial_url.empty() ? "about:blank" : config.initial_url;
+    initial.url = first_url;
     tabs.push_back(std::move(initial));
+    next_tab_id = std::max<std::uint64_t>(config.restored_next_tab_id, 1);
+    for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
+      TabSnapshot ignored;
+      CreateTabOnUi(config.restored_tabs[index].url, &ignored);
+    }
   }
 
   renderer->SetCallbacks({
