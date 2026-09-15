@@ -57,3 +57,9 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 - **After completion**: check what files were created (`find native -type f | sort`), then build and test. Don't review Codex's intermediate reasoning.
 - **If Codex times out** (exit 144): check created files — it usually finishes writing before the review pass that times out.
 - **Token discipline**: Codex does the implementation, Claude does orchestration + verification. Don't duplicate work by reading files Codex already analyzed.
+
+## Windows release ownership
+
+The Windows desktop version is `KELPIE_WINDOWS_VERSION` in `apps/windows/CMakeLists.txt`
+(currently `0.1.1`). Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
+loopback readiness-token control and the CLI stdio alias bridge before publication.

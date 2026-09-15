@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(kelpie_windows LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.1.1 LANGUAGES CXX RC)
+set(KELPIE_WINDOWS_VERSION "0.1.1")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -137,3 +137,11 @@ Each component owns its version in its own manifest — do not create a central 
 
 - Small, focused commits — one concern per commit
 - Push after each meaningful change
+
+## Windows release ownership
+
+- Windows desktop version is `apps/windows/CMakeLists.txt` `KELPIE_WINDOWS_VERSION` (`0.1.1`).
+- Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
+  include matching CEF runtime assets.
+- Verify direct `/mcp`, `kelpie --browser <alias> mcp`, native tabs/navigation/autocomplete, and
+  readiness cleanup before publishing.

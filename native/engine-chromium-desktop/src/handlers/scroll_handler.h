@@ -13,7 +13,7 @@ class ScrollHandler {
 
  private:
   nlohmann::json Scroll(const nlohmann::json& params) const;
-  nlohmann::json ScrollTo(const std::string& expression) const;
+  nlohmann::json ScrollTo(const nlohmann::json& params, const std::string& expression) const;
 
   DesktopHandlerRuntime runtime_;
 };

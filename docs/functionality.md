@@ -330,3 +330,16 @@ Blocking requests by URL pattern and mocking responses (custom bodies and status
 ## Geolocation Override
 
 Overriding the device GPS location (latitude, longitude, accuracy) is part of the API surface, but is **not currently implemented on any platform** — `set-geolocation` and `clear-geolocation` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.
+
+## Windows local control
+
+Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
+DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
+The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
+file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token.
+`kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
+creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
+provides a token-free stdio bridge for local development agents and local Nessie executors.
+`kelpie browser stop <name>` requests orderly app shutdown and clears its alias state only after
+that launch removes readiness. Windows home, native toast, and fullscreen are callable through
+HTTP and MCP; remote browser control is not shipped.

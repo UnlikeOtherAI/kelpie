@@ -4,6 +4,7 @@ import { createMcpServer, formatBrowserToolResult } from "../../src/mcp/server.j
 import { addDevice, clearDevices, getDevice, getAllDevices } from "../../src/discovery/registry.js";
 import { filterDevices } from "../../src/group/filter.js";
 import { browserTools, cliTools } from "../../src/mcp/tools.js";
+import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/kelpie-shared";
 import type { DiscoveredDevice } from "../../src/types.js";
 
 function makeDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice {
@@ -28,10 +29,9 @@ describe("createMcpServer", () => {
     expect(server).toBeDefined();
   });
 
-  it("registers 145 tools total (120 browser + 25 CLI)", () => {
-    expect(browserTools).toHaveLength(120);
-    expect(cliTools).toHaveLength(25);
-    expect(browserTools.length + cliTools.length).toBe(145);
+  it("registers every declared browser and CLI tool", () => {
+    expect(browserTools.map((tool) => tool.name)).toEqual([...BrowserMcpTools]);
+    expect(cliTools.map((tool) => tool.name)).toEqual([...CliMcpTools]);
   });
 });
 
