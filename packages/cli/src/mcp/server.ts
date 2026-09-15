@@ -14,7 +14,6 @@ import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
 import type { Platform } from "@unlikeotherai/kelpie-shared";
-import { join } from "node:path";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
 import { buildDownloadUrl, downloadModel } from "../ai/download.js";
@@ -35,7 +34,7 @@ type ScreenshotResult = JsonObject & {
 const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
 const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
-export function createMcpServer(): McpServer {
+export function createMcpServer(defaultDevice?: DiscoveredDevice): McpServer {
   const server = new McpServer(
     {
       name: "kelpie",
@@ -47,7 +46,7 @@ export function createMcpServer(): McpServer {
   );
 
   for (const tool of browserTools) {
-    registerBrowserTool(server, tool);
+    registerBrowserTool(server, tool, defaultDevice);
   }
   for (const tool of cliTools) {
     registerCliTool(server, tool);
@@ -56,10 +55,14 @@ export function createMcpServer(): McpServer {
   return server;
 }
 
-function registerBrowserTool(server: McpServer, tool: BrowserToolDef): void {
-  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
-    const deviceId = args.device as string;
-    const device = await getDevice(deviceId);
+function registerBrowserTool(server: McpServer, tool: BrowserToolDef, defaultDevice?: DiscoveredDevice): void {
+  const deviceSchema = tool.schema.device;
+  const schema = defaultDevice && deviceSchema
+    ? { ...tool.schema, device: deviceSchema.optional() }
+    : tool.schema;
+  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: schema }, async (args) => {
+    const deviceId = args.device as string | undefined;
+    const device = defaultDevice ?? (deviceId ? await getDevice(deviceId) : undefined);
     if (!device) {
       return { content: [{ type: "text", text: JSON.stringify({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } }) }] };
     }
@@ -70,7 +73,7 @@ function registerBrowserTool(server: McpServer, tool: BrowserToolDef): void {
         reportId?: string;
         storedAt?: string;
       };
-      await saveFeedbackReport(body as Parameters<typeof saveFeedbackReport>[0], {
+      await saveFeedbackReport(body as unknown as Parameters<typeof saveFeedbackReport>[0], {
         deviceId: device.id,
         deviceName: device.name,
         remoteReportId: remote.reportId,

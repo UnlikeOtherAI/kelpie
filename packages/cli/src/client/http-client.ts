@@ -7,6 +7,7 @@ import {
   getTokenStore,
 } from "../auth/token-store.js";
 import { pair } from "../auth/pairing.js";
+import { readLocalReadiness } from "../browser/store.js";
 
 export interface HttpResponse<T = unknown> {
   ok: boolean;
@@ -43,6 +44,7 @@ function urlFor(device: DiscoveredDevice, method: string): string {
 
 /** Pull whichever token (session or persistent) we have for this device. */
 async function tokenFor(device: DiscoveredDevice): Promise<string | undefined> {
+  if (device.localControlToken) return device.localControlToken;
   const sessionToken = getSessionCache().get(device.id, device.ip, device.port);
   if (sessionToken) return sessionToken;
   return getTokenStore().get(device.id, device.ip, device.port);
@@ -155,11 +157,18 @@ export async function sendCommand<T = unknown>(
   timeout = 10000,
   options: SendOptions = {},
 ): Promise<HttpResponse<T>> {
+  if (device.localReadinessFile) {
+    const readiness = await readLocalReadiness(device.localReadinessFile);
+    if (!readiness || readiness.launchId !== device.localLaunchId || readiness.deviceId !== device.id || readiness.port !== device.port) {
+      return { ok: false, status: 409, data: { success: false, error: { code: "LOCAL_BROWSER_STALE", message: "The local browser restarted or its readiness file changed; relaunch or retarget the alias." } } as T };
+    }
+    device.localControlToken = readiness.token;
+  }
   const url = urlFor(device, method);
   const token = await tokenFor(device);
   const first = await rawFetch<T>(url, body, token, timeout);
 
-  if (first.status !== 401) return first;
+  if (first.status !== 401 || device.localReadinessFile) return first;
   if (options.autoPair === false) return first;
 
   const paired = await attemptAutoPair(device);

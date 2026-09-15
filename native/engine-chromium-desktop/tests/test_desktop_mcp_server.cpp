@@ -20,8 +20,11 @@ int main() {
   config.platform = kelpie::Platform::kLinux;
   config.engine = "chromium";
 
-  const auto init = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"}}, config);
+  const auto init = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},
+       {"params", {{"protocolVersion", "2025-06-18"}}}}, config);
   assert(init["result"]["serverInfo"]["name"] == "kelpie-desktop");
+  assert(init["result"]["protocolVersion"] == "2025-06-18");
 
   const auto tools = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/list"}}, config);
   const auto& listed = tools["result"]["tools"];
@@ -33,6 +36,15 @@ int main() {
   }
   assert(found_navigate);
   assert(!found_safari_auth);
+
+  const auto notification = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}}, config);
+  assert(notification.is_null());
+
+  const auto bad_arguments = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 7}, {"method", "tools/call"},
+       {"params", {{"name", "kelpie_navigate"}, {"arguments", "bad"}}}}, config);
+  assert(bad_arguments["error"]["code"] == -32602);
 
   const auto call = server.HandleRequest(
       {{"jsonrpc", "2.0"},

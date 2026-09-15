@@ -6,20 +6,29 @@
 namespace kelpie {
 
 class DesktopRouter;
+class DesktopMcpServer;
 
 class DesktopHttpServer {
  public:
   struct Config {
-    std::string bind_host = "0.0.0.0";
+    std::string bind_host = "127.0.0.1";
     int port = 8420;
     int read_timeout_seconds = 30;
     int write_timeout_seconds = 30;
+    std::size_t max_body_bytes = 1024 * 1024;
+    std::string control_token;
+    std::string device_id;
+    std::string platform = "linux";
+    std::string engine = "chromium";
+    std::string server_name = "kelpie-desktop";
+    std::string server_version = "0.0.1";
   };
 
   DesktopHttpServer();
   ~DesktopHttpServer();
 
   void SetRouter(const DesktopRouter* router);
+  void SetMcpServer(const DesktopMcpServer* server);
 
   bool Start(const Config& config);
   void Stop();

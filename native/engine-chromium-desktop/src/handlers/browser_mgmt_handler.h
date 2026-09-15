@@ -12,8 +12,10 @@ class BrowserManagementHandler {
   void Register(DesktopRouter& router) const;
 
  private:
-  nlohmann::json GetTabs() const;
+  nlohmann::json GetTabs(const nlohmann::json& params) const;
   nlohmann::json NewTab(const nlohmann::json& params) const;
+  nlohmann::json SwitchTab(const nlohmann::json& params) const;
+  nlohmann::json CloseTab(const nlohmann::json& params) const;
 
   DesktopHandlerRuntime runtime_;
 };
