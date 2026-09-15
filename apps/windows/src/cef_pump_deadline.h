@@ -2,11 +2,13 @@
 #include <cstdint>
 #include <optional>
 namespace kelpie::windows {
-class CeftPumpDeadline {
+class CefPumpDeadline {
  public:
-  void Schedule(std::int64_t now_ms, std::int64_t delay_ms);
+  bool Schedule(std::int64_t now_ms, std::int64_t delay_ms);
   std::optional<std::int64_t> due_ms() const { return due_ms_; }
   bool ConsumeIfDue(std::int64_t now_ms);
- private: std::optional<std::int64_t> due_ms_;
+  void Cancel() { due_ms_.reset(); }
+ private:
+  std::optional<std::int64_t> due_ms_;
 };
 }

@@ -28,22 +28,32 @@ namespace {
 constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
 constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B50;
 HWND g_cef_pump_window = nullptr;
-CeftPumpDeadline g_cef_deadline;
+CefPumpDeadline g_cef_deadline;
 std::int64_t PumpNow() { return static_cast<std::int64_t>(GetTickCount64()); }
 
 void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
 #if defined(HAS_CEF)
-  KillTimer(hwnd, timer_id);
-  if (g_cef_deadline.ConsumeIfDue(PumpNow())) CefDoMessageLoopWork();
+  if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
+    KillTimer(hwnd, timer_id);
+    CefDoMessageLoopWork();
+  } else if (const auto due = g_cef_deadline.due_ms()) {
+    SetTimer(hwnd, timer_id, static_cast<UINT>(std::max<std::int64_t>(1, *due - PumpNow())), &PumpCefTimer);
+  }
 #endif
 }
 
 LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == kScheduleCefPumpMessage) {
-    g_cef_deadline.Schedule(PumpNow(), static_cast<std::int64_t>(wparam));
-    const auto due = g_cef_deadline.due_ms();
-    if (due) { KillTimer(hwnd, kCefPumpTimerId); SetTimer(hwnd, kCefPumpTimerId,
-        static_cast<UINT>(std::clamp<std::int64_t>(*due - PumpNow(), 1, 60'000)), &PumpCefTimer); }
+    const auto now = PumpNow();
+    if (g_cef_deadline.Schedule(now, static_cast<std::int64_t>(wparam))) {
+      const auto due = *g_cef_deadline.due_ms();
+      if (due <= now) PostMessageW(hwnd, kScheduleCefPumpMessage + 1, 0, 0);
+      else SetTimer(hwnd, kCefPumpTimerId, static_cast<UINT>(due - now), &PumpCefTimer);
+    }
+    return 0;
+  }
+  if (message == kScheduleCefPumpMessage + 1) {
+    if (g_cef_deadline.ConsumeIfDue(PumpNow())) CefDoMessageLoopWork();
     return 0;
   }
   return DefWindowProcW(hwnd, message, wparam, lparam);
