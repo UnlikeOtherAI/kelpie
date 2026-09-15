@@ -73,7 +73,7 @@ DesktopBrowserControl::Timeout RemainingTimeout(std::chrono::steady_clock::time_
   return elapsed >= timeout ? DesktopBrowserControl::Timeout::zero() : timeout - elapsed;
 }
 
-std::optional<double> CookieExpirySeconds(const Json& value) {
+std::optional<double> CookieExpirySeconds(const nlohmann::json& value) {
   if (value.is_number()) return value.get<double>();
   if (!value.is_string()) return std::nullopt;
   std::tm utc{};
