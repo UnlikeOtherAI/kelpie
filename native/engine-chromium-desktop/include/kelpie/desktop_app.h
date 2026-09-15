@@ -60,7 +60,7 @@ class DesktopApp {
   ~DesktopApp();
 
   bool Start(const Config& config);
-  void Stop();
+  bool Stop();
   void Tick();
 
   bool is_running() const;

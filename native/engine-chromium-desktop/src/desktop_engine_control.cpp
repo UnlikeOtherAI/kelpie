@@ -1,6 +1,9 @@
 #include "desktop_engine_impl.h"
 
 #include <condition_variable>
+#include <ctime>
+#include <iomanip>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -85,7 +88,7 @@ BrowserControlResult PlannerError(const std::string& code, const std::string& me
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
   for (auto& tab : tabs) {
     if (tab.id == lease.id) {
-      return tab.generation == lease.generation ? &tab : nullptr;
+      return !tab.closing && tab.generation == lease.generation ? &tab : nullptr;
     }
   }
   return nullptr;
@@ -93,7 +96,7 @@ DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
 
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(CefRefPtr<CefBrowser> candidate) {
   for (auto& tab : tabs) {
-    if (tab.browser && tab.browser->IsSame(candidate)) return &tab;
+    if (!tab.closing && tab.browser && tab.browser->IsSame(candidate)) return &tab;
   }
   return nullptr;
 }
@@ -144,8 +147,11 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
 
 BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
   if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
+  if (!restored_id && next_tab_id == std::numeric_limits<std::uint64_t>::max()) {
+    return BrowserControlResult::Failure("TAB_ID_EXHAUSTED", "No more tab identifiers are available");
+  }
   CefWindowInfo window_info;
-  const std::string id = restored_id ? *restored_id : "tab-" + std::to_string(next_tab_id++);
+  const std::string id = restored_id ? *restored_id : "tab-" + std::to_string(next_tab_id);
   if (config.mode == DesktopEngine::Mode::kOffscreen) {
     window_info.SetAsWindowless(0);
   } else if (config.configure_tab_window_info) {
@@ -158,6 +164,7 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, 
   CefBrowserSettings settings;
   CefRefPtr<CefBrowser> created = CefBrowserHost::CreateBrowserSync(window_info, client, url, settings, nullptr, nullptr);
   if (!created) return BrowserControlResult::Failure("INTERNAL", "CEF did not create the tab");
+  if (!restored_id) ++next_tab_id;
   Tab tab;
   tab.id = id;
   tab.browser = created;
@@ -179,10 +186,49 @@ BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>* output, Ti
   auto collected = std::make_shared<std::vector<TabSnapshot>>();
   const auto result = impl->RunOnUi([impl, collected] {
     collected->clear();
-    for (const auto& tab : impl->tabs) collected->push_back(impl->Snapshot(tab));
+    for (const auto& tab : impl->tabs) {
+      if (!tab.closing) collected->push_back(impl->Snapshot(tab));
+    }
     return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);
   if (result.ok) *output = *collected;
+  return result;
+}
+
+BrowserControlResult DesktopEngine::GetSessionState(SessionState* output, Timeout timeout) {
+  const auto impl = impl_;
+  if (output == nullptr) return BrowserControlResult::Failure("INTERNAL", "session state is required");
+  auto collected = std::make_shared<SessionState>();
+  const auto result = impl->RunOnUi([impl, collected] {
+    collected->next_tab_id = impl->next_tab_id;
+    collected->tabs.clear();
+    for (const auto& tab : impl->tabs) {
+      if (tab.closing) continue;
+      collected->tabs.push_back({tab.id, tab.url,
+                                 impl->browser && impl->browser->IsSame(tab.browser)});
+    }
+    return BrowserControlResult::Success(
+        impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
+  }, timeout);
+  if (result.ok) *output = std::move(*collected);
+  return result;
+}
+
+BrowserControlResult DesktopEngine::GetNavigationState(TabLease lease, NavigationState* output,
+                                                       Timeout timeout) {
+  const auto impl = impl_;
+  if (output == nullptr) return BrowserControlResult::Failure("INTERNAL", "navigation state is required");
+  auto state = std::make_shared<NavigationState>();
+  const auto result = impl->RunOnUi([impl, lease, state] {
+    auto* tab = impl->FindTab(lease);
+    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
+    state->tab = impl->Snapshot(*tab);
+    state->requested = tab->navigation_requested;
+    state->completed = tab->navigation_completed;
+    state->error = tab->navigation_error;
+    return BrowserControlResult::Success(state->tab);
+  }, timeout);
+  if (result.ok) *output = std::move(*state);
   return result;
 }
 
@@ -197,7 +243,9 @@ BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&
   const auto result = impl->RunOnUi([impl, tab_id, requested_generation, resolved] {
     DesktopEngine::Impl::Tab* tab = nullptr;
     if (tab_id) {
-      for (auto& candidate : impl->tabs) if (candidate.id == *tab_id) { tab = &candidate; break; }
+      for (auto& candidate : impl->tabs) {
+        if (!candidate.closing && candidate.id == *tab_id) { tab = &candidate; break; }
+      }
       if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist");
       if (requested_generation && tab->generation != *requested_generation) {
         return BrowserControlResult::Failure("TAB_STALE", "The tab lease is stale");
@@ -244,17 +292,23 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
   return impl->RunOnUi([impl, lease] {
     auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
+    const auto closing_index = static_cast<std::size_t>(tab - impl->tabs.data());
     CefRefPtr<CefBrowser> closing = tab->browser;
     CefRefPtr<DesktopDevToolsSession> closing_devtools = tab->devtools;
     const bool was_active = impl->browser && impl->browser->IsSame(closing);
-    if (impl->tabs.size() == 1) {
+    std::size_t live_tabs = 0;
+    for (const auto& candidate : impl->tabs) if (!candidate.closing) ++live_tabs;
+    if (live_tabs == 1) {
       TabSnapshot replacement;
       const auto created = impl->CreateTabOnUi("about:blank", &replacement);
       if (!created.ok) return created;
       impl->browser = impl->tabs.back().browser;
     } else if (was_active) {
       for (const auto& candidate : impl->tabs) {
-        if (!candidate.browser->IsSame(closing)) { impl->browser = candidate.browser; break; }
+        if (!candidate.closing && !candidate.browser->IsSame(closing)) {
+          impl->browser = candidate.browser;
+          break;
+        }
       }
     }
     if (closing_devtools) closing_devtools->CancelAll();
@@ -263,10 +317,11 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
       ShowWindow(impl->browser->GetHost()->GetWindowHandle(), SW_SHOW);
     }
 #endif
-    impl->tabs.erase(std::remove_if(impl->tabs.begin(), impl->tabs.end(),
-        [&closing](const DesktopEngine::Impl::Tab& candidate) { return candidate.browser->IsSame(closing); }),
-        impl->tabs.end());
-    closing->GetHost()->CloseBrowser(false);
+    // Explicit agent/UI tab closes are force-closes. This avoids a hidden,
+    // permanently closing tab when a beforeunload prompt rejects CloseBrowser(false).
+    // The CEF lifetime callback remains the sole owner-removal point.
+    impl->tabs[closing_index].closing = true;
+    closing->GetHost()->CloseBrowser(true);
     impl->UpdateActiveState();
     return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);
@@ -281,6 +336,12 @@ BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std:
     DesktopEngine::Impl::Tab* target = nullptr;
     if (lease) target = impl->FindTab(*lease); else if (impl->tabs.size() == 1) target = impl->ActiveTab();
     if (!target) return BrowserControlResult::Failure(lease ? "TAB_NOT_FOUND" : "TAB_REQUIRED", "A current tab lease is required");
+    if (target->navigation_requested == std::numeric_limits<std::uint64_t>::max()) {
+      return BrowserControlResult::Failure("NAVIGATION_EXHAUSTED", "No more navigation requests are available");
+    }
+    ++target->navigation_requested;
+    target->navigation_error.clear();
+    target->loading = true;
     target->browser->GetMainFrame()->LoadURL(url);
     target->url = url;
     *navigated = impl->Snapshot(*target);
@@ -293,19 +354,19 @@ BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std:
 BrowserControlResult DesktopEngine::Back(TabLease lease, TabSnapshot* tab, Timeout timeout) {
   const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoBack(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); ++target->navigation_requested; target->navigation_error.clear(); target->loading=true; target->browser->GoBack(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 BrowserControlResult DesktopEngine::Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) {
   const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoForward(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); ++target->navigation_requested; target->navigation_error.clear(); target->loading=true; target->browser->GoForward(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 BrowserControlResult DesktopEngine::Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) {
   const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->Reload(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); ++target->navigation_requested; target->navigation_error.clear(); target->loading=true; target->browser->Reload(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 BrowserControlResult DesktopEngine::StopLoading(TabLease lease, TabSnapshot* tab, Timeout timeout) {

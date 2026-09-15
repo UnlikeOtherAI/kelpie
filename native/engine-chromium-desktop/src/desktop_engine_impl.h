@@ -23,7 +23,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   explicit Impl(CefRenderer* renderer);
 
   bool Initialize(const DesktopEngine::Config& next_config);
-  void Shutdown();
+  bool Shutdown();
   void DoMessageLoopWork();
   std::string EvaluateJs(const std::string& script);
 
@@ -42,6 +42,13 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     bool loading = false;
     bool can_go_back = false;
     bool can_go_forward = false;
+    std::uint64_t navigation_requested = 0;
+    std::uint64_t navigation_completed = 0;
+    std::string navigation_error;
+    // CEF retains the browser until OnBeforeClose. A close request must not
+    // erase this owner early, otherwise cancellation and shutdown can leave a
+    // live callback pointing at destroyed state.
+    bool closing = false;
   };
 
   CefRefPtr<CefClient> client;

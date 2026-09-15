@@ -89,7 +89,6 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void ShutdownDesktopRuntime();
   void UpdateBrowserStateFromRuntime();
   bool CreateShell(int show_command);
-  void RememberNavigation(const BrowserState& state);
   std::wstring AppTitle() const;
 
   HINSTANCE instance_;

@@ -53,16 +53,19 @@ function stubReachablePorts(ports: number[], infoPorts = ports): void {
 
 describe("local-probe", () => {
   const originalHome = process.env.HOME;
+  const originalKelpieHome = process.env.KELPIE_HOME;
   let homeDir = "";
 
   beforeEach(async () => {
     homeDir = await mkdtemp(path.join(os.tmpdir(), "kelpie-local-probe-"));
     process.env.HOME = homeDir;
+    process.env.KELPIE_HOME = homeDir;
   });
 
   afterEach(async () => {
     vi.unstubAllGlobals();
     process.env.HOME = originalHome;
+    process.env.KELPIE_HOME = originalKelpieHome;
     await rm(homeDir, { recursive: true, force: true });
   });
 

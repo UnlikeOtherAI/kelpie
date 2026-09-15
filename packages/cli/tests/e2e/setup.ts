@@ -3,15 +3,21 @@
  *
  * These tests verify the CLI-to-device pipeline works end-to-end.
  * They require at least one real device (Simulator/Emulator) running Kelpie,
- * or fall back to a local HTTP mock server for CI.
+ * only when an explicit target is supplied. The normal suite does not probe
+ * an arbitrary service on the default local port.
  */
 
 import type { DiscoveredDevice } from "../../src/types.js";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 
-/** Env var to point tests at a specific device without mDNS discovery. */
-const DEVICE_HOST = process.env.KELPIE_TEST_HOST ?? "localhost";
-const DEVICE_PORT = parseInt(process.env.KELPIE_TEST_PORT ?? String(DEFAULT_PORT), 10);
+/** Explicit opt-in target, for example `http://127.0.0.1:8420`. */
+const TARGET = process.env.KELPIE_E2E_TARGET;
+const parsedTarget = TARGET ? new URL(TARGET) : undefined;
+const DEVICE_HOST = parsedTarget?.hostname ?? process.env.KELPIE_TEST_HOST ?? "127.0.0.1";
+const DEVICE_PORT = parsedTarget?.port
+  ? Number(parsedTarget.port)
+  : process.env.KELPIE_TEST_PORT ? Number(process.env.KELPIE_TEST_PORT) : DEFAULT_PORT;
+const HAS_EXPLICIT_TARGET = Boolean(TARGET ?? (process.env.KELPIE_TEST_HOST && process.env.KELPIE_TEST_PORT));
 
 /**
  * When set to "1", absence of a reachable device is treated as a hard
@@ -29,8 +35,12 @@ function warnNoDeviceOnce(device: DiscoveredDevice): void {
   const target = `http://${device.ip}:${device.port}`;
   console.warn(
     `[kelpie e2e] No device reachable at ${target}. Skipping device-dependent assertions. ` +
-      `Set KELPIE_E2E_REQUIRE_DEVICE=1 to make this a hard failure (recommended for CI).`,
+      `Set KELPIE_E2E_TARGET=http://host:port for an intentional live target.`,
   );
+}
+
+export function hasExplicitE2eTarget(): boolean {
+  return HAS_EXPLICIT_TARGET;
 }
 
 /** Create a test device descriptor pointing at a real or mock server. */
@@ -76,6 +86,13 @@ export async function deviceRequest(
 
 /** Check if a device's HTTP server is reachable. */
 export async function isDeviceReachable(device: DiscoveredDevice): Promise<boolean> {
+  if (!HAS_EXPLICIT_TARGET) {
+    if (REQUIRE_DEVICE) {
+      throw new Error("[kelpie e2e] KELPIE_E2E_REQUIRE_DEVICE=1 requires KELPIE_E2E_TARGET=http://host:port.");
+    }
+    warnNoDeviceOnce(device);
+    return false;
+  }
   const reachable = await probeDevice(device);
   if (!reachable) {
     if (REQUIRE_DEVICE) {
@@ -106,6 +123,7 @@ export async function waitForDevice(
   device: DiscoveredDevice,
   timeoutMs = 30000,
 ): Promise<boolean> {
+  if (!HAS_EXPLICIT_TARGET) return isDeviceReachable(device);
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (await probeDevice(device)) return true;

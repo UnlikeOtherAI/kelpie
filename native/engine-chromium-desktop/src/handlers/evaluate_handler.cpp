@@ -1,5 +1,6 @@
 #include "evaluate_handler.h"
 
+#include <algorithm>
 #include <chrono>
 #include <thread>
 
@@ -31,13 +32,13 @@ nlohmann::json EvaluateHandler::Evaluate(const nlohmann::json& params) const {
 nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) const {
   try {
     const std::string selector = RequireString(params, "selector");
-    const int timeout_ms = static_cast<int>(ControlTimeout(params).count());
+    const auto timeout = ControlTimeout(params);
     const std::string state = params.value("state", std::string("visible"));
     if (state != "attached" && state != "visible" && state != "hidden") {
       return InvalidParams("state must be attached, visible, or hidden");
     }
     const int poll_ms = 100;
-    const std::int64_t started = NowMillis();
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
     const std::string script =
         "(() => { const el = document.querySelector(" + JsStringLiteral(selector) + ");"
         "if (!el) return {attached:false,visible:false}; const style=getComputedStyle(el);"
@@ -48,9 +49,14 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
         OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
     if (!resolved.ok) return ControlError(resolved);
     while (true) {
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) {
+        return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for element '" + selector + "'");
+      }
+      const auto remaining = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(deadline - now);
       nlohmann::json result;
       const BrowserControlResult control = RequireBrowserControl(runtime_).Evaluate(
-          lease, script, &result, ControlTimeout(params));
+          lease, script, &result, remaining);
       if (!control.ok) return ControlError(control);
       const bool attached = result.value("attached", result.value("found", false));
       const bool visible = result.value("visible", attached);
@@ -58,11 +64,8 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
       if (matched) {
         return SuccessResponse({{"selector", selector}, {"state", state}});
       }
-      if ((NowMillis() - started) >= timeout_ms) {
-        return ErrorResponse(ErrorCode::kTimeout,
-                             "Timed out waiting for element '" + selector + "'");
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
+      std::this_thread::sleep_for(std::min(std::chrono::milliseconds(poll_ms),
+          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())));
     }
   } catch (const std::invalid_argument& exception) {
     return InvalidParams(exception.what());
@@ -70,27 +73,37 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
 }
 
 nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) const {
-  const int timeout_ms = static_cast<int>(ControlTimeout(params).count());
+  const auto timeout = ControlTimeout(params);
   const int poll_ms = 100;
-  const std::int64_t started = NowMillis();
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
   try {
     TabLease lease;
     BrowserControlResult resolved = RequireBrowserControl(runtime_).ResolveTab(
-        OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+        OptionalTabId(params), OptionalGeneration(params), &lease, timeout);
     if (!resolved.ok) return ControlError(resolved);
+    BrowserNavigationState initial;
+    resolved = RequireBrowserControl(runtime_).GetNavigationState(lease, &initial, timeout);
+    if (!resolved.ok) return ControlError(resolved);
+    if (initial.requested == 0) return ErrorResponse(ErrorCode::kNavigationError, "No navigation has been requested");
+    const std::uint64_t request = initial.requested;
     while (true) {
-      nlohmann::json ready_state;
-      const BrowserControlResult control = RequireBrowserControl(runtime_).Evaluate(
-          lease, "document.readyState", &ready_state, ControlTimeout(params));
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for navigation to complete");
+      const auto remaining = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(deadline - now);
+      BrowserNavigationState state;
+      const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
+          lease, &state, remaining);
       if (!control.ok) return ControlError(control);
-      if (ready_state.is_string() && ready_state.get<std::string>() == "complete") {
-        return SuccessResponse({{"tab", control.tab ? TabJson(*control.tab) : nlohmann::json::object()}});
+      if (state.requested < request) return ErrorResponse(ErrorCode::kNavigationError, "The navigation request was replaced");
+      if (!state.error.empty() && state.completed < request) {
+        return ErrorResponse(ErrorCode::kNavigationError, state.error);
       }
-    if ((NowMillis() - started) >= timeout_ms) {
-      return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for navigation to complete");
+      if (state.completed >= request) {
+        return SuccessResponse({{"tab", TabJson(state.tab)}});
+      }
+      std::this_thread::sleep_for(std::min(std::chrono::milliseconds(poll_ms),
+          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
-  }
   } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 

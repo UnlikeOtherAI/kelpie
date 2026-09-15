@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDevice, isDeviceReachable, deviceRequest } from "./setup.js";
+import { testDevice, isDeviceReachable, deviceRequest, hasExplicitE2eTarget } from "./setup.js";
 
-describe("E2E: Navigation", () => {
+describe.skipIf(!hasExplicitE2eTarget())("E2E: Navigation", () => {
   const device = testDevice();
   let reachable = false;
 

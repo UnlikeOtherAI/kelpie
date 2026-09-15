@@ -1,7 +1,6 @@
 #include "kelpie/desktop_app.h"
 
 #include <memory>
-#include <thread>
 
 #include "kelpie/bookmark_store.h"
 #include "kelpie/console_store.h"
@@ -108,7 +107,6 @@ class DesktopApp::Impl {
   DesktopMcpServer mcp_server;
   McpRegistry mcp_registry;
 
-  std::thread mcp_thread;
   std::unique_ptr<HandlerContext> handler_context;
 
   std::unique_ptr<NavigationHandler> navigation_handler;
@@ -279,10 +277,11 @@ bool DesktopApp::Start(const Config& config) {
   if (impl_->running) {
     return false;
   }
-  // Windows agents use the CLI stdio proxy, which authenticates to the
-  // loopback HTTP transport from the protected readiness file. Native stdio
-  // cannot be stopped safely while blocked on process stdin.
-  if (config.platform == Platform::kWindows && config.start_stdio_mcp) {
+  // Stdio reads cannot be cancelled portably. The CLI is the supervised stdio
+  // proxy for all desktop runtimes; it reads the protected Windows readiness
+  // capability and forwards to authenticated HTTP. Refuse this unsafe legacy
+  // worker instead of detaching it during shutdown.
+  if (config.start_stdio_mcp) {
     return false;
   }
 
@@ -318,19 +317,8 @@ bool DesktopApp::Start(const Config& config) {
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
-    impl_->engine.Shutdown();
+    if (!impl_->engine.Shutdown()) return false;
     return false;
-  }
-
-  if (config.start_stdio_mcp) {
-    impl_->mcp_thread = std::thread([this, config]() {
-      DesktopMcpServer::Config mcp_config;
-      mcp_config.platform = config.platform;
-      mcp_config.engine = config.engine_name;
-      mcp_config.server_name = config.app_name;
-      mcp_config.server_version = config.app_version;
-      impl_->mcp_server.Run(mcp_config);
-    });
   }
 
   if (config.mdns != nullptr) {
@@ -341,19 +329,17 @@ bool DesktopApp::Start(const Config& config) {
   return true;
 }
 
-void DesktopApp::Stop() {
+bool DesktopApp::Stop() {
   if (!impl_->running) {
-    return;
+    return true;
   }
   if (impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();
   }
   impl_->http_server.Stop();
-  impl_->engine.Shutdown();
-  if (impl_->mcp_thread.joinable()) {
-    impl_->mcp_thread.detach();
-  }
+  if (!impl_->engine.Shutdown()) return false;
   impl_->running = false;
+  return true;
 }
 
 void DesktopApp::Tick() {

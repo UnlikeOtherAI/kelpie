@@ -30,10 +30,16 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
-  kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false;
+  kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false; std::uint64_t nav_requested = 1; std::uint64_t nav_completed = 1; std::string nav_error; int nav_polls = 0;
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
+  kelpie::BrowserControlResult GetNavigationState(kelpie::TabLease lease, kelpie::BrowserNavigationState* state, Timeout) override {
+    ++nav_polls;
+    if (nav_error.empty() && nav_completed == 0 && nav_polls >= 2) nav_completed = nav_requested;
+    *state = {lease.id == "second" ? second : first, nav_requested, nav_completed, nav_error};
+    return kelpie::BrowserControlResult::Success(state->tab);
+  }
   kelpie::BrowserControlResult ResolveTab(const std::optional<std::string>& id, const std::optional<std::uint64_t>& gen, kelpie::TabLease* lease, Timeout) override {
     if (stale || (gen && ((id && *id == "second" && *gen != 9) || (!id && *gen != 3)))) return kelpie::BrowserControlResult::Failure("TAB_STALE", "tab lease is stale");
     const auto& tab = id && *id == "second" ? second : first; *lease={tab.id,tab.generation}; last_lease=*lease; return kelpie::BrowserControlResult::Success(tab);
@@ -91,6 +97,12 @@ int main() {
   assert(router.Dispatch("resize-viewport", {{"width", 4294967297ULL}, {"height", 720}}).status_code == 400);
   assert(router.Dispatch("get-console-messages", {{"limit", "many"}}).status_code == 400);
   assert(router.Dispatch("wait-for-element", {{"selector", "#ready"}, {"state", "visible"}, {"tabId", "second"}, {"generation", 9}}).body["state"] == "visible");
+  // Completion is an engine-tracked request, not an old document.readyState.
+  assert(router.Dispatch("wait-for-navigation", second).status_code == 200);
+  control.nav_polls = 0; control.nav_requested = 2; control.nav_completed = 0;
+  assert(router.Dispatch("wait-for-navigation", second).status_code == 200);
+  control.nav_error = "DNS failed"; control.nav_requested = 3; control.nav_completed = 0; control.nav_polls = 0;
+  assert(router.Dispatch("wait-for-navigation", second).status_code == 502); control.nav_error.clear(); control.nav_completed = 3;
   auto a11y=router.Dispatch("get-accessibility-tree", {{"tabId", "second"}, {"generation", 9}, {"interactableOnly", true}, {"maxDepth", 2}});
   assert(a11y.status_code == 200 && control.last_devtools_method == "Accessibility.getFullAXTree" && a11y.body["count"] == 1);
   assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}, {"placeholder", "Email"}}).status_code == 200);

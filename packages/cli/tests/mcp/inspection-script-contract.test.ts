@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 function rawScript(source: string, name: string): string {
-  const match = new RegExp(`${name} = R"JS\\(\\n([\\s\\S]*?)\\n\\)JS"`).exec(source);
+  const match = new RegExp(`${name}[\\s\\S]*?R"JS\\(\\r?\\n([\\s\\S]*?)\\r?\\n\\)JS`).exec(source);
   if (!match) throw new Error(`Missing ${name}`);
   return match[1] ?? "";
 }

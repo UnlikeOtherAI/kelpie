@@ -8,12 +8,12 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDevice, isDeviceReachable } from "./setup.js";
+import { testDevice, isDeviceReachable, hasExplicitE2eTarget } from "./setup.js";
 
 const MAX_BODY_BYTES = 50 * 1024 * 1024;
 const MAX_HEADER_BYTES = 64 * 1024;
 
-describe("E2E: HTTP body and header size limits", () => {
+describe.skipIf(!hasExplicitE2eTarget())("E2E: HTTP body and header size limits", () => {
   const device = testDevice();
   let reachable = false;
 

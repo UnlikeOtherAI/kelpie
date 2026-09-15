@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <atomic>
+#include <limits>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -140,6 +141,15 @@ bool SaveJsonFileAtomically(const std::filesystem::path& path, const nlohmann::j
   return true;
 }
 
+bool SameSession(const SessionSnapshot& left, const SessionSnapshot& right) {
+  if (left.next_tab_id != right.next_tab_id || left.tabs.size() != right.tabs.size()) return false;
+  for (std::size_t index = 0; index < left.tabs.size(); ++index) {
+    const SessionTab& a = left.tabs[index];
+    const SessionTab& b = right.tabs[index];
+    if (a.id != b.id || a.url != b.url || a.active != b.active) return false;
+  }
+  return true;
+}
 
 }  // namespace
 
@@ -165,7 +175,6 @@ int WindowsApp::Run(int show_command) {
   if (!InitializeCommonControls()) return 1;
   if (!CreateShell(show_command)) return 1;
   if (!InitializeDesktopRuntime()) return 1;
-  LoadStores();
 
   MSG message{};
   while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
@@ -294,8 +303,6 @@ void WindowsApp::OnWindowCloseRequested() {
 void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {
   browser_state_ = state;
   shell_->UpdateBrowserState(state);
-  RememberNavigation(state);
-  SaveSession();
 }
 
 void WindowsApp::ResolveProfileDirectory() {
@@ -335,15 +342,14 @@ void WindowsApp::LoadSession() {
 
 void WindowsApp::SaveSession() {
   if (!desktop_app_) return;
-  std::vector<TabSnapshot> tabs;
-  if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok || tabs.empty()) return;
+  DesktopEngine::SessionState state;
+  if (!desktop_app_->engine().GetSessionState(&state, std::chrono::seconds(2)).ok || state.tabs.empty()) return;
+  if (session_snapshot_.epoch == std::numeric_limits<std::uint64_t>::max()) return;
   SessionSnapshot next;
   next.epoch = session_snapshot_.epoch + 1;
-  next.next_tab_id = std::max<std::uint64_t>(session_snapshot_.next_tab_id, 1);
-  for (const auto& tab : tabs) {
-    next.tabs.push_back({tab.id, tab.url, tab.active});
-    if (tab.id.rfind("tab-", 0) == 0) { try { next.next_tab_id = std::max(next.next_tab_id, std::stoull(tab.id.substr(4)) + 1); } catch (...) {} }
-  }
+  next.next_tab_id = state.next_tab_id;
+  for (const auto& tab : state.tabs) next.tabs.push_back({tab.id, tab.url, tab.active});
+  if (SameSession(session_snapshot_, next)) return;
   if (SaveJsonFileAtomically(config_.profile_dir / "session.json", SerializeSessionSnapshot(next), next.epoch)) session_snapshot_ = std::move(next);
 }
 
@@ -381,10 +387,7 @@ void WindowsApp::SaveStores() {
 void WindowsApp::ApplySettings(const SettingsValues& settings) {
   config_.initial_url = utf::WideToUtf8(settings.startup_url).value_or(config_.initial_url);
   SaveSettings();
-  const bool restart_required = settings.port != config_.port ||
-      (!settings.profile_dir.empty() && std::filesystem::path(settings.profile_dir) != config_.profile_dir);
-  shell_->ShowToast(restart_required ? L"Startup URL saved. Restart Kelpie to change profile or port."
-                                    : L"Settings saved");
+  shell_->ShowToast(L"Settings saved");
 }
 
 bool WindowsApp::InitializeCommonControls() const {
@@ -404,6 +407,10 @@ bool WindowsApp::InitializeDesktopRuntime() {
                                                     static_cast<WPARAM>(delay_ms), 0);
   });
   desktop_app_ = std::make_unique<DesktopApp>();
+  // CEF navigation callbacks can record history immediately. Restore stores
+  // before starting the engine so they never overwrite a profile with an
+  // initially empty in-memory store.
+  LoadStores();
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
   runtime.engine_name = "chromium";
@@ -501,12 +508,16 @@ bool WindowsApp::InitializeDesktopRuntime() {
 void WindowsApp::ShutdownDesktopRuntime() {
   // Keep the owner-thread pump alive through DesktopApp::Stop: CefShutdown
   // is legal only after every browser has delivered OnBeforeClose.
-  SetDesktopCefMessagePumpScheduler({});
   if (desktop_app_) {
-    desktop_app_->Stop();
+    if (!desktop_app_->Stop()) {
+      // Keep the owner and CEF pump alive. Destroying either before every
+      // OnBeforeClose callback would leave Chromium with dangling clients.
+      return;
+    }
     desktop_app_.reset();
   }
   native_control_.Shutdown();
+  SetDesktopCefMessagePumpScheduler({});
   if (g_cef_pump_window != nullptr) {
     KillTimer(g_cef_pump_window, kCefPumpTimerId);
     DestroyWindow(g_cef_pump_window);
@@ -522,6 +533,7 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   for (const auto& tab : tabs) {
     if (tab.active) {
       OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward});
+      SaveSession();
       return;
     }
   }
@@ -533,16 +545,6 @@ bool WindowsApp::CreateShell(int show_command) {
   }
   shell_->Show(show_command);
   return true;
-}
-
-void WindowsApp::RememberNavigation(const BrowserState& state) {
-  if (state.url.empty()) {
-    return;
-  }
-  if (desktop_app_) {
-    desktop_app_->history_store().Record(state.url, state.title);
-    desktop_app_->history_store().UpdateLatestTitle(state.url, state.title);
-  }
 }
 
 std::wstring WindowsApp::AppTitle() const {

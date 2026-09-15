@@ -49,6 +49,13 @@ struct BrowserScreenshot {
   std::string base64_data;
 };
 
+struct BrowserNavigationState {
+  TabSnapshot tab;
+  std::uint64_t requested = 0;
+  std::uint64_t completed = 0;
+  std::string error;
+};
+
 // The shared router uses this interface instead of accessing a CEF renderer
 // directly. Implementations serialize operations on the browser owner thread
 // and validate the lease for the full operation.
@@ -60,6 +67,11 @@ class DesktopBrowserControl {
   virtual ~DesktopBrowserControl() = default;
 
   virtual BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) = 0;
+  virtual BrowserControlResult GetNavigationState(TabLease,
+                                                  BrowserNavigationState*,
+                                                  Timeout) {
+    return BrowserControlResult::Failure("UNSUPPORTED", "Navigation state is unavailable");
+  }
   virtual BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
                                           const std::optional<std::uint64_t>& generation,
                                           TabLease* lease,

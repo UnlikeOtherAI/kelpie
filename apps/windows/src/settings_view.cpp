@@ -46,26 +46,27 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
 
   switch (message) {
     case WM_CREATE: {
-      CreateWindowExW(0, L"STATIC", L"Port", WS_CHILD | WS_VISIBLE,
+      CreateWindowExW(0, L"STATIC", L"Port (set at launch)", WS_CHILD | WS_VISIBLE,
                       16, 16, 90, 20, hwnd, nullptr, nullptr, nullptr);
-      CreateWindowExW(0, L"STATIC", L"Profile Dir", WS_CHILD | WS_VISIBLE,
+      CreateWindowExW(0, L"STATIC", L"Profile (set at launch)", WS_CHILD | WS_VISIBLE,
                       16, 56, 90, 20, hwnd, nullptr, nullptr, nullptr);
       CreateWindowExW(0, L"STATIC", L"Startup URL", WS_CHILD | WS_VISIBLE,
                       16, 96, 90, 20, hwnd, nullptr, nullptr, nullptr);
 
       state->port_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", std::to_wstring(state->values.port).c_str(),
-                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 12, 240, 24,
+                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_READONLY, 112, 12, 240, 24,
                                          hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PORT), nullptr, nullptr);
       state->profile_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", state->values.profile_dir.c_str(),
-                                            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 52, 240, 24,
+                                            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_READONLY, 112, 52, 240, 24,
                                             hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PROFILE), nullptr, nullptr);
       state->url_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", state->values.startup_url.c_str(),
                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 92, 240, 24,
                                         hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_STARTUP_URL), nullptr, nullptr);
 
-      CreateWindowExW(0, L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+      HWND browse = CreateWindowExW(0, L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                       360, 52, 72, 24, hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PROFILE_BROWSE),
                       nullptr, nullptr);
+      EnableWindow(browse, FALSE);
       CreateWindowExW(0, L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
                       248, 136, 88, 28, hwnd, reinterpret_cast<HMENU>(IDOK), nullptr, nullptr);
       CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
@@ -89,8 +90,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
           return 0;
         }
         case IDOK:
-          state->values.port = std::clamp(_wtoi(WindowText(state->port_edit).c_str()), 1, 65535);
-          state->values.profile_dir = WindowText(state->profile_edit);
+          // Port and profile are launch-time capabilities. Keeping them
+          // read-only avoids persisting settings the launcher cannot consume.
           state->values.startup_url = WindowText(state->url_edit);
           state->output_ref = state->values;
           state->accepted = true;

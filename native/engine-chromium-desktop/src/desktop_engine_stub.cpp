@@ -34,7 +34,7 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
-void DesktopEngine::Shutdown() {}
+bool DesktopEngine::Shutdown() { return true; }
 
 void DesktopEngine::DoMessageLoopWork() {}
 
@@ -108,6 +108,10 @@ BrowserControlResult UnsupportedControl() {
 }  // namespace
 
 BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::GetNavigationState(TabLease, NavigationState*, Timeout) {
+  return UnsupportedControl();
+}
 
 BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&,
                                                const std::optional<std::uint64_t>&,
