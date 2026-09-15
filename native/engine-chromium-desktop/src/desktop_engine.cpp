@@ -1,9 +1,15 @@
 #include "kelpie/desktop_engine.h"
 
 #include <algorithm>
+#include <chrono>
 #include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 #include "include/cef_app.h"
 #include "include/cef_browser.h"
@@ -34,6 +40,19 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
 
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
+  bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
+                     CefRefPtr<CefFrame> frame,
+                     int popup_id,
+                     const CefString& target_url,
+                     const CefString& target_frame_name,
+                     WindowOpenDisposition target_disposition,
+                     bool user_gesture,
+                     const CefPopupFeatures& popup_features,
+                     CefWindowInfo& window_info,
+                     CefRefPtr<CefClient>& client,
+                     CefBrowserSettings& settings,
+                     CefRefPtr<CefDictionaryValue>& extra_info,
+                     bool* no_javascript_access) override;
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
   void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                             bool is_loading,
@@ -183,8 +202,19 @@ void DesktopEngine::Impl::Shutdown() {
   if (!initialized) {
     return;
   }
-  if (browser && browser->GetHost()) {
-    browser->GetHost()->CloseBrowser(true);
+  for (auto& tab : tabs) {
+    if (tab.devtools) tab.devtools->CancelAll();
+    if (tab.browser && tab.browser->GetHost()) tab.browser->GetHost()->CloseBrowser(true);
+  }
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (!tabs.empty() && std::chrono::steady_clock::now() < deadline) {
+    CefDoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  if (!tabs.empty()) {
+    // CEF requires every browser close callback before CefShutdown. Keep the
+    // runtime alive rather than invalidating outstanding CEF references.
+    return;
   }
   browser = nullptr;
   client = nullptr;
@@ -217,6 +247,35 @@ void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
                                        : std::string("about:blank");
   }
   owner_->UpdateActiveState();
+}
+
+bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
+                                     CefRefPtr<CefFrame>,
+                                     int,
+                                     const CefString& target_url,
+                                     const CefString&,
+                                     WindowOpenDisposition,
+                                     bool,
+                                     const CefPopupFeatures&,
+                                     CefWindowInfo&,
+                                     CefRefPtr<CefClient>&,
+                                     CefBrowserSettings&,
+                                     CefRefPtr<CefDictionaryValue>&,
+                                     bool*) {
+  const std::string url = target_url.ToString();
+  if (url.empty()) return true;
+  TabSnapshot created;
+  const auto result = owner_->CreateTabOnUi(url, &created);
+  if (!result.ok) return true;
+  if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
+#if defined(_WIN32)
+    if (owner_->browser && owner_->browser->GetHost()) ShowWindow(owner_->browser->GetHost()->GetWindowHandle(), SW_HIDE);
+    if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
+#endif
+    owner_->browser = tab->browser;
+    owner_->UpdateActiveState();
+  }
+  return true;
 }
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {

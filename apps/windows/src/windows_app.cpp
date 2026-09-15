@@ -308,6 +308,15 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.bind_host = "127.0.0.1";
   runtime.control_token = profile_session_.token();
   runtime.device_id = device_info_provider_.Collect(config_.port, config_.width, config_.height, runtime.app_version).id;
+  runtime.request_shutdown = [this]() {
+    if (shell_ == nullptr || shell_->hwnd() == nullptr) {
+      return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
+    }
+    if (!PostMessageW(shell_->hwnd(), WM_CLOSE, 0, 0)) {
+      return BrowserControlResult::Failure("INTERNAL", "Unable to request native window close");
+    }
+    return BrowserControlResult::Success();
+  };
   runtime.engine.mode = DesktopEngine::Mode::kWindowed;
   runtime.engine.process_instance = config_.cef_process_instance;
   runtime.engine.sandbox_info = config_.sandbox_info;
