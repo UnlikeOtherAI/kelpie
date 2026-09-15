@@ -113,6 +113,7 @@ int main() {
       {"kelpie_get_page_text", {{"mode", "readable"}, {"selector", "main"}, {"tabId", "second"}, {"generation", 9}}},
       {"kelpie_get_form_state", {{"selector", "form"}, {"tabId", "second"}, {"generation", 9}}},
       {"kelpie_press_key", {{"key", "K"}, {"code", "KeyK"}, {"modifiers", {"Control", "Shift"}}, {"tabId", "second"}, {"generation", 9}}},
+      {"kelpie_set_cookie", {{"name", "session"}, {"value", ""}, {"sameSite", "Lax"}, {"tabId", "second"}, {"generation", 9}}},
   };
   int fixture_id = 11;
   for (const auto& [name, arguments] : parameter_fixtures) {
@@ -128,6 +129,10 @@ int main() {
       {"params", {{"name", "kelpie_resize_viewport"}, {"arguments", {{"width", 4294967297ULL}, {"height", 720}}}}}}, config);
   assert(huge_viewport.contains("error"));
   assert(huge_viewport.at("error").at("code") == -32602);
+  const auto bad_same_site = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 101}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_set_cookie"}, {"arguments", {{"name", "session"}, {"value", ""}, {"sameSite", "invalid"}}}}}}, config);
+  assert(bad_same_site.contains("error"));
+  assert(bad_same_site.at("error").at("code") == -32602);
 
   return 0;
 }

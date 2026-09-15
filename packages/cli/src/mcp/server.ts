@@ -13,7 +13,7 @@ import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
-import { BrowserToolUnsupportedPlatforms, type Platform } from "@unlikeotherai/kelpie-shared";
+import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
 import { buildDownloadUrl, downloadModel } from "../ai/download.js";
@@ -34,7 +34,7 @@ type ScreenshotResult = JsonObject & {
 const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
 const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
-export function createMcpServer(defaultDevice?: DiscoveredDevice): McpServer {
+export function createMcpServer(defaultDevice?: DiscoveredDevice, callableTools?: ReadonlySet<BrowserMcpTool>): McpServer {
   const server = new McpServer(
     {
       name: "kelpie",
@@ -46,7 +46,7 @@ export function createMcpServer(defaultDevice?: DiscoveredDevice): McpServer {
   );
 
   for (const tool of browserTools) {
-    if (!isCallableOnDefaultDevice(tool, defaultDevice)) continue;
+    if (!isCallableOnDefaultDevice(tool, defaultDevice, callableTools)) continue;
     registerBrowserTool(server, tool, defaultDevice);
   }
   for (const tool of cliTools) {
@@ -56,8 +56,13 @@ export function createMcpServer(defaultDevice?: DiscoveredDevice): McpServer {
   return server;
 }
 
-function isCallableOnDefaultDevice(tool: BrowserToolDef, defaultDevice?: DiscoveredDevice): boolean {
+function isCallableOnDefaultDevice(
+  tool: BrowserToolDef,
+  defaultDevice?: DiscoveredDevice,
+  callableTools?: ReadonlySet<BrowserMcpTool>,
+): boolean {
   if (!defaultDevice) return true;
+  if (callableTools) return callableTools.has(tool.name as BrowserMcpTool);
   if (!(tool.name in BrowserToolUnsupportedPlatforms)) return true;
   const unsupported = BrowserToolUnsupportedPlatforms[tool.name as keyof typeof BrowserToolUnsupportedPlatforms] as readonly Platform[];
   return !unsupported.includes(defaultDevice.platform);

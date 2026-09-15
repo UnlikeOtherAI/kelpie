@@ -243,7 +243,7 @@ export const browserTools: BrowserToolDef[] = [
 
   // Cookies
   { name: "kelpie_get_cookies", description: "Get cookies", method: "getCookies", schema: { device, url: url.optional().describe("Filter by URL"), name: z.string().optional().describe("Filter by name"), tabId }, bodyFromArgs: passthrough },
-  { name: "kelpie_set_cookie", description: "Set a cookie", method: "setCookie", schema: { device, name: z.string().describe("Cookie name"), value: z.string().describe("Cookie value"), domain: z.string().optional(), path: z.string().optional(), httpOnly: z.boolean().optional(), secure: z.boolean().optional(), sameSite: z.string().optional(), expires: z.string().optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_set_cookie", description: "Set a cookie", method: "setCookie", schema: { device, name: z.string().describe("Cookie name"), value: z.string().describe("Cookie value"), domain: z.string().optional(), path: z.string().optional(), httpOnly: z.boolean().optional(), secure: z.boolean().optional(), sameSite: z.enum(["Strict", "Lax", "None", "strict", "lax", "none"]).optional(), expires: z.string().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_delete_cookies", description: "Delete cookies", method: "deleteCookies", schema: { device, name: z.string().optional().describe("Cookie name"), domain: z.string().optional(), deleteAll: z.boolean().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_clear_cookies", description: "Delete all cookies", method: "clearCookies", schema: { device, tabId }, bodyFromArgs: passthrough },
 

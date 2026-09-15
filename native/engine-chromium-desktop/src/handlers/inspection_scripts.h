@@ -7,6 +7,8 @@ namespace kelpie {
 inline constexpr std::string_view kVisibleElementsScript = R"JS(
 (() => {
   const selectorFor = (element) => {
+    if (element === document.documentElement) return "html";
+    if (element === document.body) return "body";
     if (element.id) return `#${CSS.escape(element.id)}`;
     const segments = [];
     for (let node = element; node && node.nodeType === Node.ELEMENT_NODE && node !== document.body;

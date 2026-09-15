@@ -951,7 +951,8 @@ There is no CLI installer command: the release ZIP is the supported Windows inst
 artifact. See the Windows release ZIP instructions for extraction and update steps.
 
 The stdio command is the local-agent/Nessie bridge: it reads the current user’s readiness token
-in memory and emits only JSON-RPC on stdout. `kelpie browser stop win` asks the app to close
+in memory, fetches the running browser’s authenticated callable catalogue, and emits only JSON-RPC
+on stdout. `kelpie browser stop win` asks the app to close
 orderly and waits for the matching readiness record to disappear.
 
 Windows aliases deliberately reject `kelpie --browser win mcp --http`: proxying their local

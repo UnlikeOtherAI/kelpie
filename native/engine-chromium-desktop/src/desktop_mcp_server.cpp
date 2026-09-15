@@ -108,7 +108,7 @@ nlohmann::json InputSchema(std::string_view endpoint) {
     string("name", true); string("value"); string("url"); string("domain"); string("path");
     string("expires"); properties["httpOnly"] = {{"type", "boolean"}};
     properties["secure"] = {{"type", "boolean"}};
-    properties["sameSite"] = {{"enum", {"strict", "lax", "none"}}};
+    properties["sameSite"] = {{"enum", {"Strict", "Lax", "None", "strict", "lax", "none"}}};
     require("name"); require("value");
   } else if (endpoint == "delete-cookies") {
     string("name"); string("domain"); properties["deleteAll"]={{"type","boolean"}};

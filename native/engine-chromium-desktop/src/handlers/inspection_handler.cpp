@@ -64,8 +64,8 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
           (!label || (node.labels && Array.from(node.labels).some((item) => (item.innerText || "").includes(label)))) &&
           (!placeholder || node.getAttribute("placeholder") === placeholder) &&
           (!name || node.getAttribute("name") === name));
-        const selectorFor = (node) => node.id ? `#${CSS.escape(node.id)}` :
-          `[name="${CSS.escape(node.getAttribute("name") || "")}"]`;
+      const selectorFor = (node) => node.id ? `#${CSS.escape(node.id)}` :
+          (() => { const segments=[]; for(let current=node; current && current.nodeType===Node.ELEMENT_NODE && current!==document.body; current=current.parentElement) { const tag=current.tagName.toLowerCase(); const siblings=Array.from(current.parentElement?.children || []).filter((sibling) => sibling.tagName===current.tagName); segments.unshift(siblings.length>1 ? `${tag}:nth-of-type(${siblings.indexOf(current)+1})` : tag); } return segments.length ? `body > ${segments.join(" > ")}` : "body"; })();
         return element ? {found: true, selector: selectorFor(element), tag: element.tagName.toLowerCase(),
           text: element.getAttribute("aria-label") || element.getAttribute("placeholder") || ""} : {found: false};
       })())JS";
@@ -80,6 +80,8 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
       const selector = )JS" + JsStringLiteral(selector) + R"JS(;
       const role = )JS" + JsStringLiteral(role) + R"JS(;
       const selectorFor = (element) => {
+        if (element === document.documentElement) return "html";
+        if (element === document.body) return "body";
         if (element.id) return `#${CSS.escape(element.id)}`;
         const segments = [];
         for (let node = element; node && node.nodeType === Node.ELEMENT_NODE && node !== document.body;
@@ -91,9 +93,13 @@ nlohmann::json InspectionHandler::Find(const nlohmann::json& params, const char*
         }
         return segments.length ? `body > ${segments.join(" > ")}` : "body";
       };
-      const element = Array.from(document.querySelectorAll(selector)).find((node) =>
-        (!role || node.getAttribute("role") === role) &&
-        ((node.innerText || node.value || "").includes(text)));
+      const element = Array.from(document.querySelectorAll(selector)).find((node) => {
+        const inferredRole = node.getAttribute("role") || ({button:"button", a:"link", input:"textbox", textarea:"textbox", select:"combobox"}[node.tagName.toLowerCase()] || "");
+        const ownText = Array.from(node.childNodes).filter((child) => child.nodeType === Node.TEXT_NODE)
+          .map((child) => child.textContent || "").join(" ");
+        const content = ownText || node.getAttribute("aria-label") || node.value || "";
+        return (!role || inferredRole === role) && content.includes(text);
+      });
       return element ? {found: true, selector: selectorFor(element), tag: element.tagName.toLowerCase(),
         text: (element.innerText || element.value || "").trim()} : {found: false};
     })())JS";
@@ -133,8 +139,12 @@ nlohmann::json InspectionHandler::PageText(const nlohmann::json& params) const {
     const std::string selector = OptionalString(params, "selector");
     const std::string mode = OptionalString(params, "mode");
     if (!mode.empty() && mode != "readable" && mode != "full" && mode != "markdown") return InvalidParams("mode is invalid");
+    const std::string selected_mode = mode.empty() ? "readable" : mode;
     std::string script = "(() => { const root = " + (selector.empty() ? std::string("document.body") : "document.querySelector(" + JsStringLiteral(selector) + ")") +
-        "; const text = root ? (root.innerText || '') : ''; return {text, length: text.length, mode: " + JsStringLiteral(mode.empty() ? "readable" : mode) + "}; })()";
+        "; if (!root) return {text:'', length:0, mode:" + JsStringLiteral(selected_mode) + "};"
+        "const text = " + (selected_mode == "markdown"
+          ? "Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre')).map((node) => { const tag=node.tagName.toLowerCase(); const value=(node.innerText || '').trim(); if (!value) return ''; if (tag[0] === 'h') return '#'.repeat(Number(tag[1])) + ' ' + value; if (tag === 'li') return '- ' + value; if (tag === 'pre') return '```\\n' + value + '\\n```'; return value; }).filter(Boolean).join('\\n\\n')"
+          : "root.innerText || ''") + "; return {text, length: text.length, mode: " + JsStringLiteral(selected_mode) + "}; })()";
     return Evaluate(params, script);
   } catch (const std::invalid_argument& error) { return InvalidParams(error.what()); }
 }
@@ -174,12 +184,6 @@ nlohmann::json InspectionHandler::AccessibilityTree(const nlohmann::json& params
     }
     if (!result.ok) return ControlError(result);
     nlohmann::json nodes = ax.value("nodes", nlohmann::json::array());
-    if (OptionalBool(params, "interactableOnly", false)) {
-      const std::unordered_set<std::string> interactable = {"button", "checkbox", "combobox", "link", "textbox"};
-      nodes.erase(std::remove_if(nodes.begin(), nodes.end(), [&](const nlohmann::json& node) {
-        return interactable.find(RoleValue(node)) == interactable.end();
-      }), nodes.end());
-    }
     if (params.contains("maxDepth")) {
       const int max_depth = RequireBoundedInteger(params, "maxDepth", 0, 100);
       std::unordered_set<std::string> child_ids;
@@ -209,6 +213,12 @@ nlohmann::json InspectionHandler::AccessibilityTree(const nlohmann::json& params
       nodes.erase(std::remove_if(nodes.begin(), nodes.end(), [&](const nlohmann::json& node) {
         const auto depth = depths.find(node.value("nodeId", std::string()));
         return depth == depths.end() || depth->second > max_depth;
+      }), nodes.end());
+    }
+    if (OptionalBool(params, "interactableOnly", false)) {
+      const std::unordered_set<std::string> interactable = {"button", "checkbox", "combobox", "link", "textbox"};
+      nodes.erase(std::remove_if(nodes.begin(), nodes.end(), [&](const nlohmann::json& node) {
+        return interactable.find(RoleValue(node)) == interactable.end();
       }), nodes.end());
     }
     return SuccessResponse({{"nodes", nodes}, {"count", nodes.size()},

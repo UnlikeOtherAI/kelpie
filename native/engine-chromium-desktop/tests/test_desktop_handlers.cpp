@@ -30,7 +30,7 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
-  kelpie::TabLease last_lease; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false;
+  kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false;
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
@@ -48,7 +48,7 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
   kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override { last_lease=lease; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
-  kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
+  kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json& cookies, Json* out, Timeout) override { last_lease=lease; last_cookie=cookies; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DeleteCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"deleted",1}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"trusted",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetDialog(kelpie::TabLease lease, Json* out, Timeout) override { last_lease=lease; *out={{"open",true},{"type","alert"}}; return kelpie::BrowserControlResult::Success(second); }
@@ -78,7 +78,10 @@ int main() {
   const nlohmann::json second={{"tabId","second"},{"generation",9}};
   auto dom_result=router.Dispatch("query-selector",{{"tabId","second"},{"generation",9},{"selector","div"}}); assert(dom_result.status_code==200); assert(control.last_lease.id=="second" && control.last_lease.generation==9);
   auto cookie_result=router.Dispatch("get-cookies",second); assert(cookie_result.status_code==200 && control.last_lease.id=="second");
-  assert(router.Dispatch("set-cookie",{{"tabId","second"},{"generation",9},{"name","empty"},{"value",""}}).status_code==200);
+  assert(router.Dispatch("set-cookie",{{"tabId","second"},{"generation",9},{"name","empty"},{"value",""},{"sameSite","lax"}}).status_code==200);
+  assert(control.last_cookie["sameSite"] == "Lax");
+  assert(router.Dispatch("set-cookie",{{"tabId","second"},{"generation",9},{"name","bad"},{"value",""},{"sameSite","invalid"}}).status_code==400);
+  assert(router.Dispatch("delete-cookies",{{"tabId","second"},{"generation",9},{"domain","example.test"}}).status_code==200);
   assert(router.Dispatch("set-storage",{{"tabId","second"},{"generation",9},{"key","empty"},{"value",""}}).status_code==200);
   assert(router.Dispatch("fill",{{"tabId","second"},{"generation",9},{"selector","#name"},{"value",""}}).status_code==200);
   auto dialog_result=router.Dispatch("handle-dialog",{{"tabId","second"},{"generation",9},{"action","accept"}}); assert(dialog_result.status_code==200 && control.last_lease.id=="second");
