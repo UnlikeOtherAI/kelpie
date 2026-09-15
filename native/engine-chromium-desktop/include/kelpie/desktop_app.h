@@ -34,6 +34,9 @@ class DesktopApp {
     std::string app_name = "kelpie-desktop";
     std::string app_version = "0.0.1";
     bool start_stdio_mcp = false;
+    std::string bind_host = "127.0.0.1";
+    std::string control_token;
+    std::string device_id;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;

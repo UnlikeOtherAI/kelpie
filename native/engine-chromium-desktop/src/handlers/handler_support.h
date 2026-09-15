@@ -14,6 +14,7 @@
 #include "kelpie/bookmark_store.h"
 #include "kelpie/console_store.h"
 #include "kelpie/desktop_app.h"
+#include "kelpie/desktop_browser_control.h"
 #include "kelpie/error_codes.h"
 #include "kelpie/handler_context.h"
 #include "kelpie/history_store.h"
@@ -30,6 +31,7 @@ struct DesktopHandlerRuntime {
   using VoidAction = std::function<void()>;
 
   HandlerContext* handler_context = nullptr;
+  DesktopBrowserControl* browser_control = nullptr;
   BookmarkStore* bookmark_store = nullptr;
   HistoryStore* history_store = nullptr;
   ConsoleStore* console_store = nullptr;
@@ -63,6 +65,38 @@ inline HandlerContext& RequireHandlerContext(const DesktopHandlerRuntime& runtim
   return *runtime.handler_context;
 }
 
+inline DesktopBrowserControl& RequireBrowserControl(const DesktopHandlerRuntime& runtime) {
+  if (runtime.browser_control == nullptr) throw std::runtime_error("Browser control is not configured");
+  return *runtime.browser_control;
+}
+
+inline std::optional<std::string> OptionalTabId(const nlohmann::json& params) {
+  const auto it = params.find("tabId");
+  if (it == params.end()) return std::nullopt;
+  if (!it->is_string() || it->get<std::string>().empty()) throw std::invalid_argument("tabId must be a non-empty string");
+  return it->get<std::string>();
+}
+
+inline std::optional<std::uint64_t> OptionalGeneration(const nlohmann::json& params) {
+  const auto it = params.find("generation");
+  if (it == params.end()) return std::nullopt;
+  if (!it->is_number_unsigned()) throw std::invalid_argument("generation must be an unsigned integer");
+  return it->get<std::uint64_t>();
+}
+
+inline nlohmann::json TabJson(const TabSnapshot& tab) {
+  return {{"id", tab.id}, {"generation", tab.generation}, {"url", tab.url}, {"title", tab.title},
+          {"active", tab.active}, {"isLoading", tab.is_loading}, {"canGoBack", tab.can_go_back},
+          {"canGoForward", tab.can_go_forward}};
+}
+
+inline nlohmann::json ControlError(const BrowserControlResult& result) {
+  return ErrorResponse(result.error_code.empty() ? "WEBVIEW_ERROR" : result.error_code,
+                       result.message.empty() ? "Browser operation failed" : result.message,
+                       result.operation_may_have_completed ? nlohmann::json{{"operationMayHaveCompleted", true}}
+                                                        : nlohmann::json::object());
+}
+
 inline std::string RequireString(const nlohmann::json& params, const char* key) {
   const auto it = params.find(key);
   if (it == params.end() || !it->is_string() || it->get<std::string>().empty()) {
@@ -77,6 +111,11 @@ inline int IntOrDefault(const nlohmann::json& params, const char* key, int defau
     return default_value;
   }
   return it->get<int>();
+}
+
+inline DesktopBrowserControl::Timeout ControlTimeout(const nlohmann::json& params) {
+  const int value = IntOrDefault(params, "timeout", 10000);
+  return std::chrono::milliseconds(std::clamp(value, 1, 30000));
 }
 
 inline bool BoolOrDefault(const nlohmann::json& params, const char* key, bool default_value) {

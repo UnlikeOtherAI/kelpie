@@ -1,84 +1,68 @@
 #include "navigation_handler.h"
 
-#include <chrono>
-#include <thread>
-
 namespace kelpie {
+namespace {
 
-NavigationHandler::NavigationHandler(DesktopHandlerRuntime runtime)
-    : runtime_(std::move(runtime)) {}
+BrowserControlResult Resolve(const DesktopHandlerRuntime& runtime, const nlohmann::json& params,
+                             TabLease* lease) {
+  return RequireBrowserControl(runtime).ResolveTab(OptionalTabId(params), OptionalGeneration(params), lease,
+                                                    ControlTimeout(params));
+}
+
+nlohmann::json SnapshotResponse(const BrowserControlResult& result, const TabSnapshot& tab) {
+  if (!result.ok) return ControlError(result);
+  return SuccessResponse({{"tab", TabJson(tab)}, {"url", tab.url}, {"title", tab.title}});
+}
+
+}  // namespace
+
+NavigationHandler::NavigationHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
 void NavigationHandler::Register(DesktopRouter& router) const {
   router.Register("navigate", [this](const nlohmann::json& params) { return Navigate(params); });
   router.Register("back", [this](const nlohmann::json& params) { return Back(params); });
   router.Register("forward", [this](const nlohmann::json& params) { return Forward(params); });
   router.Register("reload", [this](const nlohmann::json& params) { return Reload(params); });
-  router.Register("get-current-url",
-                  [this](const nlohmann::json&) { return GetCurrentUrl(); });
+  router.Register("get-current-url", [this](const nlohmann::json& params) { return GetCurrentUrl(params); });
 }
 
 nlohmann::json NavigationHandler::Navigate(const nlohmann::json& params) const {
   try {
-    const std::string url = RequireString(params, "url");
-    const std::int64_t started = NowMillis();
-    HandlerContext& context = RequireHandlerContext(runtime_);
-    context.Renderer()->LoadUrl(url);
-
-    const int timeout_ms = 10000;
-    const int poll_ms = 100;
-    while (context.Renderer()->IsLoading() && (NowMillis() - started) < timeout_ms) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
-    }
-
-    const std::string current_url = context.Renderer()->CurrentUrl();
-    const std::string title = context.Renderer()->CurrentTitle();
-    if (runtime_.history_store != nullptr) {
-      runtime_.history_store->Record(current_url.empty() ? url : current_url, title);
-    }
-    return SuccessResponse({
-        {"url", current_url.empty() ? url : current_url},
-        {"title", title},
-        {"loadTime", static_cast<int>(NowMillis() - started)},
-    });
-  } catch (const std::invalid_argument& exception) {
-    return InvalidParams(exception.what());
-  }
+    TabLease lease;
+    const BrowserControlResult resolved = Resolve(runtime_, params, &lease);
+    if (!resolved.ok) return ControlError(resolved);
+    TabSnapshot tab;
+    const BrowserControlResult result = RequireBrowserControl(runtime_).Navigate(lease, RequireString(params, "url"), &tab,
+                                                                                  ControlTimeout(params));
+    if (result.ok && runtime_.history_store != nullptr) runtime_.history_store->Record(tab.url, tab.title);
+    return SnapshotResponse(result, tab);
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
-nlohmann::json NavigationHandler::Back(const nlohmann::json&) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  context.Renderer()->GoBack();
-  return SuccessResponse({
-      {"url", context.Renderer()->CurrentUrl()},
-      {"title", context.Renderer()->CurrentTitle()},
-  });
+nlohmann::json NavigationHandler::Back(const nlohmann::json& params) const {
+  try { TabLease lease; auto result = Resolve(runtime_, params, &lease); TabSnapshot tab;
+    if (result.ok) result = RequireBrowserControl(runtime_).Back(lease, &tab, ControlTimeout(params));
+    return SnapshotResponse(result, tab); } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
-nlohmann::json NavigationHandler::Forward(const nlohmann::json&) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  context.Renderer()->GoForward();
-  return SuccessResponse({
-      {"url", context.Renderer()->CurrentUrl()},
-      {"title", context.Renderer()->CurrentTitle()},
-  });
+nlohmann::json NavigationHandler::Forward(const nlohmann::json& params) const {
+  try { TabLease lease; auto result = Resolve(runtime_, params, &lease); TabSnapshot tab;
+    if (result.ok) result = RequireBrowserControl(runtime_).Forward(lease, &tab, ControlTimeout(params));
+    return SnapshotResponse(result, tab); } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
-nlohmann::json NavigationHandler::Reload(const nlohmann::json&) const {
-  const std::int64_t started = NowMillis();
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  context.Renderer()->Reload();
-  return SuccessResponse({
-      {"url", context.Renderer()->CurrentUrl()},
-      {"loadTime", static_cast<int>(NowMillis() - started)},
-  });
+nlohmann::json NavigationHandler::Reload(const nlohmann::json& params) const {
+  try { TabLease lease; auto result = Resolve(runtime_, params, &lease); TabSnapshot tab;
+    if (result.ok) result = RequireBrowserControl(runtime_).Reload(lease, &tab, ControlTimeout(params));
+    return SnapshotResponse(result, tab); } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
-nlohmann::json NavigationHandler::GetCurrentUrl() const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  return {
-      {"url", context.Renderer()->CurrentUrl()},
-      {"title", context.Renderer()->CurrentTitle()},
-  };
+nlohmann::json NavigationHandler::GetCurrentUrl(const nlohmann::json& params) const {
+  try { TabLease lease; const auto result = Resolve(runtime_, params, &lease);
+    if (!result.ok) return ControlError(result);
+    if (!result.tab) return ErrorResponse("WEBVIEW_ERROR", "Resolved tab has no snapshot");
+    return SuccessResponse({{"tab", TabJson(*result.tab)}, {"url", result.tab->url}, {"title", result.tab->title}});
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
 }  // namespace kelpie

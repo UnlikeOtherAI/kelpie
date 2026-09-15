@@ -12,7 +12,7 @@ describe("browser command registration", () => {
     expect(browser?.description()).toContain("browser");
 
     const subcommands = browser?.commands.map((command) => command.name()).sort();
-    expect(subcommands).toEqual(["inspect", "launch", "list", "register", "remove"]);
+    expect(subcommands).toEqual(["inspect", "launch", "list", "register", "remove", "stop"]);
     expect(browser?.helpInformation()).toContain("launch");
     expect(browser?.helpInformation()).toContain("register");
   });

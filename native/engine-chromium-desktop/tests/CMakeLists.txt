@@ -10,4 +10,5 @@ endfunction()
 
 add_desktop_engine_test(test_desktop_router test_desktop_router.cpp)
 add_desktop_engine_test(test_desktop_mcp_server test_desktop_mcp_server.cpp)
+add_desktop_engine_test(test_desktop_http_server test_desktop_http_server.cpp)
 add_desktop_engine_test(test_desktop_handlers test_desktop_handlers.cpp)

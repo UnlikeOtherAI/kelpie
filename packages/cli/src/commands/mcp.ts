@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
 import { DEFAULT_MCP_BIND_HOST } from "../mcp/transport.js";
+import { localBrowserDevice } from "./helpers.js";
 
 export function registerMcp(program: Command): void {
   program
@@ -24,8 +25,15 @@ export function registerMcp(program: Command): void {
         bind?: string;
         unsafeHost?: boolean;
       }) => {
+        const globals = program.opts<{ browser?: string }>();
+        const local = globals.browser ? await localBrowserDevice(globals.browser) : undefined;
+        if (globals.browser && !local) {
+          process.stderr.write(`No ready local browser named ${globals.browser}\n`);
+          process.exitCode = 4;
+          return;
+        }
         const { createMcpServer } = await import("../mcp/server.js");
-        const server = createMcpServer();
+        const server = createMcpServer(local ?? undefined);
 
         if (opts.http) {
           const { startHttp } = await import("../mcp/transport.js");

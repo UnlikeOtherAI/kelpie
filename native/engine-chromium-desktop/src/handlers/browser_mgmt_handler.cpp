@@ -2,39 +2,55 @@
 
 namespace kelpie {
 
-BrowserManagementHandler::BrowserManagementHandler(DesktopHandlerRuntime runtime)
-    : runtime_(std::move(runtime)) {}
+BrowserManagementHandler::BrowserManagementHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
 void BrowserManagementHandler::Register(DesktopRouter& router) const {
-  router.Register("get-tabs", [this](const nlohmann::json&) { return GetTabs(); });
+  router.Register("get-tabs", [this](const nlohmann::json& params) { return GetTabs(params); });
   router.Register("new-tab", [this](const nlohmann::json& params) { return NewTab(params); });
-  router.Register("switch-tab", [](const nlohmann::json&) { return Unsupported("switch-tab"); });
-  router.Register("close-tab", [](const nlohmann::json&) { return Unsupported("close-tab"); });
+  router.Register("switch-tab", [this](const nlohmann::json& params) { return SwitchTab(params); });
+  router.Register("close-tab", [this](const nlohmann::json& params) { return CloseTab(params); });
 }
 
-nlohmann::json BrowserManagementHandler::GetTabs() const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  const nlohmann::json tab = {
-      {"id", 0},
-      {"url", context.Renderer()->CurrentUrl()},
-      {"title", context.Renderer()->CurrentTitle()},
-      {"active", true},
-  };
-  return SuccessResponse({{"tabs", nlohmann::json::array({tab})}, {"count", 1}, {"activeTab", 0}});
+nlohmann::json BrowserManagementHandler::GetTabs(const nlohmann::json& params) const {
+  std::vector<TabSnapshot> tabs;
+  const auto result = RequireBrowserControl(runtime_).GetTabs(&tabs, ControlTimeout(params));
+  if (!result.ok) return ControlError(result);
+  nlohmann::json response = nlohmann::json::array();
+  for (const TabSnapshot& tab : tabs) response.push_back(TabJson(tab));
+  return SuccessResponse({{"tabs", response}, {"count", response.size()}});
 }
 
 nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  const auto url_it = params.find("url");
-  if (url_it != params.end() && url_it->is_string() && !url_it->get<std::string>().empty()) {
-    context.Renderer()->LoadUrl(url_it->get<std::string>());
-  }
-  return SuccessResponse({
-      {"tab", {{"id", 0},
-                {"url", context.Renderer()->CurrentUrl()},
-                {"title", context.Renderer()->CurrentTitle()}}},
-      {"tabCount", 1},
-  });
+  try {
+    const auto url = params.find("url");
+    if (url != params.end() && (!url->is_string() || url->get<std::string>().empty())) return InvalidParams("url must be a non-empty string");
+    TabSnapshot tab;
+    const auto result = RequireBrowserControl(runtime_).CreateTab(url == params.end() ? std::string() : url->get<std::string>(), &tab, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
+    return SuccessResponse({{"tab", TabJson(tab)}, {"tabId", tab.id}});
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
+}
+
+nlohmann::json BrowserManagementHandler::SwitchTab(const nlohmann::json& params) const {
+  try {
+    TabLease lease;
+    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    if (!resolved.ok) return ControlError(resolved);
+    const auto result = RequireBrowserControl(runtime_).ActivateTab(lease, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
+    return SuccessResponse({{"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()}});
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
+}
+
+nlohmann::json BrowserManagementHandler::CloseTab(const nlohmann::json& params) const {
+  try {
+    TabLease lease;
+    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    if (!resolved.ok) return ControlError(resolved);
+    const auto result = RequireBrowserControl(runtime_).CloseTab(lease, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
+    return SuccessResponse({{"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()}, {"closedTabId", lease.id}});
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
 }  // namespace kelpie

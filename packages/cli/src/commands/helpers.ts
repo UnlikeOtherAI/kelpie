@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { getBrowserAlias, loadBrowserStore, readLocalReadiness, readinessPath } from "../browser/store.js";
 import { getDevice } from "../discovery/registry.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
@@ -21,13 +22,43 @@ export function withGlobalTabId(
   globals: GlobalOptions,
   body?: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
-  if (!globals.tabId) return body;
-  if (body?.tabId) return body;
-  return { ...(body ?? {}), tabId: globals.tabId };
+  if (!globals.tabId || body?.tabId) return body;
+  const generation = globals.tabGeneration === undefined ? undefined : Number(globals.tabGeneration);
+  return { ...(body ?? {}), tabId: globals.tabId, ...(Number.isInteger(generation) ? { generation } : {}) };
+}
+
+export async function localBrowserDevice(aliasName: string): Promise<DiscoveredDevice | null> {
+  const alias = await getBrowserAlias(aliasName);
+  const running = (await loadBrowserStore()).running[aliasName];
+  const file = alias && readinessPath(alias);
+  const readiness = file && await readLocalReadiness(file);
+  if (!alias || !running || !readiness || readiness.launchId !== running.launchId) return null;
+  return {
+    id: readiness.deviceId,
+    name: aliasName,
+    ip: "127.0.0.1",
+    port: readiness.port,
+    platform: alias.platform,
+    model: "chromium",
+    width: 0,
+    height: 0,
+    version: String(readiness.version),
+    lastSeen: Date.now(),
+    localControlToken: readiness.token,
+    localReadinessFile: file,
+    localLaunchId: readiness.launchId,
+  };
 }
 
 export async function requireDevice(program: Command): Promise<DiscoveredDevice | null> {
   const globals = getGlobals(program);
+  if (globals.browser) {
+    const local = await localBrowserDevice(globals.browser);
+    if (local) return local;
+    print({ success: false, error: { code: "LOCAL_BROWSER_UNAVAILABLE", message: `No ready local browser named ${globals.browser}` } }, globals.format);
+    process.exitCode = 4;
+    return null;
+  }
   if (globals.device) {
     const device = await getDevice(globals.device, {
       port: explicitGlobalPort(program, globals),
@@ -37,7 +68,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
       process.exitCode = 4;
       return null;
     }
-    return device;
+    return device ?? null;
   }
 
   // No --device flag: auto-scan and pick the sole device if exactly one is found
@@ -53,7 +84,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
     addDevices(await probeLocalDevices());
   }
   const all = getAllDevices();
-  if (all.length === 1) return all[0];
+  if (all.length === 1) return all[0] ?? null;
   if (all.length === 0) {
     print({ success: false, error: { code: "NO_DEVICES", message: "No Kelpie devices found on the network" } }, globals.format);
     process.exitCode = 1;

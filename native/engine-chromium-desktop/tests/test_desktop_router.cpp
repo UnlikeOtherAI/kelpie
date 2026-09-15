@@ -12,11 +12,18 @@ int main() {
   assert(ok.status_code == 200);
   assert(ok.body["success"] == true);
   assert(ok.body["echo"] == 7);
+  assert(router.IsCallable("ping"));
 
   const auto missing = router.Dispatch("missing", nlohmann::json::object());
   assert(missing.status_code == 404);
   assert(missing.body["success"] == false);
   assert(missing.body["error"]["code"] == "NOT_FOUND");
+
+  router.Register("unsupported", [](const nlohmann::json&) {
+    return nlohmann::json{{"success", false}};
+  }, false);
+  assert(router.Has("unsupported"));
+  assert(!router.IsCallable("unsupported"));
 
   return 0;
 }

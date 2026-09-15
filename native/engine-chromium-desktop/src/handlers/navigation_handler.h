@@ -16,7 +16,7 @@ class NavigationHandler {
   nlohmann::json Back(const nlohmann::json& params) const;
   nlohmann::json Forward(const nlohmann::json& params) const;
   nlohmann::json Reload(const nlohmann::json& params) const;
-  nlohmann::json GetCurrentUrl() const;
+  nlohmann::json GetCurrentUrl(const nlohmann::json& params) const;
 
   DesktopHandlerRuntime runtime_;
 };

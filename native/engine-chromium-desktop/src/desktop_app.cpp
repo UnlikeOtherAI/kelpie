@@ -132,6 +132,7 @@ class DesktopApp::Impl {
     DesktopHandlerRuntime runtime;
     handler_context = std::make_unique<HandlerContext>(&engine.renderer());
     runtime.handler_context = handler_context.get();
+    runtime.browser_control = &engine;
     runtime.bookmark_store = &bookmark_store;
     runtime.history_store = &history_store;
     runtime.console_store = &console_store;
@@ -216,7 +217,7 @@ class DesktopApp::Impl {
         router.Register(method, [method](const nlohmann::json&) {
           return ErrorResponse(ErrorCode::kPlatformNotSupported,
                                method + " is not supported on desktop Chromium");
-        });
+        }, false);
       }
     }
   }
@@ -264,15 +265,23 @@ bool DesktopApp::Start(const Config& config) {
   impl_->RegisterHandlers();
 
   impl_->http_server.SetRouter(&impl_->router);
+  impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
+  impl_->mcp_server.SetRouter(&impl_->router);
+  impl_->http_server.SetMcpServer(&impl_->mcp_server);
   DesktopHttpServer::Config server_config;
   server_config.port = config.port;
+  server_config.bind_host = config.bind_host;
+  server_config.control_token = config.control_token;
+  server_config.device_id = config.device_id;
+  server_config.platform = PlatformToString(config.platform);
+  server_config.engine = config.engine_name;
+  server_config.server_name = config.app_name;
+  server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
     impl_->engine.Shutdown();
     return false;
   }
 
-  impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
-  impl_->mcp_server.SetRouter(&impl_->router);
   if (config.start_stdio_mcp) {
     impl_->mcp_thread = std::thread([this, config]() {
       DesktopMcpServer::Config mcp_config;
