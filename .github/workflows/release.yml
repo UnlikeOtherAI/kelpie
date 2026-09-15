@@ -371,6 +371,24 @@ jobs:
             dist/release/cli/checksums.txt
           if-no-files-found: error
 
+  build-windows:
+    name: Build Windows release artifact
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build and package Windows release
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1
+          ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: |
+            dist/release/windows/*.zip
+            dist/release/windows/*.sha256
+            dist/release/windows/*.provenance.txt
+          if-no-files-found: error
   attach-to-release:
     name: Attach assets to GitHub release
     runs-on: ubuntu-latest
@@ -378,6 +396,7 @@ jobs:
       - build-linux
       - build-android
       - publish-cli
+      - build-windows
     steps:
       - uses: actions/download-artifact@v8.0.1
         with:
@@ -401,6 +420,9 @@ jobs:
             dist/release/**/*.apk
             dist/release/**/*.aab
             dist/release/**/*.tgz
+            dist/release/**/*.zip
+            dist/release/**/*.sha256
+            dist/release/**/*.provenance.txt
             dist/release/**/checksums.txt
 
   publish-package-repos:

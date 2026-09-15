@@ -1,0 +1,28 @@
+name: Windows CEF
+on:
+  pull_request:
+    paths: [apps/windows/**, native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
+  push:
+    branches: [main]
+    paths: [apps/windows/**, native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build CEF wrapper and Windows release
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - name: Package release candidate
+        shell: pwsh
+        run: ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kelpie-windows-x64
+          path: |
+            dist/release/windows/*.zip
+            dist/release/windows/*.sha256
+            dist/release/windows/*.provenance.txt
+          if-no-files-found: error
