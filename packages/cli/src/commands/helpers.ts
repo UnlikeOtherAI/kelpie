@@ -23,7 +23,7 @@ export function withGlobalTabId(
   body?: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
   if (!globals.tabId || body?.tabId) return body;
-  const generation = globals.tabGeneration === undefined ? undefined : Number(globals.tabGeneration);
+  const generation = globals.tabGeneration;
   return { ...(body ?? {}), tabId: globals.tabId, ...(Number.isInteger(generation) ? { generation } : {}) };
 }
 
@@ -68,7 +68,7 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
       process.exitCode = 4;
       return null;
     }
-    return device ?? null;
+    return device;
   }
 
   // No --device flag: auto-scan and pick the sole device if exactly one is found

@@ -69,14 +69,16 @@ describe("TokenStore", () => {
   it("creates the directory with 0700 perms on first write", async () => {
     rmSync(dir, { recursive: true, force: true });
     await store.set("d1", "h", 1, "tok");
-    const mode = statSync(dir).mode & 0o777;
-    expect(mode).toBe(0o700);
+    if (process.platform !== "win32") {
+      expect(statSync(dir).mode & 0o777).toBe(0o700);
+    }
   });
 
   it("writes tokens.json with 0600 perms", async () => {
     await store.set("d1", "192.168.1.10", 8420, "tok");
-    const mode = statSync(join(dir, "tokens.json")).mode & 0o777;
-    expect(mode).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect(statSync(join(dir, "tokens.json")).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("persists tokens across instances", async () => {
@@ -109,6 +111,7 @@ describe("TokenStore", () => {
   });
 
   it("refuses to operate on a symlinked directory", async () => {
+    if (process.platform === "win32") return;
     const real = mkdtempSync(join(tmpdir(), "kelpie-token-real-"));
     const link = `${dir}-link`;
     symlinkSync(real, link);

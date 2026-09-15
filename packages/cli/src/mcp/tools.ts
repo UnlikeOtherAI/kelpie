@@ -6,7 +6,7 @@ const allPlatforms = [...platforms] as readonly ToolPlatform[];
 const mobilePlatforms = ["ios", "android"] as const;
 const viewportPresetPlatforms = ["ios", "android", "macos"] as const;
 const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
-const fullscreenPlatforms = ["macos", "linux"] as const;
+const fullscreenPlatforms = ["macos", "linux", "windows"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
 const orientationPlatforms = ["ios", "android", "macos"] as const;
@@ -115,6 +115,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_get_current_url", description: "Get the current URL and page title", method: "getCurrentUrl", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_set_home", description: "Set the device home page URL. Persisted across app restarts.", method: "setHome", schema: { device, url: url.describe("Home page URL") }, bodyFromArgs: passthrough },
   { name: "kelpie_get_home", description: "Get the device home page URL", method: "getHome", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_close_browser", description: "Request an orderly local browser shutdown", method: "closeBrowser", platforms: ["windows"] as const, schema: { device }, bodyFromArgs: passthrough },
 
   // Debug
   { name: "kelpie_debug_screens", description: "Get screen/scene/external display diagnostics. Shows UIScreen count, connected scenes, and external display manager state.", method: "debugScreens", platforms: iosOnlyPlatforms, schema: { device }, bodyFromArgs: passthrough },
@@ -136,6 +137,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_tap", description: "Tap at specific viewport coordinates as a last resort. Prefer click, fill, or click-annotation first. Saved tap calibration offsets are applied automatically before dispatch. Shows a blue touch indicator at the applied tap point.", method: "tap", schema: { device, x: z.number().describe("X coordinate"), y: z.number().describe("Y coordinate"), tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_fill", description: "Fill a form field with a value. Shows a touch indicator at the field.", method: "fill", schema: { device, selector, value: z.string().describe("Value to fill"), mode: z.enum(["instant", "typing"]).optional().describe("Fill mode: instant (default) sets value immediately, typing types character by character"), delay: z.number().optional().describe("Delay between keystrokes in ms when mode is typing (default 50)"), timeout, tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_type", description: "Type text character by character", method: "type", schema: { device, selector: selector.optional(), text: z.string().describe("Text to type"), delay: z.number().optional().describe("Delay between keystrokes in ms"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_press_key", description: "Send a trusted native key press to the focused browser element", method: "pressKey", platforms: ["windows"] as const, schema: { device, key: z.string().describe("Key value"), code: z.string().optional().describe("Physical key code"), modifiers: z.array(z.string()).optional().describe("Modifier keys"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_select_option", description: "Select an option from a dropdown", method: "selectOption", schema: { device, selector, value: z.string().describe("Option value to select"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_check", description: "Check a checkbox", method: "check", schema: { device, selector, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_uncheck", description: "Uncheck a checkbox", method: "uncheck", schema: { device, selector, tabId }, bodyFromArgs: passthrough },

@@ -242,4 +242,17 @@ and the pinned SDK's `include/cef_sandbox_win.h`.
   package verification checks both executable and client version metadata.
 
 This corrects the implementation mechanism while preserving the reviewed sandbox-on gate.
-Cross-provider amendment review is pending before bootstrap implementation.
+Claude completed an adversarial amendment review in the same desktop conversation before
+bootstrap implementation. Accepted findings: verify the exported C ABI symbol, preserve
+bootstrap-owned pointer lifetimes and POD-only boundaries, use the DLL module handle for
+application resources, audit DLL/global initialization for subprocess side effects, fail
+on mixed SDK/bootstrap versions, check the running renderer sandbox, and retain stable
+`kelpie.exe`/`kelpie.dll` names. Package checksums distinguish original bootstrap bytes from
+any customized artifact. Installation must use a current-user-owned directory; this does
+not defend against another process already running as that same user.
+
+Review corrections: including the pinned `cef_sandbox_win.h` declaration provides C
+linkage, so a separate `.def` file is only needed if export verification shows it necessary.
+Validate the incoming version structure's size before reading fields; do not overwrite
+the size of a bootstrap-owned allocation. Keep this release Windows x64 and report that
+architecture explicitly. Resource changes precede any available code-signing step.

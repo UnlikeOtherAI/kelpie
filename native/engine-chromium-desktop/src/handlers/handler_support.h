@@ -42,6 +42,12 @@ struct DesktopHandlerRuntime {
   JsonSupplier renderer_supplier;
   ResizeViewport resize_viewport;
   VoidAction reset_viewport;
+  std::function<BrowserControlResult(bool)> set_native_fullscreen;
+  std::function<BrowserControlResult(bool*)> get_native_fullscreen;
+  std::function<BrowserControlResult()> request_shutdown;
+  std::function<BrowserControlResult(std::string)> set_home;
+  std::function<BrowserControlResult(std::string*)> get_home;
+  std::function<BrowserControlResult(std::string)> show_native_toast;
   Platform platform = Platform::kLinux;
   std::string engine_name = "chromium";
 };

@@ -10,6 +10,9 @@ int main() {
   router.Register("navigate", [](const nlohmann::json& params) {
     return nlohmann::json{{"success", true}, {"url", params.value("url", std::string())}};
   });
+  router.Register("press-key", [](const nlohmann::json&) {
+    return nlohmann::json{{"success", true}};
+  });
 
   kelpie::McpRegistry registry;
   kelpie::DesktopMcpServer server;
@@ -36,6 +39,18 @@ int main() {
   }
   assert(found_navigate);
   assert(!found_safari_auth);
+
+  config.platform = kelpie::Platform::kWindows;
+  const auto windows_tools = server.HandleRequest(
+      {{"jsonrpc", "2.0"}, {"id", 21}, {"method", "tools/list"}}, config);
+  bool found_press_key = false;
+  for (const auto& tool : windows_tools["result"]["tools"]) {
+    if (tool["name"] == "kelpie_press_key") {
+      found_press_key = tool["inputSchema"]["required"] == nlohmann::json::array({"key"});
+    }
+  }
+  assert(found_press_key);
+  config.platform = kelpie::Platform::kLinux;
 
   const auto notification = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}}, config);

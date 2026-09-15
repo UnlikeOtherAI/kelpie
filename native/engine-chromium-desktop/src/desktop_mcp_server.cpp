@@ -65,6 +65,24 @@ nlohmann::json InputSchema(std::string_view endpoint) {
   } else if (endpoint == "type") {
     properties["text"] = {{"type", "string"}};
     required.push_back("text");
+  } else if (endpoint == "press-key") {
+    properties["key"] = {{"type", "string"}, {"minLength", 1}};
+    properties["code"] = {{"type", "string"}};
+    properties["modifiers"] = {{"type", "array"}, {"items", {{"type", "string"}}}};
+    required.push_back("key");
+  } else if (endpoint == "set-home") {
+    properties["url"] = {{"type", "string"}, {"minLength", 1}};
+    required.push_back("url");
+  } else if (endpoint == "toast") {
+    properties["message"] = {{"type", "string"}, {"minLength", 1}};
+    required.push_back("message");
+  } else if (endpoint == "set-fullscreen") {
+    properties["enabled"] = {{"type", "boolean"}};
+    required.push_back("enabled");
+  } else if (endpoint == "handle-dialog") {
+    properties["action"] = {{"enum", {"accept", "dismiss"}}};
+    properties["promptText"] = {{"type", "string"}};
+    required.push_back("action");
   } else if (endpoint == "scroll") {
     properties["deltaX"] = {{"type", "number"}};
     properties["deltaY"] = {{"type", "number"}};

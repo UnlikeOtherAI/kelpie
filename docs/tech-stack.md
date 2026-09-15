@@ -227,3 +227,11 @@ WebView, NsdManager, PixelCopy are all Android SDK built-ins.
 | iOS | Xcode build | Run on device/simulator |
 | Android | `./gradlew assembleDebug` | Run on device/emulator |
 | macOS | Xcode build | Run on Mac |
+
+### Windows desktop release
+
+Windows ships a CEF 152.0.6 sandbox bootstrap (`kelpie.exe`) and application DLL (`kelpie.dll`),
+with matching CEF runtime assets. The Windows application version is owned by
+`apps/windows/CMakeLists.txt` (`KELPIE_WINDOWS_VERSION`, currently `0.1.1`); it does not share
+Apple mobile version fields. The local control server is loopback-only and uses an ACL-protected
+per-launch readiness token rather than mDNS pairing.

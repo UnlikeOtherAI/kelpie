@@ -29,6 +29,7 @@
 #include "handlers/network_handler.h"
 #include "handlers/renderer_handler.h"
 #include "handlers/screenshot_handler.h"
+#include "handlers/shell_handler.h"
 #include "handlers/scroll_handler.h"
 #include "handlers/viewport_handler.h"
 
@@ -74,9 +75,8 @@ void AppendNetwork(NetworkTrafficStore& store, const nlohmann::json& event) {
 
 std::vector<std::string> UnsupportedMethods() {
   return {
-      "set-home",           "get-home",           "debug-screens",
-      "set-debug-overlay",  "get-debug-overlay",  "tap",
-      "toast",              "click-annotation",   "fill-annotation",
+      "debug-screens",      "set-debug-overlay",  "get-debug-overlay",
+      "tap",                "click-annotation",   "fill-annotation",
       "set-dialog-auto-handler",
       "get-iframes",        "switch-to-iframe",   "switch-to-main",
       "get-iframe-context", "watch-mutations",    "get-mutations",
@@ -128,6 +128,7 @@ class DesktopApp::Impl {
   std::unique_ptr<CookieHandler> cookie_handler;
   std::unique_ptr<DialogHandler> dialog_handler;
   std::unique_ptr<InspectionHandler> inspection_handler;
+  std::unique_ptr<ShellHandler> shell_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
     DesktopHandlerRuntime runtime;
@@ -176,6 +177,12 @@ class DesktopApp::Impl {
     runtime.reset_viewport = [this]() {
       engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
     };
+    runtime.set_native_fullscreen = config.set_native_fullscreen;
+    runtime.get_native_fullscreen = config.get_native_fullscreen;
+    runtime.request_shutdown = config.request_shutdown;
+    runtime.set_home = config.set_home;
+    runtime.get_home = config.get_home;
+    runtime.show_native_toast = config.show_native_toast;
     return runtime;
   }
 
@@ -198,6 +205,7 @@ class DesktopApp::Impl {
     cookie_handler = std::make_unique<CookieHandler>(runtime);
     dialog_handler = std::make_unique<DialogHandler>(runtime);
     inspection_handler = std::make_unique<InspectionHandler>(runtime);
+    shell_handler = std::make_unique<ShellHandler>(runtime);
 
     navigation_handler->Register(router);
     interaction_handler->Register(router);
@@ -216,6 +224,7 @@ class DesktopApp::Impl {
     cookie_handler->Register(router);
     dialog_handler->Register(router);
     inspection_handler->Register(router);
+    shell_handler->Register(router);
 
     for (const std::string& method : UnsupportedMethods()) {
       if (!router.Has(method)) {
@@ -248,6 +257,12 @@ DesktopApp::~DesktopApp() {
 
 bool DesktopApp::Start(const Config& config) {
   if (impl_->running) {
+    return false;
+  }
+  // Windows agents use the CLI stdio proxy, which authenticates to the
+  // loopback HTTP transport from the protected readiness file. Native stdio
+  // cannot be stopped safely while blocked on process stdin.
+  if (config.platform == Platform::kWindows && config.start_stdio_mcp) {
     return false;
   }
 

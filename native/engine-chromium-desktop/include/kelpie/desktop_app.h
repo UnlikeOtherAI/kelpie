@@ -37,6 +37,12 @@ class DesktopApp {
     std::string bind_host = "127.0.0.1";
     std::string control_token;
     std::string device_id;
+    std::function<BrowserControlResult(bool enabled)> set_native_fullscreen;
+    std::function<BrowserControlResult(bool* enabled)> get_native_fullscreen;
+    std::function<BrowserControlResult()> request_shutdown;
+    std::function<BrowserControlResult(std::string url)> set_home;
+    std::function<BrowserControlResult(std::string* url)> get_home;
+    std::function<BrowserControlResult(std::string message)> show_native_toast;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;
@@ -63,3 +69,4 @@ class DesktopApp {
 };
 
 }  // namespace kelpie
+#include <functional>

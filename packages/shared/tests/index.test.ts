@@ -72,7 +72,7 @@ describe("MCP tools", () => {
   });
 
   it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(120);
+    expect(BrowserMcpTools.length).toBe(122);
   });
 
   it("has correct count of CLI tools", () => {
