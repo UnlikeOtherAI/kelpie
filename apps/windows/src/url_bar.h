@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <optional>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -20,6 +22,7 @@ class UrlBarDelegate {
   virtual void OnForwardRequested() = 0;
   virtual void OnReloadRequested() = 0;
   virtual void OnOpenSettingsRequested() = 0;
+  virtual std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const = 0;
 };
 
 class UrlBar {
@@ -28,10 +31,14 @@ class UrlBar {
   void Resize(const RECT& bounds);
   void SetUrl(const std::wstring& url);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
+  void Focus();
+  bool HandleCommand(WORD control_id, WORD notification_code);
   int Height() const { return kControlHeight + 8; }
 
  private:
   static LRESULT CALLBACK EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  void CompleteAfterInsertion();
+  void RejectCompletion();
   void SubmitCurrentUrl();
 
   static constexpr int kControlHeight = 32;
@@ -46,6 +53,11 @@ class UrlBar {
   HWND settings_button_ = nullptr;
   HWND url_edit_ = nullptr;
   WNDPROC original_edit_proc_ = nullptr;
+  bool setting_url_ = false;
+  bool insertion_at_end_ = false;
+  bool ime_composing_ = false;
+  bool completion_active_ = false;
+  std::wstring completion_prefix_;
 };
 
 }  // namespace kelpie::windows

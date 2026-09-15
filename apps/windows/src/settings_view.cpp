@@ -27,8 +27,12 @@ class SettingsDialogState {
 
 std::wstring WindowText(HWND hwnd) {
   const int length = GetWindowTextLengthW(hwnd);
-  std::wstring value(static_cast<std::size_t>(length), L'\0');
-  GetWindowTextW(hwnd, value.data(), length + 1);
+  if (length <= 0) {
+    return {};
+  }
+  std::wstring value(static_cast<std::size_t>(length) + 1, L'\0');
+  const int copied = GetWindowTextW(hwnd, value.data(), static_cast<int>(value.size()));
+  value.resize(copied > 0 ? static_cast<std::size_t>(copied) : 0);
   return value;
 }
 
@@ -85,7 +89,7 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
           return 0;
         }
         case IDOK:
-          state->values.port = std::max(1, _wtoi(WindowText(state->port_edit).c_str()));
+          state->values.port = std::clamp(_wtoi(WindowText(state->port_edit).c_str()), 1, 65535);
           state->values.profile_dir = WindowText(state->profile_edit);
           state->values.startup_url = WindowText(state->url_edit);
           state->output_ref = state->values;
