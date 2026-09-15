@@ -1,6 +1,7 @@
 #pragma once
 
 #define IDI_KELPIE 101
+#define VS_VERSION_INFO 1
 
 #define IDC_BACK_BUTTON 1001
 #define IDC_FORWARD_BUTTON 1002

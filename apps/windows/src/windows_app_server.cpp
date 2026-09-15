@@ -18,7 +18,7 @@
 namespace kelpie::windows {
 namespace {
 
-constexpr char kAppVersion[] = "0.1.0";
+constexpr char kAppVersion[] = "0.1.1";
 
 std::wstring Utf8ToWide(const std::string& value) {
   if (value.empty()) {
