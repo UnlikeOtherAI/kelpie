@@ -111,6 +111,22 @@ LRESULT CALLBACK Win32Shell::WindowProc(HWND hwnd, UINT message, WPARAM wparam, 
   return self != nullptr ? self->HandleMessage(message, wparam, lparam) : DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
+LRESULT CALLBACK Win32Shell::TabStripProc(HWND hwnd, UINT message, WPARAM wparam,
+                                          LPARAM lparam, UINT_PTR subclass_id,
+                                          DWORD_PTR reference_data) {
+  auto* self = reinterpret_cast<Win32Shell*>(reference_data);
+  const bool relayout = message == WM_HSCROLL || message == WM_MOUSEWHEEL ||
+                        message == WM_KEYDOWN || message == WM_LBUTTONUP ||
+                        message == TCM_SETCURFOCUS;
+  const LRESULT result = DefSubclassProc(hwnd, message, wparam, lparam);
+  if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(hwnd, &Win32Shell::TabStripProc, subclass_id);
+  } else if (relayout && self != nullptr) {
+    self->LayoutTabCloseButtons();
+  }
+  return result;
+}
+
 LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
   switch (message) {
     case WM_CREATE: {
@@ -124,6 +140,8 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       tab_strip_ = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
                                    TCS_BUTTONS | TCS_FLATBUTTONS | TCS_OWNERDRAWFIXED,
                                    0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_TAB_STRIP), instance_, nullptr);
+      SetWindowSubclass(tab_strip_, &Win32Shell::TabStripProc, 1,
+                        reinterpret_cast<DWORD_PTR>(this));
       new_tab_button_ = CreateWindowExW(0, L"BUTTON", L"New tab", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                         0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_NEW_TAB_BUTTON), instance_, nullptr);
       url_bar_.Create(hwnd_, instance_, rect, delegate_);
@@ -171,13 +189,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_PRINTCLIENT:
       PaintClient(reinterpret_cast<HDC>(wparam));
       return 0;
-    case WM_PRINT: {
-      const UINT flags = static_cast<UINT>(lparam);
-      HDC dc = reinterpret_cast<HDC>(wparam);
-      if ((flags & PRF_CLIENT) != 0) PaintClient(dc);
-      if ((flags & PRF_CHILDREN) != 0) PrintChildren(dc);
-      return 0;
-    }
+    case WM_PRINT: return DefWindowProcW(hwnd_, message, wparam, lparam);
     case WM_ERASEBKGND: return window_chrome_.EraseBackground(reinterpret_cast<HDC>(wparam));
     case WM_CTLCOLORSTATIC:
     case WM_CTLCOLOREDIT: {
@@ -199,9 +211,6 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       }
       break;
     }
-    case WM_HSCROLL:
-      if (reinterpret_cast<HWND>(lparam) == tab_strip_) LayoutTabCloseButtons();
-      break;
     case WM_COMMAND: {
       const UINT id = LOWORD(wparam);
       if (url_bar_.HandleCommand(id, HIWORD(wparam))) return 0;
@@ -290,57 +299,6 @@ void Win32Shell::PaintClient(HDC device_context) const {
   url_bar_.Paint(device_context);
 }
 
-void Win32Shell::PrintChildren(HDC device_context) const {
-  for (const UINT id : {IDC_WINDOW_CLOSE, IDC_WINDOW_MINIMIZE, IDC_WINDOW_MAXIMIZE}) {
-    PrintOwnedControl(GetDlgItem(hwnd_, id), device_context);
-  }
-  for (const UINT id : {IDC_BACK_BUTTON, IDC_FORWARD_BUTTON, IDC_RELOAD_BUTTON, IDC_URL_EDIT,
-                        IDC_BOOKMARKS_BUTTON, IDC_HISTORY_BUTTON, IDC_NETWORK_BUTTON, IDC_SETTINGS_BUTTON}) {
-    HWND control = GetDlgItem(hwnd_, id);
-    if (GetDlgCtrlID(control) == IDC_URL_EDIT) {
-      SendMessageW(control, WM_PRINT, reinterpret_cast<WPARAM>(device_context), PRF_CLIENT);
-    } else {
-      PrintOwnedControl(control, device_context);
-    }
-  }
-  RECT strip{};
-  GetWindowRect(tab_strip_, &strip);
-  MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&strip), 2);
-  HBRUSH strip_brush = CreateSolidBrush(ui::Colors().canvas);
-  FillRect(device_context, &strip, strip_brush);
-  DeleteObject(strip_brush);
-  for (std::size_t index = 0; index < tabs_.size(); ++index) {
-    RECT item{};
-    if (!TabCtrl_GetItemRect(tab_strip_, static_cast<int>(index), &item)) continue;
-    MapWindowPoints(tab_strip_, hwnd_, reinterpret_cast<POINT*>(&item), 2);
-    DRAWITEMSTRUCT draw{};
-    draw.CtlID = IDC_TAB_STRIP;
-    draw.itemID = static_cast<UINT>(index);
-    draw.hDC = device_context;
-    draw.rcItem = item;
-    DrawControl(draw);
-  }
-  for (const TabCloseButton& button : tab_close_buttons_) PrintOwnedControl(button.hwnd, device_context);
-  PrintOwnedControl(new_tab_button_, device_context);
-  if (browser_view_->hwnd() != nullptr) {
-    SendMessageW(browser_view_->hwnd(), WM_PRINT, reinterpret_cast<WPARAM>(device_context),
-                 PRF_CLIENT | PRF_CHILDREN);
-  }
-}
-
-void Win32Shell::PrintOwnedControl(HWND control, HDC device_context) const {
-  if (control == nullptr || (GetWindowLongPtrW(control, GWL_STYLE) & WS_VISIBLE) == 0) return;
-  RECT rect{};
-  GetWindowRect(control, &rect);
-  MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&rect), 2);
-  DRAWITEMSTRUCT draw{};
-  draw.CtlID = static_cast<UINT>(GetDlgCtrlID(control));
-  draw.hwndItem = control;
-  draw.hDC = device_context;
-  draw.rcItem = rect;
-  DrawControl(draw);
-}
-
 bool Win32Shell::RefreshTabs() {
   if (tab_strip_ == nullptr || delegate_ == nullptr) return false;
   const nlohmann::json parsed = nlohmann::json::parse(delegate_->GetTabsJson(), nullptr, false);
@@ -397,6 +355,13 @@ void Win32Shell::LayoutTabCloseButtons() {
   RECT strip{};
   GetClientRect(tab_strip_, &strip);
   MapWindowPoints(tab_strip_, hwnd_, reinterpret_cast<POINT*>(&strip), 2);
+  HWND scroll = FindWindowExW(tab_strip_, nullptr, UPDOWN_CLASSW, nullptr);
+  if (scroll != nullptr && (GetWindowLongPtrW(scroll, GWL_STYLE) & WS_VISIBLE) != 0) {
+    RECT scroll_rect{};
+    GetWindowRect(scroll, &scroll_rect);
+    MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&scroll_rect), 2);
+    strip.right = std::min(strip.right, scroll_rect.left);
+  }
   for (std::size_t index = 0; index < tab_close_buttons_.size(); ++index) {
     RECT item{};
     if (!TabCtrl_GetItemRect(tab_strip_, static_cast<int>(index), &item)) {

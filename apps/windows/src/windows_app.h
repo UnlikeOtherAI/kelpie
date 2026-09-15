@@ -89,12 +89,17 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   bool InitializeDesktopRuntime();
   bool ShutdownDesktopRuntime();
   void UpdateBrowserStateFromRuntime();
+  void PersistForClose();
+  bool TryCompleteClose();
   bool CreateShell(int show_command);
   std::wstring AppTitle() const;
 
   HINSTANCE instance_;
   AppConfig config_;
   std::atomic<bool> running_{true};
+  bool close_requested_ = false;
+  bool close_completed_ = false;
+  bool close_persisted_ = false;
 
   DeviceInfoWindows device_info_provider_;
   BrowserState browser_state_;

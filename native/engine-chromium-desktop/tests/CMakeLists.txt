@@ -14,7 +14,7 @@ function(add_desktop_engine_test name)
   add_test(NAME ${name} COMMAND ${name})
   if(KELPIE_ENABLE_CHROMIUM_DESKTOP AND WIN32)
     set_tests_properties(${name} PROPERTIES
-      ENVIRONMENT "PATH=${CEF_ROOT}/Release;$ENV{PATH}")
+      ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CEF_ROOT}/Release")
   endif()
 endfunction()
 

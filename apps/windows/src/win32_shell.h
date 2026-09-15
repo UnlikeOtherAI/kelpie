@@ -64,6 +64,8 @@ class Win32Shell {
   };
 
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  static LRESULT CALLBACK TabStripProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                       UINT_PTR subclass_id, DWORD_PTR reference_data);
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
   void LayoutChildren(int width, int height);
   void ShowPanel(UINT command);
@@ -71,8 +73,6 @@ class Win32Shell {
   void RebuildTabCloseButtons();
   void LayoutTabCloseButtons();
   void PaintClient(HDC device_context) const;
-  void PrintChildren(HDC device_context) const;
-  void PrintOwnedControl(HWND control, HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
   static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
   void ActivateAdjacentTab(int direction);

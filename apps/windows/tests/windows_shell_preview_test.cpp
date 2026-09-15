@@ -115,6 +115,19 @@ int main() {
     if ((GetWindowLongPtrW(close, GWL_STYLE) & WS_VISIBLE) == 0) found_hidden_close = true;
   }
   passed &= Expect(found_hidden_close, "overflow close controls were not hidden");
+  HWND strip = GetDlgItem(shell.hwnd(), IDC_TAB_STRIP);
+  HWND scroll = FindWindowExW(strip, nullptr, UPDOWN_CLASSW, nullptr);
+  HWND first_close = GetDlgItem(shell.hwnd(), 2000);
+  RECT before{};
+  GetWindowRect(first_close, &before);
+  if (scroll != nullptr) {
+    SendMessageW(strip, TCM_SETCURFOCUS, delegate.tab_count - 1, 0);
+    RECT after{};
+    GetWindowRect(first_close, &after);
+    const bool moved = before.left != after.left || before.right != after.right ||
+        ((GetWindowLongPtrW(first_close, GWL_STYLE) & WS_VISIBLE) == 0);
+    passed &= Expect(moved, "tab scroll did not relayout close controls");
+  }
 
   constexpr int kWidth = 1120;
   constexpr int kHeight = 760;

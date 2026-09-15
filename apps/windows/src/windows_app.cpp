@@ -132,24 +132,23 @@ int WindowsApp::Run(int show_command) {
 
   MSG message{};
   while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
-    // Native chrome owns its explicit Tab traversal before accelerators or
-    // renderer dispatch can consume the key.
-    if (shell_ != nullptr && shell_->HandleKeyboardNavigation(message)) {
-      UpdateBrowserStateFromRuntime();
-      continue;
-    }
-    if (shell_ == nullptr || !TranslateAcceleratorW(shell_->hwnd(), shell_->accelerators(), &message)) {
-      TranslateMessage(&message);
-      DispatchMessageW(&message);
+    const bool accelerator_handled =
+        shell_ != nullptr && TranslateAcceleratorW(shell_->hwnd(), shell_->accelerators(), &message);
+    if (!accelerator_handled) {
+      // Bare Tab is chrome traversal only after standard accelerators such as
+      // Ctrl+Tab have had first refusal.
+      if (shell_ == nullptr || !shell_->HandleKeyboardNavigation(message)) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+      }
     }
     UpdateBrowserStateFromRuntime();
+    // A forced CEF close can outlive the first WM_CLOSE dispatch. Pump-driven
+    // callbacks re-enter this owner loop and complete the same close request.
+    TryCompleteClose();
   }
 
-  if (browser_ready) {
-    SaveSession();
-    SaveStores();
-    SaveSettings();
-  }
+  PersistForClose();
   // Never let stack destruction reclaim DesktopApp while CEF still owns its
   // client callbacks. Shutdown pumps close work internally; retry only after
   // a bounded drain has reported incomplete so an unexpected WM_QUIT cannot
@@ -263,17 +262,30 @@ SettingsValues WindowsApp::CurrentSettings() const {
   };
 }
 
-void WindowsApp::OnWindowCloseRequested() {
+void WindowsApp::PersistForClose() {
+  if (close_persisted_) return;
   // Persist while the engine-owned stores and tab model still exist. Shutdown
   // releases those owners only after Chromium has accepted every browser close.
   SaveSession();
   SaveStores();
   SaveSettings();
-  if (!ShutdownDesktopRuntime()) return;
-  running_ = false;
-  if (shell_ != nullptr) shell_->Close();
+  close_persisted_ = true;
 }
 
+bool WindowsApp::TryCompleteClose() {
+  if (!close_requested_ || close_completed_) return close_completed_;
+  if (!ShutdownDesktopRuntime()) return false;
+  close_completed_ = true;
+  running_ = false;
+  if (shell_ != nullptr) shell_->Close();
+  return true;
+}
+
+void WindowsApp::OnWindowCloseRequested() {
+  close_requested_ = true;
+  PersistForClose();
+  TryCompleteClose();
+}
 void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {
   browser_state_ = state;
   shell_->UpdateBrowserState(state);
