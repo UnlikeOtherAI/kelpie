@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(kelpie_windows LANGUAGES CXX RC)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -33,6 +35,7 @@ set(WINDOWS_APP_SOURCES
   src/windows_app.cpp
   src/windows_app_server.cpp
   src/win32_shell.cpp
+  src/window_chrome.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
   src/settings_view.cpp
@@ -47,6 +50,7 @@ set(WINDOWS_APP_SOURCES
 set(WINDOWS_APP_HEADERS
   src/windows_app.h
   src/win32_shell.h
+  src/window_chrome.h
   src/win32_browser_view.h
   src/url_bar.h
   src/settings_view.h
@@ -94,6 +98,7 @@ target_link_libraries(kelpie
     nlohmann_json::nlohmann_json
     user32
     gdi32
+    dwmapi
     shell32
     ws2_32
     iphlpapi
@@ -152,4 +157,15 @@ endif()
 
 if(MINGW)
   target_link_options(kelpie PRIVATE -municode -static -static-libgcc -static-libstdc++)
+endif()
+
+if(BUILD_TESTING)
+  add_executable(window_chrome_test
+    tests/window_chrome_test.cpp
+    src/window_chrome.cpp
+  )
+  target_compile_definitions(window_chrome_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_include_directories(window_chrome_test PRIVATE src resources)
+  target_link_libraries(window_chrome_test PRIVATE user32 gdi32 dwmapi comctl32)
+  add_test(NAME window_chrome_test COMMAND window_chrome_test)
 endif()

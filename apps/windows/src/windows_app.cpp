@@ -268,7 +268,7 @@ void WindowsApp::ApplySettings(const SettingsValues& settings) {
 bool WindowsApp::InitializeCommonControls() const {
   INITCOMMONCONTROLSEX controls{};
   controls.dwSize = sizeof(controls);
-  controls.dwICC = ICC_LISTVIEW_CLASSES | ICC_STANDARD_CLASSES;
+  controls.dwICC = ICC_LISTVIEW_CLASSES;
   return InitCommonControlsEx(&controls) != FALSE;
 }
 
