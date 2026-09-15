@@ -471,7 +471,7 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
     const std::string script = "(()=>{const e=document.querySelector(" + selector_json + ");if(!e)return null;"
       "e.scrollIntoView({block:'center',inline:'center'});const r=e.getBoundingClientRect();const cs=getComputedStyle(e);"
       "const visible=r.width>0&&r.height>0&&cs.visibility!=='hidden'&&cs.display!=='none'&&!e.disabled;"
-      "return {x:r.left+r.width/2,y:r.top+r.height/2,visible,type:(e.type||e.tagName).toLowerCase(),"
+      "return {x:r.left+r.width/2,y:r.top+r.height/2,visible,editable:!!(e.isContentEditable||/^(input|textarea)$/i.test(e.tagName)&&!e.readOnly),type:(e.type||e.tagName).toLowerCase(),"
       "checked:!!e.checked,value:e.value||'',options:e.tagName==='SELECT'?Array.from(e.options).map(o=>o.value):[]};})()";
     auto result = Evaluate(lease, script, &target, RemainingTimeout(started, timeout));
     if (!result.ok) return result;
@@ -491,17 +491,23 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
     if (output) *output={{"trusted",true},{"checked",wanted}}; return BrowserControlResult::Success();
   }
   if (type == "selectOption") {
-    if (target.value("type", "") != "select") return BrowserControlResult::Failure("UNSUPPORTED", "selectOption requires a select element");
+    if (target.value("type", "") != "select-one" && target.value("type", "") != "select-multiple") return BrowserControlResult::Failure("UNSUPPORTED", "selectOption requires a select element");
     const std::string wanted=input.value("value", ""); const auto options=target.value("options", Json::array());
     auto it=std::find(options.begin(),options.end(),Json(wanted));
     if (it==options.end()) return BrowserControlResult::Failure("INVALID_URL", "The requested option does not exist");
     if (target.value("value", "") == wanted) { if(output)*output={{"trusted",true},{"value",wanted}}; return BrowserControlResult::Success(); }
     auto result=mouse_click(ignored); if(!result.ok)return result;
     const int index=static_cast<int>(std::distance(options.begin(),it));
-    for (int i=0;i<index;++i) { Json key{{"type","keyDown"},{"key","ArrowDown"},{"code","ArrowDown"}}; result=DevTools(lease,"Input.dispatchKeyEvent",key,&ignored,RemainingTimeout(started,timeout)); if(!result.ok)return result; }
-    result=DevTools(lease,"Input.dispatchKeyEvent",{{"type","keyDown"},{"key","Enter"},{"code","Enter"}},&ignored,RemainingTimeout(started,timeout));
+    auto key = [&](const char* name, const char* code) {
+      result=DevTools(lease,"Input.dispatchKeyEvent",{{"type","keyDown"},{"key",name},{"code",code}},&ignored,RemainingTimeout(started,timeout)); if(!result.ok)return false;
+      result=DevTools(lease,"Input.dispatchKeyEvent",{{"type","keyUp"},{"key",name},{"code",code}},&ignored,RemainingTimeout(started,timeout)); return result.ok;
+    };
+    if (!key("Home", "Home")) return result;
+    for (int i=0;i<index;++i) if (!key("ArrowDown", "ArrowDown")) return result;
+    if (!key("Enter", "Enter")) return result;
     if(result.ok&&output)*output={{"trusted",true},{"value",wanted}}; return result;
   }
+  if (type == "fill" && !target.value("editable", false)) return BrowserControlResult::Failure("UNSUPPORTED", "fill requires an editable target");
   if (!selector.empty()) { auto result=mouse_click(ignored); if(!result.ok)return result; }
   const std::string text=type=="fill"?input.value("value",""):input.value("text","");
   if (type == "fill") {
