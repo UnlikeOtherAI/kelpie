@@ -52,19 +52,22 @@ class Win32Shell {
   void Close();
 
  private:
+  struct TabItem {
+    std::string id;
+    std::uint64_t generation = 0;
+    std::string label;
+    bool active = false;
+  };
+
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
   void CreateMenuBar();
   void LayoutChildren(int width, int height);
   bool RefreshTabs();
+  static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
   void ActivateAdjacentTab(int direction);
   void ActivateSelectedTab();
   void CloseSelectedTab();
-
-  struct TabItem {
-    std::string id;
-    std::uint64_t generation = 0;
-  };
 
   HINSTANCE instance_;
   ShellDelegate* delegate_;

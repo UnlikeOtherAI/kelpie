@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
   [string]$CefRoot,
+  [string]$SourceRoot = (Join-Path $PSScriptRoot ".."),
+  [string]$CppHttplibRoot,
+  [string]$NlohmannJsonRoot,
   [string]$WrapperBuildDir = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build\wrapper"),
   [string]$BuildDir = (Join-Path $PSScriptRoot "..\.cache\windows-release3"),
   [switch]$SkipTests
@@ -28,7 +31,8 @@ function Invoke-Checked([string]$Description, [scriptblock]$Command) {
   if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
 }
 
-$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$repoRoot = [IO.Path]::GetFullPath($SourceRoot)
+Require-Path (Join-Path $repoRoot "apps\windows\CMakeLists.txt")
 if ([string]::IsNullOrWhiteSpace($CefRoot)) {
   $line = & (Join-Path $PSScriptRoot "download-cef-windows.ps1")
   if ($line -notmatch "^CEF_ROOT=(.+)$") { throw "CEF downloader did not return CEF_ROOT." }
@@ -45,15 +49,32 @@ Initialize-VsEnvironment
 foreach ($tool in @("cmake.exe", "ninja.exe", "cl.exe", "dumpbin.exe", "ctest.exe")) {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Missing build tool: $tool" }
 }
-Invoke-Checked "CEF wrapper configure" { cmake -S $cef -B $wrapperBuild -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_SANDBOX=ON }
+Invoke-Checked "CEF wrapper configure" { cmake -S $cef -B $wrapperBuild -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_SANDBOX=ON -DCEF_RUNTIME_LIBRARY_FLAG=/MT }
 if (-not (Select-String -LiteralPath (Join-Path $wrapperBuild "CMakeCache.txt") -Pattern "^USE_SANDBOX:BOOL=ON$" -Quiet)) {
   throw "CEF wrapper cache does not enable USE_SANDBOX=ON."
+}
+if (-not (Select-String -LiteralPath (Join-Path $wrapperBuild "CMakeCache.txt") -Pattern "^CEF_RUNTIME_LIBRARY_FLAG:STRING=/MT$" -Quiet)) {
+  throw "CEF wrapper cache does not use the static /MT runtime."
 }
 Invoke-Checked "CEF wrapper build" { cmake --build $wrapperBuild --target libcef_dll_wrapper --config Release }
 $wrapper = Join-Path $wrapperBuild "libcef_dll_wrapper\libcef_dll_wrapper.lib"
 Require-Path $wrapper
 
-Invoke-Checked "Kelpie configure" { cmake -S (Join-Path $repoRoot "apps\windows") -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON ("-DCEF_ROOT=" + $cef) ("-DCEF_WRAPPER=" + $wrapper) }
+$kelpieConfigure = @(
+  "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=ON", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
+  ("-DCEF_ROOT=" + $cef), ("-DCEF_WRAPPER=" + $wrapper)
+)
+if (-not [string]::IsNullOrWhiteSpace($CppHttplibRoot)) {
+  $httplib = [IO.Path]::GetFullPath($CppHttplibRoot)
+  Require-Path (Join-Path $httplib "CMakeLists.txt")
+  $kelpieConfigure += "-DFETCHCONTENT_SOURCE_DIR_CPP_HTTPLIB=$httplib"
+}
+if (-not [string]::IsNullOrWhiteSpace($NlohmannJsonRoot)) {
+  $nlohmann = [IO.Path]::GetFullPath($NlohmannJsonRoot)
+  Require-Path (Join-Path $nlohmann "CMakeLists.txt")
+  $kelpieConfigure += "-DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$nlohmann"
+}
+Invoke-Checked "Kelpie configure" { cmake -S (Join-Path $repoRoot "apps\windows") -B $build -G Ninja @kelpieConfigure }
 Invoke-Checked "Kelpie build" { cmake --build $build --config Release }
 foreach ($relative in @("kelpie.dll", "kelpie.exe", "locales")) { Require-Path (Join-Path $build $relative) }
 if (-not ((& dumpbin.exe /exports (Join-Path $build "kelpie.dll") | Out-String) -match "\bRunWinMain\b")) {

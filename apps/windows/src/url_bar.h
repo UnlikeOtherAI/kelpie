@@ -39,7 +39,7 @@ class UrlBar {
   static LRESULT CALLBACK EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   void CompleteAfterInsertion();
   void RejectCompletion();
-  void SubmitCurrentUrl();
+  void SubmitCurrentUrl(std::optional<std::wstring_view> completion_url = std::nullopt);
 
   static constexpr int kControlHeight = 32;
   static constexpr int kButtonWidth = 32;
@@ -58,6 +58,7 @@ class UrlBar {
   bool ime_composing_ = false;
   bool completion_active_ = false;
   std::wstring completion_prefix_;
+  std::wstring completion_navigation_url_;
 };
 
 }  // namespace kelpie::windows

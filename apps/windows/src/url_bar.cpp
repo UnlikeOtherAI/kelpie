@@ -61,6 +61,7 @@ void UrlBar::SetUrl(const std::wstring& url, bool force) {
   completion_active_ = false;
   insertion_at_end_ = false;
   completion_prefix_.clear();
+  completion_navigation_url_.clear();
   SetWindowTextW(url_edit_, url.c_str());
   setting_url_ = false;
 }
@@ -94,9 +95,11 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
     self->insertion_at_end_ = completion::IsTextInsertionAtEnd(
         self->ime_composing_, before.size(), start, end, static_cast<wchar_t>(wparam));
     self->completion_active_ = false;
+    self->completion_navigation_url_.clear();
   } else if (message == WM_PASTE || message == WM_CUT || message == WM_CLEAR || message == WM_UNDO || message == WM_IME_STARTCOMPOSITION) {
     self->insertion_at_end_ = false;
     self->completion_active_ = false;
+    self->completion_navigation_url_.clear();
     if (message == WM_IME_STARTCOMPOSITION) self->ime_composing_ = true;
   } else if (message == WM_IME_ENDCOMPOSITION) {
     self->ime_composing_ = false;
@@ -106,17 +109,21 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       return 0;
     }
     if (wparam == VK_RETURN) {
+      const std::optional<std::wstring_view> completion_url = self->completion_active_
+          ? std::optional<std::wstring_view>(self->completion_navigation_url_) : std::nullopt;
       if (self->completion_active_) SendMessageW(hwnd, EM_SETSEL, -1, -1);
       self->completion_active_ = false;
-      self->SubmitCurrentUrl();
+      self->SubmitCurrentUrl(completion_url);
       return 0;
     }
     self->completion_active_ = false;
+    self->completion_navigation_url_.clear();
     if (wparam == VK_BACK || wparam == VK_DELETE) {
       self->insertion_at_end_ = false;
     }
   } else if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MOUSEWHEEL) {
     self->completion_active_ = false;
+    self->completion_navigation_url_.clear();
   }
   return CallWindowProcW(self->original_edit_proc_, hwnd, message, wparam, lparam);
 }
@@ -126,12 +133,15 @@ void UrlBar::CompleteAfterInsertion() {
   insertion_at_end_ = false;
   const std::wstring typed = ReadWindowText(url_edit_);
   const auto candidate = delegate_ == nullptr ? std::nullopt : delegate_->BestUrlCompletion(typed);
-  if (!candidate || !completion::IsStrictSuffix(typed, *candidate)) return;
+  if (!candidate) return;
+  const auto display = completion::DisplayCandidate(typed, *candidate);
+  if (!display) return;
   setting_url_ = true;
-  SetWindowTextW(url_edit_, candidate->c_str());
-  SendMessageW(url_edit_, EM_SETSEL, static_cast<WPARAM>(typed.size()), static_cast<LPARAM>(candidate->size()));
+  SetWindowTextW(url_edit_, display->c_str());
+  SendMessageW(url_edit_, EM_SETSEL, static_cast<WPARAM>(typed.size()), static_cast<LPARAM>(display->size()));
   setting_url_ = false;
   completion_prefix_ = typed;
+  completion_navigation_url_ = *candidate;
   completion_active_ = true;
 }
 
@@ -141,11 +151,12 @@ void UrlBar::RejectCompletion() {
   SendMessageW(url_edit_, EM_SETSEL, -1, -1);
   setting_url_ = false;
   completion_active_ = false;
+  completion_navigation_url_.clear();
 }
 
-void UrlBar::SubmitCurrentUrl() {
+void UrlBar::SubmitCurrentUrl(std::optional<std::wstring_view> completion_url) {
   if (delegate_ == nullptr || url_edit_ == nullptr) return;
-  const auto url = utf::WideToUtf8(ReadWindowText(url_edit_));
+  const auto url = utf::WideToUtf8(completion_url.value_or(ReadWindowText(url_edit_)));
   if (url && !url->empty()) delegate_->OnNavigateRequested(*url);
 }
 

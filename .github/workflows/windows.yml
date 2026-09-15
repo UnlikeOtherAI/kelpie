@@ -12,6 +12,9 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
+      - name: Verify harness process handling
+        shell: pwsh
+        run: node --test tests/windows/process.test.mjs
       - name: Build CEF wrapper and Windows release
         shell: pwsh
         run: ./scripts/build-windows.ps1
