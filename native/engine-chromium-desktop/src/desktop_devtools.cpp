@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <ctime>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -197,7 +198,11 @@ CefRefPtr<CefValue> DesktopDevToolsSession::ToCefValue(const Json& value) {
   auto output = CefValue::Create();
   if (value.is_null()) output->SetNull();
   else if (value.is_boolean()) output->SetBool(value.get<bool>());
-  else if (value.is_number_integer()) output->SetInt(value.get<int>());
+  else if (value.is_number_integer()) {
+    const auto number = value.get<std::int64_t>();
+    if (number >= std::numeric_limits<int>::min() && number <= std::numeric_limits<int>::max()) output->SetInt(static_cast<int>(number));
+    else output->SetDouble(static_cast<double>(number));
+  }
   else if (value.is_number_unsigned()) output->SetDouble(value.get<double>());
   else if (value.is_number_float()) output->SetDouble(value.get<double>());
   else if (value.is_string()) output->SetString(value.get<std::string>());
@@ -230,28 +235,31 @@ std::optional<CefCookie> DesktopCookieAdapter::ToCefCookie(const Json& input) {
   if (!input.is_object() || !input.contains("name") || !input["name"].is_string() ||
       !input.contains("value") || !input["value"].is_string()) return std::nullopt;
   CefCookie cookie{};
-  cookie.name = input.value("name", "");
-  cookie.value = input.value("value", "");
-  cookie.domain = input.value("domain", "");
-  cookie.path = input.value("path", "/");
+  cookie.size = sizeof(cookie);
+  CefString(&cookie.name) = input.value("name", "");
+  CefString(&cookie.value) = input.value("value", "");
+  CefString(&cookie.domain) = input.value("domain", "");
+  CefString(&cookie.path) = input.value("path", "/");
   cookie.httponly = input.value("httpOnly", false) ? 1 : 0;
   cookie.secure = input.value("secure", false) ? 1 : 0;
   cookie.same_site = ParseSameSite(input.value("sameSite", ""));
   if (input.contains("expires") && input["expires"].is_string()) {
     const auto expires = ParseIsoUtc(input["expires"].get<std::string>());
-    if (!expires || !cef_time_from_timet(*expires, &cookie.expires)) return std::nullopt;
+    cef_time_t utc{};
+    if (!expires || !cef_time_from_timet(*expires, &utc) || !cef_time_to_basetime(&utc, &cookie.expires)) return std::nullopt;
     cookie.has_expires = 1;
   }
   return cookie;
 }
 
 DesktopCookieAdapter::Json DesktopCookieAdapter::FromCefCookie(const CefCookie& cookie) {
-  Json output = {{"name", cookie.name.ToString()}, {"value", cookie.value.ToString()}, {"domain", cookie.domain.ToString()},
-                 {"path", cookie.path.ToString()}, {"httpOnly", cookie.httponly != 0}, {"secure", cookie.secure != 0},
+  Json output = {{"name", CefString(&cookie.name).ToString()}, {"value", CefString(&cookie.value).ToString()}, {"domain", CefString(&cookie.domain).ToString()},
+                 {"path", CefString(&cookie.path).ToString()}, {"httpOnly", cookie.httponly != 0}, {"secure", cookie.secure != 0},
                  {"sameSite", SameSiteName(cookie.same_site)}};
   if (cookie.has_expires) {
+    cef_time_t utc{};
     double expires = 0;
-    if (cef_time_to_doublet(&cookie.expires, &expires)) output["expiresUnixSeconds"] = expires;
+    if (cef_time_from_basetime(cookie.expires, &utc) && cef_time_to_doublet(&utc, &expires)) output["expiresUnixSeconds"] = expires;
   }
   return output;
 }

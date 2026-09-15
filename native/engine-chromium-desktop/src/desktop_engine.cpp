@@ -9,48 +9,21 @@
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
+#include "include/cef_jsdialog_handler.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
+#include "desktop_engine_impl.h"
 
 namespace kelpie {
 
-class DesktopCefClient;
 
-class DesktopEngine::Impl {
- public:
-  explicit Impl(CefRenderer* renderer);
-
-  bool Initialize(const DesktopEngine::Config& next_config);
-  void Shutdown();
-  void DoMessageLoopWork();
-  std::string EvaluateJs(const std::string& script);
-
-  DesktopEngine::ViewportState viewport;
-  DesktopEngine::Config config;
-  CefRenderer* renderer = nullptr;
-  CefRefPtr<CefApp> app;
-  CefRefPtr<DesktopCefClient> client;
-  CefRefPtr<CefBrowser> browser;
-
-  DesktopEngine::JsonEventSink console_sink;
-  DesktopEngine::JsonEventSink network_sink;
-  DesktopEngine::NavigationSink navigation_sink;
-
-  bool initialized = false;
-  bool loading = false;
-  bool can_go_back = false;
-  bool can_go_forward = false;
-  std::string current_url = "about:blank";
-  std::string current_title;
-  std::vector<std::uint8_t> snapshot_bytes;
-  std::mutex mutex;
-};
 
 class DesktopCefClient final : public CefClient,
                                public CefLifeSpanHandler,
                                public CefLoadHandler,
                                public CefDisplayHandler,
-                               public CefRenderHandler {
+                               public CefRenderHandler,
+                               public CefJSDialogHandler {
  public:
   explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
 
@@ -58,6 +31,7 @@ class DesktopCefClient final : public CefClient,
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
   CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
   CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
+  CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
 
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
@@ -74,6 +48,14 @@ class DesktopCefClient final : public CefClient,
                         const CefString& message,
                         const CefString& source,
                         int line) override;
+  bool OnJSDialog(CefRefPtr<CefBrowser> browser,
+                  const CefString& origin_url,
+                  cef_jsdialog_type_t dialog_type,
+                  const CefString& message_text,
+                  const CefString& default_prompt_text,
+                  CefRefPtr<CefJSDialogCallback> callback,
+                  bool& suppress_message) override;
+  void OnResetDialogState(CefRefPtr<CefBrowser> browser) override;
 
   void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
   void OnPaint(CefRefPtr<CefBrowser> browser,
@@ -104,9 +86,16 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   app = CreateDesktopCefApp();
   client = new DesktopCefClient(this);
 
+#if defined(_WIN32)
+  CefMainArgs main_args(static_cast<HINSTANCE>(config.process_instance));
+#else
   CefMainArgs main_args(config.argc, config.argv);
+#endif
   CefSettings settings;
-  settings.no_sandbox = true;
+#if defined(_WIN32)
+  if (config.sandbox_info == nullptr) return false;
+#endif
+  settings.no_sandbox = false;
   settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
   settings.external_message_pump = config.external_message_pump ? 1 : 0;
   if (!config.cache_path.empty()) {
@@ -125,7 +114,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     CefString(&settings.locales_dir_path) = config.locales_dir_path;
   }
 
-  initialized = CefInitialize(main_args, settings, app.get(), nullptr);
+  initialized = CefInitialize(main_args, settings, app.get(), config.sandbox_info);
   if (!initialized) {
     return false;
   }
@@ -147,6 +136,14 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
       browser_settings,
       nullptr,
       nullptr);
+  if (browser) {
+    Tab initial;
+    initial.id = "tab-1";
+    initial.browser = browser;
+    initial.devtools = new DesktopDevToolsSession();
+    initial.url = config.initial_url.empty() ? "about:blank" : config.initial_url;
+    tabs.push_back(std::move(initial));
+  }
 
   renderer->SetCallbacks({
       [this](const std::string& script) { return EvaluateJs(script); },
@@ -212,24 +209,39 @@ std::string DesktopEngine::Impl::EvaluateJs(const std::string& script) {
 }
 
 void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
-  owner_->browser = browser;
-  owner_->current_url = browser->GetMainFrame() ? browser->GetMainFrame()->GetURL().ToString()
-                                                : std::string("about:blank");
+  if (owner_->browser == nullptr) {
+    owner_->browser = browser;
+  }
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->url = browser->GetMainFrame() ? browser->GetMainFrame()->GetURL().ToString()
+                                       : std::string("about:blank");
+  }
+  owner_->UpdateActiveState();
 }
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
-  if (owner_->browser && owner_->browser->IsSame(browser)) {
-    owner_->browser = nullptr;
+  for (auto& tab : owner_->tabs) {
+    if (tab.browser && tab.browser->IsSame(browser) && tab.devtools) tab.devtools->CancelAll();
   }
+  owner_->tabs.erase(std::remove_if(owner_->tabs.begin(), owner_->tabs.end(),
+      [&browser](const DesktopEngine::Impl::Tab& tab) { return tab.browser->IsSame(browser); }),
+      owner_->tabs.end());
+  if (owner_->browser && owner_->browser->IsSame(browser)) {
+    owner_->browser = owner_->tabs.empty() ? nullptr : owner_->tabs.front().browser;
+  }
+  owner_->UpdateActiveState();
 }
 
-void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser>,
+void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                                             bool is_loading,
                                             bool can_go_back,
                                             bool can_go_forward) {
-  owner_->loading = is_loading;
-  owner_->can_go_back = can_go_back;
-  owner_->can_go_forward = can_go_forward;
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->loading = is_loading;
+    tab->can_go_back = can_go_back;
+    tab->can_go_forward = can_go_forward;
+  }
+  owner_->UpdateActiveState();
 }
 
 void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
@@ -238,16 +250,21 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
   if (!frame || !frame->IsMain()) {
     return;
   }
-  owner_->current_url = frame->GetURL().ToString();
-  frame->ExecuteJavaScript(CombinedBridgeScript(), frame->GetURL(), 0);
-  if (owner_->navigation_sink) {
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->url = frame->GetURL().ToString();
+  }
+  owner_->UpdateActiveState();
+  if (owner_->navigation_sink && owner_->browser && owner_->browser->IsSame(browser)) {
     owner_->navigation_sink(owner_->current_url, owner_->current_title);
   }
 }
 
-void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser>, const CefString& title) {
-  owner_->current_title = title.ToString();
-  if (owner_->navigation_sink) {
+void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->title = title.ToString();
+  }
+  owner_->UpdateActiveState();
+  if (owner_->navigation_sink && owner_->browser && owner_->browser->IsSame(browser)) {
     owner_->navigation_sink(owner_->current_url, owner_->current_title);
   }
 }
@@ -278,6 +295,25 @@ bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
       {"column", 0},
   });
   return false;
+}
+
+bool DesktopCefClient::OnJSDialog(CefRefPtr<CefBrowser> browser,
+                                      const CefString& origin_url,
+                                      cef_jsdialog_type_t dialog_type,
+                                      const CefString& message_text,
+                                      const CefString& default_prompt_text,
+                                      CefRefPtr<CefJSDialogCallback> callback,
+                                      bool& suppress_message) {
+  suppress_message = false;
+  if (auto* tab = owner_->FindTab(browser)) {
+    return tab->dialogs.Observe(browser, dialog_type, origin_url, message_text,
+                                default_prompt_text, callback);
+  }
+  return false;
+}
+
+void DesktopCefClient::OnResetDialogState(CefRefPtr<CefBrowser> browser) {
+  if (auto* tab = owner_->FindTab(browser)) tab->dialogs.Reset(browser);
 }
 
 void DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
@@ -405,5 +441,6 @@ CefRenderer& DesktopEngine::renderer() {
 const CefRenderer& DesktopEngine::renderer() const {
   return *renderer_;
 }
+
 
 }  // namespace kelpie

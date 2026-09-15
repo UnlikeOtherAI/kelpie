@@ -1,5 +1,8 @@
 #include "windows_app.h"
 
+#include "kelpie/desktop_http_server.h"
+#include "windows_utf.h"
+
 #include <commctrl.h>
 
 #include <fstream>
@@ -14,33 +17,35 @@
 
 #if defined(HAS_CEF)
 #include "include/cef_app.h"
+#include "kelpie/cef_app_factory.h"
 #endif
 
 namespace kelpie::windows {
 namespace {
 
-std::wstring Utf8ToWide(const std::string& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-  std::wstring output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L'\0');
-  if (size > 1) {
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1);
-  }
-  return output;
+constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
+
+void CALLBACK PumpCefTimer(HWND, UINT, UINT_PTR timer_id, DWORD) {
+#if defined(HAS_CEF)
+  KillTimer(nullptr, timer_id);
+  CefDoMessageLoopWork();
+#endif
 }
 
-std::string WideToUtf8(const std::wstring& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
-  std::string output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), '\0');
-  if (size > 1) {
-    WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1, nullptr, nullptr);
-  }
-  return output;
+std::optional<TabLease> ActiveLease(DesktopApp* app) {
+  if (app == nullptr) return std::nullopt;
+  std::vector<TabSnapshot> tabs;
+  if (!app->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok) return std::nullopt;
+  for (const auto& tab : tabs) if (tab.active) return TabLease{tab.id, tab.generation};
+  return std::nullopt;
+}
+
+bool HasScheme(const std::string& value) {
+  const auto colon = value.find(':');
+  return colon != std::string::npos && colon > 0 &&
+      std::all_of(value.begin(), value.begin() + static_cast<std::ptrdiff_t>(colon), [](unsigned char c) {
+        return std::isalnum(c) || c == '+' || c == '-' || c == '.';
+      });
 }
 
 std::filesystem::path RoamingAppDataPath() {
@@ -71,96 +76,79 @@ void SaveJsonFile(const std::filesystem::path& path, const nlohmann::json& value
   output << value.dump(2);
 }
 
-#if defined(HAS_CEF)
-class WindowsCefApp final : public CefApp {
- public:
-  IMPLEMENT_REFCOUNTING(WindowsCefApp);
-};
-#endif
 
 }  // namespace
 
 WindowsApp::WindowsApp(HINSTANCE instance, AppConfig config)
     : instance_(instance),
       config_(std::move(config)),
-      handler_context_(nullptr),
       device_info_provider_(config_.profile_dir),
       browser_view_(std::make_unique<Win32BrowserView>()),
-      settings_view_(std::make_unique<SettingsView>()),
-      mdns_(std::make_unique<MdnsWindows>()) {
-  handler_context_.SetRenderer(browser_view_.get());
+      settings_view_(std::make_unique<SettingsView>()) {
   shell_ = std::make_unique<Win32Shell>(instance_, this, this, browser_view_.get());
 }
 
 WindowsApp::~WindowsApp() {
-  StopHttpServer();
-  StopMdns();
-  ShutdownBrowserRuntime();
+  ShutdownDesktopRuntime();
 }
 
 int WindowsApp::Run(int show_command) {
   ResolveProfileDirectory();
+  std::string session_error;
+  if (!profile_session_.Open(config_.profile_dir, config_.readiness_path, &session_error)) return 1;
   LoadSettings();
   LoadStores();
-  if (!InitializeCommonControls()) {
-    return 1;
-  }
-  if (!InitializeBrowserRuntime()) {
-    return 1;
-  }
-  const bool has_shell = CreateShell(show_command);
-  if (!has_shell) {
-    // Shell creation failed (e.g. running under Wine without a display driver).
-    // Continue anyway so the HTTP server is still accessible.
-  }
+  if (!InitializeCommonControls()) return 1;
+  if (!CreateShell(show_command)) return 1;
+  if (!InitializeDesktopRuntime()) return 1;
 
-  browser_view_->LoadUrl(config_.initial_url);
-  RefreshDeviceInfo();
-  StartHttpServer();
-  StartMdns();
-
-  if (has_shell) {
-    MSG message{};
-    while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
+  MSG message{};
+  while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
+    if (shell_ == nullptr || !TranslateAcceleratorW(shell_->hwnd(), shell_->accelerators(), &message)) {
       TranslateMessage(&message);
       DispatchMessageW(&message);
-#if defined(HAS_CEF)
-      CefDoMessageLoopWork();
-#endif
     }
-  } else {
-    // No message loop — run headless-style until shutdown is requested.
-    while (running_) {
-      Sleep(100);
-    }
+    desktop_app_->Tick();
+    UpdateBrowserStateFromRuntime();
   }
 
   SaveStores();
   SaveSettings();
-  StopHttpServer();
-  StopMdns();
-  ShutdownBrowserRuntime();
+  ShutdownDesktopRuntime();
   return 0;
 }
 
 void WindowsApp::OnNavigateRequested(const std::string& url) {
-  std::string resolved = url;
-  if (resolved.find("://") == std::string::npos) {
-    resolved = "https://" + resolved;
-  }
-  browser_view_->LoadUrl(resolved);
+  if (!desktop_app_) return;
+  const auto first = url.find_first_not_of(" \t\r\n");
+  const auto last = url.find_last_not_of(" \t\r\n");
+  const std::string trimmed = first == std::string::npos ? std::string() : url.substr(first, last - first + 1);
+  const std::string resolved = HasScheme(trimmed) ? trimmed : "https://" + trimmed;
+  const auto lease = ActiveLease(desktop_app_.get());
+  const auto result = lease ? desktop_app_->engine().Navigate(*lease, resolved, nullptr, std::chrono::seconds(5))
+                            : BrowserControlResult::Failure("TAB_NOT_FOUND", "No active tab exists");
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnBackRequested() {
-  browser_view_->GoBack();
+  const auto lease = ActiveLease(desktop_app_.get());
+  if (!lease) return;
+  const auto result = desktop_app_->engine().Back(*lease, nullptr, std::chrono::seconds(2));
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnForwardRequested() {
-  browser_view_->GoForward();
+  const auto lease = ActiveLease(desktop_app_.get());
+  if (!lease) return;
+  const auto result = desktop_app_->engine().Forward(*lease, nullptr, std::chrono::seconds(2));
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnReloadRequested() {
-  browser_view_->Reload();
+  const auto lease = ActiveLease(desktop_app_.get());
+  if (!lease) return;
+  const auto result = desktop_app_->engine().Reload(*lease, nullptr, std::chrono::seconds(2));
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
 void WindowsApp::OnOpenSettingsRequested() {
@@ -182,11 +170,51 @@ std::string WindowsApp::GetNetworkJson() const {
   return network_store_.ToJson();
 }
 
+std::string WindowsApp::GetTabsJson() const {
+  if (!desktop_app_) return R"({"tabs":[]})";
+  std::vector<TabSnapshot> tabs;
+  if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok) return R"({"tabs":[]})";
+  json items = json::array();
+  for (const auto& tab : tabs) {
+    items.push_back({{"id", tab.id}, {"generation", tab.generation}, {"title", tab.title},
+                     {"url", tab.url}, {"active", tab.active}});
+  }
+  return json{{"tabs", items}}.dump();
+}
+
+std::optional<std::wstring> WindowsApp::BestUrlCompletion(std::wstring_view typed) const {
+  const auto utf8 = utf::WideToUtf8(typed);
+  if (!utf8 || utf8->empty()) return std::nullopt;
+  const std::string completion = history_store_.BestUrlCompletion(*utf8);
+  if (completion.empty()) return std::nullopt;
+  return utf::Utf8ToWide(completion);
+}
+
+void WindowsApp::OnCreateTabRequested() {
+  if (!desktop_app_) return;
+  TabSnapshot tab;
+  const auto result = desktop_app_->engine().CreateTab("about:blank", &tab, std::chrono::seconds(5));
+  if (result.ok) desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2));
+  else if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
+}
+
+void WindowsApp::OnActivateTabRequested(std::string id, std::uint64_t generation) {
+  if (!desktop_app_) return;
+  const auto result = desktop_app_->engine().ActivateTab({std::move(id), generation}, std::chrono::seconds(2));
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
+}
+
+void WindowsApp::OnCloseTabRequested(std::string id, std::uint64_t generation) {
+  if (!desktop_app_) return;
+  const auto result = desktop_app_->engine().CloseTab({std::move(id), generation}, std::chrono::seconds(5));
+  if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
+}
+
 SettingsValues WindowsApp::CurrentSettings() const {
   return SettingsValues{
       config_.port,
       config_.profile_dir.wstring(),
-      Utf8ToWide(config_.initial_url),
+      utf::Utf8ToWideDisplay(config_.initial_url),
   };
 }
 
@@ -249,50 +277,88 @@ void WindowsApp::SaveStores() const {
 }
 
 void WindowsApp::ApplySettings(const SettingsValues& settings) {
-  config_.port = settings.port;
-  if (!settings.profile_dir.empty()) {
-    config_.profile_dir = settings.profile_dir;
-    std::filesystem::create_directories(config_.profile_dir);
-    device_info_provider_.SetProfileDir(config_.profile_dir);
-  }
-  config_.initial_url = WideToUtf8(settings.startup_url);
+  config_.initial_url = utf::WideToUtf8(settings.startup_url).value_or(config_.initial_url);
   SaveSettings();
-  RefreshDeviceInfo();
-  StopHttpServer();
-  StopMdns();
-  StartHttpServer();
-  StartMdns();
-  shell_->ShowToast(L"Settings saved");
+  const bool restart_required = settings.port != config_.port ||
+      (!settings.profile_dir.empty() && std::filesystem::path(settings.profile_dir) != config_.profile_dir);
+  shell_->ShowToast(restart_required ? L"Startup URL saved. Restart Kelpie to change profile or port."
+                                    : L"Settings saved");
 }
 
 bool WindowsApp::InitializeCommonControls() const {
   INITCOMMONCONTROLSEX controls{};
   controls.dwSize = sizeof(controls);
-  controls.dwICC = ICC_LISTVIEW_CLASSES | ICC_STANDARD_CLASSES;
+  controls.dwICC = ICC_LISTVIEW_CLASSES | ICC_STANDARD_CLASSES | ICC_TAB_CLASSES;
   return InitCommonControlsEx(&controls) != FALSE;
 }
 
-bool WindowsApp::InitializeBrowserRuntime() {
-#if defined(HAS_CEF)
-  CefMainArgs main_args(instance_);
-  CefRefPtr<WindowsCefApp> app(new WindowsCefApp());
-  if (const int exit_code = CefExecuteProcess(main_args, app, nullptr); exit_code >= 0) {
+bool WindowsApp::InitializeDesktopRuntime() {
+  SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
+    const UINT delay = static_cast<UINT>(std::clamp<std::int64_t>(delay_ms, 1, 60'000));
+    SetTimer(nullptr, kCefPumpTimerId, delay, &PumpCefTimer);
+  });
+  desktop_app_ = std::make_unique<DesktopApp>();
+  DesktopApp::Config runtime;
+  runtime.platform = Platform::kWindows;
+  runtime.engine_name = "chromium";
+  runtime.port = config_.port;
+  runtime.app_name = "kelpie";
+  runtime.app_version = "0.1.1";
+  runtime.start_stdio_mcp = config_.mcp_stdio;
+  runtime.bind_host = "127.0.0.1";
+  runtime.control_token = profile_session_.token();
+  runtime.device_id = device_info_provider_.Collect(config_.port, config_.width, config_.height, runtime.app_version).id;
+  runtime.engine.mode = DesktopEngine::Mode::kWindowed;
+  runtime.engine.process_instance = config_.cef_process_instance;
+  runtime.engine.sandbox_info = config_.sandbox_info;
+  runtime.engine.initial_url = config_.initial_url;
+  runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
+  runtime.engine.configure_window_info = [this](void* raw_info) {
+    auto* info = static_cast<CefWindowInfo*>(raw_info);
+    RECT rect{};
+    GetClientRect(browser_view_->hwnd(), &rect);
+    info->SetAsChild(browser_view_->hwnd(), CefRect(0, 0, rect.right, rect.bottom));
+  };
+  runtime.engine.configure_tab_window_info = [this](void* raw_info, const std::string&) {
+    auto* info = static_cast<CefWindowInfo*>(raw_info);
+    RECT rect{};
+    GetClientRect(browser_view_->hwnd(), &rect);
+    info->SetAsChild(browser_view_->hwnd(), CefRect(0, 0, rect.right, rect.bottom));
+  };
+  if (!desktop_app_->Start(runtime)) {
+    desktop_app_.reset();
     return false;
   }
-  CefSettings settings;
-  settings.no_sandbox = true;
-  settings.windowless_rendering_enabled = false;
-  CefString(&settings.cache_path) = config_.profile_dir.wstring() + L"\\cache";
-  return CefInitialize(main_args, settings, app, nullptr);
-#else
+  browser_view_->ShowFallback(false);
+  std::string readiness_error;
+  if (!profile_session_.PublishReadiness(runtime.device_id, desktop_app_->http_server().bound_port(),
+                                         runtime.start_stdio_mcp, &readiness_error)) {
+    ShutdownDesktopRuntime();
+    return false;
+  }
   return true;
-#endif
 }
 
-void WindowsApp::ShutdownBrowserRuntime() {
-#if defined(HAS_CEF)
-  CefShutdown();
-#endif
+void WindowsApp::ShutdownDesktopRuntime() {
+  KillTimer(nullptr, kCefPumpTimerId);
+  SetDesktopCefMessagePumpScheduler({});
+  if (desktop_app_) {
+    desktop_app_->Stop();
+    desktop_app_.reset();
+  }
+  profile_session_.ClearReadiness();
+}
+
+void WindowsApp::UpdateBrowserStateFromRuntime() {
+  if (!desktop_app_) return;
+  std::vector<TabSnapshot> tabs;
+  if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::milliseconds(20)).ok) return;
+  for (const auto& tab : tabs) {
+    if (tab.active) {
+      OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward});
+      return;
+    }
+  }
 }
 
 bool WindowsApp::CreateShell(int show_command) {
@@ -313,10 +379,6 @@ void WindowsApp::RememberNavigation(const BrowserState& state) {
     network_store_.AppendDocumentNavigation(state.url, 200, "text/html");
     last_recorded_url_ = state.url;
   }
-}
-
-void WindowsApp::RefreshDeviceInfo() {
-  device_info_ = BuildDeviceInfo();
 }
 
 std::wstring WindowsApp::AppTitle() const {

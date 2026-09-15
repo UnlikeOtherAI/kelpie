@@ -27,6 +27,12 @@ class DesktopEngine final : public DesktopBrowserControl {
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
+    // On Windows CEF receives the application HINSTANCE. Other platforms use
+    // argc/argv. Keeping both avoids platform-specific runtime entry points.
+    void* process_instance = nullptr;
+    // Supplied by CEF bootstrap.exe on Windows. It must be passed unchanged
+    // to CefInitialize so Chromium subprocesses remain sandboxed.
+    void* sandbox_info = nullptr;
     int argc = 0;
     char** argv = nullptr;
     std::string initial_url;

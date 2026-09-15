@@ -74,8 +74,14 @@ LRESULT BookmarksView::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
       if (notification->idFrom == IDC_BOOKMARKS_LIST && notification->code == NM_DBLCLK && on_navigate_) {
         const int selected = ListView_GetNextItem(list_view_, -1, LVNI_SELECTED);
         wchar_t url[4096]{};
-        if (selected >= 0 && ListView_GetItemText(list_view_, selected, 1, url, static_cast<int>(sizeof(url) / sizeof(*url))) > 0) {
-          if (const auto utf8 = utf::WideToUtf8(url)) on_navigate_(*utf8);
+        LVITEMW item{};
+        item.iSubItem = 1;
+        item.pszText = url;
+        item.cchTextMax = static_cast<int>(sizeof(url) / sizeof(*url));
+        if (selected >= 0 && SendMessageW(list_view_, LVM_GETITEMTEXTW, selected,
+                                          reinterpret_cast<LPARAM>(&item)) > 0) {
+          const auto converted = utf::WideToUtf8(std::wstring_view(url));
+          if (converted) on_navigate_(*converted);
         }
       }
       return 0;

@@ -46,23 +46,39 @@ option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CE
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER "")
+set(CEF_WRAPPER "" CACHE FILEPATH "Path to a built CEF libcef_dll_wrapper library")
 
 if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/cef_app_factory.cpp)
   if(NOT CEF_ROOT)
     message(FATAL_ERROR "KELPIE_ENABLE_CHROMIUM_DESKTOP requires CEF_ROOT to point at a CEF SDK")
   endif()
-  if(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
-    set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
-        "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
-  elseif(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
-    set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
-        "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
+  if(WIN32)
+    if(CEF_WRAPPER AND EXISTS "${CEF_WRAPPER}")
+      set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER "${CEF_WRAPPER}")
+    endif()
+    if(EXISTS "${CEF_ROOT}/Release/libcef.lib")
+      set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.lib")
+    endif()
+  else()
+    if(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
+      set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
+          "${CEF_ROOT}/build/libcef_dll_wrapper/libcef_dll_wrapper.a")
+    elseif(EXISTS "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
+      set(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER
+          "${CEF_ROOT}/build/libcef_dll_wrapper/Release/libcef_dll_wrapper.a")
+    endif()
+    if(EXISTS "${CEF_ROOT}/Release/libcef.so")
+      set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.so")
+    endif()
   endif()
-  if(EXISTS "${CEF_ROOT}/Release/libcef.so")
-    set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "${CEF_ROOT}/Release/libcef.so")
+  if(NOT KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER OR NOT KELPIE_CHROMIUM_DESKTOP_CEF_LIB)
+    message(FATAL_ERROR "CEF desktop engine requires libcef and libcef_dll_wrapper")
   endif()
-  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine.cpp)
+  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
+    src/desktop_engine.cpp
+    src/desktop_engine_control.cpp
+    src/desktop_devtools.cpp)
 else()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)
 endif()
@@ -79,6 +95,8 @@ target_include_directories(kelpie_engine_chromium_desktop
 )
 
 if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
+  target_compile_features(kelpie_engine_chromium_desktop PRIVATE cxx_std_20)
+  target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_include_directories(kelpie_engine_chromium_desktop PRIVATE ${CEF_ROOT})
   if(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER)
     target_link_libraries(kelpie_engine_chromium_desktop

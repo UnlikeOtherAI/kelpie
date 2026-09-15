@@ -6,6 +6,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
+set(CEF_WRAPPER "" CACHE FILEPATH "Path to a built Windows libcef_dll_wrapper library")
+option(HAS_CEF "Build Windows app with Chromium Embedded Framework" OFF)
+if(CEF_ROOT)
+  set(HAS_CEF ON)
+endif()
+if(HAS_CEF AND CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+  message(FATAL_ERROR "The pinned Windows CEF minimal SDK is packaged with a Release wrapper; configure -DCMAKE_BUILD_TYPE=Release")
+endif()
+if(HAS_CEF)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
+
+if(MSVC)
+  # CEF's Windows wrapper uses the static CRT. Every native target must use
+  # the same CRT or the linker rejects mixed debug/runtime allocations.
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+endif()
+
+include(CTest)
 include(FetchContent)
 
 set(KELPIE_NATIVE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../native")
@@ -18,6 +38,9 @@ set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
 
 if(NOT TARGET kelpie_core_protocol)
+  if(HAS_CEF)
+    set(KELPIE_ENABLE_CHROMIUM_DESKTOP ON CACHE BOOL "" FORCE)
+  endif()
   add_subdirectory("${KELPIE_NATIVE_ROOT}" "${CMAKE_BINARY_DIR}/kelpie_native")
 endif()
 
@@ -31,7 +54,6 @@ FetchContent_MakeAvailable(cpp_httplib)
 set(WINDOWS_APP_SOURCES
   src/main.cpp
   src/windows_app.cpp
-  src/windows_app_server.cpp
   src/win32_shell.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
@@ -39,6 +61,7 @@ set(WINDOWS_APP_SOURCES
   src/bookmarks_view.cpp
   src/history_view.cpp
   src/network_inspector.cpp
+  src/profile_session.cpp
   src/toast_view.cpp
   src/device_info_windows.cpp
   src/mdns_windows.cpp
@@ -53,6 +76,7 @@ set(WINDOWS_APP_HEADERS
   src/bookmarks_view.h
   src/history_view.h
   src/network_inspector.h
+  src/profile_session.h
   src/toast_view.h
   src/device_info_windows.h
   src/mdns_windows.h
@@ -63,7 +87,7 @@ set(WINDOWS_APP_RESOURCES
   resources/resource.h
 )
 
-add_executable(kelpie WIN32
+add_library(kelpie SHARED
   ${WINDOWS_APP_SOURCES}
   ${WINDOWS_APP_HEADERS}
   ${WINDOWS_APP_RESOURCES}
@@ -99,6 +123,7 @@ target_link_libraries(kelpie
     iphlpapi
     dnsapi
     advapi32
+    bcrypt
     comctl32
     ole32
     Rpcrt4
@@ -106,15 +131,12 @@ target_link_libraries(kelpie
 
 set_target_properties(kelpie PROPERTIES
   OUTPUT_NAME "kelpie"
+  PREFIX ""
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
 if(TARGET kelpie_engine_chromium_desktop)
   target_link_libraries(kelpie PRIVATE kelpie_engine_chromium_desktop)
-endif()
-
-option(HAS_CEF "Build Windows app with Chromium Embedded Framework" OFF)
-if(CEF_ROOT)
-  set(HAS_CEF ON)
 endif()
 
 if(HAS_CEF)
@@ -122,32 +144,53 @@ if(HAS_CEF)
     message(FATAL_ERROR "HAS_CEF requires CEF_ROOT to point at a CEF binary distribution")
   endif()
 
-  target_compile_definitions(kelpie PRIVATE HAS_CEF=1)
+  target_compile_definitions(kelpie PRIVATE HAS_CEF=1 CEF_USE_BOOTSTRAP=1)
   target_include_directories(kelpie PRIVATE "${CEF_ROOT}" "${CEF_ROOT}/include")
 
   find_library(CEF_LIBCEF NAMES libcef PATHS "${CEF_ROOT}/Release" "${CEF_ROOT}/Debug" NO_DEFAULT_PATH)
-  find_library(CEF_WRAPPER NAMES libcef_dll_wrapper PATHS "${CEF_ROOT}/Release" "${CEF_ROOT}/Debug" NO_DEFAULT_PATH)
+  if(NOT CEF_WRAPPER)
+    find_library(CEF_WRAPPER NAMES libcef_dll_wrapper PATHS
+      "${CEF_ROOT}/Release" "${CEF_ROOT}/Debug"
+      "${CEF_ROOT}/build/libcef_dll_wrapper"
+      "${CEF_ROOT}/build/libcef_dll_wrapper/Release"
+      NO_DEFAULT_PATH)
+  endif()
 
   if(CEF_LIBCEF)
     target_link_libraries(kelpie PRIVATE "${CEF_LIBCEF}")
   endif()
-  if(CEF_WRAPPER)
+  if(CEF_WRAPPER AND EXISTS "${CEF_WRAPPER}")
     target_link_libraries(kelpie PRIVATE "${CEF_WRAPPER}")
+  else()
+    message(FATAL_ERROR "Windows CEF requires a built libcef_dll_wrapper; set CEF_WRAPPER")
   endif()
 
-  file(GLOB CEF_RUNTIME_FILES
+  file(GLOB CEF_RUNTIME_FILES LIST_DIRECTORIES false
     "${CEF_ROOT}/Release/*.dll"
     "${CEF_ROOT}/Release/*.bin"
     "${CEF_ROOT}/Release/*.dat"
-    "${CEF_ROOT}/Resources/*"
+    "${CEF_ROOT}/Resources/*.pak"
   )
   foreach(runtime_file IN LISTS CEF_RUNTIME_FILES)
     add_custom_command(TARGET kelpie POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${runtime_file}"
-        "$<TARGET_FILE_DIR:kelpie>"
-    )
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${runtime_file}" "$<TARGET_FILE_DIR:kelpie>")
   endforeach()
+  add_custom_command(TARGET kelpie POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CEF_ROOT}/Resources/locales" "$<TARGET_FILE_DIR:kelpie>/locales"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CEF_ROOT}/Release/bootstrap.exe" "$<TARGET_FILE_DIR:kelpie>/kelpie.exe"
+    COMMENT "Bundling sandboxed CEF bootstrap and locale resources")
+endif()
+
+if(BUILD_TESTING)
+  add_executable(kelpie_windows_utf_test tests/windows_utf_test.cpp)
+  target_include_directories(kelpie_windows_utf_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_utf_test PRIVATE user32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_utf_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_utf_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_utf_test COMMAND kelpie_windows_utf_test)
 endif()
 
 if(MINGW)
