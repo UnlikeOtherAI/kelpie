@@ -98,6 +98,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   config = next_config;
+  shutting_down = false;
   viewport.width = std::max(1, config.viewport.width);
   viewport.height = std::max(1, config.viewport.height);
   viewport.offscreen = config.mode == DesktopEngine::Mode::kOffscreen;
@@ -202,6 +203,7 @@ void DesktopEngine::Impl::Shutdown() {
   if (!initialized) {
     return;
   }
+  shutting_down = true;
   for (auto& tab : tabs) {
     if (tab.devtools) tab.devtools->CancelAll();
     if (tab.browser && tab.browser->GetHost()) tab.browser->GetHost()->CloseBrowser(true);
@@ -396,7 +398,7 @@ void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser>,
 
 DesktopEngine::DesktopEngine()
     : renderer_(std::make_unique<CefRenderer>()),
-      impl_(std::make_unique<Impl>(renderer_.get())) {}
+      impl_(std::make_shared<Impl>(renderer_.get())) {}
 
 DesktopEngine::~DesktopEngine() = default;
 
@@ -425,12 +427,13 @@ DesktopEngine::ViewportState DesktopEngine::viewport() const {
 }
 
 bool DesktopEngine::ResizeViewport(int width, int height) {
-  impl_->viewport.width = std::max(1, width);
-  impl_->viewport.height = std::max(1, height);
-  if (impl_->browser && impl_->browser->GetHost()) {
-    impl_->browser->GetHost()->WasResized();
-  }
-  return true;
+  const auto impl = impl_;
+  return impl->RunOnUi([impl, width, height] {
+    impl->viewport.width = std::max(1, width);
+    impl->viewport.height = std::max(1, height);
+    if (impl->browser && impl->browser->GetHost()) impl->browser->GetHost()->WasResized();
+    return BrowserControlResult::Success();
+  }, std::chrono::seconds(2)).ok;
 }
 
 bool DesktopEngine::SendFocusEvent(bool focused) {

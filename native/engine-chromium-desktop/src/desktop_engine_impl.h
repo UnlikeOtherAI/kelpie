@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -15,7 +17,7 @@ namespace kelpie {
 
 class DesktopCefClient;
 
-class DesktopEngine::Impl {
+class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::Impl> {
  public:
   explicit Impl(CefRenderer* renderer);
 
@@ -51,6 +53,7 @@ class DesktopEngine::Impl {
   DesktopEngine::NavigationSink navigation_sink;
 
   bool initialized = false;
+  std::atomic<bool> shutting_down = false;
   bool loading = false;
   bool can_go_back = false;
   bool can_go_forward = false;

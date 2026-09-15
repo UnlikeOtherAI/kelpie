@@ -111,7 +111,7 @@ void DesktopEngine::Impl::UpdateActiveState() {
 
 BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlResult()> operation,
                                                    Timeout timeout) {
-  if (!initialized) return BrowserControlResult::Failure("INTERNAL", "Browser runtime is not running");
+  if (!initialized || shutting_down) return BrowserControlResult::Failure("INTERNAL", "Browser runtime is not running");
   if (CefCurrentlyOn(TID_UI)) return operation();
   auto pending = std::make_shared<UiOperation>();
   pending->call = std::move(operation);
@@ -165,12 +165,13 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, 
 }
 
 BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>* output, Timeout timeout) {
+  const auto impl = impl_;
   if (!output) return BrowserControlResult::Failure("INTERNAL", "tabs is required");
   auto collected = std::make_shared<std::vector<TabSnapshot>>();
-  const auto result = impl_->RunOnUi([this, collected] {
+  const auto result = impl->RunOnUi([impl, collected] {
     collected->clear();
-    for (const auto& tab : impl_->tabs) collected->push_back(impl_->Snapshot(tab));
-    return BrowserControlResult::Success(impl_->ActiveTab() ? std::optional(impl_->Snapshot(*impl_->ActiveTab())) : std::nullopt);
+    for (const auto& tab : impl->tabs) collected->push_back(impl->Snapshot(tab));
+    return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);
   if (result.ok) *output = *collected;
   return result;
@@ -179,96 +180,101 @@ BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>* output, Ti
 BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>& id,
                                                const std::optional<std::uint64_t>& generation,
                                                TabLease* lease, Timeout timeout) {
+  const auto impl = impl_;
   if (!lease) return BrowserControlResult::Failure("INTERNAL", "lease is required");
   const auto tab_id = id;
   const auto requested_generation = generation;
   auto resolved = std::make_shared<TabLease>();
-  const auto result = impl_->RunOnUi([this, tab_id, requested_generation, resolved] {
+  const auto result = impl->RunOnUi([impl, tab_id, requested_generation, resolved] {
     DesktopEngine::Impl::Tab* tab = nullptr;
     if (tab_id) {
-      for (auto& candidate : impl_->tabs) if (candidate.id == *tab_id) { tab = &candidate; break; }
+      for (auto& candidate : impl->tabs) if (candidate.id == *tab_id) { tab = &candidate; break; }
       if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist");
       if (requested_generation && tab->generation != *requested_generation) {
         return BrowserControlResult::Failure("TAB_STALE", "The tab lease is stale");
       }
     } else {
-      if (impl_->tabs.size() != 1) return BrowserControlResult::Failure("TAB_REQUIRED", "tabId is required when more than one tab is open");
-      tab = impl_->ActiveTab();
+      if (impl->tabs.size() != 1) return BrowserControlResult::Failure("TAB_REQUIRED", "tabId is required when more than one tab is open");
+      tab = impl->ActiveTab();
     }
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "No active tab exists");
     *resolved = {tab->id, tab->generation};
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (result.ok) *lease = *resolved;
   return result;
 }
 
 BrowserControlResult DesktopEngine::CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) {
+  const auto impl = impl_;
   auto created = std::make_shared<TabSnapshot>();
-  const auto result = impl_->RunOnUi([this, url = std::move(url), created] {
-    return impl_->CreateTabOnUi(url, created.get());
+  const auto result = impl->RunOnUi([impl, url = std::move(url), created] {
+    return impl->CreateTabOnUi(url, created.get());
   }, timeout);
   if (result.ok && tab) *tab = *created;
   return result;
 }
 
 BrowserControlResult DesktopEngine::ActivateTab(TabLease lease, Timeout timeout) {
-  return impl_->RunOnUi([this, lease] {
-    auto* tab = impl_->FindTab(lease);
+  const auto impl = impl_;
+  return impl->RunOnUi([impl, lease] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
 #if defined(_WIN32)
-    if (impl_->browser && impl_->browser->GetHost()) ShowWindow(impl_->browser->GetHost()->GetWindowHandle(), SW_HIDE);
+    if (impl->browser && impl->browser->GetHost()) ShowWindow(impl->browser->GetHost()->GetWindowHandle(), SW_HIDE);
     if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
 #endif
-    impl_->browser = tab->browser;
-    impl_->UpdateActiveState();
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    impl->browser = tab->browser;
+    impl->UpdateActiveState();
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
 }
 
 BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
-  return impl_->RunOnUi([this, lease] {
-    auto* tab = impl_->FindTab(lease);
+  const auto impl = impl_;
+  return impl->RunOnUi([impl, lease] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     CefRefPtr<CefBrowser> closing = tab->browser;
     CefRefPtr<DesktopDevToolsSession> closing_devtools = tab->devtools;
-    const bool was_active = impl_->browser && impl_->browser->IsSame(closing);
-    if (impl_->tabs.size() == 1) {
+    const bool was_active = impl->browser && impl->browser->IsSame(closing);
+    if (impl->tabs.size() == 1) {
       TabSnapshot replacement;
-      const auto created = impl_->CreateTabOnUi("about:blank", &replacement);
+      const auto created = impl->CreateTabOnUi("about:blank", &replacement);
       if (!created.ok) return created;
-      impl_->browser = impl_->tabs.back().browser;
+      impl->browser = impl->tabs.back().browser;
     } else if (was_active) {
-      for (const auto& candidate : impl_->tabs) {
-        if (!candidate.browser->IsSame(closing)) { impl_->browser = candidate.browser; break; }
+      for (const auto& candidate : impl->tabs) {
+        if (!candidate.browser->IsSame(closing)) { impl->browser = candidate.browser; break; }
       }
     }
     if (closing_devtools) closing_devtools->CancelAll();
 #if defined(_WIN32)
-    if (was_active && impl_->browser && impl_->browser->GetHost()) {
-      ShowWindow(impl_->browser->GetHost()->GetWindowHandle(), SW_SHOW);
+    if (was_active && impl->browser && impl->browser->GetHost()) {
+      ShowWindow(impl->browser->GetHost()->GetWindowHandle(), SW_SHOW);
     }
 #endif
-    impl_->tabs.erase(std::remove_if(impl_->tabs.begin(), impl_->tabs.end(),
+    impl->tabs.erase(std::remove_if(impl->tabs.begin(), impl->tabs.end(),
         [&closing](const DesktopEngine::Impl::Tab& candidate) { return candidate.browser->IsSame(closing); }),
-        impl_->tabs.end());
+        impl->tabs.end());
     closing->GetHost()->CloseBrowser(false);
-    impl_->UpdateActiveState();
-    return BrowserControlResult::Success(impl_->ActiveTab() ? std::optional(impl_->Snapshot(*impl_->ActiveTab())) : std::nullopt);
+    impl->UpdateActiveState();
+    return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);
 }
 
 BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std::string url,
                                              TabSnapshot* tab, Timeout timeout) {
+  const auto impl = impl_;
   auto navigated = std::make_shared<TabSnapshot>();
-  const auto result = impl_->RunOnUi([this, lease, url = std::move(url), navigated] {
+  const auto result = impl->RunOnUi([impl, lease, url = std::move(url), navigated] {
     if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
     DesktopEngine::Impl::Tab* target = nullptr;
-    if (lease) target = impl_->FindTab(*lease); else if (impl_->tabs.size() == 1) target = impl_->ActiveTab();
+    if (lease) target = impl->FindTab(*lease); else if (impl->tabs.size() == 1) target = impl->ActiveTab();
     if (!target) return BrowserControlResult::Failure(lease ? "TAB_NOT_FOUND" : "TAB_REQUIRED", "A current tab lease is required");
     target->browser->GetMainFrame()->LoadURL(url);
     target->url = url;
-    *navigated = impl_->Snapshot(*target);
+    *navigated = impl->Snapshot(*target);
     return BrowserControlResult::Success(*navigated);
   }, timeout);
   if (result.ok && tab) *tab = *navigated;
@@ -276,32 +282,36 @@ BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std:
 }
 
 BrowserControlResult DesktopEngine::Back(TabLease lease, TabSnapshot* tab, Timeout timeout) {
+  const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl_->RunOnUi([this, lease, state] { auto* target=impl_->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoBack(); *state=impl_->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoBack(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 BrowserControlResult DesktopEngine::Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) {
+  const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl_->RunOnUi([this, lease, state] { auto* target=impl_->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoForward(); *state=impl_->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->GoForward(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 BrowserControlResult DesktopEngine::Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) {
+  const auto impl = impl_;
   auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl_->RunOnUi([this, lease, state] { auto* target=impl_->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); if (target->loading) target->browser->StopLoad(); else target->browser->Reload(); *state=impl_->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
+  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); if (target->loading) target->browser->StopLoad(); else target->browser->Reload(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
   if (result.ok && tab) *tab=*state; return result;
 }
 
 BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script, Json* value, Timeout timeout) {
+  const auto impl = impl_;
   if (value == nullptr) return BrowserControlResult::Failure("INTERNAL", "result is required");
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl_->RunOnUi([this, lease, script = std::move(script), pending] {
-    auto* tab = impl_->FindTab(lease);
+  const auto started = impl->RunOnUi([impl, lease, script = std::move(script), pending] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     pending->session = tab->devtools;
     pending->operation = pending->session->Begin(tab->browser, "Runtime.evaluate",
                                                   DesktopDevToolsSession::EvaluateParams(script));
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (!started.ok) return started;
   const auto parsed = DesktopDevToolsSession::ParseEvaluateResult(
@@ -312,18 +322,19 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
 }
 
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
+  const auto impl = impl_;
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
   const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(Json::object());
   if (!screenshot_params) return BrowserControlResult::Failure("INTERNAL", "Screenshot parameters are invalid");
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl_->RunOnUi([this, lease, pending, screenshot_params] {
-    auto* tab = impl_->FindTab(lease);
+  const auto started = impl->RunOnUi([impl, lease, pending, screenshot_params] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     pending->session = tab->devtools;
     pending->operation = pending->session->Begin(tab->browser, "Page.captureScreenshot",
                                                   *screenshot_params);
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (!started.ok) return started;
   const auto parsed = DesktopDevToolsSession::ParseScreenshotResult(
@@ -350,27 +361,29 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
 }
 
 BrowserControlResult DesktopEngine::GetDialog(TabLease lease, Json* dialog, Timeout timeout) {
+  const auto impl = impl_;
   if (!dialog) return BrowserControlResult::Failure("INTERNAL", "dialog is required");
   auto state = std::make_shared<Json>();
-  const auto result = impl_->RunOnUi([this, lease, state] {
-    auto* tab = impl_->FindTab(lease);
+  const auto result = impl->RunOnUi([impl, lease, state] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     *state = tab->dialogs.Current(tab->browser);
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (result.ok) *dialog = *state;
   return result;
 }
 
 BrowserControlResult DesktopEngine::HandleDialog(TabLease lease, const Json& action, Json* output, Timeout timeout) {
+  const auto impl = impl_;
   auto state = std::make_shared<Json>();
-  const auto result = impl_->RunOnUi([this, lease, action, state] {
-    auto* tab = impl_->FindTab(lease);
+  const auto result = impl->RunOnUi([impl, lease, action, state] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     if (!tab->dialogs.Handle(tab->browser, action, state.get())) {
       return BrowserControlResult::Failure("UNSUPPORTED", "No matching JavaScript dialog is open");
     }
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (result.ok && output) *output = *state;
   return result;
@@ -378,15 +391,16 @@ BrowserControlResult DesktopEngine::HandleDialog(TabLease lease, const Json& act
 
 BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method, const Json& params,
                                              Json* output, Timeout timeout) {
+  const auto impl = impl_;
   if (!output) return BrowserControlResult::Failure("INTERNAL", "result is required");
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl_->RunOnUi([this, lease, method = std::move(method), params, pending] {
-    auto* tab = impl_->FindTab(lease);
+  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending] {
+    auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     pending->session = tab->devtools;
     pending->operation = pending->session->Begin(tab->browser, method, params);
-    return BrowserControlResult::Success(impl_->Snapshot(*tab));
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (!started.ok) return started;
   const auto completed = pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout));

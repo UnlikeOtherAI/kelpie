@@ -133,7 +133,7 @@ class DesktopEngine final : public DesktopBrowserControl {
 
  private:
   std::unique_ptr<CefRenderer> renderer_;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace kelpie
