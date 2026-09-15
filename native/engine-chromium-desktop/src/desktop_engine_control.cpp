@@ -1,6 +1,8 @@
 #include "desktop_engine_impl.h"
 
 #include <condition_variable>
+#include <ctime>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <utility>
@@ -69,6 +71,22 @@ DesktopBrowserControl::Timeout RemainingTimeout(std::chrono::steady_clock::time_
   const auto elapsed = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(
       std::chrono::steady_clock::now() - started);
   return elapsed >= timeout ? DesktopBrowserControl::Timeout::zero() : timeout - elapsed;
+}
+
+std::optional<double> CookieExpirySeconds(const Json& value) {
+  if (value.is_number()) return value.get<double>();
+  if (!value.is_string()) return std::nullopt;
+  std::tm utc{};
+  std::istringstream stream(value.get<std::string>());
+  stream >> std::get_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+  if (stream.fail() || stream.peek() != std::char_traits<char>::eof()) return std::nullopt;
+#if defined(_WIN32)
+  const std::time_t seconds = _mkgmtime(&utc);
+#else
+  const std::time_t seconds = timegm(&utc);
+#endif
+  if (seconds < 0) return std::nullopt;
+  return static_cast<double>(seconds);
 }
 
 }  // namespace
@@ -389,10 +407,10 @@ BrowserControlResult DesktopEngine::SetCookies(TabLease lease, const Json& cooki
       else if (value == "none" || value == "no_restriction") cookie["sameSite"] = "None";
       else return BrowserControlResult::Failure("INVALID_URL", "Invalid sameSite value");
     }
-    // CDP accepts epoch seconds. ISO expiry is intentionally rejected here rather
-    // than silently changing a durable cookie's lifetime on a locale-dependent parse.
-    if (cookie.contains("expires") && !cookie["expires"].is_number()) {
-      return BrowserControlResult::Failure("INVALID_URL", "Cookie expires must be epoch seconds");
+    if (cookie.contains("expires")) {
+      const auto expiry = CookieExpirySeconds(cookie["expires"]);
+      if (!expiry) return BrowserControlResult::Failure("INVALID_URL", "Cookie expires must be epoch seconds or ISO-8601 UTC");
+      cookie["expires"] = *expiry;
     }
     Json response;
     const auto result = DevTools(lease, "Network.setCookie", cookie, &response,
