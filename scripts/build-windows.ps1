@@ -1,5 +1,63 @@
-param([string]$CefRoot,[string]$WrapperBuildDir=(Join-Path $PSScriptRoot "..\\.cache\\cef-windows-build\\wrapper"),[string]$BuildDir=(Join-Path $PSScriptRoot "..\\.cache\\windows-release3"),[switch]$SkipTests)
-$ErrorActionPreference="Stop";Set-StrictMode -Version Latest
-function VsEnv{$w=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) "Microsoft Visual Studio\\Installer\\vswhere.exe";if(!(Test-Path $w)){throw "VS2022 Build Tools required."};$i=&$w -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath;if(!$i){throw "VS2022 x64 tools required."};$d=Join-Path $i "Common7\\Tools\\VsDevCmd.bat";cmd /c "call \`"$d\`" -arch=x64 -host_arch=x64 >nul && set"|%{if($_ -match "^([^=]+)=(.*)$"){Set-Item "Env:$($matches[1])" $matches[2]}}}
-$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."));if(!$CefRoot){$CefRoot=&"$PSScriptRoot\\download-cef-windows.ps1"};$cef=[IO.Path]::GetFullPath($CefRoot);$w=[IO.Path]::GetFullPath($WrapperBuildDir);$b=[IO.Path]::GetFullPath($BuildDir);foreach($p in "CMakeLists.txt","Release\\bootstrap.exe","include\\cef_app.h"){if(!(Test-Path "$cef\\$p")){throw "CEF_ROOT missing $p"}};VsEnv;foreach($x in "cmake.exe","ninja.exe","cl.exe","dumpbin.exe"){if(!(Get-Command $x -ErrorAction Ignore)){throw "Missing $x"}}
-&cmake -S $cef -B $w -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_SANDBOX=ON;if($LASTEXITCODE){throw "CEF wrapper configure failed."};if(!(Select-String "$w\\CMakeCache.txt" "^USE_SANDBOX:BOOL=ON$" -Quiet)){throw "CEF wrapper sandbox disabled."};&cmake --build $w --target libcef_dll_wrapper --config Release;if($LASTEXITCODE){throw "CEF wrapper build failed."};$lib="$w\\libcef_dll_wrapper\\libcef_dll_wrapper.lib";if(!(Test-Path $lib)){throw "Missing wrapper"};&cmake -S "$repo\\apps\\windows" -B $b -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON "-DCEF_ROOT=$cef" "-DCEF_WRAPPER=$lib";if($LASTEXITCODE){throw "Windows configure failed."};&cmake --build $b --target kelpie --config Release;if($LASTEXITCODE){throw "Windows build failed."};foreach($p in "kelpie.dll","kelpie.exe","locales"){if(!(Test-Path "$b\\$p")){throw "Missing release $p"}};if(!((&dumpbin.exe /exports "$b\\kelpie.dll"|Out-String)-match "\\bRunWinMain\\b")){throw "DLL lacks RunWinMain"};if(!$SkipTests){&ctest.exe --test-dir $b -C Release --output-on-failure;if($LASTEXITCODE){throw "CTest failed."}};$b
+[CmdletBinding()]
+param(
+  [string]$CefRoot,
+  [string]$WrapperBuildDir = (Join-Path $PSScriptRoot "..\.cache\cef-windows-build\wrapper"),
+  [string]$BuildDir = (Join-Path $PSScriptRoot "..\.cache\windows-release3"),
+  [switch]$SkipTests
+)
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+function Initialize-VsEnvironment {
+  $vswhere = Join-Path ([Environment]::GetFolderPath("ProgramFilesX86")) "Microsoft Visual Studio\Installer\vswhere.exe"
+  if (-not (Test-Path -LiteralPath $vswhere)) { throw "VS2022 Build Tools (vswhere) is required." }
+  $installation = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+  if ([string]::IsNullOrWhiteSpace($installation)) { throw "VS2022 x64 C++ tools are required." }
+  $devCmd = Join-Path $installation "Common7\Tools\VsDevCmd.bat"
+  if (-not (Test-Path -LiteralPath $devCmd)) { throw "VsDevCmd.bat is missing." }
+  $environment = & cmd.exe /d /s /c ('call "{0}" -arch=x64 -host_arch=x64 >nul && set' -f $devCmd)
+  foreach ($line in $environment) {
+    if ($line -match "^([^=]+)=(.*)$") { Set-Item -Path ("Env:" + $matches[1]) -Value $matches[2] }
+  }
+}
+function Require-Path([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { throw "Required path is missing: $Path" }
+}
+function Invoke-Checked([string]$Description, [scriptblock]$Command) {
+  & $Command
+  if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
+}
+
+$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+if ([string]::IsNullOrWhiteSpace($CefRoot)) {
+  $line = & (Join-Path $PSScriptRoot "download-cef-windows.ps1")
+  if ($line -notmatch "^CEF_ROOT=(.+)$") { throw "CEF downloader did not return CEF_ROOT." }
+  $CefRoot = $matches[1]
+}
+$cef = [IO.Path]::GetFullPath($CefRoot)
+$wrapperBuild = [IO.Path]::GetFullPath($WrapperBuildDir)
+$build = [IO.Path]::GetFullPath($BuildDir)
+foreach ($relative in @("CMakeLists.txt", "include\cef_app.h", "Release\bootstrap.exe")) {
+  Require-Path (Join-Path $cef $relative)
+}
+
+Initialize-VsEnvironment
+foreach ($tool in @("cmake.exe", "ninja.exe", "cl.exe", "dumpbin.exe", "ctest.exe")) {
+  if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Missing build tool: $tool" }
+}
+Invoke-Checked "CEF wrapper configure" { cmake -S $cef -B $wrapperBuild -G Ninja -DCMAKE_BUILD_TYPE=Release -DUSE_SANDBOX=ON }
+if (-not (Select-String -LiteralPath (Join-Path $wrapperBuild "CMakeCache.txt") -Pattern "^USE_SANDBOX:BOOL=ON$" -Quiet)) {
+  throw "CEF wrapper cache does not enable USE_SANDBOX=ON."
+}
+Invoke-Checked "CEF wrapper build" { cmake --build $wrapperBuild --target libcef_dll_wrapper --config Release }
+$wrapper = Join-Path $wrapperBuild "libcef_dll_wrapper\libcef_dll_wrapper.lib"
+Require-Path $wrapper
+
+Invoke-Checked "Kelpie configure" { cmake -S (Join-Path $repoRoot "apps\windows") -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON ("-DCEF_ROOT=" + $cef) ("-DCEF_WRAPPER=" + $wrapper) }
+Invoke-Checked "Kelpie build" { cmake --build $build --config Release }
+foreach ($relative in @("kelpie.dll", "kelpie.exe", "locales")) { Require-Path (Join-Path $build $relative) }
+if (-not ((& dumpbin.exe /exports (Join-Path $build "kelpie.dll") | Out-String) -match "\bRunWinMain\b")) {
+  throw "kelpie.dll must export RunWinMain."
+}
+if (-not $SkipTests) { Invoke-Checked "Windows CTest" { ctest.exe --test-dir $build -C Release --output-on-failure } }
+Write-Output "BUILD_DIR=$build"
