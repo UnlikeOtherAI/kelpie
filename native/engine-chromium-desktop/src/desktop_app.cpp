@@ -383,4 +383,8 @@ McpRegistry& DesktopApp::mcp_registry() {
   return impl_->mcp_registry;
 }
 
+BookmarkStore& DesktopApp::bookmark_store() { return impl_->bookmark_store; }
+HistoryStore& DesktopApp::history_store() { return impl_->history_store; }
+NetworkTrafficStore& DesktopApp::network_store() { return impl_->network_store; }
+
 }  // namespace kelpie

@@ -256,3 +256,6 @@ linkage, so a separate `.def` file is only needed if export verification shows i
 Validate the incoming version structure's size before reading fields; do not overwrite
 the size of a bootstrap-owned allocation. Keep this release Windows x64 and report that
 architecture explicitly. Resource changes precede any available code-signing step.
+
+### Runtime implementation note
+Windows uses CEF DevTools Network cookie methods scoped to each tab session. They preserve the handler lease/deadline invariant and avoid a second cookie callback lifetime; PNG capture is the shipped supported format. The older CefCookieManager wording is superseded by this equivalent browser-owned implementation.

@@ -6,6 +6,9 @@
 #include <nlohmann/json.hpp>
 
 #include "kelpie/constants.h"
+#include "kelpie/bookmark_store.h"
+#include "kelpie/history_store.h"
+#include "kelpie/network_traffic_store.h"
 #include "kelpie/desktop_engine.h"
 #include "kelpie/platform.h"
 
@@ -67,6 +70,10 @@ class DesktopApp {
   DesktopHttpServer& http_server();
   DesktopMcpServer& mcp_server();
   McpRegistry& mcp_registry();
+  // Native shells share these instances with HTTP/MCP handlers.
+  BookmarkStore& bookmark_store();
+  HistoryStore& history_store();
+  NetworkTrafficStore& network_store();
 
  private:
   class Impl;

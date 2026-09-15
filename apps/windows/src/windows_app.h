@@ -1,6 +1,8 @@
 #pragma once
 
 #include <filesystem>
+#include <cstdint>
+#include <mutex>
 #include <memory>
 #include <string>
 
@@ -76,7 +78,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void LoadSettings();
   void SaveSettings() const;
   void LoadStores();
-  void SaveStores() const;
+  void SaveStores();
   void ApplySettings(const SettingsValues& settings);
   bool InitializeCommonControls() const;
   bool InitializeDesktopRuntime();
@@ -90,12 +92,11 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   AppConfig config_;
   std::atomic<bool> running_{true};
 
-  BookmarkStore bookmark_store_;
-  HistoryStore history_store_;
-  NetworkTrafficStore network_store_;
   DeviceInfoWindows device_info_provider_;
   BrowserState browser_state_;
-  std::string last_recorded_url_;
+  std::uint64_t persistence_epoch_ = 0;
+  std::mutex shell_state_mutex_;
+  std::string home_url_;
 
   std::unique_ptr<Win32Shell> shell_;
   std::unique_ptr<Win32BrowserView> browser_view_;

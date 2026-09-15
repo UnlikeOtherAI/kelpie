@@ -12,6 +12,7 @@
 #endif
 
 #include "include/cef_app.h"
+#include "include/cef_version.h"
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
@@ -42,7 +43,9 @@ class DesktopCefClient final : public CefClient,
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
   bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
                      CefRefPtr<CefFrame> frame,
+#if CEF_VERSION_MAJOR >= 130
                      int popup_id,
+#endif
                      const CefString& target_url,
                      const CefString& target_frame_name,
                      WindowOpenDisposition target_disposition,
@@ -114,8 +117,12 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   CefSettings settings;
 #if defined(_WIN32)
   if (config.sandbox_info == nullptr) return false;
-#endif
   settings.no_sandbox = false;
+#else
+  // Linux's pinned CEF120 packaging does not ship the sandbox helper. Keep its
+  // existing configuration explicit until that artifact is upgraded.
+  settings.no_sandbox = true;
+#endif
   settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
   settings.external_message_pump = config.external_message_pump ? 1 : 0;
   if (!config.cache_path.empty()) {
@@ -253,7 +260,9 @@ void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
 
 bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
                                      CefRefPtr<CefFrame>,
+#if CEF_VERSION_MAJOR >= 130
                                      int,
+#endif
                                      const CefString& target_url,
                                      const CefString&,
                                      WindowOpenDisposition,
@@ -453,55 +462,6 @@ bool DesktopEngine::SendMouseMoveEvent(int x, int y, bool mouse_leave) {
   event.y = y;
   impl_->browser->GetHost()->SendMouseMoveEvent(event, mouse_leave);
   return true;
-}
-
-bool DesktopEngine::SendMouseClickEvent(int x, int y, int button, bool mouse_up, int click_count) {
-  if (!impl_->browser || !impl_->browser->GetHost()) {
-    return false;
-  }
-  cef_mouse_button_type_t button_type = MBT_LEFT;
-  if (button == 2) {
-    button_type = MBT_MIDDLE;
-  } else if (button == 3) {
-    button_type = MBT_RIGHT;
-  }
-
-  CefMouseEvent event;
-  event.x = x;
-  event.y = y;
-  impl_->browser->GetHost()->SendMouseClickEvent(event, button_type, mouse_up, click_count);
-  return true;
-}
-
-bool DesktopEngine::SendMouseWheelEvent(int x, int y, int delta_x, int delta_y) {
-  if (!impl_->browser || !impl_->browser->GetHost()) {
-    return false;
-  }
-  CefMouseEvent event;
-  event.x = x;
-  event.y = y;
-  impl_->browser->GetHost()->SendMouseWheelEvent(event, delta_x, delta_y);
-  return true;
-}
-
-void DesktopEngine::SetConsoleSink(JsonEventSink sink) {
-  impl_->console_sink = std::move(sink);
-}
-
-void DesktopEngine::SetNetworkSink(JsonEventSink sink) {
-  impl_->network_sink = std::move(sink);
-}
-
-void DesktopEngine::SetNavigationSink(NavigationSink sink) {
-  impl_->navigation_sink = std::move(sink);
-}
-
-CefRenderer& DesktopEngine::renderer() {
-  return *renderer_;
-}
-
-const CefRenderer& DesktopEngine::renderer() const {
-  return *renderer_;
 }
 
 

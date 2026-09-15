@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(kelpie_windows VERSION 0.1.1 LANGUAGES CXX RC)
-set(KELPIE_WINDOWS_VERSION "0.1.1")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +14,12 @@ if(CEF_ROOT)
 endif()
 if(HAS_CEF AND CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
   message(FATAL_ERROR "The pinned Windows CEF minimal SDK is packaged with a Release wrapper; configure -DCMAKE_BUILD_TYPE=Release")
+endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT HAS_CEF)
+  message(FATAL_ERROR "Shipping the Windows Release target requires the pinned sandboxed CEF SDK")
+endif()
+if(HAS_CEF AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+  message(FATAL_ERROR "The Windows CEF 152 artifact is x64 only")
 endif()
 if(HAS_CEF)
   set(CMAKE_CXX_STANDARD 20)
@@ -172,6 +177,7 @@ if(HAS_CEF)
     "${CEF_ROOT}/Release/*.dat"
     "${CEF_ROOT}/Release/*.json"
     "${CEF_ROOT}/Resources/*.pak"
+    "${CEF_ROOT}/Resources/*.dat"
   )
   foreach(runtime_file IN LISTS CEF_RUNTIME_FILES)
     add_custom_command(TARGET kelpie POST_BUILD

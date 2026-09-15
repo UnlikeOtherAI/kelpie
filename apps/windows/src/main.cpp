@@ -49,8 +49,13 @@ std::optional<int> ParseInt(const std::wstring& value, int minimum, int maximum)
 }
 
 bool IsRejectedBrowserSwitch(const std::wstring& arg) {
-  return arg == L"--no-sandbox" || arg.starts_with(L"--no-sandbox=") ||
-      arg.starts_with(L"--remote-debugging-port") || arg.starts_with(L"--remote-debugging-address");
+  static constexpr std::wstring_view blocked[] = {
+      L"--no-sandbox", L"--disable-gpu-sandbox", L"--single-process", L"--in-process-gpu",
+      L"--remote-debugging-port", L"--remote-debugging-address"};
+  for (const auto switch_name : blocked) {
+    if (arg == switch_name || arg.starts_with(std::wstring(switch_name) + L"=")) return true;
+  }
+  return false;
 }
 
 }  // namespace
@@ -112,6 +117,12 @@ int RunKelpieWindowsApp(HINSTANCE resource_instance,
       if (!height) return ERROR_INVALID_PARAMETER;
       config.height = *height;
       config.height_overridden = true;
+    }
+    else if (arg.starts_with(L"--")) {
+      // Do not forward arbitrary Chromium switches through the authenticated
+      // desktop launcher. Subprocess switches have already been consumed by
+      // CefExecuteProcess above.
+      return ERROR_INVALID_PARAMETER;
     }
   }
 

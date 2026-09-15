@@ -1,4 +1,5 @@
 #include "win32_browser_view.h"
+#include "windows_utf.h"
 
 #include <string>
 
@@ -13,18 +14,6 @@
 
 namespace kelpie::windows {
 namespace {
-
-std::wstring Utf8ToWide(const std::string& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-  std::wstring output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L'\0');
-  if (size > 1) {
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1);
-  }
-  return output;
-}
 
 
 }  // namespace
@@ -99,7 +88,7 @@ void Win32BrowserView::LoadUrl(const std::string& url) {
   next.title = url;
   next.is_loading = false;
   UpdateState(next);
-  UpdateFallbackText(Utf8ToWide(url));
+  UpdateFallbackText(utf::Utf8ToWideDisplay(url));
 }
 
 std::string Win32BrowserView::CurrentUrl() const {

@@ -6,6 +6,7 @@
 #include <commctrl.h>
 
 #include <fstream>
+#include <atomic>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -24,12 +25,36 @@ namespace kelpie::windows {
 namespace {
 
 constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
+constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B50;
+HWND g_cef_pump_window = nullptr;
 
-void CALLBACK PumpCefTimer(HWND, UINT, UINT_PTR timer_id, DWORD) {
+void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
 #if defined(HAS_CEF)
-  KillTimer(nullptr, timer_id);
+  KillTimer(hwnd, timer_id);
   CefDoMessageLoopWork();
 #endif
+}
+
+LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM) {
+  if (message == kScheduleCefPumpMessage) {
+    const UINT delay = static_cast<UINT>(std::clamp<std::int64_t>(static_cast<std::int64_t>(wparam), 1, 60'000));
+    KillTimer(hwnd, kCefPumpTimerId);
+    SetTimer(hwnd, kCefPumpTimerId, delay, &PumpCefTimer);
+    return 0;
+  }
+  return DefWindowProcW(hwnd, message, wparam, 0);
+}
+
+bool CreateCefPumpWindow(HINSTANCE instance) {
+  if (g_cef_pump_window != nullptr) return true;
+  WNDCLASSW window_class{};
+  window_class.lpfnWndProc = CefPumpWindowProc;
+  window_class.hInstance = instance;
+  window_class.lpszClassName = L"KelpieCefPumpWindow";
+  RegisterClassW(&window_class);
+  g_cef_pump_window = CreateWindowExW(0, window_class.lpszClassName, L"", 0,
+                                      0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
+  return g_cef_pump_window != nullptr;
 }
 
 std::optional<TabLease> ActiveLease(DesktopApp* app) {
@@ -70,10 +95,30 @@ bool LoadJsonFile(const std::filesystem::path& path, nlohmann::json& output) {
   }
 }
 
-void SaveJsonFile(const std::filesystem::path& path, const nlohmann::json& value) {
-  std::filesystem::create_directories(path.parent_path());
-  std::ofstream output(path, std::ios::trunc);
-  output << value.dump(2);
+bool SaveJsonFileAtomically(const std::filesystem::path& path, const nlohmann::json& value,
+                          std::uint64_t epoch) {
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error) return false;
+  const std::filesystem::path temporary = path.wstring() + L".tmp." + std::to_wstring(epoch);
+  {
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+    if (!output.good()) return false;
+    output << value.dump(2);
+    output.flush();
+    if (!output.good()) return false;
+  }
+  HANDLE handle = CreateFileW(temporary.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+  const bool flushed = FlushFileBuffers(handle) != FALSE;
+  CloseHandle(handle);
+  if (!flushed) return false;
+  if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    DeleteFileW(temporary.c_str());
+    return false;
+  }
+  return true;
 }
 
 
@@ -97,10 +142,10 @@ int WindowsApp::Run(int show_command) {
   std::string session_error;
   if (!profile_session_.Open(config_.profile_dir, config_.readiness_path, &session_error)) return 1;
   LoadSettings();
-  LoadStores();
   if (!InitializeCommonControls()) return 1;
   if (!CreateShell(show_command)) return 1;
   if (!InitializeDesktopRuntime()) return 1;
+  LoadStores();
 
   MSG message{};
   while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
@@ -161,15 +206,15 @@ void WindowsApp::OnOpenSettingsRequested() {
 }
 
 std::string WindowsApp::GetBookmarksJson() const {
-  return bookmark_store_.ToJson();
+  return desktop_app_ ? desktop_app_->bookmark_store().ToJson() : "[]";
 }
 
 std::string WindowsApp::GetHistoryJson() const {
-  return history_store_.ToJson();
+  return desktop_app_ ? desktop_app_->history_store().ToJson() : "[]";
 }
 
 std::string WindowsApp::GetNetworkJson() const {
-  return network_store_.ToJson();
+  return desktop_app_ ? desktop_app_->network_store().ToJson() : "[]";
 }
 
 std::string WindowsApp::GetTabsJson() const {
@@ -187,7 +232,7 @@ std::string WindowsApp::GetTabsJson() const {
 std::optional<std::wstring> WindowsApp::BestUrlCompletion(std::wstring_view typed) const {
   const auto utf8 = utf::WideToUtf8(typed);
   if (!utf8 || utf8->empty()) return std::nullopt;
-  const std::string completion = history_store_.BestUrlCompletion(*utf8);
+  const std::string completion = desktop_app_ ? desktop_app_->history_store().BestUrlCompletion(*utf8) : std::string();
   if (completion.empty()) return std::nullopt;
   return utf::Utf8ToWide(completion);
 }
@@ -252,30 +297,40 @@ void WindowsApp::LoadSettings() {
 }
 
 void WindowsApp::SaveSettings() const {
-  SaveJsonFile(config_.profile_dir / "settings.json",
-               {
-                   {"port", config_.port},
-                   {"profile_dir", config_.profile_dir.u8string()},
-                   {"startup_url", config_.initial_url},
-               });
+  SaveJsonFileAtomically(config_.profile_dir / "settings.json",
+                         {{"port", config_.port}, {"profile_dir", config_.profile_dir.u8string()},
+                          {"startup_url", config_.initial_url}}, persistence_epoch_ + 1);
 }
 
 void WindowsApp::LoadStores() {
+  nlohmann::json epoch;
+  if (LoadJsonFile(config_.profile_dir / "stores-epoch.json", epoch)) {
+    persistence_epoch_ = epoch.value("epoch", std::uint64_t{0});
+  }
+  // The exclusive ProfileSession lock is held before this method runs. Legacy
+  // files remain readable; all later writes are atomic replacements by this owner.
+  if (!desktop_app_) return;
   nlohmann::json bookmarks;
   if (LoadJsonFile(config_.profile_dir / "bookmarks.json", bookmarks)) {
-    bookmark_store_.LoadJson(bookmarks.dump());
+    desktop_app_->bookmark_store().LoadJson(bookmarks.dump());
   }
   nlohmann::json history;
   if (LoadJsonFile(config_.profile_dir / "history.json", history)) {
-    history_store_.LoadJson(history.dump());
+    desktop_app_->history_store().LoadJson(history.dump());
   }
 }
 
-void WindowsApp::SaveStores() const {
-  SaveJsonFile(config_.profile_dir / "bookmarks.json",
-               nlohmann::json::parse(bookmark_store_.ToJson(), nullptr, false));
-  SaveJsonFile(config_.profile_dir / "history.json",
-               nlohmann::json::parse(history_store_.ToJson(), nullptr, false));
+void WindowsApp::SaveStores() {
+  if (!desktop_app_) return;
+  const std::uint64_t next_epoch = persistence_epoch_ + 1;
+  const auto bookmarks = nlohmann::json::parse(desktop_app_->bookmark_store().ToJson(), nullptr, false);
+  const auto history = nlohmann::json::parse(desktop_app_->history_store().ToJson(), nullptr, false);
+  if (bookmarks.is_discarded() || history.is_discarded()) return;
+  if (!SaveJsonFileAtomically(config_.profile_dir / "bookmarks.json", bookmarks, next_epoch) ||
+      !SaveJsonFileAtomically(config_.profile_dir / "history.json", history, next_epoch)) return;
+  if (SaveJsonFileAtomically(config_.profile_dir / "stores-epoch.json", {{"epoch", next_epoch}}, next_epoch)) {
+    persistence_epoch_ = next_epoch;
+  }
 }
 
 void WindowsApp::ApplySettings(const SettingsValues& settings) {
@@ -295,9 +350,12 @@ bool WindowsApp::InitializeCommonControls() const {
 }
 
 bool WindowsApp::InitializeDesktopRuntime() {
+  if (!CreateCefPumpWindow(instance_)) return false;
   SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
-    const UINT delay = static_cast<UINT>(std::clamp<std::int64_t>(delay_ms, 1, 60'000));
-    SetTimer(nullptr, kCefPumpTimerId, delay, &PumpCefTimer);
+    // CEF may schedule work from a callback. Post it to the owner queue so the
+    // timer callback also runs while Win32 is in a modal message loop.
+    if (g_cef_pump_window != nullptr) PostMessageW(g_cef_pump_window, kScheduleCefPumpMessage,
+                                                    static_cast<WPARAM>(delay_ms), 0);
   });
   desktop_app_ = std::make_unique<DesktopApp>();
   DesktopApp::Config runtime;
@@ -323,6 +381,21 @@ bool WindowsApp::InitializeDesktopRuntime() {
     if (url == nullptr) return BrowserControlResult::Failure("INTERNAL", "home URL is required");
     std::lock_guard<std::mutex> lock(shell_state_mutex_);
     *url = home_url_;
+    return BrowserControlResult::Success();
+  };
+  runtime.show_native_toast = [this](std::string message) {
+    if (shell_ == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
+    shell_->ShowToast(utf::Utf8ToWideDisplay(message));
+    return BrowserControlResult::Success();
+  };
+  runtime.set_native_fullscreen = [this](bool enabled) {
+    if (shell_ == nullptr || shell_->hwnd() == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
+    ShowWindow(shell_->hwnd(), enabled ? SW_MAXIMIZE : SW_RESTORE);
+    return BrowserControlResult::Success();
+  };
+  runtime.get_native_fullscreen = [this](bool* enabled) {
+    if (enabled == nullptr || shell_ == nullptr || shell_->hwnd() == nullptr) return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
+    *enabled = IsZoomed(shell_->hwnd()) != FALSE;
     return BrowserControlResult::Success();
   };
   runtime.viewport_supplier = [this]() {
@@ -378,8 +451,12 @@ bool WindowsApp::InitializeDesktopRuntime() {
 }
 
 void WindowsApp::ShutdownDesktopRuntime() {
-  KillTimer(nullptr, kCefPumpTimerId);
   SetDesktopCefMessagePumpScheduler({});
+  if (g_cef_pump_window != nullptr) {
+    KillTimer(g_cef_pump_window, kCefPumpTimerId);
+    DestroyWindow(g_cef_pump_window);
+    g_cef_pump_window = nullptr;
+  }
   if (desktop_app_) {
     desktop_app_->Stop();
     desktop_app_.reset();
@@ -411,11 +488,9 @@ void WindowsApp::RememberNavigation(const BrowserState& state) {
   if (state.url.empty()) {
     return;
   }
-  history_store_.Record(state.url, state.title);
-  history_store_.UpdateLatestTitle(state.url, state.title);
-  if (state.url != last_recorded_url_) {
-    network_store_.AppendDocumentNavigation(state.url, 200, "text/html");
-    last_recorded_url_ = state.url;
+  if (desktop_app_) {
+    desktop_app_->history_store().Record(state.url, state.title);
+    desktop_app_->history_store().UpdateLatestTitle(state.url, state.title);
   }
 }
 
