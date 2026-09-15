@@ -324,8 +324,8 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
     tab->url = frame->GetURL().ToString();
   }
   owner_->UpdateActiveState();
-  if (owner_->navigation_sink && owner_->browser && owner_->browser->IsSame(browser)) {
-    owner_->navigation_sink(owner_->current_url, owner_->current_title);
+  if (owner_->navigation_sink) {
+    owner_->navigation_sink(tab->url, tab->title);
   }
 }
 
@@ -334,8 +334,8 @@ void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefStr
     tab->title = title.ToString();
   }
   owner_->UpdateActiveState();
-  if (owner_->navigation_sink && owner_->browser && owner_->browser->IsSame(browser)) {
-    owner_->navigation_sink(owner_->current_url, owner_->current_title);
+  if (owner_->navigation_sink) {
+    owner_->navigation_sink(tab->url, tab->title);
   }
 }
 

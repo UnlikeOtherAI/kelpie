@@ -35,14 +35,14 @@ void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
 #endif
 }
 
-LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM) {
+LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == kScheduleCefPumpMessage) {
     const UINT delay = static_cast<UINT>(std::clamp<std::int64_t>(static_cast<std::int64_t>(wparam), 1, 60'000));
     KillTimer(hwnd, kCefPumpTimerId);
     SetTimer(hwnd, kCefPumpTimerId, delay, &PumpCefTimer);
     return 0;
   }
-  return DefWindowProcW(hwnd, message, wparam, 0);
+  return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
 bool CreateCefPumpWindow(HINSTANCE instance) {
