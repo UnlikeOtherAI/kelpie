@@ -124,6 +124,17 @@ inline DesktopBrowserControl::Timeout ControlTimeout(const nlohmann::json& param
   return std::chrono::milliseconds(std::clamp(value, 1, 30000));
 }
 
+inline BrowserControlResult EvaluateForTab(const DesktopHandlerRuntime& runtime,
+                                           const nlohmann::json& params,
+                                           const std::string& expression,
+                                           nlohmann::json* value) {
+  TabLease lease;
+  BrowserControlResult result = RequireBrowserControl(runtime).ResolveTab(
+      OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+  if (!result.ok) return result;
+  return RequireBrowserControl(runtime).Evaluate(lease, expression, value, ControlTimeout(params));
+}
+
 inline bool BoolOrDefault(const nlohmann::json& params, const char* key, bool default_value) {
   const auto it = params.find(key);
   if (it == params.end() || !it->is_boolean()) {

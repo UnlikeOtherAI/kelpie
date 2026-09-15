@@ -306,13 +306,15 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
 
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
+  const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(Json::object());
+  if (!screenshot_params) return BrowserControlResult::Failure("INTERNAL", "Screenshot parameters are invalid");
   auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl_->RunOnUi([this, lease, pending] {
+  const auto started = impl_->RunOnUi([this, lease, pending, screenshot_params] {
     auto* tab = impl_->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     pending->session = tab->devtools;
     pending->operation = pending->session->Begin(tab->browser, "Page.captureScreenshot",
-                                                  DesktopDevToolsSession::ScreenshotParams(Json::object()));
+                                                  *screenshot_params);
     return BrowserControlResult::Success(impl_->Snapshot(*tab));
   }, timeout);
   if (!started.ok) return started;

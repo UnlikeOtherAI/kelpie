@@ -1,6 +1,7 @@
 #include "desktop_devtools.h"
 
 #include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <iomanip>
 #include <limits>
@@ -28,15 +29,20 @@ std::string SameSiteName(cef_cookie_same_site_t value) {
   }
 }
 
-cef_cookie_same_site_t ParseSameSite(const std::string& value) {
+std::optional<cef_cookie_same_site_t> ParseSameSite(const std::string& value) {
   if (value == "Lax") return CEF_COOKIE_SAME_SITE_LAX_MODE;
   if (value == "Strict") return CEF_COOKIE_SAME_SITE_STRICT_MODE;
   if (value == "None") return CEF_COOKIE_SAME_SITE_NO_RESTRICTION;
-  return CEF_COOKIE_SAME_SITE_UNSPECIFIED;
+  return std::nullopt;
 }
 
 std::optional<time_t> ParseIsoUtc(const std::string& value) {
   if (value.size() < 20 || value.back() != 'Z') return std::nullopt;
+  const std::string fraction = value.substr(19, value.size() - 20);
+  if (!fraction.empty() && (fraction.front() != '.' || fraction.size() == 1 ||
+      !std::all_of(fraction.begin() + 1, fraction.end(), [](unsigned char character) { return std::isdigit(character) != 0; }))) {
+    return std::nullopt;
+  }
   std::tm parsed{};
   std::istringstream stream(value.substr(0, 19));
   stream >> std::get_time(&parsed, "%Y-%m-%dT%H:%M:%S");
@@ -131,32 +137,80 @@ void DesktopDevToolsSession::CancelAll() {
 }
 
 DesktopDevToolsSession::Json DesktopDevToolsSession::EvaluateParams(const std::string& expression) {
-  return {{"expression", expression}, {"awaitPromise", true}, {"returnByValue", true}, {"userGesture", true}};
+  const std::string source = Json(expression).dump();
+  const std::string wrapper =
+      "(async()=>{const __kelpieSource=" + source + ";"
+      "const __kelpieEnvelope=(kind,extra)=>Object.assign({__kelpieRuntimeEnvelope:1,kind:kind},extra||{});"
+      "try{const value=await (0,eval)(__kelpieSource);"
+      "if(value===undefined)return __kelpieEnvelope('undefined');"
+      "if(typeof value==='bigint')return __kelpieEnvelope('bigint',{value:value.toString()});"
+      "if(typeof value==='number'&&!Number.isFinite(value))return __kelpieEnvelope('nonfinite',{value:String(value)});"
+      "if(typeof Node!=='undefined'&&value instanceof Node)return __kelpieEnvelope('node',{nodeName:value.nodeName,nodeType:value.nodeType});"
+      "if(typeof value==='function'||typeof value==='symbol')return __kelpieEnvelope('non_json',{valueType:typeof value,description:String(value)});"
+      "try{const encoded=JSON.stringify(value);if(encoded===undefined)return __kelpieEnvelope('non_json',{valueType:typeof value});"
+      "return __kelpieEnvelope('json',{value:JSON.parse(encoded)});}catch(error){return __kelpieEnvelope(/circular/i.test(String(error))?'cyclic':'non_json',{description:String(error)});}}"
+      "catch(error){return __kelpieEnvelope('exception',{name:String(error&&error.name||'Error'),message:String(error&&error.message||error),stack:String(error&&error.stack||'')});}})()";
+  return {{"expression", wrapper}, {"awaitPromise", true}, {"returnByValue", true}, {"userGesture", true}};
 }
 
 DesktopDevToolsSession::Result DesktopDevToolsSession::ParseEvaluateResult(const Result& protocol_result) {
   if (!protocol_result.ok) return protocol_result;
+  if (!protocol_result.value.is_object()) return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate did not return an object");
   if (protocol_result.value.contains("exceptionDetails")) {
     const auto& details = protocol_result.value["exceptionDetails"];
-    return Failure("JAVASCRIPT_ERROR", details.value("text", "JavaScript evaluation failed"));
+    return Failure("JAVASCRIPT_ERROR", details.is_object() && details.contains("text") && details["text"].is_string()
+        ? details["text"].get<std::string>() : "JavaScript evaluation failed");
   }
-  const auto& remote = protocol_result.value.value("result", Json::object());
-  if (!remote.is_object()) return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate did not return a remote object");
-  if (remote.value("type", "") == "undefined") return {true, {}, {}, {{"type", "undefined"}}, false};
-  if (remote.contains("value")) return {true, {}, {}, remote["value"], false};
-  return {true, {}, {}, {{"type", remote.value("type", "unknown")},
-                           {"description", remote.value("description", "")},
-                           {"unserializableValue", remote.value("unserializableValue", "")}}, false};
+  const auto remote_it = protocol_result.value.find("result");
+  if (remote_it == protocol_result.value.end() || !remote_it->is_object()) {
+    return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate did not return a remote object");
+  }
+  const auto& remote = *remote_it;
+  if (!remote.contains("value") || !remote["value"].is_object()) {
+    return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate did not return the Kelpie result envelope");
+  }
+  const auto& envelope = remote["value"];
+  const auto marker = envelope.find("__kelpieRuntimeEnvelope");
+  const auto kind_value = envelope.find("kind");
+  if (marker == envelope.end() || !marker->is_number_integer() || marker->get<int>() != 1 ||
+      kind_value == envelope.end() || !kind_value->is_string()) {
+    return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate returned an invalid Kelpie result envelope");
+  }
+  const std::string kind = kind_value->get<std::string>();
+  if (kind == "exception") {
+    const auto message = envelope.find("message");
+    return Failure("JAVASCRIPT_ERROR", message != envelope.end() && message->is_string()
+        ? message->get<std::string>() : "JavaScript evaluation failed");
+  }
+  if (kind == "json") {
+    if (!envelope.contains("value")) return Failure("CDP_MALFORMED_RESULT", "JSON evaluation result is missing value");
+    return {true, {}, {}, envelope["value"], false};
+  }
+  if (kind == "undefined" || kind == "nonfinite" || kind == "bigint" || kind == "cyclic" ||
+      kind == "node" || kind == "non_json") {
+    Json descriptor = envelope;
+    descriptor.erase("__kelpieRuntimeEnvelope");
+    descriptor["type"] = kind;
+    descriptor.erase("kind");
+    return {true, {}, {}, std::move(descriptor), false};
+  }
+  return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate returned an unknown result descriptor");
 }
 
-DesktopDevToolsSession::Json DesktopDevToolsSession::ScreenshotParams(const Json& options) {
-  Json params = {{"format", options.value("format", "png")}, {"captureBeyondViewport", false}};
+std::optional<DesktopDevToolsSession::Json> DesktopDevToolsSession::ScreenshotParams(const Json& options) {
+  if (!options.is_object()) return std::nullopt;
+  const auto format_value = options.find("format");
+  if (format_value != options.end() && !format_value->is_string()) return std::nullopt;
+  const std::string format = format_value == options.end() ? "png" : format_value->get<std::string>();
+  if (format != "png") return std::nullopt;
+  Json params = {{"format", "png"}, {"captureBeyondViewport", false}};
   if (options.contains("quality")) params["quality"] = options["quality"];
   return params;
 }
 
 DesktopDevToolsSession::Result DesktopDevToolsSession::ParseScreenshotResult(const Result& protocol_result) {
   if (!protocol_result.ok) return protocol_result;
+  if (!protocol_result.value.is_object()) return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return an object");
   const auto data = protocol_result.value.find("data");
   if (data == protocol_result.value.end() || !data->is_string() || data->get<std::string>().empty()) {
     return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return encoded PNG data");
@@ -219,7 +273,11 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::ParseProtocolResult(bool 
   const std::string raw = result == nullptr ? std::string() : std::string(static_cast<const char*>(result), result_size);
   const Json parsed = Json::parse(raw, nullptr, false);
   if (parsed.is_discarded() || !parsed.is_object()) return Failure("CDP_MALFORMED_RESULT", "CEF returned malformed DevTools JSON");
-  if (!success) return Failure("DEVTOOLS_ERROR", parsed.value("message", "DevTools method failed"));
+  if (!success) {
+    const auto message = parsed.find("message");
+    return Failure("DEVTOOLS_ERROR", message != parsed.end() && message->is_string()
+        ? message->get<std::string>() : "DevTools method failed");
+  }
   return {true, {}, {}, parsed, false};
 }
 
@@ -234,6 +292,13 @@ void DesktopDevToolsSession::Complete(const std::shared_ptr<Operation>& operatio
 std::optional<CefCookie> DesktopCookieAdapter::ToCefCookie(const Json& input) {
   if (!input.is_object() || !input.contains("name") || !input["name"].is_string() ||
       !input.contains("value") || !input["value"].is_string()) return std::nullopt;
+  if (input["name"].get<std::string>().empty()) return std::nullopt;
+  for (const char* name : {"domain", "path"}) {
+    if (input.contains(name) && !input[name].is_string()) return std::nullopt;
+  }
+  for (const char* name : {"httpOnly", "secure"}) {
+    if (input.contains(name) && !input[name].is_boolean()) return std::nullopt;
+  }
   CefCookie cookie{};
   cookie.size = sizeof(cookie);
   CefString(&cookie.name) = input.value("name", "");
@@ -242,11 +307,20 @@ std::optional<CefCookie> DesktopCookieAdapter::ToCefCookie(const Json& input) {
   CefString(&cookie.path) = input.value("path", "/");
   cookie.httponly = input.value("httpOnly", false) ? 1 : 0;
   cookie.secure = input.value("secure", false) ? 1 : 0;
-  cookie.same_site = ParseSameSite(input.value("sameSite", ""));
-  if (input.contains("expires") && input["expires"].is_string()) {
+  if (input.contains("sameSite")) {
+    if (!input["sameSite"].is_string()) return std::nullopt;
+    const auto same_site = ParseSameSite(input["sameSite"].get<std::string>());
+    if (!same_site) return std::nullopt;
+    cookie.same_site = *same_site;
+  } else {
+    cookie.same_site = CEF_COOKIE_SAME_SITE_UNSPECIFIED;
+  }
+  if (input.contains("expires")) {
+    if (!input["expires"].is_string()) return std::nullopt;
     const auto expires = ParseIsoUtc(input["expires"].get<std::string>());
-    cef_time_t utc{};
-    if (!expires || !cef_time_from_timet(*expires, &utc) || !cef_time_to_basetime(&utc, &cookie.expires)) return std::nullopt;
+    cef_time_t expiration_time{};
+    if (!expires || !cef_time_from_timet(*expires, &expiration_time) ||
+        !cef_time_to_basetime(&expiration_time, &cookie.expires)) return std::nullopt;
     cookie.has_expires = 1;
   }
   return cookie;
@@ -257,9 +331,11 @@ DesktopCookieAdapter::Json DesktopCookieAdapter::FromCefCookie(const CefCookie& 
                  {"path", CefString(&cookie.path).ToString()}, {"httpOnly", cookie.httponly != 0}, {"secure", cookie.secure != 0},
                  {"sameSite", SameSiteName(cookie.same_site)}};
   if (cookie.has_expires) {
-    cef_time_t utc{};
+    cef_time_t expiration_time{};
     double expires = 0;
-    if (cef_time_from_basetime(cookie.expires, &utc) && cef_time_to_doublet(&utc, &expires)) output["expiresUnixSeconds"] = expires;
+    if (cef_time_from_basetime(cookie.expires, &expiration_time) && cef_time_to_doublet(&expiration_time, &expires)) {
+      output["expiresUnixSeconds"] = expires;
+    }
   }
   return output;
 }

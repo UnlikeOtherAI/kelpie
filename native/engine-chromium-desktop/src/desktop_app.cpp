@@ -18,13 +18,11 @@
 #include "handlers/browser_mgmt_handler.h"
 #include "handlers/console_handler.h"
 #include "handlers/cookie_handler.h"
-#include "handlers/dialog_handler.h"
 #include "handlers/device_handler.h"
 #include "handlers/dom_handler.h"
 #include "handlers/evaluate_handler.h"
 #include "handlers/history_handler.h"
 #include "handlers/interaction_handler.h"
-#include "handlers/inspection_handler.h"
 #include "handlers/navigation_handler.h"
 #include "handlers/network_handler.h"
 #include "handlers/renderer_handler.h"
@@ -126,8 +124,6 @@ class DesktopApp::Impl {
   std::unique_ptr<RendererHandler> renderer_handler;
   std::unique_ptr<ViewportHandler> viewport_handler;
   std::unique_ptr<CookieHandler> cookie_handler;
-  std::unique_ptr<DialogHandler> dialog_handler;
-  std::unique_ptr<InspectionHandler> inspection_handler;
   std::unique_ptr<ShellHandler> shell_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
@@ -203,8 +199,6 @@ class DesktopApp::Impl {
     renderer_handler = std::make_unique<RendererHandler>(runtime);
     viewport_handler = std::make_unique<ViewportHandler>(runtime);
     cookie_handler = std::make_unique<CookieHandler>(runtime);
-    dialog_handler = std::make_unique<DialogHandler>(runtime);
-    inspection_handler = std::make_unique<InspectionHandler>(runtime);
     shell_handler = std::make_unique<ShellHandler>(runtime);
 
     navigation_handler->Register(router);
@@ -222,8 +216,6 @@ class DesktopApp::Impl {
     renderer_handler->Register(router);
     viewport_handler->Register(router);
     cookie_handler->Register(router);
-    dialog_handler->Register(router);
-    inspection_handler->Register(router);
     shell_handler->Register(router);
 
     for (const std::string& method : UnsupportedMethods()) {
