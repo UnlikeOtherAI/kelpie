@@ -140,7 +140,8 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `apps/windows/CMakeLists.txt` `KELPIE_WINDOWS_VERSION` (`0.1.1`).
+- Windows desktop version is the `VS_VERSION_INFO` resource in
+  `apps/windows/resources/kelpie.rc` (`0.1.1`).
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.
 - Verify direct `/mcp`, `kelpie --browser <alias> mcp`, native tabs/navigation/autocomplete, and

@@ -310,6 +310,33 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.bind_host = "127.0.0.1";
   runtime.control_token = profile_session_.token();
   runtime.device_id = device_info_provider_.Collect(config_.port, config_.width, config_.height, runtime.app_version).id;
+  {
+    std::lock_guard<std::mutex> lock(shell_state_mutex_);
+    home_url_ = config_.initial_url;
+  }
+  runtime.set_home = [this](std::string url) {
+    std::lock_guard<std::mutex> lock(shell_state_mutex_);
+    home_url_ = std::move(url);
+    return BrowserControlResult::Success();
+  };
+  runtime.get_home = [this](std::string* url) {
+    if (url == nullptr) return BrowserControlResult::Failure("INTERNAL", "home URL is required");
+    std::lock_guard<std::mutex> lock(shell_state_mutex_);
+    *url = home_url_;
+    return BrowserControlResult::Success();
+  };
+  runtime.viewport_supplier = [this]() {
+    RECT rect{};
+    if (browser_view_ != nullptr && browser_view_->hwnd() != nullptr) GetClientRect(browser_view_->hwnd(), &rect);
+    return nlohmann::json{{"width", rect.right - rect.left}, {"height", rect.bottom - rect.top},
+                          {"devicePixelRatio", 1.0}, {"platform", "windows"}};
+  };
+  runtime.resize_viewport = [this](int width, int height) {
+    return desktop_app_ != nullptr && desktop_app_->engine().ResizeViewport(width, height);
+  };
+  runtime.reset_viewport = [this]() {
+    if (desktop_app_ != nullptr) desktop_app_->engine().ResizeViewport(config_.width, config_.height);
+  };
   runtime.request_shutdown = [this]() {
     if (shell_ == nullptr || shell_->hwnd() == nullptr) {
       return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
