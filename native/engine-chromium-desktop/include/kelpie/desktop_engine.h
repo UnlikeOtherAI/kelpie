@@ -7,11 +7,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "kelpie/desktop_browser_control.h"
 #include "kelpie/cef_renderer.h"
 
 namespace kelpie {
 
-class DesktopEngine {
+class DesktopEngine final : public DesktopBrowserControl {
  public:
   enum class Mode {
     kWindowed = 0,
@@ -36,6 +37,7 @@ class DesktopEngine {
     std::string locales_dir_path;
     bool external_message_pump = true;
     std::function<void(void*)> configure_window_info;
+    std::function<void(void*, const std::string&)> configure_tab_window_info;
   };
 
   struct ViewportState {
@@ -71,6 +73,55 @@ class DesktopEngine {
 
   CefRenderer& renderer();
   const CefRenderer& renderer() const;
+
+  BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) override;
+  BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
+                                  const std::optional<std::uint64_t>& generation,
+                                  TabLease* lease,
+                                  Timeout timeout) override;
+  BrowserControlResult CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult ActivateTab(TabLease lease, Timeout timeout) override;
+  BrowserControlResult CloseTab(TabLease lease, Timeout timeout) override;
+  BrowserControlResult Navigate(std::optional<TabLease> lease,
+                                std::string url,
+                                TabSnapshot* tab,
+                                Timeout timeout) override;
+  BrowserControlResult Back(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult Evaluate(TabLease lease,
+                                std::string script,
+                                Json* value,
+                                Timeout timeout) override;
+  BrowserControlResult Screenshot(TabLease lease,
+                                  BrowserScreenshot* image,
+                                  Timeout timeout) override;
+  BrowserControlResult GetCookies(TabLease lease,
+                                  const Json& query,
+                                  Json* cookies,
+                                  Timeout timeout) override;
+  BrowserControlResult SetCookies(TabLease lease,
+                                  const Json& cookies,
+                                  Json* result,
+                                  Timeout timeout) override;
+  BrowserControlResult DeleteCookies(TabLease lease,
+                                     const Json& query,
+                                     Json* result,
+                                     Timeout timeout) override;
+  BrowserControlResult DispatchTrustedInput(TabLease lease,
+                                            const Json& input,
+                                            Json* result,
+                                            Timeout timeout) override;
+  BrowserControlResult GetDialog(TabLease lease, Json* dialog, Timeout timeout) override;
+  BrowserControlResult HandleDialog(TabLease lease,
+                                    const Json& action,
+                                    Json* result,
+                                    Timeout timeout) override;
+  BrowserControlResult DevTools(TabLease lease,
+                                std::string method,
+                                const Json& params,
+                                Json* result,
+                                Timeout timeout) override;
 
   class Impl;
 
