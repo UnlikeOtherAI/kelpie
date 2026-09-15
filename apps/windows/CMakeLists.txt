@@ -170,6 +170,7 @@ if(HAS_CEF)
     "${CEF_ROOT}/Release/*.dll"
     "${CEF_ROOT}/Release/*.bin"
     "${CEF_ROOT}/Release/*.dat"
+    "${CEF_ROOT}/Release/*.json"
     "${CEF_ROOT}/Resources/*.pak"
   )
   foreach(runtime_file IN LISTS CEF_RUNTIME_FILES)
