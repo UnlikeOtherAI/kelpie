@@ -10,9 +10,9 @@ bool TabNumber(const std::string& id, std::uint64_t* number) {
 }
 }
 bool ParseSessionSnapshot(const nlohmann::json& value, SessionSnapshot* output) {
-  if (!output || !value.is_object() || !value.contains("version") || !value["version"].is_number_unsigned() ||
-      value["version"] != 1 || !value.contains("epoch") || !value["epoch"].is_number_unsigned() ||
-      !value.contains("nextTabId") || !value["nextTabId"].is_number_unsigned() ||
+  if (!output || !value.is_object() || !value.contains("version") || !value["version"].is_number_integer() ||
+      value["version"] != 1 || !value.contains("epoch") || !value["epoch"].is_number_integer() ||
+      !value.contains("nextTabId") || !value["nextTabId"].is_number_integer() ||
       !value.contains("tabs") || !value["tabs"].is_array()) return false;
   SessionSnapshot next; next.epoch=value["epoch"].get<std::uint64_t>(); next.next_tab_id=value["nextTabId"].get<std::uint64_t>();
   if (next.next_tab_id < 1) return false;
