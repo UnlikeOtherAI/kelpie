@@ -56,7 +56,7 @@ class Win32Shell {
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
   void CreateMenuBar();
   void LayoutChildren(int width, int height);
-  void RefreshTabs();
+  bool RefreshTabs();
   void ActivateAdjacentTab(int direction);
   void ActivateSelectedTab();
   void CloseSelectedTab();
@@ -81,6 +81,7 @@ class Win32Shell {
   HistoryView history_view_;
   NetworkInspector network_view_;
   std::vector<TabItem> tabs_;
+  std::string active_tab_id_;
 };
 
 }  // namespace kelpie::windows

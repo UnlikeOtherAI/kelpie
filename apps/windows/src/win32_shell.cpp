@@ -48,12 +48,12 @@ void Win32Shell::Show(int show_command) {
 
 void Win32Shell::UpdateBrowserState(const BrowserState& state) {
   if (hwnd_ == nullptr) return;
-  url_bar_.SetUrl(utf::Utf8ToWide(state.url).value_or(L""));
+  const bool tab_changed = RefreshTabs();
+  url_bar_.SetUrl(utf::Utf8ToWide(state.url).value_or(L""), tab_changed);
   url_bar_.SetNavigationState(state.can_go_back, state.can_go_forward, state.is_loading);
   if (!state.title.empty()) {
     SetWindowTextW(hwnd_, (utf::Utf8ToWideDisplay(state.title) + L" - Kelpie").c_str());
   }
-  RefreshTabs();
 }
 
 void Win32Shell::ShowToast(const std::wstring& message) {
@@ -190,12 +190,13 @@ void Win32Shell::LayoutChildren(int width, int height) {
   toast_.Resize(RECT{0, 0, width, height});
 }
 
-void Win32Shell::RefreshTabs() {
-  if (tab_strip_ == nullptr || delegate_ == nullptr) return;
+bool Win32Shell::RefreshTabs() {
+  if (tab_strip_ == nullptr || delegate_ == nullptr) return false;
   const nlohmann::json parsed = nlohmann::json::parse(delegate_->GetTabsJson(), nullptr, false);
   const nlohmann::json* entries = parsed.is_object() && parsed.contains("tabs") ? &parsed["tabs"] : &parsed;
-  if (!entries->is_array()) return;
+  if (!entries->is_array()) return false;
   const int previous = TabCtrl_GetCurSel(tab_strip_);
+  const std::string previous_active = active_tab_id_;
   tabs_.clear();
   TabCtrl_DeleteAllItems(tab_strip_);
   int active = -1;
@@ -204,18 +205,25 @@ void Win32Shell::RefreshTabs() {
     if (!entry.is_object()) continue;
     const std::string id = entry.value("id", "");
     if (id.empty()) continue;
-    const std::string label = entry.value("title", entry.value("url", "New tab"));
+    std::string label = entry.value("title", "");
+    if (label.empty()) label = entry.value("url", "");
+    if (label.empty()) label = "New tab";
     std::wstring text = utf::Utf8ToWideDisplay(label);
     TCITEMW item{};
     item.mask = TCIF_TEXT;
     item.pszText = text.data();
     TabCtrl_InsertItem(tab_strip_, index, &item);
     tabs_.push_back({id, entry.value("generation", std::uint64_t{0})});
-    if (entry.value("active", false)) active = index;
+    if (entry.value("active", false)) {
+      active = index;
+      active_tab_id_ = id;
+    }
     ++index;
   }
   TabCtrl_SetCurSel(tab_strip_, active >= 0 ? active : previous >= 0 && previous < index ? previous : 0);
   EnableWindow(close_tab_button_, index > 0 ? TRUE : FALSE);
+  if (active < 0) active_tab_id_.clear();
+  return previous_active != active_tab_id_;
 }
 
 void Win32Shell::ActivateAdjacentTab(int direction) {

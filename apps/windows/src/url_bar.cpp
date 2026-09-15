@@ -55,8 +55,8 @@ void UrlBar::Resize(const RECT& bounds) {
   SetWindowPos(settings_button_, nullptr, bounds.right - settings_width - 8, top, settings_width, kControlHeight, SWP_NOZORDER);
 }
 
-void UrlBar::SetUrl(const std::wstring& url) {
-  if (url_edit_ == nullptr) return;
+void UrlBar::SetUrl(const std::wstring& url, bool force) {
+  if (url_edit_ == nullptr || (!force && GetFocus() == url_edit_)) return;
   setting_url_ = true;
   completion_active_ = false;
   insertion_at_end_ = false;
@@ -111,10 +111,12 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       self->SubmitCurrentUrl();
       return 0;
     }
+    self->completion_active_ = false;
     if (wparam == VK_BACK || wparam == VK_DELETE) {
       self->insertion_at_end_ = false;
-      self->completion_active_ = false;
     }
+  } else if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MOUSEWHEEL) {
+    self->completion_active_ = false;
   }
   return CallWindowProcW(self->original_edit_proc_, hwnd, message, wparam, lparam);
 }

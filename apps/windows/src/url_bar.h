@@ -29,7 +29,7 @@ class UrlBar {
  public:
   bool Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarDelegate* delegate);
   void Resize(const RECT& bounds);
-  void SetUrl(const std::wstring& url);
+  void SetUrl(const std::wstring& url, bool force = false);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void Focus();
   bool HandleCommand(WORD control_id, WORD notification_code);
