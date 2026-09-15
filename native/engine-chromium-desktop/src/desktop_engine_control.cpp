@@ -380,7 +380,35 @@ BrowserControlResult DesktopEngine::DeleteCookies(TabLease lease, const Json& qu
   return result;
 }
 BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const Json& input, Json* output, Timeout timeout) {
-  if (input.value("type", "") != "key") return BrowserControlResult::Failure("UNSUPPORTED", "Only native key input is available");
+  const std::string type = input.value("type", "");
+  if (type == "click" || type == "fill" || type == "type" || type == "selectOption" || type == "setChecked") {
+    const std::string selector = input.value("selector", "");
+    if ((type != "type" || !selector.empty()) && selector.empty()) return BrowserControlResult::Failure("INVALID_URL", "selector is required");
+    if (!selector.empty()) {
+      Json bounds;
+      const std::string selector_json = Json(selector).dump();
+      const auto found = Evaluate(lease,
+          "(()=>{const e=document.querySelector(" + selector_json + ");if(!e)return null;e.focus();const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};})()",
+          &bounds, timeout);
+      if (!found.ok) return found;
+      if (!bounds.is_object() || !bounds.contains("x") || !bounds.contains("y")) {
+        return BrowserControlResult::Failure("TAB_NOT_FOUND", "No matching visible element exists");
+      }
+      Json ignored;
+      const Json press = {{"type", "mousePressed"}, {"x", bounds["x"]}, {"y", bounds["y"]}, {"button", "left"}, {"clickCount", 1}};
+      auto result = DevTools(lease, "Input.dispatchMouseEvent", press, &ignored, timeout);
+      if (!result.ok) return result;
+      result = DevTools(lease, "Input.dispatchMouseEvent", {{"type", "mouseReleased"}, {"x", bounds["x"]}, {"y", bounds["y"]}, {"button", "left"}, {"clickCount", 1}}, &ignored, timeout);
+      if (!result.ok || type == "click") { if (result.ok && output) *output = {{"trusted", true}}; return result; }
+    }
+    if (type == "setChecked" || type == "selectOption") return BrowserControlResult::Failure("UNSUPPORTED", "This control requires a native keyboard selection path");
+    const std::string text = type == "fill" ? input.value("value", "") : input.value("text", "");
+    Json ignored;
+    const auto result = DevTools(lease, "Input.insertText", {{"text", text}}, &ignored, timeout);
+    if (result.ok && output) *output = {{"trusted", true}, {"text", text}};
+    return result;
+  }
+  if (type != "key") return BrowserControlResult::Failure("UNSUPPORTED", "Unsupported native input type");
   Json first;
   const auto down = DevTools(lease, "Input.dispatchKeyEvent", DesktopDevToolsSession::TrustedKeyParams(input, false), &first, timeout);
   if (!down.ok) return down;
