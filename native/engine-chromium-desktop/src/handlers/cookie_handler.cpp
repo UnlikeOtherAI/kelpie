@@ -54,7 +54,7 @@ nlohmann::json CookieHandler::GetCookies(const nlohmann::json& params) const {
 
 nlohmann::json CookieHandler::SetCookie(const nlohmann::json& params) const {
   try {
-    RequireString(params, "name"); RequireString(params, "value");
+    RequireString(params, "name"); RequireString(params, "value", true);
     TabLease lease; BrowserControlResult result = Resolve(runtime_, params, &lease);
     if (!result.ok) return ControlError(result);
     nlohmann::json output;
@@ -94,7 +94,7 @@ nlohmann::json CookieHandler::GetStorage(const nlohmann::json& params) const {
 nlohmann::json CookieHandler::SetStorage(const nlohmann::json& params) const {
   try {
     const std::string type = StorageType(params, false);
-    const std::string key = RequireString(params, "key"), value = RequireString(params, "value");
+    const std::string key = RequireString(params, "key"), value = RequireString(params, "value", true);
     const std::string store = type == "session" ? "sessionStorage" : "localStorage";
     nlohmann::json output; const BrowserControlResult result = EvaluateForTab(runtime_, params,
         "(() => { window." + store + ".setItem(" + JsStringLiteral(key) + "," + JsStringLiteral(value) + "); return {type:" + JsStringLiteral(type) + ",key:" + JsStringLiteral(key) + "}; })()", &output);

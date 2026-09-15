@@ -5,8 +5,8 @@ namespace kelpie {
 RendererHandler::RendererHandler(DesktopHandlerRuntime runtime) : runtime_(std::move(runtime)) {}
 
 void RendererHandler::Register(DesktopRouter& router) const {
-  router.Register("get-renderer", [this](const nlohmann::json&) { return GetRenderer(); });
-  router.Register("set-renderer", [this](const nlohmann::json&) { return SetRenderer(); });
+  router.Register("get-renderer", [this](const nlohmann::json&) { return GetRenderer(); }, false);
+  router.Register("set-renderer", [this](const nlohmann::json&) { return SetRenderer(); }, false);
 }
 
 nlohmann::json RendererHandler::GetRenderer() const {

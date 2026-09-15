@@ -12,7 +12,7 @@ void ScrollHandler::Register(DesktopRouter& router) const {
                   [this](const nlohmann::json& p) {
                     return ScrollTo(p, "window.scrollTo(0, document.documentElement.scrollHeight)");
                   });
-  router.Register("scroll2", [](const nlohmann::json&) { return Unsupported("scroll2"); });
+  router.Register("scroll2", [](const nlohmann::json&) { return Unsupported("scroll2"); }, false);
 }
 
 nlohmann::json ScrollHandler::Scroll(const nlohmann::json& params) const {

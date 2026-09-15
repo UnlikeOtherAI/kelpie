@@ -3,6 +3,10 @@ import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
 import { DEFAULT_MCP_BIND_HOST } from "../mcp/transport.js";
 import { localBrowserDevice } from "./helpers.js";
 
+export function rejectsWindowsLocalHttpProxy(http: boolean | undefined, platform: string | undefined): boolean {
+  return http === true && platform === "windows";
+}
+
 export function registerMcp(program: Command): void {
   program
     .command("mcp")
@@ -29,6 +33,11 @@ export function registerMcp(program: Command): void {
         const local = globals.browser ? await localBrowserDevice(globals.browser) : undefined;
         if (globals.browser && !local) {
           process.stderr.write(`No ready local browser named ${globals.browser}\n`);
+          process.exitCode = 4;
+          return;
+        }
+        if (rejectsWindowsLocalHttpProxy(opts.http, local?.platform)) {
+          process.stderr.write("Windows local aliases support MCP over CLI stdio only; use the browser's authenticated /mcp endpoint for HTTP.\n");
           process.exitCode = 4;
           return;
         }

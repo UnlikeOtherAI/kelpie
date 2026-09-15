@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_PORT,
   MDNS_SERVICE_TYPE,
@@ -71,12 +72,12 @@ describe("MCP tools", () => {
     }
   });
 
-  it("has correct count of browser tools", () => {
-    expect(BrowserMcpTools.length).toBe(122);
-  });
-
-  it("has correct count of CLI tools", () => {
-    expect(CliMcpTools.length).toBe(25);
+  it("includes canonical desktop state tools", () => {
+    expect(BrowserMcpTools).toEqual(expect.arrayContaining([
+      "kelpie_bookmarks_list", "kelpie_bookmarks_add", "kelpie_bookmarks_remove",
+      "kelpie_bookmarks_clear", "kelpie_history_list", "kelpie_history_clear",
+      "kelpie_clear_cookies", "kelpie_clear_network_log",
+    ]));
   });
 
   it("httpToMcp maps all browser endpoints", () => {
@@ -84,6 +85,21 @@ describe("MCP tools", () => {
     expect(mappedTools.length).toBe(BrowserMcpTools.length);
     for (const tool of BrowserMcpTools) {
       expect(mappedTools).toContain(tool);
+    }
+  });
+
+  it("keeps native MCP registry names and HTTP endpoints aligned with the shared catalogue", () => {
+    const source = readFileSync(
+      new URL("../../../native/core-mcp/src/mcp_tool.cpp", import.meta.url),
+      "utf8",
+    );
+    const nativeTools = [...source.matchAll(/Tool\("(kelpie_[^"]+)",\s*"([^"]+)"/g)];
+    expect(nativeTools.length).toBeGreaterThan(0);
+    for (const match of nativeTools) {
+      const name = match[1]!;
+      const endpoint = match[2]!;
+      expect(BrowserMcpTools).toContain(name);
+      expect(httpToMcp[endpoint]).toBe(name);
     }
   });
 

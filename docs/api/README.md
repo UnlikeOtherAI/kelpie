@@ -292,6 +292,7 @@ Internal HTTP-only debug surfaces are not exposed as MCP tools:
 | `/v1/get-console-messages` | `kelpie_get_console_messages` |
 | `/v1/get-js-errors` | `kelpie_get_js_errors` |
 | `/v1/get-network-log` | `kelpie_get_network_log` |
+| `/v1/clear-network-log` | `kelpie_clear_network_log` |
 | `/v1/network-list` | `kelpie_network_list` |
 | `/v1/network-detail` | `kelpie_network_detail` |
 | `/v1/network-current` | `kelpie_network_current` |
@@ -328,6 +329,7 @@ Internal HTTP-only debug surfaces are not exposed as MCP tools:
 | `/v1/get-cookies` | `kelpie_get_cookies` |
 | `/v1/set-cookie` | `kelpie_set_cookie` |
 | `/v1/delete-cookies` | `kelpie_delete_cookies` |
+| `/v1/clear-cookies` | `kelpie_clear_cookies` |
 | `/v1/get-storage` | `kelpie_get_storage` |
 | `/v1/set-storage` | `kelpie_set_storage` |
 | `/v1/clear-storage` | `kelpie_clear_storage` |

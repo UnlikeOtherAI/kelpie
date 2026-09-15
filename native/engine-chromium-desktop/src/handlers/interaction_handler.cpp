@@ -37,11 +37,11 @@ nlohmann::json InteractionHandler::Click(const nlohmann::json& params) const {
   catch (const std::invalid_argument& error) { return InvalidParams(error.what()); }
 }
 nlohmann::json InteractionHandler::Fill(const nlohmann::json& params) const {
-  try { return Dispatch(runtime_, params, {{"type", "fill"}, {"selector", RequireString(params, "selector")}, {"value", RequireString(params, "value")}}); }
+  try { return Dispatch(runtime_, params, {{"type", "fill"}, {"selector", RequireString(params, "selector")}, {"value", RequireString(params, "value", true)}}); }
   catch (const std::invalid_argument& error) { return InvalidParams(error.what()); }
 }
 nlohmann::json InteractionHandler::Type(const nlohmann::json& params) const {
-  try { nlohmann::json input = {{"type", "type"}, {"text", RequireString(params, "text")}};
+  try { nlohmann::json input = {{"type", "type"}, {"text", RequireString(params, "text", true)}};
     if (params.contains("selector")) input["selector"] = RequireString(params, "selector");
     return Dispatch(runtime_, params, std::move(input)); }
   catch (const std::invalid_argument& error) { return InvalidParams(error.what()); }

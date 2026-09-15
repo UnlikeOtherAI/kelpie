@@ -4,7 +4,7 @@ import { createMcpServer, formatBrowserToolResult } from "../../src/mcp/server.j
 import { addDevice, clearDevices, getDevice, getAllDevices } from "../../src/discovery/registry.js";
 import { filterDevices } from "../../src/group/filter.js";
 import { browserTools, cliTools } from "../../src/mcp/tools.js";
-import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/kelpie-shared";
+import { BrowserMcpTools, CliMcpTools } from "../../../shared/src/index.js";
 import type { DiscoveredDevice } from "../../src/types.js";
 
 function makeDevice(overrides: Partial<DiscoveredDevice> = {}): DiscoveredDevice {
@@ -29,7 +29,7 @@ describe("createMcpServer", () => {
     expect(server).toBeDefined();
   });
 
-  it("registers every declared browser and CLI tool", () => {
+  it("registers exactly the shared browser and CLI catalogues", () => {
     expect(browserTools.map((tool) => tool.name)).toEqual([...BrowserMcpTools]);
     expect(cliTools.map((tool) => tool.name)).toEqual([...CliMcpTools]);
   });
@@ -115,11 +115,16 @@ describe("MCP browser result formatting", () => {
       size: 23,
     });
     expect(result.structuredContent).toEqual(metadata);
+    expect(result.content.find((item) => item.type === "image")).toMatchObject({
+      type: "image",
+      data: image,
+      mimeType: "image/png",
+    });
     await expect(readFile(metadata.file, "utf8")).resolves.toBe("native screenshot bytes");
     await rm(metadata.file, { force: true });
   });
 
-  it("keeps viewport screenshots on the legacy text JSON path", async () => {
+  it("returns portable MCP image content for Windows screenshots", async () => {
     const payload = {
       success: true,
       image: "abc",
@@ -128,9 +133,25 @@ describe("MCP browser result formatting", () => {
       format: "png",
       resolution: "viewport",
     };
-    const result = await formatBrowserToolResult("screenshot", payload, "Test Phone");
+    const result = await formatBrowserToolResult("screenshot", payload, "Test Windows");
 
-    expect(result.content).toEqual([{ type: "text", text: JSON.stringify(payload) }]);
-    expect(result.structuredContent).toBeUndefined();
+    expect(result.content).toEqual([
+      { type: "text", text: JSON.stringify({ ...payload, mimeType: "image/png" }) },
+      { type: "image", data: "abc", mimeType: "image/png" },
+    ]);
+    expect(result.structuredContent).toEqual({ ...payload, mimeType: "image/png" });
+  });
+
+  it("marks browser-control failures as MCP errors", async () => {
+    const result = await formatBrowserToolResult("navigate", {
+      success: false,
+      error: { code: "TAB_REQUIRED", message: "tabId is required" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual([{
+      type: "text",
+      text: JSON.stringify({ success: false, error: { code: "TAB_REQUIRED", message: "tabId is required" } }),
+    }]);
   });
 });

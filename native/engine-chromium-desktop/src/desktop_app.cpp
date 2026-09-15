@@ -75,7 +75,7 @@ void AppendNetwork(NetworkTrafficStore& store, const nlohmann::json& event) {
 
 std::vector<std::string> UnsupportedMethods() {
   return {
-      "debug-screens",      "set-debug-overlay",  "get-debug-overlay",
+      "debug-screens",      "set-debug-overlay",  "get-debug-overlay", "screenshot-annotated",
       "tap",                "click-annotation",   "fill-annotation",
       "set-dialog-auto-handler",
       "get-iframes",        "switch-to-iframe",   "switch-to-main",
@@ -142,7 +142,10 @@ class DesktopApp::Impl {
     runtime.device_info_provider = config.device_info_provider;
     runtime.platform = config.platform;
     runtime.engine_name = config.engine_name;
-    runtime.viewport_supplier = [this]() {
+    if (config.viewport_supplier) {
+      runtime.viewport_supplier = config.viewport_supplier;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.viewport_supplier = [this]() {
       const DesktopEngine::ViewportState viewport = engine.viewport();
       nlohmann::json response = {
           {"width", viewport.width},
@@ -155,11 +158,19 @@ class DesktopApp::Impl {
                                                                                   std::string("Kelpie Desktop"))},
           {"orientation", viewport.width >= viewport.height ? "landscape" : "portrait"},
       };
-      return response;
-    };
+        return response;
+      };
+    }
     runtime.capabilities_supplier = [this]() {
-      const McpCapabilities capabilities =
-          mcp_registry.get_capabilities(config.platform, config.engine_name);
+      McpCapabilities capabilities;
+      for (const McpTool& tool : mcp_registry.all_tools()) {
+        if (SupportsPlatform(tool.availability, config.platform) &&
+            SupportsEngine(tool.availability, config.engine_name) && router.IsCallable(tool.http_endpoint)) {
+          capabilities.supported.push_back(tool.http_endpoint);
+        } else {
+          capabilities.unsupported.push_back(tool.http_endpoint);
+        }
+      }
       return SuccessResponse({
           {"platform", PlatformToString(config.platform)},
           {"engine", config.engine_name},
@@ -171,12 +182,20 @@ class DesktopApp::Impl {
     runtime.renderer_supplier = [this]() {
       return SuccessResponse({{"current", config.engine_name}, {"available", {"chromium"}}});
     };
-    runtime.resize_viewport = [this](int width, int height) {
-      return engine.ResizeViewport(width, height);
-    };
-    runtime.reset_viewport = [this]() {
-      engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
-    };
+    if (config.resize_viewport) {
+      runtime.resize_viewport = config.resize_viewport;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.resize_viewport = [this](int width, int height) {
+        return engine.ResizeViewport(width, height);
+      };
+    }
+    if (config.reset_viewport) {
+      runtime.reset_viewport = config.reset_viewport;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.reset_viewport = [this]() {
+        engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
+      };
+    }
     runtime.set_native_fullscreen = config.set_native_fullscreen;
     runtime.get_native_fullscreen = config.get_native_fullscreen;
     runtime.request_shutdown = config.request_shutdown;

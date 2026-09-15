@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <string_view>
 
 #include "kelpie/desktop_router.h"
@@ -42,58 +43,121 @@ nlohmann::json ReplyOrNothing(bool notification, nlohmann::json response) {
 }
 
 nlohmann::json InputSchema(std::string_view endpoint) {
-  nlohmann::json properties = {
-      {"tabId", {{"type", "string"}}},
-      {"generation", {{"type", "integer"}, {"minimum", 0}}},
-  };
+  nlohmann::json properties = nlohmann::json::object();
   nlohmann::json required = nlohmann::json::array();
-  if (endpoint == "navigate") {
-    properties["url"] = {{"type", "string"}, {"minLength", 1}};
-    required.push_back("url");
-  } else if (endpoint == "evaluate") {
-    properties["expression"] = {{"type", "string"}, {"minLength", 1}};
-    required.push_back("expression");
-  } else if (endpoint == "new-tab") {
-    properties["url"] = {{"type", "string"}, {"minLength", 1}};
-  } else if (endpoint == "click") {
-    properties["selector"] = {{"type", "string"}, {"minLength", 1}};
-    required.push_back("selector");
-  } else if (endpoint == "fill") {
-    properties["selector"] = {{"type", "string"}, {"minLength", 1}};
-    properties["value"] = {{"type", "string"}};
-    required = {"selector", "value"};
-  } else if (endpoint == "type") {
-    properties["text"] = {{"type", "string"}};
-    required.push_back("text");
-  } else if (endpoint == "press-key") {
-    properties["key"] = {{"type", "string"}, {"minLength", 1}};
-    properties["code"] = {{"type", "string"}};
-    properties["modifiers"] = {{"type", "array"}, {"items", {{"type", "string"}}}};
-    required.push_back("key");
-  } else if (endpoint == "set-home") {
-    properties["url"] = {{"type", "string"}, {"minLength", 1}};
-    required.push_back("url");
-  } else if (endpoint == "toast") {
-    properties["message"] = {{"type", "string"}, {"minLength", 1}};
-    required.push_back("message");
-  } else if (endpoint == "set-fullscreen") {
-    properties["enabled"] = {{"type", "boolean"}};
-    required.push_back("enabled");
-  } else if (endpoint == "handle-dialog") {
-    properties["action"] = {{"enum", {"accept", "dismiss"}}};
-    properties["promptText"] = {{"type", "string"}};
-    required.push_back("action");
-  } else if (endpoint == "scroll") {
-    properties["deltaX"] = {{"type", "number"}};
-    properties["deltaY"] = {{"type", "number"}};
-  } else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") {
-    properties["format"] = {{"enum", {"png", "jpeg"}}};
-    properties["fullPage"] = {{"type", "boolean"}};
+  const auto string = [&properties](const char* name, bool required_field = false) {
+    properties[name] = {{"type", "string"}, {"minLength", required_field ? 1 : 0}};
+  };
+  const auto integer = [&properties](const char* name, int minimum = 0) {
+    properties[name] = {{"type", "integer"}, {"minimum", minimum}};
+  };
+  const auto tab_scoped = [&properties] {
+    properties["tabId"] = {{"type", "string"}, {"minLength", 1}};
+    properties["generation"] = {{"type", "integer"}, {"minimum", 0}};
+    properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}};
+  };
+  const auto require = [&required](const char* name) { required.push_back(name); };
+  const bool scoped = endpoint == "navigate" || endpoint == "back" || endpoint == "forward" ||
+      endpoint == "reload" || endpoint == "get-current-url" ||
+      endpoint == "switch-tab" || endpoint == "close-tab" || endpoint == "get-dom" ||
+      endpoint == "query-selector" || endpoint == "query-selector-all" ||
+      endpoint == "get-element-text" || endpoint == "get-attributes" || endpoint == "evaluate" ||
+      endpoint == "wait-for-element" || endpoint == "wait-for-navigation" || endpoint == "click" ||
+      endpoint == "fill" || endpoint == "type" || endpoint == "select-option" || endpoint == "check" ||
+      endpoint == "uncheck" || endpoint == "press-key" || endpoint == "scroll" ||
+      endpoint == "scroll-to-top" || endpoint == "scroll-to-bottom" || endpoint == "screenshot" ||
+      endpoint == "screenshot-annotated" || endpoint == "get-cookies" || endpoint == "set-cookie" ||
+      endpoint == "delete-cookies" || endpoint == "clear-cookies" || endpoint == "get-storage" ||
+      endpoint == "set-storage" || endpoint == "clear-storage" || endpoint == "get-dialog" ||
+      endpoint == "handle-dialog" || endpoint == "find-element" || endpoint == "find-button" ||
+      endpoint == "find-link" || endpoint == "find-input" || endpoint == "get-page-text" ||
+      endpoint == "get-visible-elements" || endpoint == "get-form-state" || endpoint == "get-accessibility-tree";
+  if (scoped) tab_scoped();
+
+  if (endpoint == "navigate" || endpoint == "set-home") { string("url", true); require("url"); }
+  else if (endpoint == "new-tab") string("url");
+  else if (endpoint == "evaluate") { string("expression", true); require("expression"); }
+  else if (endpoint == "query-selector" || endpoint == "query-selector-all" || endpoint == "get-element-text" || endpoint == "get-attributes") { string("selector", true); require("selector"); }
+  else if (endpoint == "get-dom") string("selector");
+  else if (endpoint == "wait-for-element") { string("selector", true); require("selector"); }
+  else if (endpoint == "click" || endpoint == "check" || endpoint == "uncheck") { string("selector", true); require("selector"); }
+  else if (endpoint == "fill" || endpoint == "select-option") { string("selector", true); string("value"); require("selector"); require("value"); }
+  else if (endpoint == "type") { string("text", true); string("selector"); require("text"); }
+  else if (endpoint == "press-key") { string("key", true); string("code"); properties["modifiers"]={{"type","array"},{"items",{{"type","string"}}}}; require("key"); }
+  else if (endpoint == "scroll") {
+    properties["deltaX"] = {{"type", "integer"}};
+    properties["deltaY"] = {{"type", "integer"}};
+    require("deltaX"); require("deltaY");
   }
-  return {{"type", "object"},
-          {"properties", std::move(properties)},
-          {"required", std::move(required)},
-          {"additionalProperties", true}};
+  else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") { properties["format"]={{"const","png"}}; }
+  else if (endpoint == "get-cookies") { string("url"); string("name"); }
+  else if (endpoint == "set-cookie") {
+    string("name", true); string("value"); string("url"); string("domain"); string("path");
+    string("expires"); properties["httpOnly"] = {{"type", "boolean"}};
+    properties["secure"] = {{"type", "boolean"}};
+    properties["sameSite"] = {{"enum", {"strict", "lax", "none"}}};
+    require("name"); require("value");
+  } else if (endpoint == "delete-cookies") {
+    string("name"); string("domain"); properties["deleteAll"]={{"type","boolean"}};
+  }
+  else if (endpoint == "get-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key"); }
+  else if (endpoint == "set-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key",true); string("value"); require("key"); require("value"); }
+  else if (endpoint == "clear-storage") properties["type"]={{"enum",{"local","session","both"}}};
+  else if (endpoint == "handle-dialog") { properties["action"]={{"enum",{"accept","dismiss"}}}; string("promptText"); require("action"); }
+  else if (endpoint == "find-element" || endpoint == "find-button" || endpoint == "find-link" || endpoint == "find-input") { string("text", true); require("text"); }
+  else if (endpoint == "toast") { string("message", true); require("message"); }
+  else if (endpoint == "set-fullscreen") { properties["enabled"]={{"type","boolean"}}; require("enabled"); }
+  else if (endpoint == "resize-viewport") { integer("width",1); integer("height",1); require("width"); require("height"); }
+  else if (endpoint == "bookmarks-add") { string("url",true); string("title"); require("url"); }
+  else if (endpoint == "bookmarks-remove") { string("id",true); require("id"); }
+  else if (endpoint == "history-list" || endpoint == "get-history") integer("limit",1);
+  else if (endpoint == "get-console-messages") {
+    properties["level"] = {{"enum", {"log", "warn", "error", "info", "debug"}}};
+    integer("limit", 1);
+  } else if (endpoint == "get-network-log") {
+    string("type");
+    properties["status"] = {{"enum", {"success", "error", "pending"}}};
+    integer("limit", 1);
+  }
+  return {{"type", "object"}, {"properties", std::move(properties)}, {"required", std::move(required)}, {"additionalProperties", false}};
+}
+
+std::optional<std::string> ValidateToolArguments(const nlohmann::json& schema,
+                                                 const nlohmann::json& arguments) {
+  const auto& properties = schema.at("properties");
+  for (const auto& required : schema.at("required")) {
+    const std::string name = required.get<std::string>();
+    if (!arguments.contains(name)) return name + " is required";
+  }
+  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+    if (!properties.contains(it.key())) return "Unknown argument: " + it.key();
+    const auto& property = properties.at(it.key());
+    if (property.contains("const") && it.value() != property.at("const")) {
+      return it.key() + " must equal " + property.at("const").dump();
+    }
+    if (property.contains("enum") &&
+        std::find(property.at("enum").begin(), property.at("enum").end(), it.value()) ==
+            property.at("enum").end()) return it.key() + " has an invalid value";
+    const std::string type = property.value("type", std::string());
+    const bool type_ok = type.empty() ||
+        (type == "string" && it.value().is_string()) ||
+        (type == "integer" && it.value().is_number_integer()) ||
+        (type == "boolean" && it.value().is_boolean()) ||
+        (type == "array" && it.value().is_array());
+    if (!type_ok) return it.key() + " has the wrong type";
+    if (it.value().is_string() && property.contains("minLength") &&
+        it.value().get_ref<const std::string&>().size() < property.at("minLength").get<std::size_t>()) {
+      return it.key() + " is too short";
+    }
+    if (it.value().is_number_integer()) {
+      const auto value = it.value().get<std::int64_t>();
+      if ((property.contains("minimum") && value < property.at("minimum").get<std::int64_t>()) ||
+          (property.contains("maximum") && value > property.at("maximum").get<std::int64_t>())) {
+        return it.key() + " is out of range";
+      }
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -229,6 +293,9 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
     const nlohmann::json arguments = params.contains("arguments") ? params["arguments"] : nlohmann::json::object();
     if (!arguments.is_object()) {
       return ReplyOrNothing(notification, JsonRpcError(id, -32602, "tools/call.arguments must be an object"));
+    }
+    if (const auto invalid = ValidateToolArguments(InputSchema(match->http_endpoint), arguments)) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, *invalid));
     }
 
     const DesktopRouter::Result result =
