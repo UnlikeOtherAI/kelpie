@@ -352,9 +352,33 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot
   }
   return result;
 }
-BrowserControlResult DesktopEngine::GetCookies(TabLease lease, const Json&, Json*, Timeout timeout) { return Screenshot(lease, nullptr, timeout); }
-BrowserControlResult DesktopEngine::SetCookies(TabLease lease, const Json&, Json*, Timeout timeout) { return Screenshot(lease, nullptr, timeout); }
-BrowserControlResult DesktopEngine::DeleteCookies(TabLease lease, const Json&, Json*, Timeout timeout) { return Screenshot(lease, nullptr, timeout); }
+BrowserControlResult DesktopEngine::GetCookies(TabLease lease, const Json&, Json* cookies, Timeout timeout) {
+  if (!cookies) return BrowserControlResult::Failure("INTERNAL", "cookies is required");
+  Json response;
+  const auto result = DevTools(lease, "Network.getAllCookies", Json::object(), &response, timeout);
+  if (result.ok) *cookies = response.value("cookies", Json::array());
+  return result;
+}
+BrowserControlResult DesktopEngine::SetCookies(TabLease lease, const Json& cookies, Json* output, Timeout timeout) {
+  const Json values = cookies.is_array() ? cookies : Json::array({cookies});
+  if (!values.is_array() || values.empty()) return BrowserControlResult::Failure("INVALID_URL", "At least one cookie is required");
+  const auto started_at = std::chrono::steady_clock::now();
+  for (const auto& cookie : values) {
+    if (!cookie.is_object()) return BrowserControlResult::Failure("INVALID_URL", "cookie must be an object");
+    Json response;
+    const auto result = DevTools(lease, "Network.setCookie", cookie, &response, RemainingTimeout(started_at, timeout));
+    if (!result.ok) return result;
+    if (!response.value("success", false)) return BrowserControlResult::Failure("INTERNAL", "CEF rejected the cookie");
+  }
+  if (output) *output = {{"set", values.size()}};
+  return BrowserControlResult::Success();
+}
+BrowserControlResult DesktopEngine::DeleteCookies(TabLease lease, const Json& query, Json* output, Timeout timeout) {
+  Json response;
+  const auto result = DevTools(lease, "Network.deleteCookies", query, &response, timeout);
+  if (result.ok && output) *output = {{"deleted", true}};
+  return result;
+}
 BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const Json& input, Json* output, Timeout timeout) {
   if (input.value("type", "") != "key") return BrowserControlResult::Failure("UNSUPPORTED", "Only native key input is available");
   Json first;
