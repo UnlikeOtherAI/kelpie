@@ -95,6 +95,7 @@ class DesktopEngine final : public DesktopBrowserControl {
   BrowserControlResult Back(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
   BrowserControlResult Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
   BrowserControlResult Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult StopLoading(TabLease lease, TabSnapshot* tab, Timeout timeout);
   BrowserControlResult Evaluate(TabLease lease,
                                 std::string script,
                                 Json* value,

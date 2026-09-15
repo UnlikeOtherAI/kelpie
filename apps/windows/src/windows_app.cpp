@@ -147,7 +147,9 @@ void WindowsApp::OnForwardRequested() {
 void WindowsApp::OnReloadRequested() {
   const auto lease = ActiveLease(desktop_app_.get());
   if (!lease) return;
-  const auto result = desktop_app_->engine().Reload(*lease, nullptr, std::chrono::seconds(2));
+  const auto result = browser_state_.is_loading
+      ? desktop_app_->engine().StopLoading(*lease, nullptr, std::chrono::seconds(2))
+      : desktop_app_->engine().Reload(*lease, nullptr, std::chrono::seconds(2));
   if (!result.ok && shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
 
