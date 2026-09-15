@@ -151,10 +151,10 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
   return TimeoutResult();
 }
 
-BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, TabSnapshot* snapshot) {
+BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
   if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
   CefWindowInfo window_info;
-  const std::string id = "tab-" + std::to_string(++next_tab_id);
+  const std::string id = restored_id ? *restored_id : "tab-" + std::to_string(next_tab_id++);
   if (config.mode == DesktopEngine::Mode::kOffscreen) {
     window_info.SetAsWindowless(0);
   } else if (config.configure_tab_window_info) {

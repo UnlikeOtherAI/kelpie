@@ -277,6 +277,7 @@ void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {
   browser_state_ = state;
   shell_->UpdateBrowserState(state);
   RememberNavigation(state);
+  SaveSession();
 }
 
 void WindowsApp::ResolveProfileDirectory() {
@@ -320,7 +321,7 @@ void WindowsApp::SaveSession() {
   if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok || tabs.empty()) return;
   SessionSnapshot next;
   next.epoch = session_snapshot_.epoch + 1;
-  next.next_tab_id = 1;
+  next.next_tab_id = std::max<std::uint64_t>(session_snapshot_.next_tab_id, 1);
   for (const auto& tab : tabs) {
     next.tabs.push_back({tab.id, tab.url, tab.active});
     if (tab.id.rfind("tab-", 0) == 0) { try { next.next_tab_id = std::max(next.next_tab_id, std::stoull(tab.id.substr(4)) + 1); } catch (...) {} }
@@ -401,6 +402,8 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.set_home = [this](std::string url) {
     std::lock_guard<std::mutex> lock(shell_state_mutex_);
     home_url_ = std::move(url);
+    config_.initial_url = home_url_;
+    SaveSettings();
     return BrowserControlResult::Success();
   };
   runtime.get_home = [this](std::string* url) {

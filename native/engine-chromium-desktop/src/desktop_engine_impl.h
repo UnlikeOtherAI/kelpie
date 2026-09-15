@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -67,7 +68,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   Tab* ActiveTab();
   TabSnapshot Snapshot(const Tab& tab) const;
   BrowserControlResult RunOnUi(std::function<BrowserControlResult()> operation, Timeout timeout);
-  BrowserControlResult CreateTabOnUi(const std::string& url, TabSnapshot* snapshot);
+  BrowserControlResult CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id = std::nullopt);
   void UpdateActiveState();
 };
 

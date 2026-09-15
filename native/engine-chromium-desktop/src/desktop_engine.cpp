@@ -175,8 +175,12 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     next_tab_id = std::max<std::uint64_t>(config.restored_next_tab_id, 1);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
       TabSnapshot ignored;
-      CreateTabOnUi(config.restored_tabs[index].url, &ignored);
+      CreateTabOnUi(config.restored_tabs[index].url, &ignored, config.restored_tabs[index].id);
     }
+    for (const auto& restored : config.restored_tabs) {
+      if (restored.active) { if (auto* tab = FindTab(TabLease{restored.id, 1})) browser = tab->browser; break; }
+    }
+    UpdateActiveState();
   }
 
   renderer->SetCallbacks({
