@@ -322,21 +322,17 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
   }
   if (auto* tab = owner_->FindTab(browser)) {
     tab->url = frame->GetURL().ToString();
+    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
   }
   owner_->UpdateActiveState();
-  if (owner_->navigation_sink) {
-    owner_->navigation_sink(tab->url, tab->title);
-  }
 }
 
 void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
   if (auto* tab = owner_->FindTab(browser)) {
     tab->title = title.ToString();
+    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
   }
   owner_->UpdateActiveState();
-  if (owner_->navigation_sink) {
-    owner_->navigation_sink(tab->url, tab->title);
-  }
 }
 
 bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
