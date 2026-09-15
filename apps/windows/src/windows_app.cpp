@@ -481,15 +481,17 @@ bool WindowsApp::InitializeDesktopRuntime() {
 }
 
 void WindowsApp::ShutdownDesktopRuntime() {
+  // Keep the owner-thread pump alive through DesktopApp::Stop: CefShutdown
+  // is legal only after every browser has delivered OnBeforeClose.
   SetDesktopCefMessagePumpScheduler({});
+  if (desktop_app_) {
+    desktop_app_->Stop();
+    desktop_app_.reset();
+  }
   if (g_cef_pump_window != nullptr) {
     KillTimer(g_cef_pump_window, kCefPumpTimerId);
     DestroyWindow(g_cef_pump_window);
     g_cef_pump_window = nullptr;
-  }
-  if (desktop_app_) {
-    desktop_app_->Stop();
-    desktop_app_.reset();
   }
   profile_session_.ClearReadiness();
 }
