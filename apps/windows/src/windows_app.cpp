@@ -112,7 +112,13 @@ WindowsApp::WindowsApp(HINSTANCE instance, AppConfig config)
 }
 
 WindowsApp::~WindowsApp() {
-  ShutdownDesktopRuntime();
+  // Failed startup and exceptional exits use the same ownership barrier as a
+  // normal WM_CLOSE. A DesktopApp with live CEF callbacks must remain owned
+  // until its HTTP workers and browser close have drained.
+  while (!ShutdownDesktopRuntime()) {
+    if (desktop_app_ != nullptr) desktop_app_->Tick();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
 }
 
 int WindowsApp::Run(int show_command) {

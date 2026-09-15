@@ -1,6 +1,8 @@
 #include "kelpie/desktop_app.h"
 
+#include <chrono>
 #include <memory>
+#include <thread>
 
 #include "kelpie/bookmark_store.h"
 #include "kelpie/console_store.h"
@@ -271,7 +273,18 @@ class DesktopApp::Impl {
 DesktopApp::DesktopApp() : impl_(std::make_unique<Impl>()) {}
 
 DesktopApp::~DesktopApp() {
-  Stop();
+  // CEF can retain DesktopCefClient callbacks until every browser reports
+  // OnBeforeClose. Do not let member destruction invalidate that owner while a
+  // prior caller still has admitted HTTP work or an incomplete browser close.
+  BeginShutdown();
+  while (!IsShutdownReady()) {
+    impl_->engine.DoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  while (!Stop()) {
+    impl_->engine.DoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
 }
 
 bool DesktopApp::Start(const Config& config) {

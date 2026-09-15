@@ -1,6 +1,8 @@
 #include "kelpie/desktop_http_server.h"
 
+#include <atomic>
 #include <cassert>
+#include <memory>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -110,5 +112,54 @@ int main() {
   assert(server.IsDrained());
 
   server.Stop();
+
+  // RAII shutdown must join an admitted handler before releasing the server
+  // object. This is the same barrier DesktopApp uses before CEF owner teardown.
+  kelpie::DesktopRouter destructor_router;
+  std::mutex destructor_mutex;
+  std::condition_variable destructor_cv;
+  bool destructor_entered = false;
+  bool release_destructor = false;
+  destructor_router.Register("set-home", [&](const nlohmann::json&) {
+    std::unique_lock<std::mutex> lock(destructor_mutex);
+    destructor_entered = true;
+    destructor_cv.notify_all();
+    destructor_cv.wait(lock, [&] { return release_destructor; });
+    return nlohmann::json{{"success", true}};
+  });
+  kelpie::McpRegistry destructor_registry;
+  kelpie::DesktopMcpServer destructor_mcp;
+  destructor_mcp.SetRouter(&destructor_router);
+  destructor_mcp.SetRegistry(&destructor_registry);
+  auto destructor_server = std::make_unique<kelpie::DesktopHttpServer>();
+  destructor_server->SetRouter(&destructor_router);
+  destructor_server->SetMcpServer(&destructor_mcp);
+  assert(destructor_server->Start(config));
+  const int destructor_port = destructor_server->bound_port();
+  std::optional<httplib::Result> destructor_result;
+  std::thread destructor_request([&] {
+    httplib::Client destructor_client("127.0.0.1", destructor_port);
+    destructor_result = destructor_client.Post("/v1/set-home", control_headers, "{}", "application/json");
+  });
+  {
+    std::unique_lock<std::mutex> lock(destructor_mutex);
+    assert(destructor_cv.wait_for(lock, std::chrono::seconds(2), [&] { return destructor_entered; }));
+  }
+  std::atomic<bool> destructor_finished = false;
+  std::thread destroy([&] {
+    destructor_server.reset();
+    destructor_finished.store(true);
+  });
+  std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  assert(!destructor_finished.load());
+  {
+    std::lock_guard<std::mutex> lock(destructor_mutex);
+    release_destructor = true;
+  }
+  destructor_cv.notify_all();
+  destructor_request.join();
+  destroy.join();
+  assert(destructor_result && *destructor_result && (*destructor_result)->status == 200);
+  assert(destructor_finished.load());
   return 0;
 }
