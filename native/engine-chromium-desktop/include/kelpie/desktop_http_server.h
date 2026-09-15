@@ -31,6 +31,10 @@ class DesktopHttpServer {
   void SetMcpServer(const DesktopMcpServer* server);
 
   bool Start(const Config& config);
+  // Close the listener without joining its worker. Existing requests retire before
+  // IsDrained becomes true; Windows keeps its owner pump running in the meantime.
+  void BeginDrain();
+  bool IsDrained() const;
   void Stop();
 
   bool IsRunning() const;

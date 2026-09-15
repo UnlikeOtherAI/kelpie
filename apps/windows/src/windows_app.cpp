@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <thread>
 
 #include <fstream>
 #include <atomic>
@@ -22,6 +23,8 @@
 
 namespace kelpie::windows {
 namespace {
+
+constexpr UINT_PTR kCloseRetryTimerId = 0x4B51;
 
 std::optional<TabLease> ActiveLease(DesktopApp* app) {
   if (app == nullptr) return std::nullopt;
@@ -148,12 +151,15 @@ int WindowsApp::Run(int show_command) {
     TryCompleteClose();
   }
 
-  PersistForClose();
-  // Never let stack destruction reclaim DesktopApp while CEF still owns its
-  // client callbacks. Shutdown pumps close work internally; retry only after
-  // a bounded drain has reported incomplete so an unexpected WM_QUIT cannot
-  // turn a slow close into a dangling callback.
-  while (!ShutdownDesktopRuntime()) {
+  if (!close_lifecycle_.requested()) {
+    close_lifecycle_.Request();
+    if (desktop_app_ != nullptr) desktop_app_->BeginShutdown();
+  }
+  // WM_QUIT bypasses the shell timer. Keep the native owner available for HTTP
+  // handlers admitted before the close gate and for bounded CEF close retries.
+  while (!TryCompleteClose()) {
+    if (desktop_app_ != nullptr) desktop_app_->Tick();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return browser_ready ? 0 : 1;
 }
@@ -263,27 +269,48 @@ SettingsValues WindowsApp::CurrentSettings() const {
 }
 
 void WindowsApp::PersistForClose() {
-  if (close_persisted_) return;
-  // Persist while the engine-owned stores and tab model still exist. Shutdown
-  // releases those owners only after Chromium has accepted every browser close.
+  // Persist while the engine-owned stores and tab model still exist. This runs
+  // only after the HTTP listener has retired every handler it admitted before
+  // close, so no acknowledged mutation can be written after this snapshot.
   SaveSession();
   SaveStores();
   SaveSettings();
-  close_persisted_ = true;
+}
+
+void WindowsApp::ArmCloseRetry() {
+  if (shell_ != nullptr && shell_->hwnd() != nullptr) {
+    SetTimer(shell_->hwnd(), kCloseRetryTimerId, 50, nullptr);
+  }
 }
 
 bool WindowsApp::TryCompleteClose() {
-  if (!close_requested_ || close_completed_) return close_completed_;
-  if (!ShutdownDesktopRuntime()) return false;
-  close_completed_ = true;
+  if (!close_lifecycle_.requested() || close_lifecycle_.completed()) {
+    return close_lifecycle_.completed();
+  }
+  if (desktop_app_ != nullptr) {
+    desktop_app_->BeginShutdown();
+    if (!desktop_app_->IsShutdownReady()) {
+      ArmCloseRetry();
+      return false;
+    }
+  }
+  const bool completed = close_lifecycle_.Advance(
+      true, [this] { PersistForClose(); }, [this] { return ShutdownDesktopRuntime(); });
+  if (!completed) {
+    ArmCloseRetry();
+    return false;
+  }
+  if (shell_ != nullptr && shell_->hwnd() != nullptr) {
+    KillTimer(shell_->hwnd(), kCloseRetryTimerId);
+  }
   running_ = false;
   if (shell_ != nullptr) shell_->Close();
   return true;
 }
 
 void WindowsApp::OnWindowCloseRequested() {
-  close_requested_ = true;
-  PersistForClose();
+  close_lifecycle_.Request();
+  if (desktop_app_ != nullptr) desktop_app_->BeginShutdown();
   TryCompleteClose();
 }
 void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {

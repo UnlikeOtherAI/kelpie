@@ -60,6 +60,10 @@ class DesktopApp {
   ~DesktopApp();
 
   bool Start(const Config& config);
+  // Nonblocking shutdown admission gate. Call IsShutdownReady from the native
+  // owner loop before Stop so CEF work and admitted HTTP requests can drain.
+  void BeginShutdown();
+  bool IsShutdownReady() const;
   bool Stop();
   void Tick();
 

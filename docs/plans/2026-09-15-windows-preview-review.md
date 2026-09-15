@@ -45,9 +45,11 @@ Other findings remain deferred until that review is complete.
 3. Selector-based typing sends End but assumes it appends to the entire value;
    multiline controls need an explicit end-of-content behavior. Interrupted
    multi-event input also needs bounded release of held key/button state.
-4. Shutdown still stops and joins HTTP workers before cancelling engine work.
-   Returning from `ShutdownDesktopRuntime` on an incomplete close does not, by
-   itself, preserve member lifetimes when the containing object is destroyed.
+4. The original shutdown joined HTTP workers before cancelling engine work and
+   could destroy owners after an incomplete CEF close. The recovery checkpoint
+   retains owners and retries close. Final review additionally requires HTTP
+   admission to stop and accepted handlers to finish before close persistence;
+   this follow-up is in progress, not yet a passed acceptance gate.
 5. Navigation wait state needs further qualification for new-tab/page-driven
    navigation, superseded requests, unavailable back/forward history, and one
    deadline across tab resolution and state probes.
@@ -102,3 +104,30 @@ branches and review documents until their work is accounted for in integration
 and release. The local fixture is available at `http://127.0.0.1:60635/` while
 its owned Node server remains running. The next concrete build still requires
 a real app launch and review; unit tests alone did not detect this failure.
+
+## Recovery checkpoint before the next live review
+
+The combined branch `codex/windows-browser-recovery` at
+`207857383b4cd7c3bc45cf28408661002c14c375` includes the native presentation batch,
+explicit Alloy child browsers, startup stage reporting, a bound device-info
+provider, and active-child/readiness checks. Its Release build passed all 28
+native CTests. The matching application DLL reports Windows version `0.1.1`.
+That source checkpoint was pushed, although separate SSH reads still timed out.
+The draft PR does not yet contain the complete combined branch.
+
+A native-only fixture capture exposed broken source-codepage glyphs and an
+inaccurate control-printing path. Those issues were corrected in source and the
+normal tests pass. The captured image is obsolete and was rejected; it is not
+evidence of the current UI. Automatic approval review subsequently rejected
+updated fixture PNG capture with "blocked by policy", in addition to the app
+launch rejection. Neither action may be retried through an alternate launcher
+or another agent. The next visual acceptance requires a user-assisted launch
+of the completed combined build.
+
+The final lifecycle follow-up is implemented: HTTP admission stops without
+blocking the owner thread, already-admitted handlers drain while it keeps
+pumping, durable state persists once, and bounded CEF close retries are
+scheduled even without unrelated window messages. The native Release suite
+passed all 29 CTests. This preserves the required user-assisted live review: no
+application launch, fixture capture, or MCP live acceptance was performed for
+this checkpoint.

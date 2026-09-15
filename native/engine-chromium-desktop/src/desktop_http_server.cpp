@@ -1,6 +1,9 @@
 #include "kelpie/desktop_http_server.h"
 
 #include <algorithm>
+#include <atomic>
+#include <mutex>
+#include <optional>
 #include <thread>
 
 #include <httplib.h>
@@ -18,6 +21,11 @@ constexpr const char* kMcpProtocolVersion = "2025-06-18";
 void Json(httplib::Response& response, int status, const nlohmann::json& body) {
   response.status = status;
   response.set_content(body.dump(), "application/json");
+}
+
+void Draining(httplib::Response& response) {
+  Json(response, 503, {{"success", false}, {"error", {{"code", "RUNTIME_SHUTTING_DOWN"},
+      {"message", "The desktop runtime is shutting down"}}}});
 }
 
 bool IsLoopbackHost(const std::string& host) {
@@ -60,6 +68,59 @@ class DesktopHttpServer::Impl {
   Config config;
   int bound_port = 0;
   bool running = false;
+  mutable std::mutex admission_mutex;
+  bool accepting_requests = false;
+  std::size_t active_requests = 0;
+  std::atomic<bool> server_thread_finished = true;
+
+  class RequestLease {
+   public:
+    explicit RequestLease(Impl* owner) : owner_(owner) {}
+    RequestLease(const RequestLease&) = delete;
+    RequestLease& operator=(const RequestLease&) = delete;
+    RequestLease(RequestLease&& other) noexcept : owner_(other.owner_) { other.owner_ = nullptr; }
+    RequestLease& operator=(RequestLease&& other) noexcept {
+      if (this != &other) {
+        Release();
+        owner_ = other.owner_;
+        other.owner_ = nullptr;
+      }
+      return *this;
+    }
+    ~RequestLease() { Release(); }
+
+   private:
+    void Release() {
+      if (owner_ == nullptr) return;
+      std::lock_guard<std::mutex> lock(owner_->admission_mutex);
+      --owner_->active_requests;
+      owner_ = nullptr;
+    }
+    Impl* owner_ = nullptr;
+  };
+
+  std::optional<RequestLease> AcquireRequest() {
+    std::lock_guard<std::mutex> lock(admission_mutex);
+    if (!accepting_requests) return std::nullopt;
+    ++active_requests;
+    return RequestLease(this);
+  }
+
+  void BeginDrain() {
+    {
+      std::lock_guard<std::mutex> lock(admission_mutex);
+      if (!accepting_requests) return;
+      accepting_requests = false;
+    }
+    // Start waits until listen_after_bind has entered its loop, so stop closes
+    // the already-active listener without racing a late server startup.
+    server.stop();
+  }
+
+  bool IsDrained() const {
+    std::lock_guard<std::mutex> lock(admission_mutex);
+    return active_requests == 0 && server_thread_finished.load();
+  }
 
   bool IsAuthorizedControlRequest(const httplib::Request& request, httplib::Response& response) const {
     if (request.has_header("Origin") || !IsLoopbackHost(request.get_header_value("Host"))) {
@@ -100,6 +161,11 @@ bool DesktopHttpServer::Start(const Config& config) {
   if (impl_->router == nullptr || impl_->mcp_server == nullptr || impl_->running ||
       config.control_token.empty() || !IsLoopbackHost(config.bind_host)) return false;
   impl_->config = config;
+  {
+    std::lock_guard<std::mutex> lock(impl_->admission_mutex);
+    impl_->accepting_requests = true;
+    impl_->active_requests = 0;
+  }
   impl_->server.set_payload_max_length(config.max_body_bytes);
 
   impl_->server.Get("/health", [](const httplib::Request&, httplib::Response& response) {
@@ -107,6 +173,8 @@ bool DesktopHttpServer::Start(const Config& config) {
   });
   impl_->server.Post("/v1/get-device-info", [this](const httplib::Request& request,
                                                      httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
     if (!HasJsonContentType(request)) {
       Json(response, 415, {{"success", false}, {"error", {{"code", "INVALID_CONTENT_TYPE"},
           {"message", "Discovery requests must use application/json"}}}});
@@ -120,6 +188,8 @@ bool DesktopHttpServer::Start(const Config& config) {
     response.set_header("Allow", "POST");
   });
   impl_->server.Post("/mcp", [this](const httplib::Request& request, httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
     if (!impl_->IsAuthorizedControlRequest(request, response)) return;
     if (!HasJsonContentType(request) || !HasMcpAccept(request)) {
       Json(response, 406, {{"jsonrpc", "2.0"}, {"id", nullptr},
@@ -144,6 +214,8 @@ bool DesktopHttpServer::Start(const Config& config) {
   });
   impl_->server.Post(R"(/v1/(.+))", [this](const httplib::Request& request,
                                             httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
     if (!impl_->IsAuthorizedControlRequest(request, response)) return;
     if (!HasJsonContentType(request)) {
       Json(response, 415, {{"success", false}, {"error", {{"code", "INVALID_CONTENT_TYPE"},
@@ -176,19 +248,41 @@ bool DesktopHttpServer::Start(const Config& config) {
     if (!impl_->server.bind_to_port(config.bind_host.c_str(), config.port)) return false;
     impl_->bound_port = config.port;
   }
+  impl_->server_thread_finished.store(false);
+  impl_->server_thread = std::thread([this]() {
+    impl_->server.listen_after_bind();
+    impl_->server_thread_finished.store(true);
+  });
+  // Do not report a started runtime until the listener has entered its loop.
+  // BeginDrain can then safely close the bound socket without a startup race.
+  impl_->server.wait_until_ready();
+  if (!impl_->server.is_running()) {
+    if (impl_->server_thread.joinable()) impl_->server_thread.join();
+    std::lock_guard<std::mutex> lock(impl_->admission_mutex);
+    impl_->accepting_requests = false;
+    impl_->bound_port = 0;
+    return false;
+  }
   impl_->running = true;
-  impl_->server_thread = std::thread([this]() { impl_->server.listen_after_bind(); });
   return true;
+}
+
+void DesktopHttpServer::BeginDrain() {
+  if (!impl_->running) return;
+  impl_->BeginDrain();
+}
+
+bool DesktopHttpServer::IsDrained() const {
+  return !impl_->running || impl_->IsDrained();
 }
 
 void DesktopHttpServer::Stop() {
   if (!impl_->running) return;
-  impl_->server.stop();
+  impl_->BeginDrain();
   if (impl_->server_thread.joinable()) impl_->server_thread.join();
   impl_->running = false;
   impl_->bound_port = 0;
 }
-
 bool DesktopHttpServer::IsRunning() const { return impl_->running; }
 int DesktopHttpServer::bound_port() const { return impl_->bound_port; }
 

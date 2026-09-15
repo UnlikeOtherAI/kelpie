@@ -66,6 +66,7 @@ set(WINDOWS_APP_SOURCES
   src/native_window_control.cpp
   src/owner_task_queue.cpp
   src/cef_pump_deadline.cpp
+  src/close_lifecycle.h
   src/windows_app.cpp
   src/windows_runtime.cpp
   src/win32_shell.cpp
@@ -268,6 +269,14 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_startup_diagnostics_test COMMAND kelpie_windows_startup_diagnostics_test)
+  add_executable(kelpie_windows_close_lifecycle_test tests/close_lifecycle_test.cpp)
+  target_include_directories(kelpie_windows_close_lifecycle_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  if(MSVC)
+    target_compile_options(kelpie_windows_close_lifecycle_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_close_lifecycle_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_close_lifecycle_test COMMAND kelpie_windows_close_lifecycle_test)
 endif()
 
 if(MINGW)

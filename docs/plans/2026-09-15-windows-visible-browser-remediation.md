@@ -124,3 +124,63 @@ repair plan. The orchestrator accepted these concrete corrections:
 
 These are repairs to the existing native shell and reviewed runtime contracts.
 No replacement UI framework, browser framework, or protocol redesign is in scope.
+
+## Checkpoint review findings
+
+The first drawing checkpoint is not visual acceptance. Complete these within the
+existing repair batches and verify their actual final implementation:
+
+- The original owner loop refreshes browser state after every Windows message.
+  Unconditional SetWindowText/InvalidateRect calls from the shell then invalidate
+  controls again after a paint. Compare unchanged state before updating controls;
+  a hidden-native regression must show identical state does not perpetuate paint.
+  This is a plausible contributor to the preview's high CPU use, not a measured
+  attribution of its entire CPU cost.
+- WS_TABSTOP does not implement traversal for a normal top-level window. Provide
+  a real Tab/Shift+Tab path for chrome controls while preserving page key input
+  and Ctrl+Tab tab switching; check native keyboard activation and return focus.
+- Use per-window DPI for geometry and owned regular Segoe UI fonts. GDI
+  LOGPIXELSX is shared across monitors and cannot supply per-monitor scaling.
+  [Microsoft DPI contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow),
+  [GDI device-capabilities contract](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getdevicecaps).
+- Native edits must sit inside their rounded presentation surfaces. High-contrast
+  highlighted fills use their matching text colors. All font/brush owners release
+  replaced resources and refresh persistent controls on DPI/theme changes.
+- The protected-file regression shows the previous replacement sequence can
+  succeed. It does not establish where the observed launch stalled. Invalidate
+  predecessor readiness after exclusive ownership, record concrete failure stages,
+  and use the next live launch to resolve the original publication failure.
+- Report the complete actual CTest result. The first visual-build log contained
+  22 passing tests and one failed network-event test, despite an initial green
+  summary. That executable imports libcef.dll; its nested test directory and
+  test environment need a verified dependency search path. Diagnose the exit
+  cause before changing adapter logic or claiming the entire suite passed.
+
+### Final close ordering
+
+An ingress flag alone is insufficient: an already admitted settings or bookmark
+mutation can finish after persistence and receive success for a change that is
+then lost. Reuse the HTTP server's worker-drain lifecycle instead of classifying
+individual routes. Request listener stop without joining; keep the owner pump
+active until all admitted handlers have retired; persist once while stores and
+tabs exist; then drain CEF and release owners. A scheduled owner retry must
+progress a close whose first drain attempt is incomplete. Cover an in-flight
+non-engine mutation and an incomplete-then-complete close in targeted tests.
+
+This is the final follow-up in the current repair scope. It does not establish
+live shutdown, restart, rendering, or visual acceptance by itself.
+
+### Final close-ordering checkpoint
+
+Implemented on `codex/windows-browser-recovery` after the historical
+`207857383b4cd7c3bc45cf28408661002c14c375` checkpoint. The listener now waits
+until its server thread is active before `Start` succeeds, closes admission
+idempotently, retires already-admitted `/v1` and MCP handlers without blocking
+the native owner, and reports drained only after its worker thread has exited.
+Windows persists session, stores, and settings only after that drain, then
+retries bounded CEF shutdown from an owner timer until it completes.
+
+The native Release build and all 29 CTests passed, including a held `set-home`
+request that completes before drain while a later mutation is refused, and the
+close lifecycle sequence that waits for drain, persists once, then completes on
+a retry. This does not replace the required user-assisted live browser review.

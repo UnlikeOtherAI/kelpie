@@ -21,6 +21,7 @@
 #include "kelpie/history_store.h"
 #include "kelpie/network_traffic_store.h"
 
+#include "close_lifecycle.h"
 #include "device_info_windows.h"
 #include "profile_session.h"
 #include "native_window_control.h"
@@ -91,15 +92,14 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void UpdateBrowserStateFromRuntime();
   void PersistForClose();
   bool TryCompleteClose();
+  void ArmCloseRetry();
   bool CreateShell(int show_command);
   std::wstring AppTitle() const;
 
   HINSTANCE instance_;
   AppConfig config_;
   std::atomic<bool> running_{true};
-  bool close_requested_ = false;
-  bool close_completed_ = false;
-  bool close_persisted_ = false;
+  CloseLifecycle close_lifecycle_;
 
   DeviceInfoWindows device_info_provider_;
   BrowserState browser_state_;

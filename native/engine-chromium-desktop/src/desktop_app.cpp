@@ -340,13 +340,24 @@ bool DesktopApp::Start(const Config& config) {
   return true;
 }
 
-bool DesktopApp::Stop() {
-  if (!impl_->running) {
-    return true;
-  }
+void DesktopApp::BeginShutdown() {
+  if (!impl_->running) return;
   if (impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();
   }
+  // This closes listener admission but does not join HTTP workers. The native
+  // owner loop keeps pumping CEF while already-admitted work retires.
+  impl_->http_server.BeginDrain();
+}
+
+bool DesktopApp::IsShutdownReady() const {
+  return !impl_->running || impl_->http_server.IsDrained();
+}
+
+bool DesktopApp::Stop() {
+  if (!impl_->running) return true;
+  BeginShutdown();
+  if (!IsShutdownReady()) return false;
   if (!impl_->engine.Shutdown()) return false;
   impl_->http_server.Stop();
   impl_->running = false;
