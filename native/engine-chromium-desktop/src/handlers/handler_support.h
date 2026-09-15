@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -118,10 +119,30 @@ inline std::string RequireString(const nlohmann::json& params, const char* key, 
 
 inline int IntOrDefault(const nlohmann::json& params, const char* key, int default_value) {
   const auto it = params.find(key);
-  if (it == params.end() || !it->is_number_integer()) {
-    return default_value;
+  if (it == params.end()) return default_value;
+  if (!it->is_number_integer()) {
+    throw std::invalid_argument(std::string(key) + " must be an integer");
   }
-  return it->get<int>();
+  if (it->is_number_unsigned()) {
+    const std::uint64_t value = it->get<std::uint64_t>();
+    if (value > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+      throw std::invalid_argument(std::string(key) + " is out of range");
+    }
+    return static_cast<int>(value);
+  }
+  const std::int64_t value = it->get<std::int64_t>();
+  if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
+    throw std::invalid_argument(std::string(key) + " is out of range");
+  }
+  return static_cast<int>(value);
+}
+
+inline double RequireNumber(const nlohmann::json& params, const char* key) {
+  const auto it = params.find(key);
+  if (it == params.end() || !it->is_number()) {
+    throw std::invalid_argument(std::string(key) + " must be a number");
+  }
+  return it->get<double>();
 }
 
 inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, int minimum,
@@ -130,12 +151,22 @@ inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, 
   if (it == params.end() || !it->is_number_integer()) {
     throw std::invalid_argument(std::string(key) + " must be an integer");
   }
-  const int value = it->get<int>();
+  std::int64_t value = 0;
+  if (it->is_number_unsigned()) {
+    const std::uint64_t unsigned_value = it->get<std::uint64_t>();
+    if (unsigned_value > static_cast<std::uint64_t>(maximum)) {
+      throw std::invalid_argument(std::string(key) + " must be between " + std::to_string(minimum) +
+                                  " and " + std::to_string(maximum));
+    }
+    value = static_cast<std::int64_t>(unsigned_value);
+  } else {
+    value = it->get<std::int64_t>();
+  }
   if (value < minimum || value > maximum) {
     throw std::invalid_argument(std::string(key) + " must be between " + std::to_string(minimum) +
                                 " and " + std::to_string(maximum));
   }
-  return value;
+  return static_cast<int>(value);
 }
 
 inline std::optional<nlohmann::json> RejectBrowserWideTab(const nlohmann::json& params) {
