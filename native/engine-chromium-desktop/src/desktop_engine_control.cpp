@@ -126,7 +126,14 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
   if (!initialized || shutting_down) return BrowserControlResult::Failure("INTERNAL", "Browser runtime is not running");
   if (CefCurrentlyOn(TID_UI)) return operation();
   auto pending = std::make_shared<UiOperation>();
-  pending->call = std::move(operation);
+  pending->call = [this, operation = std::move(operation)]() mutable {
+    // A task admitted before Shutdown must not touch CEF after shutdown starts.
+    // Recheck on the UI thread immediately before invoking the browser operation.
+    if (!initialized || shutting_down.load()) {
+      return BrowserControlResult::Failure("INTERNAL", "Browser runtime is shutting down");
+    }
+    return operation();
+  };
   if (!CefPostTask(TID_UI, CefCreateClosureTask(base::BindOnce(&RunUiOperation, pending)))) {
     return BrowserControlResult::Failure("INTERNAL", "Unable to schedule browser operation");
   }
@@ -260,6 +267,29 @@ BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&
   }, timeout);
   if (result.ok) *lease = *resolved;
   return result;
+}
+
+bool DesktopEngine::IsActiveNativeBrowserAttached(void* parent_window, Timeout timeout) {
+  const auto impl = impl_;
+  return impl->RunOnUi([impl, parent_window] {
+#if defined(_WIN32)
+    auto* active = impl->ActiveTab();
+    if (active == nullptr || !active->browser || !active->browser->GetHost()) {
+      return BrowserControlResult::Failure("TAB_NOT_FOUND", "No active browser tab exists");
+    }
+    const HWND window = active->browser->GetHost()->GetWindowHandle();
+    RECT bounds{};
+    if (window == nullptr || GetParent(window) != static_cast<HWND>(parent_window) ||
+        !IsWindowVisible(window) || !GetWindowRect(window, &bounds) ||
+        bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
+      return BrowserControlResult::Failure("BROWSER_NOT_ATTACHED", "The active browser child is not attached");
+    }
+    return BrowserControlResult::Success();
+#else
+    (void)parent_window;
+    return BrowserControlResult::Failure("UNSUPPORTED", "Native child validation is only available on Windows");
+#endif
+  }, timeout).ok;
 }
 
 BrowserControlResult DesktopEngine::CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) {

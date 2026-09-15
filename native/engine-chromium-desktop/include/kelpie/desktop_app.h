@@ -64,6 +64,7 @@ class DesktopApp {
   void Tick();
 
   bool is_running() const;
+  const std::string& last_error() const;
 
   DesktopEngine& engine();
   DesktopRouter& router();

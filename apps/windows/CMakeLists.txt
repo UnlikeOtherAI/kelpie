@@ -31,6 +31,8 @@ if(MSVC)
   # CEF's Windows wrapper uses the static CRT. Every native target must use
   # the same CRT or the linker rejects mixed debug/runtime allocations.
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+  # Chrome glyph literals are UTF-8 source, independently of the active system code page.
+  add_compile_options(/utf-8)
 endif()
 
 include(CTest)
@@ -65,6 +67,7 @@ set(WINDOWS_APP_SOURCES
   src/owner_task_queue.cpp
   src/cef_pump_deadline.cpp
   src/windows_app.cpp
+  src/windows_runtime.cpp
   src/win32_shell.cpp
   src/window_chrome.cpp
   src/win32_browser_view.cpp
@@ -95,6 +98,7 @@ set(WINDOWS_APP_HEADERS
   src/network_inspector.h
   src/profile_session.h
   src/session_snapshot.h
+  src/startup_diagnostics.h
   src/toast_view.h
   src/device_info_windows.h
   src/mdns_windows.h
@@ -229,6 +233,41 @@ if(BUILD_TESTING)
   target_include_directories(kelpie_windows_owner_task_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_compile_options(kelpie_windows_owner_task_queue_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_owner_task_queue_test COMMAND kelpie_windows_owner_task_queue_test)
+  add_executable(kelpie_windows_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
+  target_include_directories(kelpie_windows_profile_session_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_profile_session_test PRIVATE nlohmann_json::nlohmann_json advapi32 bcrypt)
+  if(MSVC)
+    target_compile_options(kelpie_windows_profile_session_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_profile_session_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_profile_session_test COMMAND kelpie_windows_profile_session_test)
+  add_executable(kelpie_windows_device_info_test tests/device_info_windows_test.cpp src/device_info_windows.cpp)
+  target_include_directories(kelpie_windows_device_info_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_device_info_test PRIVATE kelpie_engine_chromium_desktop nlohmann_json::nlohmann_json ws2_32 iphlpapi Rpcrt4)
+  if(MSVC)
+    target_compile_options(kelpie_windows_device_info_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_device_info_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_device_info_test COMMAND kelpie_windows_device_info_test)
+  add_executable(kelpie_windows_browser_view_test tests/win32_browser_view_test.cpp src/win32_browser_view.cpp)
+  target_include_directories(kelpie_windows_browser_view_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_browser_view_test PRIVATE user32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_browser_view_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_browser_view_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_browser_view_test COMMAND kelpie_windows_browser_view_test)
+  add_executable(kelpie_windows_startup_diagnostics_test tests/startup_diagnostics_test.cpp)
+  target_include_directories(kelpie_windows_startup_diagnostics_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  if(MSVC)
+    target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_startup_diagnostics_test COMMAND kelpie_windows_startup_diagnostics_test)
 endif()
 
 if(MINGW)

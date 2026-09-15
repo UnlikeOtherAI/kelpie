@@ -338,7 +338,7 @@ Overriding the device GPS location (latitude, longitude, accuracy) is part of th
 Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
-file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token.
+file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
 `kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
 creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
 provides a token-free stdio bridge for local development agents and local Nessie executors.

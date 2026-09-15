@@ -38,6 +38,13 @@ bool DesktopEngine::Shutdown() { return true; }
 
 void DesktopEngine::DoMessageLoopWork() {}
 
+const std::string& DesktopEngine::last_error() const {
+  static const std::string error = "Chromium support is unavailable in this build";
+  return error;
+}
+
+bool DesktopEngine::IsActiveNativeBrowserAttached(void*, Timeout) { return false; }
+
 bool DesktopEngine::is_initialized() const {
   return false;
 }

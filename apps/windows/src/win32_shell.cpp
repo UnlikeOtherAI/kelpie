@@ -121,7 +121,8 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       accelerators_ = CreateAcceleratorTableW(const_cast<LPACCEL>(shortcuts), static_cast<int>(std::size(shortcuts)));
       RECT rect{};
       GetClientRect(hwnd_, &rect);
-      tab_strip_ = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | TCS_TABS | TCS_OWNERDRAWFIXED,
+      tab_strip_ = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+                                   TCS_BUTTONS | TCS_FLATBUTTONS | TCS_OWNERDRAWFIXED,
                                    0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_TAB_STRIP), instance_, nullptr);
       new_tab_button_ = CreateWindowExW(0, L"BUTTON", L"New tab", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                         0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_NEW_TAB_BUTTON), instance_, nullptr);
@@ -163,9 +164,18 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_PAINT: {
       PAINTSTRUCT paint{};
       HDC dc = BeginPaint(hwnd_, &paint);
-      window_chrome_.Draw(dc);
-      url_bar_.Paint(dc);
+      PaintClient(dc);
       EndPaint(hwnd_, &paint);
+      return 0;
+    }
+    case WM_PRINTCLIENT:
+      PaintClient(reinterpret_cast<HDC>(wparam));
+      return 0;
+    case WM_PRINT: {
+      const UINT flags = static_cast<UINT>(lparam);
+      HDC dc = reinterpret_cast<HDC>(wparam);
+      if ((flags & PRF_CLIENT) != 0) PaintClient(dc);
+      if ((flags & PRF_CHILDREN) != 0) PrintChildren(dc);
       return 0;
     }
     case WM_ERASEBKGND: return window_chrome_.EraseBackground(reinterpret_cast<HDC>(wparam));
@@ -273,6 +283,62 @@ void Win32Shell::LayoutChildren(int width, int height) {
   browser_view_->Resize(browser);
   toast_.Resize(browser);
   InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void Win32Shell::PaintClient(HDC device_context) const {
+  window_chrome_.Draw(device_context);
+  url_bar_.Paint(device_context);
+}
+
+void Win32Shell::PrintChildren(HDC device_context) const {
+  for (const UINT id : {IDC_WINDOW_CLOSE, IDC_WINDOW_MINIMIZE, IDC_WINDOW_MAXIMIZE}) {
+    PrintOwnedControl(GetDlgItem(hwnd_, id), device_context);
+  }
+  for (const UINT id : {IDC_BACK_BUTTON, IDC_FORWARD_BUTTON, IDC_RELOAD_BUTTON, IDC_URL_EDIT,
+                        IDC_BOOKMARKS_BUTTON, IDC_HISTORY_BUTTON, IDC_NETWORK_BUTTON, IDC_SETTINGS_BUTTON}) {
+    HWND control = GetDlgItem(hwnd_, id);
+    if (GetDlgCtrlID(control) == IDC_URL_EDIT) {
+      SendMessageW(control, WM_PRINT, reinterpret_cast<WPARAM>(device_context), PRF_CLIENT);
+    } else {
+      PrintOwnedControl(control, device_context);
+    }
+  }
+  RECT strip{};
+  GetWindowRect(tab_strip_, &strip);
+  MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&strip), 2);
+  HBRUSH strip_brush = CreateSolidBrush(ui::Colors().canvas);
+  FillRect(device_context, &strip, strip_brush);
+  DeleteObject(strip_brush);
+  for (std::size_t index = 0; index < tabs_.size(); ++index) {
+    RECT item{};
+    if (!TabCtrl_GetItemRect(tab_strip_, static_cast<int>(index), &item)) continue;
+    MapWindowPoints(tab_strip_, hwnd_, reinterpret_cast<POINT*>(&item), 2);
+    DRAWITEMSTRUCT draw{};
+    draw.CtlID = IDC_TAB_STRIP;
+    draw.itemID = static_cast<UINT>(index);
+    draw.hDC = device_context;
+    draw.rcItem = item;
+    DrawControl(draw);
+  }
+  for (const TabCloseButton& button : tab_close_buttons_) PrintOwnedControl(button.hwnd, device_context);
+  PrintOwnedControl(new_tab_button_, device_context);
+  if (browser_view_->hwnd() != nullptr) {
+    SendMessageW(browser_view_->hwnd(), WM_PRINT, reinterpret_cast<WPARAM>(device_context),
+                 PRF_CLIENT | PRF_CHILDREN);
+  }
+}
+
+void Win32Shell::PrintOwnedControl(HWND control, HDC device_context) const {
+  if (control == nullptr || (GetWindowLongPtrW(control, GWL_STYLE) & WS_VISIBLE) == 0) return;
+  RECT rect{};
+  GetWindowRect(control, &rect);
+  MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&rect), 2);
+  DRAWITEMSTRUCT draw{};
+  draw.CtlID = static_cast<UINT>(GetDlgCtrlID(control));
+  draw.hwndItem = control;
+  draw.hDC = device_context;
+  draw.rcItem = rect;
+  DrawControl(draw);
 }
 
 bool Win32Shell::RefreshTabs() {

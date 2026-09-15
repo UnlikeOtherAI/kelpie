@@ -1,10 +1,11 @@
 #include "windows_app.h"
-#include "cef_pump_deadline.h"
 
-#include "kelpie/desktop_http_server.h"
 #include "windows_utf.h"
 
 #include <commctrl.h>
+
+#include <algorithm>
+#include <cctype>
 
 #include <fstream>
 #include <atomic>
@@ -18,81 +19,26 @@
 #endif
 #include <shlobj.h>
 
-#if defined(HAS_CEF)
-#include "include/cef_app.h"
-#include "kelpie/cef_app_factory.h"
-#endif
 
 namespace kelpie::windows {
 namespace {
-
-constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
-constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B50;
-HWND g_cef_pump_window = nullptr;
-CefPumpDeadline g_cef_deadline;
-std::int64_t PumpNow() { return static_cast<std::int64_t>(GetTickCount64()); }
-
-void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
-#if defined(HAS_CEF)
-  if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
-    KillTimer(hwnd, timer_id);
-    CefDoMessageLoopWork();
-  } else if (const auto due = g_cef_deadline.due_ms()) {
-    SetTimer(hwnd, timer_id, static_cast<UINT>(std::max<std::int64_t>(1, *due - PumpNow())), &PumpCefTimer);
-  } else {
-    KillTimer(hwnd, timer_id);
-  }
-#endif
-}
-
-LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
-  if (message == kScheduleCefPumpMessage) {
-    const auto now = PumpNow();
-    if (g_cef_deadline.Schedule(now, static_cast<std::int64_t>(wparam))) {
-      const auto due = *g_cef_deadline.due_ms();
-      if (due <= now) PostMessageW(hwnd, kScheduleCefPumpMessage + 1, 0, 0);
-      else SetTimer(hwnd, kCefPumpTimerId, static_cast<UINT>(due - now), &PumpCefTimer);
-    }
-    return 0;
-  }
-  if (message == kScheduleCefPumpMessage + 1) {
-    if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
-      KillTimer(hwnd, kCefPumpTimerId);
-      CefDoMessageLoopWork();
-    }
-    return 0;
-  }
-  return DefWindowProcW(hwnd, message, wparam, lparam);
-}
-
-bool CreateCefPumpWindow(HINSTANCE instance) {
-  if (g_cef_pump_window != nullptr) return true;
-  WNDCLASSW window_class{};
-  window_class.lpfnWndProc = CefPumpWindowProc;
-  window_class.hInstance = instance;
-  window_class.lpszClassName = L"KelpieCefPumpWindow";
-  RegisterClassW(&window_class);
-  g_cef_pump_window = CreateWindowExW(0, window_class.lpszClassName, L"", 0,
-                                      0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
-  return g_cef_pump_window != nullptr;
-}
 
 std::optional<TabLease> ActiveLease(DesktopApp* app) {
   if (app == nullptr) return std::nullopt;
   std::vector<TabSnapshot> tabs;
   if (!app->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok) return std::nullopt;
-  for (const auto& tab : tabs) if (tab.active) return TabLease{tab.id, tab.generation};
+  for (const auto& tab : tabs) {
+    if (tab.active) return TabLease{tab.id, tab.generation};
+  }
   return std::nullopt;
 }
 
 bool HasScheme(const std::string& value) {
   const auto colon = value.find(':');
   return colon != std::string::npos && colon > 0 &&
-      std::all_of(value.begin(), value.begin() + static_cast<std::ptrdiff_t>(colon), [](unsigned char c) {
-        return std::isalnum(c) || c == '+' || c == '-' || c == '.';
-      });
+      std::all_of(value.begin(), value.begin() + static_cast<std::ptrdiff_t>(colon),
+                  [](unsigned char c) { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
 }
-
 std::filesystem::path RoamingAppDataPath() {
   wchar_t buffer[MAX_PATH]{};
   if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, buffer))) {
@@ -169,15 +115,29 @@ WindowsApp::~WindowsApp() {
 int WindowsApp::Run(int show_command) {
   ResolveProfileDirectory();
   std::string session_error;
-  if (!profile_session_.Open(config_.profile_dir, config_.readiness_path, &session_error)) return 1;
+  startup_diagnostics_.Enter(StartupStage::kProfileOwnership);
+  if (!profile_session_.Open(config_.profile_dir, config_.readiness_path, &session_error)) {
+    startup_diagnostics_.Fail(StartupStage::kProfileOwnership, session_error);
+    return 1;
+  }
   LoadSettings();
   LoadSession();
   if (!InitializeCommonControls()) return 1;
   if (!CreateShell(show_command)) return 1;
-  if (!InitializeDesktopRuntime()) return 1;
+  const bool browser_ready = InitializeDesktopRuntime();
+  if (!browser_ready) {
+    browser_view_->UpdateFallbackText(startup_diagnostics_.Presentation());
+    browser_view_->ShowFallback(true);
+  }
 
   MSG message{};
   while (running_ && GetMessageW(&message, nullptr, 0, 0) > 0) {
+    // Native chrome owns its explicit Tab traversal before accelerators or
+    // renderer dispatch can consume the key.
+    if (shell_ != nullptr && shell_->HandleKeyboardNavigation(message)) {
+      UpdateBrowserStateFromRuntime();
+      continue;
+    }
     if (shell_ == nullptr || !TranslateAcceleratorW(shell_->hwnd(), shell_->accelerators(), &message)) {
       TranslateMessage(&message);
       DispatchMessageW(&message);
@@ -185,11 +145,18 @@ int WindowsApp::Run(int show_command) {
     UpdateBrowserStateFromRuntime();
   }
 
-  SaveSession();
-  SaveStores();
-  SaveSettings();
-  ShutdownDesktopRuntime();
-  return 0;
+  if (browser_ready) {
+    SaveSession();
+    SaveStores();
+    SaveSettings();
+  }
+  // Never let stack destruction reclaim DesktopApp while CEF still owns its
+  // client callbacks. Shutdown pumps close work internally; retry only after
+  // a bounded drain has reported incomplete so an unexpected WM_QUIT cannot
+  // turn a slow close into a dangling callback.
+  while (!ShutdownDesktopRuntime()) {
+  }
+  return browser_ready ? 0 : 1;
 }
 
 void WindowsApp::OnNavigateRequested(const std::string& url) {
@@ -297,7 +264,14 @@ SettingsValues WindowsApp::CurrentSettings() const {
 }
 
 void WindowsApp::OnWindowCloseRequested() {
+  // Persist while the engine-owned stores and tab model still exist. Shutdown
+  // releases those owners only after Chromium has accepted every browser close.
+  SaveSession();
+  SaveStores();
+  SaveSettings();
+  if (!ShutdownDesktopRuntime()) return;
   running_ = false;
+  if (shell_ != nullptr) shell_->Close();
 }
 
 void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {
@@ -395,148 +369,6 @@ bool WindowsApp::InitializeCommonControls() const {
   controls.dwSize = sizeof(controls);
   controls.dwICC = ICC_LISTVIEW_CLASSES | ICC_STANDARD_CLASSES | ICC_TAB_CLASSES;
   return InitCommonControlsEx(&controls) != FALSE;
-}
-
-bool WindowsApp::InitializeDesktopRuntime() {
-  if (!native_control_.Create(instance_, browser_view_->hwnd(), config_.width, config_.height)) return false;
-  if (!CreateCefPumpWindow(instance_)) return false;
-  SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
-    // CEF may schedule work from a callback. Post it to the owner queue so the
-    // timer callback also runs while Win32 is in a modal message loop.
-    if (g_cef_pump_window != nullptr) PostMessageW(g_cef_pump_window, kScheduleCefPumpMessage,
-                                                    static_cast<WPARAM>(delay_ms), 0);
-  });
-  desktop_app_ = std::make_unique<DesktopApp>();
-  // CEF navigation callbacks can record history immediately. Restore stores
-  // before starting the engine so they never overwrite a profile with an
-  // initially empty in-memory store.
-  LoadStores();
-  DesktopApp::Config runtime;
-  runtime.platform = Platform::kWindows;
-  runtime.engine_name = "chromium";
-  runtime.port = config_.port;
-  runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.1";
-  runtime.start_stdio_mcp = config_.mcp_stdio;
-  runtime.bind_host = "127.0.0.1";
-  runtime.control_token = profile_session_.token();
-  runtime.device_id = device_info_provider_.Collect(config_.port, config_.width, config_.height, runtime.app_version).id;
-  {
-    std::lock_guard<std::mutex> lock(shell_state_mutex_);
-    home_url_ = config_.initial_url;
-  }
-  runtime.set_home = [this](std::string url) {
-    std::lock_guard<std::mutex> lock(shell_state_mutex_);
-    home_url_ = std::move(url);
-    config_.initial_url = home_url_;
-    SaveSettings();
-    return BrowserControlResult::Success();
-  };
-  runtime.get_home = [this](std::string* url) {
-    if (url == nullptr) return BrowserControlResult::Failure("INTERNAL", "home URL is required");
-    std::lock_guard<std::mutex> lock(shell_state_mutex_);
-    *url = home_url_;
-    return BrowserControlResult::Success();
-  };
-  runtime.show_native_toast = [this](std::string message) {
-    return native_control_.Invoke([this, message = std::move(message)] { shell_->ShowToast(utf::Utf8ToWideDisplay(message)); return true; }, std::chrono::seconds(2)) ? BrowserControlResult::Success() : BrowserControlResult::Failure("WEBVIEW_ERROR", "Native control did not show the toast");
-  };
-  runtime.set_native_fullscreen = [this](bool enabled) {
-    const bool complete = native_control_.Invoke([this, enabled] { return native_control_.SetFullscreen(enabled); }, std::chrono::seconds(2));
-    return complete ? BrowserControlResult::Success() : BrowserControlResult::Failure("WEBVIEW_ERROR", "Native fullscreen operation failed");
-  };
-  runtime.get_native_fullscreen = [this](bool* enabled) {
-    if (enabled == nullptr) return BrowserControlResult::Failure("INTERNAL", "fullscreen result is required");
-    auto result = std::make_shared<bool>(false);
-    const bool complete = native_control_.Invoke([this, result] { *result = native_control_.fullscreen(); return true; }, std::chrono::seconds(2));
-    if (!complete) return BrowserControlResult::Failure("WEBVIEW_ERROR", "Native fullscreen query failed");
-    *enabled = *result; return BrowserControlResult::Success();
-  };
-  runtime.viewport_supplier = [this]() {
-    auto result = std::make_shared<std::optional<RECT>>();
-    if (!native_control_.Invoke([this, result] { *result = native_control_.viewport(); return result->has_value(); }, std::chrono::seconds(2)) || !*result) return nlohmann::json();
-    return nlohmann::json{{"width", (*result)->right-(*result)->left}, {"height", (*result)->bottom-(*result)->top}, {"devicePixelRatio",1.0}, {"platform","windows"}};
-  };
-  runtime.resize_viewport = [this](int width, int height) {
-    return native_control_.Invoke([this,width,height] { return native_control_.Resize(width,height); }, std::chrono::seconds(2));
-  };
-  runtime.reset_viewport = [this]() { return native_control_.Invoke([this] { return native_control_.ResetViewport(); }, std::chrono::seconds(2)); };
-  runtime.request_shutdown = [this]() {
-    if (shell_ == nullptr || shell_->hwnd() == nullptr) {
-      return BrowserControlResult::Failure("INTERNAL", "Native window is unavailable");
-    }
-    if (!PostMessageW(shell_->hwnd(), WM_CLOSE, 0, 0)) {
-      return BrowserControlResult::Failure("INTERNAL", "Unable to request native window close");
-    }
-    return BrowserControlResult::Success();
-  };
-  runtime.engine.mode = DesktopEngine::Mode::kWindowed;
-  runtime.engine.process_instance = config_.cef_process_instance;
-  runtime.engine.sandbox_info = config_.sandbox_info;
-  runtime.engine.initial_url = config_.initial_url;
-  if (!config_.url_overridden && !session_snapshot_.tabs.empty()) {
-    runtime.engine.restored_next_tab_id = session_snapshot_.next_tab_id;
-    for (const auto& tab : session_snapshot_.tabs) runtime.engine.restored_tabs.push_back({tab.id, tab.url, tab.active});
-  }
-  runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
-  runtime.engine.configure_window_info = [this](void* raw_info) {
-    auto* info = static_cast<CefWindowInfo*>(raw_info);
-    RECT rect{};
-    GetClientRect(browser_view_->hwnd(), &rect);
-    info->SetAsChild(browser_view_->hwnd(), CefRect(0, 0, rect.right, rect.bottom));
-  };
-  runtime.engine.configure_tab_window_info = [this](void* raw_info, const std::string&) {
-    auto* info = static_cast<CefWindowInfo*>(raw_info);
-    RECT rect{};
-    GetClientRect(browser_view_->hwnd(), &rect);
-    info->SetAsChild(browser_view_->hwnd(), CefRect(0, 0, rect.right, rect.bottom));
-  };
-  if (!desktop_app_->Start(runtime)) {
-    desktop_app_.reset();
-    return false;
-  }
-  browser_view_->ShowFallback(false);
-  std::string readiness_error;
-  if (!profile_session_.PublishReadiness(runtime.device_id, desktop_app_->http_server().bound_port(),
-                                         runtime.start_stdio_mcp, &readiness_error)) {
-    ShutdownDesktopRuntime();
-    return false;
-  }
-  return true;
-}
-
-void WindowsApp::ShutdownDesktopRuntime() {
-  // Keep the owner-thread pump alive through DesktopApp::Stop: CefShutdown
-  // is legal only after every browser has delivered OnBeforeClose.
-  if (desktop_app_) {
-    if (!desktop_app_->Stop()) {
-      // Keep the owner and CEF pump alive. Destroying either before every
-      // OnBeforeClose callback would leave Chromium with dangling clients.
-      return;
-    }
-    desktop_app_.reset();
-  }
-  native_control_.Shutdown();
-  SetDesktopCefMessagePumpScheduler({});
-  if (g_cef_pump_window != nullptr) {
-    KillTimer(g_cef_pump_window, kCefPumpTimerId);
-    DestroyWindow(g_cef_pump_window);
-    g_cef_pump_window = nullptr;
-  }
-  profile_session_.ClearReadiness();
-}
-
-void WindowsApp::UpdateBrowserStateFromRuntime() {
-  if (!desktop_app_) return;
-  std::vector<TabSnapshot> tabs;
-  if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::milliseconds(20)).ok) return;
-  for (const auto& tab : tabs) {
-    if (tab.active) {
-      OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward});
-      SaveSession();
-      return;
-    }
-  }
 }
 
 bool WindowsApp::CreateShell(int show_command) {

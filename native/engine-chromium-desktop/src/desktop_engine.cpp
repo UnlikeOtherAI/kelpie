@@ -109,6 +109,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   config = next_config;
+  last_error.clear();
   shutting_down = false;
   viewport.width = std::max(1, config.viewport.width);
   viewport.height = std::max(1, config.viewport.height);
@@ -124,7 +125,10 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 #endif
   CefSettings settings;
 #if defined(_WIN32)
-  if (config.sandbox_info == nullptr) return false;
+  if (config.sandbox_info == nullptr) {
+    last_error = "The sandbox bootstrap is unavailable";
+    return false;
+  }
   settings.no_sandbox = false;
 #else
   // Linux's pinned CEF120 packaging does not ship the sandbox helper. Keep its
@@ -151,6 +155,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 
   initialized = CefInitialize(main_args, settings, app.get(), config.sandbox_info);
   if (!initialized) {
+    last_error = "Chromium framework initialization failed";
     return false;
   }
 
@@ -160,6 +165,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   } else if (config.configure_window_info) {
     config.configure_window_info(static_cast<void*>(&window_info));
   } else {
+    last_error = "No native browser host is configured";
+    app = nullptr;
+    client = nullptr;
+    CefShutdown();
+    initialized = false;
     return false;
   }
 
@@ -202,6 +212,13 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
       }
     }
     UpdateActiveState();
+  } else {
+    last_error = "Chromium did not create the initial browser";
+    app = nullptr;
+    client = nullptr;
+    CefShutdown();
+    initialized = false;
+    return false;
   }
 
   renderer->SetCallbacks({
@@ -255,6 +272,7 @@ bool DesktopEngine::Impl::Shutdown() {
   if (!tabs.empty()) {
     // CEF requires every browser close callback before CefShutdown. Keep the
     // runtime alive rather than invalidating outstanding CEF references.
+    last_error = "Chromium browser shutdown did not complete";
     return false;
   }
   browser = nullptr;
@@ -488,6 +506,10 @@ bool DesktopEngine::Shutdown() {
 
 void DesktopEngine::DoMessageLoopWork() {
   impl_->DoMessageLoopWork();
+}
+
+const std::string& DesktopEngine::last_error() const {
+  return impl_->last_error;
 }
 
 bool DesktopEngine::is_initialized() const {

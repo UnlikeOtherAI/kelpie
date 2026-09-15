@@ -26,6 +26,7 @@
 #include "native_window_control.h"
 #include "session_snapshot.h"
 #include "settings_view.h"
+#include "startup_diagnostics.h"
 #include "win32_browser_view.h"
 #include "win32_shell.h"
 
@@ -86,7 +87,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void ApplySettings(const SettingsValues& settings);
   bool InitializeCommonControls() const;
   bool InitializeDesktopRuntime();
-  void ShutdownDesktopRuntime();
+  bool ShutdownDesktopRuntime();
   void UpdateBrowserStateFromRuntime();
   bool CreateShell(int show_command);
   std::wstring AppTitle() const;
@@ -108,6 +109,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<SettingsView> settings_view_;
   std::unique_ptr<DesktopApp> desktop_app_;
   ProfileSession profile_session_;
+  StartupDiagnostics startup_diagnostics_;
 
 };
 

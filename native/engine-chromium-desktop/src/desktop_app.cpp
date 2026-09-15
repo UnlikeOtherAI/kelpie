@@ -95,6 +95,7 @@ class DesktopApp::Impl {
  public:
   Config config;
   bool running = false;
+  std::string last_error;
 
   BookmarkStore bookmark_store;
   HistoryStore history_store;
@@ -275,6 +276,7 @@ DesktopApp::~DesktopApp() {
 
 bool DesktopApp::Start(const Config& config) {
   if (impl_->running) {
+    impl_->last_error = "The desktop runtime is already running";
     return false;
   }
   // Stdio reads cannot be cancelled portably. The CLI is the supervised stdio
@@ -282,9 +284,11 @@ bool DesktopApp::Start(const Config& config) {
   // capability and forwards to authenticated HTTP. Refuse this unsafe legacy
   // worker instead of detaching it during shutdown.
   if (config.start_stdio_mcp) {
+    impl_->last_error = "Native stdio MCP is not supported";
     return false;
   }
 
+  impl_->last_error.clear();
   impl_->config = config;
   impl_->engine.SetConsoleSink([this](const nlohmann::json& event) {
     AppendConsole(impl_->console_store, event);
@@ -298,6 +302,7 @@ bool DesktopApp::Start(const Config& config) {
   });
 
   if (!impl_->engine.Initialize(config.engine)) {
+    impl_->last_error = impl_->engine.last_error();
     return false;
   }
 
@@ -317,7 +322,13 @@ bool DesktopApp::Start(const Config& config) {
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
-    if (!impl_->engine.Shutdown()) return false;
+    impl_->last_error = "The loopback control listener did not start";
+    if (!impl_->engine.Shutdown()) {
+      impl_->last_error = impl_->engine.last_error();
+      // The engine retains live CEF callbacks until OnBeforeClose. Keep this
+      // owner alive so the Windows host can drain it before destruction.
+      impl_->running = true;
+    }
     return false;
   }
 
@@ -336,8 +347,8 @@ bool DesktopApp::Stop() {
   if (impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();
   }
-  impl_->http_server.Stop();
   if (!impl_->engine.Shutdown()) return false;
+  impl_->http_server.Stop();
   impl_->running = false;
   return true;
 }
@@ -348,6 +359,10 @@ void DesktopApp::Tick() {
 
 bool DesktopApp::is_running() const {
   return impl_->running;
+}
+
+const std::string& DesktopApp::last_error() const {
+  return impl_->last_error;
 }
 
 DesktopEngine& DesktopApp::engine() {

@@ -62,6 +62,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
 
   bool initialized = false;
   std::atomic<bool> shutting_down = false;
+  std::string last_error;
   bool loading = false;
   bool can_go_back = false;
   bool can_go_forward = false;

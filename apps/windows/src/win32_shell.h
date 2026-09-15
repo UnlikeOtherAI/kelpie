@@ -70,6 +70,9 @@ class Win32Shell {
   bool RefreshTabs();
   void RebuildTabCloseButtons();
   void LayoutTabCloseButtons();
+  void PaintClient(HDC device_context) const;
+  void PrintChildren(HDC device_context) const;
+  void PrintOwnedControl(HWND control, HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
   static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
   void ActivateAdjacentTab(int direction);
