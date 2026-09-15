@@ -10,6 +10,7 @@
 
 #include "../resources/resource.h"
 #include "windows_utf.h"
+#include "panel_theme.h"
 
 namespace kelpie::windows {
 namespace {
@@ -87,6 +88,21 @@ LRESULT NetworkInspector::HandleMessage(UINT message, WPARAM wparam, LPARAM lpar
     case WM_SIZE:
       Resize();
       return 0;
+    case ui::kDpiChangedMessage:
+      RefreshFont();
+      Resize();
+      return 0;
+    case WM_DESTROY:
+      if (control_font_ != nullptr) DeleteObject(control_font_);
+      control_font_ = nullptr;
+      return 0;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(hwnd_, &paint);
+      ui::PaintPanelHeader(dc, hwnd_, L"Network");
+      EndPaint(hwnd_, &paint);
+      return 0;
+    }
     case WM_COMMAND:
       if (HIWORD(wparam) == CBN_SELCHANGE) {
         ApplyFilter();
@@ -113,7 +129,8 @@ void NetworkInspector::CreateControls() {
                                instance_, nullptr);
 
   PopulateFilters();
-  ListView_SetExtendedListViewStyle(list_view_, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+  RefreshFont();
+  ui::StyleList(list_view_, control_font_);
 
   const std::array<std::pair<const wchar_t*, int>, 6> columns{{
       {L"Method", 80},
@@ -135,14 +152,25 @@ void NetworkInspector::CreateControls() {
   ApplyFilter();
 }
 
+void NetworkInspector::RefreshFont() {
+  if (control_font_ != nullptr) {
+    DeleteObject(control_font_);
+    control_font_ = nullptr;
+  }
+  control_font_ = ui::MakeFont(hwnd_, 13, FW_NORMAL);
+  for (HWND control : {method_combo_, type_combo_, source_combo_, list_view_}) {
+    if (control != nullptr) SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(control_font_), TRUE);
+  }
+}
+
 void NetworkInspector::Resize() {
   RECT rect{};
   GetClientRect(hwnd_, &rect);
-  const int top = 12;
-  SetWindowPos(method_combo_, nullptr, 12, top, 140, 200, SWP_NOZORDER);
-  SetWindowPos(type_combo_, nullptr, 164, top, 140, 200, SWP_NOZORDER);
-  SetWindowPos(source_combo_, nullptr, 316, top, 140, 200, SWP_NOZORDER);
-  SetWindowPos(list_view_, nullptr, 12, top + 36, rect.right - 24, rect.bottom - top - 48,
+  const int top = ui::Dip(hwnd_, 60);
+  SetWindowPos(method_combo_, nullptr, ui::Dip(hwnd_, 12), top, ui::Dip(hwnd_, 140), 200, SWP_NOZORDER);
+  SetWindowPos(type_combo_, nullptr, ui::Dip(hwnd_, 164), top, ui::Dip(hwnd_, 140), 200, SWP_NOZORDER);
+  SetWindowPos(source_combo_, nullptr, ui::Dip(hwnd_, 316), top, ui::Dip(hwnd_, 140), 200, SWP_NOZORDER);
+  SetWindowPos(list_view_, nullptr, ui::Dip(hwnd_, 12), top + ui::Dip(hwnd_, 36), rect.right - ui::Dip(hwnd_, 24), rect.bottom - top - ui::Dip(hwnd_, 48),
                SWP_NOZORDER);
 }
 

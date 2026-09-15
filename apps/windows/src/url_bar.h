@@ -1,8 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
-#include <optional>
+#include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -33,26 +34,35 @@ class UrlBar {
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void Focus();
   bool HandleCommand(WORD control_id, WORD notification_code);
-  int Height() const { return kControlHeight + 8; }
+  bool DrawControl(const DRAWITEMSTRUCT& item) const;
+  bool ControlColor(HDC device_context, HWND control, HBRUSH* brush) const;
+  void Paint(HDC device_context) const;
+  int Height() const;
+  std::vector<HWND> FocusableControls() const;
+  void Destroy();
 
  private:
   static LRESULT CALLBACK EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   void CompleteAfterInsertion();
   void RejectCompletion();
   void SubmitCurrentUrl(std::optional<std::wstring_view> completion_url = std::nullopt);
-
-  static constexpr int kControlHeight = 32;
-  static constexpr int kButtonWidth = 32;
-  static constexpr int kGap = 8;
+  void InvalidateSurface() const;
+  void RefreshFont();
 
   HWND parent_ = nullptr;
   UrlBarDelegate* delegate_ = nullptr;
   HWND back_button_ = nullptr;
   HWND forward_button_ = nullptr;
   HWND reload_button_ = nullptr;
+  HWND bookmarks_button_ = nullptr;
+  HWND history_button_ = nullptr;
+  HWND network_button_ = nullptr;
   HWND settings_button_ = nullptr;
   HWND url_edit_ = nullptr;
   WNDPROC original_edit_proc_ = nullptr;
+  mutable HBRUSH edit_brush_ = nullptr;
+  HFONT edit_font_ = nullptr;
+  HWND tooltip_ = nullptr;
   bool setting_url_ = false;
   bool insertion_at_end_ = false;
   bool ime_composing_ = false;

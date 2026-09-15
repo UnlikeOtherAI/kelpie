@@ -8,6 +8,8 @@
 #endif
 #include <windows.h>
 
+#include <vector>
+
 namespace kelpie::windows {
 
 class WindowChrome {
@@ -24,6 +26,7 @@ class WindowChrome {
   void TrackMouseLeave();
   int TitleBarHeight() const;
   void UpdateDwmFrame();
+  std::vector<HWND> FocusableControls() const;
 
  private:
   static LRESULT CALLBACK ControlProc(HWND hwnd, UINT message, WPARAM wparam,

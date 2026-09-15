@@ -12,6 +12,10 @@ function(add_desktop_engine_test name)
     target_compile_definitions(${name} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
   endif()
   add_test(NAME ${name} COMMAND ${name})
+  if(KELPIE_ENABLE_CHROMIUM_DESKTOP AND WIN32)
+    set_tests_properties(${name} PROPERTIES
+      ENVIRONMENT "PATH=${CEF_ROOT}/Release;$ENV{PATH}")
+  endif()
 endfunction()
 
 add_desktop_engine_test(test_desktop_router test_desktop_router.cpp)

@@ -45,6 +45,7 @@ class Win32Shell {
   void Show(int show_command);
   HWND hwnd() const { return hwnd_; }
   HACCEL accelerators() const { return accelerators_; }
+  bool HandleKeyboardNavigation(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
   void ShowToast(const std::wstring& message);
   void Close();
@@ -74,6 +75,7 @@ class Win32Shell {
   void ActivateAdjacentTab(int direction);
   void ActivateSelectedTab();
   void CloseTabAt(std::size_t index);
+  std::vector<HWND> FocusOrder() const;
 
   HINSTANCE instance_;
   ShellDelegate* delegate_;
@@ -92,6 +94,8 @@ class Win32Shell {
   std::vector<TabItem> tabs_;
   std::vector<TabCloseButton> tab_close_buttons_;
   std::string active_tab_id_;
+  BrowserState browser_state_;
+  bool has_browser_state_ = false;
 };
 
 }  // namespace kelpie::windows

@@ -25,6 +25,7 @@ class NetworkInspector {
   void Resize();
   void PopulateFilters() const;
   void ApplyFilter();
+  void RefreshFont();
 
   HINSTANCE instance_ = nullptr;
   HWND owner_ = nullptr;
@@ -33,6 +34,7 @@ class NetworkInspector {
   HWND type_combo_ = nullptr;
   HWND source_combo_ = nullptr;
   HWND list_view_ = nullptr;
+  HFONT control_font_ = nullptr;
   std::string network_json_ = "[]";
 };
 

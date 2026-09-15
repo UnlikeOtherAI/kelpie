@@ -1,8 +1,11 @@
 #include "url_bar.h"
 
+#include <commctrl.h>
+
 #include <algorithm>
 
 #include "../resources/resource.h"
+#include "ui_theme.h"
 #include "url_completion.h"
 #include "windows_utf.h"
 
@@ -18,41 +21,122 @@ std::wstring ReadWindowText(HWND hwnd) {
   return value;
 }
 
+bool IsIconButton(UINT id) {
+  return id == IDC_BACK_BUTTON || id == IDC_FORWARD_BUTTON || id == IDC_RELOAD_BUTTON ||
+         id == IDC_BOOKMARKS_BUTTON || id == IDC_HISTORY_BUTTON || id == IDC_NETWORK_BUTTON ||
+         id == IDC_SETTINGS_BUTTON;
+}
+
+wchar_t IconFor(UINT id, bool loading) {
+  switch (id) {
+    case IDC_BACK_BUTTON: return L'‹';
+    case IDC_FORWARD_BUTTON: return L'›';
+    case IDC_RELOAD_BUTTON: return loading ? L'×' : L'↻';
+    case IDC_BOOKMARKS_BUTTON: return L'★';
+    case IDC_HISTORY_BUTTON: return L'◷';
+    case IDC_NETWORK_BUTTON: return L'⌁';
+    default: return L'⚙';
+  }
+}
+
 }  // namespace
 
 bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarDelegate* delegate) {
   parent_ = parent;
   delegate_ = delegate;
-  back_button_ = CreateWindowExW(0, L"BUTTON", L"<", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                 0, 0, kButtonWidth, kControlHeight, parent, reinterpret_cast<HMENU>(IDC_BACK_BUTTON), instance, nullptr);
-  forward_button_ = CreateWindowExW(0, L"BUTTON", L">", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                    0, 0, kButtonWidth, kControlHeight, parent, reinterpret_cast<HMENU>(IDC_FORWARD_BUTTON), instance, nullptr);
-  reload_button_ = CreateWindowExW(0, L"BUTTON", L"Reload", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                   0, 0, 52, kControlHeight, parent, reinterpret_cast<HMENU>(IDC_RELOAD_BUTTON), instance, nullptr);
-  settings_button_ = CreateWindowExW(0, L"BUTTON", L"Menu", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                                     0, 0, 56, kControlHeight, parent, reinterpret_cast<HMENU>(IDC_SETTINGS_BUTTON), instance, nullptr);
-  url_edit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                              0, 0, 200, kControlHeight, parent, reinterpret_cast<HMENU>(IDC_URL_EDIT), instance, nullptr);
-  if (!back_button_ || !forward_button_ || !reload_button_ || !settings_button_ || !url_edit_) return false;
+  const auto make_button = [&](int id, const wchar_t* name, HWND* result) {
+    *result = CreateWindowExW(0, L"BUTTON", name, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                              0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance, nullptr);
+    return *result != nullptr;
+  };
+  if (!make_button(IDC_BACK_BUTTON, L"Back", &back_button_) ||
+      !make_button(IDC_FORWARD_BUTTON, L"Forward", &forward_button_) ||
+      !make_button(IDC_RELOAD_BUTTON, L"Reload", &reload_button_) ||
+      !make_button(IDC_BOOKMARKS_BUTTON, L"Bookmarks", &bookmarks_button_) ||
+      !make_button(IDC_HISTORY_BUTTON, L"History", &history_button_) ||
+      !make_button(IDC_NETWORK_BUTTON, L"Network Inspector", &network_button_) ||
+      !make_button(IDC_SETTINGS_BUTTON, L"Settings", &settings_button_)) return false;
+  url_edit_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
+                              0, 0, 0, 0, parent, reinterpret_cast<HMENU>(IDC_URL_EDIT), instance, nullptr);
+  if (url_edit_ == nullptr) return false;
+  tooltip_ = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
+                             WS_POPUP | TTS_ALWAYSTIP, 0, 0, 0, 0, parent,
+                             nullptr, instance, nullptr);
+  if (tooltip_ != nullptr) {
+    const auto add_tooltip = [&](HWND control, const wchar_t* text) {
+      TOOLINFOW tool{sizeof(tool)};
+      tool.uFlags = TTF_SUBCLASS;
+      tool.hwnd = parent;
+      tool.uId = reinterpret_cast<UINT_PTR>(control);
+      tool.lpszText = const_cast<wchar_t*>(text);
+      SendMessageW(tooltip_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
+    };
+    add_tooltip(back_button_, L"Back");
+    add_tooltip(forward_button_, L"Forward");
+    add_tooltip(reload_button_, L"Reload or stop loading");
+    add_tooltip(bookmarks_button_, L"Bookmarks");
+    add_tooltip(history_button_, L"History");
+    add_tooltip(network_button_, L"Network inspector");
+    add_tooltip(settings_button_, L"Settings");
+  }
   SetWindowLongPtrW(url_edit_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
-  original_edit_proc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(url_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&UrlBar::EditProc)));
+  original_edit_proc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+      url_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&UrlBar::EditProc)));
+  SendMessageW(url_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(ui::Dip(parent, 10), ui::Dip(parent, 8)));
+  RefreshFont();
   Resize(bounds);
   return true;
 }
 
+int UrlBar::Height() const { return ui::Dip(parent_, 50); }
+
 void UrlBar::Resize(const RECT& bounds) {
-  const int top = bounds.top + 4;
-  int left = bounds.left + 8;
-  SetWindowPos(back_button_, nullptr, left, top, kButtonWidth, kControlHeight, SWP_NOZORDER);
-  left += kButtonWidth + kGap;
-  SetWindowPos(forward_button_, nullptr, left, top, kButtonWidth, kControlHeight, SWP_NOZORDER);
-  left += kButtonWidth + kGap;
-  SetWindowPos(reload_button_, nullptr, left, top, 52, kControlHeight, SWP_NOZORDER);
-  const int settings_width = 56;
-  const int url_left = left + 52 + kGap;
-  const int url_right = bounds.right - settings_width - 16;
-  SetWindowPos(url_edit_, nullptr, url_left, top, std::max(120, url_right - url_left), kControlHeight, SWP_NOZORDER);
-  SetWindowPos(settings_button_, nullptr, bounds.right - settings_width - 8, top, settings_width, kControlHeight, SWP_NOZORDER);
+  RefreshFont();
+  const int control_height = ui::Dip(parent_, 34);
+  const int button_width = ui::Dip(parent_, 40);
+  const int gap = ui::Dip(parent_, 8);
+  const int padding = ui::Dip(parent_, 12);
+  const int top = bounds.top + ui::Dip(parent_, 8);
+  int left = bounds.left + padding;
+  for (HWND button : {back_button_, forward_button_, reload_button_}) {
+    SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
+    left += button_width + gap;
+  }
+  const int actions_width = 4 * button_width + 3 * gap;
+  const int edit_right = bounds.right - padding - actions_width - gap;
+  const int edit_width = std::max(1, edit_right - left);
+  SetWindowPos(url_edit_, nullptr, left + ui::Dip(parent_, 4), top + ui::Dip(parent_, 2),
+               std::max(1, edit_width - ui::Dip(parent_, 8)), control_height - ui::Dip(parent_, 4), SWP_NOZORDER);
+  left = edit_right + gap;
+  for (HWND button : {bookmarks_button_, history_button_, network_button_, settings_button_}) {
+    SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
+    left += button_width + gap;
+  }
+  InvalidateSurface();
+}
+
+std::vector<HWND> UrlBar::FocusableControls() const {
+  std::vector<HWND> controls;
+  for (HWND control : {back_button_, forward_button_, reload_button_, url_edit_, bookmarks_button_,
+                       history_button_, network_button_, settings_button_}) {
+    if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);
+  }
+  return controls;
+}
+
+void UrlBar::Destroy() {
+  if (edit_brush_ != nullptr) DeleteObject(edit_brush_);
+  if (edit_font_ != nullptr) DeleteObject(edit_font_);
+  edit_brush_ = nullptr;
+  edit_font_ = nullptr;
+}
+
+void UrlBar::RefreshFont() {
+  if (url_edit_ == nullptr) return;
+  HFONT next = ui::MakeFont(parent_, 14, FW_NORMAL);
+  SendMessageW(url_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(next), TRUE);
+  if (edit_font_ != nullptr) DeleteObject(edit_font_);
+  edit_font_ = next;
 }
 
 void UrlBar::SetUrl(const std::wstring& url, bool force) {
@@ -69,7 +153,9 @@ void UrlBar::SetUrl(const std::wstring& url, bool force) {
 void UrlBar::SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading) {
   EnableWindow(back_button_, can_go_back ? TRUE : FALSE);
   EnableWindow(forward_button_, can_go_forward ? TRUE : FALSE);
-  SetWindowTextW(reload_button_, is_loading ? L"Stop" : L"Reload");
+  SetWindowTextW(reload_button_, is_loading ? L"Stop loading" : L"Reload");
+  SetWindowLongPtrW(reload_button_, GWLP_USERDATA, is_loading ? 1 : 0);
+  InvalidateRect(reload_button_, nullptr, FALSE);
 }
 
 void UrlBar::Focus() {
@@ -82,6 +168,52 @@ bool UrlBar::HandleCommand(WORD control_id, WORD notification_code) {
   if (control_id != IDC_URL_EDIT || notification_code != EN_CHANGE || setting_url_) return false;
   CompleteAfterInsertion();
   return true;
+}
+
+bool UrlBar::DrawControl(const DRAWITEMSTRUCT& item) const {
+  if (!IsIconButton(item.CtlID)) return false;
+  const auto colors = ui::Colors();
+  const bool disabled = (item.itemState & ODS_DISABLED) != 0;
+  const bool pressed = (item.itemState & ODS_SELECTED) != 0;
+  const bool focused = (item.itemState & ODS_FOCUS) != 0;
+  const COLORREF fill = pressed ? colors.surface_hover : colors.surface;
+  ui::PaintRounded(item.hDC, item.rcItem, fill, focused ? colors.focus : colors.border,
+                   ui::Dip(parent_, 8), focused ? ui::Dip(parent_, 2) : 1);
+  const bool loading = item.CtlID == IDC_RELOAD_BUTTON && GetWindowLongPtrW(item.hwndItem, GWLP_USERDATA) != 0;
+  const COLORREF glyph_color = disabled ? colors.muted_text :
+      (ui::HighContrast() && pressed ? GetSysColor(COLOR_HIGHLIGHTTEXT) : colors.text);
+  ui::DrawGlyph(item.hDC, parent_, item.rcItem, IconFor(item.CtlID, loading), glyph_color);
+  return true;
+}
+
+bool UrlBar::ControlColor(HDC device_context, HWND control, HBRUSH* brush) const {
+  if (control != url_edit_) return false;
+  const auto colors = ui::Colors();
+  SetTextColor(device_context, colors.text);
+  SetBkColor(device_context, colors.surface);
+  if (edit_brush_ != nullptr) DeleteObject(edit_brush_);
+  edit_brush_ = CreateSolidBrush(colors.surface);
+  *brush = edit_brush_;
+  return true;
+}
+
+void UrlBar::Paint(HDC device_context) const {
+  if (url_edit_ == nullptr) return;
+  RECT edit{};
+  GetWindowRect(url_edit_, &edit);
+  MapWindowPoints(HWND_DESKTOP, parent_, reinterpret_cast<POINT*>(&edit), 2);
+  edit.left -= ui::Dip(parent_, 4);
+  edit.right += ui::Dip(parent_, 4);
+  edit.top -= ui::Dip(parent_, 2);
+  edit.bottom += ui::Dip(parent_, 2);
+  const auto colors = ui::Colors();
+  const bool focused = GetFocus() == url_edit_;
+  ui::PaintRounded(device_context, edit, colors.surface, focused ? colors.focus : colors.border,
+                   ui::Dip(parent_, 15), focused ? ui::Dip(parent_, 2) : 1);
+}
+
+void UrlBar::InvalidateSurface() const {
+  if (parent_ != nullptr) InvalidateRect(parent_, nullptr, FALSE);
 }
 
 LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -104,10 +236,7 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
   } else if (message == WM_IME_ENDCOMPOSITION) {
     self->ime_composing_ = false;
   } else if (message == WM_KEYDOWN) {
-    if (wparam == VK_ESCAPE && self->completion_active_) {
-      self->RejectCompletion();
-      return 0;
-    }
+    if (wparam == VK_ESCAPE && self->completion_active_) { self->RejectCompletion(); return 0; }
     if (wparam == VK_RETURN) {
       const std::optional<std::wstring_view> completion_url = self->completion_active_
           ? std::optional<std::wstring_view>(self->completion_navigation_url_) : std::nullopt;
@@ -118,12 +247,12 @@ LRESULT CALLBACK UrlBar::EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM
     }
     self->completion_active_ = false;
     self->completion_navigation_url_.clear();
-    if (wparam == VK_BACK || wparam == VK_DELETE) {
-      self->insertion_at_end_ = false;
-    }
+    if (wparam == VK_BACK || wparam == VK_DELETE) self->insertion_at_end_ = false;
   } else if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MOUSEWHEEL) {
     self->completion_active_ = false;
     self->completion_navigation_url_.clear();
+  } else if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {
+    self->InvalidateSurface();
   }
   return CallWindowProcW(self->original_edit_proc_, hwnd, message, wparam, lparam);
 }

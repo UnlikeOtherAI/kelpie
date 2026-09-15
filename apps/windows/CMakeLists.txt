@@ -244,4 +244,20 @@ if(BUILD_TESTING)
   target_include_directories(window_chrome_test PRIVATE src resources)
   target_link_libraries(window_chrome_test PRIVATE user32 gdi32 dwmapi comctl32)
   add_test(NAME window_chrome_test COMMAND window_chrome_test)
+
+  add_executable(windows_shell_preview_test
+    tests/windows_shell_preview_test.cpp
+    src/win32_shell.cpp
+    src/window_chrome.cpp
+    src/url_bar.cpp
+    src/win32_browser_view.cpp
+    src/toast_view.cpp
+    src/bookmarks_view.cpp
+    src/history_view.cpp
+    src/network_inspector.cpp
+  )
+  target_compile_definitions(windows_shell_preview_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_include_directories(windows_shell_preview_test PRIVATE src resources)
+  target_link_libraries(windows_shell_preview_test PRIVATE nlohmann_json::nlohmann_json user32 gdi32 gdiplus dwmapi comctl32)
+  add_test(NAME windows_shell_preview_test COMMAND windows_shell_preview_test)
 endif()

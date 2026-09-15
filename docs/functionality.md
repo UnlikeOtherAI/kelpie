@@ -46,6 +46,8 @@ On Linux, the desktop shell runs in either GUI or headless mode. Both modes expo
 
 On Windows, the Win32 shell uses the shared Chromium desktop runtime for tabs, navigation, DOM inspection, trusted input, screenshots, cookies, storage, dialogs, and MCP. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
+The Windows shell has the same quiet desktop chrome as the macOS app: native icon controls and an IME-capable rounded URL field in a 50-DIP toolbar, a separate native tab strip with per-tab close controls, and native bookmarks, history, network, settings, and toast surfaces. These controls keep standard Windows accessibility roles and keyboard navigation, scale from their owning window's DPI, respect high-contrast colors, and preserve inline history completion semantics.
+
 ### Safari / Chrome Authentication
 
 One-tap login using the device's saved passwords. On iOS, opens an ASWebAuthenticationSession (Safari's login sheet) that shares Safari's saved passwords and cookies. On Android, uses Chrome Custom Tabs. After login, cookies are synced back into the browser automatically.
