@@ -15,7 +15,11 @@ void TestHfInferNoToken() {
       mgr, "google/gemma-2-2b-it", "{\"prompt\":\"hello\"}");
   assert(result != nullptr);
   json resp = json::parse(result);
+#if KELPIE_AI_HAS_HF_HTTPS
   assert(resp["error"] == "auth_required");
+#else
+  assert(resp["error"] == "unsupported");
+#endif
   kelpie_ai_free_string(result);
   kelpie_ai_destroy(mgr);
 }

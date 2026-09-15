@@ -24,12 +24,26 @@ class DesktopEngine final : public DesktopBrowserControl {
     int height = 720;
   };
 
+  struct RestoredTab {
+    std::string id;
+    std::string url;
+    bool active = false;
+  };
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
+    // On Windows CEF receives the application HINSTANCE. Other platforms use
+    // argc/argv. Keeping both avoids platform-specific runtime entry points.
+    void* process_instance = nullptr;
+    // Supplied by CEF bootstrap.exe on Windows. It must be passed unchanged
+    // to CefInitialize so Chromium subprocesses remain sandboxed.
+    void* sandbox_info = nullptr;
     int argc = 0;
     char** argv = nullptr;
     std::string initial_url;
+    std::vector<RestoredTab> restored_tabs;
+    std::uint64_t restored_next_tab_id = 1;
     std::string cache_path;
     std::string user_agent;
     std::string browser_subprocess_path;
@@ -89,6 +103,7 @@ class DesktopEngine final : public DesktopBrowserControl {
   BrowserControlResult Back(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
   BrowserControlResult Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
   BrowserControlResult Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult StopLoading(TabLease lease, TabSnapshot* tab, Timeout timeout);
   BrowserControlResult Evaluate(TabLease lease,
                                 std::string script,
                                 Json* value,
@@ -127,7 +142,7 @@ class DesktopEngine final : public DesktopBrowserControl {
 
  private:
   std::unique_ptr<CefRenderer> renderer_;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace kelpie

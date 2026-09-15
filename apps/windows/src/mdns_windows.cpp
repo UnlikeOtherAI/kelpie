@@ -1,4 +1,5 @@
 #include "mdns_windows.h"
+#include "windows_utf.h"
 
 #include <sstream>
 
@@ -21,18 +22,6 @@
 namespace kelpie::windows {
 namespace {
 
-std::wstring Utf8ToWide(const std::string& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-  std::wstring output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L'\0');
-  if (size > 1) {
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1);
-  }
-  return output;
-}
-
 std::vector<BYTE> BuildTxtRecord(const StringMap& txt_records) {
   std::vector<BYTE> bytes;
   for (const auto& [key, value] : txt_records) {
@@ -47,7 +36,7 @@ std::vector<std::wstring> Utf8MapValues(const StringMap& values, bool keys) {
   std::vector<std::wstring> output;
   output.reserve(values.size());
   for (const auto& [key, value] : values) {
-    output.push_back(Utf8ToWide(keys ? key : value));
+    output.push_back(utf::Utf8ToWide(keys ? key : value).value_or(L""));
   }
   return output;
 }
@@ -113,7 +102,8 @@ bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
     return false;
   }
 
-  const std::wstring instance_name = Utf8ToWide(registration.instance_name);
+  const auto instance_name = utf::Utf8ToWide(registration.instance_name);
+  if (!instance_name) { SetError("Invalid UTF-8 mDNS instance name"); return false; }
   const auto keys = Utf8MapValues(registration.txt_records, true);
   const auto values = Utf8MapValues(registration.txt_records, false);
   std::vector<PCWSTR> key_ptrs;
@@ -125,7 +115,7 @@ bool MdnsWindows::StartNative(const MdnsRegistration& registration) {
     value_ptrs.push_back(value.c_str());
   }
   PDNS_SERVICE_INSTANCE instance =
-      construct(instance_name.c_str(), L"_kelpie._tcp.local", nullptr, nullptr,
+      construct(instance_name->c_str(), L"_kelpie._tcp.local", nullptr, nullptr,
                 static_cast<WORD>(registration.port), 0, 0,
                 static_cast<DWORD>(key_ptrs.size()), key_ptrs.data(),
                 value_ptrs.data());

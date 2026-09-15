@@ -32,6 +32,6 @@
 
 ## Windows Shell Notes
 
-- The Windows shell is a Win32 `WS_OVERLAPPEDWINDOW` host with a 32px toolbar, child browser host, native settings dialog, native toast card, and separate bookmarks/history/network inspector utility windows.
-- The URL bar uses native `EDIT` and `BUTTON` controls, and the network inspector mirrors the three desktop/mobile filter groups: Method, Type, and Source.
+- The Windows shell is a Win32 `WS_OVERLAPPEDWINDOW` host with a tab strip, 32px toolbar, child browser host, native settings dialog, native toast card, and separate bookmarks/history/network inspector utility windows. `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+Shift+Tab`, and `Ctrl+L` remain available after page focus.
+- The URL bar uses native `EDIT` and `BUTTON` controls. Its history completion is an inline selected suffix, offered only for a typed insertion at the end of unselected text; deletion, paste, IME composition, and text replacement do not offer a completion. Escape rejects and Enter accepts it. The network inspector mirrors the three desktop/mobile filter groups: Method, Type, and Source.
 - The browser host can compile without a real CEF SDK. In that mode the shell still launches and the HTTP server still runs, but browser-engine methods that need the shared desktop Chromium runtime stay explicitly unsupported.

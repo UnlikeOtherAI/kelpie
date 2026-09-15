@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <functional>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -17,6 +18,7 @@ class HistoryView {
   bool EnsureCreated(HINSTANCE instance, HWND owner);
   void ToggleVisible();
   void UpdateFromJson(const std::string& history_json);
+  void SetNavigateCallback(std::function<void(const std::string&)> callback);
 
  private:
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
@@ -30,6 +32,7 @@ class HistoryView {
   HWND hwnd_ = nullptr;
   HWND list_view_ = nullptr;
   std::string history_json_ = "[]";
+  std::function<void(const std::string&)> on_navigate_;
 };
 
 }  // namespace kelpie::windows

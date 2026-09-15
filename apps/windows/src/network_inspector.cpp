@@ -9,21 +9,10 @@
 #include <nlohmann/json.hpp>
 
 #include "../resources/resource.h"
+#include "windows_utf.h"
 
 namespace kelpie::windows {
 namespace {
-
-std::wstring Utf8ToWide(const std::string& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-  std::wstring output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L'\0');
-  if (size > 1) {
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1);
-  }
-  return output;
-}
 
 void AddComboItem(HWND combo, const wchar_t* value) {
   SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(value));
@@ -192,9 +181,9 @@ void NetworkInspector::ApplyFilter() {
     if (!entry.is_object()) {
       continue;
     }
-    const std::wstring entry_method = Utf8ToWide(entry.value("method", ""));
-    const std::wstring entry_type = Utf8ToWide(entry.value("category", entry.value("content_type", "")));
-    std::wstring initiator = Utf8ToWide(entry.value("initiator", "browser"));
+    const std::wstring entry_method = utf::Utf8ToWideDisplay(entry.value("method", ""));
+    const std::wstring entry_type = utf::Utf8ToWideDisplay(entry.value("category", entry.value("content_type", "")));
+    std::wstring initiator = utf::Utf8ToWideDisplay(entry.value("initiator", "browser"));
     std::transform(initiator.begin(), initiator.end(), initiator.begin(), ::towupper);
 
     if (method != L"All" && entry_method != method) {
@@ -207,7 +196,7 @@ void NetworkInspector::ApplyFilter() {
       continue;
     }
 
-    std::wstring url = Utf8ToWide(entry.value("url", ""));
+    std::wstring url = utf::Utf8ToWideDisplay(entry.value("url", ""));
     std::wstring status = std::to_wstring(entry.value("status_code", 0));
     std::wstring size = std::to_wstring(entry.value("size", 0));
     std::wstring time = std::to_wstring(entry.value("duration", 0)) + L" ms";
