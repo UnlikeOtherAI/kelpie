@@ -18,9 +18,11 @@ void EvaluateHandler::Register(DesktopRouter& router) const {
 
 nlohmann::json EvaluateHandler::Evaluate(const nlohmann::json& params) const {
   try {
-    HandlerContext& context = RequireHandlerContext(runtime_);
     const std::string expression = RequireString(params, "expression");
-    return SuccessResponse({{"result", context.EvaluateJsReturningJson(expression)}});
+    nlohmann::json value;
+    const BrowserControlResult result = EvaluateForTab(runtime_, params, expression, &value);
+    if (!result.ok) return ControlError(result);
+    return SuccessResponse({{"result", value}, {"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()}});
   } catch (const std::invalid_argument& exception) {
     return InvalidParams(exception.what());
   }
@@ -28,16 +30,22 @@ nlohmann::json EvaluateHandler::Evaluate(const nlohmann::json& params) const {
 
 nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) const {
   try {
-    HandlerContext& context = RequireHandlerContext(runtime_);
     const std::string selector = RequireString(params, "selector");
-    const int timeout_ms = 5000;
+    const int timeout_ms = static_cast<int>(ControlTimeout(params).count());
     const int poll_ms = 100;
     const std::int64_t started = NowMillis();
     const std::string script =
         "(() => { const el = document.querySelector(" + JsStringLiteral(selector) + ");"
         "return {found: !!el}; })()";
+    TabLease lease;
+    BrowserControlResult resolved = RequireBrowserControl(runtime_).ResolveTab(
+        OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    if (!resolved.ok) return ControlError(resolved);
     while (true) {
-      const nlohmann::json result = context.EvaluateJsReturningJson(script);
+      nlohmann::json result;
+      const BrowserControlResult control = RequireBrowserControl(runtime_).Evaluate(
+          lease, script, &result, ControlTimeout(params));
+      if (!control.ok) return ControlError(control);
       if (result.value("found", false)) {
         return SuccessResponse({{"selector", selector}});
       }
@@ -53,20 +61,28 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
 }
 
 nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  const int timeout_ms = 10000;
+  const int timeout_ms = static_cast<int>(ControlTimeout(params).count());
   const int poll_ms = 100;
   const std::int64_t started = NowMillis();
-  while (context.Renderer()->IsLoading()) {
+  try {
+    TabLease lease;
+    BrowserControlResult resolved = RequireBrowserControl(runtime_).ResolveTab(
+        OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    if (!resolved.ok) return ControlError(resolved);
+    while (true) {
+      nlohmann::json ready_state;
+      const BrowserControlResult control = RequireBrowserControl(runtime_).Evaluate(
+          lease, "document.readyState", &ready_state, ControlTimeout(params));
+      if (!control.ok) return ControlError(control);
+      if (ready_state.is_string() && ready_state.get<std::string>() == "complete") {
+        return SuccessResponse({{"tab", control.tab ? TabJson(*control.tab) : nlohmann::json::object()}});
+      }
     if ((NowMillis() - started) >= timeout_ms) {
       return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for navigation to complete");
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms));
   }
-  return SuccessResponse({
-      {"url", context.Renderer()->CurrentUrl()},
-      {"title", context.Renderer()->CurrentTitle()},
-  });
+  } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
 }  // namespace kelpie

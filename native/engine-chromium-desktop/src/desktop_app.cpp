@@ -28,6 +28,8 @@
 #include "handlers/renderer_handler.h"
 #include "handlers/screenshot_handler.h"
 #include "handlers/shell_handler.h"
+#include "handlers/dialog_handler.h"
+#include "handlers/inspection_handler.h"
 #include "handlers/scroll_handler.h"
 #include "handlers/viewport_handler.h"
 
@@ -125,6 +127,8 @@ class DesktopApp::Impl {
   std::unique_ptr<ViewportHandler> viewport_handler;
   std::unique_ptr<CookieHandler> cookie_handler;
   std::unique_ptr<ShellHandler> shell_handler;
+  std::unique_ptr<DialogHandler> dialog_handler;
+  std::unique_ptr<InspectionHandler> inspection_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
     DesktopHandlerRuntime runtime;
@@ -200,6 +204,8 @@ class DesktopApp::Impl {
     viewport_handler = std::make_unique<ViewportHandler>(runtime);
     cookie_handler = std::make_unique<CookieHandler>(runtime);
     shell_handler = std::make_unique<ShellHandler>(runtime);
+    dialog_handler = std::make_unique<DialogHandler>(runtime);
+    inspection_handler = std::make_unique<InspectionHandler>(runtime);
 
     navigation_handler->Register(router);
     interaction_handler->Register(router);
@@ -217,6 +223,8 @@ class DesktopApp::Impl {
     viewport_handler->Register(router);
     cookie_handler->Register(router);
     shell_handler->Register(router);
+    dialog_handler->Register(router);
+    inspection_handler->Register(router);
 
     for (const std::string& method : UnsupportedMethods()) {
       if (!router.Has(method)) {

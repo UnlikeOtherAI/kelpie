@@ -14,16 +14,18 @@ void ScreenshotHandler::Register(DesktopRouter& router) const {
                   [this](const nlohmann::json& params) { return Screenshot(params, true); });
 }
 
-nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json&, bool annotated) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
-  const auto image = context.Renderer()->TakeSnapshot();
-  if (image.empty()) {
-    return ErrorResponse(ErrorCode::kWebviewError, "No snapshot is available");
-  }
+nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool annotated) const {
+  TabLease lease;
+  auto result = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+  if (!result.ok) return ControlError(result);
+  BrowserScreenshot image;
+  result = RequireBrowserControl(runtime_).Screenshot(lease, &image, ControlTimeout(params));
+  if (!result.ok) return ControlError(result);
 
   nlohmann::json response = {
-      {"image", Base64Encode(image)},
-      {"format", "png"},
+      {"image", image.base64_data},
+      {"format", image.mime_type == "image/jpeg" ? "jpeg" : "png"},
+      {"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()},
   };
   if (runtime_.viewport_supplier) {
     const nlohmann::json viewport = runtime_.viewport_supplier();
@@ -50,7 +52,10 @@ nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json&, bool annotat
       "rect: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}"
       "};"
       "}); })()";
-  response["annotations"] = RequireHandlerContext(runtime_).EvaluateJsReturningJson(script);
+  nlohmann::json annotations;
+  const BrowserControlResult evaluated = RequireBrowserControl(runtime_).Evaluate(lease, script, &annotations, ControlTimeout(params));
+  if (!evaluated.ok) return ControlError(evaluated);
+  response["annotations"] = annotations;
   return SuccessResponse(response);
 }
 

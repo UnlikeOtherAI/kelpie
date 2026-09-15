@@ -86,8 +86,11 @@ inline std::optional<std::string> OptionalTabId(const nlohmann::json& params) {
 inline std::optional<std::uint64_t> OptionalGeneration(const nlohmann::json& params) {
   const auto it = params.find("generation");
   if (it == params.end()) return std::nullopt;
-  if (!it->is_number_unsigned()) throw std::invalid_argument("generation must be an unsigned integer");
-  return it->get<std::uint64_t>();
+  if (it->is_number_unsigned()) return it->get<std::uint64_t>();
+  if (it->is_number_integer() && it->get<std::int64_t>() >= 0) {
+    return static_cast<std::uint64_t>(it->get<std::int64_t>());
+  }
+  throw std::invalid_argument("generation must be a non-negative integer");
 }
 
 inline nlohmann::json TabJson(const TabSnapshot& tab) {

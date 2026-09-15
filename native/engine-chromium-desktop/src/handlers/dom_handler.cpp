@@ -18,7 +18,6 @@ void DomHandler::Register(DesktopRouter& router) const {
 
 nlohmann::json DomHandler::QuerySelector(const nlohmann::json& params, bool all) const {
   try {
-    HandlerContext& context = RequireHandlerContext(runtime_);
     const std::string selector = RequireString(params, "selector");
     const std::string script =
         "(() => {"
@@ -33,7 +32,9 @@ nlohmann::json DomHandler::QuerySelector(const nlohmann::json& params, bool all)
         "}));"
         "return {count: mapped.length, elements: mapped};"
         "})()";
-    const nlohmann::json result = context.EvaluateJsReturningJson(script);
+    nlohmann::json result;
+    const BrowserControlResult control = EvaluateForTab(runtime_, params, script, &result);
+    if (!control.ok) return ControlError(control);
     const nlohmann::json elements = result.value("elements", nlohmann::json::array());
     if (!all) {
       return SuccessResponse({
@@ -52,12 +53,13 @@ nlohmann::json DomHandler::QuerySelector(const nlohmann::json& params, bool all)
 
 nlohmann::json DomHandler::GetElementText(const nlohmann::json& params) const {
   try {
-    HandlerContext& context = RequireHandlerContext(runtime_);
     const std::string selector = RequireString(params, "selector");
     const std::string script =
         "(() => { const node = document.querySelector(" + JsStringLiteral(selector) +
         "); return node ? {found: true, text: (node.textContent || '').trim()} : {found: false}; })()";
-    const nlohmann::json result = context.EvaluateJsReturningJson(script);
+    nlohmann::json result;
+    const BrowserControlResult control = EvaluateForTab(runtime_, params, script, &result);
+    if (!control.ok) return ControlError(control);
     if (!result.value("found", false)) {
       return ErrorResponse(ErrorCode::kElementNotFound,
                            "No element matching selector '" + selector + "'");
@@ -70,7 +72,6 @@ nlohmann::json DomHandler::GetElementText(const nlohmann::json& params) const {
 
 nlohmann::json DomHandler::GetAttributes(const nlohmann::json& params) const {
   try {
-    HandlerContext& context = RequireHandlerContext(runtime_);
     const std::string selector = RequireString(params, "selector");
     const std::string script =
         "(() => {"
@@ -79,7 +80,9 @@ nlohmann::json DomHandler::GetAttributes(const nlohmann::json& params) const {
         "const attrs = Array.from(node.attributes || []).reduce((acc, attr) => { acc[attr.name] = attr.value; return acc; }, {});"
         "return {found: true, attributes: attrs};"
         "})()";
-    const nlohmann::json result = context.EvaluateJsReturningJson(script);
+    nlohmann::json result;
+    const BrowserControlResult control = EvaluateForTab(runtime_, params, script, &result);
+    if (!control.ok) return ControlError(control);
     if (!result.value("found", false)) {
       return ErrorResponse(ErrorCode::kElementNotFound,
                            "No element matching selector '" + selector + "'");
@@ -91,7 +94,6 @@ nlohmann::json DomHandler::GetAttributes(const nlohmann::json& params) const {
 }
 
 nlohmann::json DomHandler::GetDom(const nlohmann::json& params) const {
-  HandlerContext& context = RequireHandlerContext(runtime_);
   const auto selector_it = params.find("selector");
   const std::string selector =
       selector_it != params.end() && selector_it->is_string() ? selector_it->get<std::string>() : "html";
@@ -101,7 +103,9 @@ nlohmann::json DomHandler::GetDom(const nlohmann::json& params) const {
       "if (!node) { return {found: false}; }"
       "return {found: true, html: node.outerHTML || '', nodeCount: node.querySelectorAll('*').length + 1};"
       "})()";
-  const nlohmann::json result = context.EvaluateJsReturningJson(script);
+  nlohmann::json result;
+  const BrowserControlResult control = EvaluateForTab(runtime_, params, script, &result);
+  if (!control.ok) return ControlError(control);
   if (!result.value("found", false)) {
     return ErrorResponse(ErrorCode::kElementNotFound,
                          "No element matching selector '" + selector + "'");

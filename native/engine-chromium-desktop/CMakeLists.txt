@@ -41,6 +41,8 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/viewport_handler.cpp
   src/handlers/cookie_handler.cpp
   src/handlers/shell_handler.cpp
+  src/handlers/dialog_handler.cpp
+  src/handlers/inspection_handler.cpp
 )
 
 option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
