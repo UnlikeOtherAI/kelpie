@@ -58,6 +58,7 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   static Json EvaluateParams(const std::string& expression);
   static Result ParseEvaluateResult(const Result& protocol_result);
   static Json ScreenshotParams(const Json& options);
+  static Result ParseScreenshotResult(const Result& protocol_result);
   static Json TrustedKeyParams(const Json& input, bool key_up);
 
   void OnDevToolsMethodResult(CefRefPtr<CefBrowser> browser,

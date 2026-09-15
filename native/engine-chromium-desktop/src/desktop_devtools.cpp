@@ -154,6 +154,15 @@ DesktopDevToolsSession::Json DesktopDevToolsSession::ScreenshotParams(const Json
   return params;
 }
 
+DesktopDevToolsSession::Result DesktopDevToolsSession::ParseScreenshotResult(const Result& protocol_result) {
+  if (!protocol_result.ok) return protocol_result;
+  const auto data = protocol_result.value.find("data");
+  if (data == protocol_result.value.end() || !data->is_string() || data->get<std::string>().empty()) {
+    return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return encoded PNG data");
+  }
+  return {true, {}, {}, {{"mimeType", "image/png"}, {"data", *data}}, false};
+}
+
 DesktopDevToolsSession::Json DesktopDevToolsSession::TrustedKeyParams(const Json& input, bool key_up) {
   const std::string key = input.value("key", "");
   Json params = {{"type", key_up ? "keyUp" : "keyDown"}, {"key", key},
