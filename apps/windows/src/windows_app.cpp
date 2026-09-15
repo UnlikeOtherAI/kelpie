@@ -1,4 +1,5 @@
 #include "windows_app.h"
+#include "cef_pump_deadline.h"
 
 #include "kelpie/desktop_http_server.h"
 #include "windows_utf.h"
@@ -27,19 +28,22 @@ namespace {
 constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
 constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B50;
 HWND g_cef_pump_window = nullptr;
+CeftPumpDeadline g_cef_deadline;
+std::int64_t PumpNow() { return static_cast<std::int64_t>(GetTickCount64()); }
 
 void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
 #if defined(HAS_CEF)
   KillTimer(hwnd, timer_id);
-  CefDoMessageLoopWork();
+  if (g_cef_deadline.ConsumeIfDue(PumpNow())) CefDoMessageLoopWork();
 #endif
 }
 
 LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == kScheduleCefPumpMessage) {
-    const UINT delay = static_cast<UINT>(std::clamp<std::int64_t>(static_cast<std::int64_t>(wparam), 1, 60'000));
-    KillTimer(hwnd, kCefPumpTimerId);
-    SetTimer(hwnd, kCefPumpTimerId, delay, &PumpCefTimer);
+    g_cef_deadline.Schedule(PumpNow(), static_cast<std::int64_t>(wparam));
+    const auto due = g_cef_deadline.due_ms();
+    if (due) { KillTimer(hwnd, kCefPumpTimerId); SetTimer(hwnd, kCefPumpTimerId,
+        static_cast<UINT>(std::clamp<std::int64_t>(*due - PumpNow(), 1, 60'000)), &PumpCefTimer); }
     return 0;
   }
   return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -154,7 +158,6 @@ int WindowsApp::Run(int show_command) {
       TranslateMessage(&message);
       DispatchMessageW(&message);
     }
-    desktop_app_->Tick();
     UpdateBrowserStateFromRuntime();
   }
 

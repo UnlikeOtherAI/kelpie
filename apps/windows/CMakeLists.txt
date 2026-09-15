@@ -59,6 +59,7 @@ FetchContent_MakeAvailable(cpp_httplib)
 
 set(WINDOWS_APP_SOURCES
   src/main.cpp
+  src/cef_pump_deadline.cpp
   src/windows_app.cpp
   src/win32_shell.cpp
   src/win32_browser_view.cpp
@@ -76,6 +77,7 @@ set(WINDOWS_APP_SOURCES
 
 set(WINDOWS_APP_HEADERS
   src/windows_app.h
+  src/cef_pump_deadline.h
   src/win32_shell.h
   src/win32_browser_view.h
   src/url_bar.h
@@ -210,6 +212,10 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_session_snapshot_test COMMAND kelpie_windows_session_snapshot_test)
+  add_executable(kelpie_windows_cef_pump_deadline_test tests/cef_pump_deadline_test.cpp src/cef_pump_deadline.cpp)
+  target_include_directories(kelpie_windows_cef_pump_deadline_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_compile_options(kelpie_windows_cef_pump_deadline_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_cef_pump_deadline_test COMMAND kelpie_windows_cef_pump_deadline_test)
 endif()
 
 if(MINGW)
