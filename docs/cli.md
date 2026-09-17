@@ -140,6 +140,17 @@ its own `address` and `port`: each one picks its own, so neither may be assumed.
 Kelpie upgrade that changed the tool surface without fetching every schema. The
 schemas themselves ship only under `--include-tools`.
 
+`digestAlgorithm` names the recipe, and `sha256-canonical-json-v1` is this one:
+take each tool as `{ name, description, inputSchema }`, sort those entries by
+`name` (UTF-16 code-unit order), serialize the resulting array as canonical
+JSON — object keys sorted recursively, object entries whose value is
+`undefined` dropped, no insignificant whitespace, `JSON.stringify` string and
+number semantics, no Unicode normalization — and take SHA-256 over its UTF-8
+bytes, rendered as `sha256:` followed by lowercase hex. Compare digests rather
+than recomputing them if you can: an integrator only needs to know the value
+changed. The algorithm name is part of the contract, so a future recipe
+arrives as a new name and not as a silently different digest.
+
 ### `kelpie ping [device]`
 Check if a device is reachable. Without `--device`, pings all known devices.
 

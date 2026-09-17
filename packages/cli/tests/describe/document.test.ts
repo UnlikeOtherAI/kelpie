@@ -132,10 +132,15 @@ describe("describe document", () => {
   });
 
   it("never carries a token, only the boolean pairing fact", async () => {
+    // The secret has to be reachable from the building path or this asserts
+    // nothing: it rides on the discovered device, which is where a paired
+    // instance’s credential would sit if discovery ever carried one. Copying
+    // the device through instead of naming its fields turns this red.
     const secret = "kelpie_tok_SUPERSECRETVALUE";
+    const carrying = { ...device(), token: secret, secret } as DiscoveredDevice;
     const doc = await buildDescribeDocument({}, deps({
       isPaired: async () => true,
-      scan: async () => [device()],
+      scan: async () => [carrying],
     }));
 
     const serialized = JSON.stringify(doc);

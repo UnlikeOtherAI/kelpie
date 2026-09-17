@@ -19,7 +19,7 @@ import type { DiscoveredDevice } from "../types.js";
  *
  *   kelpie describe --json                    stable machine-readable contract
  *   kelpie describe --json --scan-timeout 8000
- *   kelpie describe --json --tools            include the full wire catalog
+ *   kelpie describe --json --include-tools    include the full wire catalog
  *
  * Exit 0 means "here is the answer" — including zero devices, mDNS down, or
  * a failed MCP handshake (all carried in the document). Non-zero means the
@@ -79,14 +79,14 @@ export function registerDescribe(program: Command): void {
     .command("describe")
     .description("Machine-readable report: CLI version, MCP catalog digest, discovered instances")
     .option("--json", "Emit the stable JSON document (the integrator contract)")
-    .option("--tools", "Include the full MCP tool catalog in the document")
+    .option("--include-tools", "Include the full MCP tool catalog in the document")
     .option("--scan-timeout <ms>", "Discovery budget in milliseconds", String(DEFAULT_SCAN_TIMEOUT_MS))
-    .action(async (opts: { json?: boolean; tools?: boolean; scanTimeout: string }) => {
+    .action(async (opts: { json?: boolean; includeTools?: boolean; scanTimeout: string }) => {
       try {
         const document = await buildDescribeDocument(
           {
             scanTimeoutMs: Number(opts.scanTimeout) || DEFAULT_SCAN_TIMEOUT_MS,
-            includeTools: opts.tools === true,
+            includeTools: opts.includeTools === true,
           },
           defaultDescribeDeps(String(program.version())),
         );

@@ -25,7 +25,7 @@ New command `describe` in `packages/cli/src/commands/describe.ts`.
 - `--scan-timeout <ms>` — discovery budget, default `3000` (matches
   `kelpie discover`). A daemon polling on a schedule needs a bound; a person
   debugging wants longer.
-- `--tools` — include the full wire tool catalog (name, description,
+- `--include-tools` — include the full wire tool catalog (name, description,
   inputSchema) under `tools.catalog`. Off by default: 145 schemas do not
   belong in a detection document; count + digest answer drift.
 
@@ -163,7 +163,7 @@ handshake whose `tools/list` digest equals the describe digest. Build is
 unsigned (no Developer ID on this machine) — expected; Gatekeeper per-app
 allowance steps are documented for a person, not worked around.
 
-## Tests (vitest, `packages/cli/tests/commands/describe.test.ts`)
+## Tests (vitest, `packages/cli/tests/describe/document.test.ts`)
 
 `buildDescribeDocument` takes injected deps (scan, probe, pairing lookup,
 catalog listing) so each case is hermetic:
@@ -207,7 +207,7 @@ Reviewed by Claude (claude-sonnet-4-5, adversarial prompt) on 2026-09-17.
 - #19 ordering: mDNS entries first (scan order), then local-probe entries by
   port; documented.
 - #21/#23/#29/#33/#35/#36 documented: versions may differ; prefer stdio;
-  `--tools` is for an integrator's initial catalog cache; duplicate ids are
+  `--include-tools` is for an integrator's initial catalog cache; duplicate ids are
   preserved; HTTP port conflicts → use stdio; poll no faster than ~5s.
 
 **Rejected (push back):**
