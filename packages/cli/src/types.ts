@@ -7,6 +7,8 @@ export interface DiscoveredDevice {
   port: number;
   platform: Platform;
   runtimeMode?: RuntimeMode;
+  /** Renderer the instance reports (mDNS TXT `engine` / get-device-info), when known. */
+  engine?: string;
   model: string;
   width: number;
   height: number;
