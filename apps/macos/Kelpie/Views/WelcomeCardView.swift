@@ -75,7 +75,7 @@ struct WelcomeCardView: View {
         if let icon = NSImage(named: "WelcomeIcon") {
             Image(nsImage: icon)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
         } else {
             Image(systemName: "flame.fill")
                 .font(.system(size: 40))
