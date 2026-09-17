@@ -40,7 +40,13 @@ export const DESCRIBE_DIGEST_ALGORITHM = "sha256-canonical-json-v1";
 export function canonicalJson(value: unknown): string {
   if (value === undefined) return "";
   if (value === null || typeof value !== "object") {
-    return JSON.stringify(value) ?? "null";
+    // `JSON.stringify` answers `undefined` for a function or a symbol, which
+    // its own typing does not admit, so they are named here rather than
+    // caught by a `??` the type checker believes is dead. A tool schema
+    // carrying either is not JSON; "null" keeps the digest total where an
+    // empty string would collide with a real value.
+    if (typeof value === "function" || typeof value === "symbol") return "null";
+    return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
     return `[${value.map((item) => canonicalJson(item)).join(",")}]`;

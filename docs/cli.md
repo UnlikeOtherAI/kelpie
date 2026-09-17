@@ -67,6 +67,79 @@ mDNS announcements are racy. If the scan finds no devices, the CLI falls back to
 
 **Alias:** `kelpie devices` is equivalent to `kelpie discover`.
 
+### `kelpie describe`
+Describe this Kelpie install in one machine-readable document: which version is
+answering, how to start its MCP server, how large its tool catalog is, and every
+instance it can currently see.
+
+```bash
+kelpie describe                        # human-readable summary
+kelpie describe --json                 # the integration contract
+kelpie describe --json --scan-timeout 8000
+kelpie describe --json --include-tools # embed all 145 tool schemas
+```
+
+This is the surface external integrators should depend on — Nessie's paired
+executor polls it to decide whether Kelpie is available on a machine and what is
+on that network — so it is a **stability contract**: readers must tolerate
+unknown fields and unknown enum values, and nothing is removed or repurposed
+without raising `schemaVersion`.
+
+Three properties an integrator can rely on:
+
+- **It exits 0 with a valid document when nothing is found.** "No devices" is an
+  answer, not an error. A non-zero exit means the CLI could not answer at all.
+- **`discovery.mdns` distinguishes "looked and found nothing" (`ok`, empty
+  `devices`) from "could not look" (`unavailable`).** They are different facts,
+  and reporting the second as an empty network tells a person there are no
+  browsers on their network — the one thing this command cannot know.
+- **No credential ever leaves.** Each instance carries `paired` as a boolean and
+  nothing else; no token, no store contents. Error text is redacted of the
+  user's home path.
+
+Instances come from the mDNS browse *and* the loopback probe, so a Kelpie on the
+same host still appears when the announcement is missed. Every instance states
+its own `address` and `port`: each one picks its own, so neither may be assumed.
+
+**Output (`--json`):**
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-17T09:39:06.383Z",
+  "cli": { "version": "0.1.11", "path": "/opt/homebrew/bin/kelpie" },
+  "mcp": {
+    "available": true,
+    "serverVersion": "0.1.0",
+    "stdio": { "command": "kelpie", "args": ["mcp"] },
+    "http": { "command": "kelpie", "args": ["mcp", "--http", "--port", "8421", "--bind", "127.0.0.1"], "defaultPort": 8421, "defaultBind": "127.0.0.1" }
+  },
+  "tools": { "count": 145, "digest": "sha256:b2e5a5…", "digestAlgorithm": "sha256-canonical-json-v1" },
+  "discovery": {
+    "scanTimeoutMs": 3000,
+    "mdns": "ok",
+    "deviceCount": 1,
+    "devices": [
+      {
+        "id": "local:127.0.0.1:8420",
+        "name": "Ondrej's Mac mini",
+        "model": "Kelpie macos",
+        "platform": "macos",
+        "version": "0.1.13",
+        "address": "127.0.0.1",
+        "port": 8420,
+        "display": { "width": 0, "height": 0 },
+        "paired": false,
+        "lastSeenAt": "2026-09-17T09:40:51.182Z"
+      }
+    ]
+  }
+}
+```
+
+`tools.digest` covers the catalog's names and schemas, so a poller can detect a
+Kelpie upgrade that changed the tool surface without fetching every schema. The
+schemas themselves ship only under `--include-tools`.
+
 ### `kelpie ping [device]`
 Check if a device is reachable. Without `--device`, pings all known devices.
 
