@@ -168,7 +168,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       }
       break;
     case kDpiChangedMessage: {
-      window_chrome_.SetDpi(HIWORD(wparam));
+      window_chrome_.SetDpi(LOWORD(wparam));
       const auto* suggested = reinterpret_cast<RECT*>(lparam);
       SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top,
                    suggested->right - suggested->left,
@@ -289,11 +289,9 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       }
       return 0;
     }
-    case WM_SETTEXT: {
-      const LRESULT result = DefWindowProcW(hwnd_, message, wparam, lparam);
+    case WM_SETTEXT:
       InvalidateRect(hwnd_, nullptr, FALSE);
-      return result;
-    }
+      break;
     case WM_CLOSE:
       delegate_->OnWindowCloseRequested();
       DestroyWindow(hwnd_);
