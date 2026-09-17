@@ -107,6 +107,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
           {FVIRTKEY | FCONTROL, 'T', IDM_NEW_TAB},
           {FVIRTKEY | FCONTROL, 'W', IDM_CLOSE_TAB},
           {FVIRTKEY | FCONTROL, 'L', IDM_FOCUS_URL},
+          {FVIRTKEY | FCONTROL, 'M', IDM_APP_MENU},
           {FVIRTKEY | FCONTROL, VK_TAB, IDM_NEXT_TAB},
           {FVIRTKEY | FCONTROL | FSHIFT, VK_TAB, IDM_PREVIOUS_TAB},
       };
@@ -167,11 +168,16 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       }
       break;
     case kDpiChangedMessage: {
+      window_chrome_.SetDpi(HIWORD(wparam));
       const auto* suggested = reinterpret_cast<RECT*>(lparam);
       SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top,
                    suggested->right - suggested->left,
                    suggested->bottom - suggested->top,
                    SWP_NOACTIVATE | SWP_NOZORDER);
+      RECT rect{};
+      GetClientRect(hwnd_, &rect);
+      LayoutChildren(rect.right, rect.bottom);
+      window_chrome_.UpdateDwmFrame();
       return 0;
     }
     case WM_ACTIVATE:
@@ -238,6 +244,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
           ActivateAdjacentTab(-1);
           return 0;
         case IDC_SETTINGS_BUTTON:
+        case IDM_APP_MENU:
           ShowAppMenu();
           return 0;
         case IDM_SETTINGS:
