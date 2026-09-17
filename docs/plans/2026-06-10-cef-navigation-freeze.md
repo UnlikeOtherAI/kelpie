@@ -100,6 +100,48 @@ Sources: magpcss ceforum t=17240 (CEF blank when attaching to existing NSView; m
 ### Gemini
 - Two recommendations: (1) implement `external_message_pump=1` + `OnScheduleMessagePumpWork` with a timer; (2) **use the `OnAfterCreated` browser handle for all calls**, not the `create_browser_sync` return.
 
+## EXECUTION PLAN (2026-07-05) — CEF 149 bump + upstream comparison
+
+The recommended next steps are now actionable; CEF has shipped a new stable
+major since the investigation paused. Prep work done in this repo (branch
+`claude/chromium-mac-issue-91wio4`):
+
+1. **CEF pin bumped 148.0.10 → 149.0.6** (`scripts/download-cef.sh`,
+   Chromium 149.0.7827.201, latest macosarm64 stable as of 2026-07-05).
+   The broken pin was Chromium 148.0.7778; 149 is a full major newer and may
+   carry the renderer/IPC fix for macOS 26.x.
+2. **Stock-CEF comparison script added**: `scripts/test-cef-upstream.sh`
+   downloads the official prebuilt `cefclient.app` (no Kelpie code) for any
+   CEF version and launches it. This is next-step (1) from the conclusion —
+   the definitive upstream-vs-integration discriminator.
+
+**Steps that must run on the target Mac (cannot run in a remote sandbox):**
+
+1. `scripts/test-cef-upstream.sh` — stock cefclient @ 149.0.6.
+   Check: example.com renders; a second navigation commits; a `data:` URL
+   renders. Optionally re-run with the old pin
+   (`scripts/test-cef-upstream.sh "148.0.10+g7ee53f5+chromium-148.0.7778.218"`)
+   to confirm stock 148 reproduces the blank rendering.
+2. Decision matrix:
+   - stock 149 works + stock 148 broken → upstream bug fixed in 149; rebuild
+     Kelpie with the new pin (`scripts/download-cef.sh macos`, `tuist generate`,
+     build) and verify navigate/eval/screenshot via the CLI.
+   - stock 149 broken too → still upstream vs macOS 26.x; check the current
+     macOS build (26.2 was bleeding-edge in June; an OS update alone may fix
+     it), then try beta channel (150.0.3+chromium-150.0.7871 available) and
+     file/watch the upstream CEF issue.
+   - stock 148 works (unexpected) → our integration after all; resume the
+     hosting-view work (conclusion step 2) and the preserved OSR branch
+     `fix/cef-context-initialized` (commit 099b54b).
+3. API-version note: the bridge pins `CEF_API_VERSION_14600`
+   (`CEFBridgeSupport.h`). If 149 has dropped that API version,
+   `cef_api_hash` returns null and `cef_initialize` fails at startup — bump
+   the define to a supported version and re-check the capi call sites.
+4. If the 149 rebuild works: full release cycle per AGENTS.md (version bump,
+   publish, GitHub release, install + verify on the Mac), close the loop on
+   #74's "not fixable at embedding level" with the corrected outcome, and
+   re-evaluate un-gating multi-tab (#73) separately.
+
 ## KEY FINDING (2026-06-10, decisive)
 
 The pump tick fires steadily at 60 Hz even when navigation is frozen → **pump starvation RULED OUT**. The real split:

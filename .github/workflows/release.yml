@@ -213,7 +213,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v4.0.1
+      - uses: android-actions/setup-android@v4.0.3
 
       - name: Build Android APK and App Bundle
         env:
