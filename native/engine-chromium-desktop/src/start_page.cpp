@@ -1,6 +1,7 @@
 #include "kelpie/start_page.h"
 
 #include <algorithm>
+#include <cctype>
 
 #include <nlohmann/json.hpp>
 
@@ -34,6 +35,28 @@ std::string_view PathForUrl(std::string_view url) {
     path = path.substr(0, cut);
   }
   return path;
+}
+
+// The start page renders every entry as a link in its own origin, so only real
+// web URLs may reach it. A `javascript:` bookmark would otherwise become a
+// same-origin script injection the moment the user clicked the tile.
+bool IsWebUrl(std::string_view url) {
+  for (const std::string_view scheme : {std::string_view("http://"), std::string_view("https://")}) {
+    if (url.size() <= scheme.size()) {
+      continue;
+    }
+    bool matches = true;
+    for (std::size_t index = 0; index < scheme.size(); ++index) {
+      if (static_cast<char>(std::tolower(static_cast<unsigned char>(url[index]))) != scheme[index]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string FaviconDataUri(const std::string& png_base64) {
@@ -85,11 +108,21 @@ std::string BuildDataJson(const std::string& bookmarks_json,
   json payload{{"bookmarks", json::array()}, {"recent", json::array()}};
 
   const auto append = [&favicon_lookup](json& target, const json& source) {
-    const std::string url = source.value("url", std::string());
-    if (url.empty()) {
+    // `value()` throws on a type mismatch, and store JSON can be anything after
+    // a hand-edited or corrupted profile file, so the types are checked first.
+    const auto url_field = source.find("url");
+    if (url_field == source.end() || !url_field->is_string()) {
       return;
     }
-    json entry{{"url", url}, {"title", source.value("title", std::string())}};
+    const auto url = url_field->get<std::string>();
+    if (!IsWebUrl(url)) {
+      return;
+    }
+    const auto title_field = source.find("title");
+    const std::string title =
+        title_field != source.end() && title_field->is_string() ? title_field->get<std::string>()
+                                                                : std::string();
+    json entry{{"url", url}, {"title", title}};
     if (favicon_lookup) {
       const std::string host = FaviconRegistry::HostForUrl(url);
       const std::string favicon = host.empty() ? std::string() : favicon_lookup(host);

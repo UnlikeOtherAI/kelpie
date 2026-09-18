@@ -99,6 +99,29 @@ void TestDataPayload() {
   assert(empty["bookmarks"].empty() && empty["recent"].empty());
 }
 
+void TestRejectsNonWebUrls() {
+  // The page turns every entry into a link inside its own origin, so a
+  // `javascript:` bookmark must never reach it.
+  const std::string hostile = R"JSON([
+    {"url": "javascript:alert(1)", "title": "x"},
+    {"url": "JavaScript:alert(1)", "title": "x"},
+    {"url": "data:text/html,<script>alert(1)</script>", "title": "x"},
+    {"url": "file:///C:/Windows/win.ini", "title": "x"},
+    {"url": "kelpie://start", "title": "x"},
+    {"url": "", "title": "x"},
+    {"url": "http://", "title": "x"},
+    {"url": "https://example.com/", "title": "ok"}
+  ])JSON";
+  const json payload = json::parse(BuildDataJson(hostile, hostile));
+  assert(payload["bookmarks"].size() == 1);
+  assert(payload["bookmarks"][0]["url"] == "https://example.com/");
+  assert(payload["recent"].size() == 1);
+
+  // A non-string or missing url is dropped rather than crashing the payload.
+  const json malformed = json::parse(BuildDataJson(R"JSON([{"title":"x"},{"url":42}])JSON", "[]"));
+  assert(malformed["bookmarks"].empty());
+}
+
 void TestStoresIgnoreInternalScheme() {
   kelpie::HistoryStore history;
   history.Record(std::string(kelpie::kStartPageUrl), "Kelpie");
@@ -133,6 +156,7 @@ int main() {
   TestSchemePredicates();
   TestResourceResolution();
   TestDataPayload();
+  TestRejectsNonWebUrls();
   TestStoresIgnoreInternalScheme();
   std::cout << "start page tests passed" << std::endl;
   return 0;

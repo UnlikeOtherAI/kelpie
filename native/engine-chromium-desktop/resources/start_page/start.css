@@ -141,6 +141,40 @@ body {
   overflow: hidden;
 }
 
+/*
+ * Tile and row colours mirror `BookmarkTileView.tileColor` and
+ * `HistoryRowView.letterColor` in StartPageView.swift. They are classes rather
+ * than inline styles so the page's own Content-Security-Policy needs no
+ * `unsafe-inline` exception.
+ *
+ * This is deliberately the macOS start page's RGB palette, which differs from
+ * the tab strip's `LetterAvatarView` HSB palette. Both are mirrored as macOS
+ * has them.
+ */
+.badge-0 {
+  background-color: rgb(102, 143, 217); /* 0.40, 0.56, 0.85 */
+}
+
+.badge-1 {
+  background-color: rgb(140, 191, 140); /* 0.55, 0.75, 0.55 */
+}
+
+.badge-2 {
+  background-color: rgb(217, 140, 102); /* 0.85, 0.55, 0.40 */
+}
+
+.badge-3 {
+  background-color: rgb(179, 128, 217); /* 0.70, 0.50, 0.85 */
+}
+
+.badge-4 {
+  background-color: rgb(217, 191, 89); /* 0.85, 0.75, 0.35 */
+}
+
+.badge-5 {
+  background-color: rgb(128, 191, 204); /* 0.50, 0.75, 0.80 */
+}
+
 .tile-badge img {
   width: 28px;
   height: 28px;

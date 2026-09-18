@@ -254,7 +254,11 @@ if(BUILD_TESTING)
   endif()
   add_test(NAME kelpie_windows_utf_test COMMAND kelpie_windows_utf_test)
   add_executable(kelpie_windows_session_snapshot_test tests/session_snapshot_test.cpp src/session_snapshot.cpp)
-  target_include_directories(kelpie_windows_session_snapshot_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  # `session_snapshot.cpp` shares the internal-scheme predicate with the engine
+  # so the restorable-URL rule cannot drift from what the browser will navigate.
+  target_include_directories(kelpie_windows_session_snapshot_test PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${KELPIE_NATIVE_ROOT}/core-state/include")
   target_link_libraries(kelpie_windows_session_snapshot_test PRIVATE nlohmann_json::nlohmann_json)
   if(MSVC)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE /UNDEBUG)

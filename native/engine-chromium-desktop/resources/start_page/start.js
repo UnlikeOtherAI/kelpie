@@ -13,22 +13,16 @@
   "use strict";
 
   /*
-   * Tile and row colours mirror `BookmarkTileView.tileColor` and
+   * Badge colours mirror `BookmarkTileView.tileColor` and
    * `HistoryRowView.letterColor` in `apps/macos/Kelpie/Views/StartPageView.swift`:
-   * a six-entry RGB palette indexed by the sum of the host's Unicode scalars.
+   * six colours indexed by the sum of the host's Unicode scalars. The colours
+   * themselves live in `start.css` as `.badge-0` … `.badge-5`.
    *
    * This is deliberately the macOS start page's palette and hash, which differ
    * from the tab strip's `LetterAvatarView` (an HSB palette indexed by a
    * multiply-by-31 hash). Both are mirrored exactly as macOS has them.
    */
-  var PALETTE = [
-    "rgb(102, 143, 217)", // 0.40, 0.56, 0.85
-    "rgb(140, 191, 140)", // 0.55, 0.75, 0.55
-    "rgb(217, 140, 102)", // 0.85, 0.55, 0.40
-    "rgb(179, 128, 217)", // 0.70, 0.50, 0.85
-    "rgb(217, 191, 89)", //  0.85, 0.75, 0.35
-    "rgb(128, 191, 204)" //  0.50, 0.75, 0.80
-  ];
+  var PALETTE_SIZE = 6;
 
   function hostOf(url) {
     try {
@@ -39,14 +33,21 @@
     }
   }
 
-  function paletteColor(host) {
+  function paletteClass(host) {
     // Swift folds over `unicodeScalars`, so iterate code points rather than
     // UTF-16 units to keep non-ASCII hosts on the same colour as macOS.
     var sum = 0;
     Array.from(host).forEach(function (character) {
       sum += character.codePointAt(0);
     });
-    return PALETTE[Math.abs(sum) % PALETTE.length];
+    return "badge-" + (Math.abs(sum) % PALETTE_SIZE);
+  }
+
+  // The engine already drops anything that is not an http(s) URL. This repeats
+  // the check so a link in this origin can never be built from another scheme,
+  // whatever produced the payload.
+  function isWebUrl(url) {
+    return /^https?:\/\//i.test(String(url));
   }
 
   function domainLetter(host) {
@@ -56,8 +57,7 @@
 
   function makeBadge(className, host, faviconDataUri) {
     var badge = document.createElement("div");
-    badge.className = className;
-    badge.style.backgroundColor = paletteColor(host);
+    badge.className = className + " " + paletteClass(host);
     if (faviconDataUri) {
       var image = document.createElement("img");
       image.setAttribute("src", faviconDataUri);
@@ -74,6 +74,7 @@
     var tile = document.createElement("a");
     tile.className = "tile";
     tile.setAttribute("href", bookmark.url);
+    tile.setAttribute("rel", "noreferrer");
     tile.appendChild(makeBadge("tile-badge", host, bookmark.favicon));
 
     var label = document.createElement("span");
@@ -88,6 +89,7 @@
     var row = document.createElement("a");
     row.className = "row";
     row.setAttribute("href", entry.url);
+    row.setAttribute("rel", "noreferrer");
     row.appendChild(makeBadge("row-badge", host, entry.favicon));
 
     var text = document.createElement("span");
@@ -110,6 +112,13 @@
   function render(data) {
     var bookmarks = Array.isArray(data.bookmarks) ? data.bookmarks : [];
     var recent = Array.isArray(data.recent) ? data.recent : [];
+
+    bookmarks = bookmarks.filter(function (bookmark) {
+      return bookmark && isWebUrl(bookmark.url);
+    });
+    recent = recent.filter(function (entry) {
+      return entry && isWebUrl(entry.url);
+    });
 
     if (bookmarks.length > 0) {
       var grid = document.getElementById("favourites-grid");

@@ -1,5 +1,7 @@
 #include "session_snapshot.h"
 
+#include "kelpie/internal_scheme.h"
+
 #include <charconv>
 #include <limits>
 #include <string_view>
@@ -34,8 +36,11 @@ bool TabNumber(const std::string& id, std::uint64_t* number) {
 }
 
 bool IsRestorableUrl(const std::string& url) {
+  // `kelpie://` is Kelpie's own first-party scheme. Without it a restored
+  // session would silently drop every start page tab.
   return url.rfind("https://", 0) == 0 || url.rfind("http://", 0) == 0 ||
-      url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
+      url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0 ||
+      IsInternalSchemeUrl(url);
 }
 
 }  // namespace
