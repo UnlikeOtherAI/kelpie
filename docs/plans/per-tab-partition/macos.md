@@ -2,6 +2,30 @@
 
 Parent: [../2026-05-16-per-tab-partition-and-name.md](../2026-05-16-per-tab-partition-and-name.md)
 
+## Status (2026-09-18)
+
+Implemented on branch `feat/macos-tab-partitions`, **not compiled and not run**
+— the work was done on a Windows host with no Swift toolchain, Xcode, or
+swiftlint. Before this ships, someone on a Mac must run `make lint-swift`,
+`tuist generate` + an Xcode build, and the manual acceptance test in
+[Verification](#verification) below.
+
+Landed: `PartitionValidator`, `PartitionMap`, `PartitionRegistry`,
+`Tab`/`TabStore`/`SessionStore` fields, `WKWebViewRenderer(dataStore:)`,
+`new-tab`/`get-tabs`/`get-partitions`/`delete-partition`, the `SharedCookieJar`
+exclusion, the engine-switch block, and the tab-bar label. Unit tests cover the
+validator and the map/reconciliation policy; the engine-facing half of the
+registry needs a live WebKit environment and is untested.
+
+Two corrections to the file paths below, found during implementation: routes are
+registered in `Kelpie/Network/Router.swift` (not `Kelpie/Server/`), and the test
+target globs `apps/macos/Tests/` (not `apps/macos/KelpieTests/`). The error code
+for the CEF path is `PARTITION_UNSUPPORTED` with `reason: "chromium-engine"`,
+per the parent plan's resolved review finding #9 — the
+`PARTITION_UNSUPPORTED_ON_CHROMIUM` name below is the superseded draft.
+
+---
+
 ## Engine scope
 
 **WKWebView path only.** macOS Kelpie can run on either WKWebView or CEF (`RendererState.activeEngine`). For the CEF path, `new-tab` with `partition` returns `{"success": false, "error": "PARTITION_UNSUPPORTED_ON_CHROMIUM"}`. Engine-agnostic partition support is a follow-up requiring `native/engine-chromium-desktop` extensions and is explicitly out of scope.
