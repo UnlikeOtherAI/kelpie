@@ -13,6 +13,7 @@ All methods are available via three interfaces:
 | [llm.md](llm.md) | LLM-optimized methods — accessibility tree, annotated screenshots, visible elements, page text, form state, smart queries |
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
 | [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
+| [partitions.md](partitions.md) | Per-tab storage isolation — partition lifecycle, error matrix, cookie-jar interaction |
 | [ai.md](ai.md) | Local inference backends, model switching, inference, and audio recording endpoints |
 
 ---

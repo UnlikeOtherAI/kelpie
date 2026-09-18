@@ -270,12 +270,15 @@ Response (single window or `windowId` supplied):
   "success": true,
   "windowId": "<uuid>",
   "tabs": [
-    {"id": "550e8400-e29b-41d4-a716-446655440000", "windowId": "<uuid>", "url": "https://example.com", "title": "Example", "active": true, "isLoading": false},
+    {"id": "550e8400-e29b-41d4-a716-446655440000", "windowId": "<uuid>", "url": "https://example.com", "title": "Example", "active": true, "isLoading": false, "name": "Sam (Engineering Lead)", "partition": "sam.eng-lead", "persistent": true},
     {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>", "url": "https://example.com/about", "title": "About", "active": false, "isLoading": false}
   ],
   "count": 2,
   "activeTab": "550e8400-e29b-41d4-a716-446655440000"
 }
+
+`name`, `partition`, and `persistent` are present only on tabs created with
+those fields; they are omitted otherwise.
 
 Response (macOS only, multiple windows open, no `windowId`):
 {
@@ -306,38 +309,46 @@ Response:
 
 `tabId` is the identifier to pass into later requests. It is the same value as `tab.id`.
 
-### `switchTab`
-Switch the active tab by UUID.
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `url` | string | no | Initial URL |
+| `windowId` | string | no | Target window (macOS, multi-window only) |
+| `name` | string, max 200 chars | no | Free-form display label, shown in the tab bar and echoed by `get-tabs` |
+| `partition` | string, 1-128 chars | no | Storage container id. Tabs sharing a string share storage; different strings are isolated. Omit for the default container. |
+| `persistent` | boolean, default `true` | no | `false` makes the partition's storage in-memory only. Only meaningful alongside `partition`. |
 
 ```json
-POST /v1/switch-tab
-{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>"}  // windowId optional
+POST /v1/new-tab
+{"url": "https://admin.example.com/", "name": "Sam (Engineering Lead)", "partition": "sam.eng-lead", "persistent": true}
 
 Response:
 {
   "success": true,
-  "tab": {"id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>", "url": "https://example.com/about", "title": "About", "active": true},
+  "tabId": "550e...",
+  "tab": {"id": "550e...", "windowId": "<uuid>", "url": "https://admin.example.com/", "title": "", "active": true, "name": "Sam (Engineering Lead)", "partition": "sam.eng-lead", "persistent": true},
+  "tabCount": 3,
   "windowId": "<uuid>"
 }
 ```
 
-### `closeTab`
-Close a tab by UUID.
+**Partition string rules** (identical in the CLI, the MCP schema, and every
+platform handler — `packages/shared/src/partition.ts` is the source of truth):
 
-```json
-POST /v1/close-tab
-{"tabId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "windowId": "<uuid>"}  // windowId optional
+- 1-128 ASCII characters
+- character class `[A-Za-z0-9._-]`
+- at least one alphanumeric character
+- not `.` or `..`
+- not `Default` / `default` / `DEFAULT` (case-insensitive)
+- does not start with `ephemeral-` (reserved internal prefix)
 
-Response:
-{
-  "success": true,
-  "closed": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-  "tabCount": 1,
-  "windowId": "<uuid>"
-}
-```
+---
 
-If the last tab is closed, a new blank tab replaces it — `tabCount` will be `1`, not `0`.
+## Partitions
+
+Tabs can be bound to an isolated cookie / localStorage / IndexedDB container by
+passing `partition` to `new-tab`. The `get-partitions` and `delete-partition`
+endpoints, the error matrix, and the interaction with the shared cookie jar are
+documented in [partitions.md](partitions.md).
 
 ---
 

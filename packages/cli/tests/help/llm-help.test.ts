@@ -184,3 +184,37 @@ describe("generateLlmHelp", () => {
     expect(parsed[1].explanation).toContain("github.com/UnlikeOtherAI/kelpie/issues");
   });
 });
+
+describe("partition help", () => {
+  it("documents the new-tab partition flags and their error codes", () => {
+    const parsed = JSON.parse(generateLlmHelp("tab new"));
+    expect(parsed.explanation).toContain("partition");
+    expect(parsed.explanation).toContain("ephemeral-");
+    const codes = (parsed.errors as { code: string }[]).map((e) => e.code);
+    expect(codes).toContain("INVALID_PARTITION");
+    expect(codes).toContain("PARTITION_UNSUPPORTED");
+    expect(parsed.response).toContainEqual(
+      expect.objectContaining({ name: "tab" }),
+    );
+  });
+
+  it("publishes the partition lifecycle commands in the full catalogue", () => {
+    const list = JSON.parse(generateLlmHelp()) as { command: string }[];
+    const commands = list.map((entry) => entry.command);
+    expect(commands).toContain("get-partitions");
+    expect(commands).toContain("delete-partition");
+  });
+
+  it("resolves the CLI phrase back to the endpoint help", () => {
+    const parsed = JSON.parse(generateLlmHelp("partitions"));
+    expect(parsed.command).toBe("partitions");
+    expect(parsed.platforms).toEqual(["macos"]);
+  });
+
+  it("describes delete-partition as idempotent", () => {
+    const parsed = JSON.parse(generateLlmHelp("partition delete"));
+    expect(parsed.command).toBe("partition delete");
+    expect(parsed.explanation).toContain("Idempotent");
+    expect(parsed.response).toContainEqual(expect.objectContaining({ name: "existed" }));
+  });
+});
