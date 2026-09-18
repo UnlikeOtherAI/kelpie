@@ -101,6 +101,7 @@ function parseService(service: BonjourServiceRecord): DiscoveredDevice | null {
     port: Number(txt.port) || service.port,
     platform: parsePlatform(txt.platform),
     runtimeMode: parseRuntimeMode(txt.runtime_mode),
+    engine: txt.engine,
     model: txt.model ?? "Unknown",
     width: Number(txt.width) || 0,
     height: Number(txt.height) || 0,

@@ -27,6 +27,9 @@ interface DeviceInfoPayload {
     width?: number;
     height?: number;
   };
+  browser?: {
+    engine?: string;
+  };
   network?: {
     port?: number;
   };
@@ -118,6 +121,7 @@ function localDevice(
     ip: "127.0.0.1",
     port,
     platform,
+    engine: info.browser?.engine,
     model: info.device?.model ?? `Kelpie ${platform}`,
     width: info.display?.width ?? 0,
     height: info.display?.height ?? 0,

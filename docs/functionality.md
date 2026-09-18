@@ -299,6 +299,18 @@ The CLI runs as an MCP server (stdio or HTTP/SSE transport) exposing 100+ tools 
 
 All MCP tools use the `kelpie_` prefix and include JSON schemas with descriptions.
 
+## Install Description (`kelpie describe`)
+
+One machine-readable document answering what an external integrator needs to know before it can drive anything: which CLI version is answering, where its binary lives, how to start its MCP server over stdio or HTTP, how large the tool catalog is (with a digest so a poller notices an upgrade that changed the tool surface), and every instance currently visible — from the mDNS browse *and* the loopback probe, since a Kelpie on the same host is routinely missed by the announcement.
+
+```bash
+kelpie describe                        # human-readable summary
+kelpie describe --json                 # the integration contract
+kelpie describe --json --include-tools # embed every tool schema
+```
+
+`--json` is a stability contract: readers must tolerate unknown fields and unknown enum values, and nothing is removed or repurposed without raising `schemaVersion`. It exits 0 with a valid document even when nothing is found, and distinguishes "looked and found nothing" from "could not look". Pairing travels as a boolean per instance and never as a token. See [docs/cli.md](cli.md) for the full grammar.
+
 ## LLM Help System
 
 Every CLI command supports `--llm-help` for machine-readable documentation. `kelpie --llm-help` outputs the complete reference, including guidance on reporting unexpected automation failures or missing capabilities to the GitHub issue tracker. `kelpie explain <command>` gives natural-language explanations. Designed so an LLM can teach itself the tool without human guidance.
