@@ -72,6 +72,14 @@ final class PartitionRegistry {
 
     /// Resolve a partition string to the data store a new tab should use,
     /// creating the partition the first time it is named.
+    ///
+    /// The first resolve in a session fixes the partition's persistence: a
+    /// later tab naming the same id joins the existing store and gets the
+    /// existing flag, whatever it asked for. That is deliberate — two tabs in
+    /// one partition must share storage, and there is no coherent way to share
+    /// a store that is on disk for one tab and in memory for the other. The
+    /// caller is not left guessing: `Resolution.persistent` reports what it
+    /// actually got, and `get-tabs` echoes it back.
     func resolve(id: String, persistent: Bool) throws -> Resolution {
         if let failure = PartitionValidator.validate(id) {
             throw ResolveFailure.invalid(failure)

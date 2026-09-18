@@ -71,6 +71,12 @@ Response:
 }
 ```
 
+The first `new-tab` in a session fixes a partition's persistence. A later tab
+naming the same `partition` joins the existing store and reports the existing
+`persistent` value even if it asked for the other one — two tabs in one
+partition must share storage, and a store cannot be on disk for one and in
+memory for the other. `get-tabs` always reports what the tab actually got.
+
 `tabCount` is rebuilt from the live tab list, never trusted from persisted
 state. `sizeBytes` is best-effort and omitted when the engine cannot report it
 cheaply — macOS WebKit has no cheap size API, so macOS always omits it.
