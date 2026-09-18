@@ -236,7 +236,9 @@ Tabs can carry an optional display **name** and an optional storage **partition*
 
 This delivers isolated identities, **not** parallel execution: commands still serialise on each app's main thread, so an orchestrator drives twelve partitions in turn rather than all at once.
 
-Storage partitioning is available on **macOS with the WebKit engine only**. macOS on the Chromium (CEF) engine, iOS, Android, Linux, and Windows reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. Partitioned tabs are excluded from the macOS shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF.
+Storage partitioning is available on **macOS with the WebKit engine** and on **Windows with the Chromium (CEF) engine**. macOS on the Chromium engine, iOS, Android, and Linux reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows each partition is a separate `CefRequestContext` — persistent ones stored under `<profile>/partitions/<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart.
+
+The Windows shell exposes the same feature without the API: the `+` control is a split button offering "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
 
 On iOS, Android, macOS, and Linux, the current tab set is also persisted automatically while the browser is running and restored automatically on the next app launch. Restarting the browser reopens the same tabs and URLs that were active before exit instead of dropping back to a blank start state.
 

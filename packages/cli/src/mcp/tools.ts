@@ -10,6 +10,8 @@ const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
 const fullscreenPlatforms = ["macos", "linux", "windows"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
+// Per-tab storage isolation: macOS on WebKit, Windows on Chromium (CEF).
+const partitionPlatforms = ["macos", "windows"] as const;
 
 /**
  * Partition identifier, validated with the shared rules so the MCP layer, the
@@ -243,8 +245,8 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_new_tab", description: "Open a new tab. Pass a partition to give the tab its own isolated cookie/localStorage container - tabs sharing a partition string share storage, different strings are fully isolated.", method: "newTab", schema: { device, url: url.optional().describe("URL to open in new tab"), name: z.string().max(200).optional().describe("Display label for the tab, shown in the tab bar and returned by kelpie_get_tabs"), partition: partitionId.optional().describe("Storage container id. Omit for the shared default container."), persistent: z.boolean().optional().describe("Defaults to true. False keeps the partition in memory only; only meaningful with partition.") }, bodyFromArgs: passthrough },
   { name: "kelpie_switch_tab", description: "Switch to a specific tab", method: "switchTab", schema: { device, tabId: z.string().describe("Tab UUID to switch to") }, bodyFromArgs: passthrough },
   { name: "kelpie_close_tab", description: "Close a tab", method: "closeTab", schema: { device, tabId: z.string().describe("Tab UUID to close") }, bodyFromArgs: passthrough },
-  { name: "kelpie_get_partitions", description: "List storage partitions with their live tab counts", method: "getPartitions", platforms: macosOnlyPlatforms, schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: macosOnlyPlatforms, schema: { device, id: partitionId.describe("Partition id to delete") }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_partitions", description: "List storage partitions with their live tab counts", method: "getPartitions", platforms: partitionPlatforms, schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: partitionPlatforms, schema: { device, id: partitionId.describe("Partition id to delete") }, bodyFromArgs: passthrough },
 
   // Iframes
   { name: "kelpie_get_iframes", description: "Get all iframes on the page", method: "getIframes", schema: { device, tabId }, bodyFromArgs: passthrough },

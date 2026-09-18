@@ -673,10 +673,14 @@ before sending the request; the device validates independently.
 independent identities on one device, driven one command at a time — requests
 still serialise on the app's main thread.
 
-Supported on macOS with the WebKit engine. On the Chromium engine the request
-fails with `PARTITION_UNSUPPORTED` and `reason: "chromium-engine"`; switch back
-with `kelpie renderer set webkit`. iOS, Android, Linux, and Windows do not
-support partitions yet.
+Supported on macOS with the WebKit engine and on Windows with the Chromium
+(CEF) engine. On the macOS Chromium engine the request fails with
+`PARTITION_UNSUPPORTED` and `reason: "chromium-engine"`; switch back with
+`kelpie renderer set webkit`. iOS, Android, and Linux do not support partitions
+yet and answer with `reason: "platform-single-tab"`.
+
+On Windows a persistent partition is stored under `<profile>/partitions/<id>`
+and is rebound when the session is restored, so its logins survive a restart.
 
 ---
 
@@ -700,8 +704,8 @@ kelpie partitions --device "My Mac"
 ```
 
 Non-persistent partitions are listed too — they live as long as their tabs do.
-`sizeBytes` is included only where the engine can report it cheaply; macOS
-WebKit cannot, so it is omitted there.
+`sizeBytes` is included only where the engine can report it cheaply; neither
+macOS WebKit nor Windows Chromium can, so it is omitted on both.
 
 ### `kelpie partition delete <id>`
 Delete a storage partition: close every tab bound to it, then wipe its cookies
@@ -719,6 +723,11 @@ Idempotent — deleting an unknown id succeeds with `existed: false` and
 `tabsClosed: 0`. A `kelpie tab new --partition <id>` that arrives while the
 same id is being torn down fails with `PARTITION_DELETING`; retry once the
 delete returns.
+
+On Windows, a store Chromium still has open when the delete runs is renamed
+into `<profile>/partitions/.trash/` and purged on the next launch. That call
+reports `PARTITION_IN_USE` rather than claiming a deletion that did not
+happen; the id is free to reuse immediately either way.
 
 ### `kelpie tab switch <id>`
 Switch to a tab.
