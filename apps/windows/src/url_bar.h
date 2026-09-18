@@ -30,6 +30,8 @@ class UrlBar {
  public:
   bool Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarDelegate* delegate);
   void Resize(const RECT& bounds);
+  // Rebuilds fonts and themed colours after a DPI or app-theme change.
+  void RefreshTheme();
   void SetUrl(const std::wstring& url, bool force = false);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void Focus();

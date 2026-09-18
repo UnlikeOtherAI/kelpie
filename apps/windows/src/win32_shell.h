@@ -67,6 +67,7 @@ class Win32Shell {
   static LRESULT CALLBACK TabStripProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
                                        UINT_PTR subclass_id, DWORD_PTR reference_data);
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
+  void ApplyAppearance();
   void LayoutChildren(int width, int height);
   void ShowPanel(UINT command);
   bool RefreshTabs();

@@ -5,7 +5,7 @@
 #include <algorithm>
 
 #include "../resources/resource.h"
-#include "ui_theme.h"
+#include "theme/theme.h"
 #include "url_completion.h"
 #include "windows_utf.h"
 
@@ -133,10 +133,20 @@ void UrlBar::Destroy() {
 
 void UrlBar::RefreshFont() {
   if (url_edit_ == nullptr) return;
-  HFONT next = ui::MakeFont(parent_, 14, FW_NORMAL);
+  // 13 DIP matches the macOS address field, whose text is 13pt.
+  HFONT next = ui::MakeFont(parent_, 13, FW_NORMAL);
+  if (next == nullptr) return;
   SendMessageW(url_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(next), TRUE);
   if (edit_font_ != nullptr) DeleteObject(edit_font_);
   edit_font_ = next;
+}
+
+void UrlBar::RefreshTheme() {
+  RefreshFont();
+  // The EDIT draws its own selection highlight and caret from the system
+  // theme, so it needs the dark variant explicitly.
+  ui::ApplyControlAppearance(url_edit_);
+  if (parent_ != nullptr) InvalidateSurface();
 }
 
 void UrlBar::SetUrl(const std::wstring& url, bool force) {

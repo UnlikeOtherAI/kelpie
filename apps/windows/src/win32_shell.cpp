@@ -11,7 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "../resources/resource.h"
-#include "ui_theme.h"
+#include "theme/theme.h"
 #include "windows_utf.h"
 
 namespace kelpie::windows {
@@ -171,8 +171,19 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       const auto* suggested = reinterpret_cast<RECT*>(lparam);
       SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
                    suggested->bottom - suggested->top, SWP_NOACTIVATE | SWP_NOZORDER);
+      // Metrics and owned fonts are per-monitor, so a move between differently
+      // scaled displays has to rebuild them rather than rescale stale pixels.
+      ApplyAppearance();
       return 0;
     }
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
+    case WM_SYSCOLORCHANGE:
+      if (ui::IsAppearanceChange(message, lparam)) {
+        ui::InvalidateAppearanceCache();
+        ApplyAppearance();
+      }
+      break;
     case WM_ACTIVATE: window_chrome_.SetActive(LOWORD(wparam) != WA_INACTIVE); break;
     case WM_MOUSEMOVE: {
       window_chrome_.TrackMouse({GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)});
@@ -272,6 +283,19 @@ void Win32Shell::ShowPanel(UINT command) {
   if (command == IDM_VIEW_BOOKMARKS) { bookmarks_view_.EnsureCreated(instance_, hwnd_); bookmarks_view_.UpdateFromJson(delegate_->GetBookmarksJson()); bookmarks_view_.ToggleVisible(); }
   if (command == IDM_VIEW_HISTORY) { history_view_.EnsureCreated(instance_, hwnd_); history_view_.UpdateFromJson(delegate_->GetHistoryJson()); history_view_.ToggleVisible(); }
   if (command == IDM_VIEW_NETWORK) { network_view_.EnsureCreated(instance_, hwnd_); network_view_.UpdateFromJson(delegate_->GetNetworkJson()); network_view_.ToggleVisible(); }
+}
+
+void Win32Shell::ApplyAppearance() {
+  if (hwnd_ == nullptr) return;
+  window_chrome_.UpdateDwmFrame();
+  url_bar_.RefreshTheme();
+  RECT rect{};
+  GetClientRect(hwnd_, &rect);
+  LayoutChildren(rect.right, rect.bottom);
+  // Owner-drawn children cache nothing, but the native EDIT and ListView
+  // controls keep their own themed brushes and must be told to redraw.
+  RedrawWindow(hwnd_, nullptr, nullptr,
+               RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 }
 
 void Win32Shell::LayoutChildren(int width, int height) {
