@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -25,6 +26,35 @@ struct TabSnapshot {
   bool is_loading = false;
   bool can_go_back = false;
   bool can_go_forward = false;
+  // Free-form caller label, shown in place of the page title in the tab strip.
+  std::optional<std::string> name;
+  // Storage container the tab is bound to. Absent means the default shared
+  // store, which is what an ordinary Chrome tab uses.
+  std::optional<std::string> partition;
+  // Reported alongside `partition` so a caller learns what it actually got:
+  // the first tab to resolve a partition fixes its persistence for the rest.
+  std::optional<bool> persistent;
+};
+
+// Everything `new-tab` can ask for. `persistent` only means anything with a
+// `partition`; the first tab to resolve a partition fixes it for the rest.
+struct NewTabRequest {
+  std::string url;
+  std::optional<std::string> name;
+  std::optional<std::string> partition;
+  bool persistent = true;
+};
+
+struct PartitionInfo {
+  std::string id;
+  // Rebuilt from the live tab list on every read, never trusted from state.
+  std::size_t tab_count = 0;
+  bool persistent = true;
+};
+
+struct PartitionDeletion {
+  bool existed = false;
+  std::size_t tabs_closed = 0;
 };
 
 struct BrowserControlResult {
@@ -34,13 +64,22 @@ struct BrowserControlResult {
   std::optional<TabSnapshot> tab;
   // A timed-out browser command may already have caused a page side effect.
   bool operation_may_have_completed = false;
+  // Extra machine-actionable fields merged into the HTTP error body, such as
+  // the `reason` discriminator PARTITION_UNSUPPORTED carries.
+  nlohmann::json details = nlohmann::json::object();
 
   static BrowserControlResult Success(std::optional<TabSnapshot> snapshot = std::nullopt) {
-    return {true, {}, {}, std::move(snapshot), false};
+    return {true, {}, {}, std::move(snapshot), false, nlohmann::json::object()};
   }
 
   static BrowserControlResult Failure(std::string code, std::string detail) {
-    return {false, std::move(code), std::move(detail), std::nullopt, false};
+    return {false, std::move(code), std::move(detail), std::nullopt, false,
+            nlohmann::json::object()};
+  }
+
+  static BrowserControlResult Failure(std::string code, std::string detail,
+                                      nlohmann::json extra) {
+    return {false, std::move(code), std::move(detail), std::nullopt, false, std::move(extra)};
   }
 };
 
@@ -76,7 +115,24 @@ class DesktopBrowserControl {
                                           const std::optional<std::uint64_t>& generation,
                                           TabLease* lease,
                                           Timeout timeout) = 0;
-  virtual BrowserControlResult CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) = 0;
+  virtual BrowserControlResult CreateTab(const NewTabRequest& request,
+                                        TabSnapshot* tab,
+                                        Timeout timeout) = 0;
+  // Convenience for the many call sites that only want a URL in the default
+  // shared store. Deliberately non-virtual so there is one implementation.
+  BrowserControlResult CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) {
+    NewTabRequest request;
+    request.url = std::move(url);
+    return CreateTab(request, tab, timeout);
+  }
+  // Partition support is engine-specific. An engine that cannot isolate
+  // storage says so here rather than letting a caller believe it did.
+  virtual BrowserControlResult GetPartitions(std::vector<PartitionInfo>*, Timeout) {
+    return PartitionsUnsupported();
+  }
+  virtual BrowserControlResult DeletePartition(const std::string&, PartitionDeletion*, Timeout) {
+    return PartitionsUnsupported();
+  }
   virtual BrowserControlResult ActivateTab(TabLease lease, Timeout timeout) = 0;
   virtual BrowserControlResult CloseTab(TabLease lease, Timeout timeout) = 0;
   virtual BrowserControlResult Navigate(std::optional<TabLease> lease,
@@ -121,6 +177,16 @@ class DesktopBrowserControl {
                                         const Json& params,
                                         Json* result,
                                         Timeout timeout) = 0;
+
+ protected:
+  static BrowserControlResult PartitionsUnsupported() {
+    // `activeEngine` is omitted rather than nulled when there is no engine to
+    // name, matching the macOS envelope.
+    return BrowserControlResult::Failure(
+        "PARTITION_UNSUPPORTED", "This build has no browser engine that can isolate storage",
+        {{"reason", "platform-single-tab"},
+         {"hint", "use a Kelpie build with the Chromium desktop engine"}});
+  }
 };
 
 }  // namespace kelpie

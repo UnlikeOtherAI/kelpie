@@ -24,8 +24,11 @@ nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) co
   try {
     const auto url = params.find("url");
     if (url != params.end() && (!url->is_string() || url->get<std::string>().empty())) return InvalidParams("url must be a non-empty string");
+    NewTabRequest request;
+    request.url = url == params.end() ? std::string() : url->get<std::string>();
+    if (const auto invalid = ReadPartitionFields(params, &request)) return *invalid;
     TabSnapshot tab;
-    const auto result = RequireBrowserControl(runtime_).CreateTab(url == params.end() ? std::string() : url->get<std::string>(), &tab, ControlTimeout(params));
+    const auto result = RequireBrowserControl(runtime_).CreateTab(request, &tab, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
     return SuccessResponse({{"tab", TabJson(tab)}, {"tabId", tab.id}});
   } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }

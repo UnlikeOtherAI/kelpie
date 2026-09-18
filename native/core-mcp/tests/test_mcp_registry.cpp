@@ -51,13 +51,19 @@ void TestRegistryFiltering() {
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 105);
+  assert(all_tools.size() == 107);
   assert(ios_tools.size() == 103);
   assert(android_tools.size() == 102);
-  assert(macos_tools.size() == 99);
-  assert(windows_tools.size() == 98);
-  assert(webkit_tools.size() == 105);
-  assert(chromium_tools.size() == 104);
+  assert(macos_tools.size() == 101);
+  assert(windows_tools.size() == 100);
+  assert(webkit_tools.size() == 107);
+  assert(chromium_tools.size() == 106);
+
+  // Storage partitions: macOS and Windows only until the others land them.
+  assert(ContainsTool(windows_tools, "kelpie_get_partitions"));
+  assert(ContainsTool(macos_tools, "kelpie_delete_partition"));
+  assert(!ContainsTool(ios_tools, "kelpie_get_partitions"));
+  assert(!ContainsTool(android_tools, "kelpie_delete_partition"));
 
   // Windows-only in the shared catalogue, so Windows-only here too.
   assert(ContainsTool(windows_tools, "kelpie_close_browser"));

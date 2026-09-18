@@ -33,6 +33,7 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/scroll_handler.cpp
   src/handlers/console_handler.cpp
   src/handlers/network_handler.cpp
+  src/handlers/partition_handler.cpp
   src/handlers/device_handler.cpp
   src/handlers/bookmark_handler.cpp
   src/handlers/history_handler.cpp
@@ -88,6 +89,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
+    src/desktop_partition_registry.cpp
     src/desktop_devtools.cpp)
 else()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)

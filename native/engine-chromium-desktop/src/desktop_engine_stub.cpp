@@ -127,7 +127,16 @@ BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&
   return UnsupportedControl();
 }
 
-BrowserControlResult DesktopEngine::CreateTab(std::string, TabSnapshot*, Timeout) {
+BrowserControlResult DesktopEngine::CreateTab(const NewTabRequest&, TabSnapshot*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::GetPartitions(std::vector<PartitionInfo>*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::DeletePartition(const std::string&, PartitionDeletion*,
+                                                    Timeout) {
   return UnsupportedControl();
 }
 

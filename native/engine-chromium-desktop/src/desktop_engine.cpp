@@ -111,6 +111,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   config = next_config;
   last_error.clear();
   shutting_down = false;
+  partitions.SetRoot(config.partitions_path);
+  // A previous run may have failed to unlink a partition directory and parked
+  // it in .trash instead. Nothing holds those files now, so clear them before
+  // Chromium opens anything under the same root.
+  DesktopPartitionRegistry::PurgeTrash(config.partitions_path);
   viewport.width = std::max(1, config.viewport.width);
   viewport.height = std::max(1, config.viewport.height);
   viewport.offscreen = config.mode == DesktopEngine::Mode::kOffscreen;
@@ -176,19 +181,37 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   CefBrowserSettings browser_settings;
   const std::string first_url = config.restored_tabs.empty() ?
       (config.initial_url.empty() ? "about:blank" : config.initial_url) : config.restored_tabs.front().url;
+  // The first tab is created here rather than through CreateTabOnUi because it
+  // is what establishes `browser`. It still has to be rebound to its restored
+  // partition, or a restored session would silently lose its isolation.
+  CefRefPtr<CefRequestContext> first_context;
+  std::optional<std::string> first_partition;
+  std::optional<std::string> first_name;
+  if (!config.restored_tabs.empty()) {
+    const DesktopEngine::RestoredTab& first = config.restored_tabs.front();
+    first_name = first.name;
+    if (first.partition) {
+      if (auto* entry = partitions.Acquire(*first.partition, first.persistent)) {
+        first_context = entry->context;
+        first_partition = entry->id;
+      }
+    }
+  }
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),
       first_url,
       browser_settings,
       nullptr,
-      nullptr);
+      first_context);
   if (browser) {
     Tab initial;
     initial.id = config.restored_tabs.empty() ? "tab-1" : config.restored_tabs.front().id;
     initial.browser = browser;
     initial.devtools = new DesktopDevToolsSession();
     initial.url = first_url;
+    initial.name = first_name;
+    initial.partition = first_partition;
     tabs.push_back(std::move(initial));
     // tab-1 is already allocated for a fresh profile. The allocator is a
     // high-water mark, never a reconstruction from the currently open tabs.
@@ -196,8 +219,14 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
         ? 2
         : std::max<std::uint64_t>(config.restored_next_tab_id, 2);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
+      const DesktopEngine::RestoredTab& restored = config.restored_tabs[index];
+      NewTabRequest request;
+      request.url = restored.url;
+      request.name = restored.name;
+      request.partition = restored.partition;
+      request.persistent = restored.persistent;
       TabSnapshot ignored;
-      CreateTabOnUi(config.restored_tabs[index].url, &ignored, config.restored_tabs[index].id);
+      CreateTabOnUi(request, &ignored, restored.id);
     }
     for (const auto& restored : config.restored_tabs) {
       if (restored.active) {
@@ -309,7 +338,7 @@ void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
   owner_->UpdateActiveState();
 }
 
-bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
+bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
                                      CefRefPtr<CefFrame>,
 #if CEF_VERSION_MAJOR >= 130
                                      int,
@@ -326,8 +355,23 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
                                      bool*) {
   const std::string url = target_url.ToString();
   if (url.empty()) return true;
+  // The popup is cancelled and reopened as one of our own tabs, so CEF's own
+  // "popups inherit the opener's request context" rule does not apply here.
+  // Carrying the opener's partition across is what keeps window.open from
+  // being a hole straight out of an isolated tab.
+  NewTabRequest request;
+  request.url = url;
+  if (opener) {
+    if (const auto* source = owner_->FindTab(opener)) {
+      request.partition = source->partition;
+      if (source->partition) {
+        const auto* entry = owner_->partitions.Find(*source->partition);
+        request.persistent = entry == nullptr ? true : entry->persistent;
+      }
+    }
+  }
   TabSnapshot created;
-  const auto result = owner_->CreateTabOnUi(url, &created);
+  const auto result = owner_->CreateTabOnUi(request, &created);
   if (!result.ok) return true;
   if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
 #if defined(_WIN32)

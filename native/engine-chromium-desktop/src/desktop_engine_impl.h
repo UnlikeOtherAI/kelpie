@@ -13,6 +13,7 @@
 #include "include/cef_client.h"
 #include "kelpie/desktop_engine.h"
 #include "desktop_devtools.h"
+#include "desktop_partition_registry.h"
 
 namespace kelpie {
 
@@ -39,6 +40,10 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     DesktopDialogAdapter dialogs;
     std::string url = "about:blank";
     std::string title;
+    // Caller-supplied label and storage binding. Both absent for an ordinary
+    // tab in the default shared store.
+    std::optional<std::string> name;
+    std::optional<std::string> partition;
     bool loading = false;
     bool can_go_back = false;
     bool can_go_forward = false;
@@ -55,6 +60,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   CefRefPtr<CefBrowser> browser;
   std::vector<Tab> tabs;
   std::uint64_t next_tab_id = 1;
+  DesktopPartitionRegistry partitions;
 
   DesktopEngine::JsonEventSink console_sink;
   DesktopEngine::JsonEventSink network_sink;
@@ -76,7 +82,18 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   Tab* ActiveTab();
   TabSnapshot Snapshot(const Tab& tab) const;
   BrowserControlResult RunOnUi(std::function<BrowserControlResult()> operation, Timeout timeout);
-  BrowserControlResult CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id = std::nullopt);
+  BrowserControlResult CreateTabOnUi(const NewTabRequest& request, TabSnapshot* snapshot,
+                                     std::optional<std::string> restored_id = std::nullopt);
+  BrowserControlResult CreateTabOnUi(const std::string& url, TabSnapshot* snapshot,
+                                     std::optional<std::string> restored_id = std::nullopt) {
+    NewTabRequest request;
+    request.url = url;
+    return CreateTabOnUi(request, snapshot, std::move(restored_id));
+  }
+  // Rebuilds every partition's tab count from the live tab list and drops
+  // entries no tab is bound to any more. Counts are never carried forward
+  // from a previous read, so a crashed or force-closed tab cannot inflate one.
+  void RecountPartitions();
   void UpdateActiveState();
 };
 

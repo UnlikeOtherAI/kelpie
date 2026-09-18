@@ -26,6 +26,7 @@
 #include "handlers/interaction_handler.h"
 #include "handlers/navigation_handler.h"
 #include "handlers/network_handler.h"
+#include "handlers/partition_handler.h"
 #include "handlers/renderer_handler.h"
 #include "handlers/screenshot_handler.h"
 #include "handlers/shell_handler.h"
@@ -128,6 +129,7 @@ class DesktopApp::Impl {
   std::unique_ptr<BookmarkHandler> bookmark_handler;
   std::unique_ptr<HistoryHandler> history_handler;
   std::unique_ptr<BrowserManagementHandler> browser_handler;
+  std::unique_ptr<PartitionHandler> partition_handler;
   std::unique_ptr<RendererHandler> renderer_handler;
   std::unique_ptr<ViewportHandler> viewport_handler;
   std::unique_ptr<CookieHandler> cookie_handler;
@@ -225,6 +227,7 @@ class DesktopApp::Impl {
     bookmark_handler = std::make_unique<BookmarkHandler>(runtime);
     history_handler = std::make_unique<HistoryHandler>(runtime);
     browser_handler = std::make_unique<BrowserManagementHandler>(runtime);
+    partition_handler = std::make_unique<PartitionHandler>(runtime);
     renderer_handler = std::make_unique<RendererHandler>(runtime);
     viewport_handler = std::make_unique<ViewportHandler>(runtime);
     cookie_handler = std::make_unique<CookieHandler>(runtime);
@@ -244,6 +247,7 @@ class DesktopApp::Impl {
     bookmark_handler->Register(router);
     history_handler->Register(router);
     browser_handler->Register(router);
+    partition_handler->Register(router);
     renderer_handler->Register(router);
     viewport_handler->Register(router);
     cookie_handler->Register(router);
