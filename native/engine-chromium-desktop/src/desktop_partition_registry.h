@@ -30,7 +30,11 @@ class DesktopPartitionRegistry {
     std::size_t tab_count = 0;
   };
 
-  // `root` is <profile>/partitions. Empty means no on-disk location is
+  // `root` is the Chromium cache root (CefSettings.root_cache_path). CEF
+  // treats a request-context cache_path as a profile directory directly under
+  // that root, so each partition store is a direct child named
+  // `partition-<id>` -- a nested `partitions/<id>` path is ignored and the
+  // store silently falls back to memory. Empty means no on-disk location is
   // available, so every partition is forced in-memory.
   void SetRoot(std::string root);
   const std::string& root() const { return root_; }
@@ -42,6 +46,10 @@ class DesktopPartitionRegistry {
   // create the context.
   Entry* Acquire(const std::string& id, bool persistent);
   void Erase(const std::string& id);
+  // Releases every context. CEF requires that no reference to a CEF object
+  // survives CefShutdown, and a context still referenced at that point never
+  // gets the chance to flush its store to disk.
+  void Clear();
   std::vector<Entry*> Entries();
   bool empty() const { return entries_.empty(); }
 

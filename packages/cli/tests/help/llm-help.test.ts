@@ -208,7 +208,7 @@ describe("partition help", () => {
   it("resolves the CLI phrase back to the endpoint help", () => {
     const parsed = JSON.parse(generateLlmHelp("partitions"));
     expect(parsed.command).toBe("partitions");
-    expect(parsed.platforms).toEqual(["macos"]);
+    expect(parsed.platforms).toEqual(["macos", "windows"]);
   });
 
   it("describes delete-partition as idempotent", () => {

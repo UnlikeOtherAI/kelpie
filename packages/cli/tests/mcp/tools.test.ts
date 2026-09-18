@@ -118,11 +118,11 @@ describe("MCP tool definitions", () => {
 describe("partition tools", () => {
   const byName = (name: string) => browserTools.find((t) => t.name === name);
 
-  it("exposes get-partitions and delete-partition as macOS-only tools", () => {
+  it("exposes get-partitions and delete-partition on the platforms that isolate storage", () => {
     expect(byName("kelpie_get_partitions")?.method).toBe("getPartitions");
     expect(byName("kelpie_delete_partition")?.method).toBe("deletePartition");
-    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos"]);
-    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos"]);
+    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos", "windows"]);
+    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos", "windows"]);
   });
 
   it("validates the delete-partition id with the shared partition rules", () => {

@@ -142,6 +142,9 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 #endif
   settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
   settings.external_message_pump = config.external_message_pump ? 1 : 0;
+  if (!config.root_cache_path.empty()) {
+    CefString(&settings.root_cache_path) = config.root_cache_path;
+  }
   if (!config.cache_path.empty()) {
     CefString(&settings.cache_path) = config.cache_path;
   }
@@ -307,6 +310,10 @@ bool DesktopEngine::Impl::Shutdown() {
   browser = nullptr;
   client = nullptr;
   app = nullptr;
+  // Every CEF reference has to be gone before CefShutdown. A request context
+  // still held here is never asked to flush, and a persistent partition loses
+  // everything written to it during the session.
+  partitions.Clear();
   CefShutdown();
   initialized = false;
   return true;

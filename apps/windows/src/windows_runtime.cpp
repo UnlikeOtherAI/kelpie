@@ -244,8 +244,13 @@ bool WindowsApp::InitializeDesktopRuntime() {
     }
   }
   runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
-  runtime.engine.partitions_path =
-      utf::WideToUtf8((config_.profile_dir / "partitions").wstring()).value_or(std::string());
+  // Partition stores live inside the Chromium cache root, not beside it. CEF
+  // ignores a request-context cache_path that does not sit directly under
+  // root_cache_path, and pointing root_cache_path at the profile directory
+  // instead would move the existing default store out from under every
+  // profile that already exists.
+  runtime.engine.root_cache_path = runtime.engine.cache_path;
+  runtime.engine.partitions_path = runtime.engine.cache_path;
   runtime.engine.configure_window_info = [this](void* raw_info) {
 #if defined(HAS_CEF)
     ConfigureAlloyChildWindow(static_cast<CefWindowInfo*>(raw_info), browser_view_->hwnd());

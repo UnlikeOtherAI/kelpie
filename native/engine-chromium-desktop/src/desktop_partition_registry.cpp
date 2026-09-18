@@ -1,5 +1,9 @@
 #include "desktop_partition_registry.h"
 
+// CreateContext takes a CefRequestContextHandler; the forward declaration in
+// cef_request_context.h is not enough to destroy the scoped_refptr argument.
+#include "include/cef_request_context_handler.h"
+
 #include <chrono>
 #include <filesystem>
 #include <system_error>
@@ -7,8 +11,13 @@
 namespace kelpie {
 namespace {
 
+// Prefix, not a subdirectory: CEF only accepts a profile directory sitting
+// directly under root_cache_path, and the prefix keeps partition stores from
+// colliding with Chromium's own directories there.
+constexpr const char* kPartitionDirectoryPrefix = "partition-";
+
 std::filesystem::path TrashRoot(const std::string& root) {
-  return std::filesystem::path(root) / ".trash";
+  return std::filesystem::path(root) / ".kelpie-partition-trash";
 }
 
 std::string EpochSuffix() {
@@ -26,7 +35,7 @@ std::string DesktopPartitionRegistry::DirectoryFor(const std::string& id) const 
   if (root_.empty()) return std::string();
   // The validator has already rejected separators, `.` and `..`, so appending
   // the id cannot escape the root.
-  return (std::filesystem::path(root_) / id).string();
+  return (std::filesystem::path(root_) / (kPartitionDirectoryPrefix + id)).string();
 }
 
 DesktopPartitionRegistry::Entry* DesktopPartitionRegistry::Find(const std::string& id) {
@@ -68,6 +77,10 @@ void DesktopPartitionRegistry::Erase(const std::string& id) {
   entries_.erase(id);
 }
 
+void DesktopPartitionRegistry::Clear() {
+  entries_.clear();
+}
+
 std::vector<DesktopPartitionRegistry::Entry*> DesktopPartitionRegistry::Entries() {
   std::vector<Entry*> all;
   all.reserve(entries_.size());
@@ -86,7 +99,8 @@ bool DesktopPartitionRegistry::RemoveStorage(const std::string& id) const {
   std::error_code trash_error;
   std::filesystem::create_directories(TrashRoot(root_), trash_error);
   if (trash_error) return false;
-  const std::filesystem::path grave = TrashRoot(root_) / (id + "-" + EpochSuffix());
+  const std::filesystem::path grave =
+      TrashRoot(root_) / (kPartitionDirectoryPrefix + id + "-" + EpochSuffix());
   std::filesystem::rename(directory, grave, trash_error);
   return !trash_error;
 }

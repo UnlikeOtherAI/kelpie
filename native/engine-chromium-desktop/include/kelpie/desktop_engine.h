@@ -49,9 +49,15 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::vector<RestoredTab> restored_tabs;
     std::uint64_t restored_next_tab_id = 1;
     std::string cache_path;
-    // <profile>/partitions. Each persistent partition gets a subdirectory.
-    // Empty forces every partition in-memory, which is what a profile-less
-    // test shell wants.
+    // The parent directory CEF requires every cache path to share: CefSettings
+    // and every CefRequestContextSettings cache_path must sit under it. When
+    // it is empty CEF defaults it to cache_path, and any partition store
+    // outside that tree is silently ignored and falls back to memory.
+    std::string root_cache_path;
+    // Parent directory for the per-partition stores; each persistent partition
+    // gets a subdirectory named after its id. It must live under
+    // root_cache_path. Empty forces every partition in-memory, which is what a
+    // profile-less test shell wants.
     std::string partitions_path;
     std::string user_agent;
     std::string browser_subprocess_path;
