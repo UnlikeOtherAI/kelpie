@@ -3,6 +3,7 @@
 #include <dwmapi.h>
 #include <uxtheme.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 
@@ -38,6 +39,15 @@ bool ReadAppsUseLightTheme(bool* light) {
 }
 
 }  // namespace
+
+COLORREF Blend(COLORREF color, COLORREF onto, double ratio) {
+  const double weight = std::clamp(ratio, 0.0, 1.0);
+  const auto mix = [weight](int channel, int base) {
+    return static_cast<int>(base + (channel - base) * weight + 0.5);
+  };
+  return RGB(mix(GetRValue(color), GetRValue(onto)), mix(GetGValue(color), GetGValue(onto)),
+             mix(GetBValue(color), GetBValue(onto)));
+}
 
 bool HighContrast() {
   HIGHCONTRASTW state{sizeof(state)};

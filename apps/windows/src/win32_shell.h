@@ -23,6 +23,10 @@
 
 namespace kelpie::windows {
 
+// The macOS tab bar clamps pill widths to this range before spreading them.
+inline constexpr int kTabMinWidthDip = 80;
+inline constexpr int kTabMaxWidthDip = 200;
+
 class ShellDelegate : public UrlBarDelegate {
  public:
   ~ShellDelegate() override = default;
@@ -68,6 +72,11 @@ class Win32Shell {
                                        UINT_PTR subclass_id, DWORD_PTR reference_data);
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
   void ApplyAppearance();
+  // Re-measures the pills. The width depends on how many tabs are open, so
+  // this runs when the tab set changes as well as on resize.
+  void ApplyTabMetrics();
+  // Width of one tab pill for a strip of this width, clamped like macOS.
+  int TabWidthFor(int strip_width) const;
   void LayoutChildren(int width, int height);
   void ShowPanel(UINT command);
   bool RefreshTabs();

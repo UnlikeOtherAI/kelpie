@@ -55,6 +55,23 @@ void TestPaletteRoles() {
   }
 }
 
+void TestBlend() {
+  const COLORREF black = RGB(0, 0, 0);
+  const COLORREF white = RGB(255, 255, 255);
+  // The endpoints must be exact, or an "accent at 0%" fill would tint a
+  // surface that is supposed to be untouched.
+  assert(ui::Blend(white, black, 0.0) == black);
+  assert(ui::Blend(white, black, 1.0) == white);
+  const COLORREF half = ui::Blend(white, black, 0.5);
+  assert(GetRValue(half) == 128 && GetGValue(half) == 128 && GetBValue(half) == 128);
+  // Out-of-range ratios clamp rather than wrapping a channel.
+  assert(ui::Blend(white, black, -1.0) == black);
+  assert(ui::Blend(white, black, 2.0) == white);
+  // Channels stay independent.
+  const COLORREF mixed = ui::Blend(RGB(255, 0, 0), RGB(0, 0, 255), 0.5);
+  assert(GetRValue(mixed) == 128 && GetGValue(mixed) == 0 && GetBValue(mixed) == 128);
+}
+
 void TestAppearanceChangeDetection() {
   wchar_t immersive[] = L"ImmersiveColorSet";
   wchar_t unrelated[] = L"Environment";
@@ -181,6 +198,7 @@ int main() {
 
   TestDpiScaling(window);
   TestPaletteRoles();
+  TestBlend();
   TestAppearanceChangeDetection();
   TestFontCache(window);
   TestIconGlyphsAreDistinct();

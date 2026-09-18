@@ -45,6 +45,9 @@ class UrlBar {
 
  private:
   static LRESULT CALLBACK EditProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  static LRESULT CALLBACK ButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                     UINT_PTR subclass_id, DWORD_PTR reference_data);
+  void SetHoveredButton(HWND button);
   void CompleteAfterInsertion();
   void RejectCompletion();
   void SubmitCurrentUrl(std::optional<std::wstring_view> completion_url = std::nullopt);
@@ -65,6 +68,8 @@ class UrlBar {
   mutable HBRUSH edit_brush_ = nullptr;
   HFONT edit_font_ = nullptr;
   HWND tooltip_ = nullptr;
+  HWND hovered_button_ = nullptr;
+  bool secure_ = false;
   bool setting_url_ = false;
   bool insertion_at_end_ = false;
   bool ime_composing_ = false;

@@ -29,14 +29,21 @@ bool IsIconButton(UINT id) {
 
 wchar_t IconFor(UINT id, bool loading) {
   switch (id) {
-    case IDC_BACK_BUTTON: return L'‹';
-    case IDC_FORWARD_BUTTON: return L'›';
-    case IDC_RELOAD_BUTTON: return loading ? L'×' : L'↻';
-    case IDC_BOOKMARKS_BUTTON: return L'★';
-    case IDC_HISTORY_BUTTON: return L'◷';
-    case IDC_NETWORK_BUTTON: return L'⌁';
-    default: return L'⚙';
+    case IDC_BACK_BUTTON: return ui::icon::kBack;
+    case IDC_FORWARD_BUTTON: return ui::icon::kForward;
+    case IDC_RELOAD_BUTTON: return loading ? ui::icon::kStop : ui::icon::kReload;
+    case IDC_BOOKMARKS_BUTTON: return ui::icon::kBookmarks;
+    case IDC_HISTORY_BUTTON: return ui::icon::kHistory;
+    case IDC_NETWORK_BUTTON: return ui::icon::kNetwork;
+    default: return ui::icon::kSettings;
   }
+}
+
+// A lock is only honest for a transport that is actually secure. The macOS
+// address field shows one unconditionally; that is the one detail of it this
+// deliberately does not copy.
+bool IsSecureUrl(const std::wstring& url) {
+  return url.rfind(L"https://", 0) == 0;
 }
 
 }  // namespace
@@ -47,6 +54,10 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   const auto make_button = [&](int id, const wchar_t* name, HWND* result) {
     *result = CreateWindowExW(0, L"BUTTON", name, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                               0, 0, 0, 0, parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance, nullptr);
+    if (*result != nullptr) {
+      SetWindowSubclass(*result, &UrlBar::ButtonProc, static_cast<UINT_PTR>(id),
+                        reinterpret_cast<DWORD_PTR>(this));
+    }
     return *result != nullptr;
   };
   if (!make_button(IDC_BACK_BUTTON, L"Back", &back_button_) ||
@@ -82,7 +93,13 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   SetWindowLongPtrW(url_edit_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   original_edit_proc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
       url_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&UrlBar::EditProc)));
-  SendMessageW(url_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(ui::Dip(parent, 10), ui::Dip(parent, 8)));
+  // The lock sits inside the rounded surface, so its width is reserved in the
+  // left margin whether or not it is drawn. Reserving it only for https would
+  // shift the text sideways on every navigation between schemes.
+  SendMessageW(url_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
+               MAKELPARAM(ui::Dip(parent, 20), ui::Dip(parent, 8)));
+  SendMessageW(url_edit_, EM_SETCUEBANNER, TRUE,
+               reinterpret_cast<LPARAM>(L"Search or enter website name"));
   RefreshFont();
   Resize(bounds);
   return true;
@@ -150,7 +167,12 @@ void UrlBar::RefreshTheme() {
 }
 
 void UrlBar::SetUrl(const std::wstring& url, bool force) {
-  if (url_edit_ == nullptr || (!force && GetFocus() == url_edit_)) return;
+  if (url_edit_ == nullptr) return;
+  if (secure_ != IsSecureUrl(url)) {
+    secure_ = IsSecureUrl(url);
+    InvalidateSurface();
+  }
+  if (!force && GetFocus() == url_edit_) return;
   setting_url_ = true;
   completion_active_ = false;
   insertion_at_end_ = false;
@@ -186,7 +208,8 @@ bool UrlBar::DrawControl(const DRAWITEMSTRUCT& item) const {
   const bool disabled = (item.itemState & ODS_DISABLED) != 0;
   const bool pressed = (item.itemState & ODS_SELECTED) != 0;
   const bool focused = (item.itemState & ODS_FOCUS) != 0;
-  const COLORREF fill = pressed ? colors.surface_hover : colors.surface;
+  const bool hovered = item.hwndItem == hovered_button_;
+  const COLORREF fill = (pressed || hovered) ? colors.surface_hover : colors.surface;
   ui::PaintRounded(item.hDC, item.rcItem, fill, focused ? colors.focus : colors.border,
                    ui::Dip(parent_, 8), focused ? ui::Dip(parent_, 2) : 1);
   const bool loading = item.CtlID == IDC_RELOAD_BUTTON && GetWindowLongPtrW(item.hwndItem, GWLP_USERDATA) != 0;
@@ -194,6 +217,30 @@ bool UrlBar::DrawControl(const DRAWITEMSTRUCT& item) const {
       (ui::HighContrast() && pressed ? GetSysColor(COLOR_HIGHLIGHTTEXT) : colors.text);
   ui::DrawGlyph(item.hDC, parent_, item.rcItem, IconFor(item.CtlID, loading), glyph_color);
   return true;
+}
+
+LRESULT CALLBACK UrlBar::ButtonProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                    UINT_PTR subclass_id, DWORD_PTR reference_data) {
+  auto* self = reinterpret_cast<UrlBar*>(reference_data);
+  if (self != nullptr && message == WM_MOUSEMOVE && self->hovered_button_ != hwnd) {
+    self->SetHoveredButton(hwnd);
+    TRACKMOUSEEVENT tracking{sizeof(tracking), TME_LEAVE, hwnd, 0};
+    TrackMouseEvent(&tracking);
+  } else if (self != nullptr && message == WM_MOUSELEAVE) {
+    self->SetHoveredButton(nullptr);
+  } else if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(hwnd, &UrlBar::ButtonProc, subclass_id);
+  }
+  return DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
+void UrlBar::SetHoveredButton(HWND button) {
+  if (hovered_button_ == button) return;
+  HWND previous = hovered_button_;
+  hovered_button_ = button;
+  // Redraw only the two controls whose appearance actually changed.
+  if (previous != nullptr) InvalidateRect(previous, nullptr, FALSE);
+  if (button != nullptr) InvalidateRect(button, nullptr, FALSE);
 }
 
 bool UrlBar::ControlColor(HDC device_context, HWND control, HBRUSH* brush) const {
@@ -220,6 +267,11 @@ void UrlBar::Paint(HDC device_context) const {
   const bool focused = GetFocus() == url_edit_;
   ui::PaintRounded(device_context, edit, colors.surface, focused ? colors.focus : colors.border,
                    ui::Dip(parent_, 15), focused ? ui::Dip(parent_, 2) : 1);
+  if (secure_) {
+    const RECT lock{edit.left + ui::Dip(parent_, 6), edit.top,
+                    edit.left + ui::Dip(parent_, 22), edit.bottom};
+    ui::DrawGlyph(device_context, parent_, lock, ui::icon::kLock, colors.muted_text, 10);
+  }
 }
 
 void UrlBar::InvalidateSurface() const {

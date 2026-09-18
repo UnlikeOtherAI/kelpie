@@ -35,6 +35,12 @@ struct Palette {
   COLORREF focus;          // keyboard focus ring
 };
 
+// Mixes `ratio` of `color` into `onto`. The macOS controls express their
+// active and hover fills as a semantic colour at low opacity over the surface
+// behind them; GDI has no alpha in these paint paths, so the same result is
+// produced by blending up front.
+COLORREF Blend(COLORREF color, COLORREF onto, double ratio);
+
 bool HighContrast();
 
 // True when the user's app theme is dark. Reads

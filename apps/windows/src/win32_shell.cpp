@@ -137,8 +137,12 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       accelerators_ = CreateAcceleratorTableW(const_cast<LPACCEL>(shortcuts), static_cast<int>(std::size(shortcuts)));
       RECT rect{};
       GetClientRect(hwnd_, &rect);
+      // TCS_FIXEDWIDTH is what makes TabCtrl_SetItemSize mean anything: without
+      // it the control sizes each tab to its own label, so pills come out
+      // ragged and the shared-width rule never applies.
       tab_strip_ = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
-                                   TCS_BUTTONS | TCS_FLATBUTTONS | TCS_OWNERDRAWFIXED,
+                                   TCS_BUTTONS | TCS_FLATBUTTONS | TCS_OWNERDRAWFIXED |
+                                   TCS_FIXEDWIDTH,
                                    0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_TAB_STRIP), instance_, nullptr);
       SetWindowSubclass(tab_strip_, &Win32Shell::TabStripProc, 1,
                         reinterpret_cast<DWORD_PTR>(this));
@@ -298,6 +302,28 @@ void Win32Shell::ApplyAppearance() {
                RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 }
 
+void Win32Shell::ApplyTabMetrics() {
+  if (tab_strip_ == nullptr || hwnd_ == nullptr) return;
+  RECT strip{};
+  GetWindowRect(tab_strip_, &strip);
+  const int strip_width = strip.right - strip.left;
+  if (strip_width <= 0) return;
+  TabCtrl_SetItemSize(tab_strip_, TabWidthFor(strip_width),
+                      ui::Dip(hwnd_, 34) - ui::Dip(hwnd_, 2));
+  LayoutTabCloseButtons();
+}
+
+int Win32Shell::TabWidthFor(int strip_width) const {
+  // Mirrors TabBarCoordinator.relayout in the macOS app: pills share the
+  // available width, clamped so a lone tab does not stretch across the window
+  // and a crowded strip stays readable and scrolls instead of shrinking away.
+  const int minimum = ui::Dip(hwnd_, kTabMinWidthDip);
+  const int maximum = ui::Dip(hwnd_, kTabMaxWidthDip);
+  const int count = static_cast<int>(tabs_.size());
+  if (count <= 0 || strip_width <= 0) return maximum;
+  return std::clamp(strip_width / count, minimum, maximum);
+}
+
 void Win32Shell::LayoutChildren(int width, int height) {
   window_chrome_.LayoutControls();
   const int inset = window_chrome_.Inset();
@@ -308,9 +334,13 @@ void Win32Shell::LayoutChildren(int width, int height) {
   const int tab_height = ui::Dip(hwnd_, 34);
   const int padding = ui::Dip(hwnd_, 12);
   const int new_width = ui::Dip(hwnd_, 34);
-  SetWindowPos(tab_strip_, nullptr, inset + padding, tab_top, std::max(ui::Dip(hwnd_, 120), width - (2 * padding) - new_width - inset), tab_height, SWP_NOZORDER);
-  SetWindowPos(new_tab_button_, nullptr, width - inset - padding - new_width, tab_top, new_width, tab_height, SWP_NOZORDER);
-  TabCtrl_SetItemSize(tab_strip_, ui::Dip(hwnd_, 160), tab_height - ui::Dip(hwnd_, 2));
+  const int strip_width =
+      std::max(ui::Dip(hwnd_, 120), width - (2 * padding) - new_width - inset);
+  SetWindowPos(tab_strip_, nullptr, inset + padding, tab_top, strip_width, tab_height,
+               SWP_NOZORDER);
+  SetWindowPos(new_tab_button_, nullptr, width - inset - padding - new_width, tab_top, new_width,
+               tab_height, SWP_NOZORDER);
+  ApplyTabMetrics();
   LayoutTabCloseButtons();
   RECT browser{inset, tab_top + tab_height, width - inset, height - inset};
   browser_view_->Resize(browser);
@@ -356,6 +386,7 @@ bool Win32Shell::RefreshTabs() {
     if (tabs_[index].active) selected = static_cast<int>(index);
   }
   TabCtrl_SetCurSel(tab_strip_, selected >= 0 ? selected : 0);
+  ApplyTabMetrics();
   RebuildTabCloseButtons();
   return active_changed;
 }
@@ -412,33 +443,33 @@ bool Win32Shell::DrawControl(const DRAWITEMSTRUCT& item) const {
   const auto colors = ui::Colors();
   if (item.CtlID == IDC_NEW_TAB_BUTTON) {
     ui::PaintRounded(item.hDC, item.rcItem, colors.surface, colors.border, ui::Dip(hwnd_, 8));
-    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, L'+', colors.text);
+    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, ui::icon::kNewTab, colors.text);
     return true;
   }
   if (IsTabClose(item.CtlID)) {
     const bool pressed = (item.itemState & ODS_SELECTED) != 0;
     ui::PaintRounded(item.hDC, item.rcItem, pressed ? colors.surface_hover : colors.surface, colors.border, ui::Dip(hwnd_, 4));
-    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, L'×', colors.muted_text, 12);
+    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, ui::icon::kClose, colors.muted_text, 10);
     return true;
   }
   if (item.CtlID != IDC_TAB_STRIP || item.itemID >= tabs_.size()) return false;
   const TabItem& tab = tabs_[item.itemID];
   const bool selected = tab.active || (item.itemState & ODS_SELECTED) != 0;
-  const COLORREF selected_fill = ui::HighContrast() ? GetSysColor(COLOR_HIGHLIGHT) : RGB(237, 243, 254);
+  // The macOS active pill is selectedControlColor at 8% over the bar, which is
+  // the accent blended towards the canvas rather than a separate literal.
+  const COLORREF selected_fill =
+      ui::HighContrast() ? GetSysColor(COLOR_HIGHLIGHT) : ui::Blend(colors.accent, colors.canvas, 0.12);
   ui::PaintRounded(item.hDC, item.rcItem, selected ? selected_fill : colors.canvas,
                    selected ? colors.focus : colors.border, ui::Dip(hwnd_, 8));
   RECT text = item.rcItem;
   text.left += ui::Dip(hwnd_, 10);
   text.right -= ui::Dip(hwnd_, 28);
-  HFONT font = ui::MakeFont(hwnd_, 12, FW_NORMAL);
-  HGDIOBJ old = SelectObject(item.hDC, font);
-  SetBkMode(item.hDC, TRANSPARENT);
-  SetTextColor(item.hDC, ui::HighContrast() && selected ? GetSysColor(COLOR_HIGHLIGHTTEXT) :
-               (selected ? colors.text : colors.muted_text));
+  const COLORREF title_color = ui::HighContrast() && selected
+                                   ? GetSysColor(COLOR_HIGHLIGHTTEXT)
+                                   : (selected ? colors.text : colors.muted_text);
   const std::wstring title = utf::Utf8ToWideDisplay(tab.label);
-  DrawTextW(item.hDC, title.c_str(), -1, &text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
-  SelectObject(item.hDC, old);
-  DeleteObject(font);
+  // 12 DIP regular, truncating tail — the macOS tab title.
+  ui::DrawLabel(item.hDC, hwnd_, text, title.c_str(), title_color, 12, FW_NORMAL, DT_LEFT);
   return true;
 }
 
