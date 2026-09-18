@@ -48,6 +48,10 @@ describe("error codes", () => {
       "PLATFORM_NOT_SUPPORTED",
       "PERMISSION_REQUIRED",
       "SHADOW_ROOT_CLOSED",
+      "INVALID_PARTITION",
+      "PARTITION_UNSUPPORTED",
+      "PARTITION_DELETING",
+      "PARTITION_IN_USE",
     ];
     expect(Object.keys(ErrorCode)).toEqual(expected);
   });
