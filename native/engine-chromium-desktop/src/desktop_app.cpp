@@ -11,6 +11,7 @@
 #include "kelpie/desktop_mcp_server.h"
 #include "kelpie/desktop_router.h"
 #include "kelpie/history_store.h"
+#include "kelpie/start_page.h"
 #include "kelpie/handler_context.h"
 #include "kelpie/mcp_registry.h"
 #include "kelpie/network_traffic_store.h"
@@ -318,7 +319,20 @@ bool DesktopApp::Start(const Config& config) {
     impl_->history_store.UpdateLatestTitle(url, title);
   });
 
-  if (!impl_->engine.Initialize(config.engine)) {
+  // `kelpie://start` renders the user's own bookmarks and history. The engine
+  // owns no stores, so the payload is built here from the same instances the
+  // HTTP and MCP handlers use. Called on the CEF IO thread; every store and the
+  // favicon registry is mutex-guarded.
+  DesktopEngine::Config engine_config = config.engine;
+  engine_config.start_page_data_supplier = [this]() {
+    return start_page::BuildDataJson(
+        impl_->bookmark_store.ToJson(), impl_->history_store.ToJson(), 20,
+        [this](const std::string& host) {
+          return impl_->engine.favicons().Peek(host).value_or(std::string());
+        });
+  };
+
+  if (!impl_->engine.Initialize(engine_config)) {
     impl_->last_error = impl_->engine.last_error();
     return false;
   }

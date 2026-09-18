@@ -169,6 +169,44 @@ Chronological log of every URL navigated to. Auto-recorded from real navigation 
 
 API: `history-list` (with limit), `history-clear`.
 
+## Start Page (macOS, Windows)
+
+New tabs open Kelpie's own start page instead of a blank document. It shows the
+app icon, a "Favourites" grid of bookmark tiles, a "Recent" list of the last 20
+history entries, and the "Open a website to get started" empty state when both
+are empty. It follows the system light and dark appearance. Clicking a tile or a
+row navigates that tab.
+
+On macOS the page is the SwiftUI `StartPageView`. On Windows it is the same
+layout served to the tab as first-party content from Kelpie's own `kelpie://`
+scheme, which the browser registers as standard, secure, CORS- and
+fetch-enabled. The page reads its bookmarks and history from `data.json` on that
+same origin — it is not a script injected into a third-party page, and no bridge
+script is involved. Favicons already downloaded this session appear on the tiles
+and rows; a site without one shows a coloured letter tile.
+
+A tab on the start page reports its URL as `kelpie://start` from `get-tabs`, and
+its tab pill shows a star instead of a favicon. `new-tab` without a `url` opens
+it, as does the `+` button, the first tab at launch when no home page is set, and
+the replacement tab left behind after the last tab is closed.
+
+The `kelpie` scheme is never recorded in history and cannot be bookmarked, so the
+start page never appears inside its own Favourites grid or Recent list.
+
+## Favicons (macOS, Windows)
+
+Each tab shows the page's favicon in its pill. macOS fetches it per host and
+caches it on disk; Windows takes it from Chromium itself — the browser reports
+the page's icon URLs and downloads them without sending cookies, keeping the 32
+px representation where the site offers one and the 16 px one otherwise. Icons
+are cached by host, so every tab on a site and every start page row for it share
+one image.
+
+A tab whose site has no favicon yet shows a letter avatar: the first letter of
+the host, white on one of six colours chosen deterministically from the host
+name. macOS and Windows use the same palette and the same hash, so a given site
+is the same colour on both.
+
 ## Floating Menu
 
 The floating menu is used on iOS, Android, and Linux. On macOS these same actions live as icon buttons directly in the top toolbar instead (see the macOS section below).

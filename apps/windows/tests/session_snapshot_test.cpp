@@ -50,6 +50,17 @@ int main() {
   bad = valid; bad["tabs"][1]["active"] = true; invalid.push_back(bad);
   for (const auto& value : invalid) if (!UnchangedAfterInvalid(value)) return 3;
 
+  // A start page tab must survive a restart: `kelpie://` is Kelpie's own
+  // first-party scheme, not an unknown one to be discarded.
+  auto start_page = valid;
+  start_page["tabs"][0]["url"] = "kelpie://start";
+  SessionSnapshot restored_start;
+  if (!ParseSessionSnapshot(start_page, &restored_start) ||
+      restored_start.tabs.front().url != "kelpie://start") return 5;
+  auto other_scheme = valid;
+  other_scheme["tabs"][0]["url"] = "javascript:alert(1)";
+  if (!UnchangedAfterInvalid(other_scheme)) return 6;
+
   const auto serialized = SerializeSessionSnapshot(output);
   SessionSnapshot round_trip;
   if (!ParseSessionSnapshot(serialized, &round_trip) || round_trip.next_tab_id != output.next_tab_id ||

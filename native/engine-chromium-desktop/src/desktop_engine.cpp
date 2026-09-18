@@ -17,89 +17,40 @@
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
 #include "include/cef_jsdialog_handler.h"
+#include "include/cef_task.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
+#include "kelpie/internal_scheme.h"
+#include "desktop_cef_client.h"
 #include "desktop_engine_impl.h"
+#include "start_page_scheme.h"
 
 namespace kelpie {
 
+namespace {
 
-
-class DesktopCefClient final : public CefClient,
-                               public CefLifeSpanHandler,
-                               public CefLoadHandler,
-                               public CefDisplayHandler,
-                               public CefRenderHandler,
-                               public CefJSDialogHandler {
+#if defined(_WIN32)
+// A tab browser window is a child of the single application shell window, so
+// CEF's default close notification -- PostMessage(WM_CLOSE) to
+// GetAncestor(tab_window, GA_ROOT) -- would land on the application window and
+// read as a request to close the whole application. Closing a tab must destroy
+// only that tab's own host window.
+class DestroyTabHostWindowTask final : public CefTask {
  public:
-  explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
+  explicit DestroyTabHostWindowTask(HWND window) : window_(window) {}
 
-  CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
-  CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
-  CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
-  CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
-  CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
-
-  void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
-  bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
-                     CefRefPtr<CefFrame> frame,
-#if CEF_VERSION_MAJOR >= 130
-                     int popup_id,
-#endif
-                     const CefString& target_url,
-                     const CefString& target_frame_name,
-                     WindowOpenDisposition target_disposition,
-                     bool user_gesture,
-                     const CefPopupFeatures& popup_features,
-                     CefWindowInfo& window_info,
-                     CefRefPtr<CefClient>& client,
-                     CefBrowserSettings& settings,
-                     CefRefPtr<CefDictionaryValue>& extra_info,
-                     bool* no_javascript_access) override;
-  void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
-  void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
-                            bool is_loading,
-                            bool can_go_back,
-                            bool can_go_forward) override;
-  void OnLoadEnd(CefRefPtr<CefBrowser> browser,
-                 CefRefPtr<CefFrame> frame,
-                 int http_status_code) override;
-  void OnLoadError(CefRefPtr<CefBrowser> browser,
-                   CefRefPtr<CefFrame> frame,
-                   CefLoadHandler::ErrorCode error_code,
-                   const CefString& error_text,
-                   const CefString& failed_url) override;
-  void OnAddressChange(CefRefPtr<CefBrowser> browser,
-                       CefRefPtr<CefFrame> frame,
-                       const CefString& url) override;
-  void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
-  bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
-                        cef_log_severity_t level,
-                        const CefString& message,
-                        const CefString& source,
-                        int line) override;
-  bool OnJSDialog(CefRefPtr<CefBrowser> browser,
-                  const CefString& origin_url,
-                  cef_jsdialog_type_t dialog_type,
-                  const CefString& message_text,
-                  const CefString& default_prompt_text,
-                  CefRefPtr<CefJSDialogCallback> callback,
-                  bool& suppress_message) override;
-  void OnResetDialogState(CefRefPtr<CefBrowser> browser) override;
-
-  void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
-  void OnPaint(CefRefPtr<CefBrowser> browser,
-               PaintElementType type,
-               const RectList& dirty_rects,
-               const void* buffer,
-               int width,
-               int height) override;
+  void Execute() override {
+    if (window_ != nullptr && ::IsWindow(window_)) ::DestroyWindow(window_);
+  }
 
  private:
-  DesktopEngine::Impl* owner_;
-
-  IMPLEMENT_REFCOUNTING(DesktopCefClient);
+  HWND window_ = nullptr;
+  IMPLEMENT_REFCOUNTING(DestroyTabHostWindowTask);
 };
+#endif
+
+}  // namespace
+
 
 DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}
 
@@ -159,6 +110,15 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     return false;
   }
 
+  // `kelpie://start` is first-party content served by this process, not a script
+  // injected into a page. The supplier reads the application's own stores.
+  if (!RegisterStartPageSchemeHandler(config.start_page_data_supplier)) {
+    last_error = "Chromium rejected the kelpie:// scheme handler";
+    CefShutdown();
+    initialized = false;
+    return false;
+  }
+
   CefWindowInfo window_info;
   if (config.mode == DesktopEngine::Mode::kOffscreen) {
     window_info.SetAsWindowless(0);
@@ -174,8 +134,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   CefBrowserSettings browser_settings;
+  // With nothing to restore and no configured home page, the first tab is the
+  // start page rather than a blank document, matching macOS and the `+` button.
   const std::string first_url = config.restored_tabs.empty() ?
-      (config.initial_url.empty() ? "about:blank" : config.initial_url) : config.restored_tabs.front().url;
+      (config.initial_url.empty() ? std::string(kStartPageUrl) : config.initial_url)
+      : config.restored_tabs.front().url;
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),
@@ -296,198 +259,6 @@ std::string DesktopEngine::Impl::EvaluateJs(const std::string& script) {
   CefRefPtr<CefFrame> frame = browser->GetMainFrame();
   frame->ExecuteJavaScript(script, frame->GetURL(), 0);
   return std::string();
-}
-
-void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
-  if (owner_->browser == nullptr) {
-    owner_->browser = browser;
-  }
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->url = browser->GetMainFrame() ? browser->GetMainFrame()->GetURL().ToString()
-                                       : std::string("about:blank");
-  }
-  owner_->UpdateActiveState();
-}
-
-bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
-                                     CefRefPtr<CefFrame>,
-#if CEF_VERSION_MAJOR >= 130
-                                     int,
-#endif
-                                     const CefString& target_url,
-                                     const CefString&,
-                                     WindowOpenDisposition,
-                                     bool,
-                                     const CefPopupFeatures&,
-                                     CefWindowInfo&,
-                                     CefRefPtr<CefClient>&,
-                                     CefBrowserSettings&,
-                                     CefRefPtr<CefDictionaryValue>&,
-                                     bool*) {
-  const std::string url = target_url.ToString();
-  if (url.empty()) return true;
-  TabSnapshot created;
-  const auto result = owner_->CreateTabOnUi(url, &created);
-  if (!result.ok) return true;
-  if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
-#if defined(_WIN32)
-    if (owner_->browser && owner_->browser->GetHost()) ShowWindow(owner_->browser->GetHost()->GetWindowHandle(), SW_HIDE);
-    if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
-#endif
-    owner_->browser = tab->browser;
-    owner_->UpdateActiveState();
-  }
-  return true;
-}
-
-void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
-  for (auto& tab : owner_->tabs) {
-    if (tab.browser && tab.browser->IsSame(browser) && tab.devtools) tab.devtools->CancelAll();
-  }
-  owner_->tabs.erase(std::remove_if(owner_->tabs.begin(), owner_->tabs.end(),
-      [&browser](const DesktopEngine::Impl::Tab& tab) { return tab.browser->IsSame(browser); }),
-      owner_->tabs.end());
-  if (owner_->browser && owner_->browser->IsSame(browser)) {
-    owner_->browser = nullptr;
-    for (const auto& candidate : owner_->tabs) {
-      if (!candidate.closing) {
-        owner_->browser = candidate.browser;
-#if defined(_WIN32)
-        if (owner_->browser && owner_->browser->GetHost()) {
-          ShowWindow(owner_->browser->GetHost()->GetWindowHandle(), SW_SHOW);
-        }
-#endif
-        break;
-      }
-    }
-  }
-  owner_->UpdateActiveState();
-}
-
-void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
-                                            bool is_loading,
-                                            bool can_go_back,
-                                            bool can_go_forward) {
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->loading = is_loading;
-    tab->can_go_back = can_go_back;
-    tab->can_go_forward = can_go_forward;
-    if (!is_loading && tab->navigation_requested > tab->navigation_completed && tab->navigation_error.empty()) {
-      tab->navigation_completed = tab->navigation_requested;
-    }
-  }
-  owner_->UpdateActiveState();
-}
-
-void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
-                                 CefRefPtr<CefFrame> frame,
-                                 int) {
-  if (!frame || !frame->IsMain()) {
-    return;
-  }
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->url = frame->GetURL().ToString();
-    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
-  }
-  owner_->UpdateActiveState();
-}
-
-void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
-                                   CefRefPtr<CefFrame> frame,
-                                   CefLoadHandler::ErrorCode,
-                                   const CefString& error_text,
-                                   const CefString&) {
-  if (!frame || !frame->IsMain()) return;
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->loading = false;
-    tab->navigation_error = error_text.ToString();
-  }
-  owner_->UpdateActiveState();
-}
-
-void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
-                                       CefRefPtr<CefFrame> frame,
-                                       const CefString& url) {
-  if (!frame || !frame->IsMain()) return;
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->url = url.ToString();
-    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
-  }
-  owner_->UpdateActiveState();
-}
-
-void DesktopCefClient::OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) {
-  if (auto* tab = owner_->FindTab(browser)) {
-    tab->title = title.ToString();
-    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
-  }
-  owner_->UpdateActiveState();
-}
-
-bool DesktopCefClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
-                                        cef_log_severity_t level,
-                                        const CefString& message,
-                                        const CefString& source,
-                                        int line) {
-  if (!owner_->console_sink) {
-    return false;
-  }
-
-  std::string level_name = "log";
-  if (level == LOGSEVERITY_WARNING) {
-    level_name = "warn";
-  } else if (level == LOGSEVERITY_ERROR || level == LOGSEVERITY_FATAL) {
-    level_name = "error";
-  } else if (level == LOGSEVERITY_INFO) {
-    level_name = "info";
-  }
-
-  owner_->console_sink({
-      {"level", level_name},
-      {"text", message.ToString()},
-      {"source", source.ToString()},
-      {"line", line},
-      {"column", 0},
-  });
-  return false;
-}
-
-bool DesktopCefClient::OnJSDialog(CefRefPtr<CefBrowser> browser,
-                                      const CefString& origin_url,
-                                      cef_jsdialog_type_t dialog_type,
-                                      const CefString& message_text,
-                                      const CefString& default_prompt_text,
-                                      CefRefPtr<CefJSDialogCallback> callback,
-                                      bool& suppress_message) {
-  suppress_message = false;
-  if (auto* tab = owner_->FindTab(browser)) {
-    return tab->dialogs.Observe(browser, dialog_type, origin_url, message_text,
-                                default_prompt_text, callback);
-  }
-  return false;
-}
-
-void DesktopCefClient::OnResetDialogState(CefRefPtr<CefBrowser> browser) {
-  if (auto* tab = owner_->FindTab(browser)) tab->dialogs.Reset(browser);
-}
-
-void DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
-  rect = CefRect(0, 0, owner_->viewport.width, owner_->viewport.height);
-}
-
-void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser>,
-                               PaintElementType,
-                               const RectList&,
-                               const void* buffer,
-                               int width,
-                               int height) {
-  if (buffer == nullptr || width <= 0 || height <= 0) {
-    return;
-  }
-  const std::size_t size = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
-  std::lock_guard<std::mutex> lock(owner_->mutex);
-  owner_->snapshot_bytes.assign(static_cast<const std::uint8_t*>(buffer),
-                                static_cast<const std::uint8_t*>(buffer) + size);
 }
 
 DesktopEngine::DesktopEngine()

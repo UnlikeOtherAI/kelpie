@@ -1,0 +1,282 @@
+/*
+ * Kelpie start page styling.
+ *
+ * Every measurement mirrors `apps/macos/Kelpie/Views/StartPageView.swift`, where
+ * one SwiftUI point equals one CSS pixel at 100 % scaling. Light and dark follow
+ * the OS through `prefers-color-scheme`, matching the macOS page's use of the
+ * dynamic system colours.
+ */
+
+:root {
+  /* Light mode mirrors `NSColor.windowBackgroundColor` and the `.primary` /
+   * `.secondary` label colours, and matches the Windows shell palette in
+   * `apps/windows/src/ui_theme.h` so the page and the chrome agree. */
+  --canvas: #f6f6f8;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(0, 0, 0, 0.04);
+  --divider: rgba(0, 0, 0, 0.15);
+  --text: #27282d;
+  --muted-text: #686a72;
+  --icon-shadow: rgba(0, 0, 0, 0.15);
+  --focus-ring: #3f7ce0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #202124;
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-hover: rgba(255, 255, 255, 0.08);
+    --divider: rgba(255, 255, 255, 0.15);
+    --text: #f2f2f4;
+    --muted-text: #9a9ca4;
+    --icon-shadow: rgba(0, 0, 0, 0.5);
+    --focus-ring: #6ea0ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--text);
+  font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-y: scroll;
+}
+
+/* `.frame(maxWidth: 720)` with 40 pt horizontal and 48 pt vertical padding. */
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  align-items: stretch;
+}
+
+/* `.padding(.top, 40)` on the icon row. */
+.icon-header {
+  display: flex;
+  justify-content: center;
+  padding-top: 40px;
+}
+
+/* 120 pt square, 26 pt continuous corner, black 15 % shadow with radius 8 at
+ * y 4. SwiftUI's shadow radius is roughly half a CSS blur radius. */
+.app-icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 26px;
+  box-shadow: 0 4px 16px var(--icon-shadow);
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section[hidden] {
+  display: none;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* `LazyVGrid(columns: [GridItem(.adaptive(minimum: 72, maximum: 96))], spacing: 16)`. */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 96px));
+  gap: 16px;
+  justify-content: start;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  max-width: 72px;
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.tile-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+/*
+ * Tile and row colours mirror `BookmarkTileView.tileColor` and
+ * `HistoryRowView.letterColor` in StartPageView.swift. They are classes rather
+ * than inline styles so the page's own Content-Security-Policy needs no
+ * `unsafe-inline` exception.
+ *
+ * This is deliberately the macOS start page's RGB palette, which differs from
+ * the tab strip's `LetterAvatarView` HSB palette. Both are mirrored as macOS
+ * has them.
+ */
+.badge-0 {
+  background-color: rgb(102, 143, 217); /* 0.40, 0.56, 0.85 */
+}
+
+.badge-1 {
+  background-color: rgb(140, 191, 140); /* 0.55, 0.75, 0.55 */
+}
+
+.badge-2 {
+  background-color: rgb(217, 140, 102); /* 0.85, 0.55, 0.40 */
+}
+
+.badge-3 {
+  background-color: rgb(179, 128, 217); /* 0.70, 0.50, 0.85 */
+}
+
+.badge-4 {
+  background-color: rgb(217, 191, 89); /* 0.85, 0.75, 0.35 */
+}
+
+.badge-5 {
+  background-color: rgb(128, 191, 204); /* 0.50, 0.75, 0.80 */
+}
+
+.tile-badge img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.tile-label {
+  font-size: 11px;
+  max-width: 72px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+/* `.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))`. */
+.card {
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.row + .row {
+  border-top: 1px solid var(--divider);
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.row-badge {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.row-badge img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-url {
+  font-size: 11px;
+  color: var(--muted-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* `Spacer(minLength: 100)` then a centred 15 pt secondary label. */
+.empty-state {
+  margin: 100px 0 0 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted-text);
+}
+
+.empty-state[hidden] {
+  display: none;
+}

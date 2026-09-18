@@ -104,6 +104,8 @@ set(WINDOWS_APP_SOURCES
   src/window_chrome.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
+  src/favicon_cache.cpp
+  src/letter_avatar.cpp
   src/settings_view.cpp
   src/bookmarks_view.cpp
   src/history_view.cpp
@@ -125,6 +127,8 @@ set(WINDOWS_APP_HEADERS
   src/window_chrome.h
   src/win32_browser_view.h
   src/url_bar.h
+  src/favicon_cache.h
+  src/letter_avatar.h
   src/settings_view.h
   src/bookmarks_view.h
   src/history_view.h
@@ -192,6 +196,7 @@ target_link_libraries(kelpie
     gdi32
     gdiplus
     uxtheme
+    msimg32
     dwmapi
     shell32
     ws2_32
@@ -269,7 +274,11 @@ if(BUILD_TESTING)
   endif()
   add_test(NAME kelpie_windows_utf_test COMMAND kelpie_windows_utf_test)
   add_executable(kelpie_windows_session_snapshot_test tests/session_snapshot_test.cpp src/session_snapshot.cpp)
-  target_include_directories(kelpie_windows_session_snapshot_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  # `session_snapshot.cpp` shares the internal-scheme predicate with the engine
+  # so the restorable-URL rule cannot drift from what the browser will navigate.
+  target_include_directories(kelpie_windows_session_snapshot_test PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${KELPIE_NATIVE_ROOT}/core-state/include")
   target_link_libraries(kelpie_windows_session_snapshot_test PRIVATE nlohmann_json::nlohmann_json)
   if(MSVC)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE /UNDEBUG)
@@ -320,6 +329,35 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_startup_diagnostics_test COMMAND kelpie_windows_startup_diagnostics_test)
+  # The favicon cache and the letter avatar are Win32/GDI+ only — no CEF — so
+  # both configurations build and run these.
+  add_executable(kelpie_windows_letter_avatar_test
+    tests/letter_avatar_test.cpp
+    src/letter_avatar.cpp
+    ${WINDOWS_THEME_SOURCES})
+  target_include_directories(kelpie_windows_letter_avatar_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_letter_avatar_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi)
+  if(MSVC)
+    target_compile_options(kelpie_windows_letter_avatar_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_letter_avatar_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_letter_avatar_test COMMAND kelpie_windows_letter_avatar_test)
+
+  add_executable(kelpie_windows_favicon_cache_test
+    tests/favicon_cache_test.cpp
+    src/favicon_cache.cpp
+    src/letter_avatar.cpp
+    ${WINDOWS_THEME_SOURCES})
+  target_include_directories(kelpie_windows_favicon_cache_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_favicon_cache_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi msimg32 ole32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_favicon_cache_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_favicon_cache_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_favicon_cache_test COMMAND kelpie_windows_favicon_cache_test)
+
   add_executable(kelpie_windows_close_lifecycle_test tests/close_lifecycle_test.cpp)
   target_include_directories(kelpie_windows_close_lifecycle_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   if(MSVC)
@@ -384,4 +422,18 @@ if(BUILD_TESTING)
     target_link_options(kelpie_windows_theme_test PRIVATE "/MANIFEST:NO")
   endif()
   add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
+
+  if(HAS_CEF)
+    # Only the packaged executable can prove the invariant this guards: closing
+    # a tab must not retire the loopback control surface. close-tab reports
+    # success either way, so the assertion has to be a later request that the
+    # running app actually answers.
+    add_executable(close_tab_control_surface_test tests/close_tab_control_surface_test.cpp)
+    target_compile_definitions(close_tab_control_surface_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_link_libraries(close_tab_control_surface_test PRIVATE
+      httplib::httplib nlohmann_json::nlohmann_json ws2_32 user32)
+    add_test(NAME close_tab_control_surface_test
+      COMMAND close_tab_control_surface_test "$<TARGET_FILE_DIR:kelpie>")
+    set_tests_properties(close_tab_control_surface_test PROPERTIES TIMEOUT 300)
+  endif()
 endif()

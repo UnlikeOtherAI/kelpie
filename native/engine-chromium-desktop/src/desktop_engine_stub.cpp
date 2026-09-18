@@ -20,6 +20,9 @@ class DesktopEngine::Impl {
   ViewportState viewport;
   CefRenderer* renderer_ = nullptr;
   bool initialized = false;
+  // Never populated without Chromium, but present so `favicons()` has the same
+  // shape in both configurations.
+  FaviconRegistry favicons;
 };
 
 DesktopEngine::DesktopEngine()
@@ -35,6 +38,8 @@ bool DesktopEngine::Initialize(const Config& config) {
 }
 
 bool DesktopEngine::Shutdown() { return true; }
+
+FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
 
 void DesktopEngine::DoMessageLoopWork() {}
 

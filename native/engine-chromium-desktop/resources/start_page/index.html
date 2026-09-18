@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!--
+  Kelpie start page.
+
+  First-party content served from the `kelpie://` scheme by
+  `src/start_page_scheme.cpp`. It mirrors the macOS `StartPageView`: a 120 px app
+  icon header, a "Favourites" grid of bookmark tiles, a "Recent" list of the last
+  20 history entries on a rounded card, and the "Open a website to get started"
+  empty state, all inside a 720 px content column.
+
+  Bookmarks and history arrive from `data.json` on this same scheme and origin,
+  so the page never injects a script into third-party content and never needs a
+  native bridge.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src kelpie: data:; style-src kelpie:; script-src kelpie:; connect-src kelpie:"
+    />
+    <title>Kelpie</title>
+    <link rel="stylesheet" href="start.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="icon-header">
+        <img class="app-icon" src="app-icon.png" alt="Kelpie" />
+      </header>
+
+      <section class="section" id="favourites-section" hidden>
+        <h2 class="section-title">Favourites</h2>
+        <div class="tile-grid" id="favourites-grid"></div>
+      </section>
+
+      <section class="section" id="recent-section" hidden>
+        <h2 class="section-title">Recent</h2>
+        <div class="card" id="recent-list"></div>
+      </section>
+
+      <p class="empty-state" id="empty-state" hidden>Open a website to get started</p>
+    </main>
+    <script src="start.js"></script>
+  </body>
+</html>

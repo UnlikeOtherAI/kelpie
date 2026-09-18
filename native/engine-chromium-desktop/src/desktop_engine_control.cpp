@@ -13,6 +13,7 @@
 #include "include/cef_parser.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/cef_urlrequest.h"
+#include "kelpie/internal_scheme.h"
 #include "desktop_cookie_planner.h"
 #include "desktop_input_planner.h"
 #if defined(_WIN32)
@@ -53,7 +54,11 @@ void RunUiOperation(std::shared_ptr<UiOperation> operation) {
 bool IsNavigableUrl(const std::string& url) {
   if (url.empty()) return false;
   CefURLParts parts;
-  return CefParseURL(url, parts) || url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
+  // `kelpie://` is checked explicitly: CefParseURL only recognises a custom
+  // scheme once Chromium has been initialised in this process, and the shell
+  // creates the start page tab through the same validator.
+  return CefParseURL(url, parts) || IsInternalSchemeUrl(url) ||
+         url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
 }
 
 struct PendingDevTools {
@@ -106,9 +111,17 @@ DesktopEngine::Impl::Tab* DesktopEngine::Impl::ActiveTab() {
 }
 
 TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
-  return {tab.id, tab.generation, tab.url, tab.title,
-          browser && browser->IsSame(tab.browser), tab.loading,
-          tab.can_go_back, tab.can_go_forward};
+  return {tab.id,
+          tab.generation,
+          tab.url,
+          tab.title,
+          browser && browser->IsSame(tab.browser),
+          tab.loading,
+          tab.can_go_back,
+          tab.can_go_forward,
+          IsStartPageUrl(tab.url),
+          // Shared, not copied: see the field comment on TabSnapshot.
+          tab.favicon_png_base64};
 }
 
 void DesktopEngine::Impl::UpdateActiveState() {
@@ -152,7 +165,11 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
   return TimeoutResult();
 }
 
-BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
+BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& requested_url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
+  // A tab with no URL opens Kelpie's start page, the same as macOS. This is the
+  // one place that decides it, so the `+` button, `new-tab` over HTTP/MCP, and
+  // the replacement tab after the last close all agree.
+  const std::string url = requested_url.empty() ? std::string(kStartPageUrl) : requested_url;
   if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
   if (!restored_id && next_tab_id == std::numeric_limits<std::uint64_t>::max()) {
     return BrowserControlResult::Failure("TAB_ID_EXHAUSTED", "No more tab identifiers are available");
@@ -330,7 +347,8 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     for (const auto& candidate : impl->tabs) if (!candidate.closing) ++live_tabs;
     if (live_tabs == 1) {
       TabSnapshot replacement;
-      const auto created = impl->CreateTabOnUi("about:blank", &replacement);
+      // Closing the last tab leaves the start page behind, matching macOS.
+      const auto created = impl->CreateTabOnUi(std::string(), &replacement);
       if (!created.ok) return created;
       impl->browser = impl->tabs.back().browser;
     } else if (was_active) {

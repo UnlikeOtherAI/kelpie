@@ -247,7 +247,9 @@ std::optional<std::wstring> WindowsApp::BestUrlCompletion(std::wstring_view type
 void WindowsApp::OnCreateTabRequested() {
   if (!desktop_app_) return;
   TabSnapshot tab;
-  const auto result = desktop_app_->engine().CreateTab("about:blank", &tab, std::chrono::seconds(5));
+  // No URL: the engine opens the start page, the same default the HTTP and MCP
+  // `new-tab` commands get.
+  const auto result = desktop_app_->engine().CreateTab(std::string(), &tab, std::chrono::seconds(5));
   if (result.ok) { desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2)); SaveSession(); }
   else if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }

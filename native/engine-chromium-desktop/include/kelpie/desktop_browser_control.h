@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,6 +26,23 @@ struct TabSnapshot {
   bool is_loading = false;
   bool can_go_back = false;
   bool can_go_forward = false;
+  // Kelpie's own start page (`kelpie://start`). The macOS tab pill shows a star
+  // instead of a favicon or letter avatar for it; the Windows tab strip mirrors
+  // that. Mirrors `Tab.isStartPage` in the macOS app.
+  bool is_start_page = false;
+  // The page's favicon as a base64-encoded PNG, or null when none has been
+  // downloaded yet.
+  //
+  // Base64 rather than raw bytes because every consumer — the `data:` URIs the
+  // start page renders, and any future JSON transport — needs the encoded form,
+  // so encoding once at the CEF boundary avoids repeating it per read.
+  //
+  // `shared_ptr<const std::string>` rather than `std::string` keeps TabSnapshot
+  // cheap to copy: snapshots are taken on the browser owner thread for every
+  // command result and every `get-tabs` entry, and a favicon is a few kilobytes.
+  // The payload is immutable once captured, so sharing it is safe; a new favicon
+  // replaces the pointer rather than mutating the string.
+  std::shared_ptr<const std::string> favicon_png_base64;
 };
 
 struct BrowserControlResult {

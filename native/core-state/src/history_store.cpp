@@ -8,6 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "kelpie/internal_scheme.h"
 #include "store_support.h"
 
 namespace kelpie {
@@ -58,7 +59,10 @@ json HistoryEntryToJson(const HistoryEntry& entry) {
 }  // namespace
 
 void HistoryStore::Record(const std::string& url, const std::string& title) {
-  if (url.empty() || url == "about:blank") {
+  // `kelpie://` is Kelpie's own first-party scheme. Recording it would make the
+  // start page the top entry of the Recent list it renders, and every new tab
+  // would push real sites down the list.
+  if (url.empty() || url == "about:blank" || IsInternalSchemeUrl(url)) {
     return;
   }
   const std::string normalized = store_support::NormalizeUrl(url);

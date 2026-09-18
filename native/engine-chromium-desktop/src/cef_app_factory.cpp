@@ -5,6 +5,8 @@
 
 #include <mutex>
 
+#include "start_page_scheme.h"
+
 namespace kelpie {
 
 namespace {
@@ -15,6 +17,13 @@ std::function<void(std::int64_t)> message_pump_scheduler;
 class DesktopCefApp final : public CefApp, public CefBrowserProcessHandler {
  public:
   CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
+
+  // Runs on the main thread of every process. The renderer must agree with the
+  // browser about `kelpie://` or the start page loses its origin and cannot
+  // fetch its own payload.
+  void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override {
+    RegisterKelpieCustomSchemes(registrar);
+  }
 
   void OnBeforeCommandLineProcessing(const CefString&,
                                      CefRefPtr<CefCommandLine> command_line) override {
