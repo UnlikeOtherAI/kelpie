@@ -66,7 +66,6 @@ class FaviconDownloadCallback final : public CefDownloadImageCallback {
   CefRefPtr<CefBrowser> browser_;
 
   IMPLEMENT_REFCOUNTING(FaviconDownloadCallback);
-  DISALLOW_COPY_AND_ASSIGN(FaviconDownloadCallback);
 };
 
 }  // namespace

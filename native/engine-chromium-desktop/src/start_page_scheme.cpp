@@ -82,7 +82,6 @@ class StartPageResourceHandler final : public CefResourceHandler {
   std::size_t offset_ = 0;
 
   IMPLEMENT_REFCOUNTING(StartPageResourceHandler);
-  DISALLOW_COPY_AND_ASSIGN(StartPageResourceHandler);
 };
 
 class StartPageSchemeHandlerFactory final : public CefSchemeHandlerFactory {
@@ -106,7 +105,6 @@ class StartPageSchemeHandlerFactory final : public CefSchemeHandlerFactory {
 
  private:
   IMPLEMENT_REFCOUNTING(StartPageSchemeHandlerFactory);
-  DISALLOW_COPY_AND_ASSIGN(StartPageSchemeHandlerFactory);
 };
 
 }  // namespace
