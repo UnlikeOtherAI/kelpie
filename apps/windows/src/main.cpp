@@ -133,7 +133,10 @@ int RunKelpieWindowsApp(HINSTANCE resource_instance,
 }
 
 #if defined(HAS_CEF)
-extern "C" int RunWinMain(HINSTANCE instance,
+// The sandboxed CEF bootstrap resolves this with GetProcAddress, and `extern
+// "C"` only settles the name mangling — without dllexport the symbol is absent
+// from the DLL and the shipped launcher cannot start the app.
+extern "C" __declspec(dllexport) int RunWinMain(HINSTANCE instance,
                             LPWSTR command_line,
                             int show_command,
                             void* sandbox_info,

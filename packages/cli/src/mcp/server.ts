@@ -34,7 +34,14 @@ type ScreenshotResult = JsonObject & {
 const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
 const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
-export function createMcpServer(): McpServer {
+/**
+ * `pinned` is the local browser `kelpie --browser <alias> mcp` was started
+ * for. It becomes the target of every tool call that omits `device`, so a
+ * client driving one launched browser does not have to name it on each call
+ * — and cannot silently land on whatever discovery finds first. An explicit
+ * `device` argument still wins.
+ */
+export function createMcpServer(pinned?: DiscoveredDevice): McpServer {
   const server = new McpServer(
     {
       name: "kelpie",
@@ -46,19 +53,32 @@ export function createMcpServer(): McpServer {
   );
 
   for (const tool of browserTools) {
-    registerBrowserTool(server, tool);
+    registerBrowserTool(server, tool, pinned);
   }
   for (const tool of cliTools) {
-    registerCliTool(server, tool);
+    registerCliTool(server, tool, pinned);
   }
 
   return server;
 }
 
-function registerBrowserTool(server: McpServer, tool: BrowserToolDef): void {
+/** The device a tool call targets: an explicit `device` first, else the pinned alias. */
+async function resolveDevice(
+  query: string | undefined,
+  pinned: DiscoveredDevice | undefined,
+): Promise<DiscoveredDevice | undefined> {
+  if (!query) return pinned ?? (await getDevice(""));
+  return getDevice(query);
+}
+
+function registerBrowserTool(
+  server: McpServer,
+  tool: BrowserToolDef,
+  pinned?: DiscoveredDevice,
+): void {
   server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
-    const deviceId = args.device as string;
-    const device = await getDevice(deviceId);
+    const deviceId = args.device as string | undefined;
+    const device = await resolveDevice(deviceId, pinned);
     if (!device) {
       return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
     }
@@ -202,12 +222,12 @@ function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function registerCliTool(server: McpServer, tool: CliToolDef): void {
+function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: DiscoveredDevice): void {
   server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
     const params = args as Record<string, unknown>;
 
     if (tool.kind === "discovery") {
-      return handleDiscovery(tool.method, params);
+      return handleDiscovery(tool.method, params, pinned);
     }
 
     const devices = getFilteredDevices(params);
@@ -228,7 +248,7 @@ function registerCliTool(server: McpServer, tool: CliToolDef): void {
   });
 }
 
-async function handleDiscovery(method: string, params: Record<string, unknown>): Promise<{ content: { type: "text"; text: string }[] }> {
+async function handleDiscovery(method: string, params: Record<string, unknown>, pinned?: DiscoveredDevice): Promise<{ content: { type: "text"; text: string }[] }> {
   if (method === "feedbackSummary") {
     const limit = typeof params.limit === "number" ? params.limit : 10;
     const summary = await summarizeFeedbackReports(limit);
@@ -294,7 +314,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
     return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
   }
   if (method === "pair") {
-    return handlePair(params);
+    return handlePair(params, pinned);
   }
   // listDevices
   const devices = getAllDevices();
@@ -303,9 +323,10 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
 
 async function handlePair(
   params: Record<string, unknown>,
+  pinned?: DiscoveredDevice,
 ): Promise<{ content: { type: "text"; text: string }[] }> {
   const deviceId = typeof params.device === "string" ? params.device : "";
-  const device = await getDevice(deviceId);
+  const device = await resolveDevice(deviceId, pinned);
   if (!device) {
     return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
   }

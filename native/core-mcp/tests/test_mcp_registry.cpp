@@ -48,12 +48,26 @@ void TestRegistryFiltering() {
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
-  assert(ios_tools.size() <= all_tools.size());
-  assert(android_tools.size() <= all_tools.size());
-  assert(macos_tools.size() <= all_tools.size());
-  assert(windows_tools.size() <= all_tools.size());
-  assert(webkit_tools.size() <= all_tools.size());
-  assert(chromium_tools.size() <= all_tools.size());
+  // Exact counts: a tool that quietly appears on or disappears from a platform
+  // is the regression this guards, and `<= all_tools.size()` cannot see it.
+  // Update these deliberately when the catalogue changes.
+  assert(all_tools.size() == 105);
+  assert(ios_tools.size() == 103);
+  assert(android_tools.size() == 102);
+  assert(macos_tools.size() == 99);
+  assert(windows_tools.size() == 98);
+  assert(webkit_tools.size() == 105);
+  assert(chromium_tools.size() == 104);
+
+  // Windows-only in the shared catalogue, so Windows-only here too.
+  assert(ContainsTool(windows_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(ios_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(android_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(macos_tools, "kelpie_close_browser"));
+  assert(ContainsTool(windows_tools, "kelpie_press_key"));
+  assert(!ContainsTool(ios_tools, "kelpie_press_key"));
+  assert(!ContainsTool(android_tools, "kelpie_press_key"));
+  assert(!ContainsTool(macos_tools, "kelpie_press_key"));
 
   assert(ContainsTool(ios_tools, "kelpie_safari_auth"));
   assert(!ContainsTool(android_tools, "kelpie_safari_auth"));

@@ -73,9 +73,13 @@ void AppendNetwork(NetworkTrafficStore& store, const nlohmann::json& event) {
   });
 }
 
+// Methods desktop Chromium does not implement. A method registered by a real
+// handler must not appear here: `router.Has()` already answers true for it, so
+// the entry would be inert while still claiming the method is unsupported.
+// `screenshot-annotated` is one of those — ScreenshotHandler implements it.
 std::vector<std::string> UnsupportedMethods() {
   return {
-      "debug-screens",      "set-debug-overlay",  "get-debug-overlay", "screenshot-annotated",
+      "debug-screens",      "set-debug-overlay",  "get-debug-overlay",
       "tap",                "click-annotation",   "fill-annotation",
       "set-dialog-auto-handler",
       "get-iframes",        "switch-to-iframe",   "switch-to-main",

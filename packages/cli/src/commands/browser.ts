@@ -69,11 +69,11 @@ const PRE_LAUNCH_PROBE_TIMEOUT_MS = 2_000;
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function waitForReadiness(file: string, previousLaunchId?: string, child?: ReturnType<typeof spawn>): Promise<Awaited<ReturnType<typeof readLocalReadiness>>> {
+async function waitForReadiness(file: string, previousLaunchId: string | undefined, child: ReturnType<typeof spawn>): Promise<Awaited<ReturnType<typeof readLocalReadiness>>> {
   const deadline = Date.now() + LAUNCH_BIND_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const readiness = await readLocalReadiness(file);
-    if (child?.exitCode !== null) throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
+    if (child.exitCode !== null) throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
     if (readiness && readiness.launchId !== previousLaunchId) return readiness;
     await delay(LAUNCH_BIND_POLL_MS);
   }

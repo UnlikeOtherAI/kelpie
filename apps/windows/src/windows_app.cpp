@@ -378,12 +378,14 @@ bool WindowsApp::InitializeCommonControls() const {
 
 bool WindowsApp::InitializeDesktopRuntime() {
   if (!CreateCefPumpWindow(instance_)) return false;
+#if defined(HAS_CEF)
   SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
     // CEF may schedule work from a callback. Post it to the owner queue so the
     // timer callback also runs while Win32 is in a modal message loop.
     if (g_cef_pump_window != nullptr) PostMessageW(g_cef_pump_window, kScheduleCefPumpMessage,
                                                     static_cast<WPARAM>(delay_ms), 0);
   });
+#endif
   desktop_app_ = std::make_unique<DesktopApp>();
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
@@ -457,6 +459,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
     for (const auto& tab : session_snapshot_.tabs) runtime.engine.restored_tabs.push_back({tab.id, tab.url, tab.active});
   }
   runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
+#if defined(HAS_CEF)
   runtime.engine.configure_window_info = [this](void* raw_info) {
     auto* info = static_cast<CefWindowInfo*>(raw_info);
     RECT rect{};
@@ -469,6 +472,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
     GetClientRect(browser_view_->hwnd(), &rect);
     info->SetAsChild(browser_view_->hwnd(), CefRect(0, 0, rect.right, rect.bottom));
   };
+#endif
   if (!desktop_app_->Start(runtime)) {
     desktop_app_.reset();
     return false;
@@ -486,7 +490,9 @@ bool WindowsApp::InitializeDesktopRuntime() {
 void WindowsApp::ShutdownDesktopRuntime() {
   // Keep the owner-thread pump alive through DesktopApp::Stop: CefShutdown
   // is legal only after every browser has delivered OnBeforeClose.
+#if defined(HAS_CEF)
   SetDesktopCefMessagePumpScheduler({});
+#endif
   if (desktop_app_) {
     desktop_app_->Stop();
     desktop_app_.reset();

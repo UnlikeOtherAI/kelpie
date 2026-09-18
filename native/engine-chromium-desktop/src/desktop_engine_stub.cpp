@@ -134,6 +134,8 @@ BrowserControlResult DesktopEngine::Forward(TabLease, TabSnapshot*, Timeout) { r
 
 BrowserControlResult DesktopEngine::Reload(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
 
+BrowserControlResult DesktopEngine::StopLoading(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
+
 BrowserControlResult DesktopEngine::Evaluate(TabLease, std::string, Json*, Timeout) {
   return UnsupportedControl();
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateLlmHelp } from "../../src/help/llm-help.js";
+import { generateLlmHelp, mcpToCommand } from "../../src/help/llm-help.js";
+import { browserTools, cliTools } from "../../src/mcp/tools.js";
 
 describe("generateLlmHelp", () => {
   it("returns valid JSON for all commands", () => {
@@ -7,6 +8,19 @@ describe("generateLlmHelp", () => {
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBeGreaterThan(0);
+  });
+
+  it("publishes an entry for every tool in the catalogue", () => {
+    // A bare count is either a magic number that churns on every tool added or
+    // — as `> 0` — no check at all: the generated help could lose almost every
+    // entry and still pass. The catalogue itself is the authority.
+    const parsed = JSON.parse(generateLlmHelp()) as { command: string }[];
+    const published = new Set(parsed.map((entry) => entry.command));
+    const missing = [...browserTools, ...cliTools]
+      .map((tool) => mcpToCommand(tool.name))
+      .filter((command) => !published.has(command));
+
+    expect(missing).toEqual([]);
   });
 
   it("each command entry has required fields", () => {

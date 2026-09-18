@@ -8,11 +8,20 @@ bool TabNumber(const std::string& id, std::uint64_t* number) {
   const auto parsed = std::from_chars(id.data() + 4, id.data() + id.size(), *number);
   return parsed.ec == std::errc{} && parsed.ptr == id.data() + id.size() && *number > 0;
 }
+
+// nlohmann stores a whole number as unsigned when it is parsed from text and
+// as signed when it comes from a C++ literal, so the sign has to be tested
+// rather than the storage type: is_number_integer() alone admits negatives,
+// and get<std::uint64_t>() then wraps them into enormous ids.
+bool NonNegativeInteger(const nlohmann::json& value) {
+  return value.is_number_unsigned() ||
+         (value.is_number_integer() && value.get<std::int64_t>() >= 0);
+}
 }
 bool ParseSessionSnapshot(const nlohmann::json& value, SessionSnapshot* output) {
-  if (!output || !value.is_object() || !value.contains("version") || !value["version"].is_number_integer() ||
-      value["version"] != 1 || !value.contains("epoch") || !value["epoch"].is_number_integer() ||
-      !value.contains("nextTabId") || !value["nextTabId"].is_number_integer() ||
+  if (!output || !value.is_object() || !value.contains("version") || !NonNegativeInteger(value["version"]) ||
+      value["version"] != 1 || !value.contains("epoch") || !NonNegativeInteger(value["epoch"]) ||
+      !value.contains("nextTabId") || !NonNegativeInteger(value["nextTabId"]) ||
       !value.contains("tabs") || !value["tabs"].is_array()) return false;
   SessionSnapshot next; next.epoch=value["epoch"].get<std::uint64_t>(); next.next_tab_id=value["nextTabId"].get<std::uint64_t>();
   if (next.next_tab_id < 1) return false;

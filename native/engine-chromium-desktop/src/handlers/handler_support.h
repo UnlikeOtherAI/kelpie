@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <limits>
 #include <chrono>
 #include <functional>
 #include <stdexcept>
@@ -116,12 +118,26 @@ inline std::string RequireString(const nlohmann::json& params, const char* key, 
   return it->get<std::string>();
 }
 
+// nlohmann narrows a whole number to `int` with a silent static_cast, so
+// 4294967297 arrives as 1 and satisfies any range check. Widening first is what
+// makes the bounds mean anything.
+inline std::int64_t WideInteger(const nlohmann::json& value) {
+  if (!value.is_number_unsigned()) return value.get<std::int64_t>();
+  const auto raw = value.get<std::uint64_t>();
+  constexpr auto kCeiling = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+  return raw > kCeiling ? std::numeric_limits<std::int64_t>::max() : static_cast<std::int64_t>(raw);
+}
+
 inline int IntOrDefault(const nlohmann::json& params, const char* key, int default_value) {
   const auto it = params.find(key);
   if (it == params.end() || !it->is_number_integer()) {
     return default_value;
   }
-  return it->get<int>();
+  const std::int64_t value = WideInteger(*it);
+  if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
+    return default_value;
+  }
+  return static_cast<int>(value);
 }
 
 inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, int minimum,
@@ -130,12 +146,12 @@ inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, 
   if (it == params.end() || !it->is_number_integer()) {
     throw std::invalid_argument(std::string(key) + " must be an integer");
   }
-  const int value = it->get<int>();
+  const std::int64_t value = WideInteger(*it);
   if (value < minimum || value > maximum) {
     throw std::invalid_argument(std::string(key) + " must be between " + std::to_string(minimum) +
                                 " and " + std::to_string(maximum));
   }
-  return value;
+  return static_cast<int>(value);
 }
 
 inline std::optional<nlohmann::json> RejectBrowserWideTab(const nlohmann::json& params) {

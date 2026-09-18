@@ -201,4 +201,21 @@ describe("command API method mapping", () => {
       tabId: "tab-123",
     }, { tabId: "tab-456", selector: "#submit" })).toEqual({ tabId: "tab-456", selector: "#submit" });
   });
+
+  it("carries --tab-generation from the command line into the request body", async () => {
+    // The lease only travels when the generation is an integer, and Commander
+    // leaves option values as strings unless a parser is supplied — so this
+    // goes through the real program rather than a hand-built globals object.
+    const { createProgram } = await import("../../src/program.js");
+    const program = createProgram("0.0.0-test");
+    program.parseOptions(["--tab-id", "tab-123", "--tab-generation", "2"]);
+    const globals = program.opts<Parameters<typeof withGlobalTabId>[0]>();
+
+    expect(globals.tabGeneration).toBe(2);
+    expect(withGlobalTabId(globals, { selector: "#submit" })).toEqual({
+      selector: "#submit",
+      tabId: "tab-123",
+      generation: 2,
+    });
+  });
 });

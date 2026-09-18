@@ -70,6 +70,10 @@ int main() {
   assert(router.Dispatch("get-bookmarks",nlohmann::json::object()).body["bookmarks"].size()==1); history.Record("https://example.com","Example"); assert(router.Dispatch("get-history",{{"limit",10}}).body["entries"].size()==1);
   assert(router.Dispatch("get-renderer",nlohmann::json::object()).body["current"]=="chromium"); assert(router.Dispatch("resize-viewport",{{"width",390},{"height",844}}).body["viewport"]["width"]==390); assert(router.Dispatch("reset-viewport",nlohmann::json::object()).body["viewport"]["width"]==1280);
   assert(router.Dispatch("resize-viewport",{{"width","390"},{"height",844}}).status_code==400); assert(router.Dispatch("resize-viewport",{{"width",0},{"height",844}}).status_code==400); assert(router.Dispatch("get-viewport",{{"tabId","second"}}).status_code==400);
+  // A whole number past `int` was narrowed silently, so 4294967297 arrived as 1
+  // and satisfied the bounds it should have failed.
+  assert(router.Dispatch("resize-viewport",{{"width",4294967297LL},{"height",844}}).status_code==400);
+  assert(router.Dispatch("resize-viewport",{{"width",390},{"height",-4294967295LL}}).status_code==400);
   assert(router.Dispatch("set-home", {{"url", "https://home.test"}}).status_code == 200); assert(router.Dispatch("get-home", nlohmann::json::object()).body["url"] == "https://home.test"); assert(router.Dispatch("toast", {{"message", "ready"}}).status_code == 200); assert(router.Dispatch("set-fullscreen", {{"enabled", true}}).status_code == 200); assert(router.Dispatch("get-fullscreen", nlohmann::json::object()).body["fullscreen"] == true); assert(router.Dispatch("close-browser", nlohmann::json::object()).body["accepted"] == true);
   const nlohmann::json second={{"tabId","second"},{"generation",9}};
   auto dom_result=router.Dispatch("query-selector",{{"tabId","second"},{"generation",9},{"selector","div"}}); assert(dom_result.status_code==200); assert(control.last_lease.id=="second" && control.last_lease.generation==9);

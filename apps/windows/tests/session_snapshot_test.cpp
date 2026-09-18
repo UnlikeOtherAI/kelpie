@@ -8,5 +8,10 @@ int main() {
   auto invalid = valid; invalid["epoch"] = "bad"; if (ParseSessionSnapshot(invalid, &out)) return 2;
   invalid = valid; invalid["nextTabId"] = 2; if (ParseSessionSnapshot(invalid, &out)) return 3;
   invalid = valid; invalid["tabs"].push_back(valid["tabs"][0]); if (ParseSessionSnapshot(invalid, &out)) return 4;
+  // A negative count is not an unsigned one: accepting it wraps the value into
+  // an enormous id rather than rejecting the corrupted file.
+  invalid = valid; invalid["epoch"] = -1; if (ParseSessionSnapshot(invalid, &out)) return 6;
+  invalid = valid; invalid["nextTabId"] = -9; if (ParseSessionSnapshot(invalid, &out)) return 7;
+  invalid = valid; invalid["version"] = -1; if (ParseSessionSnapshot(invalid, &out)) return 8;
   return SerializeSessionSnapshot(out).value("version", 0) == 1 ? 0 : 5;
 }
