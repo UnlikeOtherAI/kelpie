@@ -10,6 +10,7 @@
 #include "handlers/bookmark_handler.h"
 #include "handlers/cookie_handler.h"
 #include "handlers/console_handler.h"
+#include "handlers/device_handler.h"
 #include "handlers/dialog_handler.h"
 #include "handlers/dom_handler.h"
 #include "handlers/evaluate_handler.h"
@@ -74,8 +75,8 @@ int main() {
   runtime.set_home=[](std::string){ return kelpie::BrowserControlResult::Success(); }; runtime.get_home=[](std::string* url){ *url="https://home.test"; return kelpie::BrowserControlResult::Success(); }; runtime.show_native_toast=[](std::string){ return kelpie::BrowserControlResult::Success(); }; runtime.set_native_fullscreen=[](bool){ return kelpie::BrowserControlResult::Success(); }; runtime.get_native_fullscreen=[](bool* enabled){ *enabled=true; return kelpie::BrowserControlResult::Success(); }; runtime.request_shutdown=[](){ return kelpie::BrowserControlResult::Success(); };
   runtime.renderer_supplier=[](){return kelpie::SuccessResponse({{"current","chromium"},{"available",{"chromium"}}});};
   runtime.viewport_supplier=[&](){return nlohmann::json{{"width",width},{"height",height},{"devicePixelRatio",1.0}};}; runtime.resize_viewport=[&](int w,int h){width=w;height=h;return true;}; runtime.reset_viewport=[&](){width=1280;height=720;return true;};
-  kelpie::DesktopRouter router; kelpie::BookmarkHandler bookmark_handler(runtime); kelpie::HistoryHandler history_handler(runtime); kelpie::RendererHandler renderer_handler(runtime); kelpie::ViewportHandler viewport_handler(runtime); kelpie::DomHandler dom(runtime); kelpie::EvaluateHandler evaluate(runtime); kelpie::InteractionHandler interaction(runtime); kelpie::CookieHandler cookies(runtime); kelpie::DialogHandler dialogs(runtime); kelpie::InspectionHandler inspection(runtime); kelpie::ConsoleHandler console_handler(runtime); kelpie::NetworkHandler network_handler(runtime); kelpie::ShellHandler shell(runtime);
-  bookmark_handler.Register(router); history_handler.Register(router); renderer_handler.Register(router); viewport_handler.Register(router); dom.Register(router); evaluate.Register(router); interaction.Register(router); cookies.Register(router); dialogs.Register(router); inspection.Register(router); console_handler.Register(router); network_handler.Register(router); shell.Register(router);
+  kelpie::DesktopRouter router; kelpie::BookmarkHandler bookmark_handler(runtime); kelpie::HistoryHandler history_handler(runtime); kelpie::RendererHandler renderer_handler(runtime); kelpie::ViewportHandler viewport_handler(runtime); kelpie::DomHandler dom(runtime); kelpie::EvaluateHandler evaluate(runtime); kelpie::InteractionHandler interaction(runtime); kelpie::CookieHandler cookies(runtime); kelpie::DialogHandler dialogs(runtime); kelpie::InspectionHandler inspection(runtime); kelpie::ConsoleHandler console_handler(runtime); kelpie::NetworkHandler network_handler(runtime); kelpie::ShellHandler shell(runtime); kelpie::DeviceHandler device_handler(runtime);
+  bookmark_handler.Register(router); history_handler.Register(router); renderer_handler.Register(router); viewport_handler.Register(router); dom.Register(router); evaluate.Register(router); interaction.Register(router); cookies.Register(router); dialogs.Register(router); inspection.Register(router); console_handler.Register(router); network_handler.Register(router); shell.Register(router); device_handler.Register(router);
   auto add=router.Dispatch("bookmarks-add",{{"url","https://example.com"},{"title","Example"}}); assert(add.status_code==200); assert(add.body["bookmarks"].size()==1);
   assert(router.Dispatch("get-bookmarks",nlohmann::json::object()).body["bookmarks"].size()==1); history.Record("https://example.com","Example"); assert(router.Dispatch("get-history",{{"limit",10}}).body["entries"].size()==1);
   assert(router.Dispatch("get-renderer",nlohmann::json::object()).body["current"]=="chromium"); assert(router.Dispatch("resize-viewport",{{"width",390},{"height",844}}).body["viewport"]["width"]==390); assert(router.Dispatch("reset-viewport",nlohmann::json::object()).body["viewport"]["width"]==1280);
@@ -111,6 +112,12 @@ int main() {
   assert(a11y.status_code == 200 && control.last_devtools_method == "Accessibility.getFullAXTree" && a11y.body["count"] == 1);
   assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}, {"placeholder", "Email"}}).status_code == 200);
   assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}}).status_code == 400);
+  // get-device-info must answer 200: the router keys the HTTP status and the
+  // MCP isError flag off `success`, so a bare provider payload became a 400.
+  auto device=router.Dispatch("get-device-info", nlohmann::json::object());
+  assert(device.status_code==200);
+  assert(device.body["success"]==true);
+  assert(device.body["name"]=="Stub Desktop");
   control.stale=true; auto stale=router.Dispatch("get-dialog",second); assert(stale.body["error"]["code"]=="TAB_STALE"); control.stale=false;
   control.timeout_eval=true; auto timeout=router.Dispatch("get-page-text",second); assert(timeout.status_code==408 && timeout.body["error"]["code"]=="TIMEOUT");
   return 0;
