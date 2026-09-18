@@ -1,6 +1,6 @@
 #include "windows_app.h"
 
-#include "cef_pump_deadline.h"
+#include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "windows_utf.h"
 
@@ -19,48 +19,56 @@ namespace kelpie::windows {
 namespace {
 
 constexpr UINT_PTR kCefPumpTimerId = 0x4B50;
-constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B50;
+// WM_APP spans 0x8000-0xBFFF. Both pump messages have to stay inside that
+// range; past 0xBFFF they collide with the RegisterWindowMessage space.
+constexpr UINT kScheduleCefPumpMessage = WM_APP + 0x4B;
+constexpr UINT kRunCefPumpMessage = WM_APP + 0x4C;
 HWND g_cef_pump_window = nullptr;
-CefPumpDeadline g_cef_deadline;
+CefPumpScheduler g_cef_pump;
 
-std::int64_t PumpNow() {
-  return static_cast<std::int64_t>(GetTickCount64());
+void ApplyPumpDecision(HWND hwnd, CefPumpScheduler::Decision decision);
+
+void RunCefPumpWork(HWND hwnd) {
+#if defined(HAS_CEF)
+  // CEF forbids re-entering CefDoMessageLoopWork(); the scheduler records the
+  // request instead and EndWork() queues it behind the running pump.
+  if (!g_cef_pump.BeginWork()) return;
+  CefDoMessageLoopWork();
+  ApplyPumpDecision(hwnd, g_cef_pump.EndWork());
+#else
+  (void)hwnd;
+#endif
 }
 
-void CALLBACK PumpCefTimer(HWND hwnd, UINT, UINT_PTR timer_id, DWORD) {
-#if defined(HAS_CEF)
-  if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
-    KillTimer(hwnd, timer_id);
-    CefDoMessageLoopWork();
-  } else if (const auto due = g_cef_deadline.due_ms()) {
-    SetTimer(hwnd, timer_id, static_cast<UINT>(std::max<std::int64_t>(1, *due - PumpNow())),
-             &PumpCefTimer);
-  } else {
-    KillTimer(hwnd, timer_id);
+void ApplyPumpDecision(HWND hwnd, CefPumpScheduler::Decision decision) {
+  switch (decision.action) {
+    case CefPumpScheduler::Action::kNone:
+      break;
+    case CefPumpScheduler::Action::kRunWork:
+      KillTimer(hwnd, kCefPumpTimerId);
+      RunCefPumpWork(hwnd);
+      break;
+    case CefPumpScheduler::Action::kPostWork:
+      PostMessageW(hwnd, kRunCefPumpMessage, 0, 0);
+      break;
+    case CefPumpScheduler::Action::kArmTimer:
+      SetTimer(hwnd, kCefPumpTimerId, static_cast<UINT>(decision.delay_ms), nullptr);
+      break;
   }
-#endif
 }
 
 LRESULT CALLBACK CefPumpWindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   if (message == kScheduleCefPumpMessage) {
-    const auto now = PumpNow();
-    if (g_cef_deadline.Schedule(now, static_cast<std::int64_t>(wparam))) {
-      const auto due = *g_cef_deadline.due_ms();
-      if (due <= now) {
-        PostMessageW(hwnd, kScheduleCefPumpMessage + 1, 0, 0);
-      } else {
-        SetTimer(hwnd, kCefPumpTimerId, static_cast<UINT>(due - now), &PumpCefTimer);
-      }
-    }
+    ApplyPumpDecision(hwnd, g_cef_pump.OnScheduleWork(static_cast<std::int64_t>(wparam)));
     return 0;
   }
-  if (message == kScheduleCefPumpMessage + 1) {
-    if (g_cef_deadline.ConsumeIfDue(PumpNow())) {
-      KillTimer(hwnd, kCefPumpTimerId);
-#if defined(HAS_CEF)
-      CefDoMessageLoopWork();
-#endif
-    }
+  if (message == kRunCefPumpMessage) {
+    RunCefPumpWork(hwnd);
+    return 0;
+  }
+  if (message == WM_TIMER && wparam == kCefPumpTimerId) {
+    KillTimer(hwnd, kCefPumpTimerId);
+    ApplyPumpDecision(hwnd, g_cef_pump.OnTimerElapsed());
     return 0;
   }
   return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -112,10 +120,13 @@ bool WindowsApp::InitializeDesktopRuntime() {
 #if defined(HAS_CEF)
   // cef_app_factory.cpp only compiles with the Chromium desktop engine, so
   // the no-CEF configuration has no symbol to call here.
+  // CEF calls this from any thread, so the only safe handoff to the UI thread
+  // is a posted message.
   SetDesktopCefMessagePumpScheduler([](std::int64_t delay_ms) {
-    if (g_cef_pump_window != nullptr) {
-      PostMessageW(g_cef_pump_window, kScheduleCefPumpMessage, static_cast<WPARAM>(delay_ms), 0);
-    }
+    HWND window = g_cef_pump_window;
+    if (window == nullptr) return;
+    PostMessageW(window, kScheduleCefPumpMessage,
+                 static_cast<WPARAM>(std::max<std::int64_t>(0, delay_ms)), 0);
   });
 #endif
 
@@ -296,6 +307,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
     DestroyWindow(g_cef_pump_window);
     g_cef_pump_window = nullptr;
   }
+  g_cef_pump.Reset();
   profile_session_.ClearReadiness();
   return true;
 }

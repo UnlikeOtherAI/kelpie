@@ -78,7 +78,7 @@ set(WINDOWS_APP_SOURCES
   src/main.cpp
   src/native_window_control.cpp
   src/owner_task_queue.cpp
-  src/cef_pump_deadline.cpp
+  src/cef_pump_schedule.cpp
   src/close_lifecycle.h
   src/windows_app.cpp
   src/windows_runtime.cpp
@@ -101,7 +101,7 @@ set(WINDOWS_APP_HEADERS
   src/windows_app.h
   src/native_window_control.h
   src/owner_task_queue.h
-  src/cef_pump_deadline.h
+  src/cef_pump_schedule.h
   src/win32_shell.h
   src/window_chrome.h
   src/win32_browser_view.h
@@ -256,10 +256,10 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_session_snapshot_test COMMAND kelpie_windows_session_snapshot_test)
-  add_executable(kelpie_windows_cef_pump_deadline_test tests/cef_pump_deadline_test.cpp src/cef_pump_deadline.cpp)
-  target_include_directories(kelpie_windows_cef_pump_deadline_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
-  target_compile_options(kelpie_windows_cef_pump_deadline_test PRIVATE /UNDEBUG)
-  add_test(NAME kelpie_windows_cef_pump_deadline_test COMMAND kelpie_windows_cef_pump_deadline_test)
+  add_executable(kelpie_windows_cef_pump_schedule_test tests/cef_pump_schedule_test.cpp src/cef_pump_schedule.cpp)
+  target_include_directories(kelpie_windows_cef_pump_schedule_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_compile_options(kelpie_windows_cef_pump_schedule_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_cef_pump_schedule_test COMMAND kelpie_windows_cef_pump_schedule_test)
   add_executable(kelpie_windows_owner_task_queue_test tests/owner_task_queue_test.cpp src/owner_task_queue.cpp)
   target_include_directories(kelpie_windows_owner_task_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_compile_options(kelpie_windows_owner_task_queue_test PRIVATE /UNDEBUG)
