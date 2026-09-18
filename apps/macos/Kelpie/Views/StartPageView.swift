@@ -7,14 +7,10 @@ struct StartPageView: View {
     @ObservedObject private var faviconCache = FaviconCache.shared
     let onNavigate: (String) -> Void
 
-    private var iconBackgroundColor: Color {
-        guard let img = NSImage(named: "WelcomeIcon"),
-              let tiff = img.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let pixel = rep.colorAt(x: 0, y: 0) else {
-            return Color(red: 232 / 255, green: 241 / 255, blue: 249 / 255)
-        }
-        return Color(nsColor: pixel)
+    /// The page tracks the system appearance rather than the app icon, so the
+    /// `.primary` / `.secondary` text below stays legible in light and dark.
+    private var pageBackgroundColor: Color {
+        Color(nsColor: .windowBackgroundColor)
     }
 
     var body: some View {
@@ -83,12 +79,12 @@ struct StartPageView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             ZStack {
-                iconBackgroundColor
-                if let img = NSImage(named: "WelcomeIcon") {
+                pageBackgroundColor
+                if let img = NSImage(named: "KelpieMark") {
                     Image(nsImage: img)
                         .resizable()
                         .scaledToFill()
-                        .opacity(0.30)
+                        .opacity(0.06)
                 }
             }
             .clipped()
