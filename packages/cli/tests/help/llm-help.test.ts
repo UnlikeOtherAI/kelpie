@@ -218,3 +218,22 @@ describe("partition help", () => {
     expect(parsed.response).toContainEqual(expect.objectContaining({ name: "existed" }));
   });
 });
+
+describe("partition error descriptions", () => {
+  it("explains every partition error code an LLM can hit", () => {
+    // A bare code tells an LLM nothing it can act on; the description is what
+    // says which knob to turn.
+    const parsed = JSON.parse(generateLlmHelp("tab new"));
+    const errors = parsed.errors as { code: string; description?: string }[];
+    for (const error of errors) {
+      expect(error.description, `${error.code} has no description`).toBeTruthy();
+    }
+  });
+
+  it("points PARTITION_UNSUPPORTED at the reason field", () => {
+    const parsed = JSON.parse(generateLlmHelp("partition delete"));
+    const errors = parsed.errors as { code: string; description?: string }[];
+    const unsupported = errors.find((e) => e.code === "PARTITION_UNSUPPORTED");
+    expect(unsupported?.description).toContain("chromium-engine");
+  });
+});

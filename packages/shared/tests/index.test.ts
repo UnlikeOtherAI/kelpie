@@ -52,6 +52,7 @@ describe("error codes", () => {
       "PARTITION_UNSUPPORTED",
       "PARTITION_DELETING",
       "PARTITION_IN_USE",
+      "ENGINE_SWITCH_BLOCKED_BY_PARTITION",
     ];
     expect(Object.keys(ErrorCode)).toEqual(expected);
   });

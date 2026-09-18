@@ -16,7 +16,7 @@ extension HandlerContext {
     /// on the tab's own `websiteDataStore.httpCookieStore` instead.
     var activeRendererIsPartitioned: Bool {
         guard let renderer else { return false }
-        return WindowRegistry.shared.allEntries().contains { entry in
+        return WindowRegistry.shared.allEntriesIncludingDetached().contains { entry in
             entry.tabStore.tabs.contains { $0.partition != nil && $0.renderer === renderer }
         }
     }

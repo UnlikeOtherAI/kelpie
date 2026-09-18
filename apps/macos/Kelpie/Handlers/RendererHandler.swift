@@ -43,7 +43,7 @@ struct RendererHandler {
     /// the user could never get back to the engine those tabs need.
     @MainActor
     private func partitionedTabsBlockSwitch() -> [String: Any]? {
-        let partitioned = WindowRegistry.shared.allEntries()
+        let partitioned = WindowRegistry.shared.allEntriesIncludingDetached()
             .flatMap { $0.tabStore.tabs.compactMap(\.partition) }
         guard !partitioned.isEmpty else { return nil }
         let names = Set(partitioned).sorted().joined(separator: ", ")

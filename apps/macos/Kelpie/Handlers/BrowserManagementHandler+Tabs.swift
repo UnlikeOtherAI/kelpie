@@ -1,7 +1,4 @@
-import AppKit
-import WebKit
-
-// swiftlint:disable line_length
+import Foundation
 
 /// Tab lifecycle endpoints for `BrowserManagementHandler`.
 ///

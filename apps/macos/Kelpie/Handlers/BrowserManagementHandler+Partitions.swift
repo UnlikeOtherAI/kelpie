@@ -1,4 +1,4 @@
-import WebKit
+import Foundation
 
 /// Storage-partition endpoints and the shared partition error shapes.
 ///
@@ -43,7 +43,8 @@ extension BrowserManagementHandler {
                 code: "PARTITION_IN_USE",
                 message: "The engine refused to delete partition \"\(id)\" after closing " +
                     "\(tabsClosed) tab(s): \(inUse.underlying.localizedDescription). " +
-                    "The partition is still usable; retry delete-partition."
+                    "The id is free to reuse; the abandoned store is now listed by " +
+                    "get-partitions as orphan:<uuid> and can be deleted with that id."
             )
         } catch {
             return errorResponse(
@@ -64,7 +65,7 @@ extension BrowserManagementHandler {
     @MainActor
     private func closeTabs(inPartition id: String) -> Int {
         var closed = 0
-        for entry in WindowRegistry.shared.allEntries() {
+        for entry in WindowRegistry.shared.allEntriesIncludingDetached() {
             guard let callbacks = entry.callbacks else { continue }
             let doomed = entry.tabStore.tabs.filter { $0.partition == id }.map(\.id)
             for tabId in doomed {

@@ -30,7 +30,8 @@ partition in turn.
 | `INVALID_PARTITION` | 400 | The partition string fails the shared validator. |
 | `PARTITION_UNSUPPORTED` | 501 | The platform or engine cannot honour partitions. |
 | `PARTITION_DELETING` | 409 | `new-tab` named a partition that is mid-teardown. Retry. |
-| `PARTITION_IN_USE` | 409 | The engine refused deletion even after every tab was closed. |
+| `PARTITION_IN_USE` | 409 | The engine refused deletion even after every tab was closed. The id is freed anyway and the abandoned store is relisted as `orphan:<uuid>`. |
+| `ENGINE_SWITCH_BLOCKED_BY_PARTITION` | 409 | `set-renderer` to `chromium` was called while partitioned tabs are open. |
 
 `PARTITION_UNSUPPORTED` carries diagnostic context so a caller can recover
 without guessing. A single error code with a `reason` discriminator:

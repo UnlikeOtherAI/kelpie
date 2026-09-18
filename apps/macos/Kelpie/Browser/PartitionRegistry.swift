@@ -7,9 +7,9 @@ import WebKit
 ///
 /// Everything here runs on the main actor, like the rest of the app, so
 /// `new-tab` and `delete-partition` serialise against each other. They still
-/// interleave at `await` points, which is exactly what the `deleting` flag
-/// guards: once a teardown starts, `resolve` refuses the id until the engine
-/// has finished removing the store.
+/// interleave at `await` points, which is exactly what `deletingIds` guards:
+/// once a teardown starts, `resolve` refuses that id until the engine has
+/// finished removing the store.
 ///
 /// `tabCount` is never stored. It is counted from the live tab list on demand,
 /// so a crash, a session restore, or a window closing can never leave a stale
@@ -45,7 +45,6 @@ final class PartitionRegistry {
         let identifier: UUID?
         let dataStore: WKWebsiteDataStore
         let persistent: Bool
-        var deleting = false
     }
 
     private static let mapDefaultsKey = "com.kelpie.partition-map"
@@ -55,6 +54,14 @@ final class PartitionRegistry {
     /// Engine stores with no map entry, surfaced by `get-partitions` under
     /// `orphan:<uuid>` so an operator can clean them up.
     private var orphanIdentifiers: Set<UUID> = []
+    /// Partitions with a teardown in flight.
+    ///
+    /// Kept as a set of ids rather than a flag on `Entry` because a partition
+    /// can be deleted while it has no entry at all — one carried over from a
+    /// previous launch that nothing has resolved yet — and because the entry is
+    /// dropped mid-teardown to release the data store. The id is what stays
+    /// constant across the whole sequence, so the id is what the guard keys on.
+    private var deletingIds: Set<String> = []
 
     private init() {
         let raw = UserDefaults.standard.dictionary(forKey: Self.mapDefaultsKey) as? [String: String] ?? [:]
@@ -84,8 +91,8 @@ final class PartitionRegistry {
         if let failure = PartitionValidator.validate(id) {
             throw ResolveFailure.invalid(failure)
         }
+        guard !deletingIds.contains(id) else { throw ResolveFailure.deleting }
         if let existing = entries[id] {
-            guard !existing.deleting else { throw ResolveFailure.deleting }
             return Resolution(id: id, dataStore: existing.dataStore, persistent: existing.persistent)
         }
 
@@ -119,8 +126,8 @@ final class PartitionRegistry {
     /// fresh UUID, which would silently fork the user's identity under a
     /// familiar name.
     func rebind(id: String) -> Resolution? {
+        guard !deletingIds.contains(id) else { return nil }
         if let existing = entries[id] {
-            guard !existing.deleting else { return nil }
             return Resolution(id: id, dataStore: existing.dataStore, persistent: existing.persistent)
         }
         guard let identifier = map.identifier(for: id) else { return nil }
@@ -140,7 +147,12 @@ final class PartitionRegistry {
     /// `sizeBytes` is omitted throughout: `WKWebsiteDataStore` has no cheap
     /// size API, and the contract says to omit rather than guess.
     func listing() -> [[String: Any]] {
-        var rows: [[String: Any]] = entries.keys.sorted().map { id -> [String: Any] in
+        // Union of live entries and persisted map entries. A partition created
+        // in a previous launch has a store on disk but no entry until something
+        // resolves it; leaving it out would make it both invisible here and
+        // unreachable by delete-partition, so its storage could never be freed.
+        let knownIds = Set(entries.keys).union(map.identifiers.keys)
+        var rows: [[String: Any]] = knownIds.sorted().map { id -> [String: Any] in
             [
                 "id": id,
                 "tabCount": tabCount(for: id),
@@ -159,7 +171,7 @@ final class PartitionRegistry {
 
     /// Open tabs bound to `id`, counted across every window.
     func tabCount(for id: String) -> Int {
-        WindowRegistry.shared.allEntries()
+        WindowRegistry.shared.allEntriesIncludingDetached()
             .reduce(0) { total, entry in
                 total + entry.tabStore.tabs.filter { $0.partition == id }.count
             }
@@ -170,12 +182,18 @@ final class PartitionRegistry {
     /// Mark a partition as being torn down so no new tab binds to its store.
     ///
     /// Returns `false` when the id names nothing deletable, which is not an
-    /// error — `delete-partition` is idempotent.
+    /// error — `delete-partition` is idempotent. Three things are deletable: a
+    /// live partition, a dormant one carried over from a previous launch that
+    /// nothing has resolved yet (otherwise its storage would be stranded
+    /// forever), and a recorded orphan store.
     func beginDeleting(id: String) -> Bool {
-        if entries[id] != nil {
-            entries[id]?.deleting = true
-            return true
-        }
+        guard isDeletable(id: id) else { return false }
+        deletingIds.insert(id)
+        return true
+    }
+
+    private func isDeletable(id: String) -> Bool {
+        if entries[id] != nil || map.identifier(for: id) != nil { return true }
         guard let identifier = PartitionMap.orphanIdentifier(from: id) else { return false }
         return orphanIdentifiers.contains(identifier)
     }
@@ -183,30 +201,55 @@ final class PartitionRegistry {
     /// Remove the engine store and drop the registry entry. Call only after
     /// every tab bound to the partition has been closed.
     ///
-    /// On failure the `deleting` flag is cleared and `PartitionInUseError` is
-    /// thrown, so the partition stays usable and a retry can try again rather
-    /// than leaving an id that is permanently unbindable.
+    /// The registry entry is dropped *before* the engine call: WebKit refuses
+    /// to remove a data store while a live `WKWebsiteDataStore` for that
+    /// identifier still exists in the process, and this registry's own entry is
+    /// one of those. Removing it first is what makes the deletion possible at
+    /// all.
+    ///
+    /// If the engine still refuses, the abandoned store is recorded as an
+    /// orphan so `get-partitions` surfaces it as `orphan:<uuid>` and it stays
+    /// deletable. The partition id itself is free again either way, so a fresh
+    /// `new-tab` mints a clean store rather than binding to a half-deleted one.
     func finishDeleting(id: String) async throws {
-        do {
-            if let identifier = PartitionMap.orphanIdentifier(from: id) {
-                try await removeStore(identifier: identifier, id: id)
-                orphanIdentifiers.remove(identifier)
-                return
-            }
-            if let identifier = entries[id]?.identifier {
-                try await removeStore(identifier: identifier, id: id)
-            }
+        defer { deletingIds.remove(id) }
+
+        if let identifier = PartitionMap.orphanIdentifier(from: id) {
+            try await removeStore(identifier: identifier, id: id)
+            orphanIdentifiers.remove(identifier)
+            return
+        }
+
+        let identifier: UUID?
+        if let entry = entries[id] {
             // A non-persistent partition has no on-disk store; dropping the
-            // entry below releases the in-memory one.
-            entries.removeValue(forKey: id)
-            map.remove(id)
-            persistMap()
+            // entry releases the in-memory one and there is nothing to remove.
+            identifier = entry.identifier
+        } else {
+            identifier = map.identifier(for: id)
+        }
+        entries.removeValue(forKey: id)
+        map.remove(id)
+        persistMap()
+
+        guard let identifier else { return }
+        do {
+            try await removeStore(identifier: identifier, id: id)
         } catch {
-            entries[id]?.deleting = false
+            orphanIdentifiers.insert(identifier)
             throw error
         }
     }
 
+    /// - Important: the two `WKWebsiteDataStore` type methods used here and in
+    ///   `reconcile()` were matched to Apple's documented macOS 14 Swift names
+    ///   but never compiled — this branch was written without a Swift toolchain.
+    ///   If the build rejects them, the ObjC selectors are
+    ///   `+removeDataStoreForIdentifier:completionHandler:` and
+    ///   `+fetchAllDataStoreIdentifiers:`; the alternative Swift spellings to
+    ///   try are `removeDataStore(forIdentifier:)` and
+    ///   `allDataStoreIdentifiers()`. These four call sites are the only place
+    ///   the app touches those APIs.
     private func removeStore(identifier: UUID, id: String) async throws {
         do {
             try await WKWebsiteDataStore.remove(forIdentifier: identifier)
@@ -251,7 +294,7 @@ final class PartitionRegistry {
 
     private func livePartitionIds() -> Set<String> {
         Set(
-            WindowRegistry.shared.allEntries()
+            WindowRegistry.shared.allEntriesIncludingDetached()
                 .flatMap { $0.tabStore.tabs.compactMap(\.partition) }
         )
     }
