@@ -110,8 +110,6 @@ DesktopEngine::Impl::Tab* DesktopEngine::Impl::ActiveTab() {
   return browser ? FindTab(browser) : nullptr;
 }
 
-FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
-
 TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
   return {tab.id,
           tab.generation,

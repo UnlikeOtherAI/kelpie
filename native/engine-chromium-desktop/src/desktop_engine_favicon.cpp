@@ -17,6 +17,8 @@
 // of the client stays about navigation and lifecycle.
 namespace kelpie {
 
+FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
+
 namespace {
 
 // Receives the decoded icon on the UI thread and hands the PNG to the engine.

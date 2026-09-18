@@ -112,6 +112,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   endif()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
     src/desktop_engine.cpp
+    src/desktop_engine_client.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
     src/desktop_devtools.cpp
