@@ -9,8 +9,8 @@
 #include <nlohmann/json.hpp>
 
 #include "../resources/resource.h"
+#include "theme/theme.h"
 #include "windows_utf.h"
-#include "panel_theme.h"
 
 namespace kelpie::windows {
 namespace {

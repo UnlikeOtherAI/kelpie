@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "resource.h"
+#include "theme/theme.h"
 #include "win32_shell.h"
 
 namespace {
@@ -128,6 +129,26 @@ int main() {
         ((GetWindowLongPtrW(first_close, GWL_STYLE) & WS_VISIBLE) == 0);
     passed &= Expect(moved, "tab scroll did not relayout close controls");
   }
+
+  // Pills share the strip like the macOS tab bar: wide when few, narrower when
+  // many, and never outside the clamp in either direction.
+  const auto pill_width = [&](int count) {
+    delegate.tab_count = count;
+    shell.UpdateBrowserState(state);
+    RECT item{};
+    if (!TabCtrl_GetItemRect(GetDlgItem(shell.hwnd(), IDC_TAB_STRIP), 0, &item)) return 0L;
+    return item.right - item.left;
+  };
+  const LONG few = pill_width(2);
+  const LONG many = pill_width(20);
+  const UINT dpi = kelpie::windows::ui::WindowDpi(shell.hwnd());
+  const LONG minimum = MulDiv(kelpie::windows::kTabMinWidthDip, static_cast<int>(dpi), 96);
+  const LONG maximum = MulDiv(kelpie::windows::kTabMaxWidthDip, static_cast<int>(dpi), 96);
+  passed &= Expect(few > many, "tab pills did not widen when fewer tabs were open");
+  passed &= Expect(few <= maximum, "a sparse strip stretched a pill past the clamp");
+  passed &= Expect(many >= minimum, "a crowded strip shrank a pill below the clamp");
+  delegate.tab_count = 20;
+  shell.UpdateBrowserState(state);
 
   constexpr int kWidth = 1120;
   constexpr int kHeight = 760;
