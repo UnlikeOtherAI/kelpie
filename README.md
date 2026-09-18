@@ -33,7 +33,7 @@ No emulators pretending to be phones. No persistent content scripts. No browser 
 | Android | Done | Main mobile platform, actively usable |
 | macOS | Done | Desktop app is usable |
 | Linux | In progress | Desktop shell exists, still evolving |
-| Windows | Not done | Very much a work in progress. Not even worth launching yet |
+| Windows | In progress | Runs and is controllable: native chrome, tabs, navigation, DOM, eval, screenshots over loopback HTTP/MCP. Not yet released |
 | CLI | Done | Main control surface for devices |
 
 ## Install
