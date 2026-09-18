@@ -1,5 +1,24 @@
 include(FetchContent)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedResource.cmake")
 find_package(Threads REQUIRED)
+
+# The start page assets ship as editable .html/.css/.js/.png files and are turned
+# into a byte array at configure time. Both build configurations embed them: the
+# no-CEF stub cannot serve them, but its tests still assert the payload builder
+# and the resource table.
+set(KELPIE_START_PAGE_RESOURCES_CPP
+  "${CMAKE_CURRENT_BINARY_DIR}/generated/start_page_resources.cpp")
+set(KELPIE_START_PAGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/start_page")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+kelpie_embed_resources(
+  OUTPUT "${KELPIE_START_PAGE_RESOURCES_CPP}"
+  HEADER "kelpie/start_page.h"
+  NAMESPACE "kelpie::start_page::resources"
+  RESOURCES
+    "kIndexHtml=${KELPIE_START_PAGE_DIR}/index.html"
+    "kStartCss=${KELPIE_START_PAGE_DIR}/start.css"
+    "kStartJs=${KELPIE_START_PAGE_DIR}/start.js"
+    "kAppIconPng=${KELPIE_START_PAGE_DIR}/app-icon.png")
 
 find_path(CPP_HTTPLIB_INCLUDE_DIR
   NAMES httplib.h
@@ -51,6 +70,13 @@ list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_input_planner.cpp
   src/desktop_cookie_planner.cpp)
 
+# The favicon registry and the start page payload builder are pure data handling
+# with no CEF dependency, so both configurations compile and test them.
+list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
+  src/favicon_registry.cpp
+  src/start_page.cpp
+  "${KELPIE_START_PAGE_RESOURCES_CPP}")
+
 option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "")
@@ -88,7 +114,9 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
-    src/desktop_devtools.cpp)
+    src/desktop_devtools.cpp
+    src/desktop_engine_favicon.cpp
+    src/start_page_scheme.cpp)
 else()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)
 endif()

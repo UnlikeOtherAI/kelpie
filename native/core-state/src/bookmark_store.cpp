@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "kelpie/internal_scheme.h"
 #include "store_support.h"
 
 namespace kelpie {
@@ -23,6 +24,11 @@ json BookmarkToJson(const Bookmark& bookmark) {
 }  // namespace
 
 void BookmarkStore::Add(const std::string& title, const std::string& url) {
+  // Kelpie's own first-party pages (kelpie://start) are chrome, not content.
+  // Bookmarking them would put the start page inside its own Favourites grid.
+  if (IsInternalSchemeUrl(url)) {
+    return;
+  }
   std::lock_guard<std::mutex> lock(mutex_);
   bookmarks_.push_back(Bookmark{
       store_support::GenerateUuidV4(),

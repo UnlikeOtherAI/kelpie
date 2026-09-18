@@ -13,6 +13,7 @@
 #include "include/cef_parser.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/cef_urlrequest.h"
+#include "kelpie/internal_scheme.h"
 #include "desktop_cookie_planner.h"
 #include "desktop_input_planner.h"
 #if defined(_WIN32)
@@ -53,7 +54,11 @@ void RunUiOperation(std::shared_ptr<UiOperation> operation) {
 bool IsNavigableUrl(const std::string& url) {
   if (url.empty()) return false;
   CefURLParts parts;
-  return CefParseURL(url, parts) || url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
+  // `kelpie://` is checked explicitly: CefParseURL only recognises a custom
+  // scheme once Chromium has been initialised in this process, and the shell
+  // creates the start page tab through the same validator.
+  return CefParseURL(url, parts) || IsInternalSchemeUrl(url) ||
+         url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
 }
 
 struct PendingDevTools {
@@ -105,10 +110,20 @@ DesktopEngine::Impl::Tab* DesktopEngine::Impl::ActiveTab() {
   return browser ? FindTab(browser) : nullptr;
 }
 
+FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
+
 TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
-  return {tab.id, tab.generation, tab.url, tab.title,
-          browser && browser->IsSame(tab.browser), tab.loading,
-          tab.can_go_back, tab.can_go_forward};
+  return {tab.id,
+          tab.generation,
+          tab.url,
+          tab.title,
+          browser && browser->IsSame(tab.browser),
+          tab.loading,
+          tab.can_go_back,
+          tab.can_go_forward,
+          IsStartPageUrl(tab.url),
+          // Shared, not copied: see the field comment on TabSnapshot.
+          tab.favicon_png_base64};
 }
 
 void DesktopEngine::Impl::UpdateActiveState() {

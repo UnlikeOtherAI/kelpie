@@ -19,87 +19,13 @@
 #include "include/cef_jsdialog_handler.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
+#include "desktop_cef_client.h"
 #include "desktop_engine_impl.h"
+#include "start_page_scheme.h"
 
 namespace kelpie {
 
 
-
-class DesktopCefClient final : public CefClient,
-                               public CefLifeSpanHandler,
-                               public CefLoadHandler,
-                               public CefDisplayHandler,
-                               public CefRenderHandler,
-                               public CefJSDialogHandler {
- public:
-  explicit DesktopCefClient(DesktopEngine::Impl* owner) : owner_(owner) {}
-
-  CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
-  CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
-  CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
-  CefRefPtr<CefRenderHandler> GetRenderHandler() override { return this; }
-  CefRefPtr<CefJSDialogHandler> GetJSDialogHandler() override { return this; }
-
-  void OnAfterCreated(CefRefPtr<CefBrowser> browser) override;
-  bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
-                     CefRefPtr<CefFrame> frame,
-#if CEF_VERSION_MAJOR >= 130
-                     int popup_id,
-#endif
-                     const CefString& target_url,
-                     const CefString& target_frame_name,
-                     WindowOpenDisposition target_disposition,
-                     bool user_gesture,
-                     const CefPopupFeatures& popup_features,
-                     CefWindowInfo& window_info,
-                     CefRefPtr<CefClient>& client,
-                     CefBrowserSettings& settings,
-                     CefRefPtr<CefDictionaryValue>& extra_info,
-                     bool* no_javascript_access) override;
-  void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
-  void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
-                            bool is_loading,
-                            bool can_go_back,
-                            bool can_go_forward) override;
-  void OnLoadEnd(CefRefPtr<CefBrowser> browser,
-                 CefRefPtr<CefFrame> frame,
-                 int http_status_code) override;
-  void OnLoadError(CefRefPtr<CefBrowser> browser,
-                   CefRefPtr<CefFrame> frame,
-                   CefLoadHandler::ErrorCode error_code,
-                   const CefString& error_text,
-                   const CefString& failed_url) override;
-  void OnAddressChange(CefRefPtr<CefBrowser> browser,
-                       CefRefPtr<CefFrame> frame,
-                       const CefString& url) override;
-  void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
-  bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
-                        cef_log_severity_t level,
-                        const CefString& message,
-                        const CefString& source,
-                        int line) override;
-  bool OnJSDialog(CefRefPtr<CefBrowser> browser,
-                  const CefString& origin_url,
-                  cef_jsdialog_type_t dialog_type,
-                  const CefString& message_text,
-                  const CefString& default_prompt_text,
-                  CefRefPtr<CefJSDialogCallback> callback,
-                  bool& suppress_message) override;
-  void OnResetDialogState(CefRefPtr<CefBrowser> browser) override;
-
-  void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
-  void OnPaint(CefRefPtr<CefBrowser> browser,
-               PaintElementType type,
-               const RectList& dirty_rects,
-               const void* buffer,
-               int width,
-               int height) override;
-
- private:
-  DesktopEngine::Impl* owner_;
-
-  IMPLEMENT_REFCOUNTING(DesktopCefClient);
-};
 
 DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}
 
@@ -156,6 +82,15 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   initialized = CefInitialize(main_args, settings, app.get(), config.sandbox_info);
   if (!initialized) {
     last_error = "Chromium framework initialization failed";
+    return false;
+  }
+
+  // `kelpie://start` is first-party content served by this process, not a script
+  // injected into a page. The supplier reads the application's own stores.
+  if (!RegisterStartPageSchemeHandler(config.start_page_data_supplier)) {
+    last_error = "Chromium rejected the kelpie:// scheme handler";
+    CefShutdown();
+    initialized = false;
     return false;
   }
 
@@ -410,7 +345,15 @@ void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
                                        const CefString& url) {
   if (!frame || !frame->IsMain()) return;
   if (auto* tab = owner_->FindTab(browser)) {
-    tab->url = url.ToString();
+    const std::string next = url.ToString();
+    // A new document has no icon until OnFaviconURLChange fires. Keeping the old
+    // one would leave the previous site's favicon on the pill; the registry
+    // still holds it, keyed by that site's host.
+    if (FaviconRegistry::HostForUrl(next) != FaviconRegistry::HostForUrl(tab->url)) {
+      tab->favicon_url.clear();
+      tab->favicon_png_base64.reset();
+    }
+    tab->url = next;
     if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
   }
   owner_->UpdateActiveState();
