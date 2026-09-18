@@ -1,8 +1,5 @@
 #include "hf_cloud_client.h"
 
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-#  undef CPPHTTPLIB_OPENSSL_SUPPORT
-#endif
 #include <httplib.h>
 
 #include <chrono>

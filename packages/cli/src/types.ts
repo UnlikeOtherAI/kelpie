@@ -15,6 +15,10 @@ export interface DiscoveredDevice {
   version: string;
   lastSeen: number;
   capabilities?: DeviceCapabilities;
+  /** Read from an ACL-protected local readiness file; never persisted or printed. */
+  localControlToken?: string;
+  localReadinessFile?: string;
+  localLaunchId?: string;
 }
 
 export interface GlobalOptions {
@@ -22,7 +26,9 @@ export interface GlobalOptions {
   format: "json" | "table" | "text";
   timeout: number;
   port: number;
+  browser?: string;
   tabId?: string;
+  tabGeneration?: number;
 }
 
 export type OutputFormat = GlobalOptions["format"];

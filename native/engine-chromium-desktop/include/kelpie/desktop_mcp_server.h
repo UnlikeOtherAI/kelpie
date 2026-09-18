@@ -33,6 +33,8 @@ class DesktopMcpServer {
   void SetRegistry(const McpRegistry* registry);
 
   bool Run(const Config& config);
+  // Returns null for a valid JSON-RPC notification.  Stdio callers must not
+  // write anything for that case; HTTP callers translate it to 202 with no body.
   json HandleRequest(const json& request, const Config& config) const;
 
  private:

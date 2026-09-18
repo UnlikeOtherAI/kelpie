@@ -6,7 +6,7 @@ const allPlatforms = [...platforms] as readonly ToolPlatform[];
 const mobilePlatforms = ["ios", "android"] as const;
 const viewportPresetPlatforms = ["ios", "android", "macos"] as const;
 const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
-const fullscreenPlatforms = ["macos", "linux"] as const;
+const fullscreenPlatforms = ["macos", "linux", "windows"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
 const orientationPlatforms = ["ios", "android", "macos"] as const;
@@ -115,6 +115,13 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_get_current_url", description: "Get the current URL and page title", method: "getCurrentUrl", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_set_home", description: "Set the device home page URL. Persisted across app restarts.", method: "setHome", schema: { device, url: url.describe("Home page URL") }, bodyFromArgs: passthrough },
   { name: "kelpie_get_home", description: "Get the device home page URL", method: "getHome", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_close_browser", description: "Request an orderly local browser shutdown", method: "closeBrowser", platforms: ["windows"] as const, schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_list", description: "List saved bookmarks", method: "bookmarksList", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_add", description: "Add a saved bookmark", method: "bookmarksAdd", schema: { device, url, title: z.string().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_remove", description: "Remove a saved bookmark", method: "bookmarksRemove", schema: { device, id: z.string() }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_clear", description: "Remove all saved bookmarks", method: "bookmarksClear", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_history_list", description: "List browser history", method: "historyList", schema: { device, limit: z.number().int().positive().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_history_clear", description: "Clear browser history", method: "historyClear", schema: { device }, bodyFromArgs: passthrough },
 
   // Debug
   { name: "kelpie_debug_screens", description: "Get screen/scene/external display diagnostics. Shows UIScreen count, connected scenes, and external display manager state.", method: "debugScreens", platforms: iosOnlyPlatforms, schema: { device }, bodyFromArgs: passthrough },
@@ -136,6 +143,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_tap", description: "Tap at specific viewport coordinates as a last resort. Prefer click, fill, or click-annotation first. Saved tap calibration offsets are applied automatically before dispatch. Shows a blue touch indicator at the applied tap point.", method: "tap", schema: { device, x: z.number().describe("X coordinate"), y: z.number().describe("Y coordinate"), tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_fill", description: "Fill a form field with a value. Shows a touch indicator at the field.", method: "fill", schema: { device, selector, value: z.string().describe("Value to fill"), mode: z.enum(["instant", "typing"]).optional().describe("Fill mode: instant (default) sets value immediately, typing types character by character"), delay: z.number().optional().describe("Delay between keystrokes in ms when mode is typing (default 50)"), timeout, tabId, message }, bodyFromArgs: passthrough },
   { name: "kelpie_type", description: "Type text character by character", method: "type", schema: { device, selector: selector.optional(), text: z.string().describe("Text to type"), delay: z.number().optional().describe("Delay between keystrokes in ms"), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_press_key", description: "Send a trusted native key press to the focused browser element", method: "pressKey", platforms: ["windows"] as const, schema: { device, key: z.string().describe("Key value"), code: z.string().optional().describe("Physical key code"), modifiers: z.array(z.string()).optional().describe("Modifier keys"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_select_option", description: "Select an option from a dropdown", method: "selectOption", schema: { device, selector, value: z.string().describe("Option value to select"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_check", description: "Check a checkbox", method: "check", schema: { device, selector, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_uncheck", description: "Uncheck a checkbox", method: "uncheck", schema: { device, selector, tabId }, bodyFromArgs: passthrough },
@@ -185,6 +193,7 @@ export const browserTools: BrowserToolDef[] = [
 
   // Network
   { name: "kelpie_get_network_log", description: "Get network request log", method: "getNetworkLog", schema: { device, type: z.string().optional().describe("Filter by resource type"), status: z.enum(["success", "error", "pending"]).optional(), since: z.string().optional(), limit: z.number().optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_clear_network_log", description: "Clear the network request log", method: "clearNetworkLog", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_get_resource_timeline", description: "Get resource loading timeline", method: "getResourceTimeline", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_get_websockets", description: "List active WebSocket connections", method: "getWebSockets", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_get_websocket_messages", description: "Get recent WebSocket messages", method: "getWebSocketMessages", schema: { device, connectionIndex: z.number().optional().describe("Active connection index from getWebSockets"), limit: z.number().optional().describe("Max messages"), tabId }, bodyFromArgs: passthrough },
@@ -236,6 +245,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_get_cookies", description: "Get cookies", method: "getCookies", schema: { device, url: url.optional().describe("Filter by URL"), name: z.string().optional().describe("Filter by name"), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_set_cookie", description: "Set a cookie", method: "setCookie", schema: { device, name: z.string().describe("Cookie name"), value: z.string().describe("Cookie value"), domain: z.string().optional(), path: z.string().optional(), httpOnly: z.boolean().optional(), secure: z.boolean().optional(), sameSite: z.string().optional(), expires: z.string().optional(), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_delete_cookies", description: "Delete cookies", method: "deleteCookies", schema: { device, name: z.string().optional().describe("Cookie name"), domain: z.string().optional(), deleteAll: z.boolean().optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_clear_cookies", description: "Delete all cookies", method: "clearCookies", schema: { device, tabId }, bodyFromArgs: passthrough },
 
   // Storage
   { name: "kelpie_get_storage", description: "Get localStorage or sessionStorage entries", method: "getStorage", schema: { device, type: z.enum(["local", "session"]).optional().describe("Storage type"), key: z.string().optional(), tabId }, bodyFromArgs: passthrough },

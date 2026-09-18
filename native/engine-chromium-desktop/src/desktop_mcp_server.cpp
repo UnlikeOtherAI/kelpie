@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
+#include <string_view>
 
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
@@ -9,6 +11,8 @@
 
 namespace kelpie {
 namespace {
+
+constexpr std::string_view kProtocolVersion = "2025-06-18";
 
 nlohmann::json JsonRpcResult(const nlohmann::json& id, const nlohmann::json& result) {
   return {{"jsonrpc", "2.0"}, {"id", id}, {"result", result}};
@@ -18,6 +22,142 @@ nlohmann::json JsonRpcError(const nlohmann::json& id, int code, const std::strin
   return {{"jsonrpc", "2.0"},
           {"id", id},
           {"error", {{"code", code}, {"message", message}}}};
+}
+
+bool IsJsonRpcRequest(const nlohmann::json& request) {
+  if (!request.is_object()) {
+    return false;
+  }
+  const auto jsonrpc = request.find("jsonrpc");
+  const auto method = request.find("method");
+  return jsonrpc != request.end() && jsonrpc->is_string() && *jsonrpc == "2.0" &&
+         method != request.end() && method->is_string();
+}
+
+bool IsNotification(const nlohmann::json& request) {
+  return IsJsonRpcRequest(request) && !request.contains("id");
+}
+
+nlohmann::json ReplyOrNothing(bool notification, nlohmann::json response) {
+  return notification ? nlohmann::json(nullptr) : std::move(response);
+}
+
+nlohmann::json InputSchema(std::string_view endpoint) {
+  nlohmann::json properties = nlohmann::json::object();
+  nlohmann::json required = nlohmann::json::array();
+  const auto string = [&properties](const char* name, bool required_field = false) {
+    properties[name] = {{"type", "string"}, {"minLength", required_field ? 1 : 0}};
+  };
+  const auto integer = [&properties](const char* name, int minimum = 0) {
+    properties[name] = {{"type", "integer"}, {"minimum", minimum}};
+  };
+  const auto tab_scoped = [&properties] {
+    properties["tabId"] = {{"type", "string"}, {"minLength", 1}};
+    properties["generation"] = {{"type", "integer"}, {"minimum", 0}};
+    properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}};
+  };
+  const auto require = [&required](const char* name) { required.push_back(name); };
+  const bool scoped = endpoint == "navigate" || endpoint == "back" || endpoint == "forward" ||
+      endpoint == "reload" || endpoint == "get-current-url" ||
+      endpoint == "switch-tab" || endpoint == "close-tab" || endpoint == "get-dom" ||
+      endpoint == "query-selector" || endpoint == "query-selector-all" ||
+      endpoint == "get-element-text" || endpoint == "get-attributes" || endpoint == "evaluate" ||
+      endpoint == "wait-for-element" || endpoint == "wait-for-navigation" || endpoint == "click" ||
+      endpoint == "fill" || endpoint == "type" || endpoint == "select-option" || endpoint == "check" ||
+      endpoint == "uncheck" || endpoint == "press-key" || endpoint == "scroll" ||
+      endpoint == "scroll-to-top" || endpoint == "scroll-to-bottom" || endpoint == "screenshot" ||
+      endpoint == "screenshot-annotated" || endpoint == "get-cookies" || endpoint == "set-cookie" ||
+      endpoint == "delete-cookies" || endpoint == "clear-cookies" || endpoint == "get-storage" ||
+      endpoint == "set-storage" || endpoint == "clear-storage" || endpoint == "get-dialog" ||
+      endpoint == "handle-dialog" || endpoint == "find-element" || endpoint == "find-button" ||
+      endpoint == "find-link" || endpoint == "find-input" || endpoint == "get-page-text" ||
+      endpoint == "get-visible-elements" || endpoint == "get-form-state" || endpoint == "get-accessibility-tree";
+  if (scoped) tab_scoped();
+
+  if (endpoint == "navigate" || endpoint == "set-home") { string("url", true); require("url"); }
+  else if (endpoint == "new-tab") string("url");
+  else if (endpoint == "evaluate") { string("expression", true); require("expression"); }
+  else if (endpoint == "query-selector" || endpoint == "query-selector-all" || endpoint == "get-element-text" || endpoint == "get-attributes") { string("selector", true); require("selector"); }
+  else if (endpoint == "get-dom") string("selector");
+  else if (endpoint == "wait-for-element") { string("selector", true); require("selector"); }
+  else if (endpoint == "click" || endpoint == "check" || endpoint == "uncheck") { string("selector", true); require("selector"); }
+  else if (endpoint == "fill" || endpoint == "select-option") { string("selector", true); string("value"); require("selector"); require("value"); }
+  else if (endpoint == "type") { string("text", true); string("selector"); require("text"); }
+  else if (endpoint == "press-key") { string("key", true); string("code"); properties["modifiers"]={{"type","array"},{"items",{{"type","string"}}}}; require("key"); }
+  else if (endpoint == "scroll") {
+    properties["deltaX"] = {{"type", "integer"}};
+    properties["deltaY"] = {{"type", "integer"}};
+    require("deltaX"); require("deltaY");
+  }
+  else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") { properties["format"]={{"const","png"}}; }
+  else if (endpoint == "get-cookies") { string("url"); string("name"); }
+  else if (endpoint == "set-cookie") {
+    string("name", true); string("value"); string("url"); string("domain"); string("path");
+    string("expires"); properties["httpOnly"] = {{"type", "boolean"}};
+    properties["secure"] = {{"type", "boolean"}};
+    properties["sameSite"] = {{"enum", {"strict", "lax", "none"}}};
+    require("name"); require("value");
+  } else if (endpoint == "delete-cookies") {
+    string("name"); string("domain"); properties["deleteAll"]={{"type","boolean"}};
+  }
+  else if (endpoint == "get-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key"); }
+  else if (endpoint == "set-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key",true); string("value"); require("key"); require("value"); }
+  else if (endpoint == "clear-storage") properties["type"]={{"enum",{"local","session","both"}}};
+  else if (endpoint == "handle-dialog") { properties["action"]={{"enum",{"accept","dismiss"}}}; string("promptText"); require("action"); }
+  else if (endpoint == "find-element" || endpoint == "find-button" || endpoint == "find-link" || endpoint == "find-input") { string("text", true); require("text"); }
+  else if (endpoint == "toast") { string("message", true); require("message"); }
+  else if (endpoint == "set-fullscreen") { properties["enabled"]={{"type","boolean"}}; require("enabled"); }
+  else if (endpoint == "resize-viewport") { integer("width",1); integer("height",1); require("width"); require("height"); }
+  else if (endpoint == "bookmarks-add") { string("url",true); string("title"); require("url"); }
+  else if (endpoint == "bookmarks-remove") { string("id",true); require("id"); }
+  else if (endpoint == "history-list" || endpoint == "get-history") integer("limit",1);
+  else if (endpoint == "get-console-messages") {
+    properties["level"] = {{"enum", {"log", "warn", "error", "info", "debug"}}};
+    integer("limit", 1);
+  } else if (endpoint == "get-network-log") {
+    string("type");
+    properties["status"] = {{"enum", {"success", "error", "pending"}}};
+    integer("limit", 1);
+  }
+  return {{"type", "object"}, {"properties", std::move(properties)}, {"required", std::move(required)}, {"additionalProperties", false}};
+}
+
+std::optional<std::string> ValidateToolArguments(const nlohmann::json& schema,
+                                                 const nlohmann::json& arguments) {
+  const auto& properties = schema.at("properties");
+  for (const auto& required : schema.at("required")) {
+    const std::string name = required.get<std::string>();
+    if (!arguments.contains(name)) return name + " is required";
+  }
+  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+    if (!properties.contains(it.key())) return "Unknown argument: " + it.key();
+    const auto& property = properties.at(it.key());
+    if (property.contains("const") && it.value() != property.at("const")) {
+      return it.key() + " must equal " + property.at("const").dump();
+    }
+    if (property.contains("enum") &&
+        std::find(property.at("enum").begin(), property.at("enum").end(), it.value()) ==
+            property.at("enum").end()) return it.key() + " has an invalid value";
+    const std::string type = property.value("type", std::string());
+    const bool type_ok = type.empty() ||
+        (type == "string" && it.value().is_string()) ||
+        (type == "integer" && it.value().is_number_integer()) ||
+        (type == "boolean" && it.value().is_boolean()) ||
+        (type == "array" && it.value().is_array());
+    if (!type_ok) return it.key() + " has the wrong type";
+    if (it.value().is_string() && property.contains("minLength") &&
+        it.value().get_ref<const std::string&>().size() < property.at("minLength").get<std::size_t>()) {
+      return it.key() + " is too short";
+    }
+    if (it.value().is_number_integer()) {
+      const auto value = it.value().get<std::int64_t>();
+      if ((property.contains("minimum") && value < property.at("minimum").get<std::int64_t>()) ||
+          (property.contains("maximum") && value > property.at("maximum").get<std::int64_t>())) {
+        return it.key() + " is out of range";
+      }
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -57,75 +197,125 @@ bool DesktopMcpServer::Run(const Config& config) {
       output.flush();
       continue;
     }
-    output << HandleRequest(request, config).dump() << '\n';
-    output.flush();
+    const json response = HandleRequest(request, config);
+    if (!response.is_null()) {
+      output << response.dump() << '\n';
+      output.flush();
+    }
   }
   return true;
 }
 
 DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
                                                        const Config& config) const {
-  const nlohmann::json id = request.contains("id") ? request["id"] : nlohmann::json(nullptr);
-  const std::string method = request.value("method", std::string());
+  if (!IsJsonRpcRequest(request)) {
+    return JsonRpcError(nullptr, -32600, "Request must be a JSON-RPC 2.0 object with a method");
+  }
+  const bool notification = IsNotification(request);
+  if (request.contains("id") && !request["id"].is_null() &&
+      !request["id"].is_string() && !request["id"].is_number()) {
+    return JsonRpcError(nullptr, -32600, "id must be a string, number, or null");
+  }
+  const nlohmann::json id = notification ? nlohmann::json(nullptr) : request.value("id", nlohmann::json(nullptr));
+  const std::string method = request["method"].get<std::string>();
   if (method.empty()) {
-    return JsonRpcError(id, -32600, "method is required");
+    return ReplyOrNothing(notification, JsonRpcError(id, -32600, "method is required"));
   }
   if (impl_->registry == nullptr) {
-    return JsonRpcError(id, -32000, "MCP registry is not configured");
+    return ReplyOrNothing(notification, JsonRpcError(id, -32000, "MCP registry is not configured"));
   }
   if (method == "initialize") {
-    return JsonRpcResult(id,
-                         {{"protocolVersion", "2024-11-05"},
+    const nlohmann::json params = request.contains("params") ? request["params"] : nlohmann::json::object();
+    if (!params.is_object()) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "initialize.params must be an object"));
+    }
+    if (params.contains("protocolVersion") && !params["protocolVersion"].is_string()) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "initialize.protocolVersion must be a string"));
+    }
+    // The transport is stateless, so return the version this server actually
+    // speaks.  A client offering a newer version can use this result to retry
+    // subsequent requests with the negotiated header value.
+    return ReplyOrNothing(notification, JsonRpcResult(id,
+                         {{"protocolVersion", kProtocolVersion},
                           {"serverInfo", {{"name", config.server_name},
                                           {"version", config.server_version}}},
-                          {"capabilities", {{"tools", nlohmann::json::object()}}}});
+                          {"capabilities", {{"tools", nlohmann::json::object()}}}}));
+  }
+
+  if (method == "notifications/initialized") {
+    return ReplyOrNothing(notification, JsonRpcResult(id, nlohmann::json::object()));
+  }
+
+  if (method == "ping") {
+    return ReplyOrNothing(notification, JsonRpcResult(id, nlohmann::json::object()));
   }
 
   if (method == "tools/list") {
     nlohmann::json tools = nlohmann::json::array();
     for (const McpTool& tool : impl_->registry->all_tools()) {
       if (!SupportsPlatform(tool.availability, config.platform) ||
-          !SupportsEngine(tool.availability, config.engine)) {
+          !SupportsEngine(tool.availability, config.engine) || impl_->router == nullptr ||
+          !impl_->router->IsCallable(tool.http_endpoint)) {
         continue;
       }
       tools.push_back({{"name", tool.name},
                        {"description", tool.description},
-                       {"inputSchema",
-                        {{"type", "object"}, {"additionalProperties", true}}}});
+                       {"inputSchema", InputSchema(tool.http_endpoint)}});
     }
-    return JsonRpcResult(id, {{"tools", tools}});
+    return ReplyOrNothing(notification, JsonRpcResult(id, {{"tools", tools}}));
   }
 
   if (method == "tools/call") {
     if (impl_->router == nullptr) {
       return JsonRpcError(id, -32000, "Desktop router is not configured");
     }
-    const nlohmann::json params = request.value("params", nlohmann::json::object());
-    const std::string tool_name = params.value("name", std::string());
-    if (tool_name.empty()) {
-      return JsonRpcError(id, -32602, "params.name is required");
+    const nlohmann::json params = request.contains("params") ? request["params"] : nlohmann::json::object();
+    if (!params.is_object()) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "tools/call.params must be an object"));
     }
+    if (!params.contains("name") || !params["name"].is_string() || params["name"].empty()) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "params.name is required"));
+    }
+    const std::string tool_name = params["name"].get<std::string>();
 
     const auto match = std::find_if(impl_->registry->all_tools().begin(),
                                     impl_->registry->all_tools().end(),
                                     [&](const McpTool& tool) { return tool.name == tool_name; });
     if (match == impl_->registry->all_tools().end()) {
-      return JsonRpcError(id, -32602, "Unknown tool: " + tool_name);
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "Unknown tool: " + tool_name));
     }
     if (!SupportsPlatform(match->availability, config.platform) ||
-        !SupportsEngine(match->availability, config.engine)) {
-      return JsonRpcError(id, -32601, "Tool is not available in this runtime");
+        !SupportsEngine(match->availability, config.engine) ||
+        !impl_->router->IsCallable(match->http_endpoint)) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32601, "Tool is not available in this runtime"));
+    }
+
+    const nlohmann::json arguments = params.contains("arguments") ? params["arguments"] : nlohmann::json::object();
+    if (!arguments.is_object()) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "tools/call.arguments must be an object"));
+    }
+    if (const auto invalid = ValidateToolArguments(InputSchema(match->http_endpoint), arguments)) {
+      return ReplyOrNothing(notification, JsonRpcError(id, -32602, *invalid));
     }
 
     const DesktopRouter::Result result =
-        impl_->router->Dispatch(match->http_endpoint, params.value("arguments", nlohmann::json::object()));
-    return JsonRpcResult(id,
-                         {{"content", {{{"type", "text"}, {"text", result.body.dump()}}}},
-                          {"structuredContent", result.body},
-                          {"isError", !result.body.value("success", false)}});
+        impl_->router->Dispatch(match->http_endpoint, arguments);
+    json content = {{{"type", "text"}, {"text", result.body.dump()}}};
+    if ((match->http_endpoint == "screenshot" || match->http_endpoint == "screenshot-annotated") &&
+        result.body.value("success", false) && result.body.contains("image") &&
+        result.body["image"].is_string()) {
+      const std::string format = result.body.value("format", std::string("png"));
+      content.push_back({{"type", "image"}, {"data", result.body["image"]},
+                         {"mimeType", "image/" + format}});
+    }
+    const json response = JsonRpcResult(id, {{"content", content},
+                                               {"structuredContent", result.body},
+                                               {"isError", !result.body.value("success", false)}});
+    return ReplyOrNothing(notification, response);
   }
 
-  return JsonRpcError(id, -32601, "Unsupported method: " + method);
+  const json response = JsonRpcError(id, -32601, "Unsupported method: " + method);
+  return ReplyOrNothing(notification, response);
 }
 
 }  // namespace kelpie

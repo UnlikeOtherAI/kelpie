@@ -26,12 +26,17 @@ int StatusForResponse(const nlohmann::json& response) {
 
 }  // namespace
 
-void DesktopRouter::Register(std::string method, Handler handler) {
-  handlers_[std::move(method)] = std::move(handler);
+void DesktopRouter::Register(std::string method, Handler handler, bool callable) {
+  handlers_[std::move(method)] = Route{std::move(handler), callable};
 }
 
 bool DesktopRouter::Has(std::string_view method) const {
   return handlers_.find(std::string(method)) != handlers_.end();
+}
+
+bool DesktopRouter::IsCallable(std::string_view method) const {
+  const auto it = handlers_.find(std::string(method));
+  return it != handlers_.end() && it->second.callable;
 }
 
 DesktopRouter::Result DesktopRouter::Dispatch(std::string_view method, const json& params) const {
@@ -42,7 +47,7 @@ DesktopRouter::Result DesktopRouter::Dispatch(std::string_view method, const jso
   }
 
   try {
-    const json body = it->second(params);
+    const json body = it->second.handler(params);
     return {StatusForResponse(body), body};
   } catch (const std::invalid_argument& exception) {
     const json body = ErrorResponse(ErrorCode::kInvalidParams, exception.what());

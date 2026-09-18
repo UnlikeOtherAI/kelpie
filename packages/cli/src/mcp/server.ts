@@ -14,7 +14,6 @@ import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
 import type { Platform } from "@unlikeotherai/kelpie-shared";
-import { join } from "node:path";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
 import { buildDownloadUrl, downloadModel } from "../ai/download.js";
@@ -35,7 +34,14 @@ type ScreenshotResult = JsonObject & {
 const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
 const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
-export function createMcpServer(): McpServer {
+/**
+ * `pinned` is the local browser `kelpie --browser <alias> mcp` was started
+ * for. It becomes the target of every tool call that omits `device`, so a
+ * client driving one launched browser does not have to name it on each call
+ * — and cannot silently land on whatever discovery finds first. An explicit
+ * `device` argument still wins.
+ */
+export function createMcpServer(pinned?: DiscoveredDevice): McpServer {
   const server = new McpServer(
     {
       name: "kelpie",
@@ -47,21 +53,34 @@ export function createMcpServer(): McpServer {
   );
 
   for (const tool of browserTools) {
-    registerBrowserTool(server, tool);
+    registerBrowserTool(server, tool, pinned);
   }
   for (const tool of cliTools) {
-    registerCliTool(server, tool);
+    registerCliTool(server, tool, pinned);
   }
 
   return server;
 }
 
-function registerBrowserTool(server: McpServer, tool: BrowserToolDef): void {
+/** The device a tool call targets: an explicit `device` first, else the pinned alias. */
+async function resolveDevice(
+  query: string | undefined,
+  pinned: DiscoveredDevice | undefined,
+): Promise<DiscoveredDevice | undefined> {
+  if (!query) return pinned ?? (await getDevice(""));
+  return getDevice(query);
+}
+
+function registerBrowserTool(
+  server: McpServer,
+  tool: BrowserToolDef,
+  pinned?: DiscoveredDevice,
+): void {
   server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
-    const deviceId = args.device as string;
-    const device = await getDevice(deviceId);
+    const deviceId = args.device as string | undefined;
+    const device = await resolveDevice(deviceId, pinned);
     if (!device) {
-      return { content: [{ type: "text", text: JSON.stringify({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } }) }] };
+      return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
     }
     const body = tool.bodyFromArgs(args as Record<string, unknown>);
     const result = await sendCommand(device, tool.method, body);
@@ -86,26 +105,59 @@ export async function formatBrowserToolResult(
   data: unknown,
   deviceName?: string,
 ): Promise<CallToolResult> {
-  if (!isNativeScreenshotResult(method, data)) {
-    return textToolResult(data);
+  if (isScreenshotResult(method, data)) {
+    if (isNativeScreenshotResult(method, data)) {
+      return saveNativeScreenshotResult(method, data, deviceName);
+    }
+    return portableScreenshotResult(data);
   }
-
-  return saveNativeScreenshotResult(method, data, deviceName);
+  return textToolResult(data);
 }
 
 function textToolResult(data: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data) }] };
+  return {
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    ...(isMcpFailure(data) ? { isError: true } : {}),
+  };
 }
 
-function isNativeScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
+function errorToolResult(data: unknown): { content: { type: "text"; text: string }[]; isError: true } {
+  return { content: [{ type: "text", text: JSON.stringify(data) }], isError: true };
+}
+
+function isMcpFailure(data: unknown): boolean {
+  return isJsonObject(data) && data.success === false;
+}
+
+function isScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
   return (
     screenshotMethods.has(method) &&
     isJsonObject(data) &&
     data.success === true &&
-    data.resolution === "native" &&
     typeof data.image === "string" &&
     data.image.length > 0
   );
+}
+
+function isNativeScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
+  return (
+    isScreenshotResult(method, data) &&
+    data.resolution === "native" &&
+    typeof data.image === "string"
+  );
+}
+
+function portableScreenshotResult(result: ScreenshotResult): CallToolResult {
+  const format = normalizeImageFormat(result.format);
+  const mimeType = `image/${format}`;
+  const metadata: JsonObject = { ...result, mimeType };
+  return {
+    content: [
+      { type: "text", text: JSON.stringify(metadata) },
+      { type: "image", data: result.image, mimeType },
+    ],
+    structuredContent: metadata,
+  };
 }
 
 async function saveNativeScreenshotResult(
@@ -128,6 +180,7 @@ async function saveNativeScreenshotResult(
   return {
     content: [
       { type: "text", text: JSON.stringify(compactResult) },
+      { type: "image", data: result.image, mimeType: `image/${format}` },
       {
         type: "resource_link",
         uri: pathToFileURL(file).href,
@@ -169,17 +222,17 @@ function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function registerCliTool(server: McpServer, tool: CliToolDef): void {
+function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: DiscoveredDevice): void {
   server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
     const params = args as Record<string, unknown>;
 
     if (tool.kind === "discovery") {
-      return handleDiscovery(tool.method, params);
+      return handleDiscovery(tool.method, params, pinned);
     }
 
     const devices = getFilteredDevices(params);
     if (devices.length === 0) {
-      return { content: [{ type: "text", text: JSON.stringify({ success: false, error: { code: "NO_DEVICES", message: "No devices match the filter criteria" } }) }] };
+      return errorToolResult({ success: false, error: { code: "NO_DEVICES", message: "No devices match the filter criteria" } });
     }
 
     const body = tool.bodyFromArgs(params);
@@ -195,7 +248,7 @@ function registerCliTool(server: McpServer, tool: CliToolDef): void {
   });
 }
 
-async function handleDiscovery(method: string, params: Record<string, unknown>): Promise<{ content: { type: "text"; text: string }[] }> {
+async function handleDiscovery(method: string, params: Record<string, unknown>, pinned?: DiscoveredDevice): Promise<{ content: { type: "text"; text: string }[] }> {
   if (method === "feedbackSummary") {
     const limit = typeof params.limit === "number" ? params.limit : 10;
     const summary = await summarizeFeedbackReports(limit);
@@ -226,7 +279,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
     const modelId = params.model as string;
     const model = findModel(modelId);
     if (!model) {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Unknown model "${modelId}"` } }) }] };
+      return errorToolResult({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Unknown model "${modelId}"` } });
     }
     const store = new ModelStore();
     if (store.isDownloaded(modelId)) {
@@ -239,7 +292,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
       store.register(modelId, { name: model.name, capabilities: [...model.capabilities] });
       return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, model: modelId, path: destPath }) }] };
     } catch (err) {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: { code: "DOWNLOAD_FAILED", message: (err as Error).message } }) }] };
+      return errorToolResult({ success: false, error: { code: "DOWNLOAD_FAILED", message: (err as Error).message } });
     }
   }
 
@@ -247,7 +300,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
     const modelId = params.model as string;
     const store = new ModelStore();
     if (!store.isDownloaded(modelId)) {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Model "${modelId}" is not downloaded` } }) }] };
+      return errorToolResult({ success: false, error: { code: "MODEL_NOT_FOUND", message: `Model "${modelId}" is not downloaded` } });
     }
     store.remove(modelId);
     return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, message: `Model ${modelId} removed` }) }] };
@@ -261,7 +314,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
     return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };
   }
   if (method === "pair") {
-    return handlePair(params);
+    return handlePair(params, pinned);
   }
   // listDevices
   const devices = getAllDevices();
@@ -270,21 +323,12 @@ async function handleDiscovery(method: string, params: Record<string, unknown>):
 
 async function handlePair(
   params: Record<string, unknown>,
+  pinned?: DiscoveredDevice,
 ): Promise<{ content: { type: "text"; text: string }[] }> {
   const deviceId = typeof params.device === "string" ? params.device : "";
-  const device = await getDevice(deviceId);
+  const device = await resolveDevice(deviceId, pinned);
   if (!device) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({
-            success: false,
-            error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` },
-          }),
-        },
-      ],
-    };
+    return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
   }
   const store = getTokenStore();
   const clientId = await store.clientId();
@@ -299,20 +343,13 @@ async function handlePair(
     overallTimeoutMs,
   });
   if (result.status !== "approved") {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({
-            success: false,
-            error: {
-              code: result.status === "error" ? result.code : `PAIR_${result.status.toUpperCase()}`,
-              message: result.status === "error" ? result.message : `Pairing ${result.status}`,
-            },
-          }),
-        },
-      ],
-    };
+    return errorToolResult({
+      success: false,
+      error: {
+        code: result.status === "error" ? result.code : `PAIR_${result.status.toUpperCase()}`,
+        message: result.status === "error" ? result.message : `Pairing ${result.status}`,
+      },
+    });
   }
   if (result.scope === "persistent") {
     await store.set(device.id, device.ip, device.port, result.token);

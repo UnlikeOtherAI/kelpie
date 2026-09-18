@@ -44,7 +44,7 @@ On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigatio
 
 On Linux, the desktop shell runs in either GUI or headless mode. Both modes expose the same HTTP surface, advertise themselves over mDNS, persist profile-backed bookmarks/history/network/console state, support a persisted home page URL, and degrade cleanly when the CEF runtime is unavailable. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
 
-On Windows, the first desktop shell now exists under `apps/windows/`: an undecorated rounded Win32 main window with macOS-style close/minimize/maximize dots, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, device info provider, optional CEF child host, and embedded `/v1/` HTTP server. The custom frame retains native dragging, resizing, maximize, and system-menu behavior; the URL bar's Menu button keeps every action reachable without the removed native title/menu bars. Until the shared `engine-chromium-desktop` runtime lands, navigation and shell-state endpoints work, but screenshot/eval/DOM-heavy Chromium automation endpoints still return `PLATFORM_NOT_SUPPORTED` instead of faking incomplete behavior.
+On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame with macOS-style close/minimize/maximize dots, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
 ### Safari / Chrome Authentication
 
@@ -226,7 +226,7 @@ Query elements inside shadow roots, even nested ones. List all shadow DOM hosts 
 
 List open tabs, create new ones, switch between them, close them. Each tab tracks its URL, title, and active state. Each tab owns its own WebView instance so page state, scroll position, and history are preserved across tab switches.
 
-On macOS, every webview-touching command accepts an optional `tabId` parameter so multiple LLMs can independently control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, `tabId` is required — the server returns a `TAB_REQUIRED` error listing available tabs if it is missing. `new-tab` returns this identifier directly as `tabId`, and the nested `tab.id` field is the same value. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, and all other commands execute on the target tab's WebView directly. This is currently macOS only; iOS and Android always operate on the active tab.
+On macOS and Windows, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab.
 
 macOS also supports multiple top-level windows. Each window has its own tab list, and tab IDs are scoped per window. Tab-related requests accept an optional `windowId` field, and `get-tabs` returns a `windows` array enumerating every window when more than one is open. iOS and Android only ever expose one window and report `windowId: "main"`.
 
@@ -342,3 +342,16 @@ Blocking requests by URL pattern and mocking responses (custom bodies and status
 ## Geolocation Override
 
 Overriding the device GPS location (latitude, longitude, accuracy) is part of the API surface, but is **not currently implemented on any platform** — `set-geolocation` and `clear-geolocation` return `PLATFORM_NOT_SUPPORTED` on iOS, Android, and macOS alike.
+
+## Windows local control
+
+Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
+DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
+The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
+file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token.
+`kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
+creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
+provides a token-free stdio bridge for local development agents and local Nessie executors.
+`kelpie browser stop <name>` requests orderly app shutdown and clears its alias state only after
+that launch removes readiness. Windows home, native toast, and fullscreen are callable through
+HTTP and MCP; remote browser control is not shipped.

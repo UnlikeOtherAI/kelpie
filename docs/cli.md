@@ -1018,3 +1018,22 @@ Command surface: `kelpie --llm-help`, `kelpie click --llm-help`, `kelpie group -
 ## Exit Codes
 
 Detailed exit code documentation lives in [docs/cli/advanced.md](cli/advanced.md#exit-codes).
+
+### Windows aliases and agent stdio
+
+Register a Windows build with an absolute profile directory, then launch it:
+
+```text
+kelpie browser register win --platform windows --app-path "C:\\Program Files\\Kelpie\\kelpie.exe" --profile-dir "C:\\Users\\you\\KelpieProfile"
+kelpie browser launch win
+kelpie --browser win navigate https://example.com
+kelpie --browser win mcp
+```
+
+The stdio command is the local-agent/Nessie bridge: it reads the current user’s readiness token
+in memory and emits only JSON-RPC on stdout. `kelpie browser stop win` asks the app to close
+orderly and waits for the matching readiness record to disappear.
+
+Windows aliases deliberately reject `kelpie --browser win mcp --http`: proxying their local
+capability token through another HTTP listener would widen the local trust boundary. Use stdio,
+or connect a same-user local client directly to the browser's authenticated `/mcp` endpoint.

@@ -1,4 +1,5 @@
 #include "device_info_windows.h"
+#include "windows_utf.h"
 
 #include <fstream>
 #include <random>
@@ -20,18 +21,6 @@
 
 namespace kelpie::windows {
 namespace {
-
-std::string WideToUtf8(const std::wstring& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
-  std::string output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), '\0');
-  if (size > 1) {
-    WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1, nullptr, nullptr);
-  }
-  return output;
-}
 
 std::string ReadOrCreateDeviceId(const std::filesystem::path& profile_dir) {
   const auto path = profile_dir / "device-id";
@@ -59,7 +48,7 @@ std::string ComputerName() {
   wchar_t buffer[MAX_COMPUTERNAME_LENGTH + 1]{};
   DWORD size = MAX_COMPUTERNAME_LENGTH + 1;
   if (GetComputerNameExW(ComputerNameDnsHostname, buffer, &size)) {
-    return WideToUtf8(buffer);
+    return utf::WideToUtf8(buffer).value_or("Windows");
   }
   return "Windows";
 }
@@ -75,7 +64,7 @@ std::string RegistryString(HKEY root, const wchar_t* path, const wchar_t* value_
   const LONG status = RegQueryValueExW(key, value_name, nullptr, &type,
                                        reinterpret_cast<LPBYTE>(buffer), &size);
   RegCloseKey(key);
-  return status == ERROR_SUCCESS ? WideToUtf8(buffer) : fallback;
+  return status == ERROR_SUCCESS ? utf::WideToUtf8(buffer).value_or("Windows") : fallback;
 }
 
 std::string FirstIpv4Address() {

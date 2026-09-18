@@ -5,23 +5,9 @@
 #include <nlohmann/json.hpp>
 
 #include "../resources/resource.h"
+#include "windows_utf.h"
 
 namespace kelpie::windows {
-namespace {
-
-std::wstring Utf8ToWide(const std::string& value) {
-  if (value.empty()) {
-    return {};
-  }
-  const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-  std::wstring output(static_cast<std::size_t>(size > 0 ? size - 1 : 0), L'\0');
-  if (size > 1) {
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, output.data(), size - 1);
-  }
-  return output;
-}
-
-}  // namespace
 
 bool HistoryView::EnsureCreated(HINSTANCE instance, HWND owner) {
   if (hwnd_ != nullptr) {
@@ -59,6 +45,10 @@ void HistoryView::UpdateFromJson(const std::string& history_json) {
   Populate();
 }
 
+void HistoryView::SetNavigateCallback(std::function<void(const std::string&)> callback) {
+  on_navigate_ = std::move(callback);
+}
+
 LRESULT CALLBACK HistoryView::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
   auto* self = reinterpret_cast<HistoryView*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (message == WM_NCCREATE) {
@@ -79,6 +69,23 @@ LRESULT HistoryView::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_SIZE:
       Resize();
       return 0;
+    case WM_NOTIFY: {
+      const auto* notification = reinterpret_cast<NMHDR*>(lparam);
+      if (notification->idFrom == IDC_HISTORY_LIST && notification->code == NM_DBLCLK && on_navigate_) {
+        const int selected = ListView_GetNextItem(list_view_, -1, LVNI_SELECTED);
+        wchar_t url[4096]{};
+        LVITEMW item{};
+        item.iSubItem = 1;
+        item.pszText = url;
+        item.cchTextMax = static_cast<int>(sizeof(url) / sizeof(*url));
+        if (selected >= 0 && SendMessageW(list_view_, LVM_GETITEMTEXTW, selected,
+                                          reinterpret_cast<LPARAM>(&item)) > 0) {
+          const auto converted = utf::WideToUtf8(std::wstring_view(url));
+          if (converted) on_navigate_(*converted);
+        }
+      }
+      return 0;
+    }
     default:
       return DefWindowProcW(hwnd_, message, wparam, lparam);
   }
@@ -127,9 +134,9 @@ void HistoryView::Populate() {
     if (!entry.is_object()) {
       continue;
     }
-    std::wstring title = Utf8ToWide(entry.value("title", ""));
-    std::wstring url = Utf8ToWide(entry.value("url", ""));
-    std::wstring timestamp = Utf8ToWide(entry.value("timestamp", ""));
+    std::wstring title = utf::Utf8ToWideDisplay(entry.value("title", ""));
+    std::wstring url = utf::Utf8ToWideDisplay(entry.value("url", ""));
+    std::wstring timestamp = utf::Utf8ToWideDisplay(entry.value("timestamp", ""));
 
     LVITEMW item{};
     item.mask = LVIF_TEXT;

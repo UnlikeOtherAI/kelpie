@@ -7,11 +7,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "kelpie/desktop_browser_control.h"
 #include "kelpie/cef_renderer.h"
 
 namespace kelpie {
 
-class DesktopEngine {
+class DesktopEngine final : public DesktopBrowserControl {
  public:
   enum class Mode {
     kWindowed = 0,
@@ -23,12 +24,26 @@ class DesktopEngine {
     int height = 720;
   };
 
+  struct RestoredTab {
+    std::string id;
+    std::string url;
+    bool active = false;
+  };
+
   struct Config {
     Mode mode = Mode::kOffscreen;
     Size viewport;
+    // On Windows CEF receives the application HINSTANCE. Other platforms use
+    // argc/argv. Keeping both avoids platform-specific runtime entry points.
+    void* process_instance = nullptr;
+    // Supplied by CEF bootstrap.exe on Windows. It must be passed unchanged
+    // to CefInitialize so Chromium subprocesses remain sandboxed.
+    void* sandbox_info = nullptr;
     int argc = 0;
     char** argv = nullptr;
     std::string initial_url;
+    std::vector<RestoredTab> restored_tabs;
+    std::uint64_t restored_next_tab_id = 1;
     std::string cache_path;
     std::string user_agent;
     std::string browser_subprocess_path;
@@ -36,6 +51,7 @@ class DesktopEngine {
     std::string locales_dir_path;
     bool external_message_pump = true;
     std::function<void(void*)> configure_window_info;
+    std::function<void(void*, const std::string&)> configure_tab_window_info;
   };
 
   struct ViewportState {
@@ -72,11 +88,61 @@ class DesktopEngine {
   CefRenderer& renderer();
   const CefRenderer& renderer() const;
 
+  BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) override;
+  BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
+                                  const std::optional<std::uint64_t>& generation,
+                                  TabLease* lease,
+                                  Timeout timeout) override;
+  BrowserControlResult CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult ActivateTab(TabLease lease, Timeout timeout) override;
+  BrowserControlResult CloseTab(TabLease lease, Timeout timeout) override;
+  BrowserControlResult Navigate(std::optional<TabLease> lease,
+                                std::string url,
+                                TabSnapshot* tab,
+                                Timeout timeout) override;
+  BrowserControlResult Back(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult StopLoading(TabLease lease, TabSnapshot* tab, Timeout timeout);
+  BrowserControlResult Evaluate(TabLease lease,
+                                std::string script,
+                                Json* value,
+                                Timeout timeout) override;
+  BrowserControlResult Screenshot(TabLease lease,
+                                  BrowserScreenshot* image,
+                                  Timeout timeout) override;
+  BrowserControlResult GetCookies(TabLease lease,
+                                  const Json& query,
+                                  Json* cookies,
+                                  Timeout timeout) override;
+  BrowserControlResult SetCookies(TabLease lease,
+                                  const Json& cookies,
+                                  Json* result,
+                                  Timeout timeout) override;
+  BrowserControlResult DeleteCookies(TabLease lease,
+                                     const Json& query,
+                                     Json* result,
+                                     Timeout timeout) override;
+  BrowserControlResult DispatchTrustedInput(TabLease lease,
+                                            const Json& input,
+                                            Json* result,
+                                            Timeout timeout) override;
+  BrowserControlResult GetDialog(TabLease lease, Json* dialog, Timeout timeout) override;
+  BrowserControlResult HandleDialog(TabLease lease,
+                                    const Json& action,
+                                    Json* result,
+                                    Timeout timeout) override;
+  BrowserControlResult DevTools(TabLease lease,
+                                std::string method,
+                                const Json& params,
+                                Json* result,
+                                Timeout timeout) override;
+
   class Impl;
 
  private:
   std::unique_ptr<CefRenderer> renderer_;
-  std::unique_ptr<Impl> impl_;
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace kelpie

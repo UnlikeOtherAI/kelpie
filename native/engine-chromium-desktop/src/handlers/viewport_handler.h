@@ -12,9 +12,9 @@ class ViewportHandler {
   void Register(DesktopRouter& router) const;
 
  private:
-  nlohmann::json GetViewport() const;
+  nlohmann::json GetViewport(const nlohmann::json& params) const;
   nlohmann::json ResizeViewport(const nlohmann::json& params) const;
-  nlohmann::json ResetViewport() const;
+  nlohmann::json ResetViewport(const nlohmann::json& params) const;
 
   DesktopHandlerRuntime runtime_;
 };

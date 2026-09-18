@@ -27,6 +27,9 @@
 #include "handlers/network_handler.h"
 #include "handlers/renderer_handler.h"
 #include "handlers/screenshot_handler.h"
+#include "handlers/shell_handler.h"
+#include "handlers/dialog_handler.h"
+#include "handlers/inspection_handler.h"
 #include "handlers/scroll_handler.h"
 #include "handlers/viewport_handler.h"
 
@@ -70,15 +73,15 @@ void AppendNetwork(NetworkTrafficStore& store, const nlohmann::json& event) {
   });
 }
 
+// Methods desktop Chromium does not implement. A method registered by a real
+// handler must not appear here: `router.Has()` already answers true for it, so
+// the entry would be inert while still claiming the method is unsupported.
+// `screenshot-annotated` is one of those — ScreenshotHandler implements it.
 std::vector<std::string> UnsupportedMethods() {
   return {
-      "set-home",           "get-home",           "debug-screens",
-      "set-debug-overlay",  "get-debug-overlay",  "tap",
-      "find-element",       "find-button",        "find-link",
-      "find-input",         "toast",              "get-accessibility-tree",
-      "click-annotation",   "fill-annotation",    "get-visible-elements",
-      "get-page-text",      "get-form-state",     "get-dialog",
-      "handle-dialog",      "set-dialog-auto-handler",
+      "debug-screens",      "set-debug-overlay",  "get-debug-overlay",
+      "tap",                "click-annotation",   "fill-annotation",
+      "set-dialog-auto-handler",
       "get-iframes",        "switch-to-iframe",   "switch-to-main",
       "get-iframe-context", "watch-mutations",    "get-mutations",
       "stop-watching",      "query-shadow-dom",   "get-shadow-roots",
@@ -127,11 +130,15 @@ class DesktopApp::Impl {
   std::unique_ptr<RendererHandler> renderer_handler;
   std::unique_ptr<ViewportHandler> viewport_handler;
   std::unique_ptr<CookieHandler> cookie_handler;
+  std::unique_ptr<ShellHandler> shell_handler;
+  std::unique_ptr<DialogHandler> dialog_handler;
+  std::unique_ptr<InspectionHandler> inspection_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
     DesktopHandlerRuntime runtime;
     handler_context = std::make_unique<HandlerContext>(&engine.renderer());
     runtime.handler_context = handler_context.get();
+    runtime.browser_control = &engine;
     runtime.bookmark_store = &bookmark_store;
     runtime.history_store = &history_store;
     runtime.console_store = &console_store;
@@ -139,7 +146,10 @@ class DesktopApp::Impl {
     runtime.device_info_provider = config.device_info_provider;
     runtime.platform = config.platform;
     runtime.engine_name = config.engine_name;
-    runtime.viewport_supplier = [this]() {
+    if (config.viewport_supplier) {
+      runtime.viewport_supplier = config.viewport_supplier;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.viewport_supplier = [this]() {
       const DesktopEngine::ViewportState viewport = engine.viewport();
       nlohmann::json response = {
           {"width", viewport.width},
@@ -152,11 +162,19 @@ class DesktopApp::Impl {
                                                                                   std::string("Kelpie Desktop"))},
           {"orientation", viewport.width >= viewport.height ? "landscape" : "portrait"},
       };
-      return response;
-    };
+        return response;
+      };
+    }
     runtime.capabilities_supplier = [this]() {
-      const McpCapabilities capabilities =
-          mcp_registry.get_capabilities(config.platform, config.engine_name);
+      McpCapabilities capabilities;
+      for (const McpTool& tool : mcp_registry.all_tools()) {
+        if (SupportsPlatform(tool.availability, config.platform) &&
+            SupportsEngine(tool.availability, config.engine_name) && router.IsCallable(tool.http_endpoint)) {
+          capabilities.supported.push_back(tool.http_endpoint);
+        } else {
+          capabilities.unsupported.push_back(tool.http_endpoint);
+        }
+      }
       return SuccessResponse({
           {"platform", PlatformToString(config.platform)},
           {"engine", config.engine_name},
@@ -168,12 +186,26 @@ class DesktopApp::Impl {
     runtime.renderer_supplier = [this]() {
       return SuccessResponse({{"current", config.engine_name}, {"available", {"chromium"}}});
     };
-    runtime.resize_viewport = [this](int width, int height) {
-      return engine.ResizeViewport(width, height);
-    };
-    runtime.reset_viewport = [this]() {
-      engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
-    };
+    if (config.resize_viewport) {
+      runtime.resize_viewport = config.resize_viewport;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.resize_viewport = [this](int width, int height) {
+        return engine.ResizeViewport(width, height);
+      };
+    }
+    if (config.reset_viewport) {
+      runtime.reset_viewport = config.reset_viewport;
+    } else if (config.platform != Platform::kWindows) {
+      runtime.reset_viewport = [this]() {
+        engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
+      };
+    }
+    runtime.set_native_fullscreen = config.set_native_fullscreen;
+    runtime.get_native_fullscreen = config.get_native_fullscreen;
+    runtime.request_shutdown = config.request_shutdown;
+    runtime.set_home = config.set_home;
+    runtime.get_home = config.get_home;
+    runtime.show_native_toast = config.show_native_toast;
     return runtime;
   }
 
@@ -194,6 +226,9 @@ class DesktopApp::Impl {
     renderer_handler = std::make_unique<RendererHandler>(runtime);
     viewport_handler = std::make_unique<ViewportHandler>(runtime);
     cookie_handler = std::make_unique<CookieHandler>(runtime);
+    shell_handler = std::make_unique<ShellHandler>(runtime);
+    dialog_handler = std::make_unique<DialogHandler>(runtime);
+    inspection_handler = std::make_unique<InspectionHandler>(runtime);
 
     navigation_handler->Register(router);
     interaction_handler->Register(router);
@@ -210,13 +245,16 @@ class DesktopApp::Impl {
     renderer_handler->Register(router);
     viewport_handler->Register(router);
     cookie_handler->Register(router);
+    shell_handler->Register(router);
+    dialog_handler->Register(router);
+    inspection_handler->Register(router);
 
     for (const std::string& method : UnsupportedMethods()) {
       if (!router.Has(method)) {
         router.Register(method, [method](const nlohmann::json&) {
           return ErrorResponse(ErrorCode::kPlatformNotSupported,
                                method + " is not supported on desktop Chromium");
-        });
+        }, false);
       }
     }
   }
@@ -244,6 +282,12 @@ bool DesktopApp::Start(const Config& config) {
   if (impl_->running) {
     return false;
   }
+  // Windows agents use the CLI stdio proxy, which authenticates to the
+  // loopback HTTP transport from the protected readiness file. Native stdio
+  // cannot be stopped safely while blocked on process stdin.
+  if (config.platform == Platform::kWindows && config.start_stdio_mcp) {
+    return false;
+  }
 
   impl_->config = config;
   impl_->engine.SetConsoleSink([this](const nlohmann::json& event) {
@@ -264,15 +308,23 @@ bool DesktopApp::Start(const Config& config) {
   impl_->RegisterHandlers();
 
   impl_->http_server.SetRouter(&impl_->router);
+  impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
+  impl_->mcp_server.SetRouter(&impl_->router);
+  impl_->http_server.SetMcpServer(&impl_->mcp_server);
   DesktopHttpServer::Config server_config;
   server_config.port = config.port;
+  server_config.bind_host = config.bind_host;
+  server_config.control_token = config.control_token;
+  server_config.device_id = config.device_id;
+  server_config.platform = PlatformToString(config.platform);
+  server_config.engine = config.engine_name;
+  server_config.server_name = config.app_name;
+  server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
     impl_->engine.Shutdown();
     return false;
   }
 
-  impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
-  impl_->mcp_server.SetRouter(&impl_->router);
   if (config.start_stdio_mcp) {
     impl_->mcp_thread = std::thread([this, config]() {
       DesktopMcpServer::Config mcp_config;
@@ -334,5 +386,9 @@ DesktopMcpServer& DesktopApp::mcp_server() {
 McpRegistry& DesktopApp::mcp_registry() {
   return impl_->mcp_registry;
 }
+
+BookmarkStore& DesktopApp::bookmark_store() { return impl_->bookmark_store; }
+HistoryStore& DesktopApp::history_store() { return impl_->history_store; }
+NetworkTrafficStore& DesktopApp::network_store() { return impl_->network_store; }
 
 }  // namespace kelpie

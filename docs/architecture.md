@@ -346,3 +346,11 @@ Android WebView is Chromium-based. Enabling `setWebContentsDebuggingEnabled(true
 - `Network.*` — request interception (future)
 
 This is the same protocol Playwright and Chrome DevTools use.
+
+### Windows local MCP
+
+The Windows desktop server implements stateless Streamable HTTP at `POST /mcp`: initialized
+clients receive JSON replies, well-formed notifications receive `202` with an empty body, and
+`GET /mcp` returns `405` because no SSE stream is offered. Control routes require the local
+readiness bearer token; only health and device discovery are public. The runtime advertises only
+routes that are callable by its configured native shell callbacks.

@@ -99,4 +99,79 @@ const CefRenderer& DesktopEngine::renderer() const {
   return *renderer_;
 }
 
+namespace {
+
+BrowserControlResult UnsupportedControl() {
+  return BrowserControlResult::Failure("UNSUPPORTED", "Chromium desktop runtime is unavailable");
+}
+
+}  // namespace
+
+BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&,
+                                               const std::optional<std::uint64_t>&,
+                                               TabLease*,
+                                               Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::CreateTab(std::string, TabSnapshot*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::ActivateTab(TabLease, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::CloseTab(TabLease, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease>, std::string, TabSnapshot*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::Back(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::Forward(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::Reload(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::StopLoading(TabLease, TabSnapshot*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::Evaluate(TabLease, std::string, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::Screenshot(TabLease, BrowserScreenshot*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::GetCookies(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::SetCookies(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::DeleteCookies(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::GetDialog(TabLease, Json*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::HandleDialog(TabLease, const Json&, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::DevTools(TabLease,
+                                             std::string,
+                                             const Json&,
+                                             Json*,
+                                             Timeout) {
+  return UnsupportedControl();
+}
+
 }  // namespace kelpie

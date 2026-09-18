@@ -274,7 +274,8 @@ function getEnumValues(definition?: ZodDef): unknown[] | undefined {
   return undefined;
 }
 
-function mcpToCommand(name: string): string {
+/** The CLI command an MCP tool name maps to, e.g. `kelpie_group_navigate` -> `group navigate`. */
+export function mcpToCommand(name: string): string {
   return name
     .replace(/^kelpie_/, "")
     .replace(/^group_/, "group ")

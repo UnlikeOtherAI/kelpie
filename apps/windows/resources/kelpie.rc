@@ -1,3 +1,4 @@
+#include <winresrc.h>
 #include "resource.h"
 
 IDI_KELPIE ICON "kelpie.ico"
@@ -10,7 +11,7 @@ VS_VERSION_INFO VERSIONINFO
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
- FILETYPE 0x1L
+ FILETYPE 0x2L
  FILESUBTYPE 0x0L
 BEGIN
   BLOCK "StringFileInfo"
@@ -20,8 +21,8 @@ BEGIN
       VALUE "CompanyName", "UnlikeOtherAI\0"
       VALUE "FileDescription", "Kelpie Windows Browser\0"
       VALUE "FileVersion", "0.1.1\0"
-      VALUE "InternalName", "kelpie.exe\0"
-      VALUE "OriginalFilename", "kelpie.exe\0"
+      VALUE "InternalName", "kelpie.dll\0"
+      VALUE "OriginalFilename", "kelpie.dll\0"
       VALUE "ProductName", "Kelpie\0"
       VALUE "ProductVersion", "0.1.1\0"
     END

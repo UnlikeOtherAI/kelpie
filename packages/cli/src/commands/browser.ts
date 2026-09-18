@@ -1,16 +1,21 @@
 import os from "node:os";
 import { access } from "node:fs/promises";
-import { execFile } from "node:child_process";
+import path from "node:path";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { Command } from "commander";
 import { print } from "../output/formatter.js";
 import { probeHealth } from "../discovery/local-probe.js";
+import { sendCommand } from "../client/http-client.js";
+import type { DiscoveredDevice } from "../types.js";
 import type { GlobalOptions } from "../types.js";
 import {
   clearRunningBrowser,
   getBrowserAlias,
   loadBrowserStore,
+  readLocalReadiness,
+  readinessPath,
   removeBrowserAlias,
   setRunningBrowser,
   upsertBrowserAlias,
@@ -24,6 +29,7 @@ const PORT_FALLBACK_RANGE = 10;
 const LAUNCH_BIND_TIMEOUT_MS = 12_000;
 /** How often to re-probe while waiting for the launched instance to bind. */
 const LAUNCH_BIND_POLL_MS = 400;
+const STOP_TIMEOUT_MS = 12_000;
 
 async function isReachable(port?: number): Promise<boolean> {
   if (!port) {
@@ -33,10 +39,11 @@ async function isReachable(port?: number): Promise<boolean> {
 }
 
 function chooseLaunchPort(requestedPort?: string): number {
-  if (requestedPort) {
-    return Number(requestedPort);
+  const port = requestedPort ? Number(requestedPort) : DEFAULT_PORT;
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("Port must be an integer from 1 to 65535");
   }
-  return DEFAULT_PORT;
+  return port;
 }
 
 function fallbackPorts(requestedPort: number): number[] {
@@ -61,6 +68,17 @@ export async function reachablePorts(ports: number[], timeoutMs = 600): Promise<
 const PRE_LAUNCH_PROBE_TIMEOUT_MS = 2_000;
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForReadiness(file: string, previousLaunchId: string | undefined, child: ReturnType<typeof spawn>): Promise<Awaited<ReturnType<typeof readLocalReadiness>>> {
+  const deadline = Date.now() + LAUNCH_BIND_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const readiness = await readLocalReadiness(file);
+    if (child.exitCode !== null) throw new Error(`Kelpie exited before publishing readiness (exit ${child.exitCode})`);
+    if (readiness && readiness.launchId !== previousLaunchId) return readiness;
+    await delay(LAUNCH_BIND_POLL_MS);
+  }
+  return undefined;
+}
 
 /**
  * The macOS app falls back to the next free port when the requested one is held
@@ -94,12 +112,19 @@ export function registerBrowser(program: Command): void {
 
   browser
     .command("register <name>")
-    .option("--platform <platform>", "Alias platform", os.platform() === "darwin" ? "macos" : "linux")
+    .option("--platform <platform>", "Alias platform", os.platform() === "darwin" ? "macos" : os.platform() === "win32" ? "windows" : "linux")
     .option("--app-path <path>", "Explicit app path")
-    .action(async (name: string, opts: { platform: "macos" | "linux" | "windows"; appPath?: string }) => {
+    .option("--profile-dir <path>", "Absolute profile directory for this local browser")
+    .action(async (name: string, opts: { platform: "macos" | "linux" | "windows"; appPath?: string; profileDir?: string }) => {
       const globals = program.opts<GlobalOptions>();
-      await upsertBrowserAlias(name, { platform: opts.platform, appPath: opts.appPath });
-      print({ success: true, name, platform: opts.platform, appPath: opts.appPath ?? null }, globals.format);
+      const profileDir = opts.profileDir && path.isAbsolute(opts.profileDir) ? opts.profileDir : undefined;
+      if (opts.platform === "windows" && !profileDir) {
+        print({ success: false, error: { code: "PROFILE_DIR_REQUIRED", message: "Windows browser aliases require an absolute --profile-dir" } }, globals.format);
+        process.exitCode = 4;
+        return;
+      }
+      await upsertBrowserAlias(name, { platform: opts.platform, appPath: opts.appPath, profileDir });
+      print({ success: true, name, platform: opts.platform, appPath: opts.appPath ?? null, profileDir: profileDir ?? null }, globals.format);
     });
 
   browser
@@ -165,18 +190,47 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
-      const port = chooseLaunchPort(opts.port);
-      if (alias.platform !== "macos") {
-        await setRunningBrowser(name, { port, lastLaunchedAt: new Date().toISOString() });
-        print({
-          success: true,
-          name,
-          platform: alias.platform,
-          port,
-          note: "Recorded local browser alias without spawning a new process on this platform.",
-        }, globals.format);
+      let port: number;
+      try { port = chooseLaunchPort(opts.port); } catch (error) {
+        print({ success: false, error: { code: "INVALID_PORT", message: error instanceof Error ? error.message : "Invalid port" } }, globals.format);
+        process.exitCode = 4; return;
+      }
+      if (alias.platform === "windows") {
+        const appPath = alias.appPath;
+        const profileDir = alias.profileDir;
+        const readinessFile = readinessPath(alias);
+        if (!appPath || !profileDir || !readinessFile) {
+          print({ success: false, error: { code: "BROWSER_CONFIGURATION_INVALID", message: "Windows aliases require appPath and profileDir" } }, globals.format);
+          process.exitCode = 5;
+          return;
+        }
+        let launched = false;
+        try {
+          await access(appPath);
+          const previous = await readLocalReadiness(readinessFile);
+          if (previous && await isReachable(previous.port)) {
+            throw new Error("A live browser already owns this profile; attach to its alias or stop it first");
+          }
+          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir], { detached: true, stdio: "ignore" });
+          launched = true;
+          child.unref();
+          const readiness = await waitForReadiness(readinessFile, previous?.launchId, child);
+          if (!readiness) throw new Error("Kelpie did not publish a valid local readiness file");
+          await setRunningBrowser(name, { port: readiness.port, lastLaunchedAt: new Date().toISOString(), pid: child.pid, launchId: readiness.launchId, readinessFile, deviceId: readiness.deviceId });
+          print({ success: true, name, platform: alias.platform, appPath, profileDir: alias.profileDir, port: readiness.port, deviceId: readiness.deviceId, launchId: readiness.launchId }, globals.format);
+        } catch (error) {
+          if (launched) await clearRunningBrowser(name);
+          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser" } }, globals.format);
+          process.exitCode = 6;
+        }
         return;
       }
+      if (alias.platform !== "macos") {
+        print({ success: false, error: { code: "PLATFORM_NOT_SUPPORTED", message: `Browser launch is not implemented for ${alias.platform}` } }, globals.format);
+        process.exitCode = 5;
+        return;
+      }
+
 
       const appPath = alias.appPath ?? "/Applications/Kelpie.app";
       try {
@@ -202,6 +256,53 @@ export function registerBrowser(program: Command): void {
             message: error instanceof Error ? error.message : "Failed to launch browser",
           },
         }, globals.format);
+        process.exitCode = 6;
+      }
+    });
+
+  browser
+    .command("stop <name>")
+    .action(async (name: string) => {
+      const globals = program.opts<GlobalOptions>();
+      const store = await loadBrowserStore();
+      const running = store.running[name];
+      if (!running?.pid || !running.launchId || !running.readinessFile) {
+        print({ success: false, error: { code: "BROWSER_NOT_RUNNING", message: `No CLI-launched browser is recorded for ${name}` } }, globals.format);
+        process.exitCode = 4;
+        return;
+      }
+      const readiness = await readLocalReadiness(running.readinessFile);
+      if (readiness?.launchId !== running.launchId) {
+        print({ success: false, error: { code: "BROWSER_LAUNCH_MISMATCH", message: "Refusing to stop a process whose readiness launch ID changed" } }, globals.format);
+        process.exitCode = 5;
+        return;
+      }
+      try {
+        const device: DiscoveredDevice = {
+          id: readiness.deviceId, name, ip: "127.0.0.1", port: readiness.port,
+          platform: "windows", model: "Kelpie Desktop", width: 0, height: 0,
+          version: "", lastSeen: Date.now(), localReadinessFile: running.readinessFile,
+          localLaunchId: running.launchId,
+        };
+        const request = await sendCommand(device, "closeBrowser", {}, 5_000, { autoPair: false });
+        if (!request.ok) throw new Error("Kelpie did not accept orderly shutdown");
+        const deadline = Date.now() + STOP_TIMEOUT_MS;
+        while (Date.now() < deadline) {
+          const current = await readLocalReadiness(running.readinessFile);
+          if (!current) break;
+          if (current.launchId !== running.launchId) {
+            throw new Error("Refusing to clear state after a different browser launch replaced readiness");
+          }
+          await delay(LAUNCH_BIND_POLL_MS);
+        }
+        const finalReadiness = await readLocalReadiness(running.readinessFile);
+        if (finalReadiness) {
+          throw new Error("Kelpie did not complete orderly shutdown before the deadline");
+        }
+        await clearRunningBrowser(name);
+        print({ success: true, name, stoppedPid: running.pid }, globals.format);
+      } catch (error) {
+        print({ success: false, error: { code: "BROWSER_STOP_FAILED", message: error instanceof Error ? error.message : "Failed to stop browser" } }, globals.format);
         process.exitCode = 6;
       }
     });

@@ -10,6 +10,7 @@ option(
   "Enable cpp-httplib for HTTP clients (Ollama, HF download/cloud)"
   ${KELPIE_AI_USE_HTTPLIB_DEFAULT}
 )
+option(KELPIE_AI_ENABLE_HF_HTTPS "Enable optional HTTPS Hugging Face cloud inference" OFF)
 
 set(CORE_AI_SOURCES
   src/ai_c_api.cpp
@@ -48,6 +49,14 @@ target_link_libraries(kelpie_core_ai
 if(KELPIE_AI_USE_HTTPLIB)
   target_link_libraries(kelpie_core_ai PRIVATE httplib::httplib)
   target_compile_definitions(kelpie_core_ai PUBLIC KELPIE_AI_HAS_HTTPLIB=1)
+  if(KELPIE_AI_ENABLE_HF_HTTPS)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(kelpie_core_ai PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    target_compile_definitions(kelpie_core_ai PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT
+      PUBLIC KELPIE_AI_HAS_HF_HTTPS=1)
+  else()
+    target_compile_definitions(kelpie_core_ai PUBLIC KELPIE_AI_HAS_HF_HTTPS=0)
+  endif()
 endif()
 
 if(BUILD_TESTING)

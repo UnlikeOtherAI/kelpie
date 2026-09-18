@@ -24,8 +24,17 @@ export function createProgram(version: string): Command {
     .description("LLM-first browser automation CLI for iOS and Android")
     .version(version)
     .option("--device <id|name|ip>", "Target a specific device by ID, name, or IP")
+    .option("--browser <alias>", "Target a CLI-managed local browser alias")
     .option("--tabId <id>", "Target a specific tab on macOS commands that support per-tab control")
     .option("--tab-id <id>", "Alias for --tabId")
+    .option(
+      "--tab-generation <generation>",
+      "Generation returned with --tab-id for stable tab targeting",
+      // Commander hands options through as strings unless a parser is given,
+      // and the generation lease is only sent when it is an integer, so
+      // without this the flag is accepted and then silently dropped.
+      (value) => Number.parseInt(value, 10),
+    )
     .option("--format <type>", "Output format: json, table, text", "json")
     .option("--timeout <ms>", "Command timeout in milliseconds", "10000")
     .option("--port <port>", "Override default port", String(DEFAULT_PORT))

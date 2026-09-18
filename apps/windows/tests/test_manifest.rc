@@ -1,0 +1,6 @@
+// Test executables need the same activation context as the app: the shell
+// registers comctl32 v6 classes (ICC_STANDARD_CLASSES, ICC_TAB_CLASSES), and
+// without this dependency InitCommonControlsEx fails before any assertion runs.
+#include <winresrc.h>
+
+1 RT_MANIFEST "../resources/manifest.xml"

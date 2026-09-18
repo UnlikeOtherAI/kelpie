@@ -15,6 +15,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 include(CTest)
+
+# Native tests use C assert(); retain it in Release so CTest failures are real.
+function(kelpie_enable_test_assertions target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(${target} PRIVATE -UNDEBUG)
+  endif()
+endfunction()
+
 include(FetchContent)
 
 find_package(nlohmann_json CONFIG QUIET)

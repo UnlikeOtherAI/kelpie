@@ -7,21 +7,16 @@ NetworkHandler::NetworkHandler(DesktopHandlerRuntime runtime) : runtime_(std::mo
 void NetworkHandler::Register(DesktopRouter& router) const {
   router.Register("get-network-log",
                   [this](const nlohmann::json& params) { return GetNetworkLog(params); });
-  router.Register("clear-network-log",
-                  [this](const nlohmann::json&) { return ClearNetworkLog(); });
-  router.Register("network-clear", [this](const nlohmann::json&) { return ClearNetworkLog(); });
+  router.Register("clear-network-log", [this](const nlohmann::json& p) { if (const auto invalid = RejectBrowserWideTab(p)) return *invalid; return ClearNetworkLog(); });
+  router.Register("network-clear", [this](const nlohmann::json& p) { if (const auto invalid = RejectBrowserWideTab(p)) return *invalid; return ClearNetworkLog(); });
   router.Register("get-resource-timeline",
-                  [](const nlohmann::json&) { return Unsupported("get-resource-timeline"); });
+                  [](const nlohmann::json&) { return Unsupported("get-resource-timeline"); }, false);
 }
 
 nlohmann::json NetworkHandler::GetNetworkLog(const nlohmann::json& params) const {
+  if (const auto invalid = RejectBrowserWideTab(params)) return *invalid;
   if (runtime_.network_store == nullptr) {
-    return SuccessResponse({
-        {"entries", nlohmann::json::array()},
-        {"count", 0},
-        {"hasMore", false},
-        {"summary", nlohmann::json::object()},
-    });
+    return Unsupported("get-network-log");
   }
 
   const auto type_it = params.find("type");
@@ -97,7 +92,7 @@ nlohmann::json NetworkHandler::GetNetworkLog(const nlohmann::json& params) const
 
 nlohmann::json NetworkHandler::ClearNetworkLog() const {
   if (runtime_.network_store == nullptr) {
-    return SuccessResponse({{"cleared", 0}});
+    return Unsupported("clear-network-log");
   }
   const int count = runtime_.network_store->Count();
   runtime_.network_store->Clear();

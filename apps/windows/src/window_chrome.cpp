@@ -24,10 +24,29 @@ constexpr COLORREF kCloseColor = RGB(255, 95, 87);
 constexpr COLORREF kMinimizeColor = RGB(254, 188, 46);
 constexpr COLORREF kMaximizeColor = RGB(40, 200, 64);
 constexpr COLORREF kInactiveControlColor = RGB(184, 184, 184);
-constexpr DWORD kDwmWindowCornerPreference = 33;
-constexpr DWORD kDwmBorderColor = 34;
+#ifdef DWMWA_WINDOW_CORNER_PREFERENCE
+constexpr DWMWINDOWATTRIBUTE kDwmWindowCornerPreferenceAttribute =
+    DWMWA_WINDOW_CORNER_PREFERENCE;
+#else
+constexpr DWMWINDOWATTRIBUTE kDwmWindowCornerPreferenceAttribute =
+    static_cast<DWMWINDOWATTRIBUTE>(33);
+#endif
+#ifdef DWMWA_BORDER_COLOR
+constexpr DWMWINDOWATTRIBUTE kDwmBorderColorAttribute = DWMWA_BORDER_COLOR;
+#else
+constexpr DWMWINDOWATTRIBUTE kDwmBorderColorAttribute =
+    static_cast<DWMWINDOWATTRIBUTE>(34);
+#endif
+#ifdef DWMWCP_ROUND
+constexpr DWORD kDwmRound = DWMWCP_ROUND;
+#else
 constexpr DWORD kDwmRound = 2;
+#endif
+#ifdef DWMWCP_DONOTROUND
+constexpr DWORD kDwmDoNotRound = DWMWCP_DONOTROUND;
+#else
 constexpr DWORD kDwmDoNotRound = 1;
+#endif
 
 bool IsControlId(UINT id) {
   return id == IDC_WINDOW_CLOSE || id == IDC_WINDOW_MINIMIZE ||
@@ -38,6 +57,13 @@ bool IsControlId(UINT id) {
 
 void WindowChrome::Attach(HWND window, HINSTANCE instance) {
   window_ = window;
+  if (window_ != nullptr) {
+    HDC device_context = GetDC(window_);
+    if (device_context != nullptr) {
+      SetDpi(static_cast<UINT>(GetDeviceCaps(device_context, LOGPIXELSX)));
+      ReleaseDC(window_, device_context);
+    }
+  }
   struct ControlDefinition {
     int id;
     const wchar_t* label;
@@ -51,7 +77,7 @@ void WindowChrome::Attach(HWND window, HINSTANCE instance) {
   for (auto& control : controls) {
     *control.handle = CreateWindowExW(
         0, L"BUTTON", control.label,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 0, 0, window_,
+        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 0, 0, window_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(control.id)), instance,
         nullptr);
     if (*control.handle != nullptr) {
@@ -199,7 +225,7 @@ LRESULT WindowChrome::HitTest(WPARAM wparam, LPARAM lparam) const {
 }
 
 int WindowChrome::Inset() const {
-  return window_ != nullptr && IsZoomed(window_) ? 0 : 1;
+  return window_ != nullptr && IsZoomed(window_) ? 0 : Scale(1);
 }
 
 void WindowChrome::LayoutControls() {
@@ -215,6 +241,10 @@ void WindowChrome::LayoutControls() {
     }
     control_left += control_size + control_gap;
   }
+}
+
+void WindowChrome::SetDpi(UINT dpi) {
+  dpi_ = dpi == 0 ? 96U : dpi;
 }
 
 void WindowChrome::SetActive(bool active) {
@@ -243,13 +273,11 @@ void WindowChrome::UpdateDwmFrame() {
   if (window_ == nullptr) return;
   const DWORD corner_preference =
       IsZoomed(window_) ? kDwmDoNotRound : kDwmRound;
-  DwmSetWindowAttribute(
-      window_, static_cast<DWMWINDOWATTRIBUTE>(kDwmWindowCornerPreference),
-      &corner_preference, sizeof(corner_preference));
+  DwmSetWindowAttribute(window_, kDwmWindowCornerPreferenceAttribute,
+                        &corner_preference, sizeof(corner_preference));
   const COLORREF border_color = active_ ? kActiveBorder : kInactiveBorder;
-  DwmSetWindowAttribute(window_,
-                        static_cast<DWMWINDOWATTRIBUTE>(kDwmBorderColor),
-                        &border_color, sizeof(border_color));
+  DwmSetWindowAttribute(window_, kDwmBorderColorAttribute, &border_color,
+                        sizeof(border_color));
   const MARGINS margins{1, 1, 1, 1};
   DwmExtendFrameIntoClientArea(window_, &margins);
 }
@@ -288,12 +316,7 @@ bool WindowChrome::IsPointInControls(POINT point) const {
 }
 
 int WindowChrome::Scale(int value) const {
-  HDC device_context = GetDC(window_);
-  const int dpi = device_context != nullptr
-                      ? GetDeviceCaps(device_context, LOGPIXELSX)
-                      : 96;
-  if (device_context != nullptr) ReleaseDC(window_, device_context);
-  return MulDiv(value, dpi, 96);
+  return MulDiv(value, static_cast<int>(dpi_), 96);
 }
 
 void WindowChrome::SetControlsHovered(bool hovered) {

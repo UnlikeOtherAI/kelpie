@@ -75,6 +75,10 @@ async function ensureDir(dir: string): Promise<void> {
     if (!st.isDirectory()) {
       throw new Error(`Token path is not a directory: ${dir}`);
     }
+    // Windows file modes do not express the current-user ACL that protects this
+    // directory. The browser readiness capability is ACL-protected by Windows;
+    // do not misread NTFS' synthetic 0666 mode as an unsafe POSIX directory.
+    if (process.platform === "win32") return;
     const mode = st.mode & 0o777;
     if (mode !== DIR_MODE) {
       if (st.uid === process.getuid?.()) {
@@ -99,7 +103,7 @@ async function readStoreFile(path: string): Promise<TokenStoreFile> {
     throw new Error(`Refusing to read symlinked token file: ${path}`);
   }
   const mode = st.mode & 0o777;
-  if (mode !== FILE_MODE) {
+  if (process.platform !== "win32" && mode !== FILE_MODE) {
     if (st.uid === process.getuid?.()) {
       await fs.chmod(path, FILE_MODE);
     } else {

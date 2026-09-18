@@ -4,9 +4,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <iostream>
 
 #include <nlohmann/json.hpp>
+
+#undef assert
+#define assert(expression) do { if (!(expression)) std::abort(); } while (false)
 
 namespace {
 
@@ -30,7 +34,12 @@ void TestAlternativeEngineRegions() {
 
 void TestRegistryFiltering() {
   const kelpie::McpRegistry registry;
-  assert(registry.all_tools().size() == 92);
+  const auto all_tools = registry.all_tools();
+  assert(!all_tools.empty());
+  for (const auto& tool : all_tools) {
+    assert(!tool.name.empty());
+    assert(!tool.http_endpoint.empty());
+  }
 
   const auto ios_tools = registry.tools_for_platform(kelpie::Platform::kIos);
   const auto android_tools = registry.tools_for_platform(kelpie::Platform::kAndroid);
@@ -39,12 +48,26 @@ void TestRegistryFiltering() {
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
-  assert(ios_tools.size() == 92);
-  assert(android_tools.size() == 91);
-  assert(macos_tools.size() == 88);
-  assert(windows_tools.size() == 85);
-  assert(webkit_tools.size() == 92);
-  assert(chromium_tools.size() == 91);
+  // Exact counts: a tool that quietly appears on or disappears from a platform
+  // is the regression this guards, and `<= all_tools.size()` cannot see it.
+  // Update these deliberately when the catalogue changes.
+  assert(all_tools.size() == 105);
+  assert(ios_tools.size() == 103);
+  assert(android_tools.size() == 102);
+  assert(macos_tools.size() == 99);
+  assert(windows_tools.size() == 98);
+  assert(webkit_tools.size() == 105);
+  assert(chromium_tools.size() == 104);
+
+  // Windows-only in the shared catalogue, so Windows-only here too.
+  assert(ContainsTool(windows_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(ios_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(android_tools, "kelpie_close_browser"));
+  assert(!ContainsTool(macos_tools, "kelpie_close_browser"));
+  assert(ContainsTool(windows_tools, "kelpie_press_key"));
+  assert(!ContainsTool(ios_tools, "kelpie_press_key"));
+  assert(!ContainsTool(android_tools, "kelpie_press_key"));
+  assert(!ContainsTool(macos_tools, "kelpie_press_key"));
 
   assert(ContainsTool(ios_tools, "kelpie_safari_auth"));
   assert(!ContainsTool(android_tools, "kelpie_safari_auth"));
@@ -89,7 +112,7 @@ void TestCApi() {
   assert(ios_tools_json != nullptr);
   const json ios_tools = json::parse(ios_tools_json);
   kelpie_mcp_free_string(ios_tools_json);
-  assert(ios_tools.size() == 92);
+  assert(ios_tools.size() == kelpie::McpRegistry().tools_for_platform(kelpie::Platform::kIos).size());
   assert(ios_tools[0].contains("availability"));
 
   assert(kelpie_mcp_registry_is_available(registry, "kelpie_safari_auth", KELPIE_PLATFORM_IOS,
