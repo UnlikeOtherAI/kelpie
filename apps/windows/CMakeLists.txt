@@ -384,4 +384,19 @@ if(BUILD_TESTING)
     target_link_options(kelpie_windows_theme_test PRIVATE "/MANIFEST:NO")
   endif()
   add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
+
+  if(HAS_CEF)
+    # Only the packaged executable can prove these invariants: an app left
+    # completely alone must still answer its control surface, and a close
+    # request must actually finish. Both are process-wide properties, so the
+    # test drives the shipped binary over real loopback HTTP.
+    add_executable(idle_control_surface_test tests/idle_control_surface_test.cpp)
+    target_compile_definitions(idle_control_surface_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_link_libraries(idle_control_surface_test PRIVATE
+      httplib::httplib nlohmann_json::nlohmann_json ws2_32 user32)
+    add_test(NAME idle_control_surface_test
+      COMMAND idle_control_surface_test "$<TARGET_FILE_DIR:kelpie>")
+    # The quiet period alone is 35s, and an orderly close is allowed 90s.
+    set_tests_properties(idle_control_surface_test PROPERTIES TIMEOUT 420 SKIP_RETURN_CODE 77)
+  endif()
 endif()
