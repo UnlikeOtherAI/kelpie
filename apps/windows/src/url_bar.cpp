@@ -262,7 +262,10 @@ void UrlBar::Paint(HDC device_context) const {
   RECT edit{};
   GetWindowRect(url_edit_, &edit);
   MapWindowPoints(HWND_DESKTOP, parent_, reinterpret_cast<POINT*>(&edit), 2);
-  edit.left -= ui::Dip(parent_, 4);
+  // Resize positions the EDIT one gutter in from the surface's left edge, so
+  // the surface has to start there too. Hugging the control with a uniform
+  // inset would put the lock underneath it, where an opaque child hides it.
+  edit.left -= ui::Dip(parent_, kLockGutterDip);
   edit.right += ui::Dip(parent_, 4);
   edit.top -= ui::Dip(parent_, 2);
   edit.bottom += ui::Dip(parent_, 2);
