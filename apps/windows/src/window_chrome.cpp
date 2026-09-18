@@ -7,7 +7,7 @@
 #include <algorithm>
 
 #include "../resources/resource.h"
-#include "ui_theme.h"
+#include "theme/theme.h"
 
 namespace kelpie::windows {
 namespace {
@@ -249,6 +249,9 @@ void WindowChrome::UpdateDwmFrame() {
   DwmSetWindowAttribute(window_,
                         static_cast<DWMWINDOWATTRIBUTE>(kDwmBorderColor),
                         &border_color, sizeof(border_color));
+  // The title bar and system border are drawn by DWM, not by this class, so
+  // they only follow the app theme once the dark-mode attribute is applied.
+  ui::ApplyWindowAppearance(window_);
   const MARGINS margins{1, 1, 1, 1};
   DwmExtendFrameIntoClientArea(window_, &margins);
 }

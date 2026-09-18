@@ -74,7 +74,25 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cpp_httplib)
 
+# The shared visual system: palette, DPI metrics, fonts, drawing primitives.
+set(WINDOWS_THEME_SOURCES
+  src/theme/palette.cpp
+  src/theme/metrics.cpp
+  src/theme/paint.cpp
+  src/theme/panels.cpp
+)
+
+set(WINDOWS_THEME_HEADERS
+  src/theme/theme.h
+  src/theme/palette.h
+  src/theme/metrics.h
+  src/theme/paint.h
+  src/theme/panels.h
+  src/theme/icons.h
+)
+
 set(WINDOWS_APP_SOURCES
+  ${WINDOWS_THEME_SOURCES}
   src/main.cpp
   src/native_window_control.cpp
   src/owner_task_queue.cpp
@@ -98,6 +116,7 @@ set(WINDOWS_APP_SOURCES
 )
 
 set(WINDOWS_APP_HEADERS
+  ${WINDOWS_THEME_HEADERS}
   src/windows_app.h
   src/native_window_control.h
   src/owner_task_queue.h
@@ -171,6 +190,8 @@ target_link_libraries(kelpie
     nlohmann_json::nlohmann_json
     user32
     gdi32
+    gdiplus
+    uxtheme
     dwmapi
     shell32
     ws2_32
@@ -317,15 +338,17 @@ if(BUILD_TESTING)
   add_executable(window_chrome_test
     tests/window_chrome_test.cpp
     src/window_chrome.cpp
+    ${WINDOWS_THEME_SOURCES}
   )
   target_compile_definitions(window_chrome_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
   target_include_directories(window_chrome_test PRIVATE src resources)
-  target_link_libraries(window_chrome_test PRIVATE user32 gdi32 dwmapi comctl32)
+  target_link_libraries(window_chrome_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi comctl32)
   add_test(NAME window_chrome_test COMMAND window_chrome_test)
 
   add_executable(windows_shell_preview_test
     tests/windows_shell_preview_test.cpp
     tests/test_manifest.rc
+    ${WINDOWS_THEME_SOURCES}
     src/win32_shell.cpp
     src/window_chrome.cpp
     src/url_bar.cpp
@@ -340,7 +363,7 @@ if(BUILD_TESTING)
   # win32_browser_view.h includes kelpie/renderer_interface.h, which the
   # automation core owns; without it this target cannot compile.
   target_link_libraries(windows_shell_preview_test PRIVATE nlohmann_json::nlohmann_json
-    kelpie_core_automation user32 gdi32 gdiplus dwmapi comctl32 shell32 ole32)
+    kelpie_core_automation user32 gdi32 gdiplus uxtheme dwmapi comctl32 shell32 ole32)
   if(MSVC)
     # tests/test_manifest.rc supplies the manifest; the linker would otherwise
     # add its own and the two collide as a duplicate resource.
@@ -348,6 +371,19 @@ if(BUILD_TESTING)
   endif()
 
   add_test(NAME windows_shell_preview_test COMMAND windows_shell_preview_test)
+
+  add_executable(kelpie_windows_theme_test
+    tests/theme_test.cpp
+    tests/test_manifest.rc
+    ${WINDOWS_THEME_SOURCES}
+  )
+  target_compile_definitions(kelpie_windows_theme_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_include_directories(kelpie_windows_theme_test PRIVATE src resources)
+  target_link_libraries(kelpie_windows_theme_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi comctl32)
+  if(MSVC)
+    target_link_options(kelpie_windows_theme_test PRIVATE "/MANIFEST:NO")
+  endif()
+  add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
 
   if(HAS_CEF)
     # Only the packaged executable can prove the invariant this guards: closing

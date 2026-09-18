@@ -8,7 +8,7 @@
 #include <string>
 
 #include "../resources/resource.h"
-#include "ui_theme.h"
+#include "theme/theme.h"
 
 namespace kelpie::windows {
 namespace {
