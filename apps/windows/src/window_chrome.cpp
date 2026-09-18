@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "../resources/resource.h"
+#include "ui_theme.h"
 
 namespace kelpie::windows {
 namespace {
@@ -17,36 +18,10 @@ constexpr int kControlBoxSize = 20;
 constexpr int kControlDiameter = 14;
 constexpr int kControlGap = 4;
 constexpr int kControlInset = 12;
-constexpr COLORREF kChromeBackground = RGB(246, 246, 248);
-constexpr COLORREF kActiveBorder = RGB(190, 190, 194);
-constexpr COLORREF kInactiveBorder = RGB(216, 216, 220);
-constexpr COLORREF kCloseColor = RGB(255, 95, 87);
-constexpr COLORREF kMinimizeColor = RGB(254, 188, 46);
-constexpr COLORREF kMaximizeColor = RGB(40, 200, 64);
-constexpr COLORREF kInactiveControlColor = RGB(184, 184, 184);
-#ifdef DWMWA_WINDOW_CORNER_PREFERENCE
-constexpr DWMWINDOWATTRIBUTE kDwmWindowCornerPreferenceAttribute =
-    DWMWA_WINDOW_CORNER_PREFERENCE;
-#else
-constexpr DWMWINDOWATTRIBUTE kDwmWindowCornerPreferenceAttribute =
-    static_cast<DWMWINDOWATTRIBUTE>(33);
-#endif
-#ifdef DWMWA_BORDER_COLOR
-constexpr DWMWINDOWATTRIBUTE kDwmBorderColorAttribute = DWMWA_BORDER_COLOR;
-#else
-constexpr DWMWINDOWATTRIBUTE kDwmBorderColorAttribute =
-    static_cast<DWMWINDOWATTRIBUTE>(34);
-#endif
-#ifdef DWMWCP_ROUND
-constexpr DWORD kDwmRound = DWMWCP_ROUND;
-#else
+constexpr DWORD kDwmWindowCornerPreference = 33;
+constexpr DWORD kDwmBorderColor = 34;
 constexpr DWORD kDwmRound = 2;
-#endif
-#ifdef DWMWCP_DONOTROUND
-constexpr DWORD kDwmDoNotRound = DWMWCP_DONOTROUND;
-#else
 constexpr DWORD kDwmDoNotRound = 1;
-#endif
 
 bool IsControlId(UINT id) {
   return id == IDC_WINDOW_CLOSE || id == IDC_WINDOW_MINIMIZE ||
@@ -57,13 +32,6 @@ bool IsControlId(UINT id) {
 
 void WindowChrome::Attach(HWND window, HINSTANCE instance) {
   window_ = window;
-  if (window_ != nullptr) {
-    HDC device_context = GetDC(window_);
-    if (device_context != nullptr) {
-      SetDpi(static_cast<UINT>(GetDeviceCaps(device_context, LOGPIXELSX)));
-      ReleaseDC(window_, device_context);
-    }
-  }
   struct ControlDefinition {
     int id;
     const wchar_t* label;
@@ -77,7 +45,7 @@ void WindowChrome::Attach(HWND window, HINSTANCE instance) {
   for (auto& control : controls) {
     *control.handle = CreateWindowExW(
         0, L"BUTTON", control.label,
-        WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 0, 0, window_,
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 0, 0, window_,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(control.id)), instance,
         nullptr);
     if (*control.handle != nullptr) {
@@ -95,11 +63,12 @@ void WindowChrome::Draw(HDC device_context) const {
   const int title_bar_height = TitleBarHeight();
   RECT title_rect{rect.left, rect.top, rect.right,
                   std::min(rect.bottom, static_cast<LONG>(title_bar_height))};
-  HBRUSH chrome_brush = CreateSolidBrush(kChromeBackground);
+  const auto colors = ui::Colors();
+  HBRUSH chrome_brush = CreateSolidBrush(colors.canvas);
   FillRect(device_context, &title_rect, chrome_brush);
   DeleteObject(chrome_brush);
 
-  const COLORREF separator_color = active_ ? kActiveBorder : kInactiveBorder;
+  const COLORREF separator_color = active_ ? colors.border : colors.muted_text;
   HPEN separator_pen = CreatePen(PS_SOLID, 1, separator_color);
   HGDIOBJ old_pen = SelectObject(device_context, separator_pen);
   MoveToEx(device_context, rect.left, title_rect.bottom - 1, nullptr);
@@ -112,13 +81,14 @@ void WindowChrome::Draw(HDC device_context) const {
                  static_cast<int>(sizeof(title) / sizeof(title[0])));
   RECT text_rect{Scale(88), 0, rect.right - Scale(88), title_bar_height};
   SetBkMode(device_context, TRANSPARENT);
-  SetTextColor(device_context, RGB(74, 74, 78));
-  HGDIOBJ old_font =
-      SelectObject(device_context, GetStockObject(DEFAULT_GUI_FONT));
+  SetTextColor(device_context, colors.text);
+  HFONT title_font = ui::MakeFont(window_, 13, FW_NORMAL);
+  HGDIOBJ old_font = SelectObject(device_context, title_font);
   DrawTextW(
       device_context, title, -1, &text_rect,
       DT_CENTER | DT_END_ELLIPSIS | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
   SelectObject(device_context, old_font);
+  DeleteObject(title_font);
 
   if (!IsZoomed(window_)) {
     HBRUSH border_brush = CreateSolidBrush(separator_color);
@@ -130,7 +100,8 @@ void WindowChrome::Draw(HDC device_context) const {
 bool WindowChrome::DrawControl(const DRAWITEMSTRUCT& item) const {
   if (!IsControlId(item.CtlID)) return false;
 
-  HBRUSH chrome_brush = CreateSolidBrush(kChromeBackground);
+  const auto colors = ui::Colors();
+  HBRUSH chrome_brush = CreateSolidBrush(colors.canvas);
   FillRect(item.hDC, &item.rcItem, chrome_brush);
   DeleteObject(chrome_brush);
 
@@ -140,11 +111,11 @@ bool WindowChrome::DrawControl(const DRAWITEMSTRUCT& item) const {
   const int top =
       item.rcItem.top + ((item.rcItem.bottom - item.rcItem.top) - diameter) / 2;
   RECT dot{left, top, left + diameter, top + diameter};
-  COLORREF color = kInactiveControlColor;
+  COLORREF color = ui::HighContrast() ? colors.muted_text : RGB(184, 184, 184);
   if (active_) {
-    if (item.CtlID == IDC_WINDOW_CLOSE) color = kCloseColor;
-    if (item.CtlID == IDC_WINDOW_MINIMIZE) color = kMinimizeColor;
-    if (item.CtlID == IDC_WINDOW_MAXIMIZE) color = kMaximizeColor;
+    if (item.CtlID == IDC_WINDOW_CLOSE) color = ui::HighContrast() ? colors.focus : RGB(255, 95, 87);
+    if (item.CtlID == IDC_WINDOW_MINIMIZE) color = ui::HighContrast() ? colors.focus : RGB(254, 188, 46);
+    if (item.CtlID == IDC_WINDOW_MAXIMIZE) color = ui::HighContrast() ? colors.focus : RGB(40, 200, 64);
   }
   HBRUSH dot_brush = CreateSolidBrush(color);
   HPEN outline_pen = CreatePen(PS_SOLID, 1, color);
@@ -160,7 +131,8 @@ bool WindowChrome::DrawControl(const DRAWITEMSTRUCT& item) const {
     const int center_x = (dot.left + dot.right) / 2;
     const int center_y = (dot.top + dot.bottom) / 2;
     const int mark_radius = std::max(2, Scale(3));
-    HPEN mark_pen = CreatePen(PS_SOLID, std::max(1, Scale(1)), RGB(62, 45, 44));
+    HPEN mark_pen = CreatePen(PS_SOLID, std::max(1, Scale(1)),
+                              ui::HighContrast() ? colors.text : RGB(62, 45, 44));
     old_pen = SelectObject(item.hDC, mark_pen);
     if (item.CtlID == IDC_WINDOW_CLOSE) {
       MoveToEx(item.hDC, center_x - mark_radius, center_y - mark_radius,
@@ -188,7 +160,7 @@ bool WindowChrome::EraseBackground(HDC device_context) const {
   if (window_ == nullptr) return false;
   RECT rect{};
   GetClientRect(window_, &rect);
-  HBRUSH brush = CreateSolidBrush(kChromeBackground);
+  HBRUSH brush = CreateSolidBrush(ui::Colors().canvas);
   FillRect(device_context, &rect, brush);
   DeleteObject(brush);
   return true;
@@ -225,7 +197,7 @@ LRESULT WindowChrome::HitTest(WPARAM wparam, LPARAM lparam) const {
 }
 
 int WindowChrome::Inset() const {
-  return window_ != nullptr && IsZoomed(window_) ? 0 : Scale(1);
+  return window_ != nullptr && IsZoomed(window_) ? 0 : 1;
 }
 
 void WindowChrome::LayoutControls() {
@@ -241,10 +213,6 @@ void WindowChrome::LayoutControls() {
     }
     control_left += control_size + control_gap;
   }
-}
-
-void WindowChrome::SetDpi(UINT dpi) {
-  dpi_ = dpi == 0 ? 96U : dpi;
 }
 
 void WindowChrome::SetActive(bool active) {
@@ -273,11 +241,14 @@ void WindowChrome::UpdateDwmFrame() {
   if (window_ == nullptr) return;
   const DWORD corner_preference =
       IsZoomed(window_) ? kDwmDoNotRound : kDwmRound;
-  DwmSetWindowAttribute(window_, kDwmWindowCornerPreferenceAttribute,
-                        &corner_preference, sizeof(corner_preference));
-  const COLORREF border_color = active_ ? kActiveBorder : kInactiveBorder;
-  DwmSetWindowAttribute(window_, kDwmBorderColorAttribute, &border_color,
-                        sizeof(border_color));
+  DwmSetWindowAttribute(
+      window_, static_cast<DWMWINDOWATTRIBUTE>(kDwmWindowCornerPreference),
+      &corner_preference, sizeof(corner_preference));
+  const auto colors = ui::Colors();
+  const COLORREF border_color = active_ ? colors.border : colors.muted_text;
+  DwmSetWindowAttribute(window_,
+                        static_cast<DWMWINDOWATTRIBUTE>(kDwmBorderColor),
+                        &border_color, sizeof(border_color));
   const MARGINS margins{1, 1, 1, 1};
   DwmExtendFrameIntoClientArea(window_, &margins);
 }
@@ -316,7 +287,15 @@ bool WindowChrome::IsPointInControls(POINT point) const {
 }
 
 int WindowChrome::Scale(int value) const {
-  return MulDiv(value, static_cast<int>(dpi_), 96);
+  return ui::Dip(window_, value);
+}
+
+std::vector<HWND> WindowChrome::FocusableControls() const {
+  std::vector<HWND> controls;
+  for (HWND control : {close_button_, minimize_button_, maximize_button_}) {
+    if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);
+  }
+  return controls;
 }
 
 void WindowChrome::SetControlsHovered(bool hovered) {

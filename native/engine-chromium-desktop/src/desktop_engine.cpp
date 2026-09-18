@@ -64,6 +64,14 @@ class DesktopCefClient final : public CefClient,
   void OnLoadEnd(CefRefPtr<CefBrowser> browser,
                  CefRefPtr<CefFrame> frame,
                  int http_status_code) override;
+  void OnLoadError(CefRefPtr<CefBrowser> browser,
+                   CefRefPtr<CefFrame> frame,
+                   CefLoadHandler::ErrorCode error_code,
+                   const CefString& error_text,
+                   const CefString& failed_url) override;
+  void OnAddressChange(CefRefPtr<CefBrowser> browser,
+                       CefRefPtr<CefFrame> frame,
+                       const CefString& url) override;
   void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title) override;
   bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
                         cef_log_severity_t level,
@@ -101,6 +109,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   config = next_config;
+  last_error.clear();
   shutting_down = false;
   viewport.width = std::max(1, config.viewport.width);
   viewport.height = std::max(1, config.viewport.height);
@@ -116,7 +125,10 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 #endif
   CefSettings settings;
 #if defined(_WIN32)
-  if (config.sandbox_info == nullptr) return false;
+  if (config.sandbox_info == nullptr) {
+    last_error = "The sandbox bootstrap is unavailable";
+    return false;
+  }
   settings.no_sandbox = false;
 #else
   // Linux's pinned CEF120 packaging does not ship the sandbox helper. Keep its
@@ -143,6 +155,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 
   initialized = CefInitialize(main_args, settings, app.get(), config.sandbox_info);
   if (!initialized) {
+    last_error = "Chromium framework initialization failed";
     return false;
   }
 
@@ -152,6 +165,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   } else if (config.configure_window_info) {
     config.configure_window_info(static_cast<void*>(&window_info));
   } else {
+    last_error = "No native browser host is configured";
+    app = nullptr;
+    client = nullptr;
+    CefShutdown();
+    initialized = false;
     return false;
   }
 
@@ -172,15 +190,35 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     initial.devtools = new DesktopDevToolsSession();
     initial.url = first_url;
     tabs.push_back(std::move(initial));
-    next_tab_id = std::max<std::uint64_t>(config.restored_next_tab_id, 1);
+    // tab-1 is already allocated for a fresh profile. The allocator is a
+    // high-water mark, never a reconstruction from the currently open tabs.
+    next_tab_id = config.restored_tabs.empty()
+        ? 2
+        : std::max<std::uint64_t>(config.restored_next_tab_id, 2);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
       TabSnapshot ignored;
       CreateTabOnUi(config.restored_tabs[index].url, &ignored, config.restored_tabs[index].id);
     }
     for (const auto& restored : config.restored_tabs) {
-      if (restored.active) { if (auto* tab = FindTab(TabLease{restored.id, 1})) browser = tab->browser; break; }
+      if (restored.active) {
+        if (auto* tab = FindTab(TabLease{restored.id, 1})) {
+#if defined(_WIN32)
+          if (browser && browser->GetHost()) ShowWindow(browser->GetHost()->GetWindowHandle(), SW_HIDE);
+          if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
+#endif
+          browser = tab->browser;
+        }
+        break;
+      }
     }
     UpdateActiveState();
+  } else {
+    last_error = "Chromium did not create the initial browser";
+    app = nullptr;
+    client = nullptr;
+    CefShutdown();
+    initialized = false;
+    return false;
   }
 
   renderer->SetCallbacks({
@@ -217,9 +255,9 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   return browser != nullptr;
 }
 
-void DesktopEngine::Impl::Shutdown() {
+bool DesktopEngine::Impl::Shutdown() {
   if (!initialized) {
-    return;
+    return true;
   }
   shutting_down = true;
   for (auto& tab : tabs) {
@@ -234,13 +272,15 @@ void DesktopEngine::Impl::Shutdown() {
   if (!tabs.empty()) {
     // CEF requires every browser close callback before CefShutdown. Keep the
     // runtime alive rather than invalidating outstanding CEF references.
-    return;
+    last_error = "Chromium browser shutdown did not complete";
+    return false;
   }
   browser = nullptr;
   client = nullptr;
   app = nullptr;
   CefShutdown();
   initialized = false;
+  return true;
 }
 
 void DesktopEngine::Impl::DoMessageLoopWork() {
@@ -308,7 +348,18 @@ void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
       [&browser](const DesktopEngine::Impl::Tab& tab) { return tab.browser->IsSame(browser); }),
       owner_->tabs.end());
   if (owner_->browser && owner_->browser->IsSame(browser)) {
-    owner_->browser = owner_->tabs.empty() ? nullptr : owner_->tabs.front().browser;
+    owner_->browser = nullptr;
+    for (const auto& candidate : owner_->tabs) {
+      if (!candidate.closing) {
+        owner_->browser = candidate.browser;
+#if defined(_WIN32)
+        if (owner_->browser && owner_->browser->GetHost()) {
+          ShowWindow(owner_->browser->GetHost()->GetWindowHandle(), SW_SHOW);
+        }
+#endif
+        break;
+      }
+    }
   }
   owner_->UpdateActiveState();
 }
@@ -321,6 +372,9 @@ void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
     tab->loading = is_loading;
     tab->can_go_back = can_go_back;
     tab->can_go_forward = can_go_forward;
+    if (!is_loading && tab->navigation_requested > tab->navigation_completed && tab->navigation_error.empty()) {
+      tab->navigation_completed = tab->navigation_requested;
+    }
   }
   owner_->UpdateActiveState();
 }
@@ -333,6 +387,30 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
   }
   if (auto* tab = owner_->FindTab(browser)) {
     tab->url = frame->GetURL().ToString();
+    if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
+  }
+  owner_->UpdateActiveState();
+}
+
+void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
+                                   CefRefPtr<CefFrame> frame,
+                                   CefLoadHandler::ErrorCode,
+                                   const CefString& error_text,
+                                   const CefString&) {
+  if (!frame || !frame->IsMain()) return;
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->loading = false;
+    tab->navigation_error = error_text.ToString();
+  }
+  owner_->UpdateActiveState();
+}
+
+void DesktopCefClient::OnAddressChange(CefRefPtr<CefBrowser> browser,
+                                       CefRefPtr<CefFrame> frame,
+                                       const CefString& url) {
+  if (!frame || !frame->IsMain()) return;
+  if (auto* tab = owner_->FindTab(browser)) {
+    tab->url = url.ToString();
     if (owner_->navigation_sink) owner_->navigation_sink(tab->url, tab->title);
   }
   owner_->UpdateActiveState();
@@ -422,12 +500,16 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
-void DesktopEngine::Shutdown() {
-  impl_->Shutdown();
+bool DesktopEngine::Shutdown() {
+  return impl_->Shutdown();
 }
 
 void DesktopEngine::DoMessageLoopWork() {
   impl_->DoMessageLoopWork();
+}
+
+const std::string& DesktopEngine::last_error() const {
+  return impl_->last_error;
 }
 
 bool DesktopEngine::is_initialized() const {

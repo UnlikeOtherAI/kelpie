@@ -21,10 +21,13 @@
 #include "kelpie/history_store.h"
 #include "kelpie/network_traffic_store.h"
 
+#include "close_lifecycle.h"
 #include "device_info_windows.h"
 #include "profile_session.h"
+#include "native_window_control.h"
 #include "session_snapshot.h"
 #include "settings_view.h"
+#include "startup_diagnostics.h"
 #include "win32_browser_view.h"
 #include "win32_shell.h"
 
@@ -85,15 +88,18 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void ApplySettings(const SettingsValues& settings);
   bool InitializeCommonControls() const;
   bool InitializeDesktopRuntime();
-  void ShutdownDesktopRuntime();
+  bool ShutdownDesktopRuntime();
   void UpdateBrowserStateFromRuntime();
+  void PersistForClose();
+  bool TryCompleteClose();
+  void ArmCloseRetry();
   bool CreateShell(int show_command);
-  void RememberNavigation(const BrowserState& state);
   std::wstring AppTitle() const;
 
   HINSTANCE instance_;
   AppConfig config_;
   std::atomic<bool> running_{true};
+  CloseLifecycle close_lifecycle_;
 
   DeviceInfoWindows device_info_provider_;
   BrowserState browser_state_;
@@ -102,11 +108,13 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::mutex shell_state_mutex_;
   std::string home_url_;
 
+  NativeWindowControl native_control_;
   std::unique_ptr<Win32Shell> shell_;
   std::unique_ptr<Win32BrowserView> browser_view_;
   std::unique_ptr<SettingsView> settings_view_;
   std::unique_ptr<DesktopApp> desktop_app_;
   ProfileSession profile_session_;
+  StartupDiagnostics startup_diagnostics_;
 
 };
 

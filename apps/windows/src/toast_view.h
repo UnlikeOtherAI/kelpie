@@ -20,8 +20,11 @@ class ToastView {
   void Hide();
 
  private:
+  static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  void Paint(HDC device_context) const;
+
   HWND hwnd_ = nullptr;
-  HWND label_ = nullptr;
+  std::wstring message_;
 };
 
 }  // namespace kelpie::windows

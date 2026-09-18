@@ -83,6 +83,17 @@ bool ProfileSession::Open(const std::filesystem::path& profile_dir,
   }
   lock_handle_ = handle;
   readiness_path_ = readiness_path.empty() ? profile_dir / "readiness.json" : readiness_path;
+  // The exclusive profile handle proves this process owns the profile. A
+  // predecessor may have crashed after publishing a capability; it must never
+  // remain discoverable while this launch is still starting.
+  if (!RemoveStaleReadiness(error)) {
+    CloseHandle(handle);
+    lock_handle_ = nullptr;
+    token_.clear();
+    launch_id_.clear();
+    readiness_path_.clear();
+    return false;
+  }
   return true;
 }
 
@@ -123,6 +134,18 @@ void ProfileSession::ClearReadiness() {
     return;
   }
   DeleteFileW(Wide(readiness_path_).c_str());
+}
+
+bool ProfileSession::RemoveStaleReadiness(std::string* error) const {
+  if (readiness_path_.empty() || !std::filesystem::exists(readiness_path_)) {
+    return true;
+  }
+  if (DeleteFileW(Wide(readiness_path_).c_str()) != FALSE ||
+      GetLastError() == ERROR_FILE_NOT_FOUND) {
+    return true;
+  }
+  SetError(error, "Unable to remove the stale readiness record");
+  return false;
 }
 
 bool ProfileSession::WriteProtectedFile(const std::filesystem::path& path,

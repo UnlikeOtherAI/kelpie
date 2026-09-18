@@ -6,6 +6,7 @@
 
 #include "../resources/resource.h"
 #include "windows_utf.h"
+#include "panel_theme.h"
 
 namespace kelpie::windows {
 
@@ -69,6 +70,21 @@ LRESULT HistoryView::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_SIZE:
       Resize();
       return 0;
+    case ui::kDpiChangedMessage:
+      RefreshFont();
+      Resize();
+      return 0;
+    case WM_DESTROY:
+      if (list_font_ != nullptr) DeleteObject(list_font_);
+      list_font_ = nullptr;
+      return 0;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(hwnd_, &paint);
+      ui::PaintPanelHeader(dc, hwnd_, L"History");
+      EndPaint(hwnd_, &paint);
+      return 0;
+    }
     case WM_NOTIFY: {
       const auto* notification = reinterpret_cast<NMHDR*>(lparam);
       if (notification->idFrom == IDC_HISTORY_LIST && notification->code == NM_DBLCLK && on_navigate_) {
@@ -96,7 +112,8 @@ void HistoryView::CreateListView() {
                                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
                                0, 0, 100, 100, hwnd_, reinterpret_cast<HMENU>(IDC_HISTORY_LIST),
                                instance_, nullptr);
-  ListView_SetExtendedListViewStyle(list_view_, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+  RefreshFont();
+  ui::StyleList(list_view_, list_font_);
 
   LVCOLUMNW column{};
   column.mask = LVCF_TEXT | LVCF_WIDTH;
@@ -112,10 +129,14 @@ void HistoryView::CreateListView() {
   Populate();
 }
 
+void HistoryView::RefreshFont() {
+  if (list_view_ != nullptr) ui::RefreshPanelFont(hwnd_, list_view_, &list_font_);
+}
+
 void HistoryView::Resize() {
   RECT rect{};
   GetClientRect(hwnd_, &rect);
-  SetWindowPos(list_view_, nullptr, 0, 0, rect.right, rect.bottom, SWP_NOZORDER);
+  SetWindowPos(list_view_, nullptr, ui::Dip(hwnd_, 12), ui::Dip(hwnd_, 56), rect.right - ui::Dip(hwnd_, 24), rect.bottom - ui::Dip(hwnd_, 68), SWP_NOZORDER);
 }
 
 void HistoryView::Populate() {

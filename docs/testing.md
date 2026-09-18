@@ -108,3 +108,18 @@ cd apps/android
 cd packages/cli
 pnpm build && pnpm test
 ```
+
+## Windows build and package
+
+Windows releases use the pinned CEF 152 minimal SDK. Run scripts/download-cef-windows.ps1,
+scripts/build-windows.ps1, then scripts/package-windows.ps1. The download verifies both
+pinned SHA-256 and SHA-1. The build requires VS2022 C++ Build Tools, Windows SDK, CMake,
+Ninja, and tar.exe; it uses C++20, the static MSVC CRT, USE_SANDBOX=ON, and CTest.
+
+The ZIP contains only the CEF runtime, locales, licenses, unchanged CEF bootstrap
+kelpie.exe, and Kelpie's kelpie.dll. Packaging rejects missing RunWinMain, non-x64 DLLs,
+or absent/mismatched 0.1.1 DLL resource versions. It writes uniquely named SHA-256 and
+provenance sidecars. Signing happens after deterministic resource stamping when a
+certificate is supplied; no certificate is assumed here. Use the approved Windows
+release acceptance command documented above; CI packaging does not bypass a locally
+rejected browser launch.

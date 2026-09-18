@@ -1,6 +1,7 @@
 #include "kelpie/desktop_mcp_server.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <optional>
 #include <string_view>
@@ -51,6 +52,9 @@ nlohmann::json InputSchema(std::string_view endpoint) {
   const auto integer = [&properties](const char* name, int minimum = 0) {
     properties[name] = {{"type", "integer"}, {"minimum", minimum}};
   };
+  const auto number = [&properties](const char* name) {
+    properties[name] = {{"type", "number"}};
+  };
   const auto tab_scoped = [&properties] {
     properties["tabId"] = {{"type", "string"}, {"minLength", 1}};
     properties["generation"] = {{"type", "integer"}, {"minimum", 0}};
@@ -75,18 +79,27 @@ nlohmann::json InputSchema(std::string_view endpoint) {
   if (scoped) tab_scoped();
 
   if (endpoint == "navigate" || endpoint == "set-home") { string("url", true); require("url"); }
-  else if (endpoint == "new-tab") string("url");
+  else if (endpoint == "new-tab") { string("url", true); properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}}; }
   else if (endpoint == "evaluate") { string("expression", true); require("expression"); }
   else if (endpoint == "query-selector" || endpoint == "query-selector-all" || endpoint == "get-element-text" || endpoint == "get-attributes") { string("selector", true); require("selector"); }
   else if (endpoint == "get-dom") string("selector");
-  else if (endpoint == "wait-for-element") { string("selector", true); require("selector"); }
+  else if (endpoint == "wait-for-element") {
+    string("selector", true);
+    properties["state"] = {{"enum", {"attached", "visible", "hidden"}}};
+    require("selector");
+  }
   else if (endpoint == "click" || endpoint == "check" || endpoint == "uncheck") { string("selector", true); require("selector"); }
   else if (endpoint == "fill" || endpoint == "select-option") { string("selector", true); string("value"); require("selector"); require("value"); }
   else if (endpoint == "type") { string("text", true); string("selector"); require("text"); }
-  else if (endpoint == "press-key") { string("key", true); string("code"); properties["modifiers"]={{"type","array"},{"items",{{"type","string"}}}}; require("key"); }
+  else if (endpoint == "press-key") {
+    string("key", true); string("code");
+    properties["modifiers"] = {{"type", "array"}, {"items", {{"type", "string"},
+        {"enum", {"Alt", "Control", "Meta", "Shift"}}}}};
+    require("key");
+  }
   else if (endpoint == "scroll") {
-    properties["deltaX"] = {{"type", "integer"}};
-    properties["deltaY"] = {{"type", "integer"}};
+    number("deltaX");
+    number("deltaY");
     require("deltaX"); require("deltaY");
   }
   else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") { properties["format"]={{"const","png"}}; }
@@ -95,7 +108,7 @@ nlohmann::json InputSchema(std::string_view endpoint) {
     string("name", true); string("value"); string("url"); string("domain"); string("path");
     string("expires"); properties["httpOnly"] = {{"type", "boolean"}};
     properties["secure"] = {{"type", "boolean"}};
-    properties["sameSite"] = {{"enum", {"strict", "lax", "none"}}};
+    properties["sameSite"] = {{"enum", {"Strict", "Lax", "None", "strict", "lax", "none"}}};
     require("name"); require("value");
   } else if (endpoint == "delete-cookies") {
     string("name"); string("domain"); properties["deleteAll"]={{"type","boolean"}};
@@ -104,18 +117,41 @@ nlohmann::json InputSchema(std::string_view endpoint) {
   else if (endpoint == "set-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key",true); string("value"); require("key"); require("value"); }
   else if (endpoint == "clear-storage") properties["type"]={{"enum",{"local","session","both"}}};
   else if (endpoint == "handle-dialog") { properties["action"]={{"enum",{"accept","dismiss"}}}; string("promptText"); require("action"); }
-  else if (endpoint == "find-element" || endpoint == "find-button" || endpoint == "find-link" || endpoint == "find-input") { string("text", true); require("text"); }
+  else if (endpoint == "find-element") {
+    string("text", true); string("role"); string("selector"); require("text");
+  } else if (endpoint == "find-button" || endpoint == "find-link") {
+    string("text", true); require("text");
+  } else if (endpoint == "find-input") {
+    string("label"); string("placeholder"); string("name");
+  } else if (endpoint == "get-page-text") {
+    properties["mode"] = {{"enum", {"readable", "full", "markdown"}}}; string("selector");
+  } else if (endpoint == "get-visible-elements") {
+    properties["interactableOnly"] = {{"type", "boolean"}};
+    properties["includeText"] = {{"type", "boolean"}};
+  } else if (endpoint == "get-form-state") {
+    string("selector");
+  } else if (endpoint == "get-accessibility-tree") {
+    string("root"); properties["interactableOnly"] = {{"type", "boolean"}};
+    integer("maxDepth", 0);
+    properties["maxDepth"]["maximum"] = 100;
+  }
   else if (endpoint == "toast") { string("message", true); require("message"); }
   else if (endpoint == "set-fullscreen") { properties["enabled"]={{"type","boolean"}}; require("enabled"); }
-  else if (endpoint == "resize-viewport") { integer("width",1); integer("height",1); require("width"); require("height"); }
+  else if (endpoint == "resize-viewport") {
+    integer("width", 1); integer("height", 1);
+    properties["width"]["maximum"] = 16384; properties["height"]["maximum"] = 16384;
+    require("width"); require("height");
+  }
   else if (endpoint == "bookmarks-add") { string("url",true); string("title"); require("url"); }
   else if (endpoint == "bookmarks-remove") { string("id",true); require("id"); }
   else if (endpoint == "history-list" || endpoint == "get-history") integer("limit",1);
-  else if (endpoint == "get-console-messages") {
+  else if (endpoint == "get-tabs") {
+    properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}};
+  } else if (endpoint == "get-console-messages") {
     properties["level"] = {{"enum", {"log", "warn", "error", "info", "debug"}}};
-    integer("limit", 1);
+    string("since"); integer("limit", 1);
   } else if (endpoint == "get-network-log") {
-    string("type");
+    string("type"); string("since");
     properties["status"] = {{"enum", {"success", "error", "pending"}}};
     integer("limit", 1);
   }
@@ -142,18 +178,38 @@ std::optional<std::string> ValidateToolArguments(const nlohmann::json& schema,
     const bool type_ok = type.empty() ||
         (type == "string" && it.value().is_string()) ||
         (type == "integer" && it.value().is_number_integer()) ||
+        (type == "number" && it.value().is_number()) ||
         (type == "boolean" && it.value().is_boolean()) ||
         (type == "array" && it.value().is_array());
     if (!type_ok) return it.key() + " has the wrong type";
+    if (it.value().is_array() && property.contains("items")) {
+      const auto& item_schema = property.at("items");
+      for (const auto& item : it.value()) {
+        if (item_schema.value("type", std::string()) == "string" && !item.is_string()) {
+          return it.key() + " items must be strings";
+        }
+        if (item_schema.contains("enum") &&
+            std::find(item_schema.at("enum").begin(), item_schema.at("enum").end(), item) ==
+                item_schema.at("enum").end()) return it.key() + " contains an invalid value";
+      }
+    }
     if (it.value().is_string() && property.contains("minLength") &&
         it.value().get_ref<const std::string&>().size() < property.at("minLength").get<std::size_t>()) {
       return it.key() + " is too short";
     }
     if (it.value().is_number_integer()) {
-      const auto value = it.value().get<std::int64_t>();
-      if ((property.contains("minimum") && value < property.at("minimum").get<std::int64_t>()) ||
-          (property.contains("maximum") && value > property.at("maximum").get<std::int64_t>())) {
-        return it.key() + " is out of range";
+      if (it.value().is_number_unsigned()) {
+        const auto value = it.value().get<std::uint64_t>();
+        if ((property.contains("minimum") && property.at("minimum").get<std::uint64_t>() > value) ||
+            (property.contains("maximum") && value > property.at("maximum").get<std::uint64_t>())) {
+          return it.key() + " is out of range";
+        }
+      } else {
+        const auto value = it.value().get<std::int64_t>();
+        if ((property.contains("minimum") && value < property.at("minimum").get<std::int64_t>()) ||
+            (property.contains("maximum") && value > property.at("maximum").get<std::int64_t>())) {
+          return it.key() + " is out of range";
+        }
       }
     }
   }

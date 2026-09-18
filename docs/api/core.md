@@ -950,7 +950,11 @@ Response:
 ```
 
 ### `waitForNavigation`
-Wait for a navigation event to complete.
+Wait for an already-started navigation to complete. `navigate` reports that
+the request was accepted; it does not claim the destination has loaded. This
+method returns a navigation error when the selected tab is not loading, which
+prevents an old `document.readyState === "complete"` from being reported as a
+new navigation.
 
 ```json
 POST /v1/wait-for-navigation

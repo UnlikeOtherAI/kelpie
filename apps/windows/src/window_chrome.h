@@ -8,6 +8,8 @@
 #endif
 #include <windows.h>
 
+#include <vector>
+
 namespace kelpie::windows {
 
 class WindowChrome {
@@ -19,12 +21,12 @@ class WindowChrome {
   LRESULT HitTest(WPARAM wparam, LPARAM lparam) const;
   int Inset() const;
   void LayoutControls();
-  void SetDpi(UINT dpi);
   void SetActive(bool active);
   void TrackMouse(POINT point);
   void TrackMouseLeave();
   int TitleBarHeight() const;
   void UpdateDwmFrame();
+  std::vector<HWND> FocusableControls() const;
 
  private:
   static LRESULT CALLBACK ControlProc(HWND hwnd, UINT message, WPARAM wparam,
@@ -38,7 +40,6 @@ class WindowChrome {
   HWND close_button_ = nullptr;
   HWND minimize_button_ = nullptr;
   HWND maximize_button_ = nullptr;
-  UINT dpi_ = 96;
   bool active_ = true;
   bool controls_hovered_ = false;
 };

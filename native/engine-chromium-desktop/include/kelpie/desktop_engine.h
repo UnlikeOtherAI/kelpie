@@ -54,6 +54,13 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::function<void(void*, const std::string&)> configure_tab_window_info;
   };
 
+  struct SessionState {
+    std::uint64_t next_tab_id = 1;
+    std::vector<RestoredTab> tabs;
+  };
+
+  using NavigationState = BrowserNavigationState;
+
   struct ViewportState {
     int width = 1280;
     int height = 720;
@@ -68,8 +75,10 @@ class DesktopEngine final : public DesktopBrowserControl {
   ~DesktopEngine();
 
   bool Initialize(const Config& config);
-  void Shutdown();
+  bool Shutdown();
   void DoMessageLoopWork();
+  const std::string& last_error() const;
+  bool IsActiveNativeBrowserAttached(void* parent_window, Timeout timeout);
 
   bool is_initialized() const;
   bool is_offscreen() const;
@@ -89,6 +98,8 @@ class DesktopEngine final : public DesktopBrowserControl {
   const CefRenderer& renderer() const;
 
   BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) override;
+  BrowserControlResult GetSessionState(SessionState* state, Timeout timeout);
+  BrowserControlResult GetNavigationState(TabLease lease, NavigationState* state, Timeout timeout) override;
   BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
                                   const std::optional<std::uint64_t>& generation,
                                   TabLease* lease,

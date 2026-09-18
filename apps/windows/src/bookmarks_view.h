@@ -26,11 +26,13 @@ class BookmarksView {
   void CreateListView();
   void Resize();
   void Populate();
+  void RefreshFont();
 
   HINSTANCE instance_ = nullptr;
   HWND owner_ = nullptr;
   HWND hwnd_ = nullptr;
   HWND list_view_ = nullptr;
+  HFONT list_font_ = nullptr;
   std::string bookmarks_json_ = "[]";
   std::function<void(const std::string&)> on_navigate_;
 };

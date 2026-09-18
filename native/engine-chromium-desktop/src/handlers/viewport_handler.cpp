@@ -40,7 +40,9 @@ nlohmann::json ViewportHandler::ResetViewport(const nlohmann::json& params) cons
   if (!runtime_.viewport_supplier || !runtime_.reset_viewport) {
     return Unsupported("reset-viewport");
   }
-  runtime_.reset_viewport();
+  if (!runtime_.reset_viewport()) {
+    return ErrorResponse(ErrorCode::kWebviewError, "Failed to reset viewport");
+  }
   return SuccessResponse({{"viewport", runtime_.viewport_supplier()}});
 }
 

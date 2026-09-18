@@ -50,7 +50,7 @@ class DesktopApp {
     // its owner thread; the shared fallback is for non-Windows test shells.
     std::function<nlohmann::json()> viewport_supplier;
     std::function<bool(int width, int height)> resize_viewport;
-    std::function<void()> reset_viewport;
+    std::function<bool()> reset_viewport;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;
@@ -60,10 +60,15 @@ class DesktopApp {
   ~DesktopApp();
 
   bool Start(const Config& config);
-  void Stop();
+  // Nonblocking shutdown admission gate. Call IsShutdownReady from the native
+  // owner loop before Stop so CEF work and admitted HTTP requests can drain.
+  void BeginShutdown();
+  bool IsShutdownReady() const;
+  bool Stop();
   void Tick();
 
   bool is_running() const;
+  const std::string& last_error() const;
 
   DesktopEngine& engine();
   DesktopRouter& router();

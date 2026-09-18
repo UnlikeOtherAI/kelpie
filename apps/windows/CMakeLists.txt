@@ -31,6 +31,8 @@ if(MSVC)
   # CEF's Windows wrapper uses the static CRT. Every native target must use
   # the same CRT or the linker rejects mixed debug/runtime allocations.
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+  # Chrome glyph literals are UTF-8 source, independently of the active system code page.
+  add_compile_options(/utf-8)
 endif()
 
 include(CTest)
@@ -74,7 +76,12 @@ FetchContent_MakeAvailable(cpp_httplib)
 
 set(WINDOWS_APP_SOURCES
   src/main.cpp
+  src/native_window_control.cpp
+  src/owner_task_queue.cpp
+  src/cef_pump_deadline.cpp
+  src/close_lifecycle.h
   src/windows_app.cpp
+  src/windows_runtime.cpp
   src/win32_shell.cpp
   src/window_chrome.cpp
   src/win32_browser_view.cpp
@@ -92,6 +99,9 @@ set(WINDOWS_APP_SOURCES
 
 set(WINDOWS_APP_HEADERS
   src/windows_app.h
+  src/native_window_control.h
+  src/owner_task_queue.h
+  src/cef_pump_deadline.h
   src/win32_shell.h
   src/window_chrome.h
   src/win32_browser_view.h
@@ -102,6 +112,7 @@ set(WINDOWS_APP_HEADERS
   src/network_inspector.h
   src/profile_session.h
   src/session_snapshot.h
+  src/startup_diagnostics.h
   src/toast_view.h
   src/device_info_windows.h
   src/mdns_windows.h
@@ -245,6 +256,57 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_session_snapshot_test COMMAND kelpie_windows_session_snapshot_test)
+  add_executable(kelpie_windows_cef_pump_deadline_test tests/cef_pump_deadline_test.cpp src/cef_pump_deadline.cpp)
+  target_include_directories(kelpie_windows_cef_pump_deadline_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_compile_options(kelpie_windows_cef_pump_deadline_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_cef_pump_deadline_test COMMAND kelpie_windows_cef_pump_deadline_test)
+  add_executable(kelpie_windows_owner_task_queue_test tests/owner_task_queue_test.cpp src/owner_task_queue.cpp)
+  target_include_directories(kelpie_windows_owner_task_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_compile_options(kelpie_windows_owner_task_queue_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_owner_task_queue_test COMMAND kelpie_windows_owner_task_queue_test)
+  add_executable(kelpie_windows_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
+  target_include_directories(kelpie_windows_profile_session_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_profile_session_test PRIVATE nlohmann_json::nlohmann_json advapi32 bcrypt)
+  if(MSVC)
+    target_compile_options(kelpie_windows_profile_session_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_profile_session_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_profile_session_test COMMAND kelpie_windows_profile_session_test)
+  add_executable(kelpie_windows_device_info_test tests/device_info_windows_test.cpp src/device_info_windows.cpp)
+  target_include_directories(kelpie_windows_device_info_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_device_info_test PRIVATE kelpie_engine_chromium_desktop nlohmann_json::nlohmann_json ws2_32 iphlpapi Rpcrt4)
+  if(MSVC)
+    target_compile_options(kelpie_windows_device_info_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_device_info_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_device_info_test COMMAND kelpie_windows_device_info_test)
+  add_executable(kelpie_windows_browser_view_test tests/win32_browser_view_test.cpp src/win32_browser_view.cpp)
+  target_include_directories(kelpie_windows_browser_view_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_browser_view_test PRIVATE user32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_browser_view_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_browser_view_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_browser_view_test COMMAND kelpie_windows_browser_view_test)
+  add_executable(kelpie_windows_startup_diagnostics_test tests/startup_diagnostics_test.cpp)
+  target_include_directories(kelpie_windows_startup_diagnostics_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  if(MSVC)
+    target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_startup_diagnostics_test COMMAND kelpie_windows_startup_diagnostics_test)
+  add_executable(kelpie_windows_close_lifecycle_test tests/close_lifecycle_test.cpp)
+  target_include_directories(kelpie_windows_close_lifecycle_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  if(MSVC)
+    target_compile_options(kelpie_windows_close_lifecycle_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_close_lifecycle_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_close_lifecycle_test COMMAND kelpie_windows_close_lifecycle_test)
 endif()
 
 if(MINGW)
@@ -261,30 +323,29 @@ if(BUILD_TESTING)
   target_link_libraries(window_chrome_test PRIVATE user32 gdi32 dwmapi comctl32)
   add_test(NAME window_chrome_test COMMAND window_chrome_test)
 
-  add_executable(win32_shell_test
-    tests/win32_shell_test.cpp
+  add_executable(windows_shell_preview_test
+    tests/windows_shell_preview_test.cpp
     tests/test_manifest.rc
     src/win32_shell.cpp
     src/window_chrome.cpp
-    src/win32_browser_view.cpp
     src/url_bar.cpp
+    src/win32_browser_view.cpp
+    src/toast_view.cpp
     src/bookmarks_view.cpp
     src/history_view.cpp
     src/network_inspector.cpp
-    src/settings_view.cpp
-    src/toast_view.cpp
   )
-  target_compile_definitions(win32_shell_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-  target_include_directories(win32_shell_test PRIVATE src resources)
+  target_compile_definitions(windows_shell_preview_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_include_directories(windows_shell_preview_test PRIVATE src resources)
   # win32_browser_view.h includes kelpie/renderer_interface.h, which the
   # automation core owns; without it this target cannot compile.
-  target_link_libraries(win32_shell_test PRIVATE user32 gdi32 dwmapi comctl32 shell32 ole32
-    kelpie_core_automation nlohmann_json::nlohmann_json)
+  target_link_libraries(windows_shell_preview_test PRIVATE nlohmann_json::nlohmann_json
+    kelpie_core_automation user32 gdi32 gdiplus dwmapi comctl32 shell32 ole32)
   if(MSVC)
     # tests/test_manifest.rc supplies the manifest; the linker would otherwise
     # add its own and the two collide as a duplicate resource.
-    target_link_options(win32_shell_test PRIVATE "/MANIFEST:NO")
+    target_link_options(windows_shell_preview_test PRIVATE "/MANIFEST:NO")
   endif()
 
-  add_test(NAME win32_shell_test COMMAND win32_shell_test)
+  add_test(NAME windows_shell_preview_test COMMAND windows_shell_preview_test)
 endif()

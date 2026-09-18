@@ -34,9 +34,16 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
-void DesktopEngine::Shutdown() {}
+bool DesktopEngine::Shutdown() { return true; }
 
 void DesktopEngine::DoMessageLoopWork() {}
+
+const std::string& DesktopEngine::last_error() const {
+  static const std::string error = "Chromium support is unavailable in this build";
+  return error;
+}
+
+bool DesktopEngine::IsActiveNativeBrowserAttached(void*, Timeout) { return false; }
 
 bool DesktopEngine::is_initialized() const {
   return false;
@@ -108,6 +115,10 @@ BrowserControlResult UnsupportedControl() {
 }  // namespace
 
 BrowserControlResult DesktopEngine::GetTabs(std::vector<TabSnapshot>*, Timeout) { return UnsupportedControl(); }
+
+BrowserControlResult DesktopEngine::GetNavigationState(TabLease, NavigationState*, Timeout) {
+  return UnsupportedControl();
+}
 
 BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&,
                                                const std::optional<std::uint64_t>&,

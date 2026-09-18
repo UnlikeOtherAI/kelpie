@@ -4,9 +4,11 @@
 #include <shlobj.h>
 
 #include <algorithm>
+#include <iterator>
 #include <string>
 
 #include "../resources/resource.h"
+#include "ui_theme.h"
 
 namespace kelpie::windows {
 namespace {
@@ -45,32 +47,63 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
   }
 
   switch (message) {
+    case WM_ERASEBKGND: {
+      RECT rect{};
+      GetClientRect(hwnd, &rect);
+      HBRUSH brush = CreateSolidBrush(ui::Colors().canvas);
+      FillRect(reinterpret_cast<HDC>(wparam), &rect, brush);
+      DeleteObject(brush);
+      return TRUE;
+    }
     case WM_CREATE: {
-      CreateWindowExW(0, L"STATIC", L"Port", WS_CHILD | WS_VISIBLE,
+      CreateWindowExW(0, L"STATIC", L"Port (set at launch)", WS_CHILD | WS_VISIBLE,
                       16, 16, 90, 20, hwnd, nullptr, nullptr, nullptr);
-      CreateWindowExW(0, L"STATIC", L"Profile Dir", WS_CHILD | WS_VISIBLE,
+      CreateWindowExW(0, L"STATIC", L"Profile (set at launch)", WS_CHILD | WS_VISIBLE,
                       16, 56, 90, 20, hwnd, nullptr, nullptr, nullptr);
       CreateWindowExW(0, L"STATIC", L"Startup URL", WS_CHILD | WS_VISIBLE,
                       16, 96, 90, 20, hwnd, nullptr, nullptr, nullptr);
 
-      state->port_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", std::to_wstring(state->values.port).c_str(),
-                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 12, 240, 24,
+      state->port_edit = CreateWindowExW(0, L"EDIT", std::to_wstring(state->values.port).c_str(),
+                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_READONLY, 112, 12, 240, 24,
                                          hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PORT), nullptr, nullptr);
-      state->profile_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", state->values.profile_dir.c_str(),
-                                            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 52, 240, 24,
+      state->profile_edit = CreateWindowExW(0, L"EDIT", state->values.profile_dir.c_str(),
+                                            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_READONLY, 112, 52, 240, 24,
                                             hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PROFILE), nullptr, nullptr);
-      state->url_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", state->values.startup_url.c_str(),
+      state->url_edit = CreateWindowExW(0, L"EDIT", state->values.startup_url.c_str(),
                                         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 112, 92, 240, 24,
                                         hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_STARTUP_URL), nullptr, nullptr);
 
-      CreateWindowExW(0, L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+      HWND browse = CreateWindowExW(0, L"BUTTON", L"Browse", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       360, 52, 72, 24, hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PROFILE_BROWSE),
                       nullptr, nullptr);
-      CreateWindowExW(0, L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+      EnableWindow(browse, FALSE);
+      CreateWindowExW(0, L"BUTTON", L"Save", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       248, 136, 88, 28, hwnd, reinterpret_cast<HMENU>(IDOK), nullptr, nullptr);
-      CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+      CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       344, 136, 88, 28, hwnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
       return 0;
+    }
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT: {
+      const auto colors = ui::Colors();
+      SetTextColor(reinterpret_cast<HDC>(wparam), colors.text);
+      SetBkColor(reinterpret_cast<HDC>(wparam), colors.canvas);
+      return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+    }
+    case WM_DRAWITEM: {
+      const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
+      if (item == nullptr) return FALSE;
+      const auto colors = ui::Colors();
+      const bool pressed = (item->itemState & ODS_SELECTED) != 0;
+      ui::PaintRounded(item->hDC, item->rcItem, pressed ? colors.surface_hover : colors.surface,
+                       colors.border, ui::Dip(hwnd, 8));
+      wchar_t label[64]{};
+      GetWindowTextW(item->hwndItem, label, static_cast<int>(std::size(label)));
+      SetBkMode(item->hDC, TRANSPARENT);
+      SetTextColor(item->hDC, colors.text);
+      DrawTextW(item->hDC, label, -1, const_cast<RECT*>(&item->rcItem),
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      return TRUE;
     }
     case WM_COMMAND:
       switch (LOWORD(wparam)) {
@@ -89,8 +122,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
           return 0;
         }
         case IDOK:
-          state->values.port = std::clamp(_wtoi(WindowText(state->port_edit).c_str()), 1, 65535);
-          state->values.profile_dir = WindowText(state->profile_edit);
+          // Port and profile are launch-time capabilities. Keeping them
+          // read-only avoids persisting settings the launcher cannot consume.
           state->values.startup_url = WindowText(state->url_edit);
           state->output_ref = state->values;
           state->accepted = true;

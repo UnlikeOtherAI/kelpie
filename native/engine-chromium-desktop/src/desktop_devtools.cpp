@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <limits>
@@ -11,47 +13,12 @@
 
 #include "include/cef_task.h"
 #include "include/cef_values.h"
-#include "include/internal/cef_time.h"
 
 namespace kelpie {
 namespace {
 
 DesktopDevToolsSession::Result Failure(std::string code, std::string message, bool may_have_completed = false) {
   return {false, std::move(code), std::move(message), nlohmann::json::object(), may_have_completed};
-}
-
-std::string SameSiteName(cef_cookie_same_site_t value) {
-  switch (value) {
-    case CEF_COOKIE_SAME_SITE_LAX_MODE: return "Lax";
-    case CEF_COOKIE_SAME_SITE_STRICT_MODE: return "Strict";
-    case CEF_COOKIE_SAME_SITE_NO_RESTRICTION: return "None";
-    default: return "Unspecified";
-  }
-}
-
-std::optional<cef_cookie_same_site_t> ParseSameSite(const std::string& value) {
-  if (value == "Lax") return CEF_COOKIE_SAME_SITE_LAX_MODE;
-  if (value == "Strict") return CEF_COOKIE_SAME_SITE_STRICT_MODE;
-  if (value == "None") return CEF_COOKIE_SAME_SITE_NO_RESTRICTION;
-  return std::nullopt;
-}
-
-std::optional<time_t> ParseIsoUtc(const std::string& value) {
-  if (value.size() < 20 || value.back() != 'Z') return std::nullopt;
-  const std::string fraction = value.substr(19, value.size() - 20);
-  if (!fraction.empty() && (fraction.front() != '.' || fraction.size() == 1 ||
-      !std::all_of(fraction.begin() + 1, fraction.end(), [](unsigned char character) { return std::isdigit(character) != 0; }))) {
-    return std::nullopt;
-  }
-  std::tm parsed{};
-  std::istringstream stream(value.substr(0, 19));
-  stream >> std::get_time(&parsed, "%Y-%m-%dT%H:%M:%S");
-  if (stream.fail()) return std::nullopt;
-#if defined(_WIN32)
-  return _mkgmtime(&parsed);
-#else
-  return timegm(&parsed);
-#endif
 }
 
 int ModifierMask(const nlohmann::json& input) {
@@ -66,10 +33,127 @@ int ModifierMask(const nlohmann::json& input) {
   return mask;
 }
 
+std::optional<std::string> StringMember(const nlohmann::json& object, const char* key) {
+  const auto value = object.find(key);
+  if (value == object.end() || !value->is_string()) return std::nullopt;
+  return value->get<std::string>();
+}
+
+double NumberMember(const nlohmann::json& object, const char* key, double fallback = 0) {
+  const auto value = object.find(key);
+  return value != object.end() && value->is_number() ? value->get<double>() : fallback;
+}
+
+std::string IsoUtc(double seconds) {
+  if (!std::isfinite(seconds)) {
+    seconds = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+  }
+  std::time_t whole = static_cast<std::time_t>(std::floor(seconds));
+  int millis = static_cast<int>(std::llround((seconds - std::floor(seconds)) * 1000));
+  if (millis == 1000) { ++whole; millis = 0; }
+  std::tm utc{};
+#if defined(_WIN32)
+  if (gmtime_s(&utc, &whole) != 0) return "";
+#else
+  if (!gmtime_r(&whole, &utc)) return "";
+#endif
+  char buffer[32] = {};
+  if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &utc) == 0) return "";
+  std::ostringstream output;
+  output << buffer << '.' << std::setw(3) << std::setfill('0') << millis << 'Z';
+  return output.str();
+}
+
 }  // namespace
+
+std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Observe(
+    const std::string& method, const Json& params) {
+  if (!params.is_object()) return std::nullopt;
+  const auto request_id = StringMember(params, "requestId");
+  if (!request_id || request_id->empty()) return std::nullopt;
+
+  if (method == "Network.requestWillBeSent") {
+    const auto request = params.find("request");
+    if (request == params.end() || !request->is_object()) return std::nullopt;
+    const auto url = StringMember(*request, "url");
+    if (!url || url->empty()) return std::nullopt;
+    if (requests_.size() >= kMaxPendingRequests && requests_.find(*request_id) == requests_.end()) {
+      requests_.erase(requests_.begin());
+    }
+    Request state;
+    state.url = *url;
+    state.method = StringMember(*request, "method").value_or("GET");
+    state.type = StringMember(params, "type").value_or("Other");
+    state.started_at = NumberMember(params, "timestamp");
+    state.timestamp = IsoUtc(NumberMember(params, "wallTime", std::numeric_limits<double>::quiet_NaN()));
+    const auto initiator = params.find("initiator");
+    if (initiator != params.end() && initiator->is_object()) {
+      const auto type = StringMember(*initiator, "type");
+      if (type && *type == "script") state.initiator = "js";
+    }
+    requests_[*request_id] = std::move(state);
+    return std::nullopt;
+  }
+
+  const auto pending = requests_.find(*request_id);
+  if (pending == requests_.end()) return std::nullopt;
+  if (method == "Network.responseReceived") {
+    const auto response = params.find("response");
+    if (response == params.end() || !response->is_object()) return std::nullopt;
+    if (const auto status = response->find("status"); status != response->end() && status->is_number()) {
+      pending->second.status = static_cast<int>(status->get<double>());
+    }
+    pending->second.content_type = StringMember(*response, "mimeType").value_or("");
+    pending->second.type = StringMember(params, "type").value_or(pending->second.type);
+    return std::nullopt;
+  }
+
+  const bool finished = method == "Network.loadingFinished";
+  const bool failed = method == "Network.loadingFailed";
+  if (!finished && !failed) return std::nullopt;
+  Request state = std::move(pending->second);
+  requests_.erase(pending);
+  const double completed_at = NumberMember(params, "timestamp", state.started_at);
+  const auto duration = static_cast<int>(std::clamp(
+      std::llround(std::max(0.0, completed_at - state.started_at) * 1000.0), 0LL,
+      static_cast<long long>(std::numeric_limits<int>::max())));
+  Json event = {
+      {"id", *request_id}, {"method", state.method}, {"url", state.url},
+      {"status", state.status}, {"contentType", state.content_type}, {"type", state.type},
+      {"duration", duration}, {"size", 0}, {"initiator", state.initiator}, {"timestamp", state.timestamp},
+  };
+  if (finished) {
+    const auto bytes = params.find("encodedDataLength");
+    if (bytes != params.end() && bytes->is_number()) {
+      event["size"] = static_cast<long long>(std::max(0.0, bytes->get<double>()));
+    }
+  } else {
+    event["failure"] = StringMember(params, "errorText").value_or("Network request failed");
+  }
+  return event;
+}
+
+void DesktopNetworkEventAdapter::Clear() { requests_.clear(); }
 
 DesktopDevToolsSession::DesktopDevToolsSession() = default;
 DesktopDevToolsSession::~DesktopDevToolsSession() { CancelAll(); }
+
+void DesktopDevToolsSession::Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink) {
+  if (!browser || !CefCurrentlyOn(TID_UI)) return;
+  CefRefPtr<CefBrowserHost> host = browser->GetHost();
+  if (!host) return;
+  int enable_id = 0;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (browser_ && !browser_->IsSame(browser)) return;
+    browser_ = browser;
+    network_sink_ = std::move(network_sink);
+    if (!registration_) registration_ = host->AddDevToolsMessageObserver(this);
+    if (!registration_) return;
+    enable_id = next_message_id_++;
+  }
+  host->ExecuteDevToolsMethod(enable_id, "Network.enable", CefDictionaryValue::Create());
+}
 
 std::shared_ptr<DesktopDevToolsSession::Operation> DesktopDevToolsSession::Begin(
     CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params) {
@@ -132,6 +216,8 @@ void DesktopDevToolsSession::CancelAll() {
     pending_.clear();
     registration_ = nullptr;
     browser_ = nullptr;
+    network_events_.Clear();
+    network_sink_ = nullptr;
   }
   for (const auto& operation : operations) Complete(operation, Failure("CANCELLED", "Tab closed or browser shut down"));
 }
@@ -239,6 +325,23 @@ void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser>, int m
   Complete(operation, ParseProtocolResult(success, result, result_size));
 }
 
+void DesktopDevToolsSession::OnDevToolsEvent(CefRefPtr<CefBrowser> browser, const CefString& method,
+                                             const void* params, size_t params_size) {
+  const std::string raw = params == nullptr ? std::string()
+                                            : std::string(static_cast<const char*>(params), params_size);
+  const Json parsed = Json::parse(raw, nullptr, false);
+  if (parsed.is_discarded() || !parsed.is_object()) return;
+  NetworkEventSink sink;
+  std::optional<Json> event;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!browser_ || !browser_->IsSame(browser) || !network_sink_) return;
+    event = network_events_.Observe(method.ToString(), parsed);
+    sink = network_sink_;
+  }
+  if (event) sink(*event);
+}
+
 void DesktopDevToolsSession::OnDevToolsAgentDetached(CefRefPtr<CefBrowser>) { CancelAll(); }
 
 CefRefPtr<CefDictionaryValue> DesktopDevToolsSession::ToCefDictionary(const Json& object) {
@@ -287,57 +390,6 @@ void DesktopDevToolsSession::Complete(const std::shared_ptr<Operation>& operatio
   operation->result_ = std::move(result);
   operation->done_ = true;
   operation->completed_.notify_all();
-}
-
-std::optional<CefCookie> DesktopCookieAdapter::ToCefCookie(const Json& input) {
-  if (!input.is_object() || !input.contains("name") || !input["name"].is_string() ||
-      !input.contains("value") || !input["value"].is_string()) return std::nullopt;
-  if (input["name"].get<std::string>().empty()) return std::nullopt;
-  for (const char* name : {"domain", "path"}) {
-    if (input.contains(name) && !input[name].is_string()) return std::nullopt;
-  }
-  for (const char* name : {"httpOnly", "secure"}) {
-    if (input.contains(name) && !input[name].is_boolean()) return std::nullopt;
-  }
-  CefCookie cookie{};
-  cookie.size = sizeof(cookie);
-  CefString(&cookie.name) = input.value("name", "");
-  CefString(&cookie.value) = input.value("value", "");
-  CefString(&cookie.domain) = input.value("domain", "");
-  CefString(&cookie.path) = input.value("path", "/");
-  cookie.httponly = input.value("httpOnly", false) ? 1 : 0;
-  cookie.secure = input.value("secure", false) ? 1 : 0;
-  if (input.contains("sameSite")) {
-    if (!input["sameSite"].is_string()) return std::nullopt;
-    const auto same_site = ParseSameSite(input["sameSite"].get<std::string>());
-    if (!same_site) return std::nullopt;
-    cookie.same_site = *same_site;
-  } else {
-    cookie.same_site = CEF_COOKIE_SAME_SITE_UNSPECIFIED;
-  }
-  if (input.contains("expires")) {
-    if (!input["expires"].is_string()) return std::nullopt;
-    const auto expires = ParseIsoUtc(input["expires"].get<std::string>());
-    cef_time_t expiration_time{};
-    if (!expires || !cef_time_from_timet(*expires, &expiration_time) ||
-        !cef_time_to_basetime(&expiration_time, &cookie.expires)) return std::nullopt;
-    cookie.has_expires = 1;
-  }
-  return cookie;
-}
-
-DesktopCookieAdapter::Json DesktopCookieAdapter::FromCefCookie(const CefCookie& cookie) {
-  Json output = {{"name", CefString(&cookie.name).ToString()}, {"value", CefString(&cookie.value).ToString()}, {"domain", CefString(&cookie.domain).ToString()},
-                 {"path", CefString(&cookie.path).ToString()}, {"httpOnly", cookie.httponly != 0}, {"secure", cookie.secure != 0},
-                 {"sameSite", SameSiteName(cookie.same_site)}};
-  if (cookie.has_expires) {
-    cef_time_t expiration_time{};
-    double expires = 0;
-    if (cef_time_from_basetime(cookie.expires, &expiration_time) && cef_time_to_doublet(&expiration_time, &expires)) {
-      output["expiresUnixSeconds"] = expires;
-    }
-  }
-  return output;
 }
 
 bool DesktopDialogAdapter::Observe(CefRefPtr<CefBrowser> browser, cef_jsdialog_type_t type, const CefString& origin,
