@@ -234,10 +234,23 @@ bool WindowsApp::InitializeDesktopRuntime() {
   if (!config_.url_overridden && !session_snapshot_.tabs.empty()) {
     runtime.engine.restored_next_tab_id = session_snapshot_.next_tab_id;
     for (const auto& tab : session_snapshot_.tabs) {
-      runtime.engine.restored_tabs.push_back({tab.id, tab.url, tab.active});
+      DesktopEngine::RestoredTab restored{tab.id, tab.url, tab.active};
+      // Rebinding the partition is what makes an isolated identity survive a
+      // restart rather than quietly rejoining the shared store.
+      restored.name = tab.name;
+      restored.partition = tab.partition;
+      restored.persistent = tab.persistent;
+      runtime.engine.restored_tabs.push_back(std::move(restored));
     }
   }
   runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
+  // Partition stores live inside the Chromium cache root, not beside it. CEF
+  // ignores a request-context cache_path that does not sit directly under
+  // root_cache_path, and pointing root_cache_path at the profile directory
+  // instead would move the existing default store out from under every
+  // profile that already exists.
+  runtime.engine.root_cache_path = runtime.engine.cache_path;
+  runtime.engine.partitions_path = runtime.engine.cache_path;
   runtime.engine.configure_window_info = [this](void* raw_info) {
 #if defined(HAS_CEF)
     ConfigureAlloyChildWindow(static_cast<CefWindowInfo*>(raw_info), browser_view_->hwnd());

@@ -25,6 +25,7 @@ class SettingsDialogState {
   HWND port_edit = nullptr;
   HWND profile_edit = nullptr;
   HWND url_edit = nullptr;
+  HWND isolate_check = nullptr;
 };
 
 std::wstring WindowText(HWND hwnd) {
@@ -77,10 +78,15 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
                       360, 52, 72, 24, hwnd, reinterpret_cast<HMENU>(IDC_SETTINGS_PROFILE_BROWSE),
                       nullptr, nullptr);
       EnableWindow(browse, FALSE);
+      state->isolate_check = CreateWindowExW(0, L"BUTTON", L"Isolate every new tab",
+                      WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 112, 128, 320, 24, hwnd,
+                      reinterpret_cast<HMENU>(IDC_SETTINGS_ISOLATE_TABS), nullptr, nullptr);
+      SendMessageW(state->isolate_check, BM_SETCHECK,
+                   state->values.isolate_new_tabs ? BST_CHECKED : BST_UNCHECKED, 0);
       CreateWindowExW(0, L"BUTTON", L"Save", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-                      248, 136, 88, 28, hwnd, reinterpret_cast<HMENU>(IDOK), nullptr, nullptr);
+                      248, 168, 88, 28, hwnd, reinterpret_cast<HMENU>(IDOK), nullptr, nullptr);
       CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-                      344, 136, 88, 28, hwnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
+                      344, 168, 88, 28, hwnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
       return 0;
     }
     case WM_CTLCOLORSTATIC:
@@ -92,7 +98,9 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
     }
     case WM_DRAWITEM: {
       const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
-      if (item == nullptr) return FALSE;
+      // The isolation toggle is a themed BS_AUTOCHECKBOX, not an owner-drawn
+      // control, so it must not be painted as one of the pill buttons.
+      if (item == nullptr || item->CtlID == IDC_SETTINGS_ISOLATE_TABS) return FALSE;
       const auto colors = ui::Colors();
       const bool pressed = (item->itemState & ODS_SELECTED) != 0;
       ui::PaintRounded(item->hDC, item->rcItem, pressed ? colors.surface_hover : colors.surface,
@@ -125,6 +133,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
           // Port and profile are launch-time capabilities. Keeping them
           // read-only avoids persisting settings the launcher cannot consume.
           state->values.startup_url = WindowText(state->url_edit);
+          state->values.isolate_new_tabs =
+              SendMessageW(state->isolate_check, BM_GETCHECK, 0, 0) == BST_CHECKED;
           state->output_ref = state->values;
           state->accepted = true;
           state->done = true;
@@ -165,7 +175,7 @@ bool SettingsView::ShowModal(HINSTANCE instance,
   SettingsDialogState state(initial_values, updated_values);
   HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, kClassName, L"Settings",
                                 WS_POPUP | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT,
-                                456, 210, owner, nullptr, instance, &state);
+                                456, 250, owner, nullptr, instance, &state);
   if (dialog == nullptr) {
     return false;
   }

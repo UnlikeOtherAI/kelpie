@@ -19,6 +19,7 @@ import { registerIntercept } from "./intercept.js";
 import { registerShadowDOM } from "./shadow-dom.js";
 import { registerDialog } from "./dialog.js";
 import { registerTabs } from "./tabs.js";
+import { registerPartitions } from "./partitions.js";
 import { registerIframes } from "./iframes.js";
 import { registerCookies } from "./cookies.js";
 import { registerStorage } from "./storage.js";
@@ -83,6 +84,7 @@ export function registerAllCommands(program: Command): void {
   // Browser Management
   registerDialog(program);
   registerTabs(program);
+  registerPartitions(program);
   registerIframes(program);
   registerCookies(program);
   registerStorage(program);

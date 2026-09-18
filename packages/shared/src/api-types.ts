@@ -701,6 +701,12 @@ export interface TabInfo {
   title: string;
   active: boolean;
   isLoading?: boolean;
+  /** Free-form display label supplied at creation. Omitted when unset. */
+  name?: string;
+  /** Storage container this tab is bound to. Omitted for the default store. */
+  partition?: string;
+  /** False when the partition's storage is in-memory only. */
+  persistent?: boolean;
 }
 
 export interface GetTabsResponse extends SuccessResponse {
@@ -717,6 +723,19 @@ export interface GetTabsResponse extends SuccessResponse {
 
 export interface NewTabRequest {
   url?: string;
+  /** Display label for the tab, at most 200 characters. */
+  name?: string;
+  /**
+   * Storage container identifier. Tabs sharing a partition share cookies and
+   * local storage; different partitions are isolated. Omit for the default
+   * container. Must satisfy `validatePartition`.
+   */
+  partition?: string;
+  /**
+   * Defaults to `true`. When `false` the partition's data is in-memory only
+   * and discarded when its last tab closes. Only meaningful with `partition`.
+   */
+  persistent?: boolean;
 }
 
 export interface NewTabResponse extends SuccessResponse {
@@ -740,6 +759,50 @@ export interface CloseTabRequest {
 export interface CloseTabResponse extends SuccessResponse {
   closed: string;
   tabCount: number;
+}
+
+// --- Browser: Partitions ---
+
+export interface Partition {
+  /** The user-facing partition identifier. */
+  id: string;
+  /** Number of open tabs currently bound to this partition. */
+  tabCount: number;
+  persistent: boolean;
+  /** Best-effort on-disk size. Omitted when the engine cannot report it cheaply. */
+  sizeBytes?: number;
+}
+
+export type GetPartitionsRequest = Record<string, never>;
+
+export interface GetPartitionsResponse extends SuccessResponse {
+  partitions: Partition[];
+}
+
+export interface DeletePartitionRequest {
+  id: string;
+}
+
+export interface DeletePartitionResponse extends SuccessResponse {
+  /** Always echoes the requested id, whether or not it existed. */
+  deleted: string;
+  tabsClosed: number;
+  /** False when the id was unknown — the call is idempotent either way. */
+  existed: boolean;
+}
+
+/** Discriminates why a platform could not honour a `partition` request. */
+export type PartitionUnsupportedReason =
+  | "chromium-engine"
+  | "webview-multi-profile-missing"
+  | "platform-single-tab";
+
+export interface PartitionUnsupportedError {
+  success: false;
+  error: "PARTITION_UNSUPPORTED";
+  reason: PartitionUnsupportedReason;
+  activeEngine?: "chromium" | "webkit";
+  hint?: string;
 }
 
 // --- Browser: Iframes ---

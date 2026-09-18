@@ -18,6 +18,7 @@ constexpr wchar_t kSettings = L'';    // Setting          — gear
 constexpr wchar_t kNewTab = L'';      // Add              — plus
 constexpr wchar_t kClose = L'';       // Cancel           — xmark
 constexpr wchar_t kLock = L'';        // Lock             — lock
+constexpr wchar_t kChevronDown = L'';  // ChevronDown      — chevron.down
 
 }  // namespace icon
 

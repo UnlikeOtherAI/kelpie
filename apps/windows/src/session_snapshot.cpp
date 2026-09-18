@@ -1,6 +1,7 @@
 #include "session_snapshot.h"
 
 #include "kelpie/internal_scheme.h"
+#include "kelpie/partition.h"
 
 #include <charconv>
 #include <limits>
@@ -43,6 +44,29 @@ bool IsRestorableUrl(const std::string& url) {
       IsInternalSchemeUrl(url);
 }
 
+// The partition fields are optional, but a present one has to be well formed.
+// A snapshot naming a partition the engine would reject is corrupt, and
+// silently dropping the field would restore an isolated tab into the shared
+// store — the one failure mode this feature must never have.
+bool ReadPartitionFields(const nlohmann::json& item, SessionTab* tab) {
+  if (item.contains("name")) {
+    const auto& name = item.at("name");
+    if (!name.is_string() || name.get<std::string>().size() > kelpie::kMaxTabNameLength) return false;
+    tab->name = name.get<std::string>();
+  }
+  const bool has_partition = item.contains("partition");
+  if (has_partition) {
+    const auto& partition = item.at("partition");
+    if (!partition.is_string() || !kelpie::IsValidPartition(partition.get<std::string>())) return false;
+    tab->partition = partition.get<std::string>();
+  }
+  if (!item.contains("persistent")) return true;
+  const auto& persistent = item.at("persistent");
+  if (!persistent.is_boolean() || !has_partition) return false;
+  tab->persistent = persistent.get<bool>();
+  return true;
+}
+
 }  // namespace
 
 bool ParseSessionSnapshot(const nlohmann::json& value, SessionSnapshot* output) {
@@ -73,7 +97,8 @@ bool ParseSessionSnapshot(const nlohmann::json& value, SessionSnapshot* output) 
                    item.at("active").get<bool>()};
     std::uint64_t id_number = 0;
     if (!TabNumber(tab.id, &id_number) || !IsRestorableUrl(tab.url) ||
-        !ids.insert(tab.id).second || (tab.active && has_active)) {
+        !ids.insert(tab.id).second || (tab.active && has_active) ||
+        !ReadPartitionFields(item, &tab)) {
       return false;
     }
     highest_id = std::max(highest_id, id_number);
@@ -92,7 +117,15 @@ bool ParseSessionSnapshot(const nlohmann::json& value, SessionSnapshot* output) 
 nlohmann::json SerializeSessionSnapshot(const SessionSnapshot& snapshot) {
   nlohmann::json tabs = nlohmann::json::array();
   for (const auto& tab : snapshot.tabs) {
-    tabs.push_back({{"id", tab.id}, {"url", tab.url}, {"active", tab.active}});
+    nlohmann::json entry = {{"id", tab.id}, {"url", tab.url}, {"active", tab.active}};
+    // Absent rather than null for an ordinary tab, so a profile that never
+    // used a partition keeps exactly the file it had before.
+    if (tab.name) entry["name"] = *tab.name;
+    if (tab.partition) {
+      entry["partition"] = *tab.partition;
+      entry["persistent"] = tab.persistent;
+    }
+    tabs.push_back(std::move(entry));
   }
   return {{"version", 1}, {"epoch", snapshot.epoch}, {"nextTabId", snapshot.next_tab_id},
           {"tabs", std::move(tabs)}};

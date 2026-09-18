@@ -54,6 +54,16 @@ class DestroyTabHostWindowTask final : public CefTask {
 
 DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}
 
+bool DesktopEngine::Impl::WaitForPartition(DesktopPartitionRegistry::Entry* entry) {
+  if (entry == nullptr) return false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (!entry->ready() && std::chrono::steady_clock::now() < deadline) {
+    CefDoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  return entry->ready();
+}
+
 bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   if (initialized) {
     return true;
@@ -62,6 +72,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   config = next_config;
   last_error.clear();
   shutting_down = false;
+  partitions.SetRoot(config.partitions_path);
+  // A previous run may have failed to unlink a partition directory and parked
+  // it in .trash instead. Nothing holds those files now, so clear them before
+  // Chromium opens anything under the same root.
+  DesktopPartitionRegistry::PurgeTrash(config.partitions_path);
   viewport.width = std::max(1, config.viewport.width);
   viewport.height = std::max(1, config.viewport.height);
   viewport.offscreen = config.mode == DesktopEngine::Mode::kOffscreen;
@@ -88,6 +103,9 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 #endif
   settings.windowless_rendering_enabled = config.mode == DesktopEngine::Mode::kOffscreen ? 1 : 0;
   settings.external_message_pump = config.external_message_pump ? 1 : 0;
+  if (!config.root_cache_path.empty()) {
+    CefString(&settings.root_cache_path) = config.root_cache_path;
+  }
   if (!config.cache_path.empty()) {
     CefString(&settings.cache_path) = config.cache_path;
   }
@@ -139,19 +157,41 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   const std::string first_url = config.restored_tabs.empty() ?
       (config.initial_url.empty() ? std::string(kStartPageUrl) : config.initial_url)
       : config.restored_tabs.front().url;
+  // The first tab is created here rather than through CreateTabOnUi because it
+  // is what establishes `browser`. It still has to be rebound to its restored
+  // partition, or a restored session would silently lose its isolation.
+  CefRefPtr<CefRequestContext> first_context;
+  std::optional<std::string> first_partition;
+  std::optional<std::string> first_name;
+  if (!config.restored_tabs.empty()) {
+    const DesktopEngine::RestoredTab& first = config.restored_tabs.front();
+    first_name = first.name;
+    if (first.partition) {
+      if (auto* entry = partitions.Acquire(*first.partition, first.persistent)) {
+        // Startup owns the UI thread outright and is not inside a CEF callback,
+        // so it is the one place that can pump the loop while a store loads.
+        if (WaitForPartition(entry)) {
+          first_context = entry->context;
+          first_partition = entry->id;
+        }
+      }
+    }
+  }
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),
       first_url,
       browser_settings,
       nullptr,
-      nullptr);
+      first_context);
   if (browser) {
     Tab initial;
     initial.id = config.restored_tabs.empty() ? "tab-1" : config.restored_tabs.front().id;
     initial.browser = browser;
     initial.devtools = new DesktopDevToolsSession();
     initial.url = first_url;
+    initial.name = first_name;
+    initial.partition = first_partition;
     tabs.push_back(std::move(initial));
     // tab-1 is already allocated for a fresh profile. The allocator is a
     // high-water mark, never a reconstruction from the currently open tabs.
@@ -159,8 +199,19 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
         ? 2
         : std::max<std::uint64_t>(config.restored_next_tab_id, 2);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
+      const DesktopEngine::RestoredTab& restored = config.restored_tabs[index];
+      if (restored.partition) {
+        if (auto* entry = partitions.Acquire(*restored.partition, restored.persistent)) {
+          WaitForPartition(entry);
+        }
+      }
+      NewTabRequest request;
+      request.url = restored.url;
+      request.name = restored.name;
+      request.partition = restored.partition;
+      request.persistent = restored.persistent;
       TabSnapshot ignored;
-      CreateTabOnUi(config.restored_tabs[index].url, &ignored, config.restored_tabs[index].id);
+      CreateTabOnUi(request, &ignored, restored.id);
     }
     for (const auto& restored : config.restored_tabs) {
       if (restored.active) {
@@ -241,6 +292,10 @@ bool DesktopEngine::Impl::Shutdown() {
   browser = nullptr;
   client = nullptr;
   app = nullptr;
+  // Every CEF reference has to be gone before CefShutdown. A request context
+  // still held here is never asked to flush, and a persistent partition loses
+  // everything written to it during the session.
+  partitions.Clear();
   CefShutdown();
   initialized = false;
   return true;

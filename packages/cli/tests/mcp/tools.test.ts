@@ -114,3 +114,35 @@ describe("MCP tool definitions", () => {
     expect(body).not.toHaveProperty("exclude");
   });
 });
+
+describe("partition tools", () => {
+  const byName = (name: string) => browserTools.find((t) => t.name === name);
+
+  it("exposes get-partitions and delete-partition on the platforms that isolate storage", () => {
+    expect(byName("kelpie_get_partitions")?.method).toBe("getPartitions");
+    expect(byName("kelpie_delete_partition")?.method).toBe("deletePartition");
+    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos", "windows"]);
+    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos", "windows"]);
+  });
+
+  it("validates the delete-partition id with the shared partition rules", () => {
+    const schema = byName("kelpie_delete_partition")?.schema.id;
+    expect(schema?.safeParse("sam.eng-lead").success).toBe(true);
+    expect(schema?.safeParse("default").success).toBe(false);
+    expect(schema?.safeParse("ephemeral-sam").success).toBe(false);
+    expect(schema?.safeParse("has space").success).toBe(false);
+    expect(schema?.safeParse("a".repeat(129)).success).toBe(false);
+  });
+
+  it("applies the same partition rules to new-tab, and keeps every new field optional", () => {
+    const schema = byName("kelpie_new_tab")?.schema;
+    expect(schema?.partition?.safeParse("sam").success).toBe(true);
+    expect(schema?.partition?.safeParse("..").success).toBe(false);
+    // Optional, so an existing caller that sends only a url still validates.
+    expect(schema?.partition?.safeParse(undefined).success).toBe(true);
+    expect(schema?.name?.safeParse(undefined).success).toBe(true);
+    expect(schema?.persistent?.safeParse(undefined).success).toBe(true);
+    expect(schema?.name?.safeParse("x".repeat(201)).success).toBe(false);
+    expect(schema?.persistent?.safeParse(false).success).toBe(true);
+  });
+});

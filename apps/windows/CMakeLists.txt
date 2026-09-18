@@ -112,6 +112,7 @@ set(WINDOWS_APP_SOURCES
   src/network_inspector.cpp
   src/profile_session.cpp
   src/session_snapshot.cpp
+  src/tab_tooltips.cpp
   src/toast_view.cpp
   src/device_info_windows.cpp
   src/mdns_windows.cpp
@@ -136,6 +137,7 @@ set(WINDOWS_APP_HEADERS
   src/profile_session.h
   src/session_snapshot.h
   src/startup_diagnostics.h
+  src/tab_tooltips.h
   src/toast_view.h
   src/device_info_windows.h
   src/mdns_windows.h
@@ -275,11 +277,13 @@ if(BUILD_TESTING)
   add_test(NAME kelpie_windows_utf_test COMMAND kelpie_windows_utf_test)
   add_executable(kelpie_windows_session_snapshot_test tests/session_snapshot_test.cpp src/session_snapshot.cpp)
   # `session_snapshot.cpp` shares the internal-scheme predicate with the engine
-  # so the restorable-URL rule cannot drift from what the browser will navigate.
+  # so the restorable-URL rule cannot drift from what the browser will navigate,
+  # and the partition validator so a snapshot cannot restore an invalid one.
   target_include_directories(kelpie_windows_session_snapshot_test PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${KELPIE_NATIVE_ROOT}/core-state/include")
-  target_link_libraries(kelpie_windows_session_snapshot_test PRIVATE nlohmann_json::nlohmann_json)
+  target_link_libraries(kelpie_windows_session_snapshot_test PRIVATE nlohmann_json::nlohmann_json
+    kelpie_core_protocol)
   if(MSVC)
     target_compile_options(kelpie_windows_session_snapshot_test PRIVATE /UNDEBUG)
   else()
@@ -391,6 +395,7 @@ if(BUILD_TESTING)
     src/window_chrome.cpp
     src/url_bar.cpp
     src/win32_browser_view.cpp
+    src/tab_tooltips.cpp
     src/toast_view.cpp
     src/bookmarks_view.cpp
     src/history_view.cpp

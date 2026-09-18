@@ -7,6 +7,7 @@
 #include <chrono>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -23,6 +24,7 @@
 #include "kelpie/history_store.h"
 #include "kelpie/js_string_literal.h"
 #include "kelpie/network_traffic_store.h"
+#include "kelpie/partition.h"
 #include "kelpie/response_helpers.h"
 
 namespace kelpie {
@@ -99,16 +101,68 @@ inline std::optional<std::uint64_t> OptionalGeneration(const nlohmann::json& par
 }
 
 inline nlohmann::json TabJson(const TabSnapshot& tab) {
-  return {{"id", tab.id}, {"generation", tab.generation}, {"url", tab.url}, {"title", tab.title},
-          {"active", tab.active}, {"isLoading", tab.is_loading}, {"canGoBack", tab.can_go_back},
-          {"canGoForward", tab.can_go_forward}};
+  nlohmann::json json = {{"id", tab.id}, {"generation", tab.generation}, {"url", tab.url},
+                         {"title", tab.title}, {"active", tab.active},
+                         {"isLoading", tab.is_loading}, {"canGoBack", tab.can_go_back},
+                         {"canGoForward", tab.can_go_forward}};
+  // The partition fields are omitted rather than nulled for a tab in the
+  // default shared store, so an existing consumer sees the same object it
+  // always saw.
+  if (tab.name) json["name"] = *tab.name;
+  if (tab.partition) json["partition"] = *tab.partition;
+  if (tab.persistent) json["persistent"] = *tab.persistent;
+  return json;
 }
 
 inline nlohmann::json ControlError(const BrowserControlResult& result) {
-  return ErrorResponse(result.error_code.empty() ? "WEBVIEW_ERROR" : result.error_code,
-                       result.message.empty() ? "Browser operation failed" : result.message,
-                       result.operation_may_have_completed ? nlohmann::json{{"operationMayHaveCompleted", true}}
-                                                        : nlohmann::json::object());
+  nlohmann::json response =
+      ErrorResponse(result.error_code.empty() ? "WEBVIEW_ERROR" : result.error_code,
+                    result.message.empty() ? "Browser operation failed" : result.message,
+                    result.operation_may_have_completed
+                        ? nlohmann::json{{"operationMayHaveCompleted", true}}
+                        : nlohmann::json::object());
+  // PARTITION_UNSUPPORTED carries `reason`, `hint` and `activeEngine` as direct
+  // siblings of code and message — the shape macOS already emits and the shape
+  // docs/api/partitions.md documents, not a nested diagnostics bag.
+  if (result.details.is_object()) {
+    for (auto it = result.details.begin(); it != result.details.end(); ++it) {
+      response["error"][it.key()] = it.value();
+    }
+  }
+  return response;
+}
+
+// `new-tab`'s optional naming and isolation fields. Throws std::invalid_argument
+// for a malformed request and returns the INVALID_PARTITION body for a string
+// the shared validator rejects, so the caller can return one or the other.
+inline std::optional<nlohmann::json> ReadPartitionFields(const nlohmann::json& params,
+                                                         NewTabRequest* request) {
+  const auto name = params.find("name");
+  if (name != params.end() && !name->is_null()) {
+    if (!name->is_string()) throw std::invalid_argument("name must be a string");
+    const std::string value = name->get<std::string>();
+    if (value.size() > kMaxTabNameLength) {
+      throw std::invalid_argument("name must be at most 200 characters");
+    }
+    request->name = value;
+  }
+  const auto persistent = params.find("persistent");
+  if (persistent != params.end() && !persistent->is_null()) {
+    if (!persistent->is_boolean()) throw std::invalid_argument("persistent must be a boolean");
+    request->persistent = persistent->get<bool>();
+  }
+  const auto partition = params.find("partition");
+  if (partition == params.end() || partition->is_null()) return std::nullopt;
+  if (!partition->is_string()) throw std::invalid_argument("partition must be a string");
+  const std::string value = partition->get<std::string>();
+  const PartitionValidation validation = ValidatePartition(value);
+  if (!validation.ok) {
+    return ErrorResponse(ErrorCode::kInvalidPartition,
+                         "Invalid partition \"" + value + "\": " +
+                             PartitionErrorMessage(validation.reason));
+  }
+  request->partition = value;
+  return std::nullopt;
 }
 
 inline std::string RequireString(const nlohmann::json& params, const char* key, bool allow_empty = false) {

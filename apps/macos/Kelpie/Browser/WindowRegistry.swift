@@ -24,7 +24,10 @@ final class WindowRegistry {
     /// owns its own callbacks because new-tab/switch-tab/close-tab must affect
     /// only the window the request targets.
     struct Callbacks {
-        var onNewTab: () -> Tab
+        /// Opens a tab with the caller's name/partition/data-store choices. The
+        /// spec is resolved before this runs so a bad partition never reaches
+        /// the UI layer.
+        var onNewTab: (TabSpec) -> Tab
         var onSwitchTab: (UUID) -> Void
         var onCloseTab: (UUID) -> Void
         var onWillLoad: () -> Void
@@ -133,6 +136,19 @@ final class WindowRegistry {
     /// (oldest first). Dead weak references are excluded.
     func allEntries() -> [Entry] {
         registrationOrder.compactMap { entries[$0] }.filter { $0.window != nil }
+    }
+
+    /// Every registered window, including one whose `NSWindow` has not been
+    /// attached yet.
+    ///
+    /// `registerWindow()` installs an entry with `window: nil` and the real
+    /// pointer only arrives later from `WindowRegistrationBridge`. Filtering on
+    /// `window != nil` is right for listing windows to a caller, but wrong for
+    /// tab bookkeeping: during that gap the window's tabs would be invisible,
+    /// which would under-report a partition's tab count, skip its tabs during
+    /// `delete-partition`, and let a blocked engine switch through.
+    func allEntriesIncludingDetached() -> [Entry] {
+        registrationOrder.compactMap { entries[$0] }
     }
 }
 

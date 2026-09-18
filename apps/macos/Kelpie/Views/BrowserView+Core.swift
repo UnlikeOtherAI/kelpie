@@ -139,8 +139,8 @@ extension BrowserView {
         WindowRegistry.shared.installCallbacks(
             for: windowId,
             callbacks: WindowRegistry.Callbacks(
-                onNewTab: { [self] in
-                    let tab = tabStore.addTab()
+                onNewTab: { [self] spec in
+                    let tab = tabStore.addTab(spec: spec)
                     connectNewTab(tab)
                     return tab
                 },

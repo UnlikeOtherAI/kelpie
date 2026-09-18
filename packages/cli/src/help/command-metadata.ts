@@ -105,6 +105,29 @@ const capabilitiesResponse: HelpField[] = [
   { name: "unsupported", type: "array", description: "Unsupported HTTP methods", items: { name: "method", type: "string" } },
 ];
 
+/**
+ * Shared shape of a tab entry. `get-tabs` and `new-tab` return the same record,
+ * so they read it from one place - a second copy drifts the moment either one
+ * gains a field.
+ */
+const tabInfoFields: HelpField[] = [
+  { name: "id", type: "string" },
+  { name: "url", type: "string" },
+  { name: "title", type: "string" },
+  { name: "active", type: "boolean" },
+  { name: "isLoading", type: "boolean" },
+  { name: "name", type: "string", description: "Display label supplied at creation. Omitted when unset." },
+  { name: "partition", type: "string", description: "Storage container the tab is bound to. Omitted for the default container." },
+  { name: "persistent", type: "boolean", description: "False when the partition's storage is in-memory only." },
+];
+
+const partitionInfoFields: HelpField[] = [
+  { name: "id", type: "string", description: "Partition identifier as supplied to new-tab" },
+  { name: "tabCount", type: "number", description: "Open tabs currently bound to this partition" },
+  { name: "persistent", type: "boolean", description: "False for in-memory partitions" },
+  { name: "sizeBytes", type: "number", description: "Best-effort on-disk size. Omitted when the engine cannot report it cheaply." },
+];
+
 const tabsResponse: HelpField[] = [
   { name: "success", type: "boolean", description: "true when tab state was retrieved" },
   { name: "count", type: "number", description: "Number of open tabs" },
@@ -116,13 +139,7 @@ const tabsResponse: HelpField[] = [
     items: {
       name: "tab",
       type: "object",
-      fields: [
-        { name: "id", type: "string" },
-        { name: "url", type: "string" },
-        { name: "title", type: "string" },
-        { name: "active", type: "boolean" },
-        { name: "isLoading", type: "boolean" },
-      ],
+      fields: tabInfoFields,
     },
   },
 ];
@@ -136,13 +153,27 @@ const newTabResponse: HelpField[] = [
     description: "Created tab metadata",
     fields: [
       { name: "id", type: "string", description: "Created tab ID. Same value as tabId." },
-      { name: "url", type: "string" },
-      { name: "title", type: "string" },
-      { name: "active", type: "boolean" },
-      { name: "isLoading", type: "boolean" },
+      ...tabInfoFields.slice(1),
     ],
   },
   { name: "tabCount", type: "number", description: "Number of open tabs after creation" },
+];
+
+const getPartitionsResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true when the partition list was retrieved" },
+  {
+    name: "partitions",
+    type: "array",
+    description: "Live storage partitions",
+    items: { name: "partition", type: "object", fields: partitionInfoFields },
+  },
+];
+
+const deletePartitionResponse: HelpField[] = [
+  { name: "success", type: "boolean", description: "true whether or not the partition existed" },
+  { name: "deleted", type: "string", description: "Always echoes the requested id" },
+  { name: "tabsClosed", type: "number", description: "Tabs closed as part of the teardown" },
+  { name: "existed", type: "boolean", description: "false when the id was unknown" },
 ];
 
 const reportIssueResponse: HelpField[] = [
@@ -265,9 +296,13 @@ export const commandMetadata: Record<string, CommandHelp> = {
 
   // --- Tabs ---
   "get-tabs": { purpose: "Get all open tabs", when: "Listing browser tabs or finding a specific one", explanation: "Returns all open tabs with their IDs, URLs, titles, and which is active.", related: ["new-tab", "switch-tab", "close-tab"], response: tabsResponse },
-  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab", explanation: "Opens a new browser tab, optionally navigating to a URL. Returns both tabId and tab.id for the created tab; they are the same identifier.", related: ["get-tabs", "switch-tab"], response: newTabResponse },
+  "new-tab": { purpose: "Open a new tab", when: "Opening a URL in a new tab, or giving a tab its own isolated storage", explanation: "Opens a new browser tab, optionally navigating to a URL. Returns both tabId and tab.id for the created tab; they are the same identifier. Optional name sets a display label (max 200 chars). Optional partition binds the tab to an isolated cookie/localStorage container: tabs sharing a partition string share storage, different strings are fully isolated, and omitting it uses the shared default container. persistent defaults to true; false keeps the partition in memory only and is meaningful only alongside partition. Partition strings are 1-128 characters from [A-Za-z0-9._-], must contain a letter or digit, and must not be \".\", \"..\", \"default\" (case-insensitive) or start with \"ephemeral-\". Available on macOS with the WebKit engine and on Windows with the Chromium (CEF) engine; the macOS Chromium engine returns PARTITION_UNSUPPORTED with reason \"chromium-engine\", and iOS, Android and Linux return reason \"platform-single-tab\".", errors: ["INVALID_PARTITION", "PARTITION_UNSUPPORTED", "PARTITION_DELETING"], related: ["get-tabs", "switch-tab", "get-partitions", "delete-partition"], paramDefaults: { persistent: true }, response: newTabResponse },
   "switch-tab": { purpose: "Switch to a tab", when: "Changing focus to a different tab", explanation: "Switches the active tab to the one with the given tab ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
   "close-tab": { purpose: "Close a tab", when: "Cleaning up tabs you no longer need", explanation: "Closes the tab with the given ID.", errors: ["TAB_NOT_FOUND"], related: ["get-tabs"], response: successOnlyResponse },
+
+  // --- Partitions ---
+  "get-partitions": { purpose: "List storage partitions", when: "Checking which isolated storage containers exist and how many tabs each holds", explanation: "Returns every live partition with its tab count and persistence flag. Non-persistent partitions are listed too - they exist for the lifetime of their tabs. sizeBytes is best-effort and omitted when the engine cannot report it cheaply (neither macOS WebKit nor Windows Chromium does).", errors: ["PARTITION_UNSUPPORTED"], related: ["new-tab", "delete-partition"], platforms: ["macos", "windows"], response: getPartitionsResponse },
+  "delete-partition": { purpose: "Delete a storage partition", when: "Discarding an identity: closing its tabs and wiping its cookies and local storage", explanation: "Closes every tab bound to the partition, then removes the underlying data store. Idempotent - an unknown id returns existed:false with the same response shape. A new-tab for the same partition arriving mid-teardown gets PARTITION_DELETING and should be retried.", errors: ["INVALID_PARTITION", "PARTITION_IN_USE", "PARTITION_UNSUPPORTED"], related: ["get-partitions", "new-tab"], platforms: ["macos", "windows"], response: deletePartitionResponse },
 
   // --- Iframes ---
   "get-iframes": { purpose: "List all iframes", when: "Finding iframes on the page to interact with their content", explanation: "Returns all iframes with their src, name, position, and whether they're cross-origin.", related: ["switch-to-iframe", "get-iframe-context"] },

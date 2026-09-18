@@ -88,6 +88,8 @@ export const BrowserMcpTools = [
   "kelpie_new_tab",
   "kelpie_switch_tab",
   "kelpie_close_tab",
+  "kelpie_get_partitions",
+  "kelpie_delete_partition",
   "kelpie_get_iframes",
   "kelpie_switch_to_iframe",
   "kelpie_switch_to_main",
@@ -176,6 +178,10 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_get_debug_overlay: ["android", "macos", "linux", "windows"],
   // is-element-obscured relies on the mobile keyboard/safe-area model
   kelpie_is_element_obscured: ["macos", "linux", "windows"],
+  // Storage partitions: macOS on WebKit and Windows on Chromium (CEF). The
+  // remaining platforms drop their entry here as they land the same contract.
+  kelpie_get_partitions: ["ios", "android", "linux"],
+  kelpie_delete_partition: ["ios", "android", "linux"],
 } satisfies Partial<Record<BrowserMcpTool, readonly Platform[]>>;
 
 /** CLI-level MCP tools (discovery + group commands) */
@@ -293,6 +299,8 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "new-tab": "kelpie_new_tab",
   "switch-tab": "kelpie_switch_tab",
   "close-tab": "kelpie_close_tab",
+  "get-partitions": "kelpie_get_partitions",
+  "delete-partition": "kelpie_delete_partition",
   "get-iframes": "kelpie_get_iframes",
   "switch-to-iframe": "kelpie_switch_to_iframe",
   "switch-to-main": "kelpie_switch_to_main",

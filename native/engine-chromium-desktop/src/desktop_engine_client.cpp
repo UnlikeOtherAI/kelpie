@@ -55,7 +55,7 @@ void DesktopCefClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
   owner_->UpdateActiveState();
 }
 
-bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
+bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser> opener,
                                      CefRefPtr<CefFrame>,
 #if CEF_VERSION_MAJOR >= 130
                                      int,
@@ -72,8 +72,23 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
                                      bool*) {
   const std::string url = target_url.ToString();
   if (url.empty()) return true;
+  // The popup is cancelled and reopened as one of our own tabs, so CEF's own
+  // "popups inherit the opener's request context" rule does not apply here.
+  // Carrying the opener's partition across is what keeps window.open from
+  // being a hole straight out of an isolated tab.
+  NewTabRequest request;
+  request.url = url;
+  if (opener) {
+    if (const auto* source = owner_->FindTab(opener)) {
+      request.partition = source->partition;
+      if (source->partition) {
+        const auto* entry = owner_->partitions.Find(*source->partition);
+        request.persistent = entry == nullptr ? true : entry->persistent;
+      }
+    }
+  }
   TabSnapshot created;
-  const auto result = owner_->CreateTabOnUi(url, &created);
+  const auto result = owner_->CreateTabOnUi(request, &created);
   if (!result.ok) return true;
   if (auto* tab = owner_->FindTab(TabLease{created.id, created.generation})) {
 #if defined(_WIN32)

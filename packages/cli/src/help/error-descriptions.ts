@@ -21,4 +21,24 @@ export const errorDescriptions: Record<string, string> = {
   MODEL_NOT_FOUND: "The requested model ID does not exist in the local catalog.",
   DOWNLOAD_FAILED: "The requested model download did not finish successfully.",
   NETWORK_ERROR: "The CLI could not reach the device over HTTP.",
+  INVALID_PARTITION:
+    "The partition string failed validation. It must be 1-128 characters from [A-Za-z0-9._-], " +
+    "contain at least one letter or digit, and must not be \".\", \"..\", \"default\" " +
+    "(case-insensitive) or start with \"ephemeral-\".",
+  PARTITION_UNSUPPORTED:
+    "The platform or rendering engine cannot isolate storage per tab. Read the reason field: " +
+    "\"chromium-engine\" means switch to WebKit with set-renderer and retry, " +
+    "\"webview-multi-profile-missing\" means the Android System WebView needs updating to M114+, " +
+    "and \"platform-single-tab\" means the platform has no partition support at all.",
+  PARTITION_DELETING:
+    "The named partition is being torn down. Retry once delete-partition returns; " +
+    "the retry binds to a fresh, empty store.",
+  PARTITION_IN_USE:
+    "The engine refused to delete the partition even after its tabs were closed. " +
+    "The partition id is free to reuse; the abandoned store is listed by get-partitions " +
+    "as orphan:<uuid> and can be deleted with that id.",
+  ENGINE_SWITCH_BLOCKED_BY_PARTITION:
+    "set-renderer cannot switch to Chromium while partitioned tabs are open, because " +
+    "partitioned storage has no CEF equivalent to migrate into. Close those tabs or call " +
+    "delete-partition first.",
 };

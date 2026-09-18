@@ -315,6 +315,10 @@ final class TabPillView: NSView {
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
+        tab.$name
+            .sink { [weak self] _ in self?.refreshContent() }
+            .store(in: &cancellables)
+
         tab.$currentURL
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
@@ -335,7 +339,10 @@ final class TabPillView: NSView {
     }
 
     private func refreshContent() {
-        titleField.stringValue = tab.title
+        // A caller-supplied name wins over the page title: an orchestrator that
+        // labelled a tab "Sam (Engineering Lead)" wants to see that, not the
+        // title of whatever page the tab happens to be on.
+        titleField.stringValue = tab.displayLabel
 
         // Start page: show star icon instead of letter avatar
         if tab.isStartPage {

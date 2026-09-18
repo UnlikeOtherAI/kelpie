@@ -2,6 +2,7 @@
 
 #include <condition_variable>
 #include <ctime>
+#include <thread>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -13,7 +14,9 @@
 #include "include/cef_parser.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/cef_urlrequest.h"
+#include "include/cef_request_context.h"
 #include "kelpie/internal_scheme.h"
+#include "kelpie/partition.h"
 #include "desktop_cookie_planner.h"
 #include "desktop_input_planner.h"
 #if defined(_WIN32)
@@ -111,17 +114,21 @@ DesktopEngine::Impl::Tab* DesktopEngine::Impl::ActiveTab() {
 }
 
 TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
-  return {tab.id,
-          tab.generation,
-          tab.url,
-          tab.title,
-          browser && browser->IsSame(tab.browser),
-          tab.loading,
-          tab.can_go_back,
-          tab.can_go_forward,
-          IsStartPageUrl(tab.url),
-          // Shared, not copied: see the field comment on TabSnapshot.
-          tab.favicon_png_base64};
+  TabSnapshot snapshot{tab.id, tab.generation, tab.url, tab.title,
+                       browser && browser->IsSame(tab.browser), tab.loading,
+                       tab.can_go_back, tab.can_go_forward,
+                       IsStartPageUrl(tab.url),
+                       // Shared, not copied: see the field comment on TabSnapshot.
+                       tab.favicon_png_base64};
+  snapshot.name = tab.name;
+  snapshot.partition = tab.partition;
+  // `persistent` describes the partition, so a tab in the default shared store
+  // reports neither field rather than a misleading default.
+  if (tab.partition) {
+    const auto* entry = partitions.Find(*tab.partition);
+    snapshot.persistent = entry == nullptr ? true : entry->persistent;
+  }
+  return snapshot;
 }
 
 void DesktopEngine::Impl::UpdateActiveState() {
@@ -165,14 +172,48 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
   return TimeoutResult();
 }
 
-BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& requested_url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
+BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const NewTabRequest& request,
+                                                        TabSnapshot* snapshot,
+                                                        std::optional<std::string> restored_id) {
   // A tab with no URL opens Kelpie's start page, the same as macOS. This is the
   // one place that decides it, so the `+` button, `new-tab` over HTTP/MCP, and
   // the replacement tab after the last close all agree.
-  const std::string url = requested_url.empty() ? std::string(kStartPageUrl) : requested_url;
+  const std::string url = request.url.empty() ? std::string(kStartPageUrl) : request.url;
   if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
   if (!restored_id && next_tab_id == std::numeric_limits<std::uint64_t>::max()) {
     return BrowserControlResult::Failure("TAB_ID_EXHAUSTED", "No more tab identifiers are available");
+  }
+  // nullptr is CEF's global request context: the default shared store every
+  // ordinary tab uses. Only a named partition swaps in a private one.
+  CefRefPtr<CefRequestContext> request_context;
+  DesktopPartitionRegistry::Entry* partition = nullptr;
+  if (request.partition) {
+    const PartitionValidation validation = ValidatePartition(*request.partition);
+    if (!validation.ok) {
+      return BrowserControlResult::Failure(
+          "INVALID_PARTITION",
+          "Invalid partition \"" + *request.partition + "\": " +
+              PartitionErrorMessage(validation.reason));
+    }
+    auto* existing = partitions.Find(*request.partition);
+    if (existing != nullptr && existing->deleting) {
+      return BrowserControlResult::Failure(
+          "PARTITION_DELETING", "Partition \"" + *request.partition +
+                                    "\" is being deleted. Retry once delete-partition returns.");
+    }
+    partition = partitions.Acquire(*request.partition, request.persistent);
+    if (partition == nullptr) {
+      return BrowserControlResult::Failure("WEBVIEW_ERROR",
+                                           "Chromium could not create the storage partition");
+    }
+    if (!partition->ready()) {
+      // Internal sentinel. DesktopEngine::CreateTab retries off the UI thread
+      // until the store has loaded; nothing else can wait here, because the
+      // callback that flips this flag arrives on this very thread.
+      return BrowserControlResult::Failure(kPartitionNotReady,
+                                           "The storage partition is still loading");
+    }
+    request_context = partition->context;
   }
   CefWindowInfo window_info;
   const std::string id = restored_id ? *restored_id : "tab-" + std::to_string(next_tab_id);
@@ -186,7 +227,8 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& reque
     return BrowserControlResult::Failure("INTERNAL", "No native browser window factory is configured");
   }
   CefBrowserSettings settings;
-  CefRefPtr<CefBrowser> created = CefBrowserHost::CreateBrowserSync(window_info, client, url, settings, nullptr, nullptr);
+  CefRefPtr<CefBrowser> created =
+      CefBrowserHost::CreateBrowserSync(window_info, client, url, settings, nullptr, request_context);
   if (!created) return BrowserControlResult::Failure("INTERNAL", "CEF did not create the tab");
   if (!restored_id) ++next_tab_id;
   Tab tab;
@@ -194,10 +236,13 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& reque
   tab.browser = created;
   tab.devtools = new DesktopDevToolsSession();
   tab.url = url;
+  tab.name = request.name;
+  if (partition != nullptr) tab.partition = partition->id;
   tabs.push_back(std::move(tab));
 #if defined(_WIN32)
   if (const auto window = created->GetHost()->GetWindowHandle()) ShowWindow(window, SW_HIDE);
 #endif
+  RecountPartitions();
   Tab& created_tab = tabs.back();
   const TabSnapshot state = Snapshot(created_tab);
   if (snapshot) *snapshot = state;
@@ -228,8 +273,15 @@ BrowserControlResult DesktopEngine::GetSessionState(SessionState* output, Timeou
     collected->tabs.clear();
     for (const auto& tab : impl->tabs) {
       if (tab.closing) continue;
-      collected->tabs.push_back({tab.id, tab.url,
-                                 impl->browser && impl->browser->IsSame(tab.browser)});
+      DesktopEngine::RestoredTab entry{tab.id, tab.url,
+                                       impl->browser && impl->browser->IsSame(tab.browser)};
+      entry.name = tab.name;
+      entry.partition = tab.partition;
+      if (tab.partition) {
+        const auto* found = impl->partitions.Find(*tab.partition);
+        entry.persistent = found == nullptr ? true : found->persistent;
+      }
+      collected->tabs.push_back(std::move(entry));
     }
     return BrowserControlResult::Success(
         impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
@@ -309,14 +361,29 @@ bool DesktopEngine::IsActiveNativeBrowserAttached(void* parent_window, Timeout t
   }, timeout).ok;
 }
 
-BrowserControlResult DesktopEngine::CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) {
+BrowserControlResult DesktopEngine::CreateTab(const NewTabRequest& request, TabSnapshot* tab,
+                                              Timeout timeout) {
   const auto impl = impl_;
   auto created = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, url = std::move(url), created] {
-    return impl->CreateTabOnUi(url, created.get());
-  }, timeout);
-  if (result.ok && tab) *tab = *created;
-  return result;
+  const auto started = std::chrono::steady_clock::now();
+  BrowserControlResult result;
+  // The first tab in a new persistent partition has to wait for Chromium to
+  // load that store. Waiting here, on the calling thread, keeps the UI thread
+  // free to do the loading.
+  while (true) {
+    const auto remaining = RemainingTimeout(started, timeout);
+    if (remaining <= Timeout::zero()) break;
+    result = impl->RunOnUi([impl, request, created] {
+      return impl->CreateTabOnUi(request, created.get());
+    }, remaining);
+    if (result.ok || result.error_code != kPartitionNotReady) {
+      if (result.ok && tab) *tab = *created;
+      return result;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  return BrowserControlResult::Failure(
+      "WEBVIEW_ERROR", "The storage partition did not finish loading in time");
 }
 
 BrowserControlResult DesktopEngine::ActivateTab(TabLease lease, Timeout timeout) {
@@ -370,6 +437,7 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     // The CEF lifetime callback remains the sole owner-removal point.
     impl->tabs[closing_index].closing = true;
     closing->GetHost()->CloseBrowser(true);
+    impl->RecountPartitions();
     impl->UpdateActiveState();
     return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);

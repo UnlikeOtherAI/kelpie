@@ -40,6 +40,7 @@ class PreviewDelegate final : public kelpie::windows::ShellDelegate {
   }
   kelpie::windows::SettingsValues CurrentSettings() const override { return {}; }
   void OnCreateTabRequested() override {}
+  void OnCreateIsolatedTabRequested() override {}
   void OnActivateTabRequested(std::string, std::uint64_t) override {}
   void OnCloseTabRequested(std::string, std::uint64_t) override {}
   void OnWindowCloseRequested() override {}

@@ -20,6 +20,10 @@ enum class ErrorCode {
   kPlatformNotSupported,
   kPermissionRequired,
   kShadowRootClosed,
+  kInvalidPartition,
+  kPartitionUnsupported,
+  kPartitionDeleting,
+  kPartitionInUse,
 };
 
 const char* ErrorCodeToString(ErrorCode code);

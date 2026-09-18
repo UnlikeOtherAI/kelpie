@@ -133,7 +133,8 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       window_chrome_.Attach(hwnd_, instance_);
       const ACCEL shortcuts[] = {{FVIRTKEY | FCONTROL, 'T', IDM_NEW_TAB}, {FVIRTKEY | FCONTROL, 'W', IDM_CLOSE_TAB},
                                  {FVIRTKEY | FCONTROL, 'L', IDM_FOCUS_URL}, {FVIRTKEY | FCONTROL, VK_TAB, IDM_NEXT_TAB},
-                                 {FVIRTKEY | FCONTROL | FSHIFT, VK_TAB, IDM_PREVIOUS_TAB}};
+                                 {FVIRTKEY | FCONTROL | FSHIFT, VK_TAB, IDM_PREVIOUS_TAB},
+                                 {FVIRTKEY | FCONTROL | FSHIFT, 'N', IDM_NEW_ISOLATED_TAB}};
       accelerators_ = CreateAcceleratorTableW(const_cast<LPACCEL>(shortcuts), static_cast<int>(std::size(shortcuts)));
       RECT rect{};
       GetClientRect(hwnd_, &rect);
@@ -247,7 +248,11 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
         case IDC_SETTINGS_BUTTON:
         case IDM_SETTINGS: delegate_->OnOpenSettingsRequested(); return 0;
         case IDC_NEW_TAB_BUTTON:
+          if (NewTabDropdownHit()) { ShowNewTabMenu(); return 0; }
+          delegate_->OnCreateTabRequested();
+          return 0;
         case IDM_NEW_TAB: delegate_->OnCreateTabRequested(); return 0;
+        case IDM_NEW_ISOLATED_TAB: delegate_->OnCreateIsolatedTabRequested(); return 0;
         case IDM_CLOSE_TAB: { const int selected = TabCtrl_GetCurSel(tab_strip_); if (selected >= 0) CloseTabAt(static_cast<std::size_t>(selected)); return 0; }
         case IDM_FOCUS_URL: url_bar_.Focus(); return 0;
         case IDM_NEXT_TAB: ActivateAdjacentTab(1); return 0;
@@ -275,6 +280,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     case WM_CLOSE: delegate_->OnWindowCloseRequested(); return 0;
     case WM_DESTROY:
       url_bar_.Destroy();
+      tab_tooltips_.Destroy();
       if (accelerators_ != nullptr) DestroyAcceleratorTable(accelerators_);
       PostQuitMessage(0);
       return 0;
@@ -333,7 +339,7 @@ void Win32Shell::LayoutChildren(int width, int height) {
   const int tab_top = title + url_bar_.Height();
   const int tab_height = ui::Dip(hwnd_, 34);
   const int padding = ui::Dip(hwnd_, 12);
-  const int new_width = ui::Dip(hwnd_, 34);
+  const int new_width = ui::Dip(hwnd_, 34) + ui::Dip(hwnd_, kNewTabDropdownWidthDip);
   const int strip_width =
       std::max(ui::Dip(hwnd_, 120), width - (2 * padding) - new_width - inset);
   SetWindowPos(tab_strip_, nullptr, inset + padding, tab_top, strip_width, tab_height,
@@ -364,11 +370,22 @@ bool Win32Shell::RefreshTabs() {
     if (!entry.is_object()) continue;
     const std::string id = entry.value("id", "");
     if (id.empty()) continue;
-    std::string label = entry.value("title", "");
-    if (label.empty()) label = entry.value("url", "");
-    if (label.empty()) label = "New tab";
+    std::string title = entry.value("title", "");
+    if (title.empty()) title = entry.value("url", "");
+    if (title.empty()) title = "New tab";
+    // A named tab prints its name: the point of naming one is that the page
+    // title is not what identifies it.
+    const std::string name = entry.value("name", "");
     const bool selected = entry.value("active", false);
-    next.push_back({id, entry.value("generation", std::uint64_t{0}), label, selected});
+    TabItem item;
+    item.id = id;
+    item.generation = entry.value("generation", std::uint64_t{0});
+    item.label = name.empty() ? title : name;
+    item.title = title;
+    item.partition = entry.value("partition", "");
+    item.persistent = entry.value("persistent", true);
+    item.active = selected;
+    next.push_back(std::move(item));
     if (selected) active = id;
   }
   if (SameTabs(tabs_, next) && active_tab_id_ == active) return false;
@@ -436,6 +453,50 @@ void Win32Shell::LayoutTabCloseButtons() {
                  item.top + (item.bottom - item.top - size) / 2, size, size,
                  SWP_NOACTIVATE | SWP_SHOWWINDOW);
   }
+  RefreshTabTooltips();
+}
+
+void Win32Shell::RefreshTabTooltips() {
+  if (tab_strip_ == nullptr) return;
+  std::vector<TabStripTooltips::Item> items;
+  items.reserve(tabs_.size());
+  for (std::size_t index = 0; index < tabs_.size(); ++index) {
+    RECT bounds{};
+    if (!TabCtrl_GetItemRect(tab_strip_, static_cast<int>(index), &bounds)) continue;
+    // The pill may be showing a short name, so the tooltip is where the real
+    // page title and the partition id stay readable.
+    std::wstring text = utf::Utf8ToWideDisplay(tabs_[index].title);
+    if (!tabs_[index].partition.empty()) {
+      text += L"\nPartition: " + utf::Utf8ToWideDisplay(tabs_[index].partition);
+      if (!tabs_[index].persistent) text += L" (in memory only)";
+    }
+    items.push_back({bounds, std::move(text)});
+  }
+  tab_tooltips_.Update(instance_, hwnd_, tab_strip_, items);
+}
+
+void Win32Shell::ShowNewTabMenu() {
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) return;
+  AppendMenuW(menu, MF_STRING, IDM_NEW_TAB, L"New tab\tCtrl+T");
+  AppendMenuW(menu, MF_STRING, IDM_NEW_ISOLATED_TAB, L"New isolated tab\tCtrl+Shift+N");
+  SetMenuDefaultItem(menu, IDM_NEW_TAB, FALSE);
+  RECT bounds{};
+  GetWindowRect(new_tab_button_, &bounds);
+  TrackPopupMenu(menu, TPM_RIGHTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON, bounds.right, bounds.bottom,
+                 0, hwnd_, nullptr);
+  DestroyMenu(menu);
+}
+
+bool Win32Shell::NewTabDropdownHit() const {
+  if (new_tab_button_ == nullptr) return false;
+  const DWORD packed = GetMessagePos();
+  const POINT point{GET_X_LPARAM(packed), GET_Y_LPARAM(packed)};
+  RECT bounds{};
+  // Keyboard activation leaves the cursor wherever it happened to be, so a
+  // point outside the button is not a chevron click and opens a plain tab.
+  if (!GetWindowRect(new_tab_button_, &bounds) || !PtInRect(&bounds, point)) return false;
+  return point.x >= bounds.right - ui::Dip(hwnd_, kNewTabDropdownWidthDip);
 }
 
 bool Win32Shell::DrawControl(const DRAWITEMSTRUCT& item) const {
@@ -443,7 +504,17 @@ bool Win32Shell::DrawControl(const DRAWITEMSTRUCT& item) const {
   const auto colors = ui::Colors();
   if (item.CtlID == IDC_NEW_TAB_BUTTON) {
     ui::PaintRounded(item.hDC, item.rcItem, colors.surface, colors.border, ui::Dip(hwnd_, 8));
-    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, ui::icon::kNewTab, colors.text);
+    const int chevron_width = ui::Dip(hwnd_, kNewTabDropdownWidthDip);
+    RECT plus = item.rcItem;
+    plus.right -= chevron_width;
+    RECT chevron = item.rcItem;
+    chevron.left = plus.right;
+    ui::DrawGlyph(item.hDC, hwnd_, plus, ui::icon::kNewTab, colors.text);
+    // A hairline is what tells the two halves of the split control apart.
+    const RECT divider{plus.right, plus.top + ui::Dip(hwnd_, 8), plus.right + ui::Dip(hwnd_, 1),
+                       plus.bottom - ui::Dip(hwnd_, 8)};
+    ui::FillSolid(item.hDC, divider, colors.border);
+    ui::DrawGlyph(item.hDC, hwnd_, chevron, ui::icon::kChevronDown, colors.muted_text, 8);
     return true;
   }
   if (IsTabClose(item.CtlID)) {
@@ -470,6 +541,17 @@ bool Win32Shell::DrawControl(const DRAWITEMSTRUCT& item) const {
   const std::wstring title = utf::Utf8ToWideDisplay(tab.label);
   // 12 DIP regular, truncating tail — the macOS tab title.
   ui::DrawLabel(item.hDC, hwnd_, text, title.c_str(), title_color, 12, FW_NORMAL, DT_LEFT);
+  if (!tab.partition.empty()) {
+    // A 2 DIP accent stripe along the foot of the pill: the only always-visible
+    // sign that this tab does not share the default store. High contrast keeps
+    // its own highlight colour so the stripe never vanishes into the fill.
+    const int stripe = ui::Dip(hwnd_, 2);
+    const int inset = ui::Dip(hwnd_, 8);
+    const int bottom = item.rcItem.bottom - ui::Dip(hwnd_, 2);
+    const RECT accent{item.rcItem.left + inset, bottom - stripe, item.rcItem.right - inset, bottom};
+    ui::FillSolid(item.hDC, accent,
+                  ui::HighContrast() ? GetSysColor(COLOR_HIGHLIGHTTEXT) : colors.accent);
+  }
   return true;
 }
 
@@ -477,7 +559,9 @@ bool Win32Shell::SameTabs(const std::vector<TabItem>& left, const std::vector<Ta
   if (left.size() != right.size()) return false;
   for (std::size_t index = 0; index < left.size(); ++index) {
     if (left[index].id != right[index].id || left[index].generation != right[index].generation ||
-        left[index].label != right[index].label || left[index].active != right[index].active) return false;
+        left[index].label != right[index].label || left[index].active != right[index].active ||
+        left[index].title != right[index].title || left[index].partition != right[index].partition ||
+        left[index].persistent != right[index].persistent) return false;
   }
   return true;
 }

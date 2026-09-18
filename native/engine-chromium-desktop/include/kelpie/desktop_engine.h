@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,9 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::string id;
     std::string url;
     bool active = false;
+    std::optional<std::string> name;
+    std::optional<std::string> partition;
+    bool persistent = true;
   };
 
   struct Config {
@@ -46,6 +50,16 @@ class DesktopEngine final : public DesktopBrowserControl {
     std::vector<RestoredTab> restored_tabs;
     std::uint64_t restored_next_tab_id = 1;
     std::string cache_path;
+    // The parent directory CEF requires every cache path to share: CefSettings
+    // and every CefRequestContextSettings cache_path must sit under it. When
+    // it is empty CEF defaults it to cache_path, and any partition store
+    // outside that tree is silently ignored and falls back to memory.
+    std::string root_cache_path;
+    // Parent directory for the per-partition stores; each persistent partition
+    // gets a subdirectory named after its id. It must live under
+    // root_cache_path. Empty forces every partition in-memory, which is what a
+    // profile-less test shell wants.
+    std::string partitions_path;
     std::string user_agent;
     std::string browser_subprocess_path;
     std::string resources_dir_path;
@@ -114,7 +128,13 @@ class DesktopEngine final : public DesktopBrowserControl {
                                   const std::optional<std::uint64_t>& generation,
                                   TabLease* lease,
                                   Timeout timeout) override;
-  BrowserControlResult CreateTab(std::string url, TabSnapshot* tab, Timeout timeout) override;
+  BrowserControlResult CreateTab(const NewTabRequest& request, TabSnapshot* tab,
+                                 Timeout timeout) override;
+  using DesktopBrowserControl::CreateTab;
+  BrowserControlResult GetPartitions(std::vector<PartitionInfo>* partitions,
+                                     Timeout timeout) override;
+  BrowserControlResult DeletePartition(const std::string& id, PartitionDeletion* deletion,
+                                       Timeout timeout) override;
   BrowserControlResult ActivateTab(TabLease lease, Timeout timeout) override;
   BrowserControlResult CloseTab(TabLease lease, Timeout timeout) override;
   BrowserControlResult Navigate(std::optional<TabLease> lease,
