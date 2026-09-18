@@ -34,6 +34,14 @@ const char* ErrorCodeToString(ErrorCode code) {
       return "PERMISSION_REQUIRED";
     case ErrorCode::kShadowRootClosed:
       return "SHADOW_ROOT_CLOSED";
+    case ErrorCode::kInvalidPartition:
+      return "INVALID_PARTITION";
+    case ErrorCode::kPartitionUnsupported:
+      return "PARTITION_UNSUPPORTED";
+    case ErrorCode::kPartitionDeleting:
+      return "PARTITION_DELETING";
+    case ErrorCode::kPartitionInUse:
+      return "PARTITION_IN_USE";
   }
   return "UNKNOWN_ERROR";
 }
@@ -78,6 +86,18 @@ std::optional<ErrorCode> ErrorCodeFromString(std::string_view value) {
   if (value == "SHADOW_ROOT_CLOSED") {
     return ErrorCode::kShadowRootClosed;
   }
+  if (value == "INVALID_PARTITION") {
+    return ErrorCode::kInvalidPartition;
+  }
+  if (value == "PARTITION_UNSUPPORTED") {
+    return ErrorCode::kPartitionUnsupported;
+  }
+  if (value == "PARTITION_DELETING") {
+    return ErrorCode::kPartitionDeleting;
+  }
+  if (value == "PARTITION_IN_USE") {
+    return ErrorCode::kPartitionInUse;
+  }
   return std::nullopt;
 }
 
@@ -109,6 +129,14 @@ std::int32_t ErrorCodeHttpStatus(ErrorCode code) {
       return 403;
     case ErrorCode::kShadowRootClosed:
       return 403;
+    case ErrorCode::kInvalidPartition:
+      return 400;
+    case ErrorCode::kPartitionUnsupported:
+      return 501;
+    case ErrorCode::kPartitionDeleting:
+      return 409;
+    case ErrorCode::kPartitionInUse:
+      return 409;
   }
   return 500;
 }
