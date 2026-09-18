@@ -1021,17 +1021,22 @@ Detailed exit code documentation lives in [docs/cli/advanced.md](cli/advanced.md
 
 ### Windows aliases and agent stdio
 
-Register a Windows build with an absolute profile directory, then launch it:
+Extract the Windows release ZIP into a current-user-owned directory such as
+`%LOCALAPPDATA%\Kelpie`, then register its executable with an absolute profile directory:
 
 ```text
-kelpie browser register win --platform windows --app-path "C:\\Program Files\\Kelpie\\kelpie.exe" --profile-dir "C:\\Users\\you\\KelpieProfile"
+kelpie browser register win --platform windows --app-path "%LOCALAPPDATA%\\Kelpie\\kelpie.exe" --profile-dir "%LOCALAPPDATA%\\Kelpie\\profiles\\agent"
 kelpie browser launch win
 kelpie --browser win navigate https://example.com
 kelpie --browser win mcp
 ```
 
+There is no CLI installer command: the release ZIP is the supported Windows installation
+artifact. See the Windows release ZIP instructions for extraction and update steps.
+
 The stdio command is the local-agent/Nessie bridge: it reads the current user’s readiness token
-in memory and emits only JSON-RPC on stdout. `kelpie browser stop win` asks the app to close
+in memory, fetches the running browser’s authenticated callable catalogue, and emits only JSON-RPC
+on stdout. `kelpie browser stop win` asks the app to close
 orderly and waits for the matching readiness record to disappear.
 
 Windows aliases deliberately reject `kelpie --browser win mcp --http`: proxying their local

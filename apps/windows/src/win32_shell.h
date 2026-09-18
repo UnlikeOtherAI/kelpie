@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -23,6 +23,10 @@
 
 namespace kelpie::windows {
 
+// The macOS tab bar clamps pill widths to this range before spreading them.
+inline constexpr int kTabMinWidthDip = 80;
+inline constexpr int kTabMaxWidthDip = 200;
+
 class ShellDelegate : public UrlBarDelegate {
  public:
   ~ShellDelegate() override = default;
@@ -39,32 +43,52 @@ class ShellDelegate : public UrlBarDelegate {
 
 class Win32Shell {
  public:
-  Win32Shell(HINSTANCE instance, ShellDelegate* delegate,
-             BrowserStateObserver* observer, Win32BrowserView* browser_view);
-
+  Win32Shell(HINSTANCE instance, ShellDelegate* delegate, BrowserStateObserver* observer,
+             Win32BrowserView* browser_view);
   bool Create(const std::wstring& title, int width, int height);
   void Show(int show_command);
   HWND hwnd() const { return hwnd_; }
   HACCEL accelerators() const { return accelerators_; }
+  bool HandleKeyboardNavigation(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
   void ShowToast(const std::wstring& message);
   void Close();
 
  private:
-  static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam,
-                                     LPARAM lparam);
-  LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
-  void LayoutChildren(int width, int height);
-  bool RefreshTabs();
-  void ActivateAdjacentTab(int direction);
-  void ActivateSelectedTab();
-  void CloseSelectedTab();
-
   struct TabItem {
     std::string id;
     std::uint64_t generation = 0;
+    std::string label;
+    bool active = false;
   };
-  void ShowAppMenu();
+  struct TabCloseButton {
+    HWND hwnd = nullptr;
+    std::string id;
+    std::uint64_t generation = 0;
+  };
+
+  static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  static LRESULT CALLBACK TabStripProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
+                                       UINT_PTR subclass_id, DWORD_PTR reference_data);
+  LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
+  void ApplyAppearance();
+  // Re-measures the pills. The width depends on how many tabs are open, so
+  // this runs when the tab set changes as well as on resize.
+  void ApplyTabMetrics();
+  // Width of one tab pill for a strip of this width, clamped like macOS.
+  int TabWidthFor(int strip_width) const;
+  void LayoutChildren(int width, int height);
+  void ShowPanel(UINT command);
+  bool RefreshTabs();
+  void RebuildTabCloseButtons();
+  void LayoutTabCloseButtons();
+  void PaintClient(HDC device_context) const;
+  bool DrawControl(const DRAWITEMSTRUCT& item) const;
+  static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
+  void ActivateAdjacentTab(int direction);
+  void ActivateSelectedTab();
+  void CloseTabAt(std::size_t index);
+  std::vector<HWND> FocusOrder() const;
 
   HINSTANCE instance_;
   ShellDelegate* delegate_;
@@ -73,7 +97,6 @@ class Win32Shell {
   HWND hwnd_ = nullptr;
   HWND tab_strip_ = nullptr;
   HWND new_tab_button_ = nullptr;
-  HWND close_tab_button_ = nullptr;
   HACCEL accelerators_ = nullptr;
   WindowChrome window_chrome_;
   UrlBar url_bar_;
@@ -82,7 +105,10 @@ class Win32Shell {
   HistoryView history_view_;
   NetworkInspector network_view_;
   std::vector<TabItem> tabs_;
+  std::vector<TabCloseButton> tab_close_buttons_;
   std::string active_tab_id_;
+  BrowserState browser_state_;
+  bool has_browser_state_ = false;
 };
 
 }  // namespace kelpie::windows

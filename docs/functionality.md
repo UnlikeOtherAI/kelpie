@@ -46,6 +46,8 @@ On Linux, the desktop shell runs in either GUI or headless mode. Both modes expo
 
 On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame with macOS-style close/minimize/maximize dots, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
+The Windows shell has the same quiet desktop chrome as the macOS app: native icon controls and an IME-capable rounded URL field in a 50-DIP toolbar, a separate native tab strip with per-tab close controls, and native bookmarks, history, network, settings, and toast surfaces. These controls keep standard Windows accessibility roles and keyboard navigation, scale from their owning window's DPI, respect high-contrast colors, and preserve inline history completion semantics.
+
 ### Safari / Chrome Authentication
 
 One-tap login using the device's saved passwords. On iOS, opens an ASWebAuthenticationSession (Safari's login sheet) that shares Safari's saved passwords and cookies. On Android, uses Chrome Custom Tabs. After login, cookies are synced back into the browser automatically.
@@ -315,7 +317,7 @@ kelpie describe --json --include-tools # embed every tool schema
 
 Every CLI command supports `--llm-help` for machine-readable documentation. `kelpie --llm-help` outputs the complete reference, including guidance on reporting unexpected automation failures or missing capabilities to the GitHub issue tracker. `kelpie explain <command>` gives natural-language explanations. Designed so an LLM can teach itself the tool without human guidance.
 
-The CLI also manages local macOS browser aliases under `~/.kelpie`. `kelpie browser register <name>` creates a reusable local alias, `kelpie browser launch <name>` starts a fresh Kelpie.app instance for that alias on an explicit or auto-assigned port, and the rest of the CLI can target that launched instance via `--device <name>` without relying on network discovery alone. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
+The CLI manages local browser aliases under `~/.kelpie`. On macOS, `kelpie browser register <name>` and `kelpie browser launch <name>` start a fresh Kelpie.app instance on an explicit or auto-assigned port. On Windows, users extract the release ZIP into a current-user-owned directory, register the executable with an absolute profile directory, and launch it through the same alias commands. Windows aliases use a protected readiness file and `kelpie --browser <name> mcp` for local agent stdio. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
 Published GitHub releases also build Android release artifacts and publish the CLI packages to npm automatically, so the release page and npm stay aligned with the tagged version.
 
@@ -348,7 +350,7 @@ Overriding the device GPS location (latitude, longitude, accuracy) is part of th
 Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
-file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token.
+file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
 `kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
 creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
 provides a token-free stdio bridge for local development agents and local Nessie executors.

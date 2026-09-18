@@ -1,10 +1,25 @@
 import type { Command } from "commander";
-import { CLI_MCP_PORT } from "@unlikeotherai/kelpie-shared";
+import { CLI_MCP_PORT, httpToMcp, type BrowserMcpTool } from "@unlikeotherai/kelpie-shared";
 import { DEFAULT_MCP_BIND_HOST } from "../mcp/transport.js";
 import { localBrowserDevice } from "./helpers.js";
+import { sendCommand } from "../client/http-client.js";
+import type { DiscoveredDevice } from "../types.js";
 
 export function rejectsWindowsLocalHttpProxy(http: boolean | undefined, platform: string | undefined): boolean {
   return http === true && platform === "windows";
+}
+
+/** Read the running browser's own callable catalogue before exposing alias MCP tools. */
+export async function localCallableTools(device: DiscoveredDevice): Promise<Set<BrowserMcpTool>> {
+  const result = await sendCommand<{ supported?: unknown }>(device, "getCapabilities");
+  const supported = result.data.supported;
+  if (!result.ok || !Array.isArray(supported) || !supported.every((item) => typeof item === "string")) {
+    throw new Error("Local browser did not return a valid callable capability catalogue");
+  }
+  return new Set(supported.flatMap((endpoint) => {
+    const tool = httpToMcp[endpoint];
+    return tool ? [tool] : [];
+  }));
 }
 
 export function registerMcp(program: Command): void {
@@ -41,8 +56,18 @@ export function registerMcp(program: Command): void {
           process.exitCode = 4;
           return;
         }
+        let callableTools: Set<BrowserMcpTool> | undefined;
+        if (local?.platform === "windows") {
+          try {
+            callableTools = await localCallableTools(local);
+          } catch (error) {
+            process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+            process.exitCode = 4;
+            return;
+          }
+        }
         const { createMcpServer } = await import("../mcp/server.js");
-        const server = createMcpServer(local ?? undefined);
+        const server = createMcpServer(local ?? undefined, callableTools);
 
         if (opts.http) {
           const { startHttp } = await import("../mcp/transport.js");

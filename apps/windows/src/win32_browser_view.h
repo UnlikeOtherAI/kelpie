@@ -12,7 +12,6 @@
 #endif
 #include <windows.h>
 
-#include "kelpie/renderer_interface.h"
 
 namespace kelpie::windows {
 
@@ -30,10 +29,10 @@ class BrowserStateObserver {
   virtual void OnBrowserStateChanged(const BrowserState& state) = 0;
 };
 
-class Win32BrowserView final : public RendererInterface {
+class Win32BrowserView final {
  public:
   Win32BrowserView();
-  ~Win32BrowserView() override;
+  ~Win32BrowserView();
 
   bool Create(HWND parent, HINSTANCE instance, const RECT& bounds, BrowserStateObserver* observer);
   void Destroy();
@@ -46,17 +45,6 @@ class Win32BrowserView final : public RendererInterface {
   void UpdateFallbackText(const std::wstring& message) const;
   void ShowFallback(bool visible) const;
 
-  std::string EvaluateJs(const std::string& script) override;
-  std::vector<std::uint8_t> TakeSnapshot() override;
-  void LoadUrl(const std::string& url) override;
-  std::string CurrentUrl() const override;
-  std::string CurrentTitle() const override;
-  bool IsLoading() const override;
-  bool CanGoBack() const override;
-  bool CanGoForward() const override;
-  void GoBack() override;
-  void GoForward() override;
-  void Reload() override;
 
  private:
   HWND hwnd_ = nullptr;

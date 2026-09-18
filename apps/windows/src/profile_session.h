@@ -27,6 +27,7 @@ class ProfileSession {
   const std::string& launch_id() const { return launch_id_; }
 
  private:
+  bool RemoveStaleReadiness(std::string* error) const;
   bool WriteProtectedFile(const std::filesystem::path& path,
                           const std::string& contents,
                           std::string* error) const;

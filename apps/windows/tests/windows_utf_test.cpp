@@ -16,6 +16,7 @@ int main() {
   using kelpie::windows::utf::WideToUtf8Display;
   using kelpie::windows::completion::IsStrictSuffix;
   using kelpie::windows::completion::IsTextInsertionAtEnd;
+  using kelpie::windows::completion::DisplayCandidate;
 
   const std::string snowman = "https://example.test/\xE2\x98\x83";
   const auto wide = Utf8ToWide(snowman);
@@ -31,5 +32,11 @@ int main() {
   if (!Expect(!IsTextInsertionAtEnd(true, 4, 4, 4, L'x'))) return 9;
   if (!Expect(IsStrictSuffix(L"https://exa", L"https://example.test"))) return 10;
   if (!Expect(!IsStrictSuffix(L"https://exa", std::wstring(L"https://exa")))) return 11;
+  // History remains canonical; only the Windows display layer hides compatible prefixes.
+  if (!Expect(DisplayCandidate(L"exa", L"https://www.example.test/\u2603") == L"example.test/\u2603")) return 12;
+  if (!Expect(DisplayCandidate(L"www.exa", L"https://www.example.test") == L"www.example.test")) return 13;
+  if (!Expect(DisplayCandidate(L"https://exa", L"https://www.example.test") == L"https://example.test")) return 14;
+  if (!Expect(!DisplayCandidate(L"http://exa", L"https://example.test").has_value())) return 15;
+  if (!Expect(DisplayCandidate(L"EXA", L"https://www.Example.test") == L"EXAmple.test")) return 16;
   return 0;
 }

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { testDevice, isDeviceReachable } from "./setup.js";
+import { testDevice, isDeviceReachable, hasExplicitE2eTarget } from "./setup.js";
 import { BrowserMcpTools, CliMcpTools } from "@unlikeotherai/kelpie-shared";
 
 /**
  * MCP tool definition tests — verify all tools are correctly defined
  * and match the shared constants. These don't require a real device.
  */
-describe("E2E: MCP Tool Definitions", () => {
+describe.skipIf(!hasExplicitE2eTarget())("E2E: MCP Tool Definitions", () => {
   it("browser MCP tools cover all expected methods", () => {
     expect(BrowserMcpTools.length).toBeGreaterThan(0);
     // Spot check key tools
@@ -36,7 +36,7 @@ describe("E2E: MCP Tool Definitions", () => {
   });
 });
 
-describe("E2E: MCP Server Endpoint", () => {
+describe.skipIf(!hasExplicitE2eTarget())("E2E: MCP Server Endpoint", () => {
   const device = testDevice();
   let reachable = false;
 

@@ -13,7 +13,7 @@ import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
-import type { Platform } from "@unlikeotherai/kelpie-shared";
+import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
 import { getApprovedModels, findModel } from "../ai/models.js";
 import { ModelStore } from "../ai/store.js";
 import { buildDownloadUrl, downloadModel } from "../ai/download.js";
@@ -40,8 +40,12 @@ const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
  * client driving one launched browser does not have to name it on each call
  * — and cannot silently land on whatever discovery finds first. An explicit
  * `device` argument still wins.
+ *
+ * `callableTools` is the runtime's own answer about what it can actually do.
+ * When it is supplied, only those tools are registered, so the catalogue never
+ * advertises a tool the pinned browser would reject.
  */
-export function createMcpServer(pinned?: DiscoveredDevice): McpServer {
+export function createMcpServer(pinned?: DiscoveredDevice, callableTools?: ReadonlySet<BrowserMcpTool>): McpServer {
   const server = new McpServer(
     {
       name: "kelpie",
@@ -53,6 +57,7 @@ export function createMcpServer(pinned?: DiscoveredDevice): McpServer {
   );
 
   for (const tool of browserTools) {
+    if (!isCallableOnPinnedDevice(tool, pinned, callableTools)) continue;
     registerBrowserTool(server, tool, pinned);
   }
   for (const tool of cliTools) {
@@ -71,12 +76,35 @@ async function resolveDevice(
   return getDevice(query);
 }
 
+/**
+ * Whether the pinned browser can actually run this tool. `callableTools` is
+ * the runtime's own inventory and wins when present; otherwise fall back to
+ * the shared per-platform unsupported table. With no pinned device the
+ * catalogue stays complete, because any device may answer the call.
+ */
+function isCallableOnPinnedDevice(
+  tool: BrowserToolDef,
+  pinned?: DiscoveredDevice,
+  callableTools?: ReadonlySet<BrowserMcpTool>,
+): boolean {
+  if (!pinned) return true;
+  if (callableTools) return callableTools.has(tool.name as BrowserMcpTool);
+  if (!(tool.name in BrowserToolUnsupportedPlatforms)) return true;
+  const unsupported = BrowserToolUnsupportedPlatforms[tool.name as keyof typeof BrowserToolUnsupportedPlatforms] as readonly Platform[];
+  return !unsupported.includes(pinned.platform);
+}
+
 function registerBrowserTool(
   server: McpServer,
   tool: BrowserToolDef,
   pinned?: DiscoveredDevice,
 ): void {
-  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
+  // With a pinned browser `device` is optional: omitting it targets the alias.
+  const deviceSchema = tool.schema.device;
+  const schema = pinned && deviceSchema
+    ? { ...tool.schema, device: deviceSchema.optional() }
+    : tool.schema;
+  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: schema }, async (args) => {
     const deviceId = args.device as string | undefined;
     const device = await resolveDevice(deviceId, pinned);
     if (!device) {
@@ -89,7 +117,7 @@ function registerBrowserTool(
         reportId?: string;
         storedAt?: string;
       };
-      await saveFeedbackReport(body as Parameters<typeof saveFeedbackReport>[0], {
+      await saveFeedbackReport(body as unknown as Parameters<typeof saveFeedbackReport>[0], {
         deviceId: device.id,
         deviceName: device.name,
         remoteReportId: remote.reportId,

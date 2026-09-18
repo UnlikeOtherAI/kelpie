@@ -6,6 +6,7 @@
 #include <limits>
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -45,7 +46,7 @@ struct DesktopHandlerRuntime {
   JsonSupplier capabilities_supplier;
   JsonSupplier renderer_supplier;
   ResizeViewport resize_viewport;
-  VoidAction reset_viewport;
+  std::function<bool()> reset_viewport;
   std::function<BrowserControlResult(bool)> set_native_fullscreen;
   std::function<BrowserControlResult(bool*)> get_native_fullscreen;
   std::function<BrowserControlResult()> request_shutdown;
@@ -130,14 +131,23 @@ inline std::int64_t WideInteger(const nlohmann::json& value) {
 
 inline int IntOrDefault(const nlohmann::json& params, const char* key, int default_value) {
   const auto it = params.find(key);
-  if (it == params.end() || !it->is_number_integer()) {
-    return default_value;
+  if (it == params.end()) return default_value;
+  if (!it->is_number_integer()) {
+    throw std::invalid_argument(std::string(key) + " must be an integer");
   }
   const std::int64_t value = WideInteger(*it);
   if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max()) {
-    return default_value;
+    throw std::invalid_argument(std::string(key) + " is out of range");
   }
   return static_cast<int>(value);
+}
+
+inline double RequireNumber(const nlohmann::json& params, const char* key) {
+  const auto it = params.find(key);
+  if (it == params.end() || !it->is_number()) {
+    throw std::invalid_argument(std::string(key) + " must be a number");
+  }
+  return it->get<double>();
 }
 
 inline int RequireBoundedInteger(const nlohmann::json& params, const char* key, int minimum,

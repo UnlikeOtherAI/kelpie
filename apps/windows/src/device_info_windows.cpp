@@ -67,31 +67,6 @@ std::string RegistryString(HKEY root, const wchar_t* path, const wchar_t* value_
   return status == ERROR_SUCCESS ? utf::WideToUtf8(buffer).value_or("Windows") : fallback;
 }
 
-std::string FirstIpv4Address() {
-  ULONG buffer_size = 15 * 1024;
-  std::vector<BYTE> buffer(buffer_size);
-  auto* addresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
-  if (GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
-                                       GAA_FLAG_SKIP_DNS_SERVER,
-                           nullptr, addresses, &buffer_size) != NO_ERROR) {
-    return "0.0.0.0";
-  }
-
-  for (auto* adapter = addresses; adapter != nullptr; adapter = adapter->Next) {
-    if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) {
-      continue;
-    }
-    for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
-      char host[NI_MAXHOST]{};
-      if (getnameinfo(unicast->Address.lpSockaddr, static_cast<socklen_t>(unicast->Address.iSockaddrLength),
-                      host, sizeof(host), nullptr, 0, NI_NUMERICHOST) == 0) {
-        return host;
-      }
-    }
-  }
-  return "0.0.0.0";
-}
-
 std::string OsVersion() {
   using RtlGetVersionPtr = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
   HMODULE module = GetModuleHandleW(L"ntdll.dll");
@@ -122,6 +97,8 @@ nlohmann::json ToJson(const DeviceInfo& device_info) {
       {"platform", device_info.platform},
       {"engine", device_info.engine},
       {"ip", device_info.ip_address},
+      {"controlMode", "loopback"},
+      {"mcp", {{"http", true}, {"stdio", false}, {"endpoint", "/mcp"}}},
       {"os", device_info.os_version},
       {"version", device_info.app_version},
       {"width", device_info.width},
@@ -152,6 +129,13 @@ void DeviceInfoWindows::SetProfileDir(std::filesystem::path profile_dir) {
   profile_dir_ = std::move(profile_dir);
 }
 
+void DeviceInfoWindows::Configure(int port, int width, int height, std::string app_version) {
+  port_ = port;
+  width_ = width;
+  height_ = height;
+  app_version_ = std::move(app_version);
+}
+
 DeviceInfo DeviceInfoWindows::Collect(int port, int width, int height, const std::string& app_version) const {
   MEMORYSTATUSEX status{};
   status.dwLength = sizeof(status);
@@ -164,7 +148,7 @@ DeviceInfo DeviceInfoWindows::Collect(int port, int width, int height, const std
                               L"HARDWARE\\DESCRIPTION\\System\\BIOS",
                               L"SystemProductName",
                               "PC");
-  info.ip_address = FirstIpv4Address();
+  info.ip_address = "127.0.0.1";
   info.os_version = OsVersion();
   info.app_version = app_version;
   info.total_memory_bytes = status.ullTotalPhys;
@@ -173,6 +157,14 @@ DeviceInfo DeviceInfoWindows::Collect(int port, int width, int height, const std
   info.height = height;
   info.port = port;
   return info;
+}
+
+nlohmann::json DeviceInfoWindows::GetDeviceInfo() const {
+  return ToJson(Collect(port_, width_, height_, app_version_));
+}
+
+StringMap DeviceInfoWindows::GetMdnsMetadata() const {
+  return ToTxtRecord(Collect(port_, width_, height_, app_version_));
 }
 
 }  // namespace kelpie::windows

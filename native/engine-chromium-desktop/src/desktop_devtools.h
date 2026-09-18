@@ -3,6 +3,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -12,16 +13,40 @@
 #include <nlohmann/json.hpp>
 
 #include "include/cef_browser.h"
-#include "include/cef_cookie.h"
 #include "include/cef_devtools_message_observer.h"
 #include "include/cef_jsdialog_handler.h"
 #include "include/cef_registration.h"
 
 namespace kelpie {
 
+class DesktopNetworkEventAdapter {
+ public:
+  using Json = nlohmann::json;
+
+  std::optional<Json> Observe(const std::string& method, const Json& params);
+  void Clear();
+  std::size_t pending_count() const { return requests_.size(); }
+
+ private:
+  struct Request {
+    std::string url;
+    std::string method = "GET";
+    std::string type = "Other";
+    std::string content_type;
+    std::string initiator = "browser";
+    std::string timestamp;
+    double started_at = 0;
+    int status = 0;
+  };
+
+  static constexpr std::size_t kMaxPendingRequests = 512;
+  std::unordered_map<std::string, Request> requests_;
+};
+
 class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
  public:
   using Json = nlohmann::json;
+  using NetworkEventSink = std::function<void(const Json&)>;
 
   struct Result {
     bool ok = false;
@@ -49,6 +74,7 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   };
 
   DesktopDevToolsSession();
+  void Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink);
   std::shared_ptr<Operation> Begin(CefRefPtr<CefBrowser> browser,
                                    const std::string& method,
                                    const Json& params);
@@ -66,6 +92,10 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
                               bool success,
                               const void* result,
                               size_t result_size) override;
+  void OnDevToolsEvent(CefRefPtr<CefBrowser> browser,
+                       const CefString& method,
+                       const void* params,
+                       size_t params_size) override;
   void OnDevToolsAgentDetached(CefRefPtr<CefBrowser> browser) override;
 
  private:
@@ -81,16 +111,10 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   CefRefPtr<CefBrowser> browser_;
   CefRefPtr<CefRegistration> registration_;
   std::unordered_map<int, std::shared_ptr<Operation>> pending_;
+  DesktopNetworkEventAdapter network_events_;
+  NetworkEventSink network_sink_;
 
   IMPLEMENT_REFCOUNTING(DesktopDevToolsSession);
-};
-
-class DesktopCookieAdapter {
- public:
-  using Json = nlohmann::json;
-
-  static std::optional<CefCookie> ToCefCookie(const Json& input);
-  static Json FromCefCookie(const CefCookie& cookie);
 };
 
 class DesktopDialogAdapter {

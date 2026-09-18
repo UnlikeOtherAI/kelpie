@@ -4,32 +4,28 @@
 #include <windowsx.h>
 
 #include <algorithm>
-#include <iterator>
+#include <array>
 #include <memory>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
 #include "../resources/resource.h"
+#include "theme/theme.h"
 #include "windows_utf.h"
 
 namespace kelpie::windows {
 namespace {
-
 constexpr UINT kToastMessage = WM_APP + 1;
-constexpr UINT kDpiChangedMessage = 0x02E0;
 constexpr UINT_PTR kToastTimerId = 1;
-constexpr int kTabHeight = 30;
+constexpr int kTabCloseFirst = 2000;
 
+bool IsTabClose(UINT id) { return id >= kTabCloseFirst && id < kTabCloseFirst + 256; }
 }  // namespace
 
-Win32Shell::Win32Shell(HINSTANCE instance, ShellDelegate* delegate,
-                       BrowserStateObserver* observer,
+Win32Shell::Win32Shell(HINSTANCE instance, ShellDelegate* delegate, BrowserStateObserver* observer,
                        Win32BrowserView* browser_view)
-    : instance_(instance),
-      delegate_(delegate),
-      observer_(observer),
-      browser_view_(browser_view) {}
+    : instance_(instance), delegate_(delegate), observer_(observer), browser_view_(browser_view) {}
 
 bool Win32Shell::Create(const std::wstring& title, int width, int height) {
   WNDCLASSEXW window_class{};
@@ -39,19 +35,14 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height) {
   window_class.lpszClassName = L"Kelpie";
   window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   window_class.hIcon = LoadIconW(instance_, MAKEINTRESOURCEW(IDI_KELPIE));
-  window_class.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+  window_class.hbrBackground = nullptr;
   RegisterClassExW(&window_class);
-
-  constexpr DWORD window_style = WS_OVERLAPPED | WS_THICKFRAME |
-                                 WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU |
-                                 WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-  hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(),
-                          window_style, CW_USEDEFAULT, CW_USEDEFAULT, width,
-                          height, nullptr, nullptr, instance_, this);
+  constexpr DWORD style = WS_OVERLAPPED | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
+                          WS_SYSMENU | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+  hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(), style, CW_USEDEFAULT,
+                          CW_USEDEFAULT, width, height, nullptr, nullptr, instance_, this);
   if (hwnd_ != nullptr) {
-    SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
-                 SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-                     SWP_NOACTIVATE);
+    SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     window_chrome_.UpdateDwmFrame();
   }
   return hwnd_ != nullptr;
@@ -66,302 +57,309 @@ void Win32Shell::Show(int show_command) {
 void Win32Shell::UpdateBrowserState(const BrowserState& state) {
   if (hwnd_ == nullptr) return;
   const bool tab_changed = RefreshTabs();
-  url_bar_.SetUrl(utf::Utf8ToWide(state.url).value_or(L""), tab_changed);
-  url_bar_.SetNavigationState(state.can_go_back, state.can_go_forward,
-                              state.is_loading);
-  if (!state.title.empty()) {
-    SetWindowTextW(hwnd_,
-                   (utf::Utf8ToWideDisplay(state.title) + L" - Kelpie").c_str());
+  const bool state_changed = !has_browser_state_ || state.url != browser_state_.url ||
+      state.title != browser_state_.title || state.is_loading != browser_state_.is_loading ||
+      state.can_go_back != browser_state_.can_go_back || state.can_go_forward != browser_state_.can_go_forward;
+  if (!state_changed && !tab_changed) return;
+  if (state_changed || tab_changed) {
+    url_bar_.SetUrl(utf::Utf8ToWide(state.url).value_or(L""), tab_changed);
   }
+  if (state_changed) {
+    url_bar_.SetNavigationState(state.can_go_back, state.can_go_forward, state.is_loading);
+    if (!state.title.empty()) SetWindowTextW(hwnd_, (utf::Utf8ToWideDisplay(state.title) + L" - Kelpie").c_str());
+  }
+  browser_state_ = state;
+  has_browser_state_ = true;
 }
 
 void Win32Shell::ShowToast(const std::wstring& message) {
-  if (hwnd_ == nullptr) return;
-  auto* payload = new std::wstring(message);
-  PostMessageW(hwnd_, kToastMessage, 0, reinterpret_cast<LPARAM>(payload));
+  if (hwnd_ != nullptr) PostMessageW(hwnd_, kToastMessage, 0, reinterpret_cast<LPARAM>(new std::wstring(message)));
 }
 
-void Win32Shell::Close() {
-  if (hwnd_ != nullptr) DestroyWindow(hwnd_);
+void Win32Shell::Close() { if (hwnd_ != nullptr) DestroyWindow(hwnd_); }
+
+bool Win32Shell::HandleKeyboardNavigation(const MSG& message) {
+  if (message.message != WM_KEYDOWN || message.wParam != VK_TAB || hwnd_ == nullptr) return false;
+  const std::vector<HWND> controls = FocusOrder();
+  if (controls.empty()) return false;
+  const HWND focused = GetFocus();
+  const auto found = std::find(controls.begin(), controls.end(), focused);
+  // A renderer child owns ordinary page Tab traversal. The shell only cycles
+  // controls after native chrome already owns keyboard focus.
+  if (focused == nullptr || focused == browser_view_->hwnd() ||
+      IsChild(browser_view_->hwnd(), focused) || found == controls.end()) {
+    return false;
+  }
+  const bool reverse = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+  std::size_t next = 0;
+  if (reverse) {
+    next = found == controls.begin() ? controls.size() - 1 : static_cast<std::size_t>(found - controls.begin() - 1);
+  } else {
+    next = static_cast<std::size_t>((found - controls.begin() + 1) % controls.size());
+  }
+  SetFocus(controls[next]);
+  return true;
 }
 
-LRESULT CALLBACK Win32Shell::WindowProc(HWND hwnd, UINT message, WPARAM wparam,
-                                        LPARAM lparam) {
-  auto* self =
-      reinterpret_cast<Win32Shell*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+LRESULT CALLBACK Win32Shell::WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+  auto* self = reinterpret_cast<Win32Shell*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (message == WM_NCCREATE) {
-    auto* create = reinterpret_cast<CREATESTRUCTW*>(lparam);
-    self = reinterpret_cast<Win32Shell*>(create->lpCreateParams);
+    self = static_cast<Win32Shell*>(reinterpret_cast<CREATESTRUCTW*>(lparam)->lpCreateParams);
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
     self->hwnd_ = hwnd;
   }
-  return self != nullptr ? self->HandleMessage(message, wparam, lparam)
-                         : DefWindowProcW(hwnd, message, wparam, lparam);
+  return self != nullptr ? self->HandleMessage(message, wparam, lparam) : DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+LRESULT CALLBACK Win32Shell::TabStripProc(HWND hwnd, UINT message, WPARAM wparam,
+                                          LPARAM lparam, UINT_PTR subclass_id,
+                                          DWORD_PTR reference_data) {
+  auto* self = reinterpret_cast<Win32Shell*>(reference_data);
+  const bool relayout = message == WM_HSCROLL || message == WM_MOUSEWHEEL ||
+                        message == WM_KEYDOWN || message == WM_LBUTTONUP ||
+                        message == TCM_SETCURFOCUS;
+  const LRESULT result = DefSubclassProc(hwnd, message, wparam, lparam);
+  if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(hwnd, &Win32Shell::TabStripProc, subclass_id);
+  } else if (relayout && self != nullptr) {
+    self->LayoutTabCloseButtons();
+  }
+  return result;
 }
 
 LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
   switch (message) {
     case WM_CREATE: {
       window_chrome_.Attach(hwnd_, instance_);
-      const ACCEL shortcuts[] = {
-          {FVIRTKEY | FCONTROL, 'T', IDM_NEW_TAB},
-          {FVIRTKEY | FCONTROL, 'W', IDM_CLOSE_TAB},
-          {FVIRTKEY | FCONTROL, 'L', IDM_FOCUS_URL},
-          {FVIRTKEY | FCONTROL, 'M', IDM_APP_MENU},
-          {FVIRTKEY | FCONTROL, VK_TAB, IDM_NEXT_TAB},
-          {FVIRTKEY | FCONTROL | FSHIFT, VK_TAB, IDM_PREVIOUS_TAB},
-      };
-      accelerators_ = CreateAcceleratorTableW(
-          const_cast<LPACCEL>(shortcuts), static_cast<int>(std::size(shortcuts)));
+      const ACCEL shortcuts[] = {{FVIRTKEY | FCONTROL, 'T', IDM_NEW_TAB}, {FVIRTKEY | FCONTROL, 'W', IDM_CLOSE_TAB},
+                                 {FVIRTKEY | FCONTROL, 'L', IDM_FOCUS_URL}, {FVIRTKEY | FCONTROL, VK_TAB, IDM_NEXT_TAB},
+                                 {FVIRTKEY | FCONTROL | FSHIFT, VK_TAB, IDM_PREVIOUS_TAB}};
+      accelerators_ = CreateAcceleratorTableW(const_cast<LPACCEL>(shortcuts), static_cast<int>(std::size(shortcuts)));
       RECT rect{};
       GetClientRect(hwnd_, &rect);
-      tab_strip_ = CreateWindowExW(
-          0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | TCS_TABS | TCS_FOCUSNEVER,
-          8, 2, 300, kTabHeight, hwnd_, reinterpret_cast<HMENU>(IDC_TAB_STRIP),
-          instance_, nullptr);
-      new_tab_button_ = CreateWindowExW(
-          0, L"BUTTON", L"+", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 28,
-          26, hwnd_, reinterpret_cast<HMENU>(IDC_NEW_TAB_BUTTON), instance_,
-          nullptr);
-      close_tab_button_ = CreateWindowExW(
-          0, L"BUTTON", L"x", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 28,
-          26, hwnd_, reinterpret_cast<HMENU>(IDC_CLOSE_TAB_BUTTON), instance_,
-          nullptr);
+      // TCS_FIXEDWIDTH is what makes TabCtrl_SetItemSize mean anything: without
+      // it the control sizes each tab to its own label, so pills come out
+      // ragged and the shared-width rule never applies.
+      tab_strip_ = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+                                   TCS_BUTTONS | TCS_FLATBUTTONS | TCS_OWNERDRAWFIXED |
+                                   TCS_FIXEDWIDTH,
+                                   0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_TAB_STRIP), instance_, nullptr);
+      SetWindowSubclass(tab_strip_, &Win32Shell::TabStripProc, 1,
+                        reinterpret_cast<DWORD_PTR>(this));
+      new_tab_button_ = CreateWindowExW(0, L"BUTTON", L"New tab", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                                        0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(IDC_NEW_TAB_BUTTON), instance_, nullptr);
       url_bar_.Create(hwnd_, instance_, rect, delegate_);
       browser_view_->Create(hwnd_, instance_, rect, observer_);
       toast_.Create(hwnd_, instance_);
-      bookmarks_view_.SetNavigateCallback([this](const std::string& url) {
-        delegate_->OnNavigateRequested(url);
-      });
-      history_view_.SetNavigateCallback([this](const std::string& url) {
-        delegate_->OnNavigateRequested(url);
-      });
+      bookmarks_view_.SetNavigateCallback([this](const std::string& url) { delegate_->OnNavigateRequested(url); });
+      history_view_.SetNavigateCallback([this](const std::string& url) { delegate_->OnNavigateRequested(url); });
       LayoutChildren(rect.right, rect.bottom);
       RefreshTabs();
       return 0;
     }
     case WM_NCCALCSIZE:
-      if (wparam == TRUE) {
-        if (IsZoomed(hwnd_)) {
-          auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
-          MONITORINFO monitor_info{sizeof(monitor_info)};
-          const HMONITOR monitor =
-              MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
-          if (GetMonitorInfoW(monitor, &monitor_info))
-            params->rgrc[0] = monitor_info.rcWork;
-        }
-        return 0;
-      }
+      if (wparam == TRUE) return 0;
       break;
-    case WM_NCHITTEST:
-      return window_chrome_.HitTest(wparam, lparam);
+    case WM_NCHITTEST: return window_chrome_.HitTest(wparam, lparam);
+    case WM_GETMINMAXINFO: {
+      auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      info->ptMinTrackSize.x = ui::Dip(hwnd_, 720);
+      info->ptMinTrackSize.y = ui::Dip(hwnd_, 480);
+      return 0;
+    }
     case WM_SIZE:
-      if (wparam != SIZE_MINIMIZED)
-        LayoutChildren(LOWORD(lparam), HIWORD(lparam));
+      if (wparam != SIZE_MINIMIZED) LayoutChildren(LOWORD(lparam), HIWORD(lparam));
       window_chrome_.UpdateDwmFrame();
       return 0;
-    case WM_NOTIFY:
-      if (reinterpret_cast<NMHDR*>(lparam)->idFrom == IDC_TAB_STRIP &&
-          reinterpret_cast<NMHDR*>(lparam)->code == TCN_SELCHANGE) {
+    case ui::kDpiChangedMessage: {
+      const auto* suggested = reinterpret_cast<RECT*>(lparam);
+      SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
+                   suggested->bottom - suggested->top, SWP_NOACTIVATE | SWP_NOZORDER);
+      // Metrics and owned fonts are per-monitor, so a move between differently
+      // scaled displays has to rebuild them rather than rescale stale pixels.
+      ApplyAppearance();
+      return 0;
+    }
+    case WM_SETTINGCHANGE:
+    case WM_THEMECHANGED:
+    case WM_SYSCOLORCHANGE:
+      if (ui::IsAppearanceChange(message, lparam)) {
+        ui::InvalidateAppearanceCache();
+        ApplyAppearance();
+      }
+      break;
+    case WM_ACTIVATE: window_chrome_.SetActive(LOWORD(wparam) != WA_INACTIVE); break;
+    case WM_MOUSEMOVE: {
+      window_chrome_.TrackMouse({GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)});
+      break;
+    }
+    case WM_MOUSELEAVE: window_chrome_.TrackMouseLeave(); return 0;
+    case WM_PAINT: {
+      PAINTSTRUCT paint{};
+      HDC dc = BeginPaint(hwnd_, &paint);
+      PaintClient(dc);
+      EndPaint(hwnd_, &paint);
+      return 0;
+    }
+    case WM_PRINTCLIENT:
+      PaintClient(reinterpret_cast<HDC>(wparam));
+      return 0;
+    case WM_PRINT: return DefWindowProcW(hwnd_, message, wparam, lparam);
+    case WM_ERASEBKGND: return window_chrome_.EraseBackground(reinterpret_cast<HDC>(wparam));
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLOREDIT: {
+      HBRUSH brush = nullptr;
+      if (url_bar_.ControlColor(reinterpret_cast<HDC>(wparam), reinterpret_cast<HWND>(lparam), &brush)) return reinterpret_cast<LRESULT>(brush);
+      break;
+    }
+    case WM_DRAWITEM: {
+      const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
+      if (item != nullptr && DrawControl(*item)) return TRUE;
+      break;
+    }
+    case WM_NOTIFY: {
+      const auto* notice = reinterpret_cast<NMHDR*>(lparam);
+      if (notice != nullptr && notice->idFrom == IDC_TAB_STRIP && notice->code == TCN_SELCHANGE) {
+        LayoutTabCloseButtons();
         ActivateSelectedTab();
         return 0;
       }
       break;
-    case kDpiChangedMessage: {
-      window_chrome_.SetDpi(LOWORD(wparam));
-      const auto* suggested = reinterpret_cast<RECT*>(lparam);
-      SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top,
-                   suggested->right - suggested->left,
-                   suggested->bottom - suggested->top,
-                   SWP_NOACTIVATE | SWP_NOZORDER);
-      RECT rect{};
-      GetClientRect(hwnd_, &rect);
-      LayoutChildren(rect.right, rect.bottom);
-      window_chrome_.UpdateDwmFrame();
-      return 0;
     }
-    case WM_ACTIVATE:
-      window_chrome_.SetActive(LOWORD(wparam) != WA_INACTIVE);
-      break;
-    case WM_MOUSEMOVE: {
-      POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
-      window_chrome_.TrackMouse(point);
-      break;
-    }
-    case WM_MOUSELEAVE:
-      window_chrome_.TrackMouseLeave();
-      return 0;
-    case WM_PAINT: {
-      PAINTSTRUCT paint{};
-      HDC device_context = BeginPaint(hwnd_, &paint);
-      window_chrome_.Draw(device_context);
-      EndPaint(hwnd_, &paint);
-      return 0;
-    }
-    case WM_ERASEBKGND:
-      return window_chrome_.EraseBackground(reinterpret_cast<HDC>(wparam));
-    case WM_DRAWITEM: {
-      const auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
-      if (item != nullptr && window_chrome_.DrawControl(*item)) return TRUE;
-      break;
-    }
-    case WM_COMMAND:
-      if (url_bar_.HandleCommand(LOWORD(wparam), HIWORD(wparam))) return 0;
-      switch (LOWORD(wparam)) {
-        case IDC_WINDOW_CLOSE:
-          SendMessageW(hwnd_, WM_CLOSE, 0, 0);
-          return 0;
-        case IDC_WINDOW_MINIMIZE:
-          ShowWindow(hwnd_, SW_MINIMIZE);
-          return 0;
-        case IDC_WINDOW_MAXIMIZE:
-          ShowWindow(hwnd_, IsZoomed(hwnd_) ? SW_RESTORE : SW_MAXIMIZE);
-          return 0;
-        case IDC_BACK_BUTTON:
-          delegate_->OnBackRequested();
-          return 0;
-        case IDC_FORWARD_BUTTON:
-          delegate_->OnForwardRequested();
-          return 0;
-        case IDC_RELOAD_BUTTON:
-          delegate_->OnReloadRequested();
-          return 0;
-        case IDC_NEW_TAB_BUTTON:
-        case IDM_NEW_TAB:
-          delegate_->OnCreateTabRequested();
-          return 0;
-        case IDC_CLOSE_TAB_BUTTON:
-        case IDM_CLOSE_TAB:
-          CloseSelectedTab();
-          return 0;
-        case IDM_FOCUS_URL:
-          url_bar_.Focus();
-          return 0;
-        case IDM_NEXT_TAB:
-          ActivateAdjacentTab(1);
-          return 0;
-        case IDM_PREVIOUS_TAB:
-          ActivateAdjacentTab(-1);
-          return 0;
-        case IDC_SETTINGS_BUTTON:
-        case IDM_APP_MENU:
-          ShowAppMenu();
-          return 0;
-        case IDM_SETTINGS:
-          delegate_->OnOpenSettingsRequested();
-          return 0;
-        case IDM_VIEW_BOOKMARKS:
-          bookmarks_view_.EnsureCreated(instance_, hwnd_);
-          bookmarks_view_.UpdateFromJson(delegate_->GetBookmarksJson());
-          bookmarks_view_.ToggleVisible();
-          return 0;
-        case IDM_VIEW_HISTORY:
-          history_view_.EnsureCreated(instance_, hwnd_);
-          history_view_.UpdateFromJson(delegate_->GetHistoryJson());
-          history_view_.ToggleVisible();
-          return 0;
-        case IDM_VIEW_NETWORK:
-          network_view_.EnsureCreated(instance_, hwnd_);
-          network_view_.UpdateFromJson(delegate_->GetNetworkJson());
-          network_view_.ToggleVisible();
-          return 0;
-        default:
-          break;
-      }
-      break;
-    case WM_SETFOCUS:
-      browser_view_->Focus();
-      return 0;
-    case WM_TIMER:
-      if (wparam == kToastTimerId) {
-        KillTimer(hwnd_, kToastTimerId);
-        toast_.Hide();
+    case WM_COMMAND: {
+      const UINT id = LOWORD(wparam);
+      if (url_bar_.HandleCommand(id, HIWORD(wparam))) return 0;
+      if (IsTabClose(id)) {
+        const std::size_t index = id - kTabCloseFirst;
+        if (index < tab_close_buttons_.size()) delegate_->OnCloseTabRequested(tab_close_buttons_[index].id, tab_close_buttons_[index].generation);
         return 0;
       }
+      switch (id) {
+        case IDC_WINDOW_CLOSE: SendMessageW(hwnd_, WM_CLOSE, 0, 0); return 0;
+        case IDC_WINDOW_MINIMIZE: ShowWindow(hwnd_, SW_MINIMIZE); return 0;
+        case IDC_WINDOW_MAXIMIZE: ShowWindow(hwnd_, IsZoomed(hwnd_) ? SW_RESTORE : SW_MAXIMIZE); return 0;
+        case IDC_BACK_BUTTON: delegate_->OnBackRequested(); return 0;
+        case IDC_FORWARD_BUTTON: delegate_->OnForwardRequested(); return 0;
+        case IDC_RELOAD_BUTTON: delegate_->OnReloadRequested(); return 0;
+        case IDC_BOOKMARKS_BUTTON: ShowPanel(IDM_VIEW_BOOKMARKS); return 0;
+        case IDC_HISTORY_BUTTON: ShowPanel(IDM_VIEW_HISTORY); return 0;
+        case IDC_NETWORK_BUTTON: ShowPanel(IDM_VIEW_NETWORK); return 0;
+        case IDC_SETTINGS_BUTTON:
+        case IDM_SETTINGS: delegate_->OnOpenSettingsRequested(); return 0;
+        case IDC_NEW_TAB_BUTTON:
+        case IDM_NEW_TAB: delegate_->OnCreateTabRequested(); return 0;
+        case IDM_CLOSE_TAB: { const int selected = TabCtrl_GetCurSel(tab_strip_); if (selected >= 0) CloseTabAt(static_cast<std::size_t>(selected)); return 0; }
+        case IDM_FOCUS_URL: url_bar_.Focus(); return 0;
+        case IDM_NEXT_TAB: ActivateAdjacentTab(1); return 0;
+        case IDM_PREVIOUS_TAB: ActivateAdjacentTab(-1); return 0;
+        default: break;
+      }
+      break;
+    }
+    case WM_SETFOCUS:
+      if (GetFocus() == hwnd_) browser_view_->Focus();
+      return 0;
+    case WM_TIMER:
+      if (wparam == kToastTimerId) { KillTimer(hwnd_, kToastTimerId); toast_.Hide(); return 0; }
       break;
     case kToastMessage: {
-      std::unique_ptr<std::wstring> payload(
-          reinterpret_cast<std::wstring*>(lparam));
-      if (payload) {
-        toast_.ShowMessage(*payload);
-        KillTimer(hwnd_, kToastTimerId);
-        SetTimer(hwnd_, kToastTimerId, 3000, nullptr);
-      }
+      std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));
+      if (payload) { toast_.ShowMessage(*payload); KillTimer(hwnd_, kToastTimerId); SetTimer(hwnd_, kToastTimerId, 3000, nullptr); }
       return 0;
     }
-    case WM_SETTEXT:
+    case WM_SETTEXT: {
+      const LRESULT result = DefWindowProcW(hwnd_, message, wparam, lparam);
       InvalidateRect(hwnd_, nullptr, FALSE);
-      break;
-    case WM_CLOSE:
-      delegate_->OnWindowCloseRequested();
-      DestroyWindow(hwnd_);
-      return 0;
+      return result;
+    }
+    case WM_CLOSE: delegate_->OnWindowCloseRequested(); return 0;
     case WM_DESTROY:
-      if (accelerators_) {
-        DestroyAcceleratorTable(accelerators_);
-        accelerators_ = nullptr;
-      }
+      url_bar_.Destroy();
+      if (accelerators_ != nullptr) DestroyAcceleratorTable(accelerators_);
       PostQuitMessage(0);
       return 0;
-    default:
-      break;
+    default: break;
   }
   return DefWindowProcW(hwnd_, message, wparam, lparam);
 }
 
-void Win32Shell::ShowAppMenu() {
-  HMENU menu = CreatePopupMenu();
-  AppendMenuW(menu, MF_STRING, IDM_VIEW_BOOKMARKS, L"Bookmarks");
-  AppendMenuW(menu, MF_STRING, IDM_VIEW_HISTORY, L"History");
-  AppendMenuW(menu, MF_STRING, IDM_VIEW_NETWORK, L"Network Inspector");
-  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-  AppendMenuW(menu, MF_STRING, IDM_SETTINGS, L"Settings");
-  RECT anchor{};
-  GetWindowRect(GetDlgItem(hwnd_, IDC_SETTINGS_BUTTON), &anchor);
-  const UINT command =
-      TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTALIGN | TPM_TOPALIGN,
-                     anchor.right, anchor.bottom, 0, hwnd_, nullptr);
-  DestroyMenu(menu);
-  if (command != 0) SendMessageW(hwnd_, WM_COMMAND, command, 0);
+void Win32Shell::ShowPanel(UINT command) {
+  if (command == IDM_VIEW_BOOKMARKS) { bookmarks_view_.EnsureCreated(instance_, hwnd_); bookmarks_view_.UpdateFromJson(delegate_->GetBookmarksJson()); bookmarks_view_.ToggleVisible(); }
+  if (command == IDM_VIEW_HISTORY) { history_view_.EnsureCreated(instance_, hwnd_); history_view_.UpdateFromJson(delegate_->GetHistoryJson()); history_view_.ToggleVisible(); }
+  if (command == IDM_VIEW_NETWORK) { network_view_.EnsureCreated(instance_, hwnd_); network_view_.UpdateFromJson(delegate_->GetNetworkJson()); network_view_.ToggleVisible(); }
+}
+
+void Win32Shell::ApplyAppearance() {
+  if (hwnd_ == nullptr) return;
+  window_chrome_.UpdateDwmFrame();
+  url_bar_.RefreshTheme();
+  RECT rect{};
+  GetClientRect(hwnd_, &rect);
+  LayoutChildren(rect.right, rect.bottom);
+  // Owner-drawn children cache nothing, but the native EDIT and ListView
+  // controls keep their own themed brushes and must be told to redraw.
+  RedrawWindow(hwnd_, nullptr, nullptr,
+               RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+}
+
+void Win32Shell::ApplyTabMetrics() {
+  if (tab_strip_ == nullptr || hwnd_ == nullptr) return;
+  RECT strip{};
+  GetWindowRect(tab_strip_, &strip);
+  const int strip_width = strip.right - strip.left;
+  if (strip_width <= 0) return;
+  TabCtrl_SetItemSize(tab_strip_, TabWidthFor(strip_width),
+                      ui::Dip(hwnd_, 34) - ui::Dip(hwnd_, 2));
+  LayoutTabCloseButtons();
+}
+
+int Win32Shell::TabWidthFor(int strip_width) const {
+  // Mirrors TabBarCoordinator.relayout in the macOS app: pills share the
+  // available width, clamped so a lone tab does not stretch across the window
+  // and a crowded strip stays readable and scrolls instead of shrinking away.
+  const int minimum = ui::Dip(hwnd_, kTabMinWidthDip);
+  const int maximum = ui::Dip(hwnd_, kTabMaxWidthDip);
+  const int count = static_cast<int>(tabs_.size());
+  if (count <= 0 || strip_width <= 0) return maximum;
+  return std::clamp(strip_width / count, minimum, maximum);
 }
 
 void Win32Shell::LayoutChildren(int width, int height) {
   window_chrome_.LayoutControls();
   const int inset = window_chrome_.Inset();
-  const int title_bar_height = window_chrome_.TitleBarHeight();
-  const int tab_top = title_bar_height + 2;
-  const int tab_left = inset + 8;
-  const int controls_right = std::max(tab_left + 80, width - inset - 8);
-  SetWindowPos(new_tab_button_, nullptr, controls_right - 60, tab_top + 2, 28,
-               26, SWP_NOZORDER);
-  SetWindowPos(close_tab_button_, nullptr, controls_right - 28, tab_top + 2,
-               28, 26, SWP_NOZORDER);
-  SetWindowPos(tab_strip_, nullptr, tab_left, tab_top,
-               std::max(40, controls_right - tab_left - 68), kTabHeight,
+  const int title = window_chrome_.TitleBarHeight();
+  RECT toolbar{inset, title, width - inset, height - inset};
+  url_bar_.Resize(toolbar);
+  const int tab_top = title + url_bar_.Height();
+  const int tab_height = ui::Dip(hwnd_, 34);
+  const int padding = ui::Dip(hwnd_, 12);
+  const int new_width = ui::Dip(hwnd_, 34);
+  const int strip_width =
+      std::max(ui::Dip(hwnd_, 120), width - (2 * padding) - new_width - inset);
+  SetWindowPos(tab_strip_, nullptr, inset + padding, tab_top, strip_width, tab_height,
                SWP_NOZORDER);
-  const int content_top = title_bar_height + kTabHeight;
-  RECT rect{inset, content_top, width - inset, height - inset};
-  url_bar_.Resize(rect);
-  RECT browser_rect{inset, content_top + url_bar_.Height(), width - inset,
-                    height - inset};
-  browser_view_->Resize(browser_rect);
-  toast_.Resize(rect);
+  SetWindowPos(new_tab_button_, nullptr, width - inset - padding - new_width, tab_top, new_width,
+               tab_height, SWP_NOZORDER);
+  ApplyTabMetrics();
+  LayoutTabCloseButtons();
+  RECT browser{inset, tab_top + tab_height, width - inset, height - inset};
+  browser_view_->Resize(browser);
+  toast_.Resize(browser);
   InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void Win32Shell::PaintClient(HDC device_context) const {
+  window_chrome_.Draw(device_context);
+  url_bar_.Paint(device_context);
 }
 
 bool Win32Shell::RefreshTabs() {
   if (tab_strip_ == nullptr || delegate_ == nullptr) return false;
-  const nlohmann::json parsed =
-      nlohmann::json::parse(delegate_->GetTabsJson(), nullptr, false);
-  const nlohmann::json* entries =
-      parsed.is_object() && parsed.contains("tabs") ? &parsed["tabs"] : &parsed;
+  const nlohmann::json parsed = nlohmann::json::parse(delegate_->GetTabsJson(), nullptr, false);
+  const nlohmann::json* entries = parsed.is_object() && parsed.contains("tabs") ? &parsed["tabs"] : &parsed;
   if (!entries->is_array()) return false;
-  const int previous = TabCtrl_GetCurSel(tab_strip_);
-  const std::string previous_active = active_tab_id_;
-  tabs_.clear();
-  TabCtrl_DeleteAllItems(tab_strip_);
-  int active = -1;
-  int index = 0;
+  std::vector<TabItem> next;
+  std::string active;
   for (const auto& entry : *entries) {
     if (!entry.is_object()) continue;
     const std::string id = entry.value("id", "");
@@ -369,52 +367,151 @@ bool Win32Shell::RefreshTabs() {
     std::string label = entry.value("title", "");
     if (label.empty()) label = entry.value("url", "");
     if (label.empty()) label = "New tab";
-    std::wstring text = utf::Utf8ToWideDisplay(label);
+    const bool selected = entry.value("active", false);
+    next.push_back({id, entry.value("generation", std::uint64_t{0}), label, selected});
+    if (selected) active = id;
+  }
+  if (SameTabs(tabs_, next) && active_tab_id_ == active) return false;
+  const bool active_changed = active_tab_id_ != active;
+  tabs_ = std::move(next);
+  active_tab_id_ = active;
+  TabCtrl_DeleteAllItems(tab_strip_);
+  int selected = -1;
+  for (std::size_t index = 0; index < tabs_.size(); ++index) {
+    std::wstring text = utf::Utf8ToWideDisplay(tabs_[index].label);
     TCITEMW item{};
     item.mask = TCIF_TEXT;
     item.pszText = text.data();
-    TabCtrl_InsertItem(tab_strip_, index, &item);
-    tabs_.push_back({id, entry.value("generation", std::uint64_t{0})});
-    if (entry.value("active", false)) {
-      active = index;
-      active_tab_id_ = id;
-    }
-    ++index;
+    TabCtrl_InsertItem(tab_strip_, static_cast<int>(index), &item);
+    if (tabs_[index].active) selected = static_cast<int>(index);
   }
-  TabCtrl_SetCurSel(tab_strip_,
-                    active >= 0 ? active
-                                : previous >= 0 && previous < index ? previous
-                                                                  : 0);
-  EnableWindow(close_tab_button_, index > 0 ? TRUE : FALSE);
-  if (active < 0) active_tab_id_.clear();
-  return previous_active != active_tab_id_;
+  TabCtrl_SetCurSel(tab_strip_, selected >= 0 ? selected : 0);
+  ApplyTabMetrics();
+  RebuildTabCloseButtons();
+  return active_changed;
+}
+
+void Win32Shell::RebuildTabCloseButtons() {
+  for (const auto& button : tab_close_buttons_) if (button.hwnd != nullptr) DestroyWindow(button.hwnd);
+  tab_close_buttons_.clear();
+  for (std::size_t index = 0; index < tabs_.size() && index < 256; ++index) {
+    const auto& tab = tabs_[index];
+    const std::wstring title = utf::Utf8ToWideDisplay(tab.label);
+    HWND button = CreateWindowExW(0, L"BUTTON", (L"Close " + title).c_str(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+                                  0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kTabCloseFirst + index)), instance_, nullptr);
+    tab_close_buttons_.push_back({button, tab.id, tab.generation});
+  }
+  RECT rect{};
+  GetClientRect(hwnd_, &rect);
+  LayoutChildren(rect.right, rect.bottom);
+}
+
+void Win32Shell::LayoutTabCloseButtons() {
+  RECT strip{};
+  GetClientRect(tab_strip_, &strip);
+  MapWindowPoints(tab_strip_, hwnd_, reinterpret_cast<POINT*>(&strip), 2);
+  HWND scroll = FindWindowExW(tab_strip_, nullptr, UPDOWN_CLASSW, nullptr);
+  if (scroll != nullptr && (GetWindowLongPtrW(scroll, GWL_STYLE) & WS_VISIBLE) != 0) {
+    RECT scroll_rect{};
+    GetWindowRect(scroll, &scroll_rect);
+    MapWindowPoints(HWND_DESKTOP, hwnd_, reinterpret_cast<POINT*>(&scroll_rect), 2);
+    strip.right = std::min(strip.right, scroll_rect.left);
+  }
+  for (std::size_t index = 0; index < tab_close_buttons_.size(); ++index) {
+    RECT item{};
+    if (!TabCtrl_GetItemRect(tab_strip_, static_cast<int>(index), &item)) {
+      ShowWindow(tab_close_buttons_[index].hwnd, SW_HIDE);
+      continue;
+    }
+    MapWindowPoints(tab_strip_, hwnd_, reinterpret_cast<POINT*>(&item), 2);
+    const int size = ui::Dip(hwnd_, 18);
+    const int left = item.right - size - ui::Dip(hwnd_, 5);
+    const bool visible = left >= strip.left && left + size <= strip.right &&
+                         item.top >= strip.top && item.bottom <= strip.bottom;
+    if (!visible) {
+      ShowWindow(tab_close_buttons_[index].hwnd, SW_HIDE);
+      continue;
+    }
+    SetWindowPos(tab_close_buttons_[index].hwnd, HWND_TOP, item.right - size - ui::Dip(hwnd_, 5),
+                 item.top + (item.bottom - item.top - size) / 2, size, size,
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  }
+}
+
+bool Win32Shell::DrawControl(const DRAWITEMSTRUCT& item) const {
+  if (window_chrome_.DrawControl(item) || url_bar_.DrawControl(item)) return true;
+  const auto colors = ui::Colors();
+  if (item.CtlID == IDC_NEW_TAB_BUTTON) {
+    ui::PaintRounded(item.hDC, item.rcItem, colors.surface, colors.border, ui::Dip(hwnd_, 8));
+    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, ui::icon::kNewTab, colors.text);
+    return true;
+  }
+  if (IsTabClose(item.CtlID)) {
+    const bool pressed = (item.itemState & ODS_SELECTED) != 0;
+    ui::PaintRounded(item.hDC, item.rcItem, pressed ? colors.surface_hover : colors.surface, colors.border, ui::Dip(hwnd_, 4));
+    ui::DrawGlyph(item.hDC, hwnd_, item.rcItem, ui::icon::kClose, colors.muted_text, 10);
+    return true;
+  }
+  if (item.CtlID != IDC_TAB_STRIP || item.itemID >= tabs_.size()) return false;
+  const TabItem& tab = tabs_[item.itemID];
+  const bool selected = tab.active || (item.itemState & ODS_SELECTED) != 0;
+  // The macOS active pill is selectedControlColor at 8% over the bar, which is
+  // the accent blended towards the canvas rather than a separate literal.
+  const COLORREF selected_fill =
+      ui::HighContrast() ? GetSysColor(COLOR_HIGHLIGHT) : ui::Blend(colors.accent, colors.canvas, 0.12);
+  ui::PaintRounded(item.hDC, item.rcItem, selected ? selected_fill : colors.canvas,
+                   selected ? colors.focus : colors.border, ui::Dip(hwnd_, 8));
+  RECT text = item.rcItem;
+  text.left += ui::Dip(hwnd_, 10);
+  text.right -= ui::Dip(hwnd_, 28);
+  const COLORREF title_color = ui::HighContrast() && selected
+                                   ? GetSysColor(COLOR_HIGHLIGHTTEXT)
+                                   : (selected ? colors.text : colors.muted_text);
+  const std::wstring title = utf::Utf8ToWideDisplay(tab.label);
+  // 12 DIP regular, truncating tail — the macOS tab title.
+  ui::DrawLabel(item.hDC, hwnd_, text, title.c_str(), title_color, 12, FW_NORMAL, DT_LEFT);
+  return true;
+}
+
+bool Win32Shell::SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right) {
+  if (left.size() != right.size()) return false;
+  for (std::size_t index = 0; index < left.size(); ++index) {
+    if (left[index].id != right[index].id || left[index].generation != right[index].generation ||
+        left[index].label != right[index].label || left[index].active != right[index].active) return false;
+  }
+  return true;
 }
 
 void Win32Shell::ActivateAdjacentTab(int direction) {
   if (tabs_.empty()) return;
   const int current = std::max(0, TabCtrl_GetCurSel(tab_strip_));
-  const int next =
-      (current + direction + static_cast<int>(tabs_.size())) %
-      static_cast<int>(tabs_.size());
-  TabCtrl_SetCurSel(tab_strip_, next);
+  TabCtrl_SetCurSel(tab_strip_, (current + direction + static_cast<int>(tabs_.size())) % static_cast<int>(tabs_.size()));
   ActivateSelectedTab();
 }
 
 void Win32Shell::ActivateSelectedTab() {
   const int selected = TabCtrl_GetCurSel(tab_strip_);
   if (selected >= 0 && static_cast<std::size_t>(selected) < tabs_.size()) {
-    const TabItem& tab = tabs_[static_cast<std::size_t>(selected)];
+    const auto& tab = tabs_[selected];
     delegate_->OnActivateTabRequested(tab.id, tab.generation);
     browser_view_->Focus();
   }
 }
 
-void Win32Shell::CloseSelectedTab() {
-  const int selected = TabCtrl_GetCurSel(tab_strip_);
-  if (selected >= 0 && static_cast<std::size_t>(selected) < tabs_.size()) {
-    const TabItem& tab = tabs_[static_cast<std::size_t>(selected)];
-    delegate_->OnCloseTabRequested(tab.id, tab.generation);
+void Win32Shell::CloseTabAt(std::size_t index) {
+  if (index < tabs_.size()) delegate_->OnCloseTabRequested(tabs_[index].id, tabs_[index].generation);
+}
+
+std::vector<HWND> Win32Shell::FocusOrder() const {
+  std::vector<HWND> controls = window_chrome_.FocusableControls();
+  const std::vector<HWND> toolbar = url_bar_.FocusableControls();
+  controls.insert(controls.end(), toolbar.begin(), toolbar.end());
+  if (tab_strip_ != nullptr && IsWindowVisible(tab_strip_) && IsWindowEnabled(tab_strip_)) controls.push_back(tab_strip_);
+  for (const TabCloseButton& button : tab_close_buttons_) {
+    if (button.hwnd != nullptr && IsWindowVisible(button.hwnd) && IsWindowEnabled(button.hwnd)) controls.push_back(button.hwnd);
   }
+  if (new_tab_button_ != nullptr && IsWindowVisible(new_tab_button_) && IsWindowEnabled(new_tab_button_)) controls.push_back(new_tab_button_);
+  return controls;
 }
 
 }  // namespace kelpie::windows

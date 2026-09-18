@@ -1,5 +1,6 @@
 #include "kelpie/desktop_app.h"
 
+#include <chrono>
 #include <memory>
 #include <thread>
 
@@ -100,6 +101,7 @@ class DesktopApp::Impl {
  public:
   Config config;
   bool running = false;
+  std::string last_error;
 
   BookmarkStore bookmark_store;
   HistoryStore history_store;
@@ -112,7 +114,6 @@ class DesktopApp::Impl {
   DesktopMcpServer mcp_server;
   McpRegistry mcp_registry;
 
-  std::thread mcp_thread;
   std::unique_ptr<HandlerContext> handler_context;
 
   std::unique_ptr<NavigationHandler> navigation_handler;
@@ -198,6 +199,7 @@ class DesktopApp::Impl {
     } else if (config.platform != Platform::kWindows) {
       runtime.reset_viewport = [this]() {
         engine.ResizeViewport(config.engine.viewport.width, config.engine.viewport.height);
+        return true;
       };
     }
     runtime.set_native_fullscreen = config.set_native_fullscreen;
@@ -275,20 +277,35 @@ class DesktopApp::Impl {
 DesktopApp::DesktopApp() : impl_(std::make_unique<Impl>()) {}
 
 DesktopApp::~DesktopApp() {
-  Stop();
+  // CEF can retain DesktopCefClient callbacks until every browser reports
+  // OnBeforeClose. Do not let member destruction invalidate that owner while a
+  // prior caller still has admitted HTTP work or an incomplete browser close.
+  BeginShutdown();
+  while (!IsShutdownReady()) {
+    impl_->engine.DoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  while (!Stop()) {
+    impl_->engine.DoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
 }
 
 bool DesktopApp::Start(const Config& config) {
   if (impl_->running) {
+    impl_->last_error = "The desktop runtime is already running";
     return false;
   }
-  // Windows agents use the CLI stdio proxy, which authenticates to the
-  // loopback HTTP transport from the protected readiness file. Native stdio
-  // cannot be stopped safely while blocked on process stdin.
-  if (config.platform == Platform::kWindows && config.start_stdio_mcp) {
+  // Stdio reads cannot be cancelled portably. The CLI is the supervised stdio
+  // proxy for all desktop runtimes; it reads the protected Windows readiness
+  // capability and forwards to authenticated HTTP. Refuse this unsafe legacy
+  // worker instead of detaching it during shutdown.
+  if (config.start_stdio_mcp) {
+    impl_->last_error = "Native stdio MCP is not supported";
     return false;
   }
 
+  impl_->last_error.clear();
   impl_->config = config;
   impl_->engine.SetConsoleSink([this](const nlohmann::json& event) {
     AppendConsole(impl_->console_store, event);
@@ -302,6 +319,7 @@ bool DesktopApp::Start(const Config& config) {
   });
 
   if (!impl_->engine.Initialize(config.engine)) {
+    impl_->last_error = impl_->engine.last_error();
     return false;
   }
 
@@ -321,19 +339,14 @@ bool DesktopApp::Start(const Config& config) {
   server_config.server_name = config.app_name;
   server_config.server_version = config.app_version;
   if (!impl_->http_server.Start(server_config)) {
-    impl_->engine.Shutdown();
+    impl_->last_error = "The loopback control listener did not start";
+    if (!impl_->engine.Shutdown()) {
+      impl_->last_error = impl_->engine.last_error();
+      // The engine retains live CEF callbacks until OnBeforeClose. Keep this
+      // owner alive so the Windows host can drain it before destruction.
+      impl_->running = true;
+    }
     return false;
-  }
-
-  if (config.start_stdio_mcp) {
-    impl_->mcp_thread = std::thread([this, config]() {
-      DesktopMcpServer::Config mcp_config;
-      mcp_config.platform = config.platform;
-      mcp_config.engine = config.engine_name;
-      mcp_config.server_name = config.app_name;
-      mcp_config.server_version = config.app_version;
-      impl_->mcp_server.Run(mcp_config);
-    });
   }
 
   if (config.mdns != nullptr) {
@@ -344,19 +357,28 @@ bool DesktopApp::Start(const Config& config) {
   return true;
 }
 
-void DesktopApp::Stop() {
-  if (!impl_->running) {
-    return;
-  }
+void DesktopApp::BeginShutdown() {
+  if (!impl_->running) return;
   if (impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();
   }
+  // This closes listener admission but does not join HTTP workers. The native
+  // owner loop keeps pumping CEF while already-admitted work retires.
+  impl_->http_server.BeginDrain();
+}
+
+bool DesktopApp::IsShutdownReady() const {
+  return !impl_->running || impl_->http_server.IsDrained();
+}
+
+bool DesktopApp::Stop() {
+  if (!impl_->running) return true;
+  BeginShutdown();
+  if (!IsShutdownReady()) return false;
+  if (!impl_->engine.Shutdown()) return false;
   impl_->http_server.Stop();
-  impl_->engine.Shutdown();
-  if (impl_->mcp_thread.joinable()) {
-    impl_->mcp_thread.detach();
-  }
   impl_->running = false;
+  return true;
 }
 
 void DesktopApp::Tick() {
@@ -365,6 +387,10 @@ void DesktopApp::Tick() {
 
 bool DesktopApp::is_running() const {
   return impl_->running;
+}
+
+const std::string& DesktopApp::last_error() const {
+  return impl_->last_error;
 }
 
 DesktopEngine& DesktopApp::engine() {

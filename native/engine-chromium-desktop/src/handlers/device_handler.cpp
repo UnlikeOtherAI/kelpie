@@ -13,7 +13,9 @@ nlohmann::json DeviceHandler::GetDeviceInfo() const {
   if (runtime_.device_info_provider == nullptr) {
     return Unsupported("get-device-info");
   }
-  return runtime_.device_info_provider->GetDeviceInfo();
+  // The router derives the HTTP status and the MCP isError flag from the
+  // `success` field, so a bare provider payload is read as a failed call.
+  return SuccessResponse(runtime_.device_info_provider->GetDeviceInfo());
 }
 
 nlohmann::json DeviceHandler::GetCapabilities() const {

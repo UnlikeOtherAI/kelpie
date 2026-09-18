@@ -55,10 +55,18 @@ nlohmann::json CookieHandler::GetCookies(const nlohmann::json& params) const {
 nlohmann::json CookieHandler::SetCookie(const nlohmann::json& params) const {
   try {
     RequireString(params, "name"); RequireString(params, "value", true);
-    TabLease lease; BrowserControlResult result = Resolve(runtime_, params, &lease);
+    nlohmann::json request = params;
+    if (request.contains("sameSite")) {
+      const std::string same_site = RequireString(request, "sameSite");
+      if (same_site == "Strict" || same_site == "strict") request["sameSite"] = "Strict";
+      else if (same_site == "Lax" || same_site == "lax") request["sameSite"] = "Lax";
+      else if (same_site == "None" || same_site == "none") request["sameSite"] = "None";
+      else return InvalidParams("sameSite must be Strict, Lax, or None");
+    }
+    TabLease lease; BrowserControlResult result = Resolve(runtime_, request, &lease);
     if (!result.ok) return ControlError(result);
     nlohmann::json output;
-    result = RequireBrowserControl(runtime_).SetCookies(lease, params, &output, ControlTimeout(params));
+    result = RequireBrowserControl(runtime_).SetCookies(lease, request, &output, ControlTimeout(request));
     if (!result.ok) return ControlError(result);
     return WithTab(result, {{"result", output}});
   } catch (const std::invalid_argument& e) { return InvalidParams(e.what()); }
@@ -67,7 +75,15 @@ nlohmann::json CookieHandler::SetCookie(const nlohmann::json& params) const {
 nlohmann::json CookieHandler::DeleteCookies(const nlohmann::json& params) const {
   try {
     const bool all = BoolOrDefault(params, "deleteAll", false);
-    if (!all) RequireString(params, "name");
+    const auto has_selector = [&params](const char* key) {
+      const auto value = params.find(key);
+      if (value == params.end()) return false;
+      if (!value->is_string()) throw std::invalid_argument(std::string(key) + " must be a string");
+      return !value->get<std::string>().empty();
+    };
+    if (!all && !has_selector("name") && !has_selector("domain")) {
+      return InvalidParams("delete-cookies requires name, domain, or deleteAll");
+    }
     TabLease lease; BrowserControlResult result = Resolve(runtime_, params, &lease);
     if (!result.ok) return ControlError(result);
     nlohmann::json output;
@@ -81,10 +97,11 @@ nlohmann::json CookieHandler::GetStorage(const nlohmann::json& params) const {
   try {
     const std::string type = StorageType(params, false);
     const std::string store = type == "session" ? "sessionStorage" : "localStorage";
-    std::string script = "(() => { const s=window." + store + "; const e={}; for(let i=0;i<s.length;i++){const k=s.key(i);e[k]=s.getItem(k);} return {type:"" + type + "",entries:e,count:Object.keys(e).length}; })()";
+    const std::string type_literal = JsStringLiteral(type);
+    std::string script = "(() => { const s=window." + store + "; const e={}; for(let i=0;i<s.length;i++){const k=s.key(i);e[k]=s.getItem(k);} return {type:" + type_literal + ",entries:e,count:Object.keys(e).length}; })()";
     if (params.contains("key")) {
       const std::string key = RequireString(params, "key");
-      script = "(() => { const s=window." + store + "; const k=" + JsStringLiteral(key) + "; const v=s.getItem(k); return {type:"" + type + "",entries:v===null?{}:{[k]:v},count:v===null?0:1}; })()";
+      script = "(() => { const s=window." + store + "; const k=" + JsStringLiteral(key) + "; const v=s.getItem(k); return {type:" + type_literal + ",entries:v===null?{}:{[k]:v},count:v===null?0:1}; })()";
     }
     nlohmann::json value; const BrowserControlResult result = EvaluateForTab(runtime_, params, script, &value);
     return result.ok ? SuccessResponse(value) : ControlError(result);

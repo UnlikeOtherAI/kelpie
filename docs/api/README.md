@@ -396,4 +396,4 @@ CLI MCP adds additional tools:
 Windows local browsers expose `/mcp` only on loopback with a per-launch bearer token read from a
 current-user ACL-protected readiness file. `kelpie_close_browser` requests orderly shutdown;
 `kelpie_press_key` sends trusted native key input. `kelpie_set_home`, `kelpie_toast`, and
-`kelpie_set_fullscreen` are callable only when the Windows shell configures their native callbacks.
+`kelpie_set_fullscreen` are callable only when the Windows shell configures their native callbacks. Windows `get-device-info` reports the bound loopback address, actual listener port, and loopback MCP transport; it does not advertise a LAN control endpoint.

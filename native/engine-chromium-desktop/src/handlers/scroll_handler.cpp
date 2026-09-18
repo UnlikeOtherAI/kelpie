@@ -17,7 +17,8 @@ void ScrollHandler::Register(DesktopRouter& router) const {
 
 nlohmann::json ScrollHandler::Scroll(const nlohmann::json& params) const {
   try {
-  const int delta_x = IntOrDefault(params, "deltaX", 0), delta_y = IntOrDefault(params, "deltaY", 0);
+  const double delta_x = RequireNumber(params, "deltaX");
+  const double delta_y = RequireNumber(params, "deltaY");
   const std::string script =
       "(() => {"
       "window.scrollBy(" + std::to_string(delta_x) + ", " + std::to_string(delta_y) + ");"
