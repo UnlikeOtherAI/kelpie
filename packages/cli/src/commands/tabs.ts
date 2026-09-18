@@ -1,5 +1,11 @@
 import type { Command } from "commander";
 import { deviceCommand } from "./helpers.js";
+import {
+  partitionFlagError,
+  partitionTabBody,
+  printValidationError,
+  type PartitionTabOptions,
+} from "./partition-options.js";
 
 export function registerTabs(program: Command): void {
   program
@@ -14,8 +20,17 @@ export function registerTabs(program: Command): void {
   tab
     .command("new [url]")
     .description("Open a new tab")
-    .action(async (url?: string) => {
-      const body: Record<string, unknown> = {};
+    .option("--name <label>", "Display label for the tab (max 200 characters)")
+    .option("--partition <id>", "Storage partition to isolate the tab's cookies and local storage")
+    .option("--ephemeral", "Keep the partition's storage in memory only (requires --partition)")
+    .option("--non-persistent", "Alias for --ephemeral")
+    .action(async (url: string | undefined, opts: PartitionTabOptions) => {
+      const invalid = partitionFlagError(opts);
+      if (invalid) {
+        printValidationError(program, invalid);
+        return;
+      }
+      const body = partitionTabBody(opts);
       if (url) body.url = url;
       await deviceCommand(program, "newTab", body);
     });

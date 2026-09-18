@@ -80,8 +80,16 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
 
-    override init() {
+    /// - Parameter dataStore: the partition's website data store, or `nil` for
+    ///   the shared default store. Supplied by the caller rather than resolved
+    ///   here so partition failures surface in the HTTP response instead of
+    ///   inside a renderer constructor. Every cookie/storage path already reads
+    ///   `webView.configuration.websiteDataStore`, so it follows automatically.
+    init(dataStore: WKWebsiteDataStore? = nil) {
         let config = WKWebViewConfiguration()
+        if let dataStore {
+            config.websiteDataStore = dataStore
+        }
 
         let ucc = config.userContentController
         // Inject network bridge FIRST (saves postMessage ref before console bridge masks messageHandlers)

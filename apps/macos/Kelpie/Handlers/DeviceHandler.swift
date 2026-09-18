@@ -211,6 +211,7 @@ private let macosCapabilityMethods = [
     "get-visible-elements", "get-page-text", "get-form-state",
     "get-dialog", "handle-dialog", "set-dialog-auto-handler",
     "get-tabs", "new-tab", "switch-tab", "close-tab",
+    "get-partitions", "delete-partition",
     "get-iframes", "switch-to-iframe", "switch-to-main", "get-iframe-context",
     "get-cookies", "set-cookie", "delete-cookies",
     "get-storage", "set-storage", "clear-storage",

@@ -646,6 +646,80 @@ kelpie tab new --device "My iPhone"                         # blank tab
 
 The JSON response includes `tabId` for the created tab; `tab.id` contains the same value.
 
+| Flag | Meaning |
+|---|---|
+| `--name <label>` | Display label for the tab, at most 200 characters. Shown in the tab bar instead of the page title and returned by `kelpie tabs`. |
+| `--partition <id>` | Bind the tab to an isolated storage container. |
+| `--ephemeral` | Keep the partition's storage in memory only. Requires `--partition`. |
+| `--non-persistent` | Alias for `--ephemeral`. |
+
+```bash
+kelpie tab new "https://admin.example.com" --name "Sam (Engineering Lead)" --partition sam.eng-lead
+kelpie tab new "https://admin.example.com" --partition throwaway --ephemeral
+```
+
+Storage partitions give one device several independent logins on the same
+origin. Tabs created with the same `--partition` string share cookies and
+local storage; tabs with different strings are fully isolated from each other
+and from the default container. Omitting `--partition` leaves the tab in the
+shared default container, exactly as before.
+
+Partition identifiers are 1-128 characters drawn from `[A-Za-z0-9._-]`, must
+contain at least one letter or digit, and must not be `.`, `..`, `default`
+(case-insensitive) or start with `ephemeral-`. The CLI rejects a bad value
+before sending the request; the device validates independently.
+
+**Isolation is not parallelism.** Twelve partitions give you twelve
+independent identities on one device, driven one command at a time — requests
+still serialise on the app's main thread.
+
+Supported on macOS with the WebKit engine. On the Chromium engine the request
+fails with `PARTITION_UNSUPPORTED` and `reason: "chromium-engine"`; switch back
+with `kelpie renderer set webkit`. iOS, Android, Linux, and Windows do not
+support partitions yet.
+
+---
+
+## Partition Commands
+
+### `kelpie partitions`
+List storage partitions and how many tabs each holds.
+
+```bash
+kelpie partitions --device "My Mac"
+```
+
+```json
+{
+  "success": true,
+  "partitions": [
+    {"id": "sam.eng-lead", "tabCount": 2, "persistent": true},
+    {"id": "morgan.product", "tabCount": 1, "persistent": false}
+  ]
+}
+```
+
+Non-persistent partitions are listed too — they live as long as their tabs do.
+`sizeBytes` is included only where the engine can report it cheaply; macOS
+WebKit cannot, so it is omitted there.
+
+### `kelpie partition delete <id>`
+Delete a storage partition: close every tab bound to it, then wipe its cookies
+and local storage.
+
+```bash
+kelpie partition delete sam.eng-lead --device "My Mac"
+```
+
+```json
+{"success": true, "deleted": "sam.eng-lead", "tabsClosed": 2, "existed": true}
+```
+
+Idempotent — deleting an unknown id succeeds with `existed: false` and
+`tabsClosed: 0`. A `kelpie tab new --partition <id>` that arrives while the
+same id is being torn down fails with `PARTITION_DELETING`; retry once the
+delete returns.
+
 ### `kelpie tab switch <id>`
 Switch to a tab.
 

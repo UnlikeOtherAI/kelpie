@@ -166,6 +166,8 @@ const endpointToCliCommandAliases: Record<string, string> = {
   "set-dialog-auto-handler": "dialog auto",
   "get-tabs": "tabs",
   "new-tab": "tab new",
+  "get-partitions": "partitions",
+  "delete-partition": "partition delete",
   "switch-tab": "tab switch",
   "close-tab": "tab close",
   "get-iframes": "iframes",
