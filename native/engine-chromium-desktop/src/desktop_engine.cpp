@@ -17,6 +17,7 @@
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
 #include "include/cef_jsdialog_handler.h"
+#include "include/cef_task.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
 #include "kelpie/internal_scheme.h"
@@ -26,6 +27,29 @@
 
 namespace kelpie {
 
+namespace {
+
+#if defined(_WIN32)
+// A tab browser window is a child of the single application shell window, so
+// CEF's default close notification -- PostMessage(WM_CLOSE) to
+// GetAncestor(tab_window, GA_ROOT) -- would land on the application window and
+// read as a request to close the whole application. Closing a tab must destroy
+// only that tab's own host window.
+class DestroyTabHostWindowTask final : public CefTask {
+ public:
+  explicit DestroyTabHostWindowTask(HWND window) : window_(window) {}
+
+  void Execute() override {
+    if (window_ != nullptr && ::IsWindow(window_)) ::DestroyWindow(window_);
+  }
+
+ private:
+  HWND window_ = nullptr;
+  IMPLEMENT_REFCOUNTING(DestroyTabHostWindowTask);
+};
+#endif
+
+}  // namespace
 
 
 DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}

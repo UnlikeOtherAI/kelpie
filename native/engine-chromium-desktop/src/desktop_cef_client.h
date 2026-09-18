@@ -49,6 +49,7 @@ class DesktopCefClient final : public CefClient,
                      CefBrowserSettings& settings,
                      CefRefPtr<CefDictionaryValue>& extra_info,
                      bool* no_javascript_access) override;
+  bool DoClose(CefRefPtr<CefBrowser> browser) override;
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
   void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                             bool is_loading,
