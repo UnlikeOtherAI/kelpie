@@ -89,7 +89,8 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   void StoreFavicon(CefRefPtr<CefBrowser> browser, std::string png_base64);
   TabSnapshot Snapshot(const Tab& tab) const;
   BrowserControlResult RunOnUi(std::function<BrowserControlResult()> operation, Timeout timeout);
-  BrowserControlResult CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id = std::nullopt);
+  // An empty `requested_url` opens `kelpie://start`.
+  BrowserControlResult CreateTabOnUi(const std::string& requested_url, TabSnapshot* snapshot, std::optional<std::string> restored_id = std::nullopt);
   void UpdateActiveState();
 };
 

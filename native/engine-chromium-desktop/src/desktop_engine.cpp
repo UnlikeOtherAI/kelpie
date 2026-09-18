@@ -19,6 +19,7 @@
 #include "include/cef_jsdialog_handler.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
+#include "kelpie/internal_scheme.h"
 #include "desktop_cef_client.h"
 #include "desktop_engine_impl.h"
 #include "start_page_scheme.h"
@@ -109,8 +110,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   }
 
   CefBrowserSettings browser_settings;
+  // With nothing to restore and no configured home page, the first tab is the
+  // start page rather than a blank document, matching macOS and the `+` button.
   const std::string first_url = config.restored_tabs.empty() ?
-      (config.initial_url.empty() ? "about:blank" : config.initial_url) : config.restored_tabs.front().url;
+      (config.initial_url.empty() ? std::string(kStartPageUrl) : config.initial_url)
+      : config.restored_tabs.front().url;
   browser = CefBrowserHost::CreateBrowserSync(
       window_info,
       client.get(),

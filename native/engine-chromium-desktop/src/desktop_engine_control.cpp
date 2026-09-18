@@ -167,7 +167,11 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
   return TimeoutResult();
 }
 
-BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
+BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const std::string& requested_url, TabSnapshot* snapshot, std::optional<std::string> restored_id) {
+  // A tab with no URL opens Kelpie's start page, the same as macOS. This is the
+  // one place that decides it, so the `+` button, `new-tab` over HTTP/MCP, and
+  // the replacement tab after the last close all agree.
+  const std::string url = requested_url.empty() ? std::string(kStartPageUrl) : requested_url;
   if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
   if (!restored_id && next_tab_id == std::numeric_limits<std::uint64_t>::max()) {
     return BrowserControlResult::Failure("TAB_ID_EXHAUSTED", "No more tab identifiers are available");
@@ -345,7 +349,8 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     for (const auto& candidate : impl->tabs) if (!candidate.closing) ++live_tabs;
     if (live_tabs == 1) {
       TabSnapshot replacement;
-      const auto created = impl->CreateTabOnUi("about:blank", &replacement);
+      // Closing the last tab leaves the start page behind, matching macOS.
+      const auto created = impl->CreateTabOnUi(std::string(), &replacement);
       if (!created.ok) return created;
       impl->browser = impl->tabs.back().browser;
     } else if (was_active) {

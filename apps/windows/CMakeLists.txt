@@ -86,6 +86,8 @@ set(WINDOWS_APP_SOURCES
   src/window_chrome.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
+  src/favicon_cache.cpp
+  src/letter_avatar.cpp
   src/settings_view.cpp
   src/bookmarks_view.cpp
   src/history_view.cpp
@@ -106,6 +108,8 @@ set(WINDOWS_APP_HEADERS
   src/window_chrome.h
   src/win32_browser_view.h
   src/url_bar.h
+  src/favicon_cache.h
+  src/letter_avatar.h
   src/settings_view.h
   src/bookmarks_view.h
   src/history_view.h
@@ -171,6 +175,8 @@ target_link_libraries(kelpie
     nlohmann_json::nlohmann_json
     user32
     gdi32
+    gdiplus
+    msimg32
     dwmapi
     shell32
     ws2_32
@@ -299,6 +305,33 @@ if(BUILD_TESTING)
     target_compile_options(kelpie_windows_startup_diagnostics_test PRIVATE -UNDEBUG)
   endif()
   add_test(NAME kelpie_windows_startup_diagnostics_test COMMAND kelpie_windows_startup_diagnostics_test)
+  # The favicon cache and the letter avatar are Win32/GDI+ only — no CEF — so
+  # both configurations build and run these.
+  add_executable(kelpie_windows_letter_avatar_test
+    tests/letter_avatar_test.cpp
+    src/letter_avatar.cpp)
+  target_include_directories(kelpie_windows_letter_avatar_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_letter_avatar_test PRIVATE user32 gdi32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_letter_avatar_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_letter_avatar_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_letter_avatar_test COMMAND kelpie_windows_letter_avatar_test)
+
+  add_executable(kelpie_windows_favicon_cache_test
+    tests/favicon_cache_test.cpp
+    src/favicon_cache.cpp
+    src/letter_avatar.cpp)
+  target_include_directories(kelpie_windows_favicon_cache_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_favicon_cache_test PRIVATE user32 gdi32 gdiplus msimg32 ole32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_favicon_cache_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_favicon_cache_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_favicon_cache_test COMMAND kelpie_windows_favicon_cache_test)
+
   add_executable(kelpie_windows_close_lifecycle_test tests/close_lifecycle_test.cpp)
   target_include_directories(kelpie_windows_close_lifecycle_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   if(MSVC)
