@@ -53,6 +53,10 @@ void RunUiOperation(std::shared_ptr<UiOperation> operation) {
   operation->ready.notify_all();
 }
 
+// Never leaves the engine: DesktopEngine::CreateTab either retries past it or
+// rewrites it into a real error.
+constexpr const char* kPartitionNotReady = "PARTITION_NOT_READY";
+
 bool IsNavigableUrl(const std::string& url) {
   if (url.empty()) return false;
   CefURLParts parts;
@@ -211,6 +215,13 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const NewTabRequest& req
       return BrowserControlResult::Failure("WEBVIEW_ERROR",
                                            "Chromium could not create the storage partition");
     }
+    if (!partition->ready()) {
+      // Internal sentinel. DesktopEngine::CreateTab retries off the UI thread
+      // until the store has loaded; nothing else can wait here, because the
+      // callback that flips this flag arrives on this very thread.
+      return BrowserControlResult::Failure(kPartitionNotReady,
+                                           "The storage partition is still loading");
+    }
     request_context = partition->context;
   }
   CefWindowInfo window_info;
@@ -363,11 +374,25 @@ BrowserControlResult DesktopEngine::CreateTab(const NewTabRequest& request, TabS
                                               Timeout timeout) {
   const auto impl = impl_;
   auto created = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, request, created] {
-    return impl->CreateTabOnUi(request, created.get());
-  }, timeout);
-  if (result.ok && tab) *tab = *created;
-  return result;
+  const auto started = std::chrono::steady_clock::now();
+  BrowserControlResult result;
+  // The first tab in a new persistent partition has to wait for Chromium to
+  // load that store. Waiting here, on the calling thread, keeps the UI thread
+  // free to do the loading.
+  while (true) {
+    const auto remaining = RemainingTimeout(started, timeout);
+    if (remaining <= Timeout::zero()) break;
+    result = impl->RunOnUi([impl, request, created] {
+      return impl->CreateTabOnUi(request, created.get());
+    }, remaining);
+    if (result.ok || result.error_code != kPartitionNotReady) {
+      if (result.ok && tab) *tab = *created;
+      return result;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  return BrowserControlResult::Failure(
+      "WEBVIEW_ERROR", "The storage partition did not finish loading in time");
 }
 
 BrowserControlResult DesktopEngine::GetPartitions(std::vector<PartitionInfo>* output,
@@ -465,15 +490,28 @@ BrowserControlResult DesktopEngine::DeletePartition(const std::string& id,
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
-  auto released = std::make_shared<bool>(false);
-  const auto removed = impl->RunOnUi([impl, id, released] {
+  auto partitions_root = std::make_shared<std::string>();
+  const auto removed = impl->RunOnUi([impl, id, partitions_root] {
+    *partitions_root = impl->partitions.root();
     impl->partitions.Erase(id);
-    *released = impl->partitions.RemoveStorage(id);
     return BrowserControlResult::Success();
   }, timeout);
   if (!removed.ok) return removed;
+  // Chromium keeps the profile's files open briefly after the context is
+  // released, so the first unlink loses a race it wins a moment later.
+  // Retrying here, off the owner thread, is what turns the common case into a
+  // real deletion rather than a trashed directory and a PARTITION_IN_USE.
+  // Its own small budget: the wait above may already have spent the caller's,
+  // and giving up instantly here is what leaves a directory in the trash.
+  const auto removal_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  bool released = false;
+  do {
+    released = DesktopPartitionRegistry::RemoveStorage(*partitions_root, id);
+    if (released) break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  } while (std::chrono::steady_clock::now() < removal_deadline);
   *deletion = *outcome;
-  if (!*released) {
+  if (!released) {
     // The id is freed either way. The caller must not be told the data is gone
     // while Chromium still owns the files.
     return BrowserControlResult::Failure(

@@ -139,6 +139,17 @@ partition id from colliding with Chromium's own directories, and leaving
 `root_cache_path` on the cache directory means no existing profile's default
 store moves.
 
+**The first tab in a new persistent partition waits for its store.** Chromium
+loads the profile asynchronously and refuses to create a browser in a context
+that has not finished, so `new-tab` blocks until the store is ready, within the
+request's `timeout`. Later tabs in the same partition return immediately. A
+non-persistent partition has nothing to load.
+
+**Session cookies are not persisted**, in a partition or in the default store —
+that is Chromium's own behaviour, not a partition limitation. A login that must
+survive a restart needs a cookie with an expiry; `localStorage` and IndexedDB
+persist either way.
+
 `window.open` inherits the opener's context. Windows cancels the CEF popup and
 reopens the target as one of its own tabs, so the opener's partition is copied
 onto the new tab explicitly — an isolated tab cannot open its way out of its

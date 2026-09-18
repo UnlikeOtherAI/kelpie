@@ -90,6 +90,9 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     request.url = url;
     return CreateTabOnUi(request, snapshot, std::move(restored_id));
   }
+  // Pumps the CEF loop until a partition's store has loaded. Only callable
+  // from the UI thread outside a CEF callback -- startup, in practice.
+  bool WaitForPartition(DesktopPartitionRegistry::Entry* entry);
   // Rebuilds every partition's tab count from the live tab list and drops
   // entries no tab is bound to any more. Counts are never carried forward
   // from a previous read, so a crashed or force-closed tab cannot inflate one.

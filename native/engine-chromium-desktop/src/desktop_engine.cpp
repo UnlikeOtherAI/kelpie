@@ -103,6 +103,16 @@ class DesktopCefClient final : public CefClient,
 
 DesktopEngine::Impl::Impl(CefRenderer* next_renderer) : renderer(next_renderer) {}
 
+bool DesktopEngine::Impl::WaitForPartition(DesktopPartitionRegistry::Entry* entry) {
+  if (entry == nullptr) return false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (!entry->ready() && std::chrono::steady_clock::now() < deadline) {
+    CefDoMessageLoopWork();
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+  return entry->ready();
+}
+
 bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
   if (initialized) {
     return true;
@@ -195,8 +205,12 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     first_name = first.name;
     if (first.partition) {
       if (auto* entry = partitions.Acquire(*first.partition, first.persistent)) {
-        first_context = entry->context;
-        first_partition = entry->id;
+        // Startup owns the UI thread outright and is not inside a CEF callback,
+        // so it is the one place that can pump the loop while a store loads.
+        if (WaitForPartition(entry)) {
+          first_context = entry->context;
+          first_partition = entry->id;
+        }
       }
     }
   }
@@ -223,6 +237,11 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
         : std::max<std::uint64_t>(config.restored_next_tab_id, 2);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
       const DesktopEngine::RestoredTab& restored = config.restored_tabs[index];
+      if (restored.partition) {
+        if (auto* entry = partitions.Acquire(*restored.partition, restored.persistent)) {
+          WaitForPartition(entry);
+        }
+      }
       NewTabRequest request;
       request.url = restored.url;
       request.name = restored.name;

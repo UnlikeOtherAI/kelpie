@@ -62,12 +62,14 @@ DesktopPartitionRegistry::Entry* DesktopPartitionRegistry::Acquire(const std::st
   }
   // An empty cache_path is CEF's in-memory context, which is exactly what a
   // non-persistent partition needs: the data never reaches the disk.
-  CefRefPtr<CefRequestContext> context = CefRequestContext::CreateContext(settings, nullptr);
+  CefRefPtr<PartitionContextHandler> handler = new PartitionContextHandler();
+  CefRefPtr<CefRequestContext> context = CefRequestContext::CreateContext(settings, handler);
   if (!context) return nullptr;
 
   Entry entry;
   entry.id = id;
   entry.context = context;
+  entry.handler = handler;
   entry.persistent = on_disk;
   auto inserted = entries_.emplace(id, std::move(entry));
   return &inserted.first->second;
@@ -88,19 +90,20 @@ std::vector<DesktopPartitionRegistry::Entry*> DesktopPartitionRegistry::Entries(
   return all;
 }
 
-bool DesktopPartitionRegistry::RemoveStorage(const std::string& id) const {
-  const std::string directory = DirectoryFor(id);
-  if (directory.empty()) return true;
+bool DesktopPartitionRegistry::RemoveStorage(const std::string& root, const std::string& id) {
+  if (root.empty()) return true;
+  const std::filesystem::path directory =
+      std::filesystem::path(root) / (kPartitionDirectoryPrefix + id);
   std::error_code error;
   if (!std::filesystem::exists(directory, error)) return true;
   std::filesystem::remove_all(directory, error);
   if (!error) return true;
 
   std::error_code trash_error;
-  std::filesystem::create_directories(TrashRoot(root_), trash_error);
+  std::filesystem::create_directories(TrashRoot(root), trash_error);
   if (trash_error) return false;
   const std::filesystem::path grave =
-      TrashRoot(root_) / (kPartitionDirectoryPrefix + id + "-" + EpochSuffix());
+      TrashRoot(root) / (kPartitionDirectoryPrefix + id + "-" + EpochSuffix());
   std::filesystem::rename(directory, grave, trash_error);
   return !trash_error;
 }
