@@ -1,24 +1,59 @@
 import Foundation
 import AppKit
 import Combine
+import WebKit
+
+/// Everything a caller can ask for when opening a tab beyond its URL.
+///
+/// `dataStore` is resolved by the caller (the `new-tab` handler or the session
+/// restore) rather than looked up here, because resolution can fail — an
+/// invalid partition string, or one that is mid-teardown — and those failures
+/// have to reach the HTTP response, not a tab constructor.
+struct TabSpec {
+    var name: String?
+    var partition: String?
+    var persistent = true
+    var dataStore: WKWebsiteDataStore?
+}
 
 @MainActor
 final class Tab: ObservableObject, Identifiable {
     let id = UUID()
     let renderer: WKWebViewRenderer
 
+    /// Storage container this tab is bound to; `nil` means the shared default
+    /// store. Immutable: a tab cannot change identity mid-life, and a partition
+    /// only makes sense for the web view it was built with.
+    let partition: String?
+    /// `false` when the partition's storage is in-memory only. Always `true`
+    /// for an unpartitioned tab, which uses the persistent default store.
+    let persistent: Bool
+
+    /// Free-form display label. Published because the tab bar shows it in place
+    /// of the page title.
+    @Published var name: String?
     @Published var title: String = "Start Page"
     @Published var currentURL: String = ""
     @Published var isLoading: Bool = false
     @Published var favicon: NSImage?
     @Published var isStartPage: Bool = true
 
+    /// Label shown in the tab bar: the caller-supplied name when there is one,
+    /// otherwise the page title.
+    var displayLabel: String {
+        guard let name, !name.isEmpty else { return title }
+        return name
+    }
+
     private var lastHistoryURL: String = ""
     private var lastHistoryTitle: String = ""
     private var lastObservedHistoryClearGeneration = HistoryStore.shared.clearGeneration
 
-    init() {
-        self.renderer = WKWebViewRenderer()
+    init(spec: TabSpec = TabSpec()) {
+        self.name = spec.name
+        self.partition = spec.partition
+        self.persistent = spec.persistent
+        self.renderer = WKWebViewRenderer(dataStore: spec.dataStore)
     }
 
     deinit {
@@ -70,20 +105,20 @@ final class TabStore: ObservableObject {
     private var tabSinks: [UUID: AnyCancellable] = [:]
 
     init() {
-        if let session = SessionStore.load() {
-            let restoredTabs = session.urls.compactMap { value -> Tab? in
-                guard let url = URL(string: value) else { return nil }
-                let tab = Tab()
-                tab.isStartPage = false
-                bind(tab)
-                tab.renderer.load(url: url)
-                return tab
-            }
-            if !restoredTabs.isEmpty {
-                tabs = restoredTabs
-                activeTabID = restoredTabs[min(session.activeIndex, restoredTabs.count - 1)].id
-                return
-            }
+        var restoredTabs: [Tab] = []
+        var activeIndex = 0
+        // Index against the tabs that actually came back, not against the
+        // persisted records: a dropped partitioned tab would otherwise shift
+        // the selection onto the wrong tab.
+        for record in SessionStore.load() {
+            guard let tab = restore(record) else { continue }
+            if record.isActive { activeIndex = restoredTabs.count }
+            restoredTabs.append(tab)
+        }
+        if !restoredTabs.isEmpty {
+            tabs = restoredTabs
+            activeTabID = restoredTabs[min(activeIndex, restoredTabs.count - 1)].id
+            return
         }
 
         let initial = Tab()
@@ -92,9 +127,32 @@ final class TabStore: ObservableObject {
         activeTabID = initial.id
     }
 
+    /// Rebuild one tab from its persisted record, or `nil` when it must not be
+    /// restored: a non-persistent partition (its storage is gone), or a
+    /// partition the registry no longer knows about (restoring it under a fresh
+    /// store would fork the identity behind a familiar name).
+    private func restore(_ record: SessionStore.TabRecord) -> Tab? {
+        guard let url = URL(string: record.url) else { return nil }
+        var spec = TabSpec(name: record.name)
+        if let partition = record.partition {
+            guard record.persistent, let resolved = PartitionRegistry.shared.rebind(id: partition) else {
+                print("[TabStore] dropping restored tab for unavailable partition \"\(partition)\"")
+                return nil
+            }
+            spec.partition = resolved.id
+            spec.persistent = resolved.persistent
+            spec.dataStore = resolved.dataStore
+        }
+        let tab = Tab(spec: spec)
+        tab.isStartPage = false
+        bind(tab)
+        tab.renderer.load(url: url)
+        return tab
+    }
+
     @discardableResult
-    func addTab() -> Tab {
-        let tab = Tab()
+    func addTab(spec: TabSpec = TabSpec()) -> Tab {
+        let tab = Tab(spec: spec)
         bind(tab)
         tabs.append(tab)
         activeTabID = tab.id

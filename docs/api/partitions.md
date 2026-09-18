@@ -115,9 +115,12 @@ receive every other tab's cookies back. `get-cookies`, `set-cookie`, and
 `delete-cookies` targeting a partitioned tab operate directly on that tab's own
 cookie store.
 
-For the same reason, `set-renderer` is **rejected** while any partitioned tab
-is open: partitioned WebKit stores cannot be losslessly migrated into CEF's
-single browser. Close or delete the partitions first.
+For the same reason, `set-renderer` to `chromium` is **rejected** with
+`ENGINE_SWITCH_BLOCKED_BY_PARTITION` while any partitioned tab is open:
+partitioned WebKit stores cannot be losslessly migrated into CEF's single
+browser. Close or delete the partitions first. Switching back to `webkit` is
+always allowed, so a session that restored partitioned tabs under Chromium can
+still reach the engine those tabs need.
 
 ### `switchTab`
 Switch the active tab by UUID.

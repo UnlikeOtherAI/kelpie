@@ -234,7 +234,7 @@ Tabs can carry an optional display **name** and an optional storage **partition*
 
 This delivers isolated identities, **not** parallel execution: commands still serialise on each app's main thread, so an orchestrator drives twelve partitions in turn rather than all at once.
 
-Storage partitioning is available on **macOS with the WebKit engine only**. macOS on the Chromium (CEF) engine, iOS, Android, Linux, and Windows reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. Partitioned tabs are excluded from the macOS shared cookie jar, and switching the renderer engine is blocked while any partitioned tab is open.
+Storage partitioning is available on **macOS with the WebKit engine only**. macOS on the Chromium (CEF) engine, iOS, Android, Linux, and Windows reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. Partitioned tabs are excluded from the macOS shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF.
 
 On iOS, Android, macOS, and Linux, the current tab set is also persisted automatically while the browser is running and restored automatically on the next app launch. Restarting the browser reopens the same tabs and URLs that were active before exit instead of dropping back to a blank start state.
 

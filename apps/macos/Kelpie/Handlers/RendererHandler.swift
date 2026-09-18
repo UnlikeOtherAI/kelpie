@@ -23,10 +23,36 @@ struct RendererHandler {
         if engine == rendererState.activeEngine {
             return successResponse(["engine": engine.rawValue, "changed": false])
         }
+        if engine == .chromium, let blocked = partitionedTabsBlockSwitch() { return blocked }
 
         await onSwitch(engine)
 
         return successResponse(["engine": engine.rawValue, "changed": true])
+    }
+
+    /// Refuses a switch to Chromium while any partitioned tab is open.
+    ///
+    /// Switching engines migrates cookies through a single shared jar. A
+    /// partitioned tab has a data store of its own that CEF has no equivalent
+    /// for, so the migration would either silently drop those sessions or merge
+    /// them into one — both of which destroy the isolation the caller asked
+    /// for. Refusing is the only honest option.
+    ///
+    /// Only the Chromium direction is blocked. Blocking both would trap a
+    /// launch that restored partitioned tabs with Chromium already selected:
+    /// the user could never get back to the engine those tabs need.
+    @MainActor
+    private func partitionedTabsBlockSwitch() -> [String: Any]? {
+        let partitioned = WindowRegistry.shared.allEntries()
+            .flatMap { $0.tabStore.tabs.compactMap(\.partition) }
+        guard !partitioned.isEmpty else { return nil }
+        let names = Set(partitioned).sorted().joined(separator: ", ")
+        return errorResponse(
+            code: "ENGINE_SWITCH_BLOCKED_BY_PARTITION",
+            message: "Cannot switch to the Chromium engine while partitioned tabs are open (\(names)). " +
+                "Partitioned storage cannot be migrated between engines. " +
+                "Close those tabs or call delete-partition first."
+        )
     }
 
     @MainActor

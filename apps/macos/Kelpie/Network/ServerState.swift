@@ -112,6 +112,14 @@ final class ServerState: ObservableObject {
                 self?.startMDNS()
             }
         }
+        // Prune partition map entries whose engine store has vanished and record
+        // any orphaned store. Corrective only: `PartitionRegistry` loads its map
+        // synchronously at init, so resolution is already correct and a request
+        // landing mid-pass sees at worst an entry this pass was about to drop.
+        Task { @MainActor in
+            await PartitionRegistry.shared.reconcile()
+        }
+
         httpServer = server
         httpServer?.start()
     }

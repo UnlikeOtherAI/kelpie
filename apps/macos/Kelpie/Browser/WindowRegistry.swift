@@ -24,7 +24,10 @@ final class WindowRegistry {
     /// owns its own callbacks because new-tab/switch-tab/close-tab must affect
     /// only the window the request targets.
     struct Callbacks {
-        var onNewTab: () -> Tab
+        /// Opens a tab with the caller's name/partition/data-store choices. The
+        /// spec is resolved before this runs so a bad partition never reaches
+        /// the UI layer.
+        var onNewTab: (TabSpec) -> Tab
         var onSwitchTab: (UUID) -> Void
         var onCloseTab: (UUID) -> Void
         var onWillLoad: () -> Void

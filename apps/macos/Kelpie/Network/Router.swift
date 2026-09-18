@@ -62,8 +62,10 @@ private func statusCode(forErrorCode code: String?) -> Int {
         return 501
     case "IFRAME_ACCESS_DENIED", "PERMISSION_REQUIRED", "SHADOW_ROOT_CLOSED":
         return 403
-    case "RECORDING_IN_PROGRESS":
+    case "RECORDING_IN_PROGRESS", "PARTITION_DELETING", "PARTITION_IN_USE":
         return 409
+    case "PARTITION_UNSUPPORTED":
+        return 501
     case "WEBVIEW_ERROR":
         return 500
     default:
