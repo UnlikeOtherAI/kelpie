@@ -17,12 +17,36 @@
 #include "include/cef_client.h"
 #include "include/cef_render_handler.h"
 #include "include/cef_jsdialog_handler.h"
+#include "include/cef_task.h"
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
 #include "desktop_engine_impl.h"
 
 namespace kelpie {
 
+namespace {
+
+#if defined(_WIN32)
+// A tab browser window is a child of the single application shell window, so
+// CEF's default close notification -- PostMessage(WM_CLOSE) to
+// GetAncestor(tab_window, GA_ROOT) -- would land on the application window and
+// read as a request to close the whole application. Closing a tab must destroy
+// only that tab's own host window.
+class DestroyTabHostWindowTask final : public CefTask {
+ public:
+  explicit DestroyTabHostWindowTask(HWND window) : window_(window) {}
+
+  void Execute() override {
+    if (window_ != nullptr && ::IsWindow(window_)) ::DestroyWindow(window_);
+  }
+
+ private:
+  HWND window_ = nullptr;
+  IMPLEMENT_REFCOUNTING(DestroyTabHostWindowTask);
+};
+#endif
+
+}  // namespace
 
 
 class DesktopCefClient final : public CefClient,
@@ -56,6 +80,7 @@ class DesktopCefClient final : public CefClient,
                      CefBrowserSettings& settings,
                      CefRefPtr<CefDictionaryValue>& extra_info,
                      bool* no_javascript_access) override;
+  bool DoClose(CefRefPtr<CefBrowser> browser) override;
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override;
   void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
                             bool is_loading,
@@ -338,6 +363,27 @@ bool DesktopCefClient::OnBeforePopup(CefRefPtr<CefBrowser>,
     owner_->UpdateActiveState();
   }
   return true;
+}
+
+bool DesktopCefClient::DoClose(CefRefPtr<CefBrowser> browser) {
+#if defined(_WIN32)
+  // Returning false here lets CEF send the OS close notification to the tab
+  // window's top-level owner, which is the shared application shell window --
+  // one tab closing would then drain the control listener and shut the runtime
+  // down. Take ownership of the tab window instead so the close stays scoped to
+  // the tab that asked for it.
+  if (browser && browser->GetHost()) {
+    const HWND window = browser->GetHost()->GetWindowHandle();
+    if (window != nullptr) {
+      // CEF rewrites this browser's destruction state after DoClose returns, so
+      // the window must be destroyed after the call unwinds, not inside it.
+      CefPostTask(TID_UI, CefRefPtr<CefTask>(new DestroyTabHostWindowTask(window)));
+      return true;
+    }
+  }
+#endif
+  (void)browser;
+  return false;
 }
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
