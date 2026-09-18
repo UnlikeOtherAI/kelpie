@@ -17,6 +17,11 @@
 
 namespace kelpie {
 
+// Internal sentinel, never seen by a caller: CreateTabOnUi reports a partition
+// whose store is still loading, and DesktopEngine::CreateTab either retries
+// past it or rewrites it into a real error.
+inline constexpr const char* kPartitionNotReady = "PARTITION_NOT_READY";
+
 class DesktopCefClient;
 
 class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::Impl> {
