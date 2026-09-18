@@ -140,8 +140,11 @@ The `getDeviceInfo` endpoint (see [api/core.md](api/core.md)) includes an `isSim
 
 ## App Icon
 
-The canonical app icon is a kawaii fire character in pastel yellow-to-orange tones.
+The canonical app icon is a geometric multicolour **K**, built from three rounded
+capsules whose overlaps blend into secondary colours, on a deep navy field.
 
-- **Source file (1024x1024)**: [extended-1024.png](extended-1024.png) — use this for App Store and Play Store submission
-- **Assets directory**: `assets/extended-1024.png`
-- **Style**: Flat pastel, kawaii Japanese-style fire, happy/chuckling expression, no outlines, no text
+- **Source file (1024x1024)**: `assets/kelpie-icon-1024.png` — the shipped tile, opaque; use this for App Store and Play Store submission
+- **Transparent mark**: `assets/kelpie-mark-1024.png` — the bare K, for placing on any background
+- **Field colour**: `#000C30` — the deep navy shared with the Nessie mark
+- **Mark palette**: green `#05BE92`, yellow `#FDC803`, pink `#FC389C`, blue `#13A8FC` at the overlaps
+- **Style**: Flat geometric, rounded capsule strokes, no outlines, no text

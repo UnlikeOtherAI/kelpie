@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/extended-1024.png" width="128" height="128" alt="Kelpie icon">
+  <img src="assets/kelpie-icon-1024.png" width="128" height="128" alt="Kelpie icon">
 </p>
 
 <h1 align="center">Kelpie</h1>
