@@ -19,6 +19,7 @@
 #define NOMINMAX
 #endif
 #include <shlobj.h>
+#include <rpc.h>
 
 
 namespace kelpie::windows {
@@ -95,9 +96,25 @@ bool SameSession(const SessionSnapshot& left, const SessionSnapshot& right) {
   for (std::size_t index = 0; index < left.tabs.size(); ++index) {
     const SessionTab& a = left.tabs[index];
     const SessionTab& b = right.tabs[index];
-    if (a.id != b.id || a.url != b.url || a.active != b.active) return false;
+    if (a.id != b.id || a.url != b.url || a.active != b.active || a.name != b.name ||
+        a.partition != b.partition || a.persistent != b.persistent) {
+      return false;
+    }
   }
   return true;
+}
+
+// A fresh partition id for an isolated tab. A UUID rather than a counter: the
+// id has to stay unique against partitions restored from a previous session,
+// which the counter would know nothing about.
+std::string NewIsolatedPartitionId() {
+  UUID uuid{};
+  if (UuidCreate(&uuid) != RPC_S_OK) return std::string();
+  RPC_CSTR text = nullptr;
+  if (UuidToStringA(&uuid, &text) != RPC_S_OK || text == nullptr) return std::string();
+  std::string id = "isolated-" + std::string(reinterpret_cast<const char*>(text));
+  RpcStringFreeA(&text);
+  return id;
 }
 
 }  // namespace
@@ -230,8 +247,14 @@ std::string WindowsApp::GetTabsJson() const {
   if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::seconds(2)).ok) return R"({"tabs":[]})";
   json items = json::array();
   for (const auto& tab : tabs) {
-    items.push_back({{"id", tab.id}, {"generation", tab.generation}, {"title", tab.title},
-                     {"url", tab.url}, {"active", tab.active}});
+    json entry = {{"id", tab.id}, {"generation", tab.generation}, {"title", tab.title},
+                  {"url", tab.url}, {"active", tab.active}};
+    // The shell prints `name` instead of the title and marks a partitioned
+    // pill, so both have to reach it.
+    if (tab.name) entry["name"] = *tab.name;
+    if (tab.partition) entry["partition"] = *tab.partition;
+    if (tab.persistent) entry["persistent"] = *tab.persistent;
+    items.push_back(std::move(entry));
   }
   return json{{"tabs", items}}.dump();
 }
@@ -245,9 +268,27 @@ std::optional<std::wstring> WindowsApp::BestUrlCompletion(std::wstring_view type
 }
 
 void WindowsApp::OnCreateTabRequested() {
+  CreateTabFromShell(config_.isolate_new_tabs);
+}
+
+void WindowsApp::OnCreateIsolatedTabRequested() {
+  CreateTabFromShell(true);
+}
+
+void WindowsApp::CreateTabFromShell(bool isolated) {
   if (!desktop_app_) return;
+  NewTabRequest request;
+  request.url = "about:blank";
+  if (isolated) {
+    const std::string partition = NewIsolatedPartitionId();
+    if (partition.empty()) {
+      if (shell_) shell_->ShowToast(L"Could not allocate an isolated partition");
+      return;
+    }
+    request.partition = partition;
+  }
   TabSnapshot tab;
-  const auto result = desktop_app_->engine().CreateTab("about:blank", &tab, std::chrono::seconds(5));
+  const auto result = desktop_app_->engine().CreateTab(request, &tab, std::chrono::seconds(5));
   if (result.ok) { desktop_app_->engine().ActivateTab({tab.id, tab.generation}, std::chrono::seconds(2)); SaveSession(); }
   else if (shell_) shell_->ShowToast(utf::Utf8ToWideDisplay(result.message));
 }
@@ -271,6 +312,7 @@ SettingsValues WindowsApp::CurrentSettings() const {
       config_.port,
       config_.profile_dir.wstring(),
       utf::Utf8ToWideDisplay(config_.initial_url),
+      config_.isolate_new_tabs,
   };
 }
 
@@ -343,12 +385,14 @@ void WindowsApp::LoadSettings() {
   if (!config_.url_overridden) {
     config_.initial_url = settings.value("startup_url", config_.initial_url);
   }
+  config_.isolate_new_tabs = settings.value("isolate_new_tabs", config_.isolate_new_tabs);
 }
 
 void WindowsApp::SaveSettings() const {
   SaveJsonFileAtomically(config_.profile_dir / "settings.json",
                          {{"port", config_.port}, {"profile_dir", config_.profile_dir.u8string()},
-                          {"startup_url", config_.initial_url}}, persistence_epoch_ + 1);
+                          {"startup_url", config_.initial_url},
+                          {"isolate_new_tabs", config_.isolate_new_tabs}}, persistence_epoch_ + 1);
 }
 
 
@@ -367,7 +411,13 @@ void WindowsApp::SaveSession() {
   SessionSnapshot next;
   next.epoch = session_snapshot_.epoch + 1;
   next.next_tab_id = state.next_tab_id;
-  for (const auto& tab : state.tabs) next.tabs.push_back({tab.id, tab.url, tab.active});
+  for (const auto& tab : state.tabs) {
+    SessionTab entry{tab.id, tab.url, tab.active};
+    entry.name = tab.name;
+    entry.partition = tab.partition;
+    entry.persistent = tab.persistent;
+    next.tabs.push_back(std::move(entry));
+  }
   if (SameSession(session_snapshot_, next)) return;
   if (SaveJsonFileAtomically(config_.profile_dir / "session.json", SerializeSessionSnapshot(next), next.epoch)) session_snapshot_ = std::move(next);
 }
@@ -405,6 +455,7 @@ void WindowsApp::SaveStores() {
 
 void WindowsApp::ApplySettings(const SettingsValues& settings) {
   config_.initial_url = utf::WideToUtf8(settings.startup_url).value_or(config_.initial_url);
+  config_.isolate_new_tabs = settings.isolate_new_tabs;
   SaveSettings();
   shell_->ShowToast(L"Settings saved");
 }

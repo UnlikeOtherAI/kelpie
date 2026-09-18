@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <vector>
 
 using namespace kelpie::windows;
@@ -48,7 +49,40 @@ int main() {
   bad = valid; bad["tabs"][0]["id"] = "tab-18446744073709551616"; invalid.push_back(bad);
   bad = valid; bad["tabs"][0]["url"] = "not-a-url"; invalid.push_back(bad);
   bad = valid; bad["tabs"][1]["active"] = true; invalid.push_back(bad);
+  // A snapshot naming a partition the engine would reject is corrupt. Dropping
+  // the field instead would restore an isolated tab into the shared store.
+  for (const char* rejected : {"has space", "default", "..", "ephemeral-1", "a/b", ""}) {
+    bad = valid; bad["tabs"][0]["partition"] = rejected; invalid.push_back(bad);
+  }
+  bad = valid; bad["tabs"][0]["partition"] = 7; invalid.push_back(bad);
+  bad = valid; bad["tabs"][0]["name"] = 7; invalid.push_back(bad);
+  bad = valid; bad["tabs"][0]["name"] = std::string(201, 'x'); invalid.push_back(bad);
+  bad = valid; bad["tabs"][0]["persistent"] = "yes"; invalid.push_back(bad);
+  // `persistent` without `partition` describes nothing.
+  bad = valid; bad["tabs"][0]["persistent"] = false; invalid.push_back(bad);
   for (const auto& value : invalid) if (!UnchangedAfterInvalid(value)) return 3;
+
+  auto partitioned = valid;
+  partitioned["tabs"][0]["partition"] = "sam.eng-lead";
+  partitioned["tabs"][0]["persistent"] = false;
+  partitioned["tabs"][0]["name"] = "Sam";
+  partitioned["tabs"][1]["partition"] = "morgan.product";
+  SessionSnapshot restored;
+  if (!ParseSessionSnapshot(partitioned, &restored)) return 5;
+  if (!restored.tabs[0].partition || *restored.tabs[0].partition != "sam.eng-lead") return 6;
+  if (restored.tabs[0].persistent) return 7;
+  if (!restored.tabs[0].name || *restored.tabs[0].name != "Sam") return 8;
+  // Persistence defaults to true when the snapshot only names a partition.
+  if (!restored.tabs[1].persistent || restored.tabs[1].name) return 9;
+  // An ordinary tab keeps exactly the object it always had.
+  const auto plain = SerializeSessionSnapshot(SessionSnapshot{1, 3, {{"tab-2", "https://a.test", true}}});
+  if (plain["tabs"][0].contains("partition") || plain["tabs"][0].contains("name") ||
+      plain["tabs"][0].contains("persistent")) return 10;
+  SessionSnapshot partition_round_trip;
+  if (!ParseSessionSnapshot(SerializeSessionSnapshot(restored), &partition_round_trip)) return 11;
+  if (partition_round_trip.tabs[0].partition != restored.tabs[0].partition ||
+      partition_round_trip.tabs[0].persistent != restored.tabs[0].persistent ||
+      partition_round_trip.tabs[0].name != restored.tabs[0].name) return 12;
 
   const auto serialized = SerializeSessionSnapshot(output);
   SessionSnapshot round_trip;

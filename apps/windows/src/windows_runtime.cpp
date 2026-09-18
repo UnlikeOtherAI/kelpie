@@ -234,10 +234,18 @@ bool WindowsApp::InitializeDesktopRuntime() {
   if (!config_.url_overridden && !session_snapshot_.tabs.empty()) {
     runtime.engine.restored_next_tab_id = session_snapshot_.next_tab_id;
     for (const auto& tab : session_snapshot_.tabs) {
-      runtime.engine.restored_tabs.push_back({tab.id, tab.url, tab.active});
+      DesktopEngine::RestoredTab restored{tab.id, tab.url, tab.active};
+      // Rebinding the partition is what makes an isolated identity survive a
+      // restart rather than quietly rejoining the shared store.
+      restored.name = tab.name;
+      restored.partition = tab.partition;
+      restored.persistent = tab.persistent;
+      runtime.engine.restored_tabs.push_back(std::move(restored));
     }
   }
   runtime.engine.cache_path = utf::WideToUtf8((config_.profile_dir / "cache").wstring()).value_or(std::string());
+  runtime.engine.partitions_path =
+      utf::WideToUtf8((config_.profile_dir / "partitions").wstring()).value_or(std::string());
   runtime.engine.configure_window_info = [this](void* raw_info) {
 #if defined(HAS_CEF)
     ConfigureAlloyChildWindow(static_cast<CefWindowInfo*>(raw_info), browser_view_->hwnd());

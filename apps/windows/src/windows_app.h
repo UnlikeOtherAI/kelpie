@@ -45,6 +45,10 @@ struct AppConfig {
   bool width_overridden = false;
   bool height_overridden = false;
   bool mcp_stdio = false;
+  // "Isolate every new tab" from Settings. Off by default: isolating every tab
+  // breaks ordinary browsing, because a login would not carry into a tab
+  // opened from a link.
+  bool isolate_new_tabs = false;
   std::filesystem::path readiness_path;
   void* sandbox_info = nullptr;
   void* cef_process_instance = nullptr;
@@ -69,6 +73,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const override;
   SettingsValues CurrentSettings() const override;
   void OnCreateTabRequested() override;
+  void OnCreateIsolatedTabRequested() override;
   void OnActivateTabRequested(std::string id, std::uint64_t generation) override;
   void OnCloseTabRequested(std::string id, std::uint64_t generation) override;
   void OnWindowCloseRequested() override;
@@ -86,6 +91,8 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void SaveSession();
   void SaveStores();
   void ApplySettings(const SettingsValues& settings);
+  // Opens a tab from the shell, in its own storage partition when asked.
+  void CreateTabFromShell(bool isolated);
   bool InitializeCommonControls() const;
   bool InitializeDesktopRuntime();
   bool ShutdownDesktopRuntime();

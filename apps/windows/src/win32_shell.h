@@ -16,6 +16,7 @@
 #include "history_view.h"
 #include "network_inspector.h"
 #include "settings_view.h"
+#include "tab_tooltips.h"
 #include "toast_view.h"
 #include "url_bar.h"
 #include "win32_browser_view.h"
@@ -27,6 +28,10 @@ namespace kelpie::windows {
 inline constexpr int kTabMinWidthDip = 80;
 inline constexpr int kTabMaxWidthDip = 200;
 
+// The chevron half of the split "+" control. Clicking the plus opens an
+// ordinary tab; clicking here offers the isolated one too.
+inline constexpr int kNewTabDropdownWidthDip = 16;
+
 class ShellDelegate : public UrlBarDelegate {
  public:
   ~ShellDelegate() override = default;
@@ -36,6 +41,7 @@ class ShellDelegate : public UrlBarDelegate {
   virtual std::string GetTabsJson() const = 0;
   virtual SettingsValues CurrentSettings() const = 0;
   virtual void OnCreateTabRequested() = 0;
+  virtual void OnCreateIsolatedTabRequested() = 0;
   virtual void OnActivateTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnCloseTabRequested(std::string id, std::uint64_t generation) = 0;
   virtual void OnWindowCloseRequested() = 0;
@@ -58,7 +64,12 @@ class Win32Shell {
   struct TabItem {
     std::string id;
     std::uint64_t generation = 0;
+    // What the pill prints: the caller's `name` when it set one, otherwise the
+    // page title. `title` is kept for the tooltip, which stays truthful.
     std::string label;
+    std::string title;
+    std::string partition;
+    bool persistent = true;
     bool active = false;
   };
   struct TabCloseButton {
@@ -82,6 +93,12 @@ class Win32Shell {
   bool RefreshTabs();
   void RebuildTabCloseButtons();
   void LayoutTabCloseButtons();
+  // Hover text for the pills, rebuilt with their rects.
+  void RefreshTabTooltips();
+  // Offers "New tab" and "New isolated tab" under the split "+" control.
+  void ShowNewTabMenu();
+  // True when the click that produced a WM_COMMAND landed on the chevron.
+  bool NewTabDropdownHit() const;
   void PaintClient(HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
   static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
@@ -101,6 +118,7 @@ class Win32Shell {
   WindowChrome window_chrome_;
   UrlBar url_bar_;
   ToastView toast_;
+  TabStripTooltips tab_tooltips_;
   BookmarksView bookmarks_view_;
   HistoryView history_view_;
   NetworkInspector network_view_;
