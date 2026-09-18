@@ -9,6 +9,7 @@
 
 #include "kelpie/desktop_browser_control.h"
 #include "kelpie/cef_renderer.h"
+#include "kelpie/favicon_registry.h"
 
 namespace kelpie {
 
@@ -52,6 +53,10 @@ class DesktopEngine final : public DesktopBrowserControl {
     bool external_message_pump = true;
     std::function<void(void*)> configure_window_info;
     std::function<void(void*, const std::string&)> configure_tab_window_info;
+    // Supplies the `kelpie://start` data payload. The engine owns no stores, so
+    // the application wires this to its BookmarkStore and HistoryStore. Called
+    // on the CEF IO thread; the implementation must be thread-safe.
+    std::function<std::string()> start_page_data_supplier;
   };
 
   struct SessionState {
@@ -82,6 +87,11 @@ class DesktopEngine final : public DesktopBrowserControl {
 
   bool is_initialized() const;
   bool is_offscreen() const;
+
+  // Favicons downloaded this session, keyed by host. Survives tab close, which
+  // is what the start page's Favourites and Recent lists need. The stub
+  // configuration keeps an always-empty registry so callers need no #if.
+  FaviconRegistry& favicons();
 
   ViewportState viewport() const;
   bool ResizeViewport(int width, int height);
