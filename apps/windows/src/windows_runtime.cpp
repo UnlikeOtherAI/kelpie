@@ -2,7 +2,6 @@
 
 #include "cef_pump_deadline.h"
 #include "kelpie/desktop_http_server.h"
-#include "kelpie/cef_app_factory.h"
 #include "windows_utf.h"
 
 #include <algorithm>
@@ -11,6 +10,9 @@
 
 #if defined(HAS_CEF)
 #include "include/cef_app.h"
+// cef_app_factory.h includes the CEF SDK headers, so it only exists in the
+// Chromium desktop configuration.
+#include "kelpie/cef_app_factory.h"
 #endif
 
 namespace kelpie::windows {

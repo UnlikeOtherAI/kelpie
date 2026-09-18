@@ -171,6 +171,12 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease, const Json&, 
   return UnsupportedControl();
 }
 
+// Session persistence is a browser-wide query, so the no-CEF configuration
+// reports it unsupported rather than writing an empty snapshot over a real one.
+BrowserControlResult DesktopEngine::GetSessionState(SessionState*, Timeout) {
+  return UnsupportedControl();
+}
+
 BrowserControlResult DesktopEngine::GetDialog(TabLease, Json*, Timeout) { return UnsupportedControl(); }
 
 BrowserControlResult DesktopEngine::HandleDialog(TabLease, const Json&, Json*, Timeout) {

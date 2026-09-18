@@ -45,6 +45,12 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/inspection_handler.cpp
 )
 
+# The input and cookie planners are pure JSON-to-DevTools translation with no
+# CEF dependency, so both configurations compile them and both run their tests.
+list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
+  src/desktop_input_planner.cpp
+  src/desktop_cookie_planner.cpp)
+
 option(KELPIE_ENABLE_CHROMIUM_DESKTOP "Build the Chromium desktop engine with CEF" OFF)
 set(CEF_ROOT "" CACHE PATH "Path to an extracted CEF SDK root")
 set(KELPIE_CHROMIUM_DESKTOP_CEF_LIB "")
@@ -82,9 +88,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
-    src/desktop_cookie_planner.cpp
-    src/desktop_devtools.cpp
-    src/desktop_input_planner.cpp)
+    src/desktop_devtools.cpp)
 else()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)
 endif()
