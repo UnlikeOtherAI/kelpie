@@ -93,11 +93,10 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   SetWindowLongPtrW(url_edit_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   original_edit_proc_ = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
       url_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&UrlBar::EditProc)));
-  // The lock sits inside the rounded surface, so its width is reserved in the
-  // left margin whether or not it is drawn. Reserving it only for https would
-  // shift the text sideways on every navigation between schemes.
+  // The lock's width is reserved by the gutter in Resize whether or not the
+  // glyph is drawn, so the text does not shift when the scheme changes.
   SendMessageW(url_edit_, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
-               MAKELPARAM(ui::Dip(parent, 20), ui::Dip(parent, 8)));
+               MAKELPARAM(ui::Dip(parent, 2), ui::Dip(parent, 8)));
   SendMessageW(url_edit_, EM_SETCUEBANNER, TRUE,
                reinterpret_cast<LPARAM>(L"Search or enter website name"));
   RefreshFont();
@@ -122,8 +121,12 @@ void UrlBar::Resize(const RECT& bounds) {
   const int actions_width = 4 * button_width + 3 * gap;
   const int edit_right = bounds.right - padding - actions_width - gap;
   const int edit_width = std::max(1, edit_right - left);
-  SetWindowPos(url_edit_, nullptr, left + ui::Dip(parent_, 4), top + ui::Dip(parent_, 2),
-               std::max(1, edit_width - ui::Dip(parent_, 8)), control_height - ui::Dip(parent_, 4), SWP_NOZORDER);
+  // The lock is painted on the shell behind this control, so the EDIT has to
+  // start clear of it: a child window is opaque and would cover the glyph.
+  const int lock_gutter = ui::Dip(parent_, kLockGutterDip);
+  SetWindowPos(url_edit_, nullptr, left + lock_gutter, top + ui::Dip(parent_, 2),
+               std::max(1, edit_width - lock_gutter - ui::Dip(parent_, 8)),
+               control_height - ui::Dip(parent_, 4), SWP_NOZORDER);
   left = edit_right + gap;
   for (HWND button : {bookmarks_button_, history_button_, network_button_, settings_button_}) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
@@ -268,9 +271,8 @@ void UrlBar::Paint(HDC device_context) const {
   ui::PaintRounded(device_context, edit, colors.surface, focused ? colors.focus : colors.border,
                    ui::Dip(parent_, 15), focused ? ui::Dip(parent_, 2) : 1);
   if (secure_) {
-    const RECT lock{edit.left + ui::Dip(parent_, 6), edit.top,
-                    edit.left + ui::Dip(parent_, 22), edit.bottom};
-    ui::DrawGlyph(device_context, parent_, lock, ui::icon::kLock, colors.muted_text, 10);
+    const RECT lock{edit.left, edit.top, edit.left + ui::Dip(parent_, kLockGutterDip), edit.bottom};
+    ui::DrawGlyph(device_context, parent_, lock, ui::icon::kLock, colors.muted_text, 11);
   }
 }
 
