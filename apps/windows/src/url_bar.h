@@ -15,6 +15,9 @@
 
 namespace kelpie::windows {
 
+// Width reserved at the left of the address surface for the lock glyph.
+inline constexpr int kLockGutterDip = 22;
+
 class UrlBarDelegate {
  public:
   virtual ~UrlBarDelegate() = default;
