@@ -679,8 +679,9 @@ Supported on macOS with the WebKit engine and on Windows with the Chromium
 `kelpie renderer set webkit`. iOS, Android, and Linux do not support partitions
 yet and answer with `reason: "platform-single-tab"`.
 
-On Windows a persistent partition is stored under `<profile>/partitions/<id>`
-and is rebound when the session is restored, so its logins survive a restart.
+On Windows a persistent partition is stored under
+`<profile>/cache/partition-<id>` and is rebound when the session is restored,
+so its logins survive a restart.
 
 ---
 
@@ -725,7 +726,7 @@ same id is being torn down fails with `PARTITION_DELETING`; retry once the
 delete returns.
 
 On Windows, a store Chromium still has open when the delete runs is renamed
-into `<profile>/partitions/.trash/` and purged on the next launch. That call
+into `<profile>/cache/.kelpie-partition-trash/` and purged on the next launch. That call
 reports `PARTITION_IN_USE` rather than claiming a deletion that did not
 happen; the id is free to reuse immediately either way.
 

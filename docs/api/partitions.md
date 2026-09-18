@@ -118,13 +118,26 @@ returns, a retry creates a fresh store under a fresh engine handle.
 ### Windows (Chromium/CEF)
 
 Windows maps one partition onto one `CefRequestContext`. A persistent partition
-gets `CefRequestContextSettings.cache_path = <profile>/partitions/<id>`; a
+gets `CefRequestContextSettings.cache_path = <profile>/cache/partition-<id>`;
+a
 non-persistent one is created with an empty `cache_path`, which is CEF's
 in-memory context — the data never reaches the disk. A tab with no `partition`
 is created with a null request context, which is the global store every
 ordinary Chrome tab shares. Cookies, `localStorage`, IndexedDB, and the HTTP
 cache all follow the context, so `get-cookies` / `set-cookie` and `evaluate`
 are partition-scoped without any special casing.
+
+**The store must be a direct child of `root_cache_path`.** CEF reads a
+request-context `cache_path` as a Chromium profile directory immediately under
+`CefSettings.root_cache_path`, and silently ignores any other path -- the
+partition then falls back to memory and loses its data on exit, with no error
+anywhere. Windows therefore pins `root_cache_path` to the Chromium cache
+directory it already uses (`<profile>/cache`) and names each store
+`partition-<id>` beside the `Default` profile, rather than the nested
+`<profile>/partitions/<id>` the design sketch assumed. The prefix keeps a
+partition id from colliding with Chromium's own directories, and leaving
+`root_cache_path` on the cache directory means no existing profile's default
+store moves.
 
 `window.open` inherits the opener's context. Windows cancels the CEF popup and
 reopens the target as one of its own tabs, so the opener's partition is copied
@@ -140,7 +153,8 @@ than restored into the default store.
 `delete-partition` marks the partition deleting, force-closes its tabs, waits
 for CEF to report every `OnBeforeClose`, releases the context, and then removes
 the directory. If Chromium still holds file handles, the directory is renamed
-to `<profile>/partitions/.trash/<id>-<epoch>` and purged on the next launch;
+to `<profile>/cache/.kelpie-partition-trash/partition-<id>-<epoch>` and purged
+on the next launch;
 the call then returns `PARTITION_IN_USE` rather than a success that left the
 data in place. The id is freed either way, and the response carries the honest
 `tabsClosed` and `existed` values alongside the error.
