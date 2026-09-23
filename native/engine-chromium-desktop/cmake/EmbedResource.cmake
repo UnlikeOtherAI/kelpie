@@ -44,8 +44,14 @@ function(kelpie_embed_resources)
     math(EXPR byte_count "${hex_length} / 2")
     string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," bytes "${hex}")
     # Wrap at 16 bytes per line so the generated file stays within what every
-    # supported compiler and editor handles comfortably.
-    string(REGEX REPLACE "((0x[0-9a-f][0-9a-f],){16})" "\\1\n    " bytes "${bytes}")
+    # supported compiler and editor handles comfortably. CMake regexes have no
+    # {n} repetition, so the 16-byte run is spelled out.
+    string(REPEAT "0x[0-9a-f][0-9a-f]," 16 line_of_bytes)
+    string(REGEX REPLACE "(${line_of_bytes})" "\\1\n    " bytes "${bytes}")
+    # Emit character literals rather than integers: 0x80-0xff do not fit a
+    # signed char, which GCC rejects as a narrowing conversion. A '\xNN' literal
+    # has type char and carries the same byte on every compiler.
+    string(REGEX REPLACE "0x([0-9a-f][0-9a-f])" "'\\\\x\\1'" bytes "${bytes}")
 
     string(APPEND generated "namespace {\nconstexpr char k${symbol}Bytes[] = {\n    ${bytes}\n};\n}  // namespace\n\n")
     string(APPEND generated
