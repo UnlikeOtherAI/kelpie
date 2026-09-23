@@ -724,8 +724,10 @@ nothing about the load now in progress.
 A third fix came from the live check. The last poll of a wait only gets what
 is left of the timeout, and when the UI thread did not answer in those
 milliseconds, the caller got RunOnUi's generic "Browser operation timed
-out". A poll that times out at the wait's own deadline now ends the wait
-with the wait's own message.
+out". A poll now gets the remaining time rounded up, and at least 50 ms. A poll
+that times out has therefore always run past the deadline, and ends the
+wait with the wait's own message. Truncating the budget to whole
+milliseconds had left the last poll 0 or 1 ms.
 
 Live results for C8:
 
@@ -773,3 +775,38 @@ and cookies, trusted input and dialogs to `desktop_engine_page.cpp`.
   this change added passed. The run stopped at the cookie step, before the
   harness's MCP and CLI phases. The one-copy `/mcp` screenshot and the
   CLI's `--port` were checked directly instead.
+
+### Cross-Provider Review of the native implementation
+
+**How it ran.** Reviewer: `kimix exec` (provider `kimi`, model `k3-256k`),
+on 2026-09-23. It was told to be adversarial and read-only, and to look for
+event sequences that give a wrong wait result or an oversized screenshot. It
+read four files:
+
+- `navigation_tracker.h`
+- the load events in `desktop_engine_client.cpp`
+- `WaitForNavigation` and `Evaluate` in `evaluate_handler.cpp`
+- `desktop_screenshot_planner.cpp`
+
+It used 20,074 tokens, returned four findings and changed no files.
+
+1. **A same-document API navigation wedges the tracker. Rejected, on
+   evidence.** The worry was that `navigate` to a fragment, or `back` onto
+   a `pushState` entry, fires no loading events, so `finished` would never
+   catch up. Live on CEF 152, both waits returned in 26–30 ms: CEF reports
+   loading start and stop for same-document navigations. The following
+   no-op wait and link click behaved normally.
+2. **A stale error survives a superseding commit. Accepted.** A commit that
+   merged into an in-flight navigation kept the earlier load's error.
+   `LoadStarted` now clears the error on every main-frame commit, and a
+   test covers "fails after commit, then superseded by a commit that
+   loads".
+3. **A download that replaces an API navigate is reported as success.
+   Rejected.** This follows from the reviewed decision (review finding 1
+   above) to ignore `ERR_ABORTED`, which is documented in `core.md`. The
+   same code arrives when a newer navigation supersedes a load, which is
+   far more common.
+4. **`maxWidth` is exceeded when the deprecated `visualViewport` is
+   missing. Rejected as hypothetical.** CEF 152 sends it, as verified live.
+   A build that dropped it would report an oversized `width`, which the
+   CLI's option check refuses, rather than failing silently.
