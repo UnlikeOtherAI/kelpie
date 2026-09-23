@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Report system tar (temporary diagnostic)
         shell: pwsh
-        run: '& "$env:SystemRoot\System32	ar.exe" --version; (Get-CimInstance Win32_OperatingSystem).Caption; (Get-Command bzip2.exe -All -ErrorAction SilentlyContinue).Source'
+        run: '& (Join-Path $env:SystemRoot "System32/tar.exe") --version; (Get-CimInstance Win32_OperatingSystem).Caption; (Get-Command bzip2.exe -All -ErrorAction SilentlyContinue).Source'
       - name: Verify harness process handling
         shell: pwsh
         run: node --test tests/windows/process.test.mjs
