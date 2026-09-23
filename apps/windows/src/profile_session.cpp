@@ -1,5 +1,6 @@
 #include "profile_session.h"
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <sstream>
@@ -47,7 +48,31 @@ std::string ReadText(const std::filesystem::path& path) {
   return output.str();
 }
 
+// With long paths off (the Windows default), a path is limited to MAX_PATH
+// including its terminating NUL, and the app's longPathAware manifest entry
+// does nothing. A failure on such a path says so, because "unable to write"
+// alone sends people looking for a permissions problem.
+std::string WithPathLimit(std::string message, std::size_t length) {
+  if (length < MAX_PATH) return message;
+  return message + ": its path is " + std::to_string(length) +
+         " characters, and Windows allows at most " + std::to_string(MAX_PATH - 1) +
+         " unless long paths are enabled. Use a shorter --profile-dir or --readiness-file";
+}
+
 }  // namespace
+
+std::filesystem::path ReadinessTemporaryPath(const std::filesystem::path& readiness_path,
+                                             const std::string& launch_id) {
+  // A sibling named "~<8 hex>.tmp" is 13 characters, shorter than
+  // "readiness.json", so whenever the final path fits under MAX_PATH the
+  // temporary one does too. Appending the full 64-hex launch id to the record's
+  // own name added 69 characters and broke profiles near the limit. Eight hex
+  // digits still keep two launches apart when they share a --readiness-file
+  // directory; the profile lock already serialises launches of one profile.
+  const std::string suffix = launch_id.substr(0, 8);
+  return readiness_path.parent_path() /
+         (L"~" + std::wstring(suffix.begin(), suffix.end()) + L".tmp");
+}
 
 ProfileSession::~ProfileSession() {
   ClearReadiness();
@@ -70,7 +95,11 @@ bool ProfileSession::Open(const std::filesystem::path& profile_dir,
   HANDLE handle = CreateFileW(Wide(lock_path).c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
                               OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
-    SetError(error, "This profile is already in use");
+    // Only a sharing violation means another launch holds the lock. A lock path
+    // past MAX_PATH fails differently, and calling that "in use" hid the limit.
+    SetError(error, GetLastError() == ERROR_SHARING_VIOLATION
+                        ? std::string("This profile is already in use")
+                        : WithPathLimit("Unable to open the profile lock", lock_path.native().size()));
     return false;
   }
 
@@ -110,15 +139,18 @@ bool ProfileSession::PublishReadiness(const std::string& device_id,
       {"controlMode", "loopback"},
       {"mcp", {{"http", true}, {"stdio", stdio_mcp}, {"endpoint", "/mcp"}}},
   };
-  const std::filesystem::path temporary = readiness_path_.wstring() + L"." +
-                                          std::wstring(launch_id_.begin(), launch_id_.end()) + L".tmp";
+  const std::filesystem::path temporary = ReadinessTemporaryPath(readiness_path_, launch_id_);
+  // The record's own path is the one a caller chose, so the limit hint quotes
+  // it; the temporary sibling is only longer for an unusually short custom name.
+  const std::size_t longest = (std::max)(readiness_path_.native().size(), temporary.native().size());
   if (!WriteProtectedFile(temporary, record.dump(), error)) {
+    if (error != nullptr) *error = WithPathLimit(std::move(*error), longest);
     return false;
   }
   if (!MoveFileExW(Wide(temporary).c_str(), Wide(readiness_path_).c_str(),
                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
     DeleteFileW(Wide(temporary).c_str());
-    SetError(error, "Unable to publish the readiness record");
+    SetError(error, WithPathLimit("Unable to publish the readiness record", longest));
     return false;
   }
   return true;
@@ -137,7 +169,11 @@ void ProfileSession::ClearReadiness() {
 }
 
 bool ProfileSession::RemoveStaleReadiness(std::string* error) const {
-  if (readiness_path_.empty() || !std::filesystem::exists(readiness_path_)) {
+  // The error_code overload: a path past MAX_PATH makes the throwing one raise,
+  // which would abort startup instead of reaching the publish step and its
+  // explanation of the limit.
+  std::error_code filesystem_error;
+  if (readiness_path_.empty() || !std::filesystem::exists(readiness_path_, filesystem_error)) {
     return true;
   }
   if (DeleteFileW(Wide(readiness_path_).c_str()) != FALSE ||

@@ -100,6 +100,74 @@ void RemoveTree(const std::filesystem::path& path) {
   std::filesystem::remove_all(path, error);
 }
 
+// A directory path of exactly `length` characters under `base`, built from
+// segments short enough for CreateDirectoryW. Empty when `base` is too long.
+std::filesystem::path PathOfLength(const std::filesystem::path& base, std::size_t length) {
+  std::filesystem::path path = base;
+  while (path.native().size() + 1 < length) {
+    const std::size_t remaining = length - path.native().size() - 1;
+    path /= std::wstring(remaining > 100 ? 50 : remaining, L'p');
+  }
+  return path.native().size() == length ? path : std::filesystem::path();
+}
+
+bool HasTemporaryFile(const std::filesystem::path& directory) {
+  std::error_code error;
+  for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+    if (entry.path().extension() == L".tmp") return true;
+  }
+  return false;
+}
+
+// Long paths are off by default on Windows, and this test executable carries no
+// longPathAware manifest, so MAX_PATH applies here whatever the machine policy.
+int CheckLongProfilePaths(const std::filesystem::path& root) {
+  // 244 characters is the longest profile whose readiness.json still fits:
+  // 244 + "\readiness.json" is 259, the most MAX_PATH allows before its NUL.
+  const std::filesystem::path longest = PathOfLength(root / L"long", 244);
+  if (longest.empty()) return 20;
+  {
+    ProfileSession session;
+    std::string error;
+    if (!session.Open(longest, {}, &error)) return 21;
+    if (session.readiness_path().native().size() != MAX_PATH - 1) return 22;
+    const auto temporary = kelpie::windows::ReadinessTemporaryPath(session.readiness_path(), session.launch_id());
+    if (temporary.parent_path() != longest ||
+        temporary.native().size() >= session.readiness_path().native().size()) return 23;
+    if (!session.PublishReadiness("device-test", 8420, false, &error)) return 24;
+    if (ReadLaunchId(session.readiness_path()) != session.launch_id()) return 25;
+    if (HasTemporaryFile(longest)) return 26;
+  }
+
+  // Past it, each step that cannot fit says why instead of the bare "Unable to
+  // write the readiness record" people took for an ACL problem. With a profile
+  // of 245 the temporary record (259) is written and the rename to 260 fails;
+  // at 246 the temporary record (260) cannot be written; at 247 not even
+  // profile.lock (260) fits, which used to read as "already in use".
+  const struct {
+    std::size_t directory;
+    bool opens;
+    const char* expected;
+  } cases[] = {{245, true, "260 characters"}, {246, true, "261 characters"}, {247, false, "260 characters"}};
+  int failure = 27;
+  for (const auto& limit : cases) {
+    const std::filesystem::path too_long = PathOfLength(root / (L"over" + std::to_wstring(limit.directory)),
+                                                        limit.directory);
+    if (too_long.empty()) return failure;
+    ProfileSession session;
+    std::string error;
+    const bool opened = session.Open(too_long, {}, &error);
+    if (opened != limit.opens) return failure + 1;
+    if (opened && session.PublishReadiness("device-test", 8420, false, &error)) return failure + 2;
+    if (error.find(limit.expected) == std::string::npos || error.find("at most 259") == std::string::npos) {
+      return failure + 3;
+    }
+    if (HasTemporaryFile(too_long)) return failure + 4;
+    failure += 5;
+  }
+  return 0;
+}
+
 }  // namespace
 
 int wmain(int argc, wchar_t* argv[]) {
@@ -177,6 +245,11 @@ int wmain(int argc, wchar_t* argv[]) {
     std::string error;
     lock_released = lock_check.Open(profile, {}, &error);
   }
+  if (!lock_released) {
+    RemoveTree(root);
+    return 12;
+  }
+  const int long_paths = CheckLongProfilePaths(root);
   RemoveTree(root);
-  return lock_released ? 0 : 12;
+  return long_paths;
 }

@@ -5,6 +5,11 @@
 
 namespace kelpie::windows {
 
+// Where a readiness record is written before it is renamed into place: a
+// short sibling in the same directory, so the rename stays atomic.
+std::filesystem::path ReadinessTemporaryPath(const std::filesystem::path& readiness_path,
+                                             const std::string& launch_id);
+
 class ProfileSession {
  public:
   ProfileSession() = default;
