@@ -115,6 +115,18 @@ void AbortedThenCompleted() {
   assert(tab.error.empty());
 }
 
+void FailureSupersededByALaterCommit() {
+  NavigationTracker tab;
+  tab.MarkAction();
+  const auto wait = WaitStarts(tab);
+  tab.LoadStarted();                  // A commits,
+  tab.LoadFailed("net::ERR_FAILED");  // fails after committing,
+  tab.LoadStarted();                  // and B commits before loading stops.
+  tab.LoadStopped();
+  // B is the navigation that landed, and it did not fail.
+  assert(tab.Since(wait) == Progress::kFinished);
+}
+
 void LoadInFlightAtTheActionStillCounts() {
   NavigationTracker tab;
   tab.ApiNavigationRequested();
@@ -147,6 +159,7 @@ int main() {
   PageNavigationThatFailsBeforeCommit();
   SecondPageLoadWhileTheFirstIsLoading();
   AbortedThenCompleted();
+  FailureSupersededByALaterCommit();
   LoadInFlightAtTheActionStillCounts();
   FreshTabFirstLoadCounts();
   return 0;

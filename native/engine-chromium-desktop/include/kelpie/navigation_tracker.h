@@ -48,10 +48,10 @@ struct NavigationTracker {
   // do not fire it and are not counted. A start while another navigation is
   // still in flight belongs to that navigation (a redirect, or a later click
   // that superseded it) and merges into it: `finished` only advances once CEF
-  // reports that everything has stopped loading.
+  // reports that everything has stopped loading. Either way the commit is the
+  // newest navigation, so an earlier load's error no longer describes it.
   void LoadStarted() {
-    if (started != finished) return;
-    ++started;
+    if (started == finished) ++started;
     error.clear();
   }
 
