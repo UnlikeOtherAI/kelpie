@@ -44,6 +44,25 @@ LRESULT CALLBACK ShellFrameProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM l
   return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
+// Puts a hidden window where Windows maximizes it: WS_MAXIMIZE is what
+// IsZoomed reads, and the frame hangs past every edge of the work area. It is
+// never shown, because these tests run on a desktop someone is working at and
+// ShowWindow(SW_MAXIMIZE) would cover it and take focus on every build.
+void MaximizeHidden(HWND window, const RECT& work_area) {
+  const SIZE frame = kelpie::windows::MaximizedFrameThickness(window);
+  SetWindowLongPtrW(window, GWL_STYLE, GetWindowLongPtrW(window, GWL_STYLE) | WS_MAXIMIZE);
+  SetWindowPos(window, nullptr, work_area.left - frame.cx, work_area.top - frame.cy,
+               work_area.right - work_area.left + 2 * frame.cx,
+               work_area.bottom - work_area.top + 2 * frame.cy,
+               SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void RestoreHidden(HWND window, const RECT& frame) {
+  SetWindowLongPtrW(window, GWL_STYLE, GetWindowLongPtrW(window, GWL_STYLE) & ~WS_MAXIMIZE);
+  SetWindowPos(window, nullptr, frame.left, frame.top, frame.right - frame.left,
+               frame.bottom - frame.top, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 // Maximized, Windows hangs the resize frame past every edge of the work area.
 // The client area, and so the caption dots and the page, must land on the
 // work area itself rather than eight pixels off screen and under the taskbar.
@@ -65,17 +84,17 @@ bool MaximizedClientAreaIsTheWorkArea(HINSTANCE instance) {
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 
   bool passed = true;
-  RECT window_rect{};
-  GetWindowRect(window, &window_rect);
-  passed &= Expect(SameRect(ClientOnScreen(window), window_rect),
+  RECT restored{};
+  GetWindowRect(window, &restored);
+  passed &= Expect(SameRect(ClientOnScreen(window), restored),
                    "restored window is no longer borderless");
 
-  ShowWindow(window, SW_MAXIMIZE);
-  chrome.LayoutControls();
   const HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
   MONITORINFO info{};
   info.cbSize = sizeof(info);
   GetMonitorInfoW(monitor, &info);
+  MaximizeHidden(window, info.rcWork);
+  chrome.LayoutControls();
   const kelpie::windows::AutoHideEdges auto_hide = kelpie::windows::AutoHideAppbarEdges(monitor);
   RECT expected = info.rcWork;
   if (auto_hide.left) expected.left += kelpie::windows::kAutoHideRevealPx;
@@ -84,6 +103,7 @@ bool MaximizedClientAreaIsTheWorkArea(HINSTANCE instance) {
   if (auto_hide.bottom) expected.bottom -= kelpie::windows::kAutoHideRevealPx;
   const RECT client = ClientOnScreen(window);
   passed &= Expect(IsZoomed(window) != FALSE, "window did not maximize");
+  passed &= Expect(IsWindowVisible(window) == FALSE, "maximize test window was shown");
   passed &= Expect(SameRect(client, expected),
                    "maximized client area is not the monitor work area");
 
@@ -101,9 +121,8 @@ bool MaximizedClientAreaIsTheWorkArea(HINSTANCE instance) {
   passed &= Expect(SendMessageW(window, WM_NCHITTEST, 0, title_centre) == HTCAPTION,
                    "maximized title strip is not draggable");
 
-  ShowWindow(window, SW_RESTORE);
-  GetWindowRect(window, &window_rect);
-  passed &= Expect(SameRect(ClientOnScreen(window), window_rect),
+  RestoreHidden(window, restored);
+  passed &= Expect(SameRect(ClientOnScreen(window), restored),
                    "restoring from maximized kept the maximized inset");
   DestroyWindow(window);
   return passed;
