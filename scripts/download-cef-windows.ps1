@@ -9,6 +9,9 @@ $archiveUrl = "https://cef-builds.spotifycdn.com/" + $archiveName
 $expectedSha256 = "DB3E0751979C3CB3068F732ED4F0EF12ADE69D183D98CEEE120AD08C8D00F74C"
 $expectedSha1 = "E5E3020627F4528BD43E22F4C4970000B0458E99"
 
+# The caller captures this script's output to read CEF_ROOT, so progress has
+# to go to the host: a stalled stage otherwise leaves the log blank.
+function Write-Stage([string]$Message) { Write-Host "==> [cef] $Message" }
 function Assert-Within([string]$Child, [string]$Parent, [string]$Name) {
   $prefix = $Parent.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
   if (-not $Child.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { throw "$Name must be inside $Parent." }
@@ -42,9 +45,11 @@ Assert-Within $sdkRoot $cache "CEF root"
 Assert-Within $archive $cache "CEF archive"
 
 if ($Force -or -not (Test-Path -LiteralPath $archive)) {
+  Write-Stage "downloading $archiveUrl"
   Invoke-WebRequest -Uri $archiveUrl -OutFile "$archive.part" -UseBasicParsing
   Move-Item -Force -LiteralPath "$archive.part" -Destination $archive
 }
+Write-Stage ("verifying {0:N0} MB archive" -f ((Get-Item -LiteralPath $archive).Length / 1MB))
 $archiveHash = Assert-ArchiveHash $archive
 
 if (-not $Force -and (Test-SdkRoot $sdkRoot) -and (Test-Path -LiteralPath $proofPath)) {
@@ -61,8 +66,16 @@ $extract = Join-Path $cache ("extract-" + $PID)
 Remove-CacheTree $extract $cache
 New-Item -ItemType Directory -Path $extract | Out-Null
 try {
-  & tar.exe -xjf $archive -C $extract
+  # Not tar.exe: its libarchive depends on the Windows build. The windows-2022
+  # CI image's (bsdtar 3.8.4, "zlib/1.2.5.f-ipp cng/2.0 libb2/bundled") has no
+  # bzip2 of its own, so it hands .bz2 to an external bzip2 (Git's, there) and
+  # sat on this archive until GitHub cancelled the job at six hours. CMake
+  # bundles libarchive with bzip2 built in, and the build needs cmake anyway.
+  Write-Stage "extracting with cmake -E tar"
+  Push-Location -LiteralPath $extract
+  try { & cmake -E tar xf $archive } finally { Pop-Location }
   if ($LASTEXITCODE -ne 0) { throw "Unable to extract pinned CEF archive." }
+  Write-Stage "extracted"
   $extractedRoot = Join-Path $extract $sdkName
   if (-not (Test-SdkRoot $extractedRoot)) { throw "Pinned CEF archive has an invalid layout." }
   $bootstrapHash = (Get-FileHash -LiteralPath (Join-Path $extractedRoot "Release\bootstrap.exe") -Algorithm SHA256).Hash

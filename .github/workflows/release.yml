@@ -374,6 +374,8 @@ jobs:
   build-windows:
     name: Build Windows release artifact
     runs-on: windows-2022
+    # The same build and package as the Windows CEF job: ~9.5 minutes green.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - name: Verify harness process handling
