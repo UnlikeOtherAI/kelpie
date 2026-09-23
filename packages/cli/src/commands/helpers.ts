@@ -18,6 +18,23 @@ export function explicitGlobalPort(program: Command, globals: GlobalOptions): nu
   return Number.isInteger(port) && port > 0 ? port : undefined;
 }
 
+/**
+ * The `--port` typed for `command`, else the command's own default.
+ *
+ * The program declares a global `--port`, and commander hands every `--port`
+ * on the line to the program — one typed after the subcommand included — so a
+ * subcommand that declares `--port` for its own meaning (`browser launch`,
+ * `mcp --http`) never receives it in its own options. Those commands keep the
+ * declaration so their help says what the flag means for them, and read the
+ * value through this, never through their own `opts.port`.
+ */
+export function subcommandPort(command: Command): string | undefined {
+  let owner: Command | null = command;
+  while (owner && owner.getOptionValueSource("port") !== "cli") owner = owner.parent;
+  const value: unknown = (owner ?? command).getOptionValue("port");
+  return typeof value === "string" ? value : undefined;
+}
+
 export function withGlobalTabId(
   globals: GlobalOptions,
   body?: Record<string, unknown>,

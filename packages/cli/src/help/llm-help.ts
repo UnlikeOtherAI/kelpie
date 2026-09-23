@@ -69,8 +69,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
     platforms: ["macos"],
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
-      { name: "port", type: "number", required: false, description: "Optional explicit HTTP port" },
-      { name: "wait", type: "boolean", required: false, description: "Wait until the local browser becomes reachable" },
+      { name: "port", type: "number", required: false, description: "Optional explicit HTTP port; --port may come before or after the command" },
     ],
     errors: describeErrors(["BROWSER_NOT_REGISTERED", "APP_NOT_INSTALLED", "BROWSER_LAUNCH_FAILED"]),
     related: ["browser register", "browser list", "browser inspect"],

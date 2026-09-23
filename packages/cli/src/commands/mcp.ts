@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { CLI_MCP_PORT, httpToMcp, type BrowserMcpTool } from "@unlikeotherai/kelpie-shared";
 import { DEFAULT_MCP_BIND_HOST } from "../mcp/transport.js";
-import { localBrowserDevice } from "./helpers.js";
+import { localBrowserDevice, subcommandPort } from "./helpers.js";
 import { sendCommand } from "../client/http-client.js";
 import type { DiscoveredDevice } from "../types.js";
 
@@ -40,10 +40,9 @@ export function registerMcp(program: Command): void {
     .action(
       async (opts: {
         http?: boolean;
-        port?: string;
         bind?: string;
         unsafeHost?: boolean;
-      }) => {
+      }, command: Command) => {
         const globals = program.opts<{ browser?: string }>();
         const local = globals.browser ? await localBrowserDevice(globals.browser) : undefined;
         if (globals.browser && !local) {
@@ -72,7 +71,7 @@ export function registerMcp(program: Command): void {
         if (opts.http) {
           const { startHttp } = await import("../mcp/transport.js");
           try {
-            await startHttp(server, Number(opts.port) || CLI_MCP_PORT, {
+            await startHttp(server, Number(subcommandPort(command)) || CLI_MCP_PORT, {
               bindHost: opts.bind,
               unsafeHost: opts.unsafeHost,
             });

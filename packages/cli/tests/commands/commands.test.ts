@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { addDevice, clearDevices } from "../../src/discovery/registry.js";
+// Static, not imported inside the test: a cold import of every command module
+// can outlast the 5 s test timeout on a loaded machine.
+import { createProgram } from "../../src/program.js";
 import type { DiscoveredDevice } from "../../src/types.js";
 
 const device: DiscoveredDevice = {
@@ -202,11 +205,10 @@ describe("command API method mapping", () => {
     }, { tabId: "tab-456", selector: "#submit" })).toEqual({ tabId: "tab-456", selector: "#submit" });
   });
 
-  it("carries --tab-generation from the command line into the request body", async () => {
+  it("carries --tab-generation from the command line into the request body", () => {
     // The lease only travels when the generation is an integer, and Commander
     // leaves option values as strings unless a parser is supplied — so this
     // goes through the real program rather than a hand-built globals object.
-    const { createProgram } = await import("../../src/program.js");
     const program = createProgram("0.0.0-test");
     program.parseOptions(["--tab-id", "tab-123", "--tab-generation", "2"]);
     const globals = program.opts<Parameters<typeof withGlobalTabId>[0]>();
