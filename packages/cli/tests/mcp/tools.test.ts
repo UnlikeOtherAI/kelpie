@@ -158,3 +158,28 @@ describe("tool timeouts", () => {
     }
   });
 });
+
+describe("screenshot options", () => {
+  const screenshot = browserTools.find((t) => t.name === "kelpie_screenshot")!;
+
+  it("accepts JPEG quality 1-100 and a positive integer maxWidth", () => {
+    expect(screenshot.schema.quality?.safeParse(1).success).toBe(true);
+    expect(screenshot.schema.quality?.safeParse(100).success).toBe(true);
+    expect(screenshot.schema.quality?.safeParse(0).success).toBe(false);
+    expect(screenshot.schema.quality?.safeParse(101).success).toBe(false);
+    expect(screenshot.schema.quality?.safeParse(0.8).success).toBe(false);
+    expect(screenshot.schema.maxWidth?.safeParse(960).success).toBe(true);
+    expect(screenshot.schema.maxWidth?.safeParse(0).success).toBe(false);
+    expect(screenshot.schema.maxWidth?.safeParse(959.5).success).toBe(false);
+    expect(screenshot.schema.maxWidth?.safeParse(16385).success).toBe(false);
+  });
+
+  it("passes format, quality and maxWidth through to the device unchanged", () => {
+    expect(screenshot.bodyFromArgs({ device: "win", format: "jpeg", quality: 60, maxWidth: 960 })).toEqual({
+      format: "jpeg",
+      quality: 60,
+      maxWidth: 960,
+      resolution: "viewport",
+    });
+  });
+});

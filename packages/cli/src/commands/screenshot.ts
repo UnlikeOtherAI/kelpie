@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import { requireDevice, getGlobals, withGlobalTabId } from "./helpers.js";
 import { sendCommand } from "../client/http-client.js";
 import { print } from "../output/formatter.js";
+import { screenshotOptionError } from "../client/screenshot-options.js";
 
 export function registerScreenshot(program: Command): void {
   program
@@ -14,12 +15,14 @@ export function registerScreenshot(program: Command): void {
     .option("--base64", "Return raw base64 instead of saving to file")
     .option("--image-format <fmt>", "Image format: png or jpeg", "png")
     .option("--quality <n>", "JPEG quality 1-100")
+    .option("--max-width <px>", "Largest image width in pixels; the image is scaled down to fit")
     .action(async (opts: {
       output?: string;
       fullPage?: boolean;
       base64?: boolean;
       imageFormat: string;
       quality?: string;
+      maxWidth?: string;
     }) => {
       const globals = getGlobals(program);
       const device = await requireDevice(program);
@@ -30,6 +33,7 @@ export function registerScreenshot(program: Command): void {
         format: opts.imageFormat,
       };
       if (opts.quality) body.quality = Number(opts.quality);
+      if (opts.maxWidth) body.maxWidth = Number(opts.maxWidth);
 
       const result = await sendCommand<{
         success: boolean;
@@ -41,6 +45,13 @@ export function registerScreenshot(program: Command): void {
 
       if (!result.ok || !result.data.image) {
         print(result.data, globals.format);
+        process.exitCode = 1;
+        return;
+      }
+
+      const unsupported = screenshotOptionError(body, result.data, device);
+      if (unsupported) {
+        print(unsupported, globals.format);
         process.exitCode = 1;
         return;
       }

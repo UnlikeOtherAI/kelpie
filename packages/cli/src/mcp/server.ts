@@ -1,10 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import { sendCommand } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
 import { discoverDevices } from "../discovery/discover.js";
@@ -12,6 +8,8 @@ import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools, requestTimeoutMs } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
+import { formatScreenshotResult, isScreenshotResult } from "./screenshot-result.js";
+import { screenshotOptionError, type ScreenshotDevice } from "../client/screenshot-options.js";
 import { limitPageText } from "./page-text-limit.js";
 import type { DiscoveredDevice } from "../types.js";
 import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
@@ -24,15 +22,6 @@ import { pair as pairWithDevice } from "../auth/pairing.js";
 import { defaultClientName, getSessionCache, getTokenStore } from "../auth/token-store.js";
 
 type JsonObject = Record<string, unknown>;
-type ScreenshotResult = JsonObject & {
-  image: string;
-  format?: unknown;
-  resolution?: unknown;
-  success?: unknown;
-};
-
-const screenshotMethods = new Set(["screenshot", "screenshotAnnotated"]);
-const mcpScreenshotDir = join(tmpdir(), "kelpie-mcp-screenshots");
 
 /**
  * `pinned` is the local browser `kelpie --browser <alias> mcp` was started
@@ -124,25 +113,25 @@ function registerBrowserTool(
         remoteStoredAt: remote.storedAt,
       });
     }
-    return formatBrowserToolResult(tool.method, result.data, device.name, args as Record<string, unknown>);
+    return formatBrowserToolResult(tool.method, result.data, device, args as Record<string, unknown>);
   });
 }
 
 /**
  * Shape a device response into an MCP tool result. `args` are the tool call's
- * own arguments, such as the page-text ceiling the MCP layer applies itself.
+ * own arguments: the screenshot options the device was asked to honour, and
+ * the page-text ceiling the MCP layer applies itself.
  */
 export async function formatBrowserToolResult(
   method: string,
   data: unknown,
-  deviceName?: string,
+  device: ScreenshotDevice = {},
   args: Record<string, unknown> = {},
 ): Promise<CallToolResult> {
   if (isScreenshotResult(method, data)) {
-    if (isNativeScreenshotResult(method, data)) {
-      return saveNativeScreenshotResult(method, data, deviceName);
-    }
-    return portableScreenshotResult(data);
+    const unsupported = screenshotOptionError(args, data, device);
+    if (unsupported) return errorToolResult(unsupported);
+    return formatScreenshotResult(method, data, device.name);
   }
   if (method === "getPageText") {
     return textToolResult(limitPageText(data, typeof args.maxChars === "number" ? args.maxChars : undefined));
@@ -163,95 +152,6 @@ function errorToolResult(data: unknown): { content: { type: "text"; text: string
 
 function isMcpFailure(data: unknown): boolean {
   return isJsonObject(data) && data.success === false;
-}
-
-function isScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
-  return (
-    screenshotMethods.has(method) &&
-    isJsonObject(data) &&
-    data.success === true &&
-    typeof data.image === "string" &&
-    data.image.length > 0
-  );
-}
-
-function isNativeScreenshotResult(method: string, data: unknown): data is ScreenshotResult {
-  return (
-    isScreenshotResult(method, data) &&
-    data.resolution === "native" &&
-    typeof data.image === "string"
-  );
-}
-
-function portableScreenshotResult(result: ScreenshotResult): CallToolResult {
-  const format = normalizeImageFormat(result.format);
-  const mimeType = `image/${format}`;
-  const metadata: JsonObject = { ...result, mimeType };
-  return {
-    content: [
-      { type: "text", text: JSON.stringify(metadata) },
-      { type: "image", data: result.image, mimeType },
-    ],
-    structuredContent: metadata,
-  };
-}
-
-async function saveNativeScreenshotResult(
-  method: string,
-  result: ScreenshotResult,
-  deviceName: string | undefined,
-): Promise<CallToolResult> {
-  const format = normalizeImageFormat(result.format);
-  const extension = format === "jpeg" ? "jpg" : "png";
-  const imageBytes = Buffer.from(result.image, "base64");
-  const file = await writeMcpScreenshotFile(imageBytes, extension, method, deviceName);
-  const { image: _image, ...metadata } = result;
-  const compactResult: JsonObject = {
-    ...metadata,
-    file,
-    imageSavedToFile: true,
-    imageBytes: imageBytes.byteLength,
-  };
-
-  return {
-    content: [
-      { type: "text", text: JSON.stringify(compactResult) },
-      { type: "image", data: result.image, mimeType: `image/${format}` },
-      {
-        type: "resource_link",
-        uri: pathToFileURL(file).href,
-        name: basename(file),
-        mimeType: `image/${format}`,
-        size: imageBytes.byteLength,
-        description: "Native screenshot saved by Kelpie MCP",
-      },
-    ],
-    structuredContent: compactResult,
-  };
-}
-
-async function writeMcpScreenshotFile(
-  imageBytes: Buffer,
-  extension: "jpg" | "png",
-  method: string,
-  deviceName: string | undefined,
-): Promise<string> {
-  await mkdir(mcpScreenshotDir, { recursive: true });
-  const slug = slugify(deviceName ?? method);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const suffix = randomUUID().slice(0, 8);
-  const file = join(mcpScreenshotDir, `${slug}-${timestamp}-${suffix}.${extension}`);
-  await writeFile(file, imageBytes);
-  return file;
-}
-
-function normalizeImageFormat(raw: unknown): "jpeg" | "png" {
-  return raw === "jpeg" || raw === "jpg" ? "jpeg" : "png";
-}
-
-function slugify(value: string): string {
-  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return slug.length > 0 ? slug : "screenshot";
 }
 
 function isJsonObject(value: unknown): value is JsonObject {

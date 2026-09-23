@@ -89,7 +89,7 @@ describe("MCP browser result formatting", () => {
         format: "png",
         resolution: "native",
       },
-      "Test Mac",
+      { name: "Test Mac" },
     );
 
     const text = result.content.find((item) => item.type === "text");
@@ -124,29 +124,66 @@ describe("MCP browser result formatting", () => {
     await rm(metadata.file, { force: true });
   });
 
-  it("returns portable MCP image content for Windows screenshots", async () => {
+  it("sends a portable screenshot's base64 exactly once, as the image item", async () => {
+    const image = Buffer.from("portable screenshot bytes!").toString("base64");
     const payload = {
       success: true,
-      image: "abc",
+      image,
       width: 390,
       height: 844,
       format: "png",
       resolution: "viewport",
+      tab: { id: "tab-1" },
     };
-    const result = await formatBrowserToolResult("screenshot", payload, "Test Windows");
+    const result = await formatBrowserToolResult("screenshot", payload, { name: "Test Windows" });
 
+    const { image: _image, ...rest } = payload;
+    const metadata = { ...rest, mimeType: "image/png", imageBytes: 26 };
     expect(result.content).toEqual([
-      { type: "text", text: JSON.stringify({ ...payload, mimeType: "image/png" }) },
-      { type: "image", data: "abc", mimeType: "image/png" },
+      { type: "text", text: JSON.stringify(metadata) },
+      { type: "image", data: image, mimeType: "image/png" },
     ]);
-    expect(result.structuredContent).toEqual({ ...payload, mimeType: "image/png" });
+    expect(result.structuredContent).toEqual(metadata);
+    expect(JSON.stringify(result).split(image)).toHaveLength(2);
+  });
+
+  it("reports a JPEG screenshot's MIME type and decoded size", async () => {
+    const image = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00]).toString("base64");
+    const result = await formatBrowserToolResult(
+      "screenshot",
+      { success: true, image, width: 960, height: 479, format: "jpeg" },
+      {},
+      { format: "jpeg", maxWidth: 960 },
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({ format: "jpeg", mimeType: "image/jpeg", imageBytes: 5 });
+    expect(result.structuredContent).not.toHaveProperty("image");
+    expect(result.content[1]).toEqual({ type: "image", data: image, mimeType: "image/jpeg" });
+  });
+
+  it("refuses an image wider than the requested maxWidth instead of sending it", async () => {
+    const image = "iVBORw0KGgo=";
+    const result = await formatBrowserToolResult(
+      "screenshot",
+      { success: true, image, width: 1918, height: 957, format: "png" },
+      { name: "probe", platform: "windows", version: "0.1.1" },
+      { maxWidth: 960 },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(image);
+    const body = JSON.parse((result.content[0] as { text: string }).text);
+    expect(body.error).toMatchObject({ code: "SCREENSHOT_OPTION_UNSUPPORTED", option: "maxWidth" });
+    expect(body.error.message).toContain("\"probe\" (windows 0.1.1)");
+    expect(body.error.message).toContain("1918 px");
   });
 
   it("applies the page-text ceiling to kelpie_get_page_text results", async () => {
     const result = await formatBrowserToolResult(
       "getPageText",
       { success: true, mode: "readable", text: "x".repeat(30), length: 30 },
-      undefined,
+      {},
       { maxChars: 10 },
     );
 

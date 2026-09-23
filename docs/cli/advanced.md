@@ -32,6 +32,18 @@ kelpie mcp --http --port 8421
 
 ### Tool results and limits
 
+**Screenshots.** `kelpie_screenshot` sends the image once:
+
+- The MCP `image` item carries the base64.
+- The text item and `structuredContent` carry the same metadata object:
+  `format`, `mimeType`, `width`, `height`, `imageBytes`, `tab` and the
+  viewport-mapping fields. Neither contains `image`.
+
+To keep the image small, pass `format: "jpeg"` with a `quality` (1–100) and a
+`maxWidth`. A device that ignores `maxWidth` or JPEG returns
+`SCREENSHOT_OPTION_UNSUPPORTED` instead of an oversized image. This is checked
+against the returned `width` and `format`.
+
 **Timeouts.** These tools take a `timeout` argument:
 
 - `kelpie_click`

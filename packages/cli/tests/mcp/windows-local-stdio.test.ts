@@ -75,6 +75,13 @@ describe("Windows local alias MCP stdio", () => {
     expect(failure.isError).toBe(true);
     const screenshot = await client.callTool({ name: "kelpie_screenshot", arguments: {} });
     expect(screenshot.content).toContainEqual({ type: "image", data: "cG5n", mimeType: "image/png" });
+    // The base64 travels once, as the image item — never in the text or structuredContent.
+    expect(JSON.stringify(screenshot).split("cG5n")).toHaveLength(2);
+    expect(screenshot.structuredContent).toMatchObject({ format: "png", mimeType: "image/png", imageBytes: 3 });
+    expect(screenshot.structuredContent).not.toHaveProperty("image");
     await client.close();
-  });
+    // The child compiles the whole CLI through tsx before it can answer. That
+    // takes about 2 s alone and more than 5 s (vitest's default) beside the
+    // rest of the suite, so this test states its own budget.
+  }, 30_000);
 });

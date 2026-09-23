@@ -347,6 +347,8 @@ The CLI runs as an MCP server (stdio or HTTP/SSE transport) exposing 100+ tools 
 
 All MCP tools use the `kelpie_` prefix and include JSON schemas with descriptions.
 
+A screenshot reaches an MCP client once, as an image item, with its metadata in the text and `structuredContent`. An ordinary page used to arrive at three times its size. `kelpie_screenshot` also passes on `format`, `quality` and `maxWidth`. When the device ignores an option, the call fails with `SCREENSHOT_OPTION_UNSUPPORTED`, so an oversized image never reaches the client.
+
 ## Install Description (`kelpie describe`)
 
 One machine-readable document answering what an external integrator needs to know before it can drive anything: which CLI version is answering, where its binary lives, how to start its MCP server over stdio or HTTP, how large the tool catalog is (with a digest so a poller notices an upgrade that changed the tool surface), and every instance currently visible — from the mDNS browse *and* the loopback probe, since a Kelpie on the same host is routinely missed by the announcement.

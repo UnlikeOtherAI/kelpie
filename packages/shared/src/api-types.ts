@@ -59,6 +59,8 @@ export interface ScreenshotRequest {
   fullPage?: boolean;
   format?: "png" | "jpeg";
   quality?: number;
+  /** Largest image width in pixels; scaled down, never up. Desktop Chromium (Windows, Linux) only. */
+  maxWidth?: number;
   resolution?: ScreenshotResolution;
 }
 

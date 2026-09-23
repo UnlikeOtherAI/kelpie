@@ -245,8 +245,10 @@ CLI:
     Linux.
 - `kelpie screenshot` gains `--max-width <px>`.
 - **Clear error when a device does not honour an option.** After a
-  successful capture, `checkScreenshotOptions(request, response)` in
-  `screenshot-result.ts` fails in either of these cases:
+  successful capture, `screenshotOptionError(request, response, device)` in
+  `packages/cli/src/client/screenshot-options.ts` fails in either of these
+  cases. It lives in the client layer because both the MCP server and the
+  `kelpie screenshot` command use it.
   - `format: "jpeg"` was requested and the response format is not `jpeg`;
   - `maxWidth` was requested and the response `width` is greater than
     `maxWidth`.

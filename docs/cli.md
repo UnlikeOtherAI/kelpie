@@ -275,6 +275,7 @@ kelpie screenshot --device "My iPhone"
 kelpie screenshot --device "My iPhone" --output ./shot.png
 kelpie screenshot --device "My iPhone" --full-page
 kelpie screenshot --device "My iPhone" --base64     # return raw base64 instead of saving
+kelpie screenshot --device win --image-format jpeg --quality 60 --max-width 960   # small JPEG
 ```
 
 **Default behavior: saves to file, returns the path.** Without `--output`, the CLI auto-generates a filename in the current directory using the pattern `{device}-{timestamp}.png` (e.g., `my-iphone-2026-03-30T10-15-32.png`). The JSON response contains the file path — never base64 — so LLMs don't waste tokens on image data.
@@ -287,6 +288,9 @@ For LLM and MCP use, prefer viewport/CSS-pixel screenshots unless you explicitly
 | `--output <path>` | Save to explicit path, return `{"file": "..."}` |
 | `--output <dir>/` | Save to directory with auto-generated filename |
 | `--base64` | Return raw base64 JSON (for programmatic use, not LLM conversations) |
+| `--image-format <png\|jpeg>` | Image format (default `png`) |
+| `--quality <1-100>` | JPEG quality |
+| `--max-width <px>` | Largest image width in pixels; the device scales the image down (never up) to fit. Honoured on Windows and Linux. A device that ignores it fails the command with `SCREENSHOT_OPTION_UNSUPPORTED` and nothing is saved. |
 
 Group screenshots (`kelpie group screenshot`) always save to files — one per device. Use `--output <dir>/` to collect them in a folder.
 
