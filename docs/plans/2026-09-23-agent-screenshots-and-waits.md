@@ -648,3 +648,128 @@ Each finding and what was done with it:
     platform supports them.
 13. **Low, C5: the minimised check is not atomic with the capture. Accepted.**
     This is a wording change, and the live check asserts the steady state.
+
+---
+
+## Implementation notes: native side
+
+These notes record where the native implementation refined or departed from
+the design above, and what the live checks measured. They cover C1 and C3 on
+the app's own `/mcp`, and C4 to C8. The live checks ran against a build from
+this branch on this machine (device pixel ratio 1), driven through
+`kelpie --browser <alias> mcp`.
+
+**C4. CDP, as designed; WIC was not needed.** `clip.scale` behaves under CEF
+windowed rendering. JPEG quality 60 at `maxWidth` 960:
+
+| Page | Image | JPEG | Whole MCP response |
+|---|---|---|---|
+| Hacker News | 960×483 | 35 KB | 47.9 KB |
+| Wikipedia article | 960×483 | 51 KB | 69.4 KB |
+
+The evidence measured 529 KB and 911 KB for the same pages. One refinement
+came from the live check. `Page.getLayoutMetrics`' CSS visual viewport
+excludes the page's scrollbars, but an unclipped capture includes them: a
+1921 px viewport came back as a 1936 px image. Two consequences:
+
+- A `maxWidth` between the two widths skipped the clip and returned an image
+  wider than asked.
+- `imageScaleX` read 1.0078 instead of 1.
+
+So a `maxWidth` capture is always a clip of the visual viewport, at a scale
+capped at 1, and the engine reports the scale it captured at
+(`image_scale`) rather than the handler dividing widths. The dpr-2 formula
+is pinned by a unit test only; this machine runs at 1.
+
+**C5.** Besides `IsIconic` on the root window, a tab host window with an
+empty client area also returns `WINDOW_MINIMIZED`, with its own message.
+Live:
+
+- While minimised, both PNG and JPEG screenshots returned `WINDOW_MINIMIZED`;
+  `evaluate`, `navigate` and `wait-for-navigation` kept working.
+- After restoring, screenshots succeeded again.
+
+**C6.** As designed. In addition, the profile-lock failure no longer reports
+every error as "This profile is already in use": only a sharing violation
+means that, and a lock path of `MAX_PATH` or more names its length. The
+stale-record check uses the non-throwing `exists()`, so an over-long path
+reaches that explanation instead of an exception. Live, a 194-character
+profile under `%LOCALAPPDATA%\Kelpie\profiles\` launched, published its
+readiness record, and could be driven over MCP.
+
+**C7. No native change.** The task text asked for `MdnsWindows` to be
+started. This design rejects that for the reasons in C7, which were
+verified before implementing:
+
+- the listener refuses a non-loopback bind and a non-loopback `Host`
+  header;
+- commit 63ed078 removed `StartMdns`.
+
+Live, `kelpie_discover` listed this build (`local:127.0.0.1:8426`) through
+the loopback probe.
+
+**C8. Two refinements to `NavigationTracker`.**
+
+- `MarkAction()` sets `baseline = finished`, not `started`. A load that is
+  still in flight when an action runs therefore still counts, and a wait
+  after it waits for that load to finish.
+- A main-frame `OnLoadError` while the tab is idle counts as a navigation.
+  CEF never calls `OnLoadStart` for a navigation that fails before commit,
+  so a page-started navigation to an unreachable address would otherwise
+  time out as "No navigation started".
+
+`ERR_ABORTED` also leaves the tab's `loading` flag alone, since it says
+nothing about the load now in progress.
+
+A third fix came from the live check. The last poll of a wait only gets what
+is left of the timeout, and when the UI thread did not answer in those
+milliseconds, the caller got RunOnUi's generic "Browser operation timed
+out". A poll that times out at the wait's own deadline now ends the wait
+with the wait's own message.
+
+Live results for C8:
+
+| After | Result |
+|---|---|
+| Click on a link | 23 ms |
+| Click on a slow link | 1545 ms |
+| `evaluate` that navigates | Followed |
+| `back` | 48 ms |
+| Click that does not navigate | `TIMEOUT` after 2 s: "No navigation started within 2000 ms" |
+| `pushState` | `TIMEOUT` after 2 s: "No navigation started within 2000 ms" |
+| API navigation that fails before commit | `NAVIGATION_ERROR` |
+| Page navigation that fails before commit | `NAVIGATION_ERROR` |
+
+**C1 and C3 on the app's own `/mcp`.** Both landed as designed. Live:
+
+- A JPEG screenshot's base64 appeared exactly once in the response.
+- `kelpie_get_page_text` with `maxChars` 500 cut 77,395 characters with the
+  note.
+
+**Structure.** `desktop_engine_control.cpp` was 691 lines. The move-only
+split leaves it at 457 lines of tab lifecycle, the UI-thread bridge,
+`Evaluate` and `DevTools`. Navigation moved to `desktop_engine_navigation.cpp`,
+and cookies, trusted input and dialogs to `desktop_engine_page.cpp`.
+
+**Found along the way.**
+
+- **`kelpie browser launch <name> --port N` always launched on 8420.** The
+  program-level `--port` took the value. Fixed.
+- **A second Kelpie can bind a loopback port another Kelpie already
+  listens on.** cpp-httplib sets `SO_REUSEADDR`, after which Windows
+  rejects `SO_EXCLUSIVEADDRUSE`. Recorded as a separate task, not fixed
+  here.
+- **The release acceptance harness (not run by CI) had four defects that
+  kept it from starting or comparing correctly.** They are fixed: the
+  hidden spawn, the double-unwrapped evaluate result, the non-canonical URL
+  comparison, and the CLI phase's fixed port. It still does not pass end to
+  end on this machine, because of four failures that predate this change:
+  - the occupied-port check expects the app to exit;
+  - press-key's keydown is not delivered;
+  - a click that opens `alert()` blocks for 10 s;
+  - a `set-cookie` it expects to be refused succeeds.
+
+  In a local run with those steps skipped, the screenshot and wait checks
+  this change added passed. The run stopped at the cookie step, before the
+  harness's MCP and CLI phases. The one-copy `/mcp` screenshot and the
+  CLI's `--port` were checked directly instead.
