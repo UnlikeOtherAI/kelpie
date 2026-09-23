@@ -1,6 +1,6 @@
 # Screenshots and waits an agent can rely on
 
-Status: design, before implementation. Branch `fix/agent-screenshots-and-waits`.
+Status: design, reviewed before implementation (see [Cross-Provider Review](#cross-provider-review)). Branch `fix/agent-screenshots-and-waits`.
 
 ## Why
 
@@ -101,6 +101,16 @@ The desktop app clamps every `timeout` to 1–30000 ms (`ControlTimeout`,
   matches the desktop app's clamp and its published `/mcp` schema.
 - The timeout helper and its constants live in `tools.ts`, beside the
   `timeout` fragment.
+- Two schema changes reject values the old schema accepted:
+  - `timeout` above 30 000 ms. Such values never worked over MCP, because the
+    CLI cut every call at 10 s.
+  - `quality` of 0 or a fraction.
+
+  `docs/cli.md` records both as a tightening.
+- Known limit: the margin is measured from when the CLI sends the request.
+  A call that the device holds behind other work can still hit the CLI's
+  deadline first. An agent drives one tab at a time over stdio, so this is
+  recorded, not engineered around.
 
 **Tests.** `tests/mcp/request-timeout.test.ts` mocks `sendCommand` with
 `vi.mock` and connects a client to the real `createMcpServer` over
@@ -128,7 +138,11 @@ layer bounds it.
   Chromium.
 - When the text is longer than `maxChars`:
   - The text field is cut to `maxChars` UTF-16 code units, without splitting
-    a surrogate pair.
+    a surrogate pair. The native `/mcp` holds UTF-8, so it counts the same
+    UTF-16 units while walking the UTF-8: one unit per code point below
+    U+10000 and two for a 4-byte sequence. It never cuts inside a sequence or
+    a pair, so both surfaces report the same `totalChars` and cut at the same
+    place.
   - The result gains `truncated: true`, `totalChars: <original length>` and a
     `note`, for example: `"Page text truncated to 20000 of 80359 characters.
     Pass a larger maxChars, or a selector for the part you need."`
@@ -149,7 +163,8 @@ layer bounds it.
   - a custom `maxChars`;
   - a surrogate pair on the boundary;
   - that `maxChars` is never forwarded to the device.
-- Native: `test_desktop_mcp_server.cpp`.
+- Native: `test_desktop_mcp_server.cpp`, including the same astral-character
+  boundary case, so the two implementations are held to one answer.
 
 ## C4 — Windows screenshots: JPEG, quality, maxWidth
 
@@ -191,10 +206,22 @@ updated first.
 3. When `maxWidth` is smaller than `clientWidth × dpr`, the capture passes
    `clip: {x: pageX, y: pageY, width: clientWidth, height: clientHeight,
    scale: maxWidth / (clientWidth × dpr)}`. The image is never upscaled.
-4. `ParseScreenshotResult` reports the MIME type of the format actually
-   requested. Today it hard-codes `image/png`.
+4. `format`, `width` and `height` are read from the encoded image's own
+   header, not from the request or from arithmetic. The PNG `IHDR` and the
+   JPEG `SOF0`/`SOF2` markers are parsed by a small pure function that
+   decodes only a prefix of the base64.
+
+   `ParseScreenshotResult` hard-codes `image/png` today. After this change a
+   wrong label, or a wrong scale formula, shows up in the metadata and in the
+   CLI's option check, instead of passing silently.
+
+   The formula in step 3 assumes that CDP multiplies `clip.scale` by the
+   device pixel ratio. That is how a Puppeteer `deviceScaleFactor` screenshot
+   behaves, but it is unverified at a ratio other than 1, because this
+   machine runs at 1. If the assumption is wrong, the header-read width
+   exposes it.
 5. The response carries the metadata iOS, Android and macOS already send:
-   - `width`, `height`: the encoded image's pixel size;
+   - `width`, `height`: the encoded image's pixel size, from step 4;
    - `viewportWidth`, `viewportHeight` (CSS);
    - `devicePixelRatio`;
    - `imageScaleX`, `imageScaleY`;
@@ -246,7 +273,10 @@ CLI:
   - quality out of range;
   - `maxWidth` rejected when it is 0 or not an integer;
   - `fullPage: false` accepted and `fullPage: true` rejected.
-- Native unit tests for the scale arithmetic, as a pure function.
+- Native unit tests for the scale arithmetic, as a pure function, including
+  a device pixel ratio of 2.
+- Native unit tests for the header reader: PNG, baseline JPEG, progressive
+  JPEG, and a truncated or garbage prefix.
 - CLI unit tests:
   - the schema ranges;
   - pass-through of `maxWidth` and `quality`;
@@ -281,12 +311,16 @@ The page itself does not know it is hidden: `evaluate` reported
 - Other methods keep working while the window is minimised, as they do
   today.
 - Linux has no check yet. `docs/functionality.md` states this.
+- The check and the capture are not atomic. A minimise that lands between
+  them can still yield one stale frame. The docs say "returns an error while
+  the window is minimised", not "never returns a stale image".
 
 **Tests.**
 - Native: the router maps `WINDOW_MINIMIZED` to 409.
 - Live: minimise the window with
   `ShowWindow(hwnd, SW_MINIMIZE)` from PowerShell. `kelpie_screenshot` must
   return `isError` with `WINDOW_MINIMIZED`. After a restore it must succeed.
+  Both assertions are made on the steady state, after the window has settled.
 
 ## C6 — Long profile paths start
 
@@ -411,7 +445,21 @@ The events that drive it:
 | `ApiNavigationRequested()` | `MarkAction()`, then `++started`, and `error` is cleared |
 | `OnLoadStart` for the main frame, when `started == finished` | `++started` and `error` is cleared. This is a page-started load; the API's own load is not counted twice |
 | `OnLoadingStateChange(false)` with no error | `finished = started` |
-| `OnLoadError` for the main frame | Records `error` |
+| `OnLoadError` for the main frame, except `ERR_ABORTED` | Records `error` |
+
+- `OnLoadStart` is new wiring. `DesktopCefClient` implements `OnLoadEnd`,
+  `OnLoadError` and `OnLoadingStateChange` today, but not `OnLoadStart`.
+- `ERR_ABORTED` is what CEF reports when a newer navigation supersedes a load,
+  or a link turns out to be a download. It is not a failure of the navigation
+  being waited for. Today's `OnLoadError` records it as one; the tracker
+  ignores it.
+- **Thread affinity.** Every tracker read and write happens on the CEF UI
+  thread. The load events already run there, and the wait reads the state
+  through `RunOnUi`.
+- `MarkAction` runs in a UI task that completes before the action dispatches
+  its input. The handler resolves the tab, runs `MarkAction` through
+  `RunOnUi`, then acts. A load that the action starts can therefore only be
+  counted after the baseline is taken.
 
 - The interaction handlers and `evaluate` call `MarkAction` after resolving
   the tab and before acting.
@@ -427,13 +475,16 @@ The events that drive it:
   - a navigation that finished before the wait started;
   - no navigation at all;
   - a load error;
-  - a second page load while the first is still loading.
+  - a second page load while the first is still loading;
+  - an `ERR_ABORTED` followed by a completed load, which succeeds.
 - Live, on a fixture page with a link and a button that does not navigate:
   - click the link, then `wait_for_navigation` returns and the URL has
     changed;
   - click the button, then `wait_for_navigation` with `timeout: 2000` returns
     `TIMEOUT`;
-  - `navigate` followed by `wait_for_navigation` still works on a fast page.
+  - `navigate` followed by `wait_for_navigation` still works on a fast page;
+  - a button that calls `history.pushState` does not count as a navigation,
+    so the wait times out.
 
 ---
 
@@ -515,3 +566,80 @@ described in C8.
   size, because it expects nested `get-device-info` fields while desktop
   Chromium sends them flat.
 - Deleting `MdnsWindows`.
+
+---
+
+## Cross-Provider Review
+
+**How it ran.** Reviewer: `kimix exec` (provider `kimi`, model `k3-256k`), run
+on 2026-09-23 against this document as first committed (`ea9dec6`). It was
+told to be adversarial, to read only eight source files, and to answer in
+under 800 words. It finished in about three minutes and used 42,758 tokens.
+
+It could not check claims about files outside those eight. The claim it
+singled out — that iOS, Android and macOS report `width` as the image's pixel
+width — was checked afterwards:
+- iOS: `apps/ios/Kelpie/Handlers/HandlerContext.swift:28`
+- macOS: `apps/macos/Kelpie/Handlers/ScreenshotHandler.swift:28`
+- Android: `apps/android/app/src/main/java/com/kelpie/browser/handlers/ScreenshotHandler.kt:61`
+
+All three set `width` to the rendered image's width.
+
+Each finding and what was done with it:
+
+1. **High, C8: `ERR_ABORTED` counted as a failure. Accepted.** CEF reports it
+   for a superseded load or a download. The tracker now ignores it, and a new
+   test covers "aborted, then completed".
+2. **High, C8: race between the baseline and `OnLoadStart`. Accepted in part.**
+   The race as described is reversed: the baseline is taken *before* the
+   action, so the action's own load always counts after it. The thread
+   affinity was unstated, though. The design now puts every tracker access on
+   the CEF UI thread, with `MarkAction` in a UI task that completes before the
+   input is dispatched.
+3. **High, C4: `clip.scale` off by the device pixel ratio. Not accepted as
+   stated; the risk it points at is real.** Chromium multiplies `clip.scale`
+   by the device scale factor, which is how Puppeteer `deviceScaleFactor`
+   screenshots behave, so `maxWidth / (clientWidth × dpr)` is the expected
+   formula. Neither side verified it at a ratio other than 1. Two changes
+   follow:
+   - `width` and `height` now come from the encoded image's header, not from
+     arithmetic, so a wrong formula is visible rather than silent.
+   - A unit test pins the formula at dpr 2. The unverified live case is
+     recorded in C4.
+4. **Medium, C4: the MIME type taken from the request. Accepted.** The format
+   comes from the image header, the same parse as finding 3.
+5. **Medium, C2: the margin does not cover queueing. Accepted as a documented
+   limit.** It is not engineered around: requests are not serialised behind a
+   whole-tab lease for their full duration, and an agent drives one tab at a
+   time.
+6. **Medium, C8: a page load started during an in-flight load is merged.
+   Rejected.** `finished` advances only when CEF reports that loading has
+   stopped, and it does not report that until the superseding load has
+   finished too. The merged count cannot produce a "finished" answer for a
+   superseded load. A test ("a second page load while the first is still
+   loading") pins this.
+7. **Medium, C8: `OnLoadStart` is not wired today. Accepted.** The design says
+   so. A live check that `pushState` is not counted was added.
+8. **Medium, C3: UTF-16 on one surface, UTF-8 on the other. Accepted.** Both
+   surfaces count UTF-16 code units. The native side counts them while walking
+   the UTF-8, and a shared astral-boundary case is tested on both.
+9. **Medium, C6: a custom `--readiness-file` shorter than 13 characters.
+   Rejected.** The CLI and the acceptance harness always use `readiness.json`
+   inside the profile. A tiny custom name in a directory near `MAX_PATH` is
+   not a case anyone hits. The improved error message still names the path
+   length if it happens. Extended-length (`\?\`) paths are the complete fix;
+   they are recorded as a follow-up, because CEF's own profile paths would
+   then be the limit.
+10. **Low, C6: two launches whose ids share the first 8 hex characters.
+    Rejected.** The chance is 1 in 2³², and it needs two launches sharing an
+    explicit readiness directory at the same moment.
+11. **Low, C2: `.max(30000)` and integer `quality` are breaking. Accepted as a
+    documentation point.** Values above 10 s never worked over MCP, so no
+    working caller breaks. `docs/cli.md` records both as a tightening.
+12. **Low, C4: add `maxWidth` and `quality` to `kelpie_screenshot_annotated`.
+    Rejected for now.** No platform could honour them there today. Windows
+    does not expose the annotated tool, and iOS, Android and macOS do not know
+    `maxWidth`, so every oversized result would be refused. Add them when a
+    platform supports them.
+13. **Low, C5: the minimised check is not atomic with the capture. Accepted.**
+    This is a wording change, and the live check asserts the steady state.
