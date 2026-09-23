@@ -447,6 +447,10 @@ has a ceiling:
   a `note`.
 - Otherwise the result gains `truncated: false`.
 - Other device fields are left as sent.
+- The desktop app's own `/mcp` endpoint (Windows, Linux) applies the same
+  ceiling to `kelpie_get_page_text`, with the same default, fields and note.
+  It counts the same UTF-16 code units, so both MCP surfaces cut the same text
+  at the same place.
 
 ```json
 {

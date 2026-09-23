@@ -129,6 +129,40 @@ int main() {
   assert(text == shot_result["structuredContent"]);
   assert(text["width"] == 960 && text["mimeType"] == "image/jpeg");
   assert(text["imageBytes"] == 13);
+
+  // kelpie_get_page_text has the CLI's ceiling. maxChars is applied here and
+  // never reaches the handler, and lengths are UTF-16 code units, as the CLI
+  // counts them, so both MCP surfaces cut in the same place.
+  std::string page = "abcd\xF0\x9F\x98\x80x";  // "abcd", U+1F600 (two units), "x": 7 units
+  nlohmann::json page_params;
+  router.Register("get-page-text", [&page, &page_params](const nlohmann::json& params) {
+    page_params = params;
+    return nlohmann::json{{"success", true}, {"text", page}, {"length", page.size()}};
+  });
+  const auto page_text = [&server, &config](const nlohmann::json& arguments) {
+    const auto reply = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 30}, {"method", "tools/call"},
+        {"params", {{"name", "kelpie_get_page_text"}, {"arguments", arguments}}}}, config);
+    const auto& structured = reply["result"]["structuredContent"];
+    assert(nlohmann::json::parse(reply["result"]["content"][0]["text"].get<std::string>()) == structured);
+    return structured;
+  };
+  const auto whole = page_text({{"mode", "readable"}});
+  assert(whole["truncated"] == false && whole["text"] == page && !whole.contains("totalChars"));
+  assert(!page_params.contains("maxChars") && page_params["mode"] == "readable");
+  // Five units would split the astral character, so it is left out whole.
+  const auto cut = page_text({{"maxChars", 5}});
+  assert(!page_params.contains("maxChars"));
+  assert(cut["truncated"] == true && cut["text"] == "abcd" && cut["totalChars"] == 7);
+  assert(cut["note"] == "Page text truncated to 4 of 7 characters. Pass a larger maxChars, or a selector for the part you need.");
+  assert(page_text({{"maxChars", 6}})["text"] == "abcd\xF0\x9F\x98\x80");
+  assert(page_text({{"maxChars", 7}})["truncated"] == false);
+  page = std::string(25000, 'w');
+  const auto defaulted = page_text(nlohmann::json::object());
+  assert(defaulted["text"].get<std::string>().size() == 20000 && defaulted["totalChars"] == 25000);
+  assert(defaulted["length"] == 25000);  // Other device fields are left as they were.
+  const auto zero = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 31}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_get_page_text"}, {"arguments", {{"maxChars", 0}}}}}}, config);
+  assert(zero["error"]["code"] == -32602);
   const auto empty_fill = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);

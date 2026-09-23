@@ -6,6 +6,7 @@
 #include <optional>
 #include <string_view>
 
+#include "desktop_mcp_page_text.h"
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
 #include "kelpie/response_helpers.h"
@@ -129,6 +130,7 @@ nlohmann::json InputSchema(std::string_view endpoint) {
     string("label"); string("placeholder"); string("name");
   } else if (endpoint == "get-page-text") {
     properties["mode"] = {{"enum", {"readable", "full", "markdown"}}}; string("selector");
+    integer("maxChars", 1);  // Applied here, never sent to the handler.
   } else if (endpoint == "get-visible-elements") {
     properties["interactableOnly"] = {{"type", "boolean"}};
     properties["includeText"] = {{"type", "boolean"}};
@@ -374,16 +376,23 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
       return ReplyOrNothing(notification, JsonRpcError(id, -32602, *invalid));
     }
 
+    const bool page_text = match->http_endpoint == "get-page-text";
+    json forwarded = arguments;
+    std::size_t max_chars = desktop_mcp::kDefaultPageTextMaxChars;
+    if (page_text && forwarded.contains("maxChars")) {
+      max_chars = static_cast<std::size_t>(forwarded["maxChars"].get<std::uint64_t>());
+      forwarded.erase("maxChars");
+    }
     const DesktopRouter::Result result =
-        impl_->router->Dispatch(match->http_endpoint, arguments);
+        impl_->router->Dispatch(match->http_endpoint, forwarded);
     const bool screenshot = match->http_endpoint == "screenshot" || match->http_endpoint == "screenshot-annotated";
     json content;
-    json structured = result.body;
+    json structured = page_text ? desktop_mcp::LimitPageText(result.body, max_chars) : result.body;
     if (screenshot && result.body.value("success", false) && result.body.contains("image") &&
         result.body["image"].is_string()) {
       content = ScreenshotContent(&structured);
     } else {
-      content = {{{"type", "text"}, {"text", result.body.dump()}}};
+      content = {{{"type", "text"}, {"text", structured.dump()}}};
     }
     const json response = JsonRpcResult(id, {{"content", content},
                                                {"structuredContent", structured},

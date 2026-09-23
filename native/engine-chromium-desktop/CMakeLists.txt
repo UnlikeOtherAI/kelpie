@@ -42,6 +42,7 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_bridge.cpp
   src/desktop_http_server.cpp
   src/desktop_mcp_server.cpp
+  src/desktop_mcp_page_text.cpp
   src/desktop_router.cpp
   src/cef_renderer.cpp
   src/handlers/navigation_handler.cpp
