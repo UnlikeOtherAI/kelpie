@@ -38,6 +38,18 @@ async function isReachable(port?: number): Promise<boolean> {
   return probeHealth(port);
 }
 
+/**
+ * The port `browser launch` was asked for. `--port` is also a program-level
+ * option (the device port, default 8420), and Commander hands the value to the
+ * program instead of this subcommand, so `browser launch <name> --port 8450`
+ * launched on 8420 whatever it was given. Only a value typed on the command
+ * line counts: the program's default is not a request.
+ */
+export function requestedLaunchPort(program: Command, own?: string): string | undefined {
+  if (own !== undefined) return own;
+  return program.getOptionValueSource("port") === "cli" ? String(program.opts().port) : undefined;
+}
+
 function chooseLaunchPort(requestedPort?: string): number {
   const port = requestedPort ? Number(requestedPort) : DEFAULT_PORT;
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
@@ -220,7 +232,7 @@ export function registerBrowser(program: Command): void {
       }
 
       let port: number;
-      try { port = chooseLaunchPort(opts.port); } catch (error) {
+      try { port = chooseLaunchPort(requestedLaunchPort(program, opts.port)); } catch (error) {
         print({ success: false, error: { code: "INVALID_PORT", message: error instanceof Error ? error.message : "Invalid port" } }, globals.format);
         process.exitCode = 4; return;
       }
