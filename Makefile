@@ -207,14 +207,14 @@ linux:
 	fi
 	@if [ -d "$(LINUX_CEF_ROOT)" ]; then \
 		echo "→ Using Linux CEF SDK at $(LINUX_CEF_ROOT)"; \
-		cmake -S native -B native/.build-linux -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DKELPIE_ENABLE_CHROMIUM_DESKTOP=ON; \
+		cmake -S native -B native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DKELPIE_ENABLE_CHROMIUM_DESKTOP=ON; \
 		cmake --build native/.build-linux; \
-		cmake -S apps/linux -B apps/linux/build -G Ninja -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEF_ROOT="$(LINUX_CEF_ROOT)" -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
 	else \
 		echo "→ No Linux CEF SDK found at $(LINUX_CEF_ROOT); building fallback renderer"; \
-		cmake -S native -B native/.build-linux -G Ninja; \
+		cmake -S native -B native/.build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release; \
 		cmake --build native/.build-linux; \
-		cmake -S apps/linux -B apps/linux/build -G Ninja -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
+		cmake -S apps/linux -B apps/linux/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNATIVE_BUILD_DIR=$(REPO_ROOT)native/.build-linux; \
 	fi
 	cmake --build apps/linux/build
 
