@@ -13,6 +13,10 @@ struct MdnsRegistration {
   StringMap txt_records;
 };
 
+// Deliberately never started: the Windows control plane is loopback-only
+// (commit 63ed078), so an advertisement would announce an address no LAN peer
+// can use. The CLI finds a local Windows browser through its loopback probe.
+// See docs/plans/2026-09-23-agent-screenshots-and-waits.md, C7.
 class MdnsWindows {
  public:
   MdnsWindows();

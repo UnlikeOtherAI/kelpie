@@ -7,7 +7,7 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { sendCommand } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
-import { scanForDevices } from "../discovery/scanner.js";
+import { discoverDevices } from "../discovery/discover.js";
 import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
@@ -19,7 +19,6 @@ import { ModelStore } from "../ai/store.js";
 import { buildDownloadUrl, downloadModel } from "../ai/download.js";
 import { detectOllama, listOllamaModels } from "../ai/ollama.js";
 import { saveFeedbackReport, summarizeFeedbackReports } from "../feedback/store.js";
-import { enrichDevicesWithCapabilities } from "../discovery/capabilities.js";
 import { pair as pairWithDevice } from "../auth/pairing.js";
 import { defaultClientName, getSessionCache, getTokenStore } from "../auth/token-store.js";
 
@@ -336,7 +335,7 @@ async function handleDiscovery(method: string, params: Record<string, unknown>, 
 
   if (method === "discover") {
     const timeout = typeof params.timeout === "number" ? params.timeout : 3000;
-    const found = await enrichDevicesWithCapabilities(await scanForDevices(timeout));
+    const found = await discoverDevices(timeout);
     addDevices(found);
     const devices = getAllDevices();
     return { content: [{ type: "text", text: JSON.stringify({ success: true, devices, count: devices.length }) }] };

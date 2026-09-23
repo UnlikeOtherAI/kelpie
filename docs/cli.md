@@ -44,7 +44,7 @@ kelpie discover --scan-timeout 5000    # custom mDNS scan duration in ms
 
 `--scan-timeout` controls how long the mDNS scan runs. The global `--timeout` flag, by contrast, governs the per-request timeout used by individual device commands and has no effect on `discover`.
 
-mDNS announcements are racy. If the scan finds no devices, the CLI falls back to probing `127.0.0.1` directly (the recorded running ports plus `8420`–`8429`) so a Kelpie running on the same host still appears. A localhost candidate is accepted only when both `/health` and `/v1/get-device-info` respond, so a stale or non-automation process cannot turn ordinary commands into full request timeouts. This same localhost fallback is used whenever a command runs without `--device` and the scan comes up empty, and `kelpie info` uses it before reporting an empty device list.
+mDNS announcements are racy. If the scan finds no devices, the CLI falls back to probing `127.0.0.1` directly (the recorded running ports plus `8420`–`8429`) so a Kelpie running on the same host still appears. A localhost candidate is accepted only when both `/health` and `/v1/get-device-info` respond, so a stale or non-automation process cannot turn ordinary commands into full request timeouts. This same localhost fallback is used whenever a command runs without `--device` and the scan comes up empty, and `kelpie info` uses it before reporting an empty device list. The MCP tool `kelpie_discover` runs the same sweep. A Windows browser is only ever found this way: its control plane is loopback-only, so it does not announce itself on mDNS.
 
 **Output:**
 ```json

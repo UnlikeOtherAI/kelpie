@@ -325,7 +325,7 @@ export const browserTools: BrowserToolDef[] = [
 
 export const cliTools: CliToolDef[] = [
   // Discovery
-  { name: "kelpie_discover", description: "Discover devices on the local network via mDNS", method: "discover", kind: "discovery", schema: { timeout: z.number().optional().describe("Discovery timeout in ms (default 3000)") }, bodyFromArgs: filterBody },
+  { name: "kelpie_discover", description: "Discover devices on the local network via mDNS, falling back to probing this machine's loopback ports when the browse finds nothing (the Windows browser is loopback-only and never announces itself)", method: "discover", kind: "discovery", schema: { timeout: z.number().optional().describe("Discovery timeout in ms (default 3000)") }, bodyFromArgs: filterBody },
   { name: "kelpie_list_devices", description: "List all discovered devices", method: "listDevices", kind: "discovery", schema: {}, bodyFromArgs: filterBody },
   { name: "kelpie_pair", description: "Pair the CLI with a device. The end-user must explicitly approve on the device — this tool blocks until approval, denial, or timeout. Resulting tokens are scoped 'session' (process-memory) or 'persistent' (~/.kelpie/tokens.json, 0600).", method: "pair", kind: "discovery", schema: { device, clientName: z.string().optional().describe("Self-reported name displayed on the device prompt"), timeoutMs: z.number().optional().describe("How long to wait for approval before giving up (default 300000)") }, bodyFromArgs: passthrough },
   { name: "kelpie_feedback_summary", description: "Summarize locally stored automation feedback reports", method: "feedbackSummary", kind: "discovery", schema: { limit: z.number().optional().describe("How many recent reports to include (default 10)") }, bodyFromArgs: filterBody },
