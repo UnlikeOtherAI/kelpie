@@ -751,7 +751,8 @@ Live results for C8:
 **Structure.** `desktop_engine_control.cpp` was 691 lines. The move-only
 split leaves it at 457 lines of tab lifecycle, the UI-thread bridge,
 `Evaluate` and `DevTools`. Navigation moved to `desktop_engine_navigation.cpp`,
-and cookies, trusted input and dialogs to `desktop_engine_page.cpp`.
+and cookies, trusted input and dialogs to `desktop_engine_page.cpp` (since
+replaced by main's own split; see "Merging main's release-gate fixes").
 
 **Found along the way.**
 
@@ -866,11 +867,15 @@ adds a third. A client that must keep every result under 200 KB asks for
 
 ## Merging main's release-gate fixes
 
-`main` gained four commits while this branch was open, among them
-7c422dc ("make the Windows control surface pass its release acceptance
-gate") and 4fb23bf ("remember window placement, fail hidden startups
-promptly"). They touched the same code as C8 and the acceptance harness.
-The merge keeps both behaviours:
+`main` gained five commits while this branch was open. Three of them
+touched the same code as C8, the engine split and the acceptance harness:
+
+- 7c422dc, "make the Windows control surface pass its release acceptance
+  gate";
+- 4fb23bf, "remember window placement, fail hidden startups promptly";
+- 305750c, "split desktop_engine_control.cpp along its responsibilities".
+
+The merges keep both sides' behaviour:
 
 - **`navigate` now waits for its own load, as on main.** Main added
   `handlers/navigation_wait`, which polled the old `requested` / `completed`
@@ -881,10 +886,19 @@ The merge keeps both behaviours:
   when it starts, so `navigate` waits for its own load and not an earlier
   one. The poll floor and the "No navigation started" message moved into it
   with the loop.
-- **Trusted input that opens a dialog.** Main's interrupt predicate is now
-  in `DispatchTrustedInput` in `desktop_engine_page.cpp`, where this
-  branch had moved that function. `RunDevTools` is declared in
-  `desktop_engine_impl.h` so that file can pass the predicate.
+- **One split of `desktop_engine_control.cpp`, main's.** Main split the
+  same file (305750c) while this branch had its own split. The merge keeps
+  main's files: `desktop_engine_control_support` for the shared helpers,
+  `desktop_engine_input.cpp` for trusted input and dialogs, and
+  `desktop_engine_page_control.cpp` for `Evaluate`, cookies and `DevTools`.
+  It also keeps two of this branch's files. `desktop_engine_navigation.cpp`
+  holds the tracker-based navigation, and `desktop_engine_screenshot.cpp`
+  holds the new `Screenshot`. The old PNG-only `Screenshot` is gone from
+  `page_control`. This branch's `desktop_engine_page.cpp` was a byte-for-byte
+  copy of main's input and cookie code, so it is removed. `IsNavigableUrl`
+  moved into `desktop_engine_control_support`. That file now also has the
+  helpers this branch had added to `desktop_engine_impl.h`: `RemainingTimeout`
+  and the `RunDevTools` declaration.
 - **The harness launches hidden again.** This branch had started the
   browser visible because a hidden launch never became ready. Main fixed
   the cause: startup now checks the browser child's own `WS_VISIBLE`. So the

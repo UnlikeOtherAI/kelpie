@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -23,18 +22,6 @@ namespace kelpie {
 // whose store is still loading, and DesktopEngine::CreateTab either retries
 // past it or rewrites it into a real error.
 inline constexpr const char* kPartitionNotReady = "PARTITION_NOT_READY";
-
-// Whether `url` can be loaded into a tab. Defined in desktop_engine_control.cpp.
-bool IsNavigableUrl(const std::string& url);
-
-// What is left of `timeout` since `started`, never negative. Shared by the
-// engine's operations that make more than one native call.
-inline DesktopBrowserControl::Timeout RemainingTimeout(std::chrono::steady_clock::time_point started,
-                                                       DesktopBrowserControl::Timeout timeout) {
-  const auto elapsed = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(
-      std::chrono::steady_clock::now() - started);
-  return elapsed >= timeout ? DesktopBrowserControl::Timeout::zero() : timeout - elapsed;
-}
 
 class DesktopCefClient;
 
@@ -132,14 +119,5 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   void RecountPartitions();
   void UpdateActiveState();
 };
-
-// Begins `method` on the tab's DevTools session and waits for its reply, giving
-// up early when `interrupted` reports that the reply can no longer arrive.
-// Defined in desktop_engine_control.cpp; trusted input in
-// desktop_engine_page.cpp is the caller that passes `interrupted`.
-BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease,
-                                 std::string method, const nlohmann::json& params,
-                                 nlohmann::json* output, DesktopBrowserControl::Timeout timeout,
-                                 const std::function<bool()>& interrupted = {});
 
 }  // namespace kelpie

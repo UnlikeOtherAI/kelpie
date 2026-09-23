@@ -1,4 +1,4 @@
-#include "desktop_engine_impl.h"
+#include "desktop_engine_control_support.h"
 
 #include <condition_variable>
 #include <ctime>
@@ -12,7 +12,6 @@
 #include "include/base/cef_bind.h"
 #include "include/base/cef_callback.h"
 #include "include/cef_task.h"
-#include "include/cef_parser.h"
 #include "include/wrapper/cef_closure_task.h"
 #include "include/cef_urlrequest.h"
 #include "include/cef_request_context.h"
@@ -53,56 +52,14 @@ void RunUiOperation(std::shared_ptr<UiOperation> operation) {
   operation->ready.notify_all();
 }
 
-struct PendingDevTools {
-  CefRefPtr<DesktopDevToolsSession> session;
-  std::shared_ptr<DesktopDevToolsSession::Operation> operation;
-};
-
-BrowserControlResult DevToolsResult(const DesktopDevToolsSession::Result& result) {
-  BrowserControlResult output = result.ok ? BrowserControlResult::Success()
-                                         : BrowserControlResult::Failure(result.error_code, result.message);
-  output.operation_may_have_completed = result.operation_may_have_completed;
-  return output;
-}
-
 }  // namespace
 
-BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease,
-                                 std::string method, const nlohmann::json& params,
-                                 nlohmann::json* output, DesktopBrowserControl::Timeout timeout,
-                                 const std::function<bool()>& interrupted) {
-  if (!output) return BrowserControlResult::Failure("INTERNAL", "result is required");
-  const auto started_at = std::chrono::steady_clock::now();
-  auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    pending->session = tab->devtools;
-    pending->operation = pending->session->Begin(tab->browser, method, params);
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (!started.ok) return started;
-  const auto completed =
-      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout), interrupted);
-  const auto result = DevToolsResult(completed);
-  if (result.ok) *output = completed.value;
-  return result;
-}
+using namespace engine_control;
 
-// Tab lifecycle, the UI-thread bridge and the DevTools calls every other
-// operation is built on. Navigation is in desktop_engine_navigation.cpp;
-// cookies, trusted input and dialogs in desktop_engine_page.cpp; screenshots in
-// desktop_engine_screenshot.cpp.
-
-bool IsNavigableUrl(const std::string& url) {
-  if (url.empty()) return false;
-  CefURLParts parts;
-  // `kelpie://` is checked explicitly: CefParseURL only recognises a custom
-  // scheme once Chromium has been initialised in this process, and the shell
-  // creates the start page tab through the same validator.
-  return CefParseURL(url, parts) || IsInternalSchemeUrl(url) ||
-         url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
-}
+// Tab lifecycle and the UI-thread bridge every other operation is built on.
+// Navigation is in desktop_engine_navigation.cpp; DevTools page operations in
+// desktop_engine_page_control.cpp; trusted input and dialogs in
+// desktop_engine_input.cpp; screenshots in desktop_engine_screenshot.cpp.
 
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
   for (auto& tab : tabs) {
@@ -438,32 +395,6 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     impl->UpdateActiveState();
     return BrowserControlResult::Success(impl->ActiveTab() ? std::optional(impl->Snapshot(*impl->ActiveTab())) : std::nullopt);
   }, timeout);
-}
-
-BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script, Json* value, Timeout timeout) {
-  const auto impl = impl_;
-  if (value == nullptr) return BrowserControlResult::Failure("INTERNAL", "result is required");
-  const auto started_at = std::chrono::steady_clock::now();
-  auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl->RunOnUi([impl, lease, script = std::move(script), pending] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    pending->session = tab->devtools;
-    pending->operation = pending->session->Begin(tab->browser, "Runtime.evaluate",
-                                                  DesktopDevToolsSession::EvaluateParams(script));
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (!started.ok) return started;
-  const auto parsed = DesktopDevToolsSession::ParseEvaluateResult(
-      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout)));
-  const auto result = DevToolsResult(parsed);
-  if (result.ok) *value = parsed.value;
-  return result;
-}
-
-BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method, const Json& params,
-                                             Json* output, Timeout timeout) {
-  return RunDevTools(impl_, lease, std::move(method), params, output, timeout);
 }
 
 }  // namespace kelpie

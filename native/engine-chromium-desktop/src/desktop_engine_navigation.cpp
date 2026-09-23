@@ -1,4 +1,4 @@
-#include "desktop_engine_impl.h"
+#include "desktop_engine_control_support.h"
 
 #include <limits>
 #include <memory>
@@ -9,6 +9,8 @@
 // wait-for-navigation. The tracker's load events arrive in
 // desktop_engine_client.cpp.
 namespace kelpie {
+
+using namespace engine_control;
 
 BrowserControlResult DesktopEngine::GetNavigationState(TabLease lease, NavigationState* output,
                                                        Timeout timeout) {

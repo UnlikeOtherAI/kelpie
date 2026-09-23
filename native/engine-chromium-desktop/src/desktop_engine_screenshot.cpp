@@ -1,4 +1,4 @@
-#include "desktop_engine_impl.h"
+#include "desktop_engine_control_support.h"
 
 #include <chrono>
 
@@ -42,6 +42,8 @@ BrowserControlResult WindowCanProduceImage(const CefRefPtr<CefBrowser>& browser)
 }
 
 }  // namespace
+
+using namespace engine_control;
 
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, const BrowserScreenshotOptions& options,
                                                BrowserScreenshot* image, Timeout timeout) {
