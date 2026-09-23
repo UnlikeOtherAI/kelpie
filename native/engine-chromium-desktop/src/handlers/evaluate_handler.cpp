@@ -110,6 +110,10 @@ nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) 
       BrowserNavigationState state;
       const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
           lease, &state, remaining);
+      // The last poll only has what is left of the wait. When the wait's own
+      // deadline cut it short, the answer is the wait's timeout, which says
+      // whether a navigation had started, not a generic operation timeout.
+      if (!control.ok && control.error_code == "TIMEOUT" && std::chrono::steady_clock::now() >= deadline) continue;
       if (!control.ok) return ControlError(control);
       progress = state.navigation.Since(baseline);
       if (progress == NavigationTracker::Progress::kFailed) {

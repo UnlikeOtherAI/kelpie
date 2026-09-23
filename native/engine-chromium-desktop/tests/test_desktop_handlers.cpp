@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <thread>
 #undef assert
 #define assert(expression) do { if (!(expression)) std::abort(); } while (false)
 
@@ -46,7 +47,14 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
-  kelpie::BrowserControlResult GetNavigationState(kelpie::TabLease lease, kelpie::BrowserNavigationState* state, Timeout) override {
+  // Models a UI thread too busy to answer a poll given only the last few
+  // milliseconds of a wait: like RunOnUi, it waits out that budget, then times out.
+  bool nav_poll_starved = false;
+  kelpie::BrowserControlResult GetNavigationState(kelpie::TabLease lease, kelpie::BrowserNavigationState* state, Timeout timeout) override {
+    if (nav_poll_starved && timeout < std::chrono::milliseconds(80)) {
+      std::this_thread::sleep_for(timeout);
+      return kelpie::BrowserControlResult::Failure("TIMEOUT", "Browser operation timed out");
+    }
     ++nav_polls;
     if (nav_stops_on_second_poll && nav_polls >= 2) nav.LoadStopped();
     *state = {lease.id == "second" ? second : first, nav};
@@ -152,6 +160,13 @@ int main() {
   auto idle = router.Dispatch("wait-for-navigation", {{"tabId", "second"}, {"generation", 9}, {"timeout", 150}});
   assert(idle.status_code == 408 && idle.body["error"]["code"] == "TIMEOUT");
   assert(idle.body["error"]["message"] == "No navigation started within 150 ms");
+  // The last poll only gets what is left of the wait. When that poll times out
+  // at the deadline, the caller still learns that no navigation started,
+  // rather than a generic "Browser operation timed out".
+  control.nav_poll_starved = true;
+  auto starved = router.Dispatch("wait-for-navigation", {{"tabId", "second"}, {"generation", 9}, {"timeout", 150}});
+  control.nav_poll_starved = false;
+  assert(starved.status_code == 408 && starved.body["error"]["message"] == "No navigation started within 150 ms");
   // The page commits a navigation, and the wait returns once loading stops.
   control.nav.LoadStarted(); control.nav_polls = 0; control.nav_stops_on_second_poll = true;
   assert(router.Dispatch("wait-for-navigation", second).status_code == 200);
