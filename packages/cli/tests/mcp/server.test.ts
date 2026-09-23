@@ -167,7 +167,7 @@ describe("MCP browser result formatting", () => {
     const result = await formatBrowserToolResult(
       "screenshot",
       { success: true, image, width: 1918, height: 957, format: "png" },
-      { name: "probe", platform: "windows", version: "0.1.1" },
+      { name: "probe", platform: "windows" },
       { maxWidth: 960 },
     );
 
@@ -175,7 +175,7 @@ describe("MCP browser result formatting", () => {
     expect(JSON.stringify(result)).not.toContain(image);
     const body = JSON.parse((result.content[0] as { text: string }).text);
     expect(body.error).toMatchObject({ code: "SCREENSHOT_OPTION_UNSUPPORTED", option: "maxWidth" });
-    expect(body.error.message).toContain("\"probe\" (windows 0.1.1)");
+    expect(body.error.message).toContain("\"probe\" (windows)");
     expect(body.error.message).toContain("1918 px");
   });
 

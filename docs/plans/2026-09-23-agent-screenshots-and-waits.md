@@ -255,9 +255,12 @@ CLI:
 
   The failure is `SCREENSHOT_OPTION_UNSUPPORTED`:
   - It is a CLI-generated code, like `DEVICE_NOT_FOUND`.
-  - The message names the option, what came back, the device's platform and
-    version, and the fix (update the app, omit the option, or shrink the
+  - The message names the option, what came back, the device and its
+    platform, and the fix (update the app, omit the option, or shrink the
     window with `kelpie_resize_viewport`).
+  - It does not quote a version. An alias device's `version` is its
+    readiness record's format version (`helpers.ts:45`), not the app's, so it
+    would mislead.
   - The result carries no image. The point of `maxWidth` is to keep an
     oversized image away from the client.
 - The check is on the result, not on a platform table, so it also catches a

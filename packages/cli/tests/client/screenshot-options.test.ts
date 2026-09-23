@@ -17,13 +17,13 @@ describe("screenshotOptionError", () => {
   });
 
   it("names an unhonoured JPEG request", () => {
-    const failure = screenshotOptionError({ format: "jpeg" }, { format: "png" }, { name: "win", platform: "windows", version: "0.1.1" });
+    const failure = screenshotOptionError({ format: "jpeg" }, { format: "png" }, { name: "win", platform: "windows" });
     expect(failure).toEqual({
       success: false,
       error: {
         code: "SCREENSHOT_OPTION_UNSUPPORTED",
         option: "format",
-        message: "JPEG was requested but \"win\" (windows 0.1.1) returned png. Update the Kelpie app or omit format.",
+        message: "JPEG was requested but \"win\" (windows) returned png. Update the Kelpie app or omit format.",
       },
     });
   });

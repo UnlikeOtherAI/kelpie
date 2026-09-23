@@ -21,10 +21,14 @@ export interface ScreenshotAnswer {
   width?: unknown;
 }
 
+/**
+ * Who answered, for the error message. The app version is deliberately left
+ * out: an alias device's `version` is its readiness record's format version,
+ * not the app's, so quoting it would mislead.
+ */
 export interface ScreenshotDevice {
   name?: string;
   platform?: string;
-  version?: string;
 }
 
 export interface ScreenshotOptionFailure {
@@ -63,7 +67,6 @@ function failure(option: "format" | "maxWidth", message: string): ScreenshotOpti
 }
 
 function describeDevice(device: ScreenshotDevice): string {
-  const parts = [device.platform, device.version].filter((part): part is string => Boolean(part));
   const name = device.name ? `"${device.name}"` : "the device";
-  return parts.length > 0 ? `${name} (${parts.join(" ")})` : name;
+  return device.platform ? `${name} (${device.platform})` : name;
 }
