@@ -118,7 +118,7 @@ Ninja, and tar.exe; it uses C++20, the static MSVC CRT, USE_SANDBOX=ON, and CTes
 
 The ZIP contains only the CEF runtime, locales, licenses, unchanged CEF bootstrap
 kelpie.exe, and Kelpie's kelpie.dll. Packaging rejects missing RunWinMain, non-x64 DLLs,
-or absent/mismatched 0.1.1 DLL resource versions. It writes uniquely named SHA-256 and
+or absent/mismatched 0.1.2 DLL resource versions. It writes uniquely named SHA-256 and
 provenance sidecars. Signing happens after deterministic resource stamping when a
 certificate is supplied; no certificate is assumed here. Use the approved Windows
 release acceptance command documented above; CI packaging does not bypass a locally

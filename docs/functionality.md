@@ -393,7 +393,7 @@ Overriding the device GPS location (latitude, longitude, accuracy) is part of th
 
 ## Windows local control
 
-Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
+Windows `0.1.2` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
 file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
