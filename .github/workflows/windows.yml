@@ -10,6 +10,7 @@ permissions: {contents: read}
 jobs:
   build:
     runs-on: windows-2022
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - name: Verify harness process handling

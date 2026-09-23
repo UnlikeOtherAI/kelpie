@@ -26,7 +26,9 @@ function Initialize-VsEnvironment {
 function Require-Path([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { throw "Required path is missing: $Path" }
 }
+function Write-Stage([string]$Message) { Write-Host "==> $Message" }
 function Invoke-Checked([string]$Description, [scriptblock]$Command) {
+  Write-Stage $Description
   & $Command
   if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
 }
@@ -34,6 +36,7 @@ function Invoke-Checked([string]$Description, [scriptblock]$Command) {
 $repoRoot = [IO.Path]::GetFullPath($SourceRoot)
 Require-Path (Join-Path $repoRoot "apps\windows\CMakeLists.txt")
 if ([string]::IsNullOrWhiteSpace($CefRoot)) {
+  Write-Stage "CEF SDK"
   $line = & (Join-Path $PSScriptRoot "download-cef-windows.ps1")
   if ($line -notmatch "^CEF_ROOT=(.+)$") { throw "CEF downloader did not return CEF_ROOT." }
   $CefRoot = $matches[1]
@@ -45,6 +48,7 @@ foreach ($relative in @("CMakeLists.txt", "include\cef_app.h", "Release\bootstra
   Require-Path (Join-Path $cef $relative)
 }
 
+Write-Stage "Visual Studio environment"
 Initialize-VsEnvironment
 foreach ($tool in @("cmake.exe", "ninja.exe", "cl.exe", "dumpbin.exe", "ctest.exe")) {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Missing build tool: $tool" }
