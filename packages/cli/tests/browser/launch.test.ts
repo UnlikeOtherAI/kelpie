@@ -1,22 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import net from "node:net";
-import { allocateBrowserPort, resolveAppPath, validateBrowserName } from "../../src/browser/launch.js";
+import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
+import { allocateBrowserPort, isPortFree, resolveAppPath, validateBrowserName } from "../../src/browser/launch.js";
+
+/** A probe that reports exactly the given ports as taken. */
+const takenPorts = (...taken: number[]) => async (port: number) => !taken.includes(port);
 
 describe("browser launch helpers", () => {
   let busyServer: net.Server | null = null;
 
-  beforeEach(() => {
-    busyServer = null;
-  });
-
   afterEach(async () => {
-    await new Promise<void>((resolve) => {
-      if (!busyServer) {
-        resolve();
-        return;
-      }
-      busyServer.close(() => { resolve(); });
-    });
+    const server = busyServer;
+    busyServer = null;
+    if (server) await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
   });
 
   it("validates browser alias names", () => {
@@ -25,19 +21,25 @@ describe("browser launch helpers", () => {
     expect(validateBrowserName("bad name")).toBe(false);
   });
 
-  it("rejects the AppReveal and CLI MCP reserved port", async () => {
-    await expect(allocateBrowserPort(8421)).rejects.toThrow("reserved");
+  it("allocates the default port when it is free", async () => {
+    expect(await allocateBrowserPort(takenPorts())).toBe(DEFAULT_PORT);
   });
 
-  it("skips an occupied port during automatic allocation", async () => {
-    busyServer = net.createServer();
-    await new Promise<void>((resolve) => {
-      busyServer!.listen(8420, "127.0.0.1", () => { resolve(); });
-    });
+  it("skips an occupied port and never hands out the AppReveal and CLI MCP port", async () => {
+    // 8421 is free here, so only the reservation keeps the scan off it.
+    expect(await allocateBrowserPort(takenPorts(8420))).toBe(8422);
+  });
 
-    const port = await allocateBrowserPort();
-    expect(port).not.toBe(8420);
-    expect(port).not.toBe(8421);
+  it("fails rather than falling back to a taken port when the range is full", async () => {
+    await expect(allocateBrowserPort(async () => false)).rejects.toThrow("No free port");
+  });
+
+  it("probes by binding the loopback address", async () => {
+    busyServer = net.createServer();
+    const port = await new Promise<number>((resolve) => {
+      busyServer!.listen(0, "127.0.0.1", () => { resolve((busyServer!.address() as net.AddressInfo).port); });
+    });
+    expect(await isPortFree(port)).toBe(false);
   });
 
   it("returns null when Kelpie.app is not installed", () => {
