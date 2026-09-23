@@ -102,7 +102,11 @@ nlohmann::json InputSchema(std::string_view endpoint) {
     number("deltaY");
     require("deltaX"); require("deltaY");
   }
-  else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") { properties["format"]={{"const","png"}}; }
+  else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") {
+    properties["format"] = {{"enum", {"png", "jpeg"}}};
+    integer("quality", 1); properties["quality"]["maximum"] = 100;
+    integer("maxWidth", 1); properties["maxWidth"]["maximum"] = 16384;
+  }
   else if (endpoint == "get-cookies") { string("url"); string("name"); }
   else if (endpoint == "set-cookie") {
     string("name", true); string("value"); string("url"); string("domain"); string("path");
@@ -214,6 +218,22 @@ std::optional<std::string> ValidateToolArguments(const nlohmann::json& schema,
     }
   }
   return std::nullopt;
+}
+
+// A screenshot reaches the client once, as the image item. The text item and
+// structuredContent carry the metadata only, plus the MIME type and the decoded
+// size -- the same shape the CLI's MCP server sends. Sending the base64 in all
+// three tripled every screenshot, 0.5-0.9 MB for an ordinary page.
+nlohmann::json ScreenshotContent(nlohmann::json* body) {
+  const std::string image = (*body)["image"].get<std::string>();
+  body->erase("image");
+  const std::string mime_type = "image/" + body->value("format", std::string("png"));
+  const std::size_t padding = image.size() >= 2 && image[image.size() - 2] == '=' ? 2
+                              : !image.empty() && image.back() == '=' ? 1 : 0;
+  (*body)["mimeType"] = mime_type;
+  (*body)["imageBytes"] = image.size() * 3 / 4 - padding;
+  return nlohmann::json::array({{{"type", "text"}, {"text", body->dump()}},
+                                {{"type", "image"}, {"data", image}, {"mimeType", mime_type}}});
 }
 
 }  // namespace
@@ -356,16 +376,17 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
 
     const DesktopRouter::Result result =
         impl_->router->Dispatch(match->http_endpoint, arguments);
-    json content = {{{"type", "text"}, {"text", result.body.dump()}}};
-    if ((match->http_endpoint == "screenshot" || match->http_endpoint == "screenshot-annotated") &&
-        result.body.value("success", false) && result.body.contains("image") &&
+    const bool screenshot = match->http_endpoint == "screenshot" || match->http_endpoint == "screenshot-annotated";
+    json content;
+    json structured = result.body;
+    if (screenshot && result.body.value("success", false) && result.body.contains("image") &&
         result.body["image"].is_string()) {
-      const std::string format = result.body.value("format", std::string("png"));
-      content.push_back({{"type", "image"}, {"data", result.body["image"]},
-                         {"mimeType", "image/" + format}});
+      content = ScreenshotContent(&structured);
+    } else {
+      content = {{{"type", "text"}, {"text", result.body.dump()}}};
     }
     const json response = JsonRpcResult(id, {{"content", content},
-                                               {"structuredContent", result.body},
+                                               {"structuredContent", structured},
                                                {"isError", !result.body.value("success", false)}});
     return ReplyOrNothing(notification, response);
   }

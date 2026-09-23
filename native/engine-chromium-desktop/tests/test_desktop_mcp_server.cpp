@@ -76,7 +76,9 @@ int main() {
   assert(fill["required"] == nlohmann::json::array({"selector", "value"}));
   assert(fill["properties"]["value"]["minLength"] == 0);
   const auto& screenshot = schema_for("kelpie_screenshot");
-  assert(screenshot["properties"]["format"]["const"] == "png");
+  assert(screenshot["properties"]["format"]["enum"] == nlohmann::json::array({"png", "jpeg"}));
+  assert(screenshot["properties"]["quality"]["minimum"] == 1 && screenshot["properties"]["quality"]["maximum"] == 100);
+  assert(screenshot["properties"]["maxWidth"]["minimum"] == 1 && screenshot["properties"]["maxWidth"]["maximum"] == 16384);
   assert(!screenshot["properties"].contains("fullPage"));
   const auto& viewport = schema_for("kelpie_resize_viewport");
   assert(viewport["required"] == nlohmann::json::array({"width", "height"}));
@@ -96,10 +98,37 @@ int main() {
       {{"jsonrpc", "2.0"}, {"id", 8}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}}}}}}, config);
   assert(missing_fill["error"]["code"] == -32602);
-  const auto invalid_screenshot = server.HandleRequest(
+  for (const auto& invalid : {nlohmann::json{{"format", "webp"}}, nlohmann::json{{"quality", 0}},
+                              nlohmann::json{{"quality", 60.5}}, nlohmann::json{{"maxWidth", 16385}}}) {
+    const auto invalid_screenshot = server.HandleRequest(
+        {{"jsonrpc", "2.0"}, {"id", 9}, {"method", "tools/call"},
+         {"params", {{"name", "kelpie_screenshot"}, {"arguments", invalid}}}}, config);
+    assert(invalid_screenshot["error"]["code"] == -32602);
+  }
+
+  // A screenshot sends its base64 once, as the image item. The text item and
+  // structuredContent are metadata only.
+  const std::string image = "/9j/4AAQSkZJRgABAQ==";
+  router.Register("screenshot", [&image](const nlohmann::json&) {
+    return nlohmann::json{{"success", true}, {"image", image}, {"format", "jpeg"}, {"width", 960}};
+  });
+  const auto shot = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 9}, {"method", "tools/call"},
-       {"params", {{"name", "kelpie_screenshot"}, {"arguments", {{"format", "jpeg"}}}}}}, config);
-  assert(invalid_screenshot["error"]["code"] == -32602);
+       {"params", {{"name", "kelpie_screenshot"}, {"arguments", {{"format", "jpeg"}, {"quality", 60}, {"maxWidth", 960}}}}}},
+      config);
+  const std::string dumped = shot.dump();
+  assert(dumped.find(image) != std::string::npos);
+  assert(dumped.find(image) == dumped.rfind(image));
+  const auto& shot_result = shot["result"];
+  assert(shot_result["isError"] == false);
+  assert(shot_result["content"].size() == 2);
+  assert(shot_result["content"][1]["type"] == "image" && shot_result["content"][1]["data"] == image);
+  assert(shot_result["content"][1]["mimeType"] == "image/jpeg");
+  const auto text = nlohmann::json::parse(shot_result["content"][0]["text"].get<std::string>());
+  assert(!text.contains("image") && !shot_result["structuredContent"].contains("image"));
+  assert(text == shot_result["structuredContent"]);
+  assert(text["width"] == 960 && text["mimeType"] == "image/jpeg");
+  assert(text["imageBytes"] == 13);
   const auto empty_fill = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);
