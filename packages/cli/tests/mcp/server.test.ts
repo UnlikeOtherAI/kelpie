@@ -142,6 +142,18 @@ describe("MCP browser result formatting", () => {
     expect(result.structuredContent).toEqual({ ...payload, mimeType: "image/png" });
   });
 
+  it("applies the page-text ceiling to kelpie_get_page_text results", async () => {
+    const result = await formatBrowserToolResult(
+      "getPageText",
+      { success: true, mode: "readable", text: "x".repeat(30), length: 30 },
+      undefined,
+      { maxChars: 10 },
+    );
+
+    const body = JSON.parse((result.content[0] as { text: string }).text);
+    expect(body).toMatchObject({ text: "x".repeat(10), truncated: true, totalChars: 30, length: 30 });
+  });
+
   it("marks browser-control failures as MCP errors", async () => {
     const result = await formatBrowserToolResult("navigate", {
       success: false,

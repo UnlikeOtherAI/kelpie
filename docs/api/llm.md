@@ -431,6 +431,34 @@ Response:
   "excerpt": "This is the main article text..."
 }
 ```
+
+That is the iOS, Android and macOS shape. The desktop Chromium engine
+(Windows, Linux) answers `{"success": true, "mode": "readable", "text": "…",
+"length": 129}`. Its text is in `text`, not `content`.
+
+The HTTP method returns the whole text. The MCP tool `kelpie_get_page_text`
+has a ceiling:
+
+- It takes `maxChars` (default 20000), which is never sent to the device.
+- Text longer than that is cut to `maxChars` UTF-16 code units, and never
+  splits a surrogate pair. The cut applies to whichever of `content` or `text`
+  the device sent.
+- The result then gains `truncated: true`, `totalChars` (the full length) and
+  a `note`.
+- Otherwise the result gains `truncated: false`.
+- Other device fields are left as sent.
+
+```json
+{
+  "success": true,
+  "mode": "readable",
+  "text": "…the first 20000 characters…",
+  "length": 80359,
+  "truncated": true,
+  "totalChars": 80359,
+  "note": "Page text truncated to 20000 of 80359 characters. Pass a larger maxChars, or a selector for the part you need."
+}
+```
 ## Form State
 
 ### `getFormState`

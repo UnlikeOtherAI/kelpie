@@ -12,6 +12,7 @@ import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools, requestTimeoutMs } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
+import { limitPageText } from "./page-text-limit.js";
 import type { DiscoveredDevice } from "../types.js";
 import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
 import { getApprovedModels, findModel } from "../ai/models.js";
@@ -123,20 +124,28 @@ function registerBrowserTool(
         remoteStoredAt: remote.storedAt,
       });
     }
-    return formatBrowserToolResult(tool.method, result.data, device.name);
+    return formatBrowserToolResult(tool.method, result.data, device.name, args as Record<string, unknown>);
   });
 }
 
+/**
+ * Shape a device response into an MCP tool result. `args` are the tool call's
+ * own arguments, such as the page-text ceiling the MCP layer applies itself.
+ */
 export async function formatBrowserToolResult(
   method: string,
   data: unknown,
   deviceName?: string,
+  args: Record<string, unknown> = {},
 ): Promise<CallToolResult> {
   if (isScreenshotResult(method, data)) {
     if (isNativeScreenshotResult(method, data)) {
       return saveNativeScreenshotResult(method, data, deviceName);
     }
     return portableScreenshotResult(data);
+  }
+  if (method === "getPageText") {
+    return textToolResult(limitPageText(data, typeof args.maxChars === "number" ? args.maxChars : undefined));
   }
   return textToolResult(data);
 }

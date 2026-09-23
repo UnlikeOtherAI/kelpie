@@ -219,7 +219,7 @@ Purpose-built methods that return semantic data instead of raw HTML:
 
 - **Accessibility tree** — ARIA roles, labels, states, and nesting. What a screen reader sees.
 - **Visible elements** — only what's currently in the viewport, optionally filtered to interactive elements only. Up to 200 elements with positions.
-- **Page text** — reader-mode text extraction: title, content, word count, language.
+- **Page text** — reader-mode text extraction: title, content, word count, language. Over MCP it has a ceiling: at most `maxChars` characters (default 20 000), and the result says when it was cut and how long the full text was.
 - **Form state** — snapshot of every form on the page: fields, values, validation state, which required fields are empty.
 - **Smart find** — find a button, link, input, or any element by its visible text or label. No selectors needed.
 

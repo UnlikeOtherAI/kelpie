@@ -52,6 +52,12 @@ Before this change, every call was cut at 10 s whatever `timeout` said, so no
 value above 10 s ever worked. The 30 s ceiling is a tightening of the schema,
 not a loss of behaviour.
 
+**Page text.** `kelpie_get_page_text` returns at most `maxChars` characters of
+text (default 20000). When it cuts, the result says `truncated: true` and gives
+the full length in `totalChars`. To read more, pass a larger `maxChars`, or a
+`selector` for the part you need. The result shape is in
+[the API reference](../api/llm.md#getpagetext).
+
 ---
 
 ## AI Commands

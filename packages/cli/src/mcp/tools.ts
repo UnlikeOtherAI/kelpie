@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidPartition } from "@unlikeotherai/kelpie-shared";
+import { DEFAULT_PAGE_TEXT_MAX_CHARS } from "./page-text-limit.js";
 
 const platforms = ["ios", "android", "macos", "linux", "windows"] as const;
 type ToolPlatform = (typeof platforms)[number];
@@ -129,6 +130,12 @@ export function requestTimeoutMs(tool: Pick<BrowserToolDef, "schema">, args: Rec
   return Math.min(requested, MAX_TOOL_TIMEOUT_MS) + TOOL_TIMEOUT_MARGIN_MS;
 }
 
+function pageTextBody(args: Record<string, unknown>): Record<string, unknown> {
+  // maxChars is applied by the MCP layer; the device HTTP API has no such option.
+  const { device: _d, maxChars: _m, ...rest } = args;
+  return rest;
+}
+
 function screenshotBody(defaultResolution: "native" | "viewport") {
   return (args: Record<string, unknown>): Record<string, unknown> => {
     const { device: _d, resolution, ...rest } = args;
@@ -256,7 +263,7 @@ export const browserTools: BrowserToolDef[] = [
   { name: "kelpie_get_visible_elements", description: "Get all visible elements in the viewport", method: "getVisibleElements", schema: { device, interactableOnly: z.boolean().optional(), includeText: z.boolean().optional(), tabId }, bodyFromArgs: passthrough },
 
   // Page text
-  { name: "kelpie_get_page_text", description: "Extract readable text content from the page", method: "getPageText", schema: { device, mode: z.enum(["readable", "full", "markdown"]).optional().describe("Extraction mode"), selector: selector.optional(), tabId }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_page_text", description: `Extract readable text content from the page. Text longer than maxChars (default ${DEFAULT_PAGE_TEXT_MAX_CHARS}) is cut, and the result then says truncated=true with the full length in totalChars.`, method: "getPageText", schema: { device, mode: z.enum(["readable", "full", "markdown"]).optional().describe("Extraction mode"), selector: selector.optional(), maxChars: z.number().int().min(1).optional().describe(`Most characters of text to return (default ${DEFAULT_PAGE_TEXT_MAX_CHARS})`), tabId }, bodyFromArgs: pageTextBody },
 
   // Form state
   { name: "kelpie_get_form_state", description: "Get the state of all forms on the page", method: "getFormState", schema: { device, selector: selector.optional(), tabId }, bodyFromArgs: passthrough },
