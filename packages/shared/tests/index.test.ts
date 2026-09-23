@@ -53,8 +53,13 @@ describe("error codes", () => {
       "PARTITION_DELETING",
       "PARTITION_IN_USE",
       "ENGINE_SWITCH_BLOCKED_BY_PARTITION",
+      "WINDOW_MINIMIZED",
     ];
     expect(Object.keys(ErrorCode)).toEqual(expected);
+  });
+
+  it("maps WINDOW_MINIMIZED to 409, a request that conflicts with the window's state", () => {
+    expect(ErrorHttpStatus.WINDOW_MINIMIZED).toBe(409);
   });
 
   it("has HTTP status mapping for every error code", () => {
