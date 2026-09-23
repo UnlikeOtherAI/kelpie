@@ -145,6 +145,7 @@ capsules whose overlaps blend into secondary colours, on a deep navy field.
 
 - **Source file (1024x1024)**: `assets/kelpie-icon-1024.png` — the shipped tile, opaque; use this for App Store and Play Store submission
 - **Transparent mark**: `assets/kelpie-mark-1024.png` — the bare K, for placing on any background
+- **Windows**: `apps/windows/resources/kelpie.ico` is the same tile with rounded corners (radius 18.75% of the edge, transparent outside), in 16/24/32/48/64/128/256 sizes
 - **Field colour**: `#000C30` — the deep navy shared with the Nessie mark
 - **Mark palette**: green `#05BE92`, yellow `#FDC803`, pink `#FC389C`, blue `#13A8FC` at the overlaps
 - **Style**: Flat geometric, rounded capsule strokes, no outlines, no text
