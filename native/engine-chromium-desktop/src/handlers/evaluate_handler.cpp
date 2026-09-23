@@ -5,6 +5,13 @@
 #include <thread>
 
 namespace kelpie {
+namespace {
+
+// The least time a wait-for-navigation poll is given to be answered by the UI
+// thread, however little of the wait is left.
+constexpr DesktopBrowserControl::Timeout kPollFloor{50};
+
+}  // namespace
 
 EvaluateHandler::EvaluateHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -106,13 +113,17 @@ nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) 
                 ? "No navigation started within " + std::to_string(timeout.count()) + " ms"
                 : "Timed out waiting for navigation to complete");
       }
-      const auto remaining = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(deadline - now);
+      // A poll gets what is left of the wait, rounded up and never less than
+      // kPollFloor. Truncating 1.9 ms to 1 (or 0) gave the last poll no time
+      // to be answered and made it time out just short of the deadline.
+      const auto remaining = std::max(
+          std::chrono::ceil<DesktopBrowserControl::Timeout>(deadline - now), kPollFloor);
       BrowserNavigationState state;
       const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
           lease, &state, remaining);
-      // The last poll only has what is left of the wait. When the wait's own
-      // deadline cut it short, the answer is the wait's timeout, which says
-      // whether a navigation had started, not a generic operation timeout.
+      // So a poll that times out has run past the wait's deadline, and the
+      // answer is the wait's own timeout, which says whether a navigation had
+      // started, not a generic "Browser operation timed out".
       if (!control.ok && control.error_code == "TIMEOUT" && std::chrono::steady_clock::now() >= deadline) continue;
       if (!control.ok) return ControlError(control);
       progress = state.navigation.Since(baseline);
