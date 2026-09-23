@@ -44,7 +44,10 @@ export function delay(ms) {
 }
 
 export function startBrowser(executable, args) {
-  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  // The shell only reports ready once Chromium's child window is visible
+  // (IsActiveNativeBrowserAttached checks IsWindowVisible), so a hidden launch
+  // always stops at browser attachment. Launch it the way a person would.
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: false });
   const stdout = capture(child.stdout);
   const stderr = capture(child.stderr);
   const exited = new Promise(resolve => {
