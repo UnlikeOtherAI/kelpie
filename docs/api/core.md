@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, and macOS. When the wait elapses without the load completing, iOS returns a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
+`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. When the wait elapses without the load completing, iOS and Windows return a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
 
 ### `back`
 Go back in browser history.

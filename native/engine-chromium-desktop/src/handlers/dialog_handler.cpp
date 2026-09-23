@@ -10,7 +10,7 @@ nlohmann::json DialogHandler::Get(const nlohmann::json& params) const {
     if (!result.ok) return ControlError(result);
     nlohmann::json dialog; result = RequireBrowserControl(runtime_).GetDialog(lease, &dialog, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
-    nlohmann::json body{{"dialog", dialog}}; if (result.tab) body["tab"] = TabJson(*result.tab); return SuccessResponse(body);
+    nlohmann::json body = dialog; if (result.tab) body["tab"] = TabJson(*result.tab); return SuccessResponse(body);
   } catch (const std::invalid_argument& e) { return InvalidParams(e.what()); }
 }
 nlohmann::json DialogHandler::Handle(const nlohmann::json& params) const {
@@ -22,7 +22,7 @@ nlohmann::json DialogHandler::Handle(const nlohmann::json& params) const {
     if (!result.ok) return ControlError(result);
     nlohmann::json output; result = RequireBrowserControl(runtime_).HandleDialog(lease, params, &output, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
-    nlohmann::json body{{"result", output}}; if (result.tab) body["tab"] = TabJson(*result.tab); return SuccessResponse(body);
+    nlohmann::json body = output; if (result.tab) body["tab"] = TabJson(*result.tab); return SuccessResponse(body);
   } catch (const std::invalid_argument& e) { return InvalidParams(e.what()); }
 }
 }  // namespace kelpie

@@ -95,6 +95,8 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
 
   Tab* FindTab(const TabLease& lease);
   Tab* FindTab(CefRefPtr<CefBrowser> browser);
+  // A tab's DevTools session, attached so its Network events reach network_sink.
+  CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser);
   Tab* ActiveTab();
   // Records a downloaded favicon against the tab and the host registry.
   void StoreFavicon(CefRefPtr<CefBrowser> browser, std::string png_base64);
