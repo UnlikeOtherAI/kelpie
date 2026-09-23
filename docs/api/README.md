@@ -9,7 +9,8 @@ All methods are available via three interfaces:
 
 | Document | When to Read |
 |---|---|
-| [core.md](core.md) | Navigation, screenshots, DOM access, interaction, scrolling, viewport/device info, wait/sync |
+| [core.md](core.md) | Navigation, DOM access, interaction, scrolling, viewport/device info, wait/sync |
+| [screenshots.md](screenshots.md) | `screenshot`: viewport and full page, PNG and JPEG, `maxWidth`, the viewport-mapping metadata, `WINDOW_MINIMIZED` |
 | [llm.md](llm.md) | LLM-optimized methods — accessibility tree, annotated screenshots, visible elements, page text, form state, smart queries |
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
 | [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
@@ -183,7 +184,7 @@ All errors follow the same format:
 
 The CLI generates one code of its own, `SCREENSHOT_OPTION_UNSUPPORTED`, when a
 device ignored a screenshot option it was sent (JPEG, or `maxWidth`). No device
-returns it. See [core.md](core.md#screenshot).
+returns it. See [screenshots.md](screenshots.md#screenshot).
 
 ---
 
