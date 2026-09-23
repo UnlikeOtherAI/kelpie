@@ -30,6 +30,28 @@ Start the MCP server with HTTP transport.
 kelpie mcp --http --port 8421
 ```
 
+### Tool results and limits
+
+**Timeouts.** These tools take a `timeout` argument:
+
+- `kelpie_click`
+- `kelpie_fill`
+- `kelpie_wait_for_element`
+- `kelpie_wait_for_navigation`
+
+`timeout` is a whole number of milliseconds from 1 to 30000. The desktop apps
+clamp to 30 s, and the same ceiling applies on every platform. A larger value
+is rejected by the tool schema; it is not silently cut short.
+
+The CLI waits for the device's answer for `timeout` plus 5 s, or 15 s when
+`timeout` is omitted and the device uses its own default. The device's
+`TIMEOUT`, or its success, therefore reaches the caller before the CLI would
+give up. Every other tool waits 10 s.
+
+Before this change, every call was cut at 10 s whatever `timeout` said, so no
+value above 10 s ever worked. The 30 s ceiling is a tightening of the schema,
+not a loss of behaviour.
+
 ---
 
 ## AI Commands

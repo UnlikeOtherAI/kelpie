@@ -146,3 +146,15 @@ describe("partition tools", () => {
     expect(schema?.persistent?.safeParse(false).success).toBe(true);
   });
 });
+
+describe("tool timeouts", () => {
+  it("bounds every timeout argument to 1-30000 whole milliseconds", () => {
+    for (const tool of browserTools.filter((t) => "timeout" in t.schema)) {
+      expect(tool.schema.timeout?.safeParse(30_000).success).toBe(true);
+      expect(tool.schema.timeout?.safeParse(30_001).success).toBe(false);
+      expect(tool.schema.timeout?.safeParse(0).success).toBe(false);
+      expect(tool.schema.timeout?.safeParse(1.5).success).toBe(false);
+      expect(tool.schema.timeout?.safeParse(undefined).success).toBe(true);
+    }
+  });
+});

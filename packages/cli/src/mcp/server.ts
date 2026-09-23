@@ -10,7 +10,7 @@ import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
 import { discoverDevices } from "../discovery/discover.js";
 import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
-import { browserTools, cliTools } from "./tools.js";
+import { browserTools, cliTools, requestTimeoutMs } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import type { DiscoveredDevice } from "../types.js";
 import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
@@ -110,7 +110,7 @@ function registerBrowserTool(
       return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
     }
     const body = tool.bodyFromArgs(args as Record<string, unknown>);
-    const result = await sendCommand(device, tool.method, body);
+    const result = await sendCommand(device, tool.method, body, requestTimeoutMs(tool, args as Record<string, unknown>));
     if (tool.method === "reportIssue" && result.ok && (result.data as { success?: boolean }).success === true) {
       const remote = result.data as {
         reportId?: string;

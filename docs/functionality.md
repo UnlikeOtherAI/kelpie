@@ -102,7 +102,7 @@ Scroll by pixel deltas, scroll a specific element into view (with configurable a
 
 ## Wait and Synchronisation
 
-Wait for an element to appear, become visible, or disappear — with configurable timeout. Wait for page navigation to complete. Essential for reliable automation when pages load dynamically.
+Wait for an element to appear, become visible, or disappear — with configurable timeout. Wait for page navigation to complete. Essential for reliable automation when pages load dynamically. Over MCP, a wait gets the time it asked for: a tool's `timeout`, which is capped at 30 s on every platform, is also how long the CLI waits for the device's answer, plus a small margin.
 
 ## JavaScript Evaluation
 

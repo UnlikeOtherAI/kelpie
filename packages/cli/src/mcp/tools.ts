@@ -33,7 +33,20 @@ const unavailablePlatforms = [] as const;
 const device = z.string().describe("Device ID, name, or IP address");
 const selector = z.string().describe("CSS selector");
 const url = z.string().describe("URL");
-const timeout = z.number().optional().describe("Timeout in milliseconds");
+/** The CLI's own HTTP deadline for a tool that takes no `timeout` argument. */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+/** The desktop apps clamp every `timeout` to this; one bound for every platform. */
+export const MAX_TOOL_TIMEOUT_MS = 30_000;
+/** Room for the device's own overshoot and the network, so the device's answer arrives first. */
+export const TOOL_TIMEOUT_MARGIN_MS = 5_000;
+
+const timeout = z
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_TOOL_TIMEOUT_MS)
+  .optional()
+  .describe(`Timeout in milliseconds, 1-${MAX_TOOL_TIMEOUT_MS}. Omit it for the device's default.`);
 const message = z.string().optional().describe("Optional message to show on device screen as a toast overlay while this action runs. Use this to narrate what you are doing, e.g. 'Clicking the login button' or 'Scrolling to pricing section'. The toast appears at the bottom of the viewport with a semi-transparent background.");
 const screenshotResolution = z.enum(["native", "viewport"]).optional().describe("Screenshot resolution: 'viewport' returns CSS-pixel/non-retina output that lines up with tap coordinates more directly; 'native' preserves full renderer detail.");
 const tabId = z.string().optional().describe("Tab ID to target (macOS only). Required when multiple tabs are open. Use kelpie_get_tabs to list available tabs with their IDs, URLs, and titles.");
@@ -101,6 +114,19 @@ export interface CliToolDef {
 function passthrough(args: Record<string, unknown>): Record<string, unknown> {
   const { device: _d, ...rest } = args;
   return rest;
+}
+
+/**
+ * How long the CLI waits for the device's HTTP answer. A tool that takes a
+ * `timeout` argument waits that long (or the device default) plus a margin, so
+ * the device's own result — success or its TIMEOUT — reaches the caller
+ * instead of the CLI cutting the request off first. Every other tool keeps the
+ * CLI default.
+ */
+export function requestTimeoutMs(tool: Pick<BrowserToolDef, "schema">, args: Record<string, unknown>): number {
+  if (!("timeout" in tool.schema)) return DEFAULT_REQUEST_TIMEOUT_MS;
+  const requested = typeof args.timeout === "number" ? args.timeout : DEFAULT_REQUEST_TIMEOUT_MS;
+  return Math.min(requested, MAX_TOOL_TIMEOUT_MS) + TOOL_TIMEOUT_MARGIN_MS;
 }
 
 function screenshotBody(defaultResolution: "native" | "viewport") {
