@@ -194,7 +194,7 @@ kelpie browser register codex-b --app /Applications/Kelpie.app
 ```
 
 ### `kelpie browser launch <name>`
-Launch a new local macOS Kelpie app instance for a registered alias. If `--port` is omitted, the CLI auto-selects the first safe free port and skips reserved ports such as `8421` used by AppReveal and CLI MCP.
+Launch a new local macOS Kelpie app instance for a registered alias. The launch requests the program-wide `--port`, which may come before or after the alias; without it the launch requests `8420`.
 
 If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
 
@@ -1118,7 +1118,7 @@ kelpie --browser win mcp
 There is no CLI installer command: the release ZIP is the supported Windows installation
 artifact. See the Windows release ZIP instructions for extraction and update steps.
 
-`kelpie browser launch` uses port `8420` unless given `--port`. A Windows browser owns its port
+`kelpie browser launch` uses port `8420` unless given `--port` (before or after the alias). A Windows browser owns its port
 exclusively with no fallback, so a second alias on a held port fails at the local control
 listener and publishes no readiness; give each Windows alias its own `--port`.
 

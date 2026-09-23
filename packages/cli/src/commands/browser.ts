@@ -38,7 +38,7 @@ async function isReachable(port?: number): Promise<boolean> {
   return probeHealth(port);
 }
 
-function chooseLaunchPort(requestedPort?: string): number {
+function chooseLaunchPort(requestedPort?: string | number): number {
   const port = requestedPort ? Number(requestedPort) : DEFAULT_PORT;
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error("Port must be an integer from 1 to 65535");
@@ -209,8 +209,11 @@ export function registerBrowser(program: Command): void {
 
   browser
     .command("launch <name>")
-    .option("--port <port>", "Port to use for the launched browser")
-    .action(async (name: string, opts: { port?: string }) => {
+    // The launch port is the program-wide `--port`. Commander gives that option
+    // to the root command even when it follows `launch <name>`, so a
+    // launch-level `--port` never received a value and every launch used
+    // DEFAULT_PORT.
+    .action(async (name: string) => {
       const globals = program.opts<GlobalOptions>();
       const alias = await getBrowserAlias(name);
       if (!alias) {
@@ -220,7 +223,7 @@ export function registerBrowser(program: Command): void {
       }
 
       let port: number;
-      try { port = chooseLaunchPort(opts.port); } catch (error) {
+      try { port = chooseLaunchPort(globals.port); } catch (error) {
         print({ success: false, error: { code: "INVALID_PORT", message: error instanceof Error ? error.message : "Invalid port" } }, globals.format);
         process.exitCode = 4; return;
       }
