@@ -374,6 +374,7 @@ jobs:
   build-windows:
     name: Build Windows release artifact
     runs-on: windows-2022
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - name: Verify harness process handling

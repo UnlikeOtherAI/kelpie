@@ -66,8 +66,13 @@ $extract = Join-Path $cache ("extract-" + $PID)
 Remove-CacheTree $extract $cache
 New-Item -ItemType Directory -Path $extract | Out-Null
 try {
-  Write-Stage ("extracting with " + ((Get-Command tar.exe -All | ForEach-Object Source) -join " | "))
-  & tar.exe -xjf $archive -C $extract
+  # Not tar.exe: which libarchive that is depends on the Windows build, and on
+  # the windows-2022 CI image it sat on this archive for six hours before the
+  # job was cancelled. CMake bundles its own libarchive with bzip2 built in,
+  # and the build needs cmake anyway.
+  Write-Stage "extracting with cmake -E tar"
+  Push-Location -LiteralPath $extract
+  try { & cmake -E tar xf $archive } finally { Pop-Location }
   if ($LASTEXITCODE -ne 0) { throw "Unable to extract pinned CEF archive." }
   Write-Stage "extracted"
   $extractedRoot = Join-Path $extract $sdkName
