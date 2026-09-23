@@ -78,7 +78,11 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   std::shared_ptr<Operation> Begin(CefRefPtr<CefBrowser> browser,
                                    const std::string& method,
                                    const Json& params);
-  Result Wait(const std::shared_ptr<Operation>& operation, std::chrono::milliseconds timeout);
+  // `interrupted` is polled while the reply is outstanding; when it returns
+  // true the operation is abandoned with INTERRUPTED. It runs without any
+  // session lock held, so it may hop to the CEF UI thread.
+  Result Wait(const std::shared_ptr<Operation>& operation, std::chrono::milliseconds timeout,
+              const std::function<bool()>& interrupted = {});
   void CancelAll();
 
   static Json EvaluateParams(const std::string& expression);

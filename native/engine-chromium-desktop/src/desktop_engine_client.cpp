@@ -187,9 +187,10 @@ void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
                                    const CefString& error_text,
                                    const CefString&) {
   if (!frame || !frame->IsMain()) return;
-  // ERR_ABORTED is CEF's report that a newer navigation, or a link that turned
-  // out to be a download, replaced this load. It says nothing about the load
-  // now in progress, so it neither fails a wait nor clears the loading state.
+  // ERR_ABORTED is CEF's report that a newer navigation, a stop, or a link that
+  // turned out to be a download, replaced this load. It must not be charged to
+  // the navigation that replaced it, so it neither fails a wait nor clears the
+  // loading state.
   if (error_code == ERR_ABORTED) return;
   if (auto* tab = owner_->FindTab(browser)) {
     tab->loading = false;

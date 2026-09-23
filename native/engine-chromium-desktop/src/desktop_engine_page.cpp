@@ -113,6 +113,20 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
   }
   const auto plan = desktop_input::PlanTrustedInput(input, target);
   if (!plan.ok) return PlannerError(plan.error_code, plan.message);
+  // A page handler that calls alert()/confirm()/prompt() suspends the renderer,
+  // so Chromium withholds the input reply until the dialog is handled -- which
+  // the caller can only do once this request returns. The open dialog is the
+  // proof the input landed.
+  const auto impl = impl_;
+  const auto dialog_opened = [impl, lease] {
+    auto showing = std::make_shared<bool>(false);
+    impl->RunOnUi([impl, lease, showing] {
+      if (auto* tab = impl->FindTab(lease)) *showing = tab->dialogs.Current(tab->browser).value("showing", false);
+      return BrowserControlResult::Success();
+    }, std::chrono::seconds(1));
+    return *showing;
+  };
+  bool opened_dialog = false;
   for (const auto& command : plan.commands) {
     const auto method = command.find("method");
     const auto params = command.find("params");
@@ -122,8 +136,17 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
     const auto remaining = RemainingTimeout(started_at, timeout);
     if (remaining <= Timeout::zero()) return DeadlineExceeded();
     Json ignored;
-    const auto result = DevTools(lease, method->get<std::string>(), *params, &ignored, remaining);
+    const auto result =
+        RunDevTools(impl, lease, method->get<std::string>(), *params, &ignored, remaining, dialog_opened);
+    if (result.error_code == "INTERRUPTED") {
+      opened_dialog = true;
+      break;
+    }
     if (!result.ok) return result;
+  }
+  if (opened_dialog) {
+    if (output) *output = {{"trusted", true}, {"dialogOpened", true}};
+    return BrowserControlResult::Success();
   }
   if (!plan.expected.empty()) {
     const auto result = inspect(false);

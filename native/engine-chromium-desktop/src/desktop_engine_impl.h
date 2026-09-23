@@ -107,6 +107,8 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
 
   Tab* FindTab(const TabLease& lease);
   Tab* FindTab(CefRefPtr<CefBrowser> browser);
+  // A tab's DevTools session, attached so its Network events reach network_sink.
+  CefRefPtr<DesktopDevToolsSession> NewDevToolsSession(CefRefPtr<CefBrowser> browser);
   Tab* ActiveTab();
   // Records a downloaded favicon against the tab and the host registry.
   void StoreFavicon(CefRefPtr<CefBrowser> browser, std::string png_base64);
@@ -130,5 +132,14 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   void RecountPartitions();
   void UpdateActiveState();
 };
+
+// Begins `method` on the tab's DevTools session and waits for its reply, giving
+// up early when `interrupted` reports that the reply can no longer arrive.
+// Defined in desktop_engine_control.cpp; trusted input in
+// desktop_engine_page.cpp is the caller that passes `interrupted`.
+BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease,
+                                 std::string method, const nlohmann::json& params,
+                                 nlohmann::json* output, DesktopBrowserControl::Timeout timeout,
+                                 const std::function<bool()>& interrupted = {});
 
 }  // namespace kelpie

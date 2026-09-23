@@ -27,7 +27,7 @@ Response:
 }
 ```
 
-`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, and macOS. When the wait elapses without the load completing, iOS returns a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
+`timeout` caps how long the device waits for the page to finish loading before returning. Honored on iOS, Android, macOS, and Windows. When the wait elapses without the load completing, iOS and Windows return a `TIMEOUT` error; a captured navigation failure (e.g. DNS error) returns `NAVIGATION_ERROR`.
 
 ### `back`
 Go back in browser history.
@@ -916,11 +916,9 @@ Response:
 ```
 
 ### `waitForNavigation`
-Wait for an already-started navigation to complete. `navigate` reports that
-the request was accepted; it does not claim the destination has loaded. This
-method returns a navigation error when the selected tab is not loading, which
-prevents an old `document.readyState === "complete"` from being reported as a
-new navigation.
+Wait for a navigation to complete, such as the page a clicked link opens.
+`navigate` already waits for its own load where its `timeout` is honoured (see
+`navigate` above), so this method is for navigations that other actions start.
 
 **Desktop Chromium (Windows, Linux).** The wait is for the main-frame
 navigation that started after the tab's most recent navigation-capable

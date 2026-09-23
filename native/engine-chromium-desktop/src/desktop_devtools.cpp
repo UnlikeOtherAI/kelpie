@@ -195,17 +195,37 @@ std::shared_ptr<DesktopDevToolsSession::Operation> DesktopDevToolsSession::Begin
 }
 
 DesktopDevToolsSession::Result DesktopDevToolsSession::Wait(const std::shared_ptr<Operation>& operation,
-                                                             std::chrono::milliseconds timeout) {
+                                                             std::chrono::milliseconds timeout,
+                                                             const std::function<bool()>& interrupted) {
   if (!operation) return Failure("INTERNAL", "DevTools operation is required");
   if (CefCurrentlyOn(TID_UI)) return Failure("INTERNAL", "Waiting for DevTools on the CEF UI thread is forbidden");
+  constexpr auto kInterruptPoll = std::chrono::milliseconds(25);
+  const auto deadline = std::chrono::steady_clock::now() + timeout;
+  const auto done = [&] { return operation->done_; };
   std::unique_lock<std::mutex> lock(operation->mutex_);
-  if (operation->completed_.wait_for(lock, timeout, [&] { return operation->done_; })) return operation->result_;
+  bool stopped = false;
+  while (!stopped) {
+    if (done()) return operation->result_;
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= deadline) break;
+    auto slice = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
+    if (interrupted) slice = std::min(slice, kInterruptPoll);
+    if (operation->completed_.wait_for(lock, slice, done)) return operation->result_;
+    if (!interrupted) continue;
+    // Complete() takes this mutex on the UI thread; never hold it while the
+    // predicate may be waiting on that thread.
+    lock.unlock();
+    stopped = interrupted();
+    lock.lock();
+    if (operation->done_) return operation->result_;
+  }
   operation->abandoned_ = true;
   lock.unlock();
   std::lock_guard<std::mutex> pending_lock(mutex_);
   const auto it = pending_.find(operation->message_id_);
   if (it != pending_.end() && it->second == operation) pending_.erase(it);
-  return Failure("TIMEOUT", "DevTools operation timed out", true);
+  return stopped ? Failure("INTERRUPTED", "DevTools operation was interrupted", true)
+                 : Failure("TIMEOUT", "DevTools operation timed out", true);
 }
 
 void DesktopDevToolsSession::CancelAll() {
@@ -378,8 +398,12 @@ bool DesktopDialogAdapter::Observe(CefRefPtr<CefBrowser> browser, cef_jsdialog_t
     if (callback) callback->Continue(false, "");
     return true;
   }
-  dialog_ = Dialog{browser, callback, {{"showing", true}, {"type", static_cast<int>(type)}, {"origin", origin.ToString()},
-                                      {"message", message.ToString()}, {"defaultPrompt", default_prompt.ToString()}}};
+  // The documented get-dialog shape (docs/api/browser.md): `showing` beside a
+  // `dialog` object whose type is named, not CEF's enum value.
+  const char* kind = type == JSDIALOGTYPE_CONFIRM ? "confirm" : type == JSDIALOGTYPE_PROMPT ? "prompt" : "alert";
+  Json details = {{"type", kind}, {"message", message.ToString()}, {"origin", origin.ToString()},
+                  {"defaultValue", type == JSDIALOGTYPE_PROMPT ? Json(default_prompt.ToString()) : Json(nullptr)}};
+  dialog_ = Dialog{browser, callback, {{"showing", true}, {"dialog", std::move(details)}}};
   return true;
 }
 
@@ -391,9 +415,10 @@ DesktopDialogAdapter::Json DesktopDialogAdapter::Current(CefRefPtr<CefBrowser> b
 bool DesktopDialogAdapter::Handle(CefRefPtr<CefBrowser> browser, const Json& action, Json* result) {
   if (!dialog_ || !dialog_->browser || !dialog_->browser->IsSame(browser) || !dialog_->callback) return false;
   const bool accept = action.value("action", "dismiss") == "accept";
+  const Json handled = {{"action", accept ? "accept" : "dismiss"}, {"dialogType", dialog_->value["dialog"]["type"]}};
   dialog_->callback->Continue(accept, action.value("promptText", ""));
   dialog_.reset();
-  if (result) *result = {{"handled", true}};
+  if (result) *result = handled;
   return true;
 }
 

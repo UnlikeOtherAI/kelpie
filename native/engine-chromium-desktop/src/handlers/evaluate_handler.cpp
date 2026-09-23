@@ -1,17 +1,12 @@
 #include "evaluate_handler.h"
 
+#include "navigation_wait.h"
+
 #include <algorithm>
 #include <chrono>
 #include <thread>
 
 namespace kelpie {
-namespace {
-
-// The least time a wait-for-navigation poll is given to be answered by the UI
-// thread, however little of the wait is left.
-constexpr DesktopBrowserControl::Timeout kPollFloor{50};
-
-}  // namespace
 
 EvaluateHandler::EvaluateHandler(DesktopHandlerRuntime runtime)
     : runtime_(std::move(runtime)) {}
@@ -90,7 +85,6 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
 
 nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) const {
   const auto timeout = ControlTimeout(params);
-  const int poll_ms = 100;
   const auto deadline = std::chrono::steady_clock::now() + timeout;
   try {
     TabLease lease;
@@ -101,41 +95,10 @@ nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) 
     resolved = RequireBrowserControl(runtime_).GetNavigationState(lease, &initial, timeout);
     if (!resolved.ok) return ControlError(resolved);
     // The navigation to wait for is the first one after the tab's most recent
-    // navigation-capable action, whether the API or the page started it. The
-    // baseline is read once, so the wait's own polling cannot move it.
-    const std::uint64_t baseline = initial.navigation.baseline;
-    NavigationTracker::Progress progress = initial.navigation.Since(baseline);
-    while (true) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) {
-        return ErrorResponse(ErrorCode::kTimeout,
-            progress == NavigationTracker::Progress::kNotStarted
-                ? "No navigation started within " + std::to_string(timeout.count()) + " ms"
-                : "Timed out waiting for navigation to complete");
-      }
-      // A poll gets what is left of the wait, rounded up and never less than
-      // kPollFloor. Truncating 1.9 ms to 1 (or 0) gave the last poll no time
-      // to be answered and made it time out just short of the deadline.
-      const auto remaining = std::max(
-          std::chrono::ceil<DesktopBrowserControl::Timeout>(deadline - now), kPollFloor);
-      BrowserNavigationState state;
-      const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
-          lease, &state, remaining);
-      // So a poll that times out has run past the wait's deadline, and the
-      // answer is the wait's own timeout, which says whether a navigation had
-      // started, not a generic "Browser operation timed out".
-      if (!control.ok && control.error_code == "TIMEOUT" && std::chrono::steady_clock::now() >= deadline) continue;
-      if (!control.ok) return ControlError(control);
-      progress = state.navigation.Since(baseline);
-      if (progress == NavigationTracker::Progress::kFailed) {
-        return ErrorResponse(ErrorCode::kNavigationError, state.navigation.error);
-      }
-      if (progress == NavigationTracker::Progress::kFinished) {
-        return SuccessResponse({{"tab", TabJson(state.tab)}});
-      }
-      std::this_thread::sleep_for(std::min(std::chrono::milliseconds(poll_ms),
-          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())));
-    }
+    // navigation-capable action, whether the API or the page started it.
+    const NavigationWaitResult waited = AwaitNavigation(runtime_, lease, initial.navigation, deadline, timeout);
+    if (!waited.ok) return waited.error;
+    return SuccessResponse({{"tab", TabJson(waited.tab)}});
   } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 

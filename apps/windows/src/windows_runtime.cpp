@@ -140,7 +140,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.1";
+  runtime.app_version = "0.1.2";
   runtime.start_stdio_mcp = config_.mcp_stdio;
   runtime.bind_host = "127.0.0.1";
   runtime.control_token = profile_session_.token();

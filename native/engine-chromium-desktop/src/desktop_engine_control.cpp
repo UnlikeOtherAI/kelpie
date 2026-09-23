@@ -2,6 +2,7 @@
 
 #include <condition_variable>
 #include <ctime>
+#include <functional>
 #include <thread>
 #include <iomanip>
 #include <limits>
@@ -65,6 +66,28 @@ BrowserControlResult DevToolsResult(const DesktopDevToolsSession::Result& result
 }
 
 }  // namespace
+
+BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease,
+                                 std::string method, const nlohmann::json& params,
+                                 nlohmann::json* output, DesktopBrowserControl::Timeout timeout,
+                                 const std::function<bool()>& interrupted) {
+  if (!output) return BrowserControlResult::Failure("INTERNAL", "result is required");
+  const auto started_at = std::chrono::steady_clock::now();
+  auto pending = std::make_shared<PendingDevTools>();
+  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending] {
+    auto* tab = impl->FindTab(lease);
+    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
+    pending->session = tab->devtools;
+    pending->operation = pending->session->Begin(tab->browser, method, params);
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
+  }, timeout);
+  if (!started.ok) return started;
+  const auto completed =
+      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout), interrupted);
+  const auto result = DevToolsResult(completed);
+  if (result.ok) *output = completed.value;
+  return result;
+}
 
 // Tab lifecycle, the UI-thread bridge and the DevTools calls every other
 // operation is built on. Navigation is in desktop_engine_navigation.cpp;
@@ -222,7 +245,7 @@ BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const NewTabRequest& req
   Tab tab;
   tab.id = id;
   tab.browser = created;
-  tab.devtools = new DesktopDevToolsSession();
+  tab.devtools = NewDevToolsSession(created);
   tab.url = url;
   tab.name = request.name;
   if (partition != nullptr) tab.partition = partition->id;
@@ -318,8 +341,12 @@ bool DesktopEngine::IsActiveNativeBrowserAttached(void* parent_window, Timeout t
     }
     const HWND window = active->browser->GetHost()->GetWindowHandle();
     RECT bounds{};
+    // The child's own WS_VISIBLE, not IsWindowVisible: the latter also demands
+    // every ancestor be visible, so a shell launched hidden (SW_HIDE) would
+    // fail startup although its browser child is attached and rendering.
+    const bool child_shown = (GetWindowLongPtrW(window, GWL_STYLE) & WS_VISIBLE) != 0;
     if (window == nullptr || GetParent(window) != static_cast<HWND>(parent_window) ||
-        !IsWindowVisible(window) || !GetWindowRect(window, &bounds) ||
+        !child_shown || !GetWindowRect(window, &bounds) ||
         bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
       return BrowserControlResult::Failure("BROWSER_NOT_ATTACHED", "The active browser child is not attached");
     }
@@ -436,22 +463,7 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
 
 BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method, const Json& params,
                                              Json* output, Timeout timeout) {
-  const auto impl = impl_;
-  if (!output) return BrowserControlResult::Failure("INTERNAL", "result is required");
-  const auto started_at = std::chrono::steady_clock::now();
-  auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    pending->session = tab->devtools;
-    pending->operation = pending->session->Begin(tab->browser, method, params);
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (!started.ok) return started;
-  const auto completed = pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout));
-  const auto result = DevToolsResult(completed);
-  if (result.ok) *output = completed.value;
-  return result;
+  return RunDevTools(impl_, lease, std::move(method), params, output, timeout);
 }
 
 }  // namespace kelpie

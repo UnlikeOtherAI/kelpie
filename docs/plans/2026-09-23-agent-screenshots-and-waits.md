@@ -863,3 +863,31 @@ adds a third. A client that must keep every result under 200 KB asks for
   size. It was taken about a second after an external maximise. Four later
   attempts were clean, as was every capture taken straight after
   `kelpie_resize_viewport`. It was not reproduced.
+
+## Merging main's release-gate fixes
+
+`main` gained four commits while this branch was open, among them
+7c422dc ("make the Windows control surface pass its release acceptance
+gate") and 4fb23bf ("remember window placement, fail hidden startups
+promptly"). They touched the same code as C8 and the acceptance harness.
+The merge keeps both behaviours:
+
+- **`navigate` now waits for its own load, as on main.** Main added
+  `handlers/navigation_wait`, which polled the old `requested` / `completed`
+  counters. `AwaitNavigation` now runs on the `NavigationTracker` instead.
+  It takes the tracker state read after the action and waits for the first
+  navigation after that state's baseline. `navigate` and
+  `wait-for-navigation` share it. The API navigation moves the baseline
+  when it starts, so `navigate` waits for its own load and not an earlier
+  one. The poll floor and the "No navigation started" message moved into it
+  with the loop.
+- **Trusted input that opens a dialog.** Main's interrupt predicate is now
+  in `DispatchTrustedInput` in `desktop_engine_page.cpp`, where this
+  branch had moved that function. `RunDevTools` is declared in
+  `desktop_engine_impl.h` so that file can pass the predicate.
+- **The harness launches hidden again.** This branch had started the
+  browser visible because a hidden launch never became ready. Main fixed
+  the cause: startup now checks the browser child's own `WS_VISIBLE`. So the
+  harness is back to main's hidden launch, and the README paragraph that
+  said otherwise is gone. Main's URL and `evaluate` fixes replaced this
+  branch's copies of the same fixes.
