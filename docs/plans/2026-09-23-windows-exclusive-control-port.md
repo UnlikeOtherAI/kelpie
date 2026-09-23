@@ -131,7 +131,11 @@ fallback are scoped to the platforms that do it.
   own `WS_VISIBLE`, so that workaround was dropped when main was merged in.)
 - The harness's CLI phase launches its alias on the run's `--port`. Without it
   the CLI uses `8420`, which a developer's own Kelpie usually holds; before the
-  fix that launch would have shared the developer's port.
+  fix that launch would have shared the developer's port. This needed a CLI
+  fix: `browser launch` declared its own `--port`, which the program-wide
+  `--port` always shadowed, so every launch used 8420. The launch now reads
+  the program-wide option, pinned by
+  `packages/cli/tests/commands/browser-launch-requested-port.test.ts`.
 
 ## Verification
 
@@ -151,16 +155,35 @@ profiles; no other Kelpie was touched.
   | fixed | unfixed | unfixed second is refused (reported as Chromium setup) |
 
   Each refused window closed on `WM_CLOSE` with exit status 1.
-- Release harness, fixed build: launch, profile lock and all three occupied-port
-  holders pass, then it fails at `evaluation must describe non-finite values`
-  (`NaN` comes back bare instead of `{type: "nonfinite"}`), which is in the
-  evaluate path this change does not touch. A local copy that logs that
-  failure and continues also passed the sandbox check, authenticated close,
-  the CLI launch/navigate/Nessie stdio MCP/stop phase on `--port 8441`, and a
-  clean restart on 8441 with the same device id; session restoration was
-  skipped because it depends on the failed phase.
+- Release harness, fixed build, before main was merged in: launch, profile
+  lock and all three occupied-port holders pass, then it fails at
+  `evaluation must describe non-finite values`, an evaluate defect main has
+  since fixed.
 - Release harness, unfixed build: fails at `launch against a SO_REUSEADDR
   listener published readiness, so it shares the port`.
+
+After merging main (0.1.2), rebuilt with `scripts/build-windows.ps1`:
+
+- CTest: 38/38 passed, including `test_desktop_http_server_exclusive_port`.
+- `node --test tests/windows/process.test.mjs` (the Windows CI step): 3/3.
+- Release harness on `--port 8441`: first run passed everything up to the CLI
+  phase (all visible occupied-port contenders and the hidden one included),
+  then `kelpie browser launch <alias> --port 8441` launched on 8420, which
+  another worktree's Kelpie held, and the fixed build correctly refused it at
+  the local control listener. The CLI never honoured `browser launch --port`:
+  the program-wide `--port` (default 8420) takes the value even after the
+  subcommand, so the launch-level option was always empty. That is fixed in
+  `packages/cli/src/commands/browser.ts`, and the pre-merge claim that the CLI
+  phase ran on 8441 was wrong; it ran on 8420. The second run passed end to
+  end (`{"success":true,...,"port":8441}`).
+- Two instances, same profile-per-instance setup: unfixed A and B on 8442 both
+  appear `LISTENING` in `netstat -ano` and both publish readiness; 20 of 20
+  requests carrying B's token reached A and got `401`. Fixed A and B on 8441:
+  visible B shows `Browser startup failed during local control listener:
+  Could not start the control listener on 127.0.0.1:8441; another process
+  may own the port`, publishes no readiness, `netstat -ano` lists only A's
+  PID, A answers 20 of 20 with its own token, and B exits 1 on `WM_CLOSE`; a
+  hidden B exits 1 by itself under the same checks.
 
 ## Out of scope, reported
 
