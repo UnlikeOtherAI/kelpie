@@ -157,14 +157,26 @@ async function verifyProfileLock(config, fixtureUrl, profile, primaryReadiness, 
 }
 
 /**
+ * A visible launch opens as a normal window. Seed its profile's remembered
+ * placement so it opens small in the corner instead of covering the screen.
+ */
+async function seedCornerPlacement(profile) {
+  await writeFile(join(profile, "settings.json"),
+    JSON.stringify({ window: { x: 16, y: 16, width: 560, height: 360, maximized: false } }));
+}
+
+/**
  * A launch on a port another process already listens on must stop at the
  * local control listener stage: it never shares the port, never publishes
- * readiness, and its window names that stage until a person closes it.
+ * readiness, and its window names that stage until a person closes it. Only
+ * a visible window shows the stage, so this contender is launched visible.
  */
 async function verifyOccupiedPort(config, fixtureUrl, holder) {
   const profile = await mkdtemp(join(tmpdir(), "kelpie-windows-port-conflict-"));
   const readiness = join(profile, "readiness.json");
-  const contender = startBrowser(config.exe, browserArguments({ profile, readiness, port: holder.port, fixtureUrl }));
+  await seedCornerPlacement(profile);
+  const contender = startBrowser(config.exe, browserArguments({ profile, readiness, port: holder.port, fixtureUrl }),
+    { visible: true });
   try {
     const deadline = Date.now() + config.timeoutMs;
     let failure;
@@ -177,12 +189,7 @@ async function verifyOccupiedPort(config, fixtureUrl, holder) {
     }
     assert.match(failure, /^Browser startup failed during local control listener: /,
       `launch against ${holder.description} must fail at the local control listener`);
-    assert.equal(await fileExists(readiness), false, `launch against ${holder.description} must not publish readiness`);
-    const listeners = await listeningPids(holder.port);
-    assert.equal(listeners.includes(contender.child.pid), false, `launch against ${holder.description} must not share its port`);
-    assert.equal(listeners.includes(holder.pid), true,
-      `${holder.description} (PID ${holder.pid}) must keep port ${holder.port}; listening PIDs: ${JSON.stringify(listeners)}`);
-    await holder.stillServes?.();
+    await assertHolderKeepsPort(holder, contender, readiness);
     await closeShellWindow(contender.child.pid);
     const outcome = await Promise.race([contender.exited, delay(config.timeoutMs).then(() => null)]);
     assert.notEqual(outcome, null, "a window that failed startup must close when asked");
@@ -191,6 +198,34 @@ async function verifyOccupiedPort(config, fixtureUrl, holder) {
     await stopBrowser(contender);
     await rm(profile, PROFILE_REMOVAL);
   }
+}
+
+/**
+ * A hidden launch has no window to show its failure, so on an occupied port
+ * it must exit promptly with a failure status, still without readiness.
+ */
+async function verifyHiddenOccupiedPort(config, fixtureUrl, holder) {
+  const profile = await mkdtemp(join(tmpdir(), "kelpie-windows-port-conflict-"));
+  const readiness = join(profile, "readiness.json");
+  const contender = startBrowser(config.exe, browserArguments({ profile, readiness, port: holder.port, fixtureUrl }));
+  try {
+    const outcome = await Promise.race([contender.exited, delay(8_000).then(() => null)]);
+    assert.notEqual(outcome, null, `hidden launch against ${holder.description} must fail promptly`);
+    assert.equal(outcome.code, 1, `hidden launch against ${holder.description} must exit with a failure status`);
+    await assertHolderKeepsPort(holder, contender, readiness);
+  } finally {
+    await stopBrowser(contender);
+    await rm(profile, PROFILE_REMOVAL);
+  }
+}
+
+async function assertHolderKeepsPort(holder, contender, readiness) {
+  assert.equal(await fileExists(readiness), false, `launch against ${holder.description} must not publish readiness`);
+  const listeners = await listeningPids(holder.port);
+  assert.equal(listeners.includes(contender.child.pid), false, `launch against ${holder.description} must not share its port`);
+  assert.equal(listeners.includes(holder.pid), true,
+    `${holder.description} (PID ${holder.pid}) must keep port ${holder.port}; listening PIDs: ${JSON.stringify(listeners)}`);
+  await holder.stillServes?.();
 }
 
 async function verifyOccupiedPorts(config, fixtureUrl, current, readinessFile) {
@@ -204,7 +239,7 @@ async function verifyOccupiedPorts(config, fixtureUrl, current, readinessFile) {
       await holder.close();
     }
   }
-  await verifyOccupiedPort(config, fixtureUrl, {
+  const running = {
     description: "the running kelpie.exe",
     port: current.readiness.port,
     pid: current.browser.child.pid,
@@ -212,7 +247,9 @@ async function verifyOccupiedPorts(config, fixtureUrl, current, readinessFile) {
       assert.equal(await fileExists(readinessFile), true, "the running browser must keep its readiness file");
       await control(current.readiness, "get-current-url", {});
     },
-  });
+  };
+  await verifyOccupiedPort(config, fixtureUrl, running);
+  await verifyHiddenOccupiedPort(config, fixtureUrl, running);
 }
 
 async function verifyRestoration(readiness, session) {
@@ -260,10 +297,8 @@ async function verifyCliAndStdio(config, fixtureUrl, port) {
   const environment = { KELPIE_HOME: cliHome };
   let launched = false;
   try {
-    // The CLI launches a normal, visible window. Seed the remembered placement
-    // so it opens small in the corner instead of covering the operator's screen.
-    await writeFile(join(profile, "settings.json"),
-      JSON.stringify({ window: { x: 16, y: 16, width: 560, height: 360, maximized: false } }));
+    // The CLI launches a normal, visible window.
+    await seedCornerPlacement(profile);
     const registered = await runCommand(process.execPath, [config.cli, "browser", "register", alias,
       "--platform", "windows", "--app-path", config.exe, "--profile-dir", profile], { env: environment });
     assert.equal(parseCliResult(registered, "CLI browser register").success, true, "CLI must register an isolated Windows alias");

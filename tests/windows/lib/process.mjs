@@ -43,11 +43,13 @@ export function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export function startBrowser(executable, args) {
-  // The shell only reports ready once Chromium's child window is visible
-  // (IsActiveNativeBrowserAttached checks IsWindowVisible), so a hidden launch
-  // always stops at browser attachment. Launch it the way a person would.
-  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: false });
+/**
+ * Starts an owned browser, hidden unless `visible`. A hidden launch that fails
+ * startup exits at once; only a visible one keeps its window open to show the
+ * failed stage.
+ */
+export function startBrowser(executable, args, { visible = false } = {}) {
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: !visible });
   const stdout = capture(child.stdout);
   const stderr = capture(child.stderr);
   const exited = new Promise(resolve => {

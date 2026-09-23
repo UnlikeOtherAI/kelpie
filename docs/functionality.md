@@ -400,9 +400,9 @@ file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch b
 The loopback control port (`--port`, default `8420`) is exclusive. When another process already
 listens on it — a second Kelpie included — the new launch does not share it and does not move to
 another port: startup stops at the local control listener, the window reads
-`Browser startup failed during local control listener: …`, and no readiness file is written, so
-the running instance keeps its port and every request that carries its token. Give each Windows
-instance its own `--port`.
+`Browser startup failed during local control listener: …` (a launch started hidden exits with a
+failure code instead), and no readiness file is written, so the running instance keeps its port
+and every request that carries its token. Give each Windows instance its own `--port`.
 `kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
 creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
 provides a token-free stdio bridge for local development agents and local Nessie executors.

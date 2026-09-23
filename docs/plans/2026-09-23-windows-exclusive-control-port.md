@@ -94,8 +94,10 @@ so that failure path is dead.
    start the control listener on 127.0.0.1:<port>; another process may own the
    port`. `StartListener` composes that from its config; `DesktopHttpServer`
    reports only a boolean, so the text does not claim to know which of bind or
-   listen failed. The process does not exit on its own, exactly like the other
-   post-shell startup failures; closing the window exits with status 1.
+   listen failed. A visible window does not exit on its own, exactly like the
+   other post-shell startup failures; closing it exits with status 1. A launch
+   whose window is hidden has nobody to read that, so it exits with status 1 at
+   once (main's `WindowsApp::Run` rule, which this change leaves as it is).
 
 Windows does not fall back to another port; the docs that describe port
 fallback are scoped to the platforms that do it.
@@ -119,10 +121,14 @@ fallback are scoped to the platforms that do it.
   window `WM_CLOSE` and requires exit status 1, which exercises the failed
   listener's teardown. The old assertion that the contender exits by itself
   within 8 s predates the visible-failure design and never matched this build.
-- The harness launches browsers visibly. `IsActiveNativeBrowserAttached`
-  requires `IsWindowVisible`, so a `windowsHide` launch always stops at
-  browser attachment; the harness could not pass its first launch on this
-  build before this change.
+- Only a visible window shows the failed stage, so the occupied-port
+  contenders are launched visible, with a seeded small corner placement; every
+  other harness launch stays hidden. One further hidden contender against the
+  running `kelpie.exe` must exit within 8 s with status 1, with the same
+  readiness and `netstat` checks. (This branch first launched every harness
+  browser visibly to get past `IsActiveNativeBrowserAttached`'s
+  `IsWindowVisible` check; main has since fixed that check to read the child's
+  own `WS_VISIBLE`, so that workaround was dropped when main was merged in.)
 - The harness's CLI phase launches its alias on the run's `--port`. Without it
   the CLI uses `8420`, which a developer's own Kelpie usually holds; before the
   fix that launch would have shared the developer's port.
