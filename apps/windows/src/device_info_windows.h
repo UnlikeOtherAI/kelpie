@@ -44,7 +44,7 @@ class DeviceInfoWindows final : public DeviceInfoProvider {
   int port_ = 8420;
   int width_ = 1280;
   int height_ = 720;
-  std::string app_version_ = "0.1.1";
+  std::string app_version_ = "0.1.2";
 };
 
 }  // namespace kelpie::windows

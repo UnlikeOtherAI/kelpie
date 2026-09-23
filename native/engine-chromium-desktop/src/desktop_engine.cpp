@@ -188,7 +188,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     Tab initial;
     initial.id = config.restored_tabs.empty() ? "tab-1" : config.restored_tabs.front().id;
     initial.browser = browser;
-    initial.devtools = new DesktopDevToolsSession();
+    initial.devtools = NewDevToolsSession(browser);
     initial.url = first_url;
     initial.name = first_name;
     initial.partition = first_partition;

@@ -45,6 +45,7 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_router.cpp
   src/cef_renderer.cpp
   src/handlers/navigation_handler.cpp
+  src/handlers/navigation_wait.cpp
   src/handlers/interaction_handler.cpp
   src/handlers/dom_handler.cpp
   src/handlers/evaluate_handler.cpp

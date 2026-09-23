@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import { control, expectControlError, mcpRequest, rawRequest, resultValue, waitFor } from "./http.mjs";
+import { control, expectControlError, mcpRequest, rawRequest, resultValue, sameUrl, waitFor } from "./http.mjs";
 import { decodePng } from "./png.mjs";
 
 function assertion(condition, message) {
@@ -48,15 +48,17 @@ function activeTab(response) {
   return tab;
 }
 
+// `evaluate` answers `{ result: <value> }` (docs/api/browser.md). Unwrap once
+// only: a described value such as `{ type: "nonfinite", value: "NaN" }` is
+// itself the result, not another envelope.
 function evalResult(response) {
-  const value = resultValue(response);
-  return value.result ?? value.value ?? value;
+  return resultValue(response);
 }
 
 async function requireUrl(readiness, expected, tabIdValue = undefined) {
   await waitFor(async () => {
     const state = await control(readiness, "get-current-url", tabIdValue === undefined ? {} : { tabId: tabIdValue });
-    return resultValue(state).url === expected;
+    return sameUrl(resultValue(state).url, expected);
   }, `URL ${expected}`);
 }
 
@@ -178,6 +180,9 @@ async function runBrowserActions(readiness, fixtureUrl) {
   await expectControlError(readiness, "fill", { selector: "#disabled-input", value: "must fail" });
   await expectControlError(readiness, "click", { selector: "#missing-target" }, "ELEMENT_NOT_FOUND");
 
+  // press-key targets the focused element and the fixture listens on the text
+  // input, but the check/uncheck clicks above left focus on the checkbox.
+  await control(readiness, "click", { selector: "#text-input" });
   await control(readiness, "evaluate", { expression: "window.fixture.keyTrusted = null; window.fixture.lastKey = null; true" });
   const keyTab = activeTab(await control(readiness, "get-tabs", {}));
   const pressed = await control(readiness, "press-key", {
@@ -233,7 +238,9 @@ async function runBrowserActions(readiness, fixtureUrl) {
   assert.equal(cookie?.httpOnly, true, "cookie manager must retain httpOnly");
   assert.equal(String(cookie?.sameSite).toLowerCase(), "lax", "cookie manager must retain sameSite");
   await expectControlError(readiness, "set-cookie", {
-    name: "invalid_cookie", value: "present", domain: "127.0.0.1", expires: 123,
+    // Epoch seconds are a valid expiry (a past one deletes the cookie); an
+    // unparseable date is not.
+    name: "invalid_cookie", value: "present", domain: "127.0.0.1", expires: "not a date",
   });
   await control(readiness, "set-storage", { type: "local", key: "acceptance", value: "stored" });
   const storage = resultValue(await control(readiness, "get-storage", { type: "local", key: "acceptance" }));
@@ -252,7 +259,7 @@ async function runBrowserActions(readiness, fixtureUrl) {
   const bookmarks = resultValue(await control(readiness, "bookmarks-list", {}));
   assertion(Array.isArray(bookmarks.bookmarks) && bookmarks.bookmarks.some(item => item.url === fixtureUrl), "bookmark must be stored");
   const history = resultValue(await control(readiness, "history-list", {}));
-  assertion(Array.isArray(history.entries) && history.entries.some(item => item.url === fixtureUrl), "history must contain fixture navigation");
+  assertion(Array.isArray(history.entries) && history.entries.some(item => sameUrl(item.url, fixtureUrl)), "history must contain fixture navigation");
   await control(readiness, "set-home", { url: fixtureUrl });
   const home = resultValue(await control(readiness, "get-home", {}));
   assert.equal(home.url ?? home.home, fixtureUrl, "home page must persist through the browser control surface");
@@ -326,8 +333,8 @@ async function prepareRestoration(readiness, fixtureUrl) {
   await control(readiness, "switch-tab", { tabId: retained.id, generation: retained.generation });
   await waitFor(async () => {
     const tabs = tabsFrom(await control(readiness, "get-tabs", {}));
-    return tabs.some(tab => tab.id === retained.id && tab.url === retainedUrl && tab.active) &&
-      tabs.some(tab => tab.id === other.id && tab.url === otherUrl) &&
+    return tabs.some(tab => tab.id === retained.id && sameUrl(tab.url, retainedUrl) && tab.active) &&
+      tabs.some(tab => tab.id === other.id && sameUrl(tab.url, otherUrl)) &&
       !tabs.some(tab => tab.id === closed.id);
   }, "persisted two-tab restoration state");
   return {
@@ -383,7 +390,7 @@ async function runMcp(readiness, fixtureUrl) {
     "MCP navigation tool must return a success payload");
   const screenshot = await mcpRequest(readiness, { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "kelpie_screenshot", arguments: { format: "png" } } }, protocolVersion);
   assert.equal(screenshot.status, 200, `MCP screenshot failed: ${screenshot.text}`);
-  assert.notEqual(screenshot.json?.result?.isError, true, "MCP screenshot tool must be callable");
+  assert.notEqual(screenshot.json?.result?.isError, true, `MCP screenshot tool must be callable: ${screenshot.text.slice(0, 500)}`);
   decodePng(Buffer.from(imageFrom(screenshot.json?.result), "base64"));
 }
 

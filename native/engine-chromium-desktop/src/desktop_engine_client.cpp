@@ -176,10 +176,13 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
 
 void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
                                    CefRefPtr<CefFrame> frame,
-                                   CefLoadHandler::ErrorCode,
+                                   CefLoadHandler::ErrorCode error_code,
                                    const CefString& error_text,
                                    const CefString&) {
   if (!frame || !frame->IsMain()) return;
+  // ERR_ABORTED is the load a newer navigation (or a stop) replaced. It must
+  // not be charged to the navigation that replaced it.
+  if (error_code == ERR_ABORTED) return;
   if (auto* tab = owner_->FindTab(browser)) {
     tab->loading = false;
     tab->navigation_error = error_text.ToString();

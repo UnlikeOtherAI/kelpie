@@ -173,9 +173,14 @@ int main(int argc, char** argv) {
   std::filesystem::create_directories(profile_dir, code);
 
   std::wstring command = L"\"" + executable.wstring() + L"\" --port " + std::to_wstring(port) +
-                         L" --profile-dir \"" + profile_dir.wstring() + L"\" --url about:blank";
+                         L" --profile-dir \"" + profile_dir.wstring() + L"\" --url about:blank" +
+                         L" --width 640 --height 400";
+  // A small window that does not take focus, so a test run does not cover or
+  // steal the desktop of whoever is working on this machine.
   STARTUPINFOW startup{};
   startup.cb = sizeof(startup);
+  startup.dwFlags = STARTF_USESHOWWINDOW;
+  startup.wShowWindow = SW_SHOWNOACTIVATE;
   PROCESS_INFORMATION information{};
   if (!Check(::CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr,
                               binary_dir.wstring().c_str(), &startup, &information) != FALSE,

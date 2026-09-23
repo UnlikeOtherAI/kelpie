@@ -220,6 +220,8 @@ Queued dialogs are tied to the current page. If a new navigation starts before t
 
 JavaScript dialog handling (`get-dialog`, `handle-dialog`, `set-dialog-auto-handler`) is fully supported on iOS, Android, and macOS. On macOS the active WebKit renderer's `WKUIDelegate` enqueues alert/confirm/prompt dialogs into a shared store that the handler reads, so queued and auto-handled dialogs behave the same as on mobile.
 
+On Windows, a trusted input call (`click`, `press-key`, `type`, …) whose page handler opens a dialog returns as soon as the dialog is showing, with `{"trusted": true, "dialogOpened": true}` in its `input` result, so the caller can read and answer it with `get-dialog` and `handle-dialog` instead of the input call blocking until it times out.
+
 ---
 
 ## Tabs

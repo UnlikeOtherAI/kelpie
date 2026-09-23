@@ -1,5 +1,9 @@
 #include "navigation_handler.h"
 
+#include <chrono>
+
+#include "navigation_wait.h"
+
 namespace kelpie {
 namespace {
 
@@ -31,11 +35,24 @@ nlohmann::json NavigationHandler::Navigate(const nlohmann::json& params) const {
     TabLease lease;
     const BrowserControlResult resolved = Resolve(runtime_, params, &lease);
     if (!resolved.ok) return ControlError(resolved);
+    // `timeout` bounds the whole call, including the wait for the page to load
+    // (docs/api/core.md), so the next command sees the new document.
+    const auto started = std::chrono::steady_clock::now();
+    const auto deadline = started + ControlTimeout(params);
     TabSnapshot tab;
     const BrowserControlResult result = RequireBrowserControl(runtime_).Navigate(lease, RequireString(params, "url"), &tab,
                                                                                   ControlTimeout(params));
-    if (result.ok && runtime_.history_store != nullptr) runtime_.history_store->Record(tab.url, tab.title);
-    return SnapshotResponse(result, tab);
+    if (!result.ok) return ControlError(result);
+    BrowserNavigationState requested;
+    const BrowserControlResult state = RequireBrowserControl(runtime_).GetNavigationState(lease, &requested, ControlTimeout(params));
+    if (!state.ok) return ControlError(state);
+    const NavigationWaitResult waited = AwaitNavigation(runtime_, lease, requested.requested, deadline);
+    if (!waited.ok) return waited.error;
+    if (runtime_.history_store != nullptr) runtime_.history_store->Record(waited.tab.url, waited.tab.title);
+    const auto load_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+    nlohmann::json response = SnapshotResponse(result, waited.tab);
+    response["loadTime"] = load_ms.count();
+    return response;
   } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 

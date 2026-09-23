@@ -1,5 +1,7 @@
 #include "evaluate_handler.h"
 
+#include "navigation_wait.h"
+
 #include <algorithm>
 #include <chrono>
 #include <thread>
@@ -74,7 +76,6 @@ nlohmann::json EvaluateHandler::WaitForElement(const nlohmann::json& params) con
 
 nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) const {
   const auto timeout = ControlTimeout(params);
-  const int poll_ms = 100;
   const auto deadline = std::chrono::steady_clock::now() + timeout;
   try {
     TabLease lease;
@@ -85,25 +86,9 @@ nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) 
     resolved = RequireBrowserControl(runtime_).GetNavigationState(lease, &initial, timeout);
     if (!resolved.ok) return ControlError(resolved);
     if (initial.requested == 0) return ErrorResponse(ErrorCode::kNavigationError, "No navigation has been requested");
-    const std::uint64_t request = initial.requested;
-    while (true) {
-      const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for navigation to complete");
-      const auto remaining = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(deadline - now);
-      BrowserNavigationState state;
-      const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
-          lease, &state, remaining);
-      if (!control.ok) return ControlError(control);
-      if (state.requested < request) return ErrorResponse(ErrorCode::kNavigationError, "The navigation request was replaced");
-      if (!state.error.empty() && state.completed < request) {
-        return ErrorResponse(ErrorCode::kNavigationError, state.error);
-      }
-      if (state.completed >= request) {
-        return SuccessResponse({{"tab", TabJson(state.tab)}});
-      }
-      std::this_thread::sleep_for(std::min(std::chrono::milliseconds(poll_ms),
-          std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now())));
-    }
+    const NavigationWaitResult waited = AwaitNavigation(runtime_, lease, initial.requested, deadline);
+    if (!waited.ok) return waited.error;
+    return SuccessResponse({{"tab", TabJson(waited.tab)}});
   } catch (const std::invalid_argument& exception) { return InvalidParams(exception.what()); }
 }
 
