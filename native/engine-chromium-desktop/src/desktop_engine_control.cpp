@@ -17,8 +17,6 @@
 #include "include/cef_request_context.h"
 #include "kelpie/internal_scheme.h"
 #include "kelpie/partition.h"
-#include "desktop_cookie_planner.h"
-#include "desktop_input_planner.h"
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -54,16 +52,6 @@ void RunUiOperation(std::shared_ptr<UiOperation> operation) {
   operation->ready.notify_all();
 }
 
-bool IsNavigableUrl(const std::string& url) {
-  if (url.empty()) return false;
-  CefURLParts parts;
-  // `kelpie://` is checked explicitly: CefParseURL only recognises a custom
-  // scheme once Chromium has been initialised in this process, and the shell
-  // creates the start page tab through the same validator.
-  return CefParseURL(url, parts) || IsInternalSchemeUrl(url) ||
-         url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
-}
-
 struct PendingDevTools {
   CefRefPtr<DesktopDevToolsSession> session;
   std::shared_ptr<DesktopDevToolsSession::Operation> operation;
@@ -76,22 +64,22 @@ BrowserControlResult DevToolsResult(const DesktopDevToolsSession::Result& result
   return output;
 }
 
-DesktopBrowserControl::Timeout RemainingTimeout(std::chrono::steady_clock::time_point started,
-                                                DesktopBrowserControl::Timeout timeout) {
-  const auto elapsed = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(
-      std::chrono::steady_clock::now() - started);
-  return elapsed >= timeout ? DesktopBrowserControl::Timeout::zero() : timeout - elapsed;
-}
-
-BrowserControlResult DeadlineExceeded() {
-  return BrowserControlResult::Failure("TIMEOUT", "Browser operation timed out before the next native operation");
-}
-
-BrowserControlResult PlannerError(const std::string& code, const std::string& message) {
-  return BrowserControlResult::Failure(code.empty() ? "INVALID_PARAMS" : code, message);
-}
-
 }  // namespace
+
+// Tab lifecycle, the UI-thread bridge and the DevTools calls every other
+// operation is built on. Navigation is in desktop_engine_navigation.cpp;
+// cookies, trusted input and dialogs in desktop_engine_page.cpp; screenshots in
+// desktop_engine_screenshot.cpp.
+
+bool IsNavigableUrl(const std::string& url) {
+  if (url.empty()) return false;
+  CefURLParts parts;
+  // `kelpie://` is checked explicitly: CefParseURL only recognises a custom
+  // scheme once Chromium has been initialised in this process, and the shell
+  // creates the start page tab through the same validator.
+  return CefParseURL(url, parts) || IsInternalSchemeUrl(url) ||
+         url.rfind("about:", 0) == 0 || url.rfind("data:", 0) == 0;
+}
 
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
   for (auto& tab : tabs) {
@@ -290,32 +278,6 @@ BrowserControlResult DesktopEngine::GetSessionState(SessionState* output, Timeou
   return result;
 }
 
-BrowserControlResult DesktopEngine::GetNavigationState(TabLease lease, NavigationState* output,
-                                                       Timeout timeout) {
-  const auto impl = impl_;
-  if (output == nullptr) return BrowserControlResult::Failure("INTERNAL", "navigation state is required");
-  auto state = std::make_shared<NavigationState>();
-  const auto result = impl->RunOnUi([impl, lease, state] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    state->tab = impl->Snapshot(*tab);
-    state->navigation = tab->navigation;
-    return BrowserControlResult::Success(state->tab);
-  }, timeout);
-  if (result.ok) *output = std::move(*state);
-  return result;
-}
-
-BrowserControlResult DesktopEngine::MarkNavigationAction(TabLease lease, Timeout timeout) {
-  const auto impl = impl_;
-  return impl->RunOnUi([impl, lease] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    tab->navigation.MarkAction();
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-}
-
 BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>& id,
                                                const std::optional<std::uint64_t>& generation,
                                                TabLease* lease, Timeout timeout) {
@@ -451,54 +413,6 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
   }, timeout);
 }
 
-BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease> lease, std::string url,
-                                             TabSnapshot* tab, Timeout timeout) {
-  const auto impl = impl_;
-  auto navigated = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, url = std::move(url), navigated] {
-    if (!IsNavigableUrl(url)) return BrowserControlResult::Failure("INVALID_URL", "url must be an absolute URL");
-    DesktopEngine::Impl::Tab* target = nullptr;
-    if (lease) target = impl->FindTab(*lease); else if (impl->tabs.size() == 1) target = impl->ActiveTab();
-    if (!target) return BrowserControlResult::Failure(lease ? "TAB_NOT_FOUND" : "TAB_REQUIRED", "A current tab lease is required");
-    if (target->navigation.started == std::numeric_limits<std::uint64_t>::max()) {
-      return BrowserControlResult::Failure("NAVIGATION_EXHAUSTED", "No more navigation requests are available");
-    }
-    target->navigation.ApiNavigationRequested();
-    target->loading = true;
-    target->browser->GetMainFrame()->LoadURL(url);
-    target->url = url;
-    *navigated = impl->Snapshot(*target);
-    return BrowserControlResult::Success(*navigated);
-  }, timeout);
-  if (result.ok && tab) *tab = *navigated;
-  return result;
-}
-
-BrowserControlResult DesktopEngine::Back(TabLease lease, TabSnapshot* tab, Timeout timeout) {
-  const auto impl = impl_;
-  auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->navigation.ApiNavigationRequested(); target->loading=true; target->browser->GoBack(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
-  if (result.ok && tab) *tab=*state; return result;
-}
-BrowserControlResult DesktopEngine::Forward(TabLease lease, TabSnapshot* tab, Timeout timeout) {
-  const auto impl = impl_;
-  auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->navigation.ApiNavigationRequested(); target->loading=true; target->browser->GoForward(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
-  if (result.ok && tab) *tab=*state; return result;
-}
-BrowserControlResult DesktopEngine::Reload(TabLease lease, TabSnapshot* tab, Timeout timeout) {
-  const auto impl = impl_;
-  auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->navigation.ApiNavigationRequested(); target->loading=true; target->browser->Reload(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
-  if (result.ok && tab) *tab=*state; return result;
-}
-BrowserControlResult DesktopEngine::StopLoading(TabLease lease, TabSnapshot* tab, Timeout timeout) {
-  const auto impl = impl_;
-  auto state = std::make_shared<TabSnapshot>();
-  const auto result = impl->RunOnUi([impl, lease, state] { auto* target=impl->FindTab(lease); if(!target) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale"); target->browser->StopLoad(); *state=impl->Snapshot(*target); return BrowserControlResult::Success(*state); }, timeout);
-  if (result.ok && tab) *tab=*state; return result;
-}
-
 BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script, Json* value, Timeout timeout) {
   const auto impl = impl_;
   if (value == nullptr) return BrowserControlResult::Failure("INTERNAL", "result is required");
@@ -517,154 +431,6 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
       pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout)));
   const auto result = DevToolsResult(parsed);
   if (result.ok) *value = parsed.value;
-  return result;
-}
-
-// DesktopEngine::Screenshot lives in desktop_engine_screenshot.cpp.
-
-BrowserControlResult DesktopEngine::GetCookies(TabLease lease, const Json& query, Json* cookies, Timeout timeout) {
-  if (!cookies) return BrowserControlResult::Failure("INTERNAL", "cookies is required");
-  const auto planned = desktop_cookie::PlanGetCookies(query);
-  if (!planned.ok) return PlannerError("INVALID_PARAMS", planned.error);
-  Json response;
-  const std::string method = query.contains("url") ? "Network.getCookies" : "Network.getAllCookies";
-  const auto result = DevTools(lease, method, planned.params, &response, timeout);
-  if (!result.ok) return result;
-  const auto listed = response.find("cookies");
-  if (listed == response.end() || !listed->is_array()) {
-    return BrowserControlResult::Failure("CDP_MALFORMED_RESULT", method + " did not return cookies");
-  }
-  Json filtered = Json::array();
-  for (const auto& cookie : *listed) if (desktop_cookie::MatchesFilter(cookie, query)) filtered.push_back(cookie);
-  *cookies = std::move(filtered);
-  return result;
-}
-
-BrowserControlResult DesktopEngine::SetCookies(TabLease lease, const Json& cookies, Json* output, Timeout timeout) {
-  const Json values = cookies.is_array() ? cookies : Json::array({cookies});
-  if (values.empty()) return BrowserControlResult::Failure("INVALID_PARAMS", "At least one cookie is required");
-  const auto started_at = std::chrono::steady_clock::now();
-  std::size_t set = 0;
-  for (const auto& value : values) {
-    const auto planned = desktop_cookie::PlanSetCookie(value);
-    if (!planned.ok) return PlannerError("INVALID_PARAMS", planned.error);
-    const auto remaining = RemainingTimeout(started_at, timeout);
-    if (remaining <= Timeout::zero()) return DeadlineExceeded();
-    Json response;
-    const auto result = DevTools(lease, "Network.setCookie", planned.params, &response, remaining);
-    if (!result.ok) return result;
-    const auto success = response.find("success");
-    if (success == response.end() || !success->is_boolean() || !success->get<bool>()) {
-      return BrowserControlResult::Failure("DEVTOOLS_ERROR", "Chromium rejected the cookie");
-    }
-    ++set;
-  }
-  if (output) *output = {{"set", set}};
-  return BrowserControlResult::Success();
-}
-
-BrowserControlResult DesktopEngine::DeleteCookies(TabLease lease, const Json& query, Json* output, Timeout timeout) {
-  const auto planned = desktop_cookie::PlanDeleteCookies(query);
-  if (!planned.ok) return PlannerError("INVALID_PARAMS", planned.error);
-  const auto started_at = std::chrono::steady_clock::now();
-  const auto remaining = RemainingTimeout(started_at, timeout);
-  if (remaining <= Timeout::zero()) return DeadlineExceeded();
-  Json response;
-  const std::string method = planned.action == desktop_cookie::DeletePlan::Action::kClearAll
-      ? "Network.clearBrowserCookies" : "Network.deleteCookies";
-  const auto result = DevTools(lease, method, planned.params, &response, remaining);
-  if (result.ok && output) *output = std::move(response);
-  return result;
-}
-
-BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const Json& input, Json* output, Timeout timeout) {
-  if (!input.is_object()) return BrowserControlResult::Failure("INVALID_PARAMS", "Input must be an object");
-  const auto type = input.find("type");
-  if (type == input.end() || !type->is_string()) return BrowserControlResult::Failure("INVALID_PARAMS", "Input type is required");
-  const auto started_at = std::chrono::steady_clock::now();
-  const auto has_selector = input.contains("selector");
-  std::optional<std::string> selector;
-  if (has_selector) {
-    if (!input["selector"].is_string() || input["selector"].get<std::string>().empty()) {
-      return BrowserControlResult::Failure("INVALID_PARAMS", "selector must be a non-empty string");
-    }
-    selector = input["selector"].get<std::string>();
-  }
-  if (type->get<std::string>() != "key" && type->get<std::string>() != "type" && !selector) {
-    return BrowserControlResult::Failure("INVALID_PARAMS", "selector is required for this input type");
-  }
-
-  std::optional<desktop_input::Target> target;
-  const auto inspect = [&](bool scroll) -> BrowserControlResult {
-    const auto remaining = RemainingTimeout(started_at, timeout);
-    if (remaining <= Timeout::zero()) return DeadlineExceeded();
-    Json inspected;
-    const auto result = Evaluate(lease, desktop_input::TargetInspectionScript(selector, scroll), &inspected, remaining);
-    if (!result.ok) return result;
-    std::string error;
-    target = desktop_input::ParseTarget(inspected, &error);
-    return target ? BrowserControlResult::Success() : BrowserControlResult::Failure("CDP_MALFORMED_RESULT", error);
-  };
-
-  if (type->get<std::string>() != "key") {
-    const auto result = inspect(selector.has_value());
-    if (!result.ok) return result;
-  }
-  const auto plan = desktop_input::PlanTrustedInput(input, target);
-  if (!plan.ok) return PlannerError(plan.error_code, plan.message);
-  for (const auto& command : plan.commands) {
-    const auto method = command.find("method");
-    const auto params = command.find("params");
-    if (method == command.end() || !method->is_string() || params == command.end() || !params->is_object()) {
-      return BrowserControlResult::Failure("INTERNAL", "Input planner emitted an invalid DevTools command");
-    }
-    const auto remaining = RemainingTimeout(started_at, timeout);
-    if (remaining <= Timeout::zero()) return DeadlineExceeded();
-    Json ignored;
-    const auto result = DevTools(lease, method->get<std::string>(), *params, &ignored, remaining);
-    if (!result.ok) return result;
-  }
-  if (!plan.expected.empty()) {
-    const auto result = inspect(false);
-    if (!result.ok) return result;
-    if (!desktop_input::MatchesExpectedState(*target, plan.expected)) {
-      return BrowserControlResult::Failure("INPUT_STATE_MISMATCH", "Native input did not produce the requested state");
-    }
-  }
-  if (output) {
-    *output = {{"trusted", true}};
-    if (plan.expected.contains("kind") && plan.expected.contains("value")) {
-      (*output)[plan.expected["kind"].get<std::string>()] = plan.expected["value"];
-    }
-  }
-  return BrowserControlResult::Success();
-}
-BrowserControlResult DesktopEngine::GetDialog(TabLease lease, Json* dialog, Timeout timeout) {
-  const auto impl = impl_;
-  if (!dialog) return BrowserControlResult::Failure("INTERNAL", "dialog is required");
-  auto state = std::make_shared<Json>();
-  const auto result = impl->RunOnUi([impl, lease, state] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    *state = tab->dialogs.Current(tab->browser);
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (result.ok) *dialog = *state;
-  return result;
-}
-
-BrowserControlResult DesktopEngine::HandleDialog(TabLease lease, const Json& action, Json* output, Timeout timeout) {
-  const auto impl = impl_;
-  auto state = std::make_shared<Json>();
-  const auto result = impl->RunOnUi([impl, lease, action, state] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    if (!tab->dialogs.Handle(tab->browser, action, state.get())) {
-      return BrowserControlResult::Failure("UNSUPPORTED", "No matching JavaScript dialog is open");
-    }
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (result.ok && output) *output = *state;
   return result;
 }
 

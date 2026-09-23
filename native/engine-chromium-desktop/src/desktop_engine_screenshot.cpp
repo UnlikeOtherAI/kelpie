@@ -14,13 +14,6 @@
 namespace kelpie {
 namespace {
 
-DesktopBrowserControl::Timeout Remaining(std::chrono::steady_clock::time_point started,
-                                         DesktopBrowserControl::Timeout timeout) {
-  const auto elapsed = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(
-      std::chrono::steady_clock::now() - started);
-  return elapsed >= timeout ? DesktopBrowserControl::Timeout::zero() : timeout - elapsed;
-}
-
 // A minimised top-level window stops producing frames, and CDP then hands back
 // the last frame or the iconic window's tiny surface (158x14 in practice) while
 // the page still believes it is visible. So the window is asked, not the page.
@@ -70,12 +63,12 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, const BrowserScre
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     const BrowserControlResult state = WindowCanProduceImage(tab->browser);
     return state.ok ? BrowserControlResult::Success(impl->Snapshot(*tab)) : state;
-  }, Remaining(started_at, timeout));
+  }, RemainingTimeout(started_at, timeout));
   if (!window.ok) return window;
 
   Json captured;
   result = DevTools(lease, "Page.captureScreenshot", desktop_screenshot::CaptureParams(options, *viewport),
-                    &captured, Remaining(started_at, timeout));
+                    &captured, RemainingTimeout(started_at, timeout));
   if (!result.ok) return result;
   const auto data = captured.find("data");
   if (data == captured.end() || !data->is_string() || data->get_ref<const std::string&>().empty()) {
