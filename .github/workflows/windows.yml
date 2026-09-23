@@ -10,12 +10,11 @@ permissions: {contents: read}
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 60
+    # A green run takes ~9.5 minutes (2026-09-23), so 30 leaves ~3x headroom
+    # and a stall fails in half an hour instead of GitHub's six.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-      - name: Report system tar (temporary diagnostic)
-        shell: pwsh
-        run: '& (Join-Path $env:SystemRoot "System32/tar.exe") --version; (Get-CimInstance Win32_OperatingSystem).Caption; (Get-Command bzip2.exe -All -ErrorAction SilentlyContinue).Source'
       - name: Verify harness process handling
         shell: pwsh
         run: node --test tests/windows/process.test.mjs

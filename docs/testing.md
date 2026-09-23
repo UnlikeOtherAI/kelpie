@@ -114,7 +114,15 @@ pnpm build && pnpm test
 Windows releases use the pinned CEF 152 minimal SDK. Run scripts/download-cef-windows.ps1,
 scripts/build-windows.ps1, then scripts/package-windows.ps1. The download verifies both
 pinned SHA-256 and SHA-1. The build requires VS2022 C++ Build Tools, Windows SDK, CMake,
-Ninja, and tar.exe; it uses C++20, the static MSVC CRT, USE_SANDBOX=ON, and CTest.
+and Ninja; it uses C++20, the static MSVC CRT, USE_SANDBOX=ON, and CTest.
+
+The SDK archive is extracted with `cmake -E tar`, not `tar.exe`. Windows' own tar depends on
+the Windows build: the windows-2022 CI image's bsdtar 3.8.4 has no bzip2 of its own, hands the
+`.tar.bz2` to an external `bzip2`, and never finished. CMake's bundled libarchive extracts it
+in about 16 s there. CTest gives any test without its own `TIMEOUT` 120 s, so a hang fails with
+the test's name. A green Windows CI run takes about 9.5 minutes, and the Windows CI and release
+jobs stop after 30. Each build stage prints a `==>` line, so a stalled job shows where it
+stopped.
 
 The ZIP contains only the CEF runtime, locales, licenses, unchanged CEF bootstrap
 kelpie.exe, and Kelpie's kelpie.dll. Packaging rejects missing RunWinMain, non-x64 DLLs,

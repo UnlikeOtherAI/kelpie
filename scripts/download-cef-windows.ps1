@@ -66,10 +66,11 @@ $extract = Join-Path $cache ("extract-" + $PID)
 Remove-CacheTree $extract $cache
 New-Item -ItemType Directory -Path $extract | Out-Null
 try {
-  # Not tar.exe: which libarchive that is depends on the Windows build, and on
-  # the windows-2022 CI image it sat on this archive for six hours before the
-  # job was cancelled. CMake bundles its own libarchive with bzip2 built in,
-  # and the build needs cmake anyway.
+  # Not tar.exe: its libarchive depends on the Windows build. The windows-2022
+  # CI image's (bsdtar 3.8.4, "zlib/1.2.5.f-ipp cng/2.0 libb2/bundled") has no
+  # bzip2 of its own, so it hands .bz2 to an external bzip2 (Git's, there) and
+  # sat on this archive until GitHub cancelled the job at six hours. CMake
+  # bundles libarchive with bzip2 built in, and the build needs cmake anyway.
   Write-Stage "extracting with cmake -E tar"
   Push-Location -LiteralPath $extract
   try { & cmake -E tar xf $archive } finally { Pop-Location }
