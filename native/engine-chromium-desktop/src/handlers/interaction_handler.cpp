@@ -10,6 +10,10 @@ nlohmann::json Dispatch(const DesktopHandlerRuntime& runtime, const nlohmann::js
     auto result = RequireBrowserControl(runtime).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease,
                                                             ControlTimeout(params));
     if (!result.ok) return ControlError(result);
+    // Every input here can start a navigation (a link, a submit, Enter in a
+    // form), so a wait-for-navigation that follows waits for what it starts.
+    result = RequireBrowserControl(runtime).MarkNavigationAction(lease, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
     nlohmann::json output;
     result = RequireBrowserControl(runtime).DispatchTrustedInput(lease, std::move(input), &output, ControlTimeout(params));
     if (!result.ok) return ControlError(result);

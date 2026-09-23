@@ -124,6 +124,7 @@ class DesktopEngine final : public DesktopBrowserControl {
   BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) override;
   BrowserControlResult GetSessionState(SessionState* state, Timeout timeout);
   BrowserControlResult GetNavigationState(TabLease lease, NavigationState* state, Timeout timeout) override;
+  BrowserControlResult MarkNavigationAction(TabLease lease, Timeout timeout) override;
   BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
                                   const std::optional<std::uint64_t>& generation,
                                   TabLease* lease,

@@ -11,6 +11,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "kelpie/navigation_tracker.h"
+
 namespace kelpie {
 
 struct TabLease {
@@ -108,9 +110,7 @@ struct BrowserScreenshot {
 
 struct BrowserNavigationState {
   TabSnapshot tab;
-  std::uint64_t requested = 0;
-  std::uint64_t completed = 0;
-  std::string error;
+  NavigationTracker navigation;
 };
 
 // The shared router uses this interface instead of accessing a CEF renderer
@@ -128,6 +128,13 @@ class DesktopBrowserControl {
                                                   BrowserNavigationState*,
                                                   Timeout) {
     return BrowserControlResult::Failure("UNSUPPORTED", "Navigation state is unavailable");
+  }
+  // Called before a navigation-capable action (click, fill, evaluate, ...)
+  // runs, so a later `wait-for-navigation` waits for what that action starts
+  // rather than an earlier navigation. An engine without navigation tracking
+  // has no baseline to move.
+  virtual BrowserControlResult MarkNavigationAction(TabLease, Timeout) {
+    return BrowserControlResult::Success();
   }
   virtual BrowserControlResult ResolveTab(const std::optional<std::string>& tab_id,
                                           const std::optional<std::uint64_t>& generation,

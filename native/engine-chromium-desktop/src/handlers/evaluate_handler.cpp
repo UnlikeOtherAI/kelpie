@@ -20,8 +20,17 @@ void EvaluateHandler::Register(DesktopRouter& router) const {
 nlohmann::json EvaluateHandler::Evaluate(const nlohmann::json& params) const {
   try {
     const std::string expression = RequireString(params, "expression");
+    TabLease lease;
+    BrowserControlResult result = RequireBrowserControl(runtime_).ResolveTab(
+        OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
+    // A caller's script can navigate (`location.href = ...`, a form submit), so
+    // it moves the wait-for-navigation baseline like any other action. Kelpie's
+    // own internal evaluations do not come through here and leave it alone.
+    result = RequireBrowserControl(runtime_).MarkNavigationAction(lease, ControlTimeout(params));
+    if (!result.ok) return ControlError(result);
     nlohmann::json value;
-    const BrowserControlResult result = EvaluateForTab(runtime_, params, expression, &value);
+    result = RequireBrowserControl(runtime_).Evaluate(lease, expression, &value, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
     return SuccessResponse({{"result", value}, {"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()}});
   } catch (const std::invalid_argument& exception) {
@@ -84,21 +93,29 @@ nlohmann::json EvaluateHandler::WaitForNavigation(const nlohmann::json& params) 
     BrowserNavigationState initial;
     resolved = RequireBrowserControl(runtime_).GetNavigationState(lease, &initial, timeout);
     if (!resolved.ok) return ControlError(resolved);
-    if (initial.requested == 0) return ErrorResponse(ErrorCode::kNavigationError, "No navigation has been requested");
-    const std::uint64_t request = initial.requested;
+    // The navigation to wait for is the first one after the tab's most recent
+    // navigation-capable action, whether the API or the page started it. The
+    // baseline is read once, so the wait's own polling cannot move it.
+    const std::uint64_t baseline = initial.navigation.baseline;
+    NavigationTracker::Progress progress = initial.navigation.Since(baseline);
     while (true) {
       const auto now = std::chrono::steady_clock::now();
-      if (now >= deadline) return ErrorResponse(ErrorCode::kTimeout, "Timed out waiting for navigation to complete");
+      if (now >= deadline) {
+        return ErrorResponse(ErrorCode::kTimeout,
+            progress == NavigationTracker::Progress::kNotStarted
+                ? "No navigation started within " + std::to_string(timeout.count()) + " ms"
+                : "Timed out waiting for navigation to complete");
+      }
       const auto remaining = std::chrono::duration_cast<DesktopBrowserControl::Timeout>(deadline - now);
       BrowserNavigationState state;
       const BrowserControlResult control = RequireBrowserControl(runtime_).GetNavigationState(
           lease, &state, remaining);
       if (!control.ok) return ControlError(control);
-      if (state.requested < request) return ErrorResponse(ErrorCode::kNavigationError, "The navigation request was replaced");
-      if (!state.error.empty() && state.completed < request) {
-        return ErrorResponse(ErrorCode::kNavigationError, state.error);
+      progress = state.navigation.Since(baseline);
+      if (progress == NavigationTracker::Progress::kFailed) {
+        return ErrorResponse(ErrorCode::kNavigationError, state.navigation.error);
       }
-      if (state.completed >= request) {
+      if (progress == NavigationTracker::Progress::kFinished) {
         return SuccessResponse({{"tab", TabJson(state.tab)}});
       }
       std::this_thread::sleep_for(std::min(std::chrono::milliseconds(poll_ms),

@@ -973,6 +973,31 @@ method returns a navigation error when the selected tab is not loading, which
 prevents an old `document.readyState === "complete"` from being reported as a
 new navigation.
 
+**Desktop Chromium (Windows, Linux).** The wait is for the main-frame
+navigation that started after the tab's most recent navigation-capable
+action, whether the API or the page started it. Those actions are `navigate`,
+`back`, `forward`, `reload`, `click`, `fill`, `type`, `press-key`,
+`select-option`, `check`, `uncheck` and `evaluate`. So `click` on a link
+followed by `wait-for-navigation` waits for the page the link opens.
+
+- If that navigation has already finished, the wait returns at once.
+- If it is still loading, including a load that was already in flight when
+  the action ran, the wait returns when loading stops.
+- If none has started, the wait waits up to `timeout` for one to start and
+  finish. When the time runs out it returns `TIMEOUT` with the message
+  `No navigation started within <timeout> ms`.
+- A load error on that navigation returns `NAVIGATION_ERROR` with Chromium's
+  error text. A load that a newer navigation or a download replaced
+  (`ERR_ABORTED`) is not an error.
+- Same-document navigations (`history.pushState`, a hash change) are not
+  counted, so a wait after one times out.
+- A fresh tab has had no action, so its first page load counts.
+- An `evaluate` run after a navigation finished moves the baseline past it.
+  Wait before evaluating, not after.
+
+The desktop response is `{"success": true, "tab": {...}}`, with the tab's
+`url`, `title` and `isLoading`.
+
 ```json
 POST /v1/wait-for-navigation
 {

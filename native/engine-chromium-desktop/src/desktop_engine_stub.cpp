@@ -125,6 +125,10 @@ BrowserControlResult DesktopEngine::GetNavigationState(TabLease, NavigationState
   return UnsupportedControl();
 }
 
+BrowserControlResult DesktopEngine::MarkNavigationAction(TabLease, Timeout) {
+  return UnsupportedControl();
+}
+
 BrowserControlResult DesktopEngine::ResolveTab(const std::optional<std::string>&,
                                                const std::optional<std::uint64_t>&,
                                                TabLease*,

@@ -154,11 +154,18 @@ void DesktopCefClient::OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
     tab->loading = is_loading;
     tab->can_go_back = can_go_back;
     tab->can_go_forward = can_go_forward;
-    if (!is_loading && tab->navigation_requested > tab->navigation_completed && tab->navigation_error.empty()) {
-      tab->navigation_completed = tab->navigation_requested;
-    }
+    if (!is_loading) tab->navigation.LoadStopped();
   }
   owner_->UpdateActiveState();
+}
+
+void DesktopCefClient::OnLoadStart(CefRefPtr<CefBrowser> browser,
+                                   CefRefPtr<CefFrame> frame,
+                                   TransitionType) {
+  // Fires when a cross-document main-frame navigation commits, whoever started
+  // it -- which is how a navigation the page began after a click is counted.
+  if (!frame || !frame->IsMain()) return;
+  if (auto* tab = owner_->FindTab(browser)) tab->navigation.LoadStarted();
 }
 
 void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
@@ -176,13 +183,17 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
 
 void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
                                    CefRefPtr<CefFrame> frame,
-                                   CefLoadHandler::ErrorCode,
+                                   CefLoadHandler::ErrorCode error_code,
                                    const CefString& error_text,
                                    const CefString&) {
   if (!frame || !frame->IsMain()) return;
+  // ERR_ABORTED is CEF's report that a newer navigation, or a link that turned
+  // out to be a download, replaced this load. It says nothing about the load
+  // now in progress, so it neither fails a wait nor clears the loading state.
+  if (error_code == ERR_ABORTED) return;
   if (auto* tab = owner_->FindTab(browser)) {
     tab->loading = false;
-    tab->navigation_error = error_text.ToString();
+    tab->navigation.LoadFailed(error_text.ToString());
   }
   owner_->UpdateActiveState();
 }

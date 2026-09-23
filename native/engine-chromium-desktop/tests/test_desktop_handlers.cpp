@@ -33,14 +33,21 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
-  kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false; std::uint64_t nav_requested = 1; std::uint64_t nav_completed = 1; std::string nav_error; int nav_polls = 0;
+  kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false;
+  // One finished page load, as a fresh tab has after its first page.
+  kelpie::NavigationTracker nav{1, 1, 0, {}}; bool nav_stops_on_second_poll = false; int nav_polls = 0;
+  // The order the handlers called the engine in, for the baseline checks.
+  std::vector<std::string> calls;
+  kelpie::BrowserControlResult MarkNavigationAction(kelpie::TabLease lease, Timeout) override {
+    last_lease=lease; calls.push_back("mark"); nav.MarkAction(); return kelpie::BrowserControlResult::Success();
+  }
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
   kelpie::BrowserControlResult GetNavigationState(kelpie::TabLease lease, kelpie::BrowserNavigationState* state, Timeout) override {
     ++nav_polls;
-    if (nav_error.empty() && nav_completed == 0 && nav_polls >= 2) nav_completed = nav_requested;
-    *state = {lease.id == "second" ? second : first, nav_requested, nav_completed, nav_error};
+    if (nav_stops_on_second_poll && nav_polls >= 2) nav.LoadStopped();
+    *state = {lease.id == "second" ? second : first, nav};
     return kelpie::BrowserControlResult::Success(state->tab);
   }
   kelpie::BrowserControlResult ResolveTab(const std::optional<std::string>& id, const std::optional<std::uint64_t>& gen, kelpie::TabLease* lease, Timeout) override {
@@ -70,12 +77,12 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Back(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
-  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
+  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; calls.push_back("evaluate"); if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
   kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override { last_lease=lease; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json& cookies, Json* out, Timeout) override { last_lease=lease; last_cookie=cookies; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DeleteCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"deleted",1}}; return kelpie::BrowserControlResult::Success(second); }
-  kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"trusted",true}}; return kelpie::BrowserControlResult::Success(second); }
+  kelpie::BrowserControlResult DispatchTrustedInput(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; calls.push_back("input"); *out={{"trusted",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetDialog(kelpie::TabLease lease, Json* out, Timeout) override { last_lease=lease; *out={{"open",true},{"type","alert"}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult HandleDialog(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"handled",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DevTools(kelpie::TabLease lease, std::string method, const Json& params, Json* out, Timeout) override {
@@ -120,12 +127,37 @@ int main() {
   assert(router.Dispatch("resize-viewport", {{"width", 4294967297ULL}, {"height", 720}}).status_code == 400);
   assert(router.Dispatch("get-console-messages", {{"limit", "many"}}).status_code == 400);
   assert(router.Dispatch("wait-for-element", {{"selector", "#ready"}, {"state", "visible"}, {"tabId", "second"}, {"generation", 9}}).body["state"] == "visible");
-  // Completion is an engine-tracked request, not an old document.readyState.
+  // Completion is engine-tracked navigation state, not an old document.readyState.
+  // A fresh tab has had no action, so its first page load counts. (The fill
+  // above was an action, so the tracker is reset to a fresh tab first.)
+  control.nav = kelpie::NavigationTracker{1, 1, 0, {}};
   assert(router.Dispatch("wait-for-navigation", second).status_code == 200);
-  control.nav_polls = 0; control.nav_requested = 2; control.nav_completed = 0;
+  // Each input moves the baseline before it is dispatched, so a navigation the
+  // page starts in response is the one a later wait waits for.
+  control.calls.clear();
+  assert(router.Dispatch("click", {{"tabId", "second"}, {"generation", 9}, {"selector", "#next"}}).status_code == 200);
+  assert((control.calls == std::vector<std::string>{"mark", "input"}));
+  assert(control.nav.baseline == 1);
+  // The click did not navigate: the earlier page load is not returned as a
+  // stale success, and the timeout says nothing started.
+  auto idle = router.Dispatch("wait-for-navigation", {{"tabId", "second"}, {"generation", 9}, {"timeout", 150}});
+  assert(idle.status_code == 408 && idle.body["error"]["code"] == "TIMEOUT");
+  assert(idle.body["error"]["message"] == "No navigation started within 150 ms");
+  // The page commits a navigation, and the wait returns once loading stops.
+  control.nav.LoadStarted(); control.nav_polls = 0; control.nav_stops_on_second_poll = true;
   assert(router.Dispatch("wait-for-navigation", second).status_code == 200);
-  control.nav_error = "DNS failed"; control.nav_requested = 3; control.nav_completed = 0; control.nav_polls = 0;
-  assert(router.Dispatch("wait-for-navigation", second).status_code == 502); control.nav_error.clear(); control.nav_completed = 3;
+  control.nav_stops_on_second_poll = false;
+  control.nav.MarkAction(); control.nav.LoadFailed("DNS failed"); control.nav.LoadStopped();
+  auto failed = router.Dispatch("wait-for-navigation", second);
+  assert(failed.status_code == 502 && failed.body["error"]["message"] == "DNS failed");
+  // A caller's script is an action too; Kelpie's own evaluations are not.
+  control.calls.clear();
+  assert(router.Dispatch("evaluate", {{"tabId", "second"}, {"generation", 9}, {"expression", "1"}}).status_code == 200);
+  assert((control.calls == std::vector<std::string>{"mark", "evaluate"}));
+  control.calls.clear();
+  assert(router.Dispatch("get-page-text", second).status_code == 200);
+  assert(std::find(control.calls.begin(), control.calls.end(), "mark") == control.calls.end());
+  control.nav = kelpie::NavigationTracker{3, 3, 3, {}};
   auto a11y=router.Dispatch("get-accessibility-tree", {{"tabId", "second"}, {"generation", 9}, {"interactableOnly", true}, {"maxDepth", 2}});
   assert(a11y.status_code == 200 && control.last_devtools_method == "Accessibility.getFullAXTree" && a11y.body["count"] == 1);
   assert(router.Dispatch("find-input", {{"tabId", "second"}, {"generation", 9}, {"placeholder", "Email"}}).status_code == 200);

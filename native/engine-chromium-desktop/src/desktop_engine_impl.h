@@ -53,9 +53,8 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     bool loading = false;
     bool can_go_back = false;
     bool can_go_forward = false;
-    std::uint64_t navigation_requested = 0;
-    std::uint64_t navigation_completed = 0;
-    std::string navigation_error;
+    // Main-frame navigations for wait-for-navigation, whoever started them.
+    NavigationTracker navigation;
     // The icon URL currently being downloaded, so a repeated
     // OnFaviconURLChange for the same page does not re-request it.
     std::string favicon_url;
