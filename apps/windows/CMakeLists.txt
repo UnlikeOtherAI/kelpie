@@ -99,8 +99,10 @@ set(WINDOWS_APP_SOURCES
   src/cef_pump_schedule.cpp
   src/close_lifecycle.h
   src/windows_app.cpp
+  src/windows_app_persistence.cpp
   src/windows_runtime.cpp
   src/win32_shell.cpp
+  src/window_placement.cpp
   src/window_chrome.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
@@ -125,6 +127,7 @@ set(WINDOWS_APP_HEADERS
   src/owner_task_queue.h
   src/cef_pump_schedule.h
   src/win32_shell.h
+  src/window_placement.h
   src/window_chrome.h
   src/win32_browser_view.h
   src/url_bar.h
@@ -298,6 +301,11 @@ if(BUILD_TESTING)
   target_include_directories(kelpie_windows_owner_task_queue_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_compile_options(kelpie_windows_owner_task_queue_test PRIVATE /UNDEBUG)
   add_test(NAME kelpie_windows_owner_task_queue_test COMMAND kelpie_windows_owner_task_queue_test)
+  add_executable(kelpie_windows_window_placement_test tests/window_placement_test.cpp src/window_placement.cpp)
+  target_include_directories(kelpie_windows_window_placement_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(kelpie_windows_window_placement_test PRIVATE nlohmann_json::nlohmann_json user32)
+  target_compile_options(kelpie_windows_window_placement_test PRIVATE /UNDEBUG)
+  add_test(NAME kelpie_windows_window_placement_test COMMAND kelpie_windows_window_placement_test)
   add_executable(kelpie_windows_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
   target_include_directories(kelpie_windows_profile_session_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_link_libraries(kelpie_windows_profile_session_test PRIVATE nlohmann_json::nlohmann_json advapi32 bcrypt)

@@ -60,7 +60,9 @@ release gate.
 The CLI phase registers an isolated alias, launches it, reuses its saved
 readiness record for a CLI navigation, and opens `kelpie --browser <alias> mcp`
 through Nessie's real stdio transport. The MCP client receives no readiness
-path, loopback URL, or bearer capability.
+path, loopback URL, or bearer capability. Every other phase launches the browser
+hidden; the CLI launch is a normal visible window, so the runner seeds that
+profile's remembered placement to open it small in the top-left corner.
 
 The Nessie check imports the published-client build and supplies its explicit
 test-only `fetchImpl` override for this loopback fixture. Nessie's normal cloud

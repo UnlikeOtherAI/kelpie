@@ -27,7 +27,7 @@ Win32Shell::Win32Shell(HINSTANCE instance, ShellDelegate* delegate, BrowserState
                        Win32BrowserView* browser_view)
     : instance_(instance), delegate_(delegate), observer_(observer), browser_view_(browser_view) {}
 
-bool Win32Shell::Create(const std::wstring& title, int width, int height) {
+bool Win32Shell::Create(const std::wstring& title, int width, int height, std::optional<POINT> origin) {
   WNDCLASSEXW window_class{};
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = &Win32Shell::WindowProc;
@@ -39,8 +39,8 @@ bool Win32Shell::Create(const std::wstring& title, int width, int height) {
   RegisterClassExW(&window_class);
   constexpr DWORD style = WS_OVERLAPPED | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX |
                           WS_SYSMENU | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-  hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(), style, CW_USEDEFAULT,
-                          CW_USEDEFAULT, width, height, nullptr, nullptr, instance_, this);
+  hwnd_ = CreateWindowExW(0, window_class.lpszClassName, title.c_str(), style,
+                          origin ? origin->x : CW_USEDEFAULT, origin ? origin->y : CW_USEDEFAULT, width, height, nullptr, nullptr, instance_, this);
   if (hwnd_ != nullptr) {
     SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     window_chrome_.UpdateDwmFrame();

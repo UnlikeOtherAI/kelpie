@@ -74,6 +74,16 @@ export async function waitFor(condition, description, timeoutMs = 10_000) {
   throw new Error(`Timed out waiting for ${description}: ${lastError}`);
 }
 
+// Chromium reports the canonical URL once a load commits, so an origin-only
+// fixture URL comes back with a trailing slash. Compare canonical forms.
+export function sameUrl(actual, expected) {
+  try {
+    return new URL(actual).href === new URL(expected).href;
+  } catch {
+    return actual === expected;
+  }
+}
+
 export function resultValue(response) {
   if (Object.hasOwn(response, "result")) return response.result;
   if (Object.hasOwn(response, "value")) return response.value;

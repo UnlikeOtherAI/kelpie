@@ -30,6 +30,7 @@
 #include "startup_diagnostics.h"
 #include "win32_browser_view.h"
 #include "win32_shell.h"
+#include "window_placement.h"
 
 namespace kelpie::windows {
 
@@ -112,6 +113,8 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   BrowserState browser_state_;
   std::uint64_t persistence_epoch_ = 0;
   SessionSnapshot session_snapshot_;
+  // Last known shell frame; loaded from settings.json and refreshed on close.
+  std::optional<WindowPlacement> window_placement_;
   std::mutex shell_state_mutex_;
   std::string home_url_;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,7 +52,9 @@ class Win32Shell {
  public:
   Win32Shell(HINSTANCE instance, ShellDelegate* delegate, BrowserStateObserver* observer,
              Win32BrowserView* browser_view);
-  bool Create(const std::wstring& title, int width, int height);
+  // `origin` places the frame in screen coordinates; without it Windows
+  // picks the default position.
+  bool Create(const std::wstring& title, int width, int height, std::optional<POINT> origin = std::nullopt);
   void Show(int show_command);
   HWND hwnd() const { return hwnd_; }
   HACCEL accelerators() const { return accelerators_; }

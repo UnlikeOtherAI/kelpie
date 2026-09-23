@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { runLiveAcceptance, runNessieStdioClient } from "./lib/acceptance.mjs";
-import { control, waitFor } from "./lib/http.mjs";
+import { control, sameUrl, waitFor } from "./lib/http.mjs";
 import { startFixtureServer } from "./lib/fixture.mjs";
 import { assertSandboxedRenderer, delay, fileExists, runCommand, startBrowser, stopBrowser, waitForReadiness } from "./lib/process.mjs";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
+// Chromium's helper processes release profile files a moment after the
+// browser process exits, so removal retries instead of failing on EBUSY.
+const PROFILE_REMOVAL = { recursive: true, force: true, maxRetries: 20, retryDelay: 250 };
 
 function usage() {
   return `Usage: node tests/windows/run-release-acceptance.mjs --exe <kelpie.exe> [options]
@@ -169,7 +172,7 @@ async function verifyOccupiedPort(config, fixtureUrl) {
   } finally {
     await stopBrowser(contender);
     await new Promise((resolvePromise, reject) => blocker.close(error => error ? reject(error) : resolvePromise()));
-    await rm(profile, { recursive: true, force: true });
+    await rm(profile, PROFILE_REMOVAL);
   }
 }
 
@@ -180,9 +183,9 @@ async function verifyRestoration(readiness, session) {
     if (!Array.isArray(value.tabs)) return false;
     const retained = value.tabs.find(tab => tab.id === session.retained.id);
     const other = value.tabs.find(tab => tab.id === session.other.id);
-    return retained?.url === session.retained.url && retained.active === true &&
-      other?.url === session.other.url &&
-      !value.tabs.some(tab => tab.id === session.closed.id || tab.url === session.closed.url);
+    return sameUrl(retained?.url, session.retained.url) && retained.active === true &&
+      sameUrl(other?.url, session.other.url) &&
+      !value.tabs.some(tab => tab.id === session.closed.id || sameUrl(tab.url, session.closed.url));
   }, "restored tab session", 15_000);
 }
 
@@ -218,6 +221,10 @@ async function verifyCliAndStdio(config, fixtureUrl) {
   const environment = { KELPIE_HOME: cliHome };
   let launched = false;
   try {
+    // The CLI launches a normal, visible window. Seed the remembered placement
+    // so it opens small in the corner instead of covering the operator's screen.
+    await writeFile(join(profile, "settings.json"),
+      JSON.stringify({ window: { x: 16, y: 16, width: 560, height: 360, maximized: false } }));
     const registered = await runCommand(process.execPath, [config.cli, "browser", "register", alias,
       "--platform", "windows", "--app-path", config.exe, "--profile-dir", profile], { env: environment });
     assert.equal(parseCliResult(registered, "CLI browser register").success, true, "CLI must register an isolated Windows alias");
@@ -233,7 +240,7 @@ async function verifyCliAndStdio(config, fixtureUrl) {
     const navigated = await runCommand(process.execPath, [config.cli, "--browser", alias, "navigate", fixtureUrl], { env: environment });
     assert.equal(parseCliResult(navigated, "CLI browser target").success, true, "CLI target command must use the saved readiness capability");
     assertNoCapabilityLeak(navigated, readiness, "CLI browser target");
-    await waitFor(async () => (await control(readiness, "get-current-url", {})).url === fixtureUrl,
+    await waitFor(async () => sameUrl((await control(readiness, "get-current-url", {})).url, fixtureUrl),
       "CLI-targeted navigation");
 
     await runNessieStdioClient({ cliPath: config.cli, cliHome, alias, fixtureUrl, nessieRoot: config.nessieRoot });
@@ -250,8 +257,8 @@ async function verifyCliAndStdio(config, fixtureUrl) {
     if (launched) {
       await runCommand(process.execPath, [config.cli, "browser", "stop", alias], { env: environment, timeoutMs: config.timeoutMs }).catch(() => undefined);
     }
-    await rm(profile, { recursive: true, force: true });
-    await rm(cliHome, { recursive: true, force: true });
+    await rm(profile, PROFILE_REMOVAL);
+    await rm(cliHome, PROFILE_REMOVAL);
   }
 }
 
@@ -279,7 +286,7 @@ async function main() {
   } finally {
     if (current !== undefined) await stopKnownBrowser({ ...current, readinessFile: readiness }, config.timeoutMs);
     await fixture.close();
-    if (profile.owned && !config.keepArtifacts) await rm(profile.path, { recursive: true, force: true });
+    if (profile.owned && !config.keepArtifacts) await rm(profile.path, PROFILE_REMOVAL);
   }
 }
 

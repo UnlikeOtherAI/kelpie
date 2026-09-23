@@ -8,9 +8,7 @@
 #include <cctype>
 #include <thread>
 
-#include <fstream>
 #include <atomic>
-#include <limits>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -18,7 +16,6 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <shlobj.h>
 #include <rpc.h>
 
 
@@ -42,66 +39,6 @@ bool HasScheme(const std::string& value) {
   return colon != std::string::npos && colon > 0 &&
       std::all_of(value.begin(), value.begin() + static_cast<std::ptrdiff_t>(colon),
                   [](unsigned char c) { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
-}
-std::filesystem::path RoamingAppDataPath() {
-  wchar_t buffer[MAX_PATH]{};
-  if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, buffer))) {
-    return std::filesystem::path(buffer) / "Kelpie";
-  }
-  return std::filesystem::temp_directory_path() / "Kelpie";
-}
-
-bool LoadJsonFile(const std::filesystem::path& path, nlohmann::json& output) {
-  std::ifstream input(path);
-  if (!input.good()) {
-    return false;
-  }
-  try {
-    input >> output;
-    return true;
-  } catch (...) {
-    output = nlohmann::json::object();
-    return false;
-  }
-}
-
-bool SaveJsonFileAtomically(const std::filesystem::path& path, const nlohmann::json& value,
-                          std::uint64_t epoch) {
-  std::error_code error;
-  std::filesystem::create_directories(path.parent_path(), error);
-  if (error) return false;
-  const std::filesystem::path temporary = path.wstring() + L".tmp." + std::to_wstring(epoch);
-  {
-    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-    if (!output.good()) return false;
-    output << value.dump(2);
-    output.flush();
-    if (!output.good()) return false;
-  }
-  HANDLE handle = CreateFileW(temporary.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-  if (handle == INVALID_HANDLE_VALUE) return false;
-  const bool flushed = FlushFileBuffers(handle) != FALSE;
-  CloseHandle(handle);
-  if (!flushed) return false;
-  if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-    DeleteFileW(temporary.c_str());
-    return false;
-  }
-  return true;
-}
-
-bool SameSession(const SessionSnapshot& left, const SessionSnapshot& right) {
-  if (left.next_tab_id != right.next_tab_id || left.tabs.size() != right.tabs.size()) return false;
-  for (std::size_t index = 0; index < left.tabs.size(); ++index) {
-    const SessionTab& a = left.tabs[index];
-    const SessionTab& b = right.tabs[index];
-    if (a.id != b.id || a.url != b.url || a.active != b.active || a.name != b.name ||
-        a.partition != b.partition || a.persistent != b.persistent) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // A fresh partition id for an isolated tab. A UUID rather than a counter: the
@@ -151,6 +88,11 @@ int WindowsApp::Run(int show_command) {
   if (!InitializeCommonControls()) return 1;
   if (!CreateShell(show_command)) return 1;
   const bool browser_ready = InitializeDesktopRuntime();
+  // A hidden launch has nobody to read the diagnostic, so it fails promptly
+  // instead of lingering as an invisible process its launcher must time out.
+  // Ask the window rather than `show_command`: the CEF bootstrap may pass
+  // SW_SHOWDEFAULT, which only resolves to the launcher's SW_HIDE in ShowWindow.
+  if (!browser_ready && !IsWindowVisible(shell_->hwnd())) return 1;
   if (!browser_ready) {
     browser_view_->UpdateFallbackText(startup_diagnostics_.Presentation());
     browser_view_->ShowFallback(true);
@@ -324,6 +266,9 @@ void WindowsApp::PersistForClose() {
   // close, so no acknowledged mutation can be written after this snapshot.
   SaveSession();
   SaveStores();
+  if (shell_ != nullptr) {
+    if (auto placement = CaptureWindowPlacement(shell_->hwnd())) window_placement_ = placement;
+  }
   SaveSettings();
 }
 
@@ -368,92 +313,6 @@ void WindowsApp::OnBrowserStateChanged(const BrowserState& state) {
   shell_->UpdateBrowserState(state);
 }
 
-void WindowsApp::ResolveProfileDirectory() {
-  if (config_.profile_dir.empty()) {
-    config_.profile_dir = RoamingAppDataPath();
-  }
-  std::filesystem::create_directories(config_.profile_dir);
-  device_info_provider_.SetProfileDir(config_.profile_dir);
-}
-
-void WindowsApp::LoadSettings() {
-  nlohmann::json settings;
-  if (!LoadJsonFile(config_.profile_dir / "settings.json", settings)) {
-    return;
-  }
-  if (!config_.port_overridden) {
-    config_.port = settings.value("port", config_.port);
-  }
-  if (!config_.url_overridden) {
-    config_.initial_url = settings.value("startup_url", config_.initial_url);
-  }
-  config_.isolate_new_tabs = settings.value("isolate_new_tabs", config_.isolate_new_tabs);
-}
-
-void WindowsApp::SaveSettings() const {
-  SaveJsonFileAtomically(config_.profile_dir / "settings.json",
-                         {{"port", config_.port}, {"profile_dir", config_.profile_dir.u8string()},
-                          {"startup_url", config_.initial_url},
-                          {"isolate_new_tabs", config_.isolate_new_tabs}}, persistence_epoch_ + 1);
-}
-
-
-void WindowsApp::LoadSession() {
-  nlohmann::json value;
-  if (!LoadJsonFile(config_.profile_dir / "session.json", value)) return;
-  SessionSnapshot parsed;
-  if (ParseSessionSnapshot(value, &parsed)) session_snapshot_ = std::move(parsed);
-}
-
-void WindowsApp::SaveSession() {
-  if (!desktop_app_) return;
-  DesktopEngine::SessionState state;
-  if (!desktop_app_->engine().GetSessionState(&state, std::chrono::seconds(2)).ok || state.tabs.empty()) return;
-  if (session_snapshot_.epoch == std::numeric_limits<std::uint64_t>::max()) return;
-  SessionSnapshot next;
-  next.epoch = session_snapshot_.epoch + 1;
-  next.next_tab_id = state.next_tab_id;
-  for (const auto& tab : state.tabs) {
-    SessionTab entry{tab.id, tab.url, tab.active};
-    entry.name = tab.name;
-    entry.partition = tab.partition;
-    entry.persistent = tab.persistent;
-    next.tabs.push_back(std::move(entry));
-  }
-  if (SameSession(session_snapshot_, next)) return;
-  if (SaveJsonFileAtomically(config_.profile_dir / "session.json", SerializeSessionSnapshot(next), next.epoch)) session_snapshot_ = std::move(next);
-}
-
-void WindowsApp::LoadStores() {
-  nlohmann::json epoch;
-  if (LoadJsonFile(config_.profile_dir / "stores-epoch.json", epoch)) {
-    persistence_epoch_ = epoch.value("epoch", std::uint64_t{0});
-  }
-  // The exclusive ProfileSession lock is held before this method runs. Legacy
-  // files remain readable; all later writes are atomic replacements by this owner.
-  if (!desktop_app_) return;
-  nlohmann::json bookmarks;
-  if (LoadJsonFile(config_.profile_dir / "bookmarks.json", bookmarks)) {
-    desktop_app_->bookmark_store().LoadJson(bookmarks.dump());
-  }
-  nlohmann::json history;
-  if (LoadJsonFile(config_.profile_dir / "history.json", history)) {
-    desktop_app_->history_store().LoadJson(history.dump());
-  }
-}
-
-void WindowsApp::SaveStores() {
-  if (!desktop_app_) return;
-  const std::uint64_t next_epoch = persistence_epoch_ + 1;
-  const auto bookmarks = nlohmann::json::parse(desktop_app_->bookmark_store().ToJson(), nullptr, false);
-  const auto history = nlohmann::json::parse(desktop_app_->history_store().ToJson(), nullptr, false);
-  if (bookmarks.is_discarded() || history.is_discarded()) return;
-  if (!SaveJsonFileAtomically(config_.profile_dir / "bookmarks.json", bookmarks, next_epoch) ||
-      !SaveJsonFileAtomically(config_.profile_dir / "history.json", history, next_epoch)) return;
-  if (SaveJsonFileAtomically(config_.profile_dir / "stores-epoch.json", {{"epoch", next_epoch}}, next_epoch)) {
-    persistence_epoch_ = next_epoch;
-  }
-}
 
 void WindowsApp::ApplySettings(const SettingsValues& settings) {
   config_.initial_url = utf::WideToUtf8(settings.startup_url).value_or(config_.initial_url);
@@ -470,10 +329,29 @@ bool WindowsApp::InitializeCommonControls() const {
 }
 
 bool WindowsApp::CreateShell(int show_command) {
-  if (!shell_->Create(AppTitle(), config_.width, config_.height)) {
+  // The remembered position is reused only while it still lands on a connected
+  // monitor at the size being opened; otherwise Windows places the window.
+  std::optional<POINT> origin;
+  if (window_placement_) {
+    const POINT saved{window_placement_->frame.left, window_placement_->frame.top};
+    const RECT frame{saved.x, saved.y, saved.x + config_.width, saved.y + config_.height};
+    if (WindowFrameIsUsable(frame, MonitorWorkAreas())) origin = saved;
+  }
+  if (!shell_->Create(AppTitle(), config_.width, config_.height, origin)) {
     return false;
   }
-  shell_->Show(show_command);
+  // SW_SHOWDEFAULT defers to the launcher's STARTUPINFO, which may hide or
+  // minimize the window; only a plain visible launch restores maximized.
+  int requested = show_command;
+  if (requested == SW_SHOWDEFAULT) {
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    GetStartupInfoW(&startup);
+    requested = (startup.dwFlags & STARTF_USESHOWWINDOW) != 0 ? startup.wShowWindow : SW_SHOWNORMAL;
+  }
+  const bool normal_launch = requested == SW_SHOWNORMAL || requested == SW_SHOW;
+  shell_->Show(window_placement_ && window_placement_->maximized && normal_launch ? SW_SHOWMAXIMIZED
+                                                                                 : show_command);
   return true;
 }
 
