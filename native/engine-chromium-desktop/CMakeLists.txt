@@ -117,6 +117,9 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_client.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
+    src/desktop_engine_control_support.cpp
+    src/desktop_engine_input.cpp
+    src/desktop_engine_page_control.cpp
     src/desktop_engine_partitions.cpp
     src/desktop_partition_registry.cpp
     src/desktop_devtools.cpp
