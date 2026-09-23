@@ -13,6 +13,15 @@ async function listen(server: Server): Promise<number> {
   return address.port;
 }
 
+// The CLI runs as a real child process from source (`node --import tsx`), so
+// the test proves the code under test rather than whatever dist was last
+// built. Starting that child and transpiling the CLI is nearly all of its cost:
+// measured 2.3–6.6 s on Windows (6.6 s with a cold tsx cache), against ~0.2 s
+// for the MCP handshake and every tool call together. The 5 s default failed it
+// under the parallel suite; this leaves ~3x the worst measurement and still
+// fails a child that never answers.
+const SPAWNED_CLI_TIMEOUT_MS = 20_000;
+
 describe("Windows local alias MCP stdio", () => {
   const servers: Server[] = [];
   const roots: string[] = [];
@@ -76,5 +85,5 @@ describe("Windows local alias MCP stdio", () => {
     const screenshot = await client.callTool({ name: "kelpie_screenshot", arguments: {} });
     expect(screenshot.content).toContainEqual({ type: "image", data: "cG5n", mimeType: "image/png" });
     await client.close();
-  });
+  }, SPAWNED_CLI_TIMEOUT_MS);
 });
