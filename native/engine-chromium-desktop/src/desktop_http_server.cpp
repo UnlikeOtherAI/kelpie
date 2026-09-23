@@ -57,6 +57,22 @@ bool ConstantTimeEqual(const std::string& left, const std::string& right) {
   return difference == 0;
 }
 
+// cpp-httplib's default listener options set SO_REUSEADDR and then
+// SO_EXCLUSIVEADDRUSE on Windows. Windows rejects SO_EXCLUSIVEADDRUSE with
+// WSAEINVAL once SO_REUSEADDR is set, so that listener stays shareable: the
+// next SO_REUSEADDR socket, such as a second Kelpie, binds the same loopback
+// address and connections split between the two processes. Ask for exclusive
+// use alone so an occupied port fails the bind. POSIX keeps the defaults.
+void SetListenerSocketOptions(socket_t sock) {
+#if defined(_WIN32)
+  const int exclusive = 1;
+  setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive),
+             sizeof(exclusive));
+#else
+  httplib::default_socket_options(sock);
+#endif
+}
+
 }  // namespace
 
 class DesktopHttpServer::Impl {
@@ -241,6 +257,7 @@ bool DesktopHttpServer::Start(const Config& config) {
 
   impl_->server.set_read_timeout(config.read_timeout_seconds, 0);
   impl_->server.set_write_timeout(config.write_timeout_seconds, 0);
+  impl_->server.set_socket_options(SetListenerSocketOptions);
   if (config.port == 0) {
     impl_->bound_port = impl_->server.bind_to_any_port(config.bind_host.c_str());
     if (impl_->bound_port <= 0) return false;
