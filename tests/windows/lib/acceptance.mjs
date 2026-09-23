@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { control, expectControlError, mcpRequest, rawRequest, resultValue, waitFor } from "./http.mjs";
+import { readJpegSize } from "./jpeg.mjs";
 import { decodePng } from "./png.mjs";
 
 function assertion(condition, message) {
@@ -48,15 +49,23 @@ function activeTab(response) {
   return tab;
 }
 
+// The HTTP body is {success, result, tab}, and `result` is the value itself. A
+// value JSON cannot carry is a descriptor such as {type: "nonfinite", value:
+// "NaN"}; unwrapping its `value` again turned that into "NaN".
 function evalResult(response) {
-  const value = resultValue(response);
-  return value.result ?? value.value ?? value;
+  return resultValue(response);
+}
+
+// Chromium reports the canonical URL once a page commits (the fixture's origin
+// gains its "/" path), so both sides are compared in that form.
+function canonicalUrl(value) {
+  try { return new URL(value).href; } catch { return value; }
 }
 
 async function requireUrl(readiness, expected, tabIdValue = undefined) {
   await waitFor(async () => {
     const state = await control(readiness, "get-current-url", tabIdValue === undefined ? {} : { tabId: tabIdValue });
-    return resultValue(state).url === expected;
+    return canonicalUrl(resultValue(state).url) === canonicalUrl(expected);
   }, `URL ${expected}`);
 }
 
@@ -196,7 +205,13 @@ async function runBrowserActions(readiness, fixtureUrl) {
   const screenshot = await control(readiness, "screenshot", { format: "png" });
   const decoded = decodePng(Buffer.from(imageFrom(screenshot), "base64"));
   assertion(decoded.width > 0 && decoded.height > 0, "screenshot must decode to a non-empty PNG");
-  await expectControlError(readiness, "screenshot", { format: "jpeg" });
+  // Chromium encodes the JPEG and scales it to maxWidth; width and height are
+  // the encoded image's own.
+  const jpeg = await control(readiness, "screenshot", { format: "jpeg", quality: 60, maxWidth: 480 });
+  const jpegSize = readJpegSize(Buffer.from(imageFrom(jpeg), "base64"));
+  assertion(jpeg.format === "jpeg" && jpegSize.width <= 480 && jpegSize.width === jpeg.width && jpegSize.height === jpeg.height,
+    `a maxWidth JPEG must be at most 480 px wide and report its own size: ${JSON.stringify({ ...jpeg, image: undefined })}`);
+  await expectControlError(readiness, "screenshot", { fullPage: true }, "INVALID_PARAMS");
 
   // A later navigation must win even when the earlier page is still loading.
   const slowNavigation = control(readiness, "navigate", { url: `${fixtureUrl}/slow` });
@@ -206,10 +221,18 @@ async function runBrowserActions(readiness, fixtureUrl) {
   await new Promise(resolve => setTimeout(resolve, 2_200));
   await requireUrl(readiness, fixtureUrl);
 
+  // wait-for-navigation waits for the page a clicked link opens, so the URL is
+  // already the new one when it returns; no polling.
   await control(readiness, "click", { selector: "#next-link" });
-  await requireUrl(readiness, `${fixtureUrl}/next`);
+  await control(readiness, "wait-for-navigation", { timeout: 10_000 });
+  assert.equal(resultValue(await control(readiness, "get-current-url", {})).url, `${fixtureUrl}/next`,
+    "wait-for-navigation after a click must return once the linked page has loaded");
   await control(readiness, "back", {});
+  await control(readiness, "wait-for-navigation", { timeout: 10_000 });
   await requireUrl(readiness, fixtureUrl);
+  // A click that does not navigate must not be answered with the earlier load.
+  await control(readiness, "click", { selector: "#trusted-button" });
+  await expectControlError(readiness, "wait-for-navigation", { timeout: 1_000 }, "TIMEOUT");
   await control(readiness, "forward", {});
   await requireUrl(readiness, `${fixtureUrl}/next`);
   await control(readiness, "reload", {});
@@ -385,6 +408,9 @@ async function runMcp(readiness, fixtureUrl) {
   assert.equal(screenshot.status, 200, `MCP screenshot failed: ${screenshot.text}`);
   assert.notEqual(screenshot.json?.result?.isError, true, "MCP screenshot tool must be callable");
   decodePng(Buffer.from(imageFrom(screenshot.json?.result), "base64"));
+  const shotText = JSON.parse(screenshot.json?.result?.content?.find(item => item.type === "text")?.text ?? "{}");
+  assertion(shotText.image === undefined && screenshot.json?.result?.structuredContent?.image === undefined,
+    "MCP screenshot must carry its base64 once, in the image item");
 }
 
 async function loadNessieClient(nessieRoot) {

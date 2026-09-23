@@ -48,9 +48,14 @@ The runner prints only the device ID and bound port.
 
 The acceptance covers bearer/Origin/Host/body validation, tabs and background
 targeting, native trusted input, navigation, dialogs, cookies and storage,
-console/network inspection, bookmarks/history, PNG decoding, direct stateless
-MCP, a real `@nessie/mcp-client` flow, profile locking, occupied ports, and
+console/network inspection, bookmarks/history, PNG decoding, a JPEG scaled to
+`maxWidth`, `wait-for-navigation` after a click (and its `TIMEOUT` after a
+click that does not navigate), direct stateless MCP with a screenshot sent
+once, a real `@nessie/mcp-client` flow, profile locking, occupied ports, and
 clean-restart session restoration. The fixture never calls the internet.
+
+The browser is started visible, the way a person starts it: the app refuses a
+browser child that is not visible, so a hidden launch never becomes ready.
 
 It also proves the CEF sandbox from Windows process tokens: the runner finds
 every renderer descendant of its owned bootstrap PID and requires each to run

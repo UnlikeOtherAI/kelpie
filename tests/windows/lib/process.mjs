@@ -44,7 +44,10 @@ export function delay(ms) {
 }
 
 export function startBrowser(executable, args) {
-  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  // Not windowsHide: that makes the app's first ShowWindow hide its shell, and
+  // startup refuses a browser child that is not visible, so the browser never
+  // published readiness. The browser starts the way a person starts it.
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: false });
   const stdout = capture(child.stdout);
   const stderr = capture(child.stderr);
   const exited = new Promise(resolve => {

@@ -222,7 +222,10 @@ async function verifyCliAndStdio(config, fixtureUrl) {
       "--platform", "windows", "--app-path", config.exe, "--profile-dir", profile], { env: environment });
     assert.equal(parseCliResult(registered, "CLI browser register").success, true, "CLI must register an isolated Windows alias");
 
-    const launchedCommand = await runCommand(process.execPath, [config.cli, "browser", "launch", alias], { env: environment, timeoutMs: config.timeoutMs });
+    // A port of its own: the CLI's default is 8420, which another Kelpie on
+    // this machine may already hold.
+    const cliPort = await reservePort();
+    const launchedCommand = await runCommand(process.execPath, [config.cli, "browser", "launch", alias, "--port", String(cliPort)], { env: environment, timeoutMs: config.timeoutMs });
     const launch = parseCliResult(launchedCommand, "CLI browser launch");
     assert.equal(launch.success, true, "CLI must launch the registered Windows browser");
     const readiness = await waitForReadiness(readinessFile, config.timeoutMs);
