@@ -853,16 +853,18 @@ adds a third. A client that must keep every result under 200 KB asks for
   display the viewport measured 1936×926. A screenshot includes those 8 px
   on each side; the person at the screen does not see them.
 - **The window went back to its previous rectangle about 1.5 s after every
-  resize.** This happened after a maximise, after `kelpie_resize_viewport`,
-  and after a direct `SetWindowPos`. A WinForms window resized the same way
-  kept its size. Nothing in `apps/windows/src` restores the window
-  rectangle. Kelpie instances from other checkouts were starting and closing
-  on the same desktop during the run, so the cause was not found. The checks
-  above ran inside that 1.5 s window, and every screenshot reports the size
-  it actually captured.
+  resize. Not Kelpie.** This happened after a maximise, after
+  `kelpie_resize_viewport`, and after a direct `SetWindowPos`. Nothing in
+  `apps/windows/src` restores the window rectangle. The cause was a helper
+  script on the test machine, outside this repository. Every couple of
+  seconds it shrank any Kelpie window built from this worktree to
+  960×720. Its log recorded each shrink of the verification build. The
+  checks above ran inside that 1.5 s window, and every screenshot reports
+  the size it actually captured.
 - **One JPEG came back tiled**, with the old frame repeated inside the new
-  size. It was taken about a second after an external maximise. Four later
-  attempts were clean, as was every capture taken straight after
+  size. It was taken about a second after an external maximise, so most
+  likely while that script was resizing the window. Four later attempts
+  were clean, as was every capture taken straight after
   `kelpie_resize_viewport`. It was not reproduced.
 
 ## Merging main's release-gate fixes
@@ -905,3 +907,28 @@ The merges keep both sides' behaviour:
   harness is back to main's hidden launch, and the README paragraph that
   said otherwise is gone. Main's URL and `evaluate` fixes replaced this
   branch's copies of the same fixes.
+
+### Checked again after the merges
+
+The merged branch was built with `scripts/build-windows.ps1`; all 39 CTest
+tests passed. It was packaged with `scripts/package-windows.ps1`. The
+release acceptance harness then ran end to end and passed, with its hidden
+launch, its CLI phase and Nessie's stdio client. So did an MCP drive through
+`kelpie --browser <alias> mcp` (94 tools), on port 8438 with a profile of its
+own. The window was held at 943×597 by the helper script described above.
+
+| Check | Result |
+|---|---|
+| `navigate` to Hacker News | Returned when loaded: `loadTime` 917 ms, `isLoading: false` |
+| `wait_for_navigation` straight after it | Returned at once (13 ms): that load had already finished |
+| Click the first story, then wait | 662 ms; the URL was the story's and `readyState` was `complete` |
+| `back`, then wait | 825 ms, back on Hacker News |
+| Click a button that does not navigate, then wait 2 s | `TIMEOUT` "No navigation started within 2000 ms" at 2024 ms |
+| JPEG of Wikipedia's "World War II", quality 60 | 943×597, 83 KB (whole response 112 KB) |
+| The same at default quality | 99 KB (response 133 KB) |
+| `maxWidth: 640` | 640×405 JPEG, 64 KB, `imageScaleX` 0.679 |
+| Base64 copies per screenshot response | 1 in every case |
+| `kelpie_get_page_text`, default | 20,000 of 173,330 characters, with `truncated`, `totalChars` and the note |
+| `wait_for_element`, `timeout: 20000`, element added at 12 s | Succeeded at 12,029 ms |
+| Window minimised | JPEG and PNG screenshots returned `WINDOW_MINIMIZED`; `evaluate` still worked; after a restore the screenshot succeeded |
+| `kelpie_discover` and `kelpie discover` | Both listed `local:127.0.0.1:8438` through the loopback probe |
