@@ -59,7 +59,13 @@ class DesktopApp {
   DesktopApp();
   ~DesktopApp();
 
+  // Starts the engine and registers handlers. It does not bind the control
+  // listener, so a host can report a busy port as its own startup stage.
   bool Start(const Config& config);
+  // Binds config.port on config.bind_host and starts mDNS. On failure the
+  // runtime stays running and last_error names the address; shut it down with
+  // BeginShutdown/IsShutdownReady/Stop as usual.
+  bool StartListener();
   // Nonblocking shutdown admission gate. Call IsShutdownReady from the native
   // owner loop before Stop so CEF work and admitted HTTP requests can drain.
   void BeginShutdown();

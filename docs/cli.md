@@ -1118,6 +1118,10 @@ kelpie --browser win mcp
 There is no CLI installer command: the release ZIP is the supported Windows installation
 artifact. See the Windows release ZIP instructions for extraction and update steps.
 
+`kelpie browser launch` uses port `8420` unless given `--port`. A Windows browser owns its port
+exclusively with no fallback, so a second alias on a held port fails at the local control
+listener and publishes no readiness; give each Windows alias its own `--port`.
+
 The stdio command is the local-agent/Nessie bridge: it reads the current user’s readiness token
 in memory, fetches the running browser’s authenticated callable catalogue, and emits only JSON-RPC
 on stdout. `kelpie browser stop win` asks the app to close

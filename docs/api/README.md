@@ -24,7 +24,7 @@ All methods are available via three interfaces:
 - Content-Type: `application/json`
 - Auth: bearer token via `Authorization: Bearer <token>`. Tokens are issued by `POST /v1/pair` + on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
 - Default Port: `8420`
-- Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
+- Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`. Windows has no fallback: its loopback control port is exclusive, and a launch whose port is already held fails at the local control listener stage without publishing readiness.
 - Concurrency: Requests are queued and processed sequentially per device. Rapid-fire commands are safe but will execute in order. No rate limiting enforced — the embedded HTTP server handles one command at a time.
 
 ---

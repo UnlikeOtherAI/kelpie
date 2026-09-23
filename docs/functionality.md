@@ -14,7 +14,7 @@ No emulators, no cloud, no persistent scripts. Real browsers on real devices, fu
 
 ## Device Discovery
 
-Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension.
+Every running Kelpie app advertises itself via mDNS (`_kelpie._tcp`) on the local network. The CLI auto-discovers all devices and exposes their metadata: device name, model, platform, screen resolution, port, and app version. Devices can be targeted by name, ID, or IP address. Apps prefer port `8420`, but if that port is already occupied they bind the next available local port and advertise the actual port they chose. Windows is the exception: its control port is exclusive and has no fallback (see [Windows local control](#windows-local-control)). When mDNS misses a same-host macOS browser, the CLI probes recorded local ports plus `8420`–`8429` and accepts only targets whose automation API answers `/v1/get-device-info`; `discover`, `devices`, `info`, and untargeted commands all share that fallback. On macOS, advertisement remains up for the lifetime of the running app instance. On iOS and Android, the app re-establishes mDNS advertisement whenever it returns to the foreground so discovery recovers after background suspension.
 
 Works identically with real devices, iOS Simulators, and Android Emulators — a developer with no phones can spin up multiple simulators at different screen sizes and control them all.
 
@@ -397,6 +397,12 @@ Windows `0.1.1` uses the shared CEF desktop runtime for tabs, navigation, truste
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
 file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
+The loopback control port (`--port`, default `8420`) is exclusive. When another process already
+listens on it — a second Kelpie included — the new launch does not share it and does not move to
+another port: startup stops at the local control listener, the window reads
+`Browser startup failed during local control listener: …`, and no readiness file is written, so
+the running instance keeps its port and every request that carries its token. Give each Windows
+instance its own `--port`.
 `kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
 creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
 provides a token-free stdio bridge for local development agents and local Nessie executors.

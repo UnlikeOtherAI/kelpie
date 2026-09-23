@@ -281,13 +281,15 @@ bool WindowsApp::InitializeDesktopRuntime() {
     ShutdownDesktopRuntime();
     return false;
   }
+  // The listener binds only now, so a port another process holds is reported
+  // as this stage and never reaches readiness publication.
   startup_diagnostics_.Enter(StartupStage::kHttpListener);
-  const int bound_port = desktop_app_->http_server().bound_port();
-  if (bound_port <= 0) {
-    startup_diagnostics_.Fail(StartupStage::kHttpListener, "The loopback listener did not bind");
+  if (!desktop_app_->StartListener()) {
+    startup_diagnostics_.Fail(StartupStage::kHttpListener, desktop_app_->last_error());
     ShutdownDesktopRuntime();
     return false;
   }
+  const int bound_port = desktop_app_->http_server().bound_port();
   // Public discovery must report the socket that actually bound, never only
   // the requested configuration value.
   device_info_provider_.Configure(bound_port, config_.width, config_.height, runtime.app_version);
