@@ -851,7 +851,8 @@ adds a third. A client that must keep every result under 200 KB asks for
   not, so the client area is the whole window rectangle. Windows places a
   maximised window 8 px beyond each edge of the work area. On a 1920×1080
   display the viewport measured 1936×926. A screenshot includes those 8 px
-  on each side; the person at the screen does not see them.
+  on each side; the person at the screen does not see them. Fixed on `main`
+  by #140 (`maximized_frame.cpp`), which this branch has merged.
 - **The window went back to its previous rectangle about 1.5 s after every
   resize. Not Kelpie.** This happened after a maximise, after
   `kelpie_resize_viewport`, and after a direct `SetWindowPos`. Nothing in
@@ -869,7 +870,7 @@ adds a third. A client that must keep every result under 200 KB asks for
 
 ## Merging main's release-gate fixes
 
-`main` gained five commits while this branch was open. Three of them
+`main` gained six commits while this branch was open. Three of them
 touched the same code as C8, the engine split and the acceptance harness:
 
 - 7c422dc, "make the Windows control surface pass its release acceptance
@@ -911,7 +912,7 @@ The merges keep both sides' behaviour:
 ### Checked again after the merges
 
 The merged branch was built with `scripts/build-windows.ps1`; all 39 CTest
-tests passed. It was packaged with `scripts/package-windows.ps1`. The
+tests passed, and all 40 after merging #140, which adds one. It was packaged with `scripts/package-windows.ps1`. The
 release acceptance harness then ran end to end and passed, with its hidden
 launch, its CLI phase and Nessie's stdio client. So did an MCP drive through
 `kelpie --browser <alias> mcp` (94 tools), on port 8438 with a profile of its

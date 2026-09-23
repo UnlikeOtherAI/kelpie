@@ -104,6 +104,7 @@ set(WINDOWS_APP_SOURCES
   src/win32_shell.cpp
   src/window_placement.cpp
   src/window_chrome.cpp
+  src/maximized_frame.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
   src/favicon_cache.cpp
@@ -129,6 +130,7 @@ set(WINDOWS_APP_HEADERS
   src/win32_shell.h
   src/window_placement.h
   src/window_chrome.h
+  src/maximized_frame.h
   src/win32_browser_view.h
   src/url_bar.h
   src/favicon_cache.h
@@ -388,12 +390,29 @@ if(BUILD_TESTING)
   add_executable(window_chrome_test
     tests/window_chrome_test.cpp
     src/window_chrome.cpp
+    src/maximized_frame.cpp
     ${WINDOWS_THEME_SOURCES}
   )
   target_compile_definitions(window_chrome_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
   target_include_directories(window_chrome_test PRIVATE src resources)
-  target_link_libraries(window_chrome_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi comctl32)
+  target_link_libraries(window_chrome_test PRIVATE user32 gdi32 gdiplus uxtheme dwmapi comctl32 shell32)
   add_test(NAME window_chrome_test COMMAND window_chrome_test)
+
+  # The maximized client-rect arithmetic, without a window or a monitor.
+  add_executable(kelpie_windows_maximized_frame_test
+    tests/maximized_frame_test.cpp
+    src/maximized_frame.cpp
+    src/theme/metrics.cpp
+  )
+  target_compile_definitions(kelpie_windows_maximized_frame_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_include_directories(kelpie_windows_maximized_frame_test PRIVATE src)
+  target_link_libraries(kelpie_windows_maximized_frame_test PRIVATE user32 gdi32 shell32)
+  if(MSVC)
+    target_compile_options(kelpie_windows_maximized_frame_test PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(kelpie_windows_maximized_frame_test PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME kelpie_windows_maximized_frame_test COMMAND kelpie_windows_maximized_frame_test)
 
   add_executable(windows_shell_preview_test
     tests/windows_shell_preview_test.cpp
@@ -401,6 +420,7 @@ if(BUILD_TESTING)
     ${WINDOWS_THEME_SOURCES}
     src/win32_shell.cpp
     src/window_chrome.cpp
+    src/maximized_frame.cpp
     src/url_bar.cpp
     src/win32_browser_view.cpp
     src/tab_tooltips.cpp

@@ -18,6 +18,9 @@ class WindowChrome {
   void Draw(HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
   bool EraseBackground(HDC device_context) const;
+  // WM_NCCALCSIZE with wParam TRUE: turns rgrc[0], the proposed window rect,
+  // into the client rect and returns the message result.
+  LRESULT CalcClientArea(NCCALCSIZE_PARAMS* params) const;
   LRESULT HitTest(WPARAM wparam, LPARAM lparam) const;
   int Inset() const;
   void LayoutControls();

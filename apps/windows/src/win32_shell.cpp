@@ -159,7 +159,7 @@ LRESULT Win32Shell::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
       return 0;
     }
     case WM_NCCALCSIZE:
-      if (wparam == TRUE) return 0;
+      if (wparam == TRUE) return window_chrome_.CalcClientArea(reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam));
       break;
     case WM_NCHITTEST: return window_chrome_.HitTest(wparam, lparam);
     case WM_GETMINMAXINFO: {
