@@ -93,6 +93,7 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, const BrowserScre
   image->viewport_width = viewport->css_width;
   image->viewport_height = viewport->css_height;
   image->device_pixel_ratio = viewport->device_pixel_ratio;
+  image->image_scale = desktop_screenshot::ImageScale(options, *viewport);
   return BrowserControlResult::Success(window.tab);
 }
 

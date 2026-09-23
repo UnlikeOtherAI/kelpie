@@ -97,27 +97,29 @@ void LayoutMetrics() {
   assert(!screenshot::ParseLayoutMetrics(empty));
 }
 
-void Downscale() {
-  const screenshot::Viewport one{0, 0, 1918, 957, 1};
-  const auto half = screenshot::DownscaleFactor(960, one);
-  assert(half && std::abs(*half - 960.0 / 1918.0) < 1e-12);
-  assert(std::lround(1918 * *half * one.device_pixel_ratio) == 960);
+void Scale() {
+  const screenshot::Viewport one{0, 0, 1921, 926, 1};
+  const double half = screenshot::ClipScale(960, one);
+  assert(std::abs(half - 960.0 / 1921.0) < 1e-12);
+  assert(std::lround(1921 * half * one.device_pixel_ratio) == 960);
   // Chromium multiplies clip.scale by the device pixel ratio, so at 2 the
   // full image is twice the CSS width and the factor halves to match.
   const screenshot::Viewport two{0, 0, 959, 478.5, 2};
-  const auto scaled = screenshot::DownscaleFactor(960, two);
-  assert(scaled && std::lround(959 * *scaled * two.device_pixel_ratio) == 960);
-  // Never upscaled: an image that already fits is captured as it is.
-  assert(!screenshot::DownscaleFactor(1918, one));
-  assert(!screenshot::DownscaleFactor(4000, one));
+  const double scaled = screenshot::ClipScale(960, two);
+  assert(std::lround(959 * scaled * two.device_pixel_ratio) == 960);
+  // Never upscaled: a viewport that already fits keeps scale 1.
+  assert(screenshot::ClipScale(1921, one) == 1.0);
+  assert(screenshot::ClipScale(4000, one) == 1.0);
+  assert(screenshot::ClipScale(1000, two) == 1000.0 / 1918.0);
 }
 
 void Capture() {
-  const screenshot::Viewport viewport{12, 800, 1918, 957, 1};
+  const screenshot::Viewport viewport{12, 800, 1921, 926, 1};
   kelpie::BrowserScreenshotOptions png;
   png.quality = 60;
   const Json plain = screenshot::CaptureParams(png, viewport);
   assert(plain == (Json{{"format", "png"}, {"captureBeyondViewport", false}}));
+  assert(screenshot::ImageScale(png, viewport) == 1.0);
   kelpie::BrowserScreenshotOptions jpeg;
   jpeg.format = "jpeg";
   jpeg.quality = 60;
@@ -125,10 +127,17 @@ void Capture() {
   const Json small = screenshot::CaptureParams(jpeg, viewport);
   assert(small["format"] == "jpeg" && small["quality"] == 60);
   assert(small["clip"]["x"] == 12 && small["clip"]["y"] == 800);
-  assert(small["clip"]["width"] == 1918 && small["clip"]["height"] == 957);
-  assert(std::abs(small["clip"]["scale"].get<double>() - 960.0 / 1918.0) < 1e-12);
-  jpeg.max_width = 2000;
-  assert(!screenshot::CaptureParams(jpeg, viewport).contains("clip"));
+  assert(small["clip"]["width"] == 1921 && small["clip"]["height"] == 926);
+  assert(std::abs(small["clip"]["scale"].get<double>() - 960.0 / 1921.0) < 1e-12);
+  assert(std::abs(screenshot::ImageScale(jpeg, viewport) - 960.0 / 1921.0) < 1e-12);
+  // A maxWidth the viewport already fits is still a clip, at scale 1. A plain
+  // capture includes the scrollbars (1936 px for this 1921 px viewport), so
+  // skipping the clip here returned an image wider than the maxWidth asked for.
+  jpeg.max_width = 1930;
+  const Json fits = screenshot::CaptureParams(jpeg, viewport);
+  assert(fits["clip"]["scale"] == 1.0 && fits["clip"]["width"] == 1921);
+  const screenshot::Viewport retina{0, 0, 959, 478.5, 2};
+  assert(screenshot::ImageScale(png, retina) == 2.0);
 }
 
 void Headers() {
@@ -153,7 +162,7 @@ void Headers() {
 int main() {
   Options();
   LayoutMetrics();
-  Downscale();
+  Scale();
   Capture();
   Headers();
   return 0;

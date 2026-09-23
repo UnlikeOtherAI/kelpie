@@ -42,7 +42,6 @@ nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool 
 
   // The same metadata iOS, Android and macOS send: `width` and `height` are
   // the encoded image's pixels, and the scale maps them back to CSS pixels.
-  const auto scale = [](int pixels, double css) { return css > 0 ? pixels / css : 1.0; };
   nlohmann::json response = {
       {"image", image.base64_data},
       {"format", image.mime_type == "image/jpeg" ? "jpeg" : "png"},
@@ -53,8 +52,8 @@ nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool 
       {"viewportWidth", CssNumber(image.viewport_width)},
       {"viewportHeight", CssNumber(image.viewport_height)},
       {"devicePixelRatio", image.device_pixel_ratio},
-      {"imageScaleX", scale(image.width, image.viewport_width)},
-      {"imageScaleY", scale(image.height, image.viewport_height)},
+      {"imageScaleX", image.image_scale},
+      {"imageScaleY", image.image_scale},
       {"tab", result.tab ? TabJson(*result.tab) : nlohmann::json::object()},
   };
 

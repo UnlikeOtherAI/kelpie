@@ -347,7 +347,10 @@ encoded by Chromium itself (CDP `Page.captureScreenshot`).
   keeping its aspect ratio. An image that already fits is not scaled, and an
   image is never scaled up. This is the way to keep a large window's
   screenshot small: a 1918 px window at `maxWidth: 960` and `quality: 60`
-  comes back as a 960 px JPEG.
+  comes back as a 960 px JPEG. A `maxWidth` image covers the CSS viewport
+  exactly, without the page's scrollbars; a capture without `maxWidth`
+  includes them, so its `width` can be a few pixels more than
+  `viewportWidth × devicePixelRatio`.
 - `fullPage: false` is accepted; `fullPage: true` returns `INVALID_PARAMS`.
 - `resolution` is ignored, and the response always says
   `"resolution": "viewport"`. `imageScaleX` and `imageScaleY` are image pixels

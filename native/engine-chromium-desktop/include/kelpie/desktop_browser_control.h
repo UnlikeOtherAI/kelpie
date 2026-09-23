@@ -125,6 +125,10 @@ struct BrowserScreenshot {
   double viewport_width = 0;
   double viewport_height = 0;
   double device_pixel_ratio = 1;
+  // Image pixels per CSS pixel. Not width / viewport_width: an unscaled
+  // capture also includes the page's scrollbars, which the CSS viewport does
+  // not, so that ratio would be slightly off.
+  double image_scale = 1;
 };
 
 struct BrowserNavigationState {

@@ -164,9 +164,9 @@ std::optional<Viewport> ParseLayoutMetrics(const Json& metrics) {
   return viewport;
 }
 
-std::optional<double> DownscaleFactor(int max_width, const Viewport& viewport) {
+double ClipScale(int max_width, const Viewport& viewport) {
   const double full_width = viewport.css_width * viewport.device_pixel_ratio;
-  if (max_width <= 0 || full_width <= 0 || std::round(full_width) <= max_width) return std::nullopt;
+  if (max_width <= 0 || full_width <= max_width) return 1.0;
   return static_cast<double>(max_width) / full_width;
 }
 
@@ -174,13 +174,16 @@ Json CaptureParams(const BrowserScreenshotOptions& options, const Viewport& view
   Json params = {{"format", options.format}, {"captureBeyondViewport", false}};
   if (options.format == "jpeg" && options.quality) params["quality"] = *options.quality;
   if (options.max_width) {
-    if (const auto scale = DownscaleFactor(*options.max_width, viewport)) {
-      params["clip"] = {{"x", viewport.page_x}, {"y", viewport.page_y},
-                        {"width", viewport.css_width}, {"height", viewport.css_height},
-                        {"scale", *scale}};
-    }
+    params["clip"] = {{"x", viewport.page_x}, {"y", viewport.page_y},
+                      {"width", viewport.css_width}, {"height", viewport.css_height},
+                      {"scale", ClipScale(*options.max_width, viewport)}};
   }
   return params;
+}
+
+double ImageScale(const BrowserScreenshotOptions& options, const Viewport& viewport) {
+  const double clip = options.max_width ? ClipScale(*options.max_width, viewport) : 1.0;
+  return clip * viewport.device_pixel_ratio;
 }
 
 std::optional<ImageHeader> ReadImageHeader(std::string_view base64) {

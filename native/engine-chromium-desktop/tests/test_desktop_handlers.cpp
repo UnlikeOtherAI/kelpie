@@ -85,7 +85,7 @@ class MockControl final : public kelpie::DesktopBrowserControl {
     last_lease=lease; last_screenshot=options;
     if (minimized) return kelpie::BrowserControlResult::Failure("WINDOW_MINIMIZED", "The browser window is minimised");
     image->base64_data="AA=="; image->mime_type="image/"+options.format; image->width=960; image->height=479;
-    image->viewport_width=1918; image->viewport_height=957; image->device_pixel_ratio=1;
+    image->viewport_width=1918; image->viewport_height=957; image->device_pixel_ratio=1; image->image_scale=960.0/1918.0;
     return kelpie::BrowserControlResult::Success(second);
   }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }

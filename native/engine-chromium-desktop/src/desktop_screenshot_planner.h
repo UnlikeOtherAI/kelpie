@@ -39,14 +39,21 @@ struct Viewport {
 
 std::optional<Viewport> ParseLayoutMetrics(const Json& metrics);
 
-// The `clip.scale` that makes the image `max_width` pixels wide, or nothing
-// when the full-resolution image already fits. Chromium multiplies
-// `clip.scale` by the device pixel ratio, so the full image is
-// css_width * device_pixel_ratio pixels wide.
-std::optional<double> DownscaleFactor(int max_width, const Viewport& viewport);
+// The `clip.scale` for a `maxWidth` capture: the one that makes the visible
+// viewport `max_width` pixels wide, capped at 1 so an image is never scaled
+// up. Chromium multiplies `clip.scale` by the device pixel ratio, so at scale
+// 1 the clip is css_width * device_pixel_ratio pixels wide.
+double ClipScale(int max_width, const Viewport& viewport);
 
-// Page.captureScreenshot parameters for the visible viewport.
+// Page.captureScreenshot parameters. A `maxWidth` capture is always a clip of
+// the CSS visual viewport: a plain capture also includes the page's
+// scrollbars, which the viewport metrics leave out, so its width cannot be
+// known in advance -- a 1921 px viewport came back as a 1936 px image.
 Json CaptureParams(const BrowserScreenshotOptions& options, const Viewport& viewport);
+
+// Image pixels per CSS pixel for a capture made with CaptureParams, on both
+// axes. The image's origin is the visible viewport's top-left corner.
+double ImageScale(const BrowserScreenshotOptions& options, const Viewport& viewport);
 
 struct ImageHeader {
   std::string format;  // "png" or "jpeg"
