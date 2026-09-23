@@ -24,7 +24,7 @@ Configure in Claude Desktop / Claude Code:
 ```
 
 ### `kelpie mcp --http`
-Start the MCP server with HTTP transport.
+Start the MCP server with HTTP transport, on `--port` (default 8421) when one is given anywhere on the line.
 
 ```bash
 kelpie mcp --http --port 8421

@@ -25,7 +25,7 @@ kelpie <url> [options]        # compatibility shorthand for `kelpie navigate <ur
 | `--tabId <id>`, `--tab-id <id>` | Target a specific tab for macOS commands that support per-tab control |
 | `--format <type>` | Output format: `json` (default), `table`, `text` |
 | `--timeout <ms>` | CLI-level command timeout for a single device request in milliseconds (default: 10000). Overrides per-method API defaults (typically 5000ms). Not the same as `--scan-timeout` on `kelpie discover`, which controls mDNS scan duration. |
-| `--port <port>` | Override default port 8420. With `--device <ip>`, targets the matching `<ip>:<port>` device before any stale same-IP entry. |
+| `--port <port>` | Override default port 8420. With `--device <ip>`, targets the matching `<ip>:<port>` device before any stale same-IP entry. It is one flag wherever it sits on the line, so the commands that give it their own meaning read this same value: `browser launch` starts the app on it and `mcp --http` serves on it. |
 | `--help` | Show help for any command |
 | `--version` | Show CLI version |
 | `--llm-help` | Show detailed LLM-oriented help with schemas and examples |
@@ -198,9 +198,11 @@ Launch a new local macOS Kelpie app instance for a registered alias. If `--port`
 
 If the requested port is already held by a stale instance, the macOS app falls back to the next free port. After launching, the CLI polls the fallback range and records the port the new instance actually bound, so the saved alias stays reachable.
 
+`--port` may come before or after `launch`: both start the app on that port. A value that is not an integer from 1 to 65535 is rejected with `INVALID_PORT` rather than launching on the default.
+
 ```bash
 kelpie browser launch claude-a
-kelpie browser launch codex-b --port 8450 --wait
+kelpie browser launch codex-b --port 8450
 ```
 
 ### `kelpie browser list`

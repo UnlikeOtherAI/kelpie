@@ -8,6 +8,7 @@ import type { Command } from "commander";
 import { print } from "../output/formatter.js";
 import { probeHealth } from "../discovery/local-probe.js";
 import { sendCommand } from "../client/http-client.js";
+import { subcommandPort } from "./helpers.js";
 import type { DiscoveredDevice } from "../types.js";
 import type { GlobalOptions } from "../types.js";
 import {
@@ -210,7 +211,7 @@ export function registerBrowser(program: Command): void {
   browser
     .command("launch <name>")
     .option("--port <port>", "Port to use for the launched browser")
-    .action(async (name: string, opts: { port?: string }) => {
+    .action(async (name: string, _opts: unknown, command: Command) => {
       const globals = program.opts<GlobalOptions>();
       const alias = await getBrowserAlias(name);
       if (!alias) {
@@ -220,7 +221,7 @@ export function registerBrowser(program: Command): void {
       }
 
       let port: number;
-      try { port = chooseLaunchPort(opts.port); } catch (error) {
+      try { port = chooseLaunchPort(subcommandPort(command)); } catch (error) {
         print({ success: false, error: { code: "INVALID_PORT", message: error instanceof Error ? error.message : "Invalid port" } }, globals.format);
         process.exitCode = 4; return;
       }
