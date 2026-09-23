@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "../resources/resource.h"
+#include "maximized_frame.h"
 #include "theme/theme.h"
 
 namespace kelpie::windows {
@@ -164,6 +165,19 @@ bool WindowChrome::EraseBackground(HDC device_context) const {
   FillRect(device_context, &rect, brush);
   DeleteObject(brush);
   return true;
+}
+
+LRESULT WindowChrome::CalcClientArea(NCCALCSIZE_PARAMS* params) const {
+  // Restored, the whole window is client area: Draw paints the border and
+  // HitTest supplies the resize edges, and rgrc[0] already is that rect.
+  // Maximized, the frame Windows hangs off the monitor has to come back off.
+  if (window_ != nullptr && IsZoomed(window_)) {
+    RECT& proposed = params->rgrc[0];
+    const HMONITOR monitor = MonitorFromRect(&proposed, MONITOR_DEFAULTTONEAREST);
+    proposed = MaximizedClientRect(proposed, MaximizedFrameThickness(window_),
+                                   AutoHideAppbarEdges(monitor));
+  }
+  return 0;
 }
 
 LRESULT WindowChrome::HitTest(WPARAM wparam, LPARAM lparam) const {
