@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 import { runLiveAcceptance, runNessieStdioClient } from "./lib/acceptance.mjs";
 import { control, waitFor } from "./lib/http.mjs";
 import { startFixtureServer } from "./lib/fixture.mjs";
+import { holdNodeLoopbackPort, holdReusableLoopbackPort, listeningPids } from "./lib/ports.mjs";
 import { assertSandboxedRenderer, delay, fileExists, runCommand, startBrowser, stopBrowser, waitForReadiness } from "./lib/process.mjs";
+import { closeShellWindow, startupFailureText } from "./lib/window.mjs";
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 
@@ -151,26 +153,65 @@ async function verifyProfileLock(config, fixtureUrl, profile, primaryReadiness, 
   }
 }
 
-async function verifyOccupiedPort(config, fixtureUrl) {
+/**
+ * A launch on a port another process already listens on must stop at the
+ * local control listener stage: it never shares the port, never publishes
+ * readiness, and its window names that stage until a person closes it.
+ */
+async function verifyOccupiedPort(config, fixtureUrl, holder) {
   const profile = await mkdtemp(join(tmpdir(), "kelpie-windows-port-conflict-"));
   const readiness = join(profile, "readiness.json");
-  const blocker = createServer();
-  await new Promise((resolvePromise, reject) => {
-    blocker.once("error", reject);
-    blocker.listen(0, "127.0.0.1", resolvePromise);
-  });
-  const address = blocker.address();
-  if (address === null || typeof address === "string") throw new Error("Port blocker did not expose a TCP port");
-  const contender = startBrowser(config.exe, browserArguments({ profile, readiness, port: address.port, fixtureUrl }));
+  const contender = startBrowser(config.exe, browserArguments({ profile, readiness, port: holder.port, fixtureUrl }));
   try {
-    const outcome = await Promise.race([contender.exited, delay(8_000).then(() => null)]);
-    assert.notEqual(outcome, null, "launch against an occupied requested port must fail promptly");
-    assert.equal(await fileExists(readiness), false, "port-conflicted process must not publish a readiness file");
+    const deadline = Date.now() + config.timeoutMs;
+    let failure;
+    while (failure === undefined) {
+      assert.equal(await fileExists(readiness), false, `launch against ${holder.description} published readiness, so it shares the port`);
+      assert.equal(contender.child.exitCode, null, `launch against ${holder.description} exited instead of reporting its failure`);
+      assert(Date.now() < deadline, `launch against ${holder.description} never reported a startup failure`);
+      failure = await startupFailureText(contender.child.pid);
+      if (failure === undefined) await delay(250);
+    }
+    assert.match(failure, /^Browser startup failed during local control listener: /,
+      `launch against ${holder.description} must fail at the local control listener`);
+    assert.equal(await fileExists(readiness), false, `launch against ${holder.description} must not publish readiness`);
+    const listeners = await listeningPids(holder.port);
+    assert.equal(listeners.includes(contender.child.pid), false, `launch against ${holder.description} must not share its port`);
+    assert.equal(listeners.includes(holder.pid), true,
+      `${holder.description} (PID ${holder.pid}) must keep port ${holder.port}; listening PIDs: ${JSON.stringify(listeners)}`);
+    await holder.stillServes?.();
+    await closeShellWindow(contender.child.pid);
+    const outcome = await Promise.race([contender.exited, delay(config.timeoutMs).then(() => null)]);
+    assert.notEqual(outcome, null, "a window that failed startup must close when asked");
+    assert.equal(outcome.code, 1, "a failed startup must exit with a failure status");
   } finally {
     await stopBrowser(contender);
-    await new Promise((resolvePromise, reject) => blocker.close(error => error ? reject(error) : resolvePromise()));
-    await rm(profile, { recursive: true, force: true });
+    // Chromium's helper processes can hold the contender's log for a moment
+    // after the browser process itself has exited.
+    await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
+}
+
+async function verifyOccupiedPorts(config, fixtureUrl, current, readinessFile) {
+  // The SO_REUSEADDR holder goes first: it is the one a shareable listener
+  // would bind beside, so it is the check that names that regression.
+  for (const hold of [holdReusableLoopbackPort, holdNodeLoopbackPort]) {
+    const holder = await hold();
+    try {
+      await verifyOccupiedPort(config, fixtureUrl, holder);
+    } finally {
+      await holder.close();
+    }
+  }
+  await verifyOccupiedPort(config, fixtureUrl, {
+    description: "the running kelpie.exe",
+    port: current.readiness.port,
+    pid: current.browser.child.pid,
+    stillServes: async () => {
+      assert.equal(await fileExists(readinessFile), true, "the running browser must keep its readiness file");
+      await control(current.readiness, "get-current-url", {});
+    },
+  });
 }
 
 async function verifyRestoration(readiness, session) {
@@ -210,7 +251,7 @@ function assertNoCapabilityLeak(command, readiness, description) {
     `${description} must not print the readiness capability`);
 }
 
-async function verifyCliAndStdio(config, fixtureUrl) {
+async function verifyCliAndStdio(config, fixtureUrl, port) {
   const profile = await mkdtemp(join(tmpdir(), "kelpie-windows-cli-profile-"));
   const cliHome = await mkdtemp(join(tmpdir(), "kelpie-windows-cli-home-"));
   const readinessFile = join(profile, "readiness.json");
@@ -222,7 +263,10 @@ async function verifyCliAndStdio(config, fixtureUrl) {
       "--platform", "windows", "--app-path", config.exe, "--profile-dir", profile], { env: environment });
     assert.equal(parseCliResult(registered, "CLI browser register").success, true, "CLI must register an isolated Windows alias");
 
-    const launchedCommand = await runCommand(process.execPath, [config.cli, "browser", "launch", alias], { env: environment, timeoutMs: config.timeoutMs });
+    // Without --port the CLI launches on 8420, which a developer's own Kelpie
+    // usually holds; the run then fails at the listener instead of testing the CLI.
+    const launchedCommand = await runCommand(process.execPath, [config.cli, "browser", "launch", alias, "--port", String(port)],
+      { env: environment, timeoutMs: config.timeoutMs });
     const launch = parseCliResult(launchedCommand, "CLI browser launch");
     assert.equal(launch.success, true, "CLI must launch the registered Windows browser");
     const readiness = await waitForReadiness(readinessFile, config.timeoutMs);
@@ -265,13 +309,13 @@ async function main() {
     const port = config.port === undefined ? await reservePort() : Number(config.port);
     current = await launchAndRead(config, fixture.baseUrl, profile.path, readiness, port);
     await verifyProfileLock(config, fixture.baseUrl, profile.path, readiness, current.readiness.port);
-    await verifyOccupiedPort(config, fixture.baseUrl);
+    await verifyOccupiedPorts(config, fixture.baseUrl, current, readiness);
     const session = await runLiveAcceptance(current.readiness, fixture.baseUrl, config.nessieRoot);
     await assertSandboxedRenderer(current.browser, config.timeoutMs);
     const originalDeviceId = current.readiness.deviceId;
     await stopKnownBrowser({ ...current, readinessFile: readiness }, config.timeoutMs);
     current = undefined;
-    await verifyCliAndStdio(config, fixture.baseUrl);
+    await verifyCliAndStdio(config, fixture.baseUrl, port);
     current = await launchAndRead(config, undefined, profile.path, readiness, port);
     assert.equal(current.readiness.deviceId, originalDeviceId, "device identity must survive clean restart");
     await verifyRestoration(current.readiness, session);

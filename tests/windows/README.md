@@ -52,6 +52,21 @@ console/network inspection, bookmarks/history, PNG decoding, direct stateless
 MCP, a real `@nessie/mcp-client` flow, profile locking, occupied ports, and
 clean-restart session restoration. The fixture never calls the internet.
 
+Browsers are launched with a visible window: the shell reports ready only once
+Chromium's child window is visible, so a hidden launch always stops at browser
+attachment.
+
+The occupied-port check launches a second browser against three holders of
+its port: a Node listener, a `SO_REUSEADDR` socket held by a PowerShell child
+(what cpp-httplib's defaults leave on Windows, and so what an older Kelpie
+holds), and the running `kelpie.exe` itself. Each launch must stop at the local
+control listener stage: its window reads `Browser startup failed during local
+control listener: …`, it publishes no readiness file, `netstat -ano` never
+shows it `LISTENING` on the port, and the holder keeps the port (the running
+browser still answers with its own token). The runner then closes that window
+with `WM_CLOSE` and requires the process to exit with status 1. The CLI phase
+launches its alias on the run's `--port`, never the CLI default `8420`.
+
 It also proves the CEF sandbox from Windows process tokens: the runner finds
 every renderer descendant of its owned bootstrap PID and requires each to run
 below Medium integrity. A missing or unreadable renderer token fails the
