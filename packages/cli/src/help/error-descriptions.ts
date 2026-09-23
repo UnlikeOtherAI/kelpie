@@ -41,4 +41,7 @@ export const errorDescriptions: Record<string, string> = {
     "set-renderer cannot switch to Chromium while partitioned tabs are open, because " +
     "partitioned storage has no CEF equivalent to migrate into. Close those tabs or call " +
     "delete-partition first.",
+  WINDOW_MINIMIZED:
+    "The desktop browser window is minimised or has no visible area, so a screenshot has no " +
+    "current image. Restore the window and retry; other commands keep working meanwhile.",
 };

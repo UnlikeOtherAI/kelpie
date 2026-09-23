@@ -283,27 +283,6 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::ParseEvaluateResult(const
   return Failure("CDP_MALFORMED_RESULT", "Runtime.evaluate returned an unknown result descriptor");
 }
 
-std::optional<DesktopDevToolsSession::Json> DesktopDevToolsSession::ScreenshotParams(const Json& options) {
-  if (!options.is_object()) return std::nullopt;
-  const auto format_value = options.find("format");
-  if (format_value != options.end() && !format_value->is_string()) return std::nullopt;
-  const std::string format = format_value == options.end() ? "png" : format_value->get<std::string>();
-  if (format != "png") return std::nullopt;
-  Json params = {{"format", "png"}, {"captureBeyondViewport", false}};
-  if (options.contains("quality")) params["quality"] = options["quality"];
-  return params;
-}
-
-DesktopDevToolsSession::Result DesktopDevToolsSession::ParseScreenshotResult(const Result& protocol_result) {
-  if (!protocol_result.ok) return protocol_result;
-  if (!protocol_result.value.is_object()) return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return an object");
-  const auto data = protocol_result.value.find("data");
-  if (data == protocol_result.value.end() || !data->is_string() || data->get<std::string>().empty()) {
-    return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return encoded PNG data");
-  }
-  return {true, {}, {}, {{"mimeType", "image/png"}, {"data", *data}}, false};
-}
-
 DesktopDevToolsSession::Json DesktopDevToolsSession::TrustedKeyParams(const Json& input, bool key_up) {
   const std::string key = input.value("key", "");
   Json params = {{"type", key_up ? "keyUp" : "keyDown"}, {"key", key},

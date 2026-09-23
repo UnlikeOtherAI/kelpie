@@ -103,9 +103,28 @@ struct BrowserControlResult {
   }
 };
 
+// What `screenshot` may ask of the engine. The handler validates the request;
+// the engine trusts these values.
+struct BrowserScreenshotOptions {
+  std::string format = "png";  // "png" or "jpeg"
+  // JPEG compression, 1-100. Ignored for PNG, as on iOS, Android and macOS.
+  std::optional<int> quality;
+  // Largest image width in pixels. The image is scaled down to fit, never up.
+  std::optional<int> max_width;
+};
+
 struct BrowserScreenshot {
   std::string mime_type = "image/png";
   std::string base64_data;
+  // The encoded image's own pixel size, read from its header rather than from
+  // the request, so a scale the engine got wrong shows up instead of hiding.
+  int width = 0;
+  int height = 0;
+  // The CSS viewport the image shows, and the device pixels per CSS pixel, so
+  // a caller can map image pixels back to page coordinates.
+  double viewport_width = 0;
+  double viewport_height = 0;
+  double device_pixel_ratio = 1;
 };
 
 struct BrowserNavigationState {
@@ -172,6 +191,7 @@ class DesktopBrowserControl {
                                         Json* value,
                                         Timeout timeout) = 0;
   virtual BrowserControlResult Screenshot(TabLease lease,
+                                          const BrowserScreenshotOptions& options,
                                           BrowserScreenshot* image,
                                           Timeout timeout) = 0;
   virtual BrowserControlResult GetCookies(TabLease lease,

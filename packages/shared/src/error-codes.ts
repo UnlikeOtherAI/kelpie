@@ -18,6 +18,7 @@ export const ErrorCode = {
   PARTITION_DELETING: "PARTITION_DELETING",
   PARTITION_IN_USE: "PARTITION_IN_USE",
   ENGINE_SWITCH_BLOCKED_BY_PARTITION: "ENGINE_SWITCH_BLOCKED_BY_PARTITION",
+  WINDOW_MINIMIZED: "WINDOW_MINIMIZED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -54,4 +55,5 @@ export const ErrorHttpStatus: Record<ErrorCode, number> = {
   PARTITION_DELETING: 409,
   PARTITION_IN_USE: 409,
   ENGINE_SWITCH_BLOCKED_BY_PARTITION: 409,
+  WINDOW_MINIMIZED: 409,
 };

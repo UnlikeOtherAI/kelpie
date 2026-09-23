@@ -65,11 +65,13 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/handlers/inspection_handler.cpp
 )
 
-# The input and cookie planners are pure JSON-to-DevTools translation with no
-# CEF dependency, so both configurations compile them and both run their tests.
+# The input, cookie and screenshot planners are pure JSON-to-DevTools
+# translation with no CEF dependency, so both configurations compile them and
+# both run their tests.
 list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_input_planner.cpp
-  src/desktop_cookie_planner.cpp)
+  src/desktop_cookie_planner.cpp
+  src/desktop_screenshot_planner.cpp)
 
 # The favicon registry and the start page payload builder are pure data handling
 # with no CEF dependency, so both configurations compile and test them.
@@ -116,6 +118,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_client.cpp
     src/desktop_engine_events.cpp
     src/desktop_engine_control.cpp
+    src/desktop_engine_screenshot.cpp
     src/desktop_engine_partitions.cpp
     src/desktop_partition_registry.cpp
     src/desktop_devtools.cpp

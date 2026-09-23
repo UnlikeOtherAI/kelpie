@@ -32,6 +32,7 @@ typedef enum KelpieErrorCode {
   KELPIE_ERROR_PARTITION_UNSUPPORTED = 14,
   KELPIE_ERROR_PARTITION_DELETING = 15,
   KELPIE_ERROR_PARTITION_IN_USE = 16,
+  KELPIE_ERROR_WINDOW_MINIMIZED = 17,
 } KelpieErrorCode;
 
 const char* kelpie_platform_name(KelpiePlatform platform);

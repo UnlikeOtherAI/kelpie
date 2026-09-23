@@ -520,31 +520,8 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
   return result;
 }
 
-BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
-  const auto impl = impl_;
-  if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
-  const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(Json::object());
-  if (!screenshot_params) return BrowserControlResult::Failure("INTERNAL", "Screenshot parameters are invalid");
-  const auto started_at = std::chrono::steady_clock::now();
-  auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl->RunOnUi([impl, lease, pending, screenshot_params] {
-    auto* tab = impl->FindTab(lease);
-    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
-    pending->session = tab->devtools;
-    pending->operation = pending->session->Begin(tab->browser, "Page.captureScreenshot",
-                                                  *screenshot_params);
-    return BrowserControlResult::Success(impl->Snapshot(*tab));
-  }, timeout);
-  if (!started.ok) return started;
-  const auto parsed = DesktopDevToolsSession::ParseScreenshotResult(
-      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout)));
-  const auto result = DevToolsResult(parsed);
-  if (result.ok) {
-    image->mime_type = parsed.value.value("mimeType", "image/png");
-    image->base64_data = parsed.value.value("data", "");
-  }
-  return result;
-}
+// DesktopEngine::Screenshot lives in desktop_engine_screenshot.cpp.
+
 BrowserControlResult DesktopEngine::GetCookies(TabLease lease, const Json& query, Json* cookies, Timeout timeout) {
   if (!cookies) return BrowserControlResult::Failure("INTERNAL", "cookies is required");
   const auto planned = desktop_cookie::PlanGetCookies(query);

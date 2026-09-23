@@ -179,6 +179,11 @@ All errors follow the same format:
 | `PLATFORM_NOT_SUPPORTED` | 501 | Method not available on this platform (e.g., request interception on iOS) |
 | `PERMISSION_REQUIRED` | 403 | Operation requires user gesture or OS permission (e.g., clipboard read on iOS) |
 | `SHADOW_ROOT_CLOSED` | 403 | Cannot traverse a closed shadow root |
+| `WINDOW_MINIMIZED` | 409 | `screenshot` on Windows while the browser window is minimised or has no visible area; restore the window and retry |
+
+The CLI generates one code of its own, `SCREENSHOT_OPTION_UNSUPPORTED`, when a
+device ignored a screenshot option it was sent (JPEG, or `maxWidth`). No device
+returns it. See [core.md](core.md#screenshot).
 
 ---
 

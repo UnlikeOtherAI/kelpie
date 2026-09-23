@@ -313,6 +313,7 @@ POST /v1/screenshot
   "fullPage": false,       // optional, default false
   "format": "png",         // optional, "png" | "jpeg"
   "quality": 80,           // optional, jpeg only, 1-100
+  "maxWidth": 960,         // optional, 1-16384; desktop Chromium only (see below)
   "resolution": "native"   // optional, "native" | "viewport"
 }
 
@@ -334,6 +335,32 @@ Response:
 ```
 
 `resolution: "viewport"` returns a CSS-pixel/non-retina image that lines up with the interaction coordinate system more directly and keeps image payloads smaller for LLM use. `resolution: "native"` preserves the renderer's native output detail. The extra metadata is additive: older clients can ignore it, and newer clients should use it when converting image pixels back into viewport tap coordinates.
+
+`width` and `height` are always the returned image's own pixel size.
+
+**Desktop Chromium (Windows, Linux).** The capture is the visible viewport,
+encoded by Chromium itself (CDP `Page.captureScreenshot`).
+
+- `format: "jpeg"` and `quality` are honoured. PNG is the default, and
+  `quality` is ignored for PNG.
+- `maxWidth` scales the image down so it is at most that many pixels wide,
+  keeping its aspect ratio. An image that already fits is not scaled, and an
+  image is never scaled up. This is the way to keep a large window's
+  screenshot small: a 1918 px window at `maxWidth: 960` and `quality: 60`
+  comes back as a 960 px JPEG.
+- `fullPage: false` is accepted; `fullPage: true` returns `INVALID_PARAMS`.
+- `resolution` is ignored, and the response always says
+  `"resolution": "viewport"`. `imageScaleX` and `imageScaleY` are image pixels
+  per CSS pixel, so a scaled image still maps back to page coordinates.
+- `width`, `height` and `format` are read from the encoded image's header.
+- **Minimised window (Windows).** While the browser window is minimised, or
+  has no visible area, `screenshot` returns `WINDOW_MINIMIZED` (HTTP 409)
+  instead of a stale or tiny image. Restore the window and retry. Other
+  methods keep working while the window is minimised. The check runs just
+  before the capture, and a minimise that lands between the two can still
+  yield one stale frame.
+
+iOS, Android and macOS do not honour `maxWidth` yet.
 
 ---
 

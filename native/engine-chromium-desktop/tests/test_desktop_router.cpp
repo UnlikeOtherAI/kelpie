@@ -1,6 +1,10 @@
 #include "kelpie/desktop_router.h"
 
 #include <cassert>
+#include <string>
+
+#include "kelpie/error_codes.h"
+#include "kelpie/response_helpers.h"
 
 int main() {
   kelpie::DesktopRouter router;
@@ -18,6 +22,15 @@ int main() {
   assert(missing.status_code == 404);
   assert(missing.body["success"] == false);
   assert(missing.body["error"]["code"] == "NOT_FOUND");
+
+  // A minimised window conflicts with the request's need for a current image.
+  router.Register("minimised", [](const nlohmann::json&) {
+    return kelpie::ErrorResponse("WINDOW_MINIMIZED", "The browser window is minimised");
+  });
+  const auto minimised = router.Dispatch("minimised", nlohmann::json::object());
+  assert(minimised.status_code == 409);
+  assert(kelpie::ErrorCodeFromString("WINDOW_MINIMIZED") == kelpie::ErrorCode::kWindowMinimized);
+  assert(std::string(kelpie::ErrorCodeToString(kelpie::ErrorCode::kWindowMinimized)) == "WINDOW_MINIMIZED");
 
   router.Register("unsupported", [](const nlohmann::json&) {
     return nlohmann::json{{"success", false}};

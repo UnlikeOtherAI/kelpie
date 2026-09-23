@@ -151,6 +151,7 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 Json* value,
                                 Timeout timeout) override;
   BrowserControlResult Screenshot(TabLease lease,
+                                  const BrowserScreenshotOptions& options,
                                   BrowserScreenshot* image,
                                   Timeout timeout) override;
   BrowserControlResult GetCookies(TabLease lease,

@@ -24,6 +24,9 @@ enum class ErrorCode {
   kPartitionUnsupported,
   kPartitionDeleting,
   kPartitionInUse,
+  // The browser window is minimised or has no visible area, so a screenshot
+  // has no current image to return.
+  kWindowMinimized,
 };
 
 const char* ErrorCodeToString(ErrorCode code);

@@ -42,6 +42,8 @@ const char* ErrorCodeToString(ErrorCode code) {
       return "PARTITION_DELETING";
     case ErrorCode::kPartitionInUse:
       return "PARTITION_IN_USE";
+    case ErrorCode::kWindowMinimized:
+      return "WINDOW_MINIMIZED";
   }
   return "UNKNOWN_ERROR";
 }
@@ -98,6 +100,9 @@ std::optional<ErrorCode> ErrorCodeFromString(std::string_view value) {
   if (value == "PARTITION_IN_USE") {
     return ErrorCode::kPartitionInUse;
   }
+  if (value == "WINDOW_MINIMIZED") {
+    return ErrorCode::kWindowMinimized;
+  }
   return std::nullopt;
 }
 
@@ -136,6 +141,10 @@ std::int32_t ErrorCodeHttpStatus(ErrorCode code) {
     case ErrorCode::kPartitionDeleting:
       return 409;
     case ErrorCode::kPartitionInUse:
+      return 409;
+    // The request conflicts with the window's state; it succeeds once the
+    // window is restored.
+    case ErrorCode::kWindowMinimized:
       return 409;
   }
   return 500;
