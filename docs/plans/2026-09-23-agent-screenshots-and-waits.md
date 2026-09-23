@@ -810,3 +810,56 @@ It used 20,074 tokens, returned four findings and changed no files.
    missing. Rejected as hypothetical.** CEF 152 sends it, as verified live.
    A build that dropped it would report an oversized `width`, which the
    CLI's option check refuses, rather than failing silently.
+
+## End-to-end check through the CLI's MCP server
+
+On 2026-09-23 a build of this branch (`scripts/build-windows.ps1`, all 38
+CTest tests passing) was driven the way an agent drives it:
+
+- registered as a CLI alias with its own profile under
+  `%LOCALAPPDATA%\Kelpie\profiles\`;
+- started with `kelpie browser launch <alias> --port 8431`;
+- called over `kelpie --browser <alias> mcp`, a stdio JSON-RPC session that
+  listed 94 tools.
+
+The client counted how many times each image's base64 occurred in the raw
+response line. It was once in every screenshot result.
+
+| Check | Result |
+|---|---|
+| Navigate to Hacker News, then `wait_for_navigation` | Returned at 891 ms with `isLoading: false`; `readyState` was `complete` |
+| Click a story link, then `wait_for_navigation` | 479 ms (nobodywho.ai), 1208 ms (openai.com), 227 ms (an HN comments page); URL and title were the new page's, `readyState` `complete` |
+| `wait_for_navigation` with no navigation | `TIMEOUT` "No navigation started within 2000 ms" at 2024 ms |
+| JPEG, `maxWidth: 1280`, 1600 px viewport, default quality | 1280×727: Hacker News 117 KB, Wikipedia 160 KB |
+| The same with `quality: 60` | Hacker News 83 KB |
+| JPEG, `maxWidth: 1280`, maximised 1936 px viewport | Wikipedia 1280×617: 125 KB, or 90 KB at quality 60 |
+| `kelpie_get_page_text` on Wikipedia's "World War II" (173,330 characters) | 20,000 characters with `truncated`, `totalChars` and the note; `maxChars: 5000` cut markdown to 5,000 |
+| `wait_for_element`, `timeout: 20000`, element added after 15 s | Succeeded at 15,006 ms |
+| The same, element never added | The device's own `TIMEOUT` at 20,023 ms; the evidence had the CLI's cut-off at 10,017 ms |
+| Window minimised | JPEG and PNG screenshots returned `WINDOW_MINIMIZED`; `evaluate` kept working; after a restore the screenshot succeeded |
+| `kelpie discover` and `kelpie_discover` | Both listed the instance as `local:127.0.0.1:8431` through the loopback probe. A 5 s `_kelpie._tcp` browse found no advert, as C7 intends |
+
+The whole response for the 160 KB Wikipedia JPEG was 215 KB, because base64
+adds a third. A client that must keep every result under 200 KB asks for
+`quality: 60` or a smaller `maxWidth`.
+
+**Seen along the way, outside this change.**
+
+- **A maximised window's client area runs past the monitor.** `WM_NCCALCSIZE`
+  returns 0 whenever `wparam` is `TRUE` (`win32_shell.cpp`), maximised or
+  not, so the client area is the whole window rectangle. Windows places a
+  maximised window 8 px beyond each edge of the work area. On a 1920×1080
+  display the viewport measured 1936×926. A screenshot includes those 8 px
+  on each side; the person at the screen does not see them.
+- **The window went back to its previous rectangle about 1.5 s after every
+  resize.** This happened after a maximise, after `kelpie_resize_viewport`,
+  and after a direct `SetWindowPos`. A WinForms window resized the same way
+  kept its size. Nothing in `apps/windows/src` restores the window
+  rectangle. Kelpie instances from other checkouts were starting and closing
+  on the same desktop during the run, so the cause was not found. The checks
+  above ran inside that 1.5 s window, and every screenshot reports the size
+  it actually captured.
+- **One JPEG came back tiled**, with the old frame repeated inside the new
+  size. It was taken about a second after an external maximise. Four later
+  attempts were clean, as was every capture taken straight after
+  `kelpie_resize_viewport`. It was not reproduced.
