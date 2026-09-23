@@ -57,7 +57,9 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
     platforms: ["macos"],
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
-      { name: "app", type: "string", required: false, description: "Optional path to Kelpie.app" },
+      { name: "app-path", type: "string", required: false, description: "Optional path to Kelpie.app or kelpie.exe" },
+      { name: "platform", type: "string", required: false, description: "macos, windows or linux; defaults to this machine's platform" },
+      { name: "profile-dir", type: "string", required: false, description: "Absolute profile directory; required for a Windows alias" },
     ],
     related: ["browser launch", "browser inspect", "browser remove"],
     response: defaultResponse,
@@ -69,7 +71,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
     platforms: ["macos"],
     params: [
       { name: "name", type: "string", required: true, description: "Browser alias name" },
-      { name: "port", type: "number", required: false, description: "Optional explicit HTTP port; --port may come before or after the command" },
+      { name: "port", type: "number", required: false, description: "Optional explicit HTTP port, used exactly; --port may come before or after the command. Omitted, the first free port from 8420 upward, skipping 8421" },
     ],
     errors: describeErrors(["BROWSER_NOT_REGISTERED", "APP_NOT_INSTALLED", "BROWSER_LAUNCH_FAILED"]),
     related: ["browser register", "browser list", "browser inspect"],

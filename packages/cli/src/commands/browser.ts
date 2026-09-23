@@ -3,8 +3,8 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { DEFAULT_PORT } from "@unlikeotherai/kelpie-shared";
 import type { Command } from "commander";
+import { allocateBrowserPort } from "../browser/launch.js";
 import { print } from "../output/formatter.js";
 import { probeHealth } from "../discovery/local-probe.js";
 import { sendCommand } from "../client/http-client.js";
@@ -39,8 +39,9 @@ async function isReachable(port?: number): Promise<boolean> {
   return probeHealth(port);
 }
 
-function chooseLaunchPort(requestedPort?: string): number {
-  const port = requestedPort ? Number(requestedPort) : DEFAULT_PORT;
+/** An explicit --port is used exactly as given, once it is a port at all. */
+function parseLaunchPort(requestedPort: string): number {
+  const port = Number(requestedPort);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error("Port must be an integer from 1 to 65535");
   }
@@ -220,10 +221,12 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
+      const requestedPort = subcommandPort(command);
       let port: number;
-      try { port = chooseLaunchPort(subcommandPort(command)); } catch (error) {
-        print({ success: false, error: { code: "INVALID_PORT", message: error instanceof Error ? error.message : "Invalid port" } }, globals.format);
-        process.exitCode = 4; return;
+      try { port = requestedPort ? parseLaunchPort(requestedPort) : await allocateBrowserPort(); } catch (error) {
+        const code = requestedPort ? "INVALID_PORT" : "BROWSER_LAUNCH_FAILED";
+        print({ success: false, error: { code, message: error instanceof Error ? error.message : "No usable port" } }, globals.format);
+        process.exitCode = requestedPort ? 4 : 6; return;
       }
       if (alias.platform === "windows") {
         const appPath = alias.appPath;
