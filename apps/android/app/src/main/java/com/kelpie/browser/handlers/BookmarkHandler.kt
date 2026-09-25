@@ -28,10 +28,12 @@ class BookmarkHandler(
         return savedResponse(BookmarkStore.remove(id))
     }
 
-    private suspend fun clear(): Map<String, Any?> {
-        return savedResponse(BookmarkStore.clear(), cleared = true)
-    }
-    private suspend fun savedResponse(operation: kotlinx.coroutines.Deferred<Unit>? = null, cleared: Boolean = false): Map<String, Any?> =
+    private suspend fun clear(): Map<String, Any?> = savedResponse(BookmarkStore.clear(), cleared = true)
+
+    private suspend fun savedResponse(
+        operation: kotlinx.coroutines.Deferred<Unit>? = null,
+        cleared: Boolean = false,
+    ): Map<String, Any?> =
         try {
             operation?.await()
             if (cleared) successResponse(mapOf("cleared" to true)) else successResponse(mapOf("bookmarks" to BookmarkStore.toJSON()))
