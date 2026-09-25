@@ -45,6 +45,9 @@ void TestRegistryFiltering() {
   const auto android_tools = registry.tools_for_platform(kelpie::Platform::kAndroid);
   const auto macos_tools = registry.tools_for_platform(kelpie::Platform::kMacos);
   const auto windows_tools = registry.tools_for_platform(kelpie::Platform::kWindows);
+  const auto linux_tools = registry.tools_for_platform(kelpie::Platform::kLinux);
+  assert(linux_tools.size() == windows_tools.size());
+  for (const auto& tool : windows_tools) assert(ContainsTool(linux_tools, tool.name));
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
