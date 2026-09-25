@@ -11,6 +11,9 @@ struct BrowserView: View {
     /// inject a shared store — that was the source of the HTTP-routing bug
     /// where `tabId=X` in one window resolved against another window's tabs.
     @StateObject var tabStore = TabStore()
+    @State var isChromeCollapsed = false
+    @State private var isWindowFullscreen = false
+    @State var hoveredLinkURL = ""
     @State private var showSettings = false
     @State private var showBookmarks = false
     @State private var showHistory = false
@@ -37,6 +40,16 @@ struct BrowserView: View {
         ZStack {
             VStack(spacing: 0) {
                 if !serverState.isScriptRecording {
+                    Group {
+                        if isWindowFullscreen {
+                            browserTabs.padding(.horizontal, 12)
+                        } else {
+                            Color.clear.frame(height: 32)
+                        }
+                    }
+                        .background(BrowserGlassBackground())
+                        .zIndex(2)
+                    if !isChromeCollapsed {
                     // URL bar — above all overlays so buttons are always clickable
                     URLBarView(
                         browserState: browserState,
@@ -47,7 +60,9 @@ struct BrowserView: View {
                         onNavigate: navigate,
                         onBack: { serverState.handlerContext.goBack() },
                         onForward: { serverState.handlerContext.goForward() },
-                        onReload: { serverState.handlerContext.reloadPage() },
+                        onReload: { isChromeCollapsed = false; serverState.handlerContext.reloadPage() },
+                        onHome: showStartPage,
+                        isStartPage: tabStore.activeTab?.isStartPage == true,
                         onAIToggle: handleAIPillTap,
                         onSnapshot3D: {
                             Task { @MainActor in
@@ -101,28 +116,10 @@ struct BrowserView: View {
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)
+                    .zIndex(2)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    }
 
-                    TabBarView(
-                        tabStore: tabStore,
-                        onNewTab: {
-                            let tab = tabStore.addTab()
-                            connectNewTab(tab)
-                        },
-                        onCloseTab: { id in
-                            let wasActive = tabStore.activeTabID == id
-                            tabStore.closeTab(id: id)
-                            if wasActive, let next = tabStore.activeTab { activateTab(next) }
-                        },
-                        onSelectTab: { id in
-                            tabStore.selectTab(id: id)
-                            if let tab = tabStore.activeTab { activateTab(tab) }
-                        }
-                    )
-                    .frame(height: tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 34 : 0)
-                    .opacity(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium ? 1 : 0)
-                    .allowsHitTesting(tabStore.tabs.count > 1 && rendererState.activeEngine != .chromium)
-                    .animation(.easeOut(duration: 0.3), value: tabStore.tabs.count > 1)
-                    .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
                 }
 
                 HStack(spacing: 0) {
@@ -176,7 +173,23 @@ struct BrowserView: View {
                         .frame(width: aiPanelWidth)
                     }
                 }
+                if !serverState.isScriptRecording {
+                    HStack {
+                        Text(hoveredLinkURL)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .accessibilityLabel("Link destination")
+                            .accessibilityIdentifier("browser.status.link")
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 24)
+                    .background(BrowserGlassBackground())
+                    .overlay(alignment: .top) { BrowserChromeStyle.separator.frame(height: 0.5) }
+                }
             }
+            .clipped()
 
             if showWelcome && shouldShowWelcomeCard {
                 WelcomeCardView {
@@ -189,7 +202,10 @@ struct BrowserView: View {
                 .zIndex(30)
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .onChange(of: browserState.currentURL) { _, _ in
+            isChromeCollapsed = false
+            hoveredLinkURL = ""
             aiChatSession.reset()
             Task { @MainActor in
                 await serverState.handlerContext.persistRendererCookiesToSharedJar()
@@ -206,11 +222,13 @@ struct BrowserView: View {
         .background(
             WindowChromeBridge(
                 title: windowTitle,
+                tabs: AnyView(browserTabs),
+                showsTabs: !serverState.isScriptRecording && !isWindowFullscreen,
+                onFullscreenChange: { isWindowFullscreen = $0 },
                 minimumWindowSize: NSSize(
                     width: viewportState.minimumWindowSize.width + (isAIPanelOpen ? 206 : 0),
                     height: viewportState.minimumWindowSize.height
-                ),
-                resolutionLabel: viewportState.resolutionLabel
+                )
             )
             .frame(width: 0, height: 0)
         )
@@ -221,7 +239,7 @@ struct BrowserView: View {
         .background(
             BrowserCommandBridge(
                 actions: BrowserCommandActions(
-                    hardReload: { serverState.handlerContext.hardReloadPage() },
+                    hardReload: { isChromeCollapsed = false; serverState.handlerContext.hardReloadPage() },
                     newTab: { handleNewTabCommand() },
                     closeTab: { handleCloseTabCommand() }
                 )

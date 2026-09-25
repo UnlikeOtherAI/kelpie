@@ -20,12 +20,17 @@
 - The macOS app uses a fixed minimum browser shell and a separate centered viewport model.
 - The macOS shell can grow larger than the minimum size, but viewport changes never shrink the native window below that minimum.
 - Device presets simulate phone, tablet, and laptop viewports inside the shell instead of resizing the native window, and oversized viewports scroll instead of scaling down.
-- The native window title mirrors the current page title, and the titlebar shows the live viewport resolution in a pill aligned to the right.
+- Tabs and the native close/minimize/maximize controls share the top 32-point row. Fullscreen keeps tabs pinned in the content chrome while macOS hides its native titlebar. The window retains its page title for system menus. Viewport resolution is shown in the three-dot popup.
 - The macOS shell shows the same welcome card used on iOS until dismissed, including the persisted "Don't show this again" preference, and the card can be reopened from `Help > Show Welcome Screen` even when that preference is enabled.
 - The macOS `Help` menu also links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`.
 - The active macOS browser scene maps `Cmd+R` to a hard refresh. WebKit uses `reloadFromOrigin()`, and Chromium uses CEF's cache-bypassing reload path.
 - MCP and HTTP `toast` messages render as a native bottom card in the macOS shell, not as an injected page overlay.
-- macOS has no floating menu: Safari/Chrome auth, bookmarks, history, network inspector, and settings are AppKit-backed icon buttons in the top toolbar, next to reload, the AI status pill, and the 3D inspector.
+- The macOS navigation row contains back, forward, reload, Home, bookmark, native sharing, history and a trailing vertical three-dot popup. The popup holds Safari authentication, bookmark management, network inspector, settings, AI, 3D inspection and its controls, renderer, viewport preset, orientation and scale. It scrolls within a constrained height.
+- The navigation row is 44 points high with a 28-point address field; favourites use a 29-point row. Native within-window blur gives the chrome its translucent background. On macOS 26+ full-size WebKit pages paint beneath it using public obscured-content insets, preserving the visible CSS viewport and screenshot coordinates. Chromium, older macOS and staged device viewports keep their reserved content area.
+- A 24-point bottom status bar shows link destinations on hover and clears on pointer exit, scrolling or navigation. The native tracker uses one-shot DOM hit tests, including open shadow roots and same-origin frames; cross-origin frame links are not inspectable through that path.
+- The favourites row mocks the reference labels and colours without adding fake records to BookmarkStore. Its shortcuts open illustrative public sites; Add bookmark saves the current real page.
+- Tabs remain pinned. Downward vertical wheel/trackpad scrolling inside the page hides navigation and favourites; the first upward scroll reveals them. Horizontal scrolling, popup scrolling and other windows do not affect this state. Navigation, Home, reload and tab selection also reveal the rows.
+- Chromium keeps a single live tab title and close-window action, while WebKit supports the tab strip and new-tab control. The mockup website and avatar are not application content.
 - The toolbar bookmarks, history, network, and settings buttons open native macOS sheets instead of leaving those actions as placeholders.
 - The macOS bookmarks, history, and network sheets use explicit full-row hit targets, and the network sheet uses a single method dropdown above the request list instead of a dense chip row.
 - iOS and Android mirror the same network-inspector simplification: the page document is recorded in the inspector, and the in-app filter is a compact method dropdown rather than a crowded strip of category chips.

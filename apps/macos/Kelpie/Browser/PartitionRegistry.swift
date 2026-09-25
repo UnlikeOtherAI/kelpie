@@ -275,7 +275,12 @@ final class PartitionRegistry {
     /// loaded synchronously in `init`, so a request landing mid-pass sees at
     /// worst a stale entry that this pass was about to prune.
     func reconcile() async {
-        let engineIdentifiers = Set(await WKWebsiteDataStore.fetchAllDataStoreIdentifiers())
+        // Use the completion-handler API: its async importer name varies across SDKs.
+        let engineIdentifiers: Set<UUID> = await withCheckedContinuation { continuation in
+            WKWebsiteDataStore.fetchAllDataStoreIdentifiers { identifiers in
+                continuation.resume(returning: Set(identifiers))
+            }
+        }
         let liveIds = livePartitionIds()
 
         for id in map.danglingIds(engineIdentifiers: engineIdentifiers, liveIds: liveIds) {

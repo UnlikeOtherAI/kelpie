@@ -90,12 +90,14 @@ extension BrowserView {
     }
 
     func activateTab(_ tab: Tab) {
+        isChromeCollapsed = false
         connectNewTab(tab)
     }
 
     /// Cmd+T handler. Routed per-window by `BrowserCommandRouter` so only the
     /// active window opens a new tab, never every window simultaneously.
     func handleNewTabCommand() {
+        isChromeCollapsed = false
         guard !serverState.isScriptRecording else { return }
         guard rendererState.activeEngine != .chromium else { return }
         let tab = tabStore.addTab()
@@ -117,6 +119,7 @@ extension BrowserView {
     }
 
     func navigate(_ urlString: String) {
+        isChromeCollapsed = false
         guard let url = URL(string: urlString) else { return }
         if url.scheme == "http" && !skipInsecureWarning {
             pendingInsecureURL = url
@@ -158,6 +161,7 @@ extension BrowserView {
                 },
                 onWillLoad: { [weak tabStore] in
                     tabStore?.activeTab?.isStartPage = false
+                    isChromeCollapsed = false
                 }
             )
         )
@@ -191,10 +195,21 @@ extension BrowserView {
         ViewportStageView(
             viewportState: viewportState,
             stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale,
+            contentUnderlap: chromeUnderlap,
             showsStageChrome: !serverState.isScriptRecording && viewportState.showsViewportStageChrome
         ) {
             ZStack {
-                RendererContainerView(serverState: serverState, rendererState: rendererState, tabStore: tabStore)
+                RendererContainerView(
+                    serverState: serverState,
+                    rendererState: rendererState,
+                    tabStore: tabStore,
+                    chromeUnderlap: chromeUnderlap,
+                    onHoverURL: { hoveredLinkURL = $0 },
+                    onChromeScroll: { collapsed in
+                        guard !serverState.isScriptRecording, tabStore.activeTab?.isStartPage != true else { return }
+                        withAnimation(.easeOut(duration: 0.18)) { isChromeCollapsed = collapsed }
+                    }
+                )
 
                 // Start page overlay — shown when the active tab has no URL.
                 // The WKWebView is hidden by RendererContainerView.updateNSView in

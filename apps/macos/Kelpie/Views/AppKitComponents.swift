@@ -17,6 +17,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
         let btn = ToolbarButtonView(systemName: systemName)
         btn.setAccessibilityIdentifier(accessibilityID)
         btn.setAccessibilityLabel(accessibilityLabel)
+        btn.toolTip = accessibilityLabel
         btn.target = context.coordinator
         btn.action = #selector(Coordinator.handlePress)
         return btn
@@ -54,7 +55,7 @@ final class ToolbarButtonView: NSButton {
         wantsLayer = true
         layer?.cornerRadius = 8
         layer?.masksToBounds = true
-        layer?.borderWidth = 0.5
+        layer?.borderWidth = 0
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -62,8 +63,8 @@ final class ToolbarButtonView: NSButton {
         NSLayoutConstraint.activate([
             iconView.centerXAnchor.constraint(equalTo: centerXAnchor),
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 16),
-            iconView.heightAnchor.constraint(equalToConstant: 16)
+            iconView.widthAnchor.constraint(equalToConstant: 19),
+            iconView.heightAnchor.constraint(equalToConstant: 19)
         ])
 
         updateIcon(systemName: systemName)
@@ -71,8 +72,9 @@ final class ToolbarButtonView: NSButton {
     }
 
     func updateIcon(systemName: String) {
-        iconView.image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold))
+        iconView.frameCenterRotation = systemName == "ellipsis.vertical" ? 90 : 0
+        iconView.image = NSImage(systemSymbolName: systemName == "ellipsis.vertical" ? "ellipsis" : systemName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 17, weight: .regular))
         applyAppearance()
     }
 
@@ -92,9 +94,9 @@ final class ToolbarButtonView: NSButton {
             layer?.borderColor = NSColor.selectedControlColor.withAlphaComponent(0.5).cgColor
             iconView.contentTintColor = .white
         } else {
-            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.backgroundColor = NSColor.clear.cgColor
             layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
-            iconView.contentTintColor = NSColor.labelColor
+            iconView.contentTintColor = BrowserChromeStyle.inkColor
         }
     }
 

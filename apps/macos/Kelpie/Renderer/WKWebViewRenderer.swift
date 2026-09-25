@@ -179,13 +179,16 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     func takeSnapshot() async throws -> NSImage {
         let config = WKSnapshotConfiguration()
-        let hostBounds = webView.superview?.bounds ?? .zero
-        let snapshotBounds = hostBounds.width > 0 && hostBounds.height > 0 ? hostBounds : webView.bounds
+        let snapshotBounds = webView.bounds
+        let topInset: CGFloat
+        if #available(macOS 26.0, *) { topInset = webView.obscuredContentInsets.top } else { topInset = 0 }
+        // WebKit snapshots start at the layout viewport origin, already excluding
+        // obscured chrome. Subtract only its height; offsetting y would crop page content.
         config.rect = CGRect(
             origin: .zero,
             size: CGSize(
                 width: snapshotBounds.width.rounded(),
-                height: snapshotBounds.height.rounded()
+                height: max(1, snapshotBounds.height - topInset).rounded()
             )
         )
         return try await withWebKitTimeout("Snapshot capture") { completion in

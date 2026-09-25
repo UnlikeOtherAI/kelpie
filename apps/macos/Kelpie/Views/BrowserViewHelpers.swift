@@ -1,9 +1,12 @@
 import SwiftUI
 
 struct WindowChromeBridge: NSViewRepresentable {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
+    let tabs: AnyView
+    let showsTabs: Bool
+    let onFullscreenChange: (Bool) -> Void
     let minimumWindowSize: NSSize
-    let resolutionLabel: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -17,7 +20,12 @@ struct WindowChromeBridge: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = nsView.window else { return }
             window.minSize = minimumWindowSize
-            window.titleVisibility = .visible
+            window.acceptsMouseMovedEvents = true
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.styleMask.insert(.fullSizeContentView)
+            window.backgroundColor = BrowserChromeStyle.tabsColor
+            context.coordinator.onFullscreenChange = onFullscreenChange
             context.coordinator.attachWindowIfNeeded(window, minimumWindowSize: minimumWindowSize)
 
             if window.frame.width < minimumWindowSize.width || window.frame.height < minimumWindowSize.height {
@@ -36,20 +44,22 @@ struct WindowChromeBridge: NSViewRepresentable {
                 window.title = title
             }
 
-            context.coordinator.attachAccessoryIfNeeded(to: window)
-            context.coordinator.updateResolutionLabel(resolutionLabel)
+            context.coordinator.updateTabs(tabs, visible: showsTabs, colorScheme: colorScheme, in: window)
+            context.coordinator.positionTrafficLights(in: window)
         }
     }
 
     @MainActor
     final class Coordinator {
         private weak var observedWindow: NSWindow?
-        private weak var accessoryWindow: NSWindow?
+        private let tabAccessory = BrowserTabTitlebarController()
         private var resizeObserver: NSObjectProtocol?
         private var moveObserver: NSObjectProtocol?
-        private let accessoryController = ResolutionTitlebarAccessoryController()
+        private var fullscreenObservers: [NSObjectProtocol] = []
+        var onFullscreenChange: (Bool) -> Void = { _ in }
 
         deinit {
+            fullscreenObservers.forEach(NotificationCenter.default.removeObserver)
             if let resizeObserver {
                 NotificationCenter.default.removeObserver(resizeObserver)
             }
@@ -68,13 +78,22 @@ struct WindowChromeBridge: NSViewRepresentable {
                 NotificationCenter.default.removeObserver(moveObserver)
             }
 
+            fullscreenObservers.forEach(NotificationCenter.default.removeObserver)
+            fullscreenObservers = [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification].map { name in
+                NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    self?.onFullscreenChange(window.styleMask.contains(.fullScreen))
+                }
+            }
+            onFullscreenChange(window.styleMask.contains(.fullScreen))
             observedWindow = window
             restoreWindowSizeIfAvailable(window, minimumWindowSize: minimumWindowSize)
             resizeObserver = NotificationCenter.default.addObserver(
                 forName: NSWindow.didResizeNotification,
                 object: window,
                 queue: .main
-            ) { _ in
+            ) { [weak self] _ in
+                self?.tabAccessory.resize(width: window.frame.width - 96)
+                self?.positionTrafficLights(in: window)
                 guard !window.styleMask.contains(.fullScreen) else { return }
                 let contentSize = window.contentRect(forFrameRect: window.frame).size
                 let origin = window.frame.origin
@@ -96,19 +115,21 @@ struct WindowChromeBridge: NSViewRepresentable {
             }
         }
 
-        func attachAccessoryIfNeeded(to window: NSWindow) {
-            guard accessoryWindow !== window else { return }
-
-            if accessoryController.parent == nil {
-                accessoryController.layoutAttribute = .right
-                window.addTitlebarAccessoryViewController(accessoryController)
+        func updateTabs(_ content: AnyView, visible: Bool, colorScheme: ColorScheme, in window: NSWindow) {
+            if tabAccessory.parent == nil {
+                tabAccessory.layoutAttribute = .right
+                window.addTitlebarAccessoryViewController(tabAccessory)
             }
-
-            accessoryWindow = window
+            tabAccessory.update(content, visible: visible, colorScheme: colorScheme, width: window.frame.width - 96)
         }
 
-        func updateResolutionLabel(_ label: String) {
-            accessoryController.setLabel(label)
+        func positionTrafficLights(in window: NSWindow) {
+            guard !window.styleMask.contains(.fullScreen) else { return }
+            for (index, kind) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
+                guard let button = window.standardWindowButton(kind), let parent = button.superview else { continue }
+                button.setFrameOrigin(NSPoint(x: 18 + CGFloat(index) * 23,
+                                              y: parent.bounds.height - 16 - button.frame.height / 2))
+            }
         }
 
         private func restoreWindowSizeIfAvailable(_ window: NSWindow, minimumWindowSize: NSSize) {

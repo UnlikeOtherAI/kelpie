@@ -3,6 +3,7 @@ import SwiftUI
 struct ViewportStageView<Content: View>: View {
     @ObservedObject var viewportState: ViewportState
     let stageScale: Double
+    let contentUnderlap: CGFloat
     let showsStageChrome: Bool
     let content: () -> Content
 
@@ -12,11 +13,13 @@ struct ViewportStageView<Content: View>: View {
     init(
         viewportState: ViewportState,
         stageScale: Double,
+        contentUnderlap: CGFloat = 0,
         showsStageChrome: Bool,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.viewportState = viewportState
         self.stageScale = stageScale
+        self.contentUnderlap = contentUnderlap
         self.showsStageChrome = showsStageChrome
         self.content = content
     }
@@ -46,7 +49,11 @@ struct ViewportStageView<Content: View>: View {
             ZStack {
                 backgroundColor
 
-                if vp.width > 0, vp.height > 0 {
+                if !staged {
+                    // Full-size browsing needs no outer scroll view or clip. Let the
+                    // native renderer paint upward beneath the translucent chrome.
+                    content().padding(.top, -contentUnderlap)
+                } else if vp.width > 0, vp.height > 0 {
                     ScrollView([.horizontal, .vertical], showsIndicators: true) {
                         ZStack {
                             Color.clear.frame(width: canvasSize.width, height: canvasSize.height)
@@ -189,40 +196,4 @@ private final class ViewportCloseButtonView: NSButton {
     override var intrinsicContentSize: NSSize { NSSize(width: 28, height: 28) }
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not implemented") }
-}
-
-final class ResolutionTitlebarAccessoryController: NSTitlebarAccessoryViewController {
-    private let hostingView = NSHostingView(rootView: ResolutionTitlebarBadge(label: ""))
-
-    override func loadView() {
-        view = hostingView
-        view.translatesAutoresizingMaskIntoConstraints = false
-    }
-
-    func setLabel(_ label: String) {
-        hostingView.rootView = ResolutionTitlebarBadge(label: label)
-        hostingView.layoutSubtreeIfNeeded()
-    }
-}
-
-private struct ResolutionTitlebarBadge: View {
-    let label: String
-
-    var body: some View {
-        Text(label)
-            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            )
-            .accessibilityIdentifier("browser.viewport.resolution")
-            .fixedSize()
-    }
 }

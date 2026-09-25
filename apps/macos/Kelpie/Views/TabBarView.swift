@@ -87,17 +87,17 @@ final class TabBarCoordinator: NSObject {
         guard !tabStore.tabs.isEmpty else { return }
         guard container.bounds.width > 0 else { return }
 
-        let addButtonWidth: CGFloat = 28
-        let rightMargin: CGFloat = 6
+        let addButtonWidth: CGFloat = 38
+        let rightMargin: CGFloat = 12
         let leftInset: CGFloat = 4
-        let height: CGFloat = container.bounds.height > 0 ? container.bounds.height - 4 : 34
+        let height: CGFloat = container.bounds.height > 0 ? container.bounds.height - 4 : 28
         let avail = container.bounds.width - addButtonWidth - rightMargin - leftInset
 
         let tabCount = tabStore.tabs.count
         let tabW: CGFloat
         if tabCount > 0 && avail > 0 {
             let ideal = avail / CGFloat(tabCount)
-            tabW = min(max(ideal, 80), 200)
+            tabW = min(max(ideal, 110), 210)
         } else {
             tabW = 160
         }
@@ -115,18 +115,18 @@ final class TabBarCoordinator: NSObject {
         for (idx, tab) in tabStore.tabs.enumerated() {
             guard let pill = pillsByID[tab.id] else { continue }
             let x = leftInset + CGFloat(idx) * tabW
-            let y: CGFloat = 2
+            let y: CGFloat = 4
             pill.frame = CGRect(x: x, y: y, width: tabW - 2, height: height)
             pill.setActive(tab.id == tabStore.activeTabID)
+            pill.refreshContent()
         }
 
         // Position add button
-        let addX = container.bounds.width - addButtonWidth - rightMargin
+        let addX = min(totalTabsW + leftInset + 8, container.bounds.width - addButtonWidth - rightMargin)
         container.addButton.frame = CGRect(x: addX, y: (container.bounds.height - 26) / 2, width: addButtonWidth, height: 26)
 
         // Slide indicator to active tab
         if let activeID = tabStore.activeTabID, let activePill = pillsByID[activeID] {
-            container.moveIndicator(to: activePill.frame, in: container.scrollContent)
 
             // Scroll active pill into view with animation
             if needsScroll {
@@ -143,11 +143,8 @@ final class TabBarCoordinator: NSObject {
 
 final class TabBarContainerView: NSView {
     let scrollView = NSScrollView()
-    let scrollContent = NSView()
+    let scrollContent = TabStripDocumentView()
     let addButton = NSButton()
-
-    // Indicator layer lives on the scrollContent's layer, behind pills.
-    private(set) var indicatorLayer = CAShapeLayer()
 
     var onFrameChange: ((CGRect) -> Void)?
 
@@ -158,6 +155,8 @@ final class TabBarContainerView: NSView {
         wantsLayer = true
 
         // Scroll view — no vertical scroller, clipping
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
@@ -169,19 +168,12 @@ final class TabBarContainerView: NSView {
         scrollContent.wantsLayer = true
         scrollView.documentView = scrollContent
 
-        // Indicator layer — behind pills
-        indicatorLayer.fillColor = NSColor.selectedControlColor.withAlphaComponent(0.18).cgColor
-        indicatorLayer.strokeColor = NSColor.selectedControlColor.withAlphaComponent(0.35).cgColor
-        indicatorLayer.lineWidth = 1
-        indicatorLayer.frame = scrollContent.bounds
-        scrollContent.layer?.addSublayer(indicatorLayer)
-
         // Add button (+)
         addButton.isBordered = false
         addButton.setButtonType(.momentaryPushIn)
         addButton.imagePosition = .imageOnly
         addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Tab")?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .medium))
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 18, weight: .regular))
         addButton.contentTintColor = NSColor.secondaryLabelColor
         addButton.wantsLayer = true
         addButton.layer?.cornerRadius = 5
@@ -193,34 +185,20 @@ final class TabBarContainerView: NSView {
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -(28 + 6))
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -50)
         ])
     }
 
     override func layout() {
         super.layout()
         onFrameChange?(frame)
+
     }
 
-    func moveIndicator(to pillFrame: CGRect, in contentView: NSView) {
-        let inset: CGFloat = 2
-        let rect = pillFrame.insetBy(dx: inset, dy: inset)
-        let newPath = CGPath(roundedRect: rect, cornerWidth: 8, cornerHeight: 8, transform: nil)
+    override var mouseDownCanMoveWindow: Bool { true }
 
-        if indicatorLayer.path == nil {
-            // First placement — no animation
-            indicatorLayer.frame = contentView.bounds
-            indicatorLayer.path = newPath
-        } else {
-            indicatorLayer.frame = contentView.bounds
-            let anim = CABasicAnimation(keyPath: "path")
-            anim.fromValue = indicatorLayer.presentation()?.path ?? indicatorLayer.path
-            anim.toValue = newPath
-            anim.duration = 0.22
-            anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            indicatorLayer.add(anim, forKey: "indicatorSlide")
-            indicatorLayer.path = newPath
-        }
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 
     @available(*, unavailable)
@@ -239,15 +217,18 @@ final class TabPillView: NSView {
     private let titleField = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private var cancellables = Set<AnyCancellable>()
+    private var isActive = false
 
     override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
 
     init(tab: Tab) {
         self.tab = tab
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 9
+        layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         layer?.masksToBounds = true
 
         // Letter avatar
@@ -288,12 +269,12 @@ final class TabPillView: NSView {
 
         NSLayoutConstraint.activate([
             // Letter avatar / favicon — left side, 14pt square
-            letterAvatar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            letterAvatar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             letterAvatar.centerYAnchor.constraint(equalTo: centerYAnchor),
             letterAvatar.widthAnchor.constraint(equalToConstant: 14),
             letterAvatar.heightAnchor.constraint(equalToConstant: 14),
 
-            faviconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            faviconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             faviconView.centerYAnchor.constraint(equalTo: centerYAnchor),
             faviconView.widthAnchor.constraint(equalToConstant: 14),
             faviconView.heightAnchor.constraint(equalToConstant: 14),
@@ -305,25 +286,29 @@ final class TabPillView: NSView {
             closeButton.heightAnchor.constraint(equalToConstant: 16),
 
             // Title — fills the middle
-            titleField.leadingAnchor.constraint(equalTo: letterAvatar.trailingAnchor, constant: 5),
+            titleField.leadingAnchor.constraint(equalTo: letterAvatar.trailingAnchor, constant: 10),
             titleField.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -4),
             titleField.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
         // Subscribe to tab changes via Combine (NOT KVO on @Published)
         tab.$title
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
         tab.$name
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
         tab.$currentURL
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
         tab.$favicon
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshContent() }
             .store(in: &cancellables)
 
@@ -331,14 +316,23 @@ final class TabPillView: NSView {
     }
 
     func setActive(_ active: Bool) {
-        // Visual distinction for active vs inactive pills
-        layer?.backgroundColor = active
-            ? NSColor.selectedControlColor.withAlphaComponent(0.08).cgColor
-            : NSColor.clear.cgColor
-        titleField.textColor = active ? NSColor.labelColor : NSColor.secondaryLabelColor
+        isActive = active
+        updateAppearance()
     }
 
-    private func refreshContent() {
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = isActive ? BrowserChromeStyle.surfaceColor.cgColor : NSColor.clear.cgColor
+        }
+        titleField.textColor = isActive ? NSColor.labelColor : NSColor.secondaryLabelColor
+    }
+
+    func refreshContent() {
         // A caller-supplied name wins over the page title: an orchestrator that
         // labelled a tab "Sam (Engineering Lead)" wants to see that, not the
         // title of whatever page the tab happens to be on.
@@ -454,4 +448,11 @@ final class LetterAvatarView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not implemented") }
+}
+
+/// Match the strip's top-origin geometry inside NSScrollView.
+final class TabStripDocumentView: NSView {
+    override var isFlipped: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
 }
