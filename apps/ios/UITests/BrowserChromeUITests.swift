@@ -1,10 +1,12 @@
 import XCTest
+import UIKit
 
 final class BrowserChromeUITests: XCTestCase {
     @MainActor
     func testNativeChromeJourney() {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = .portrait
+        let tablet = UIDevice.current.userInterfaceIdiom == .pad
+        XCUIDevice.shared.orientation = tablet ? .landscapeLeft : .portrait
         let app = XCUIApplication()
         let html = """
         <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -20,8 +22,6 @@ final class BrowserChromeUITests: XCTestCase {
         let field = app.textFields["browser.url.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
-        let tablet = app.windows.firstMatch.frame.width > 600
-        if tablet { XCUIDevice.shared.orientation = .landscapeLeft }
         capture("expanded", app)
 
         app.webViews.firstMatch.swipeUp()
