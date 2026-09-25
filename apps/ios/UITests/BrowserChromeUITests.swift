@@ -41,8 +41,14 @@ final class BrowserChromeUITests: XCTestCase {
 
         field.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertLessThan(field.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
         capture("keyboard", app)
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.frame.width >= app.frame.width * 0.9 {
+            XCTAssertLessThan(field.frame.maxY, keyboard.frame.minY + 1)
+        } else {
+            // A floating iPad keyboard must not lift the toolbar into the page.
+            XCTAssertGreaterThan(field.frame.maxY, app.frame.maxY - 90)
+        }
         app.buttons["Cancel"].tap()
 
         app.buttons["browser.more"].tap()

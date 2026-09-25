@@ -30,7 +30,7 @@ struct TabletTabStrip: View {
                         Image(systemName: "plus")
                             .font(.system(size: 21))
                             .frame(width: 44, height: 44)
-                            .background(Color(uiColor: appearance.palette.inactiveTab.color), in: RoundedRectangle(cornerRadius: 12))
+                            .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("New tab")
@@ -40,8 +40,8 @@ struct TabletTabStrip: View {
                     Spacer(minLength: 0)
                 }
                 .frame(height: 48)
-                .foregroundStyle(Color(uiColor: appearance.palette.foreground.color))
-                .background(Color(uiColor: appearance.palette.background.color).ignoresSafeArea(edges: .top))
+                .foregroundStyle(Color(uiColor: .label))
+                .background(Color(uiColor: .systemGray5).ignoresSafeArea(edges: .top))
                 .onAppear {
                     proxy.scrollTo(tabStore.activeBrowserTabID, anchor: .center)
                 }
@@ -86,8 +86,8 @@ private struct TabletBrowserTab: View {
             .accessibilityIdentifier("browser.tabs.close.\(tab.id)")
         }
         .frame(width: 210, height: 44)
-        .foregroundStyle(Color(uiColor: palette.foreground.color).opacity(selected ? 1 : 0.72))
-        .background(Color(uiColor: selected ? palette.background.color : palette.inactiveTab.color), in: BrowserTabShape())
+        .foregroundStyle(Color(uiColor: selected ? palette.foreground.color : .secondaryLabel))
+        .background(Color(uiColor: selected ? palette.background.color : .systemGray6), in: BrowserTabShape())
         .overlay { BrowserTabShape().stroke(.white.opacity(selected ? 0.5 : 0.25), lineWidth: 0.75) }
     }
 }

@@ -90,3 +90,8 @@ underlying control touches, and overview presentation waits until the current
 touch dispatch finishes. The UI journey now repeats collapse/expand cycles and
 asserts that the app remains in the foreground; physical-device runs are part
 of verification for this regression.
+
+The iPad palette applies only to the active tab. The remaining strip and inactive
+tabs stay neutral. Browser keyboard avoidance uses UIKit's keyboard layout guide
+with `followsUndockedKeyboard = false`, so floating keyboards do not create a
+bottom gap. The native UI checks distinguish floating from docked keyboards.

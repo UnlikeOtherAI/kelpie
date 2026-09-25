@@ -232,3 +232,8 @@ height and center animate into the compact position while the surrounding
 controls and toolbar material fade away. The unfocused address stays centered
 on the domain; focusing it reveals the complete editable URL. Tapping the
 compact capsule reverses the same geometry animation.
+
+On iPad only the active tab inherits the page color and foreground contrast.
+Inactive tabs, the add button and the strip behind them retain native neutral
+greys. The bottom toolbar follows UIKit's docked keyboard guide; floating and
+undocked keyboards leave it at the bottom of the browser window.
