@@ -422,4 +422,3 @@ account popup and are returned by bookmark API mutations. Refresh favourites rel
 changes from another device. Signed-out favourites remain local and are restored on
 sign-out; they are never silently uploaded. Tokens, identity, avatar and signed-in
 favourites remain in memory and are cleared on sign-out, account change or expiry.
-

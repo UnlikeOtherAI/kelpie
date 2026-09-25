@@ -77,7 +77,7 @@ Each browser app has four internal layers:
 └──────────────────────────────────┘
 ```
 
-**UI Layer** — Minimal chrome on mobile, with the URL bar and settings access always visible. On macOS, the browser window adds desktop toolbar controls and a segmented renderer switcher for Safari/WebKit vs Chrome/Chromium. On Linux, the desktop shell offers a GTK URL bar plus floating access to bookmarks, history, network inspection, and settings, with a headless mode that skips the UI entirely. Settings still expose IP address, port, device name, mDNS status, and connection instructions. For details, see [ui/mobile.md](ui/mobile.md).
+**UI Layer** — Minimal chrome on mobile, with the URL bar and settings access always visible. On macOS, the browser window adds desktop toolbar controls and a segmented renderer switcher for Safari/WebKit vs Chrome/Chromium. On Linux, the GTK shell matches Windows title-bar tabs, navigation, conditional favorites and UOA account controls, with a headless mode that skips the UI entirely. Settings still expose IP address, port, device name, mDNS status, and connection instructions. For details, see [ui/mobile.md](ui/mobile.md).
 
 **Browser Engine** — Platform WebView. All page interaction goes through native APIs:
 - iOS: `WKWebView` native methods — `evaluateJavaScript`, `takeSnapshot`, scroll via `scrollView`
@@ -87,7 +87,7 @@ Each browser app has four internal layers:
 
 **Command Handler** — Translates incoming HTTP requests into native browser calls. Android uses CDP for most operations (no scripts enter the page). iOS uses native `evaluateJavaScript` calls and, for features WebKit doesn't expose natively, ephemeral bridge scripts that are cleared on navigation (see [iOS bridge scripts](#ios--no-injection-dom-access)). macOS routes the same handlers through the active renderer and adds `set-renderer` / `get-renderer` so the UI and API can switch engines at runtime.
 
-**Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android, Network.framework-based server on macOS, native socket server on Linux), MCP server over the same transport, and mDNS service advertisement. On macOS and Linux, advertisement stays tied to the long-lived server process. On iOS and Android, the app reasserts advertisement on foreground entry so discovery recovers after background suspension.
+**Network Layer** — Embedded HTTP server (Swifter/Telegraph on iOS, Ktor on Android, Network.framework-based server on macOS, shared desktop HTTP/MCP server on Windows and Linux Chromium), MCP server over the same transport, and mDNS service advertisement. The Windows and Linux Chromium listeners are authenticated loopback-only and are not advertised through mDNS. On macOS, advertisement stays tied to the long-lived server process. On iOS and Android, the app reasserts advertisement on foreground entry so discovery recovers after background suspension.
 
 ### Shared Native Libraries (`native/`)
 
@@ -100,7 +100,7 @@ Cross-platform C++17 static libraries with C ABI, shared by all platforms via br
 | `core-automation` | Viewport presets and device fitting |
 | `core-mcp` | MCP protocol types |
 | `core-ai` | AI model catalog, device fitness evaluation, HF token, and shared AI metadata/store helpers |
-| `engine-chromium-desktop` | CEF integration (macOS/Linux only) |
+| `engine-chromium-desktop` | CEF integration (macOS/Windows/Linux) |
 
 **`core-ai`** manages the shareable AI catalog and storage primitives: the approved model catalog (Gemma 4 E2B Q4/Q8), device fitness evaluation, HF token storage, and model-store helpers. Platform networking stays native: Apple apps use URLSession for downloads, Ollama, and HF cloud inference; Linux and Windows keep the cpp-httplib path.
 
@@ -354,3 +354,10 @@ clients receive JSON replies, well-formed notifications receive `202` with an em
 `GET /mcp` returns `405` because no SSE stream is offered. Control routes require the local
 readiness bearer token; only health and device discovery are public. The runtime advertises only
 routes that are callable by its configured native shell callbacks.
+
+Windows and Linux Chromium shells share `DesktopApp`, tab leases, request routing,
+MCP and stores. `desktop-account` owns public-client PKCE, callback validation,
+in-memory account state and conflict-safe UOA favorites; its transports are WinHTTP
+and libcurl. Linux uses an owner-only locked profile and atomic readiness. GTK
+pumps CEF on its owner thread, routes native mouse/key/IME events, and paints only
+frames matching the selected tab generation. Popup buffers remain separate.

@@ -70,6 +70,7 @@ class UrlBar {
   HWND account_button_ = nullptr;
   HBITMAP account_avatar_ = nullptr;
   std::string account_avatar_source_;
+  std::wstring account_label_;
   bool account_error_ = false, account_busy_ = false;
   HWND home_button_ = nullptr;
   HWND add_favorite_button_ = nullptr;

@@ -132,4 +132,3 @@ Each component owns its version in its own manifest — do not create a central 
   include matching CEF runtime assets.
 - Verify direct `/mcp`, `kelpie --browser <alias> mcp`, native tabs/navigation/autocomplete, and
   readiness cleanup before publishing.
-

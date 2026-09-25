@@ -149,7 +149,10 @@ void BrowserChrome::Favorites() {
   }
   if(has_overflow) { auto* button=gtk_menu_button_new(); gtk_button_set_label(GTK_BUTTON(button),"…"); Class(button,"chrome-button"); gtk_menu_button_set_popup(GTK_MENU_BUTTON(button),overflow); gtk_widget_show_all(overflow); gtk_box_pack_end(GTK_BOX(favorites_),button,FALSE,FALSE,0); }
   else gtk_widget_destroy(overflow);
-  gtk_widget_show_all(favorites_); gtk_widget_show(favorites_);
+  // no-show-all keeps the empty row hidden during window presentation. Temporarily
+  // release it so newly created favorite buttons are realized with the populated row.
+  gtk_widget_set_no_show_all(favorites_,FALSE); gtk_widget_show_all(favorites_);
+  gtk_widget_set_no_show_all(favorites_,TRUE);
 }
 void BrowserChrome::Palette() {
   auto now=g_get_monotonic_time();

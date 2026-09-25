@@ -52,5 +52,3 @@ try {
   if(child && child.exitCode===null)await close().catch(error=>{child.kill('SIGTERM');console.error(error.message);});
   await fixture.close();
 }
-
-

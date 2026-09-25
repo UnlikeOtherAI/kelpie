@@ -34,7 +34,7 @@ void UrlBar::SetAccount(const std::string& avatar,const std::wstring& label,bool
     }
   }
   if (account_button_) {
-    SetWindowTextW(account_button_,label.c_str());
+    if (label!=account_label_) { account_label_=label; SetWindowTextW(account_button_,label.c_str()); }
     if (changed) InvalidateRect(account_button_,nullptr,FALSE);
   }
 }
