@@ -95,3 +95,10 @@ The iPad palette applies only to the active tab. The remaining strip and inactiv
 tabs stay neutral. Browser keyboard avoidance uses UIKit's keyboard layout guide
 with `followsUndockedKeyboard = false`, so floating keyboards do not create a
 bottom gap. The native UI checks distinguish floating from docked keyboards.
+
+Scroll intent comes from the existing WebKit pan recognizer's translation, never
+from KVO content offsets. On physical iPhone, WebKit adjusted offsets after the
+bar had collapsed; interpreting those as upward scrolling reopened it. Observing
+the native pan directly keeps the compact state through deceleration and inset
+changes. Unit coverage reproduces the offset-only reversal, and the physical
+journey repeats both directions.

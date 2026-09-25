@@ -1,22 +1,18 @@
 import CoreGraphics
 
-/// Offset changes are not necessarily scrolling: layout, navigation and bounce
-/// reset the baseline. Only a user's pan or its deceleration changes chrome.
+/// Only finger movement changes chrome. WebKit can adjust content offsets during
+/// deceleration or inset updates; those are not a new scrolling intention.
 struct BrowserChromeScroll {
-    private var anchor: CGFloat?
-    private var viewportHeight: CGFloat = 0
+    private var anchor: CGFloat = 0
 
-    mutating func update(offset: CGFloat, maximum: CGFloat, height: CGFloat, userScrolling: Bool) -> ScrollDirection? {
-        guard userScrolling, maximum > 24, offset >= 0, offset <= maximum, height == viewportHeight else {
-            anchor = offset
-            viewportHeight = height
+    mutating func update(translation: CGFloat, offset: CGFloat, maximum: CGFloat, userDragging: Bool) -> ScrollDirection? {
+        guard userDragging, maximum > 24, offset >= 0, offset <= maximum else {
+            anchor = translation
             return nil
         }
-        guard let anchor else { self.anchor = offset; return nil }
-        let distance = offset - anchor
-        if offset <= 1 { self.anchor = offset; return .up }
+        let distance = translation - anchor
         guard abs(distance) > 18 else { return nil }
-        self.anchor = offset
+        anchor = translation
         return distance > 0 ? .down : .up
     }
 }

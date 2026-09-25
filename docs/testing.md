@@ -136,7 +136,7 @@ rejected browser launch.
 
 Generate `apps/ios` with Tuist and run the Kelpie scheme on both an iPhone and
 an iPad simulator. `BrowserChromeScrollTests` covers user motion, rubber-band
-bounds, programmatic offsets and layout changes. `BrowserChromeUITests` exercises
+bounds, deceleration/inset offset changes without finger motion, and small pans. `BrowserChromeUITests` exercises
 collapse, tap-to-expand, keyboard clearance, upward overview entry, horizontal
 card dismissal and selection. On iPad it additionally creates overflowing tabs
 and closes the active tab. Screenshot attachments are retained in the xcresult.

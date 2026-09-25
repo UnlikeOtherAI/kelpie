@@ -37,7 +37,6 @@ struct TabWebViewContainer: UIViewRepresentable {
         guard let webView = tabStore.activeBrowserTab?.webView else { return }
         context.coordinator.install(webView: webView, in: container)
         if webView.scrollView.contentInset.bottom != bottomClearance {
-            context.coordinator.resetChromeScroll()
             webView.scrollView.contentInset.bottom = bottomClearance
             webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomClearance
             webView.setMinimumViewportInset(
@@ -62,7 +61,6 @@ struct TabWebViewContainer: UIViewRepresentable {
         private var loadingObservation: NSKeyValueObservation?
         private var backObservation: NSKeyValueObservation?
         private var forwardObservation: NSKeyValueObservation?
-        private var contentOffsetObservation: NSKeyValueObservation?
         private var documentNavigationStart: Date?
         private var capturedDocumentResponseURL: String?
         private var chromeScroll = BrowserChromeScroll()
@@ -113,8 +111,6 @@ struct TabWebViewContainer: UIViewRepresentable {
             }
         }
 
-        func resetChromeScroll() { chromeScroll = BrowserChromeScroll() }
-
         private func clearObservations() {
             progressObservation = nil
             titleObservation = nil
@@ -122,7 +118,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             loadingObservation = nil
             backObservation = nil
             forwardObservation = nil
-            contentOffsetObservation = nil
+            currentWebView?.scrollView.panGestureRecognizer.removeTarget(self, action: #selector(trackUserScroll(_:)))
         }
 
         private func observe(_ webView: WKWebView) {
@@ -162,20 +158,21 @@ struct TabWebViewContainer: UIViewRepresentable {
                     self.browserState.canGoForward = wv.canGoForward
                 }
             }
-            contentOffsetObservation = webView.scrollView.observe(\.contentOffset) { [weak self] scrollView, _ in
-                guard let self else { return }
-                guard scrollView === self.currentWebView?.scrollView else { return }
-                let inset = scrollView.adjustedContentInset
-                let offset = scrollView.contentOffset.y + inset.top
-                let maximum = max(0, scrollView.contentSize.height - scrollView.bounds.height + inset.top + inset.bottom)
-                let direction = self.chromeScroll.update(
-                    offset: offset,
-                    maximum: maximum,
-                    height: scrollView.bounds.height,
-                    userScrolling: scrollView.isDragging || scrollView.isDecelerating
-                )
-                if let direction { self.onScrollDirectionChange(direction) }
-            }
+            webView.scrollView.panGestureRecognizer.addTarget(self, action: #selector(trackUserScroll(_:)))
+        }
+
+        @objc private func trackUserScroll(_ pan: UIPanGestureRecognizer) {
+            guard let scrollView = currentWebView?.scrollView, pan === scrollView.panGestureRecognizer else { return }
+            if pan.state == .began { chromeScroll = BrowserChromeScroll() }
+            guard pan.state == .began || pan.state == .changed else { return }
+            let inset = scrollView.adjustedContentInset
+            let direction = chromeScroll.update(
+                translation: -pan.translation(in: scrollView).y,
+                offset: scrollView.contentOffset.y + inset.top,
+                maximum: max(0, scrollView.contentSize.height - scrollView.bounds.height + inset.top + inset.bottom),
+                userDragging: true
+            )
+            if let direction { onScrollDirectionChange(direction) }
         }
 
         private func syncBrowserState(from webView: WKWebView) {

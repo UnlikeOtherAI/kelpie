@@ -2,29 +2,33 @@ import XCTest
 @testable import Kelpie
 
 final class BrowserChromeScrollTests: XCTestCase {
-    func testOnlyUserScrollingChangesChrome() {
+    func testFingerDirectionChangesChrome() {
         var state = BrowserChromeScroll()
-        XCTAssertNil(state.update(offset: 0, maximum: 1000, height: 600, userScrolling: false))
-        XCTAssertNil(state.update(offset: 300, maximum: 1000, height: 600, userScrolling: false))
-        XCTAssertEqual(state.update(offset: 325, maximum: 1000, height: 600, userScrolling: true), .down)
-        XCTAssertEqual(state.update(offset: 300, maximum: 1000, height: 600, userScrolling: true), .up)
+        XCTAssertEqual(state.update(translation: 25, offset: 100, maximum: 1000, userDragging: true), .down)
+        XCTAssertEqual(state.update(translation: 0, offset: 75, maximum: 1000, userDragging: true), .up)
     }
 
-    func testRubberBandAndResizeResetBaseline() {
+    func testInsetOrDecelerationOffsetsCannotReverseChrome() {
         var state = BrowserChromeScroll()
-        XCTAssertNil(state.update(offset: 980, maximum: 1000, height: 600, userScrolling: false))
-        XCTAssertNil(state.update(offset: 1020, maximum: 1000, height: 600, userScrolling: true))
-        XCTAssertNil(state.update(offset: 990, maximum: 900, height: 700, userScrolling: true))
-        XCTAssertNil(state.update(offset: 800, maximum: 900, height: 600, userScrolling: true))
-        XCTAssertEqual(state.update(offset: 770, maximum: 900, height: 600, userScrolling: true), .up)
+        XCTAssertEqual(state.update(translation: 25, offset: 100, maximum: 1000, userDragging: true), .down)
+        XCTAssertNil(state.update(translation: 25, offset: 72, maximum: 1000, userDragging: true))
+        XCTAssertNil(state.update(translation: 25, offset: 500, maximum: 1000, userDragging: false))
+        XCTAssertNil(state.update(translation: 25, offset: 472, maximum: 1000, userDragging: false))
+    }
+
+    func testRubberBandMotionDoesNotChangeChrome() {
+        var state = BrowserChromeScroll()
+        XCTAssertNil(state.update(translation: -40, offset: -40, maximum: 1000, userDragging: true))
+        XCTAssertNil(state.update(translation: -30, offset: 0, maximum: 1000, userDragging: true))
+        XCTAssertEqual(state.update(translation: 0, offset: 30, maximum: 1000, userDragging: true), .down)
+        XCTAssertNil(state.update(translation: 80, offset: 1020, maximum: 1000, userDragging: true))
     }
 
     func testSmallMotionAndUnscrollablePagesDoNotCollapse() {
         var state = BrowserChromeScroll()
-        XCTAssertNil(state.update(offset: 0, maximum: 0, height: 600, userScrolling: false))
-        XCTAssertNil(state.update(offset: 30, maximum: 0, height: 600, userScrolling: true))
-        XCTAssertNil(state.update(offset: 100, maximum: 1000, height: 600, userScrolling: false))
-        XCTAssertNil(state.update(offset: 110, maximum: 1000, height: 600, userScrolling: true))
-        XCTAssertEqual(state.update(offset: 120, maximum: 1000, height: 600, userScrolling: true), .down)
+        XCTAssertNil(state.update(translation: 30, offset: 0, maximum: 0, userDragging: true))
+        state = BrowserChromeScroll()
+        XCTAssertNil(state.update(translation: 10, offset: 100, maximum: 1000, userDragging: true))
+        XCTAssertEqual(state.update(translation: 20, offset: 110, maximum: 1000, userDragging: true), .down)
     }
 }
