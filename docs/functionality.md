@@ -467,8 +467,10 @@ during collapse. Script recording hides all browser chrome.
 Android and iOS expose Login/register directly from the bottom toolbar's account
 button. Authentication is hosted by UOA and uses public OAuth with random state
 and S256 PKCE. Android opens the default browser; when unavailable it uses a
-separate login Activity/process and WebView profile with no automation bridge or
-DevTools access. iOS uses ASWebAuthenticationSession. Cancellation, expiry and
+separate login Activity/process and WebView profile with no automation bridge and
+WebView inspection disabled. Android userdebug/eng system images can override
+that inspection setting; verify isolation on a production system image.
+iOS uses ASWebAuthenticationSession. Cancellation, expiry and
 process loss return to a signed-out state; no tokens or profiles are persisted.
 Apple and Android register a fresh public client for each login so revoked cached
 registrations cannot strand the app. Signing keys and branded configuration stay

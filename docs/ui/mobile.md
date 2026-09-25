@@ -23,6 +23,11 @@ height is 62 points/dp, collapsing to a 34-point/dp domain lane after deliberate
 finger scrolling. Programmatic scrolling does not change chrome geometry. The
 bar stays above system navigation and the keyboard, and expands on tab changes.
 Android retains history autocomplete and reload/stop in the address field.
+Tablet address fields are centered and capped at 620 points/dp. Account, Share,
+Bookmarks and More remain directly accessible beside them; phones put Share and
+Bookmarks in More to preserve typing space. A signed-out account button starts
+Login/register immediately in the system browser, with an isolated hosted-page
+fallback on Android when no browser is available.
 
 Tablet tabs remain visible with one tab and in narrow windows. The plus button
 sits at the far left. Each tab can close; closing the last creates a replacement.
