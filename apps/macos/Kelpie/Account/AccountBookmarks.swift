@@ -69,7 +69,17 @@ final class AccountBookmarks {
             guard let mutation else { return existing }
             guard let version = response.version else { throw UOATransport.Failure(status: 428) }
             let updated = mutation.apply(to: existing)
-            let body = try JSONEncoder().encode(Envelope(value: updated))
+            // Other UOA clients may attach favicon/folder metadata. Preserve their
+            // opaque fields when changing a different item in the shared list.
+            let object = try JSONSerialization.jsonObject(with: response.data) as? [String: Any]
+            let original = object?["value"] as? [Any] ?? []
+            let values: [Any] = try updated.map { bookmark in
+                if let index = existing.firstIndex(where: { $0.id == bookmark.id }), index < original.count {
+                    return original[index]
+                }
+                return try JSONSerialization.jsonObject(with: JSONEncoder().encode(bookmark))
+            }
+            let body = try JSONSerialization.data(withJSONObject: ["value": values])
             do {
                 let saved = try await request(path, "PUT", body, version)
                 guard active else { throw CancellationError() }

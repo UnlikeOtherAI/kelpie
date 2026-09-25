@@ -26,10 +26,18 @@ final class UOAAccountTests: XCTestCase {
                 puts += 1
                 if puts == 1 { current = [other]; throw UOATransport.Failure(status: 409) }
                 struct Envelope: Decodable { let value: [BookmarkStore.Bookmark] }
+                let saved = try JSONSerialization.jsonObject(with: XCTUnwrap(body)) as? [String: Any]
+                let values = saved?["value"] as? [[String: Any]]
+                XCTAssertEqual(values?.first?["favicon"] as? String, "https://other.example/favicon.png")
                 current = try JSONDecoder().decode(Envelope.self, from: XCTUnwrap(body)).value
             }
             struct Envelope: Encodable { let value: [BookmarkStore.Bookmark] }
-            return UOATransport.Response(data: try JSONEncoder().encode(Envelope(value: current)), version: "version")
+            let encoded = try JSONEncoder().encode(Envelope(value: current))
+            var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+            var values = object["value"] as? [[String: Any]] ?? []
+            if !values.isEmpty { values[0]["favicon"] = "https://other.example/favicon.png" }
+            object["value"] = values
+            return UOATransport.Response(data: try JSONSerialization.data(withJSONObject: object), version: "version")
         }
         sync.enqueue(.add(added))
         await sync.flush()
