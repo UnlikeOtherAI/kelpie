@@ -149,8 +149,8 @@ export function registerBrowser(program: Command): void {
     .action(async (name: string, opts: { platform: "macos" | "linux" | "windows"; appPath?: string; profileDir?: string }) => {
       const globals = program.opts<GlobalOptions>();
       const profileDir = opts.profileDir && path.isAbsolute(opts.profileDir) ? opts.profileDir : undefined;
-      if (opts.platform === "windows" && !profileDir) {
-        print({ success: false, error: { code: "PROFILE_DIR_REQUIRED", message: "Windows browser aliases require an absolute --profile-dir" } }, globals.format);
+      if ((opts.platform === "windows" || opts.platform === "linux") && !profileDir) {
+        print({ success: false, error: { code: "PROFILE_DIR_REQUIRED", message: "Windows and Linux browser aliases require an absolute --profile-dir" } }, globals.format);
         process.exitCode = 4;
         return;
       }
@@ -228,12 +228,12 @@ export function registerBrowser(program: Command): void {
         print({ success: false, error: { code, message: error instanceof Error ? error.message : "No usable port" } }, globals.format);
         process.exitCode = requestedPort ? 4 : 6; return;
       }
-      if (alias.platform === "windows") {
+      if (alias.platform === "windows" || alias.platform === "linux") {
         const appPath = alias.appPath;
         const profileDir = alias.profileDir;
         const readinessFile = readinessPath(alias);
         if (!appPath || !profileDir || !readinessFile) {
-          print({ success: false, error: { code: "BROWSER_CONFIGURATION_INVALID", message: "Windows aliases require appPath and profileDir" } }, globals.format);
+          print({ success: false, error: { code: "BROWSER_CONFIGURATION_INVALID", message: "Windows and Linux aliases require appPath and profileDir" } }, globals.format);
           process.exitCode = 5;
           return;
         }
@@ -313,7 +313,7 @@ export function registerBrowser(program: Command): void {
       try {
         const device: DiscoveredDevice = {
           id: readiness.deviceId, name, ip: "127.0.0.1", port: readiness.port,
-          platform: "windows", model: "Kelpie Desktop", width: 0, height: 0,
+          platform: store.aliases[name]?.platform ?? "windows", model: "Kelpie Desktop", width: 0, height: 0,
           version: "", lastSeen: Date.now(), localReadinessFile: running.readinessFile,
           localLaunchId: running.launchId,
         };

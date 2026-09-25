@@ -6,7 +6,7 @@ import { sendCommand } from "../client/http-client.js";
 import type { DiscoveredDevice } from "../types.js";
 
 export function rejectsWindowsLocalHttpProxy(http: boolean | undefined, platform: string | undefined): boolean {
-  return http === true && platform === "windows";
+  return http === true && (platform === "windows" || platform === "linux");
 }
 
 /** Read the running browser's own callable catalogue before exposing alias MCP tools. */
@@ -51,12 +51,12 @@ export function registerMcp(program: Command): void {
           return;
         }
         if (rejectsWindowsLocalHttpProxy(opts.http, local?.platform)) {
-          process.stderr.write("Windows local aliases support MCP over CLI stdio only; use the browser's authenticated /mcp endpoint for HTTP.\n");
+          process.stderr.write("Windows and Linux local aliases support MCP over CLI stdio only; use the browser's authenticated /mcp endpoint for HTTP.\n");
           process.exitCode = 4;
           return;
         }
         let callableTools: Set<BrowserMcpTool> | undefined;
-        if (local?.platform === "windows") {
+        if (local?.platform === "windows" || local?.platform === "linux") {
           try {
             callableTools = await localCallableTools(local);
           } catch (error) {

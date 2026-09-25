@@ -121,8 +121,8 @@ describe("partition tools", () => {
   it("exposes get-partitions and delete-partition on the platforms that isolate storage", () => {
     expect(byName("kelpie_get_partitions")?.method).toBe("getPartitions");
     expect(byName("kelpie_delete_partition")?.method).toBe("deletePartition");
-    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos", "windows"]);
-    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos", "windows"]);
+    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos", "windows", "linux"]);
+    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos", "windows", "linux"]);
   });
 
   it("validates the delete-partition id with the shared partition rules", () => {

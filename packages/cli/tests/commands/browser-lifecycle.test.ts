@@ -18,17 +18,18 @@ const readiness = { version: 1, launchId: "launch-a", deviceId: "device-a", port
   token: "a".repeat(32), controlMode: "loopback" as const,
   mcp: { http: true, stdio: false, endpoint: "/mcp" as const } };
 
-describe("Windows browser alias lifecycle", () => {
+describe.each(["windows", "linux"] as const)("%s browser alias lifecycle", (platform) => {
   let currentReadiness: typeof readiness | undefined;
   const running = { win: { port: 8420, lastLaunchedAt: "2026-09-15T00:00:00.000Z", pid: 1234,
     launchId: "launch-a", readinessFile: "C:/profile/readiness.json", deviceId: "device-a" } };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     currentReadiness = readiness;
-    vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "windows", appPath: process.execPath, profileDir: "C:/profile" });
+    vi.mocked(getBrowserAlias).mockResolvedValue({ platform, appPath: process.execPath, profileDir: "C:/profile" });
     vi.mocked(readinessPath).mockReturnValue("C:/profile/readiness.json");
     vi.mocked(readLocalReadiness).mockImplementation(async () => currentReadiness);
-    vi.mocked(loadBrowserStore).mockImplementation(async () => ({ aliases: {}, running }));
+    vi.mocked(loadBrowserStore).mockImplementation(async () => ({ aliases: { win: { platform } }, running }));
     vi.mocked(probeHealth).mockResolvedValue(true);
     vi.mocked(sendCommand).mockImplementation(async () => {
       currentReadiness = undefined;

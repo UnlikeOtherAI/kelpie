@@ -156,8 +156,8 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_safari_auth: ["linux", "windows"],
   kelpie_set_fullscreen: ["ios", "android"],
   kelpie_get_fullscreen: ["ios", "android"],
-  kelpie_close_browser: ["ios", "android", "macos", "linux"],
-  kelpie_press_key: ["ios", "android", "macos", "linux"],
+  kelpie_close_browser: ["ios", "android", "macos"],
+  kelpie_press_key: ["ios", "android", "macos"],
   kelpie_set_renderer: ["ios", "android", "linux", "windows"],
   kelpie_get_renderer: ["ios", "android", "linux", "windows"],
   kelpie_set_geolocation: ["ios", "android", "macos", "linux", "windows"],
@@ -180,8 +180,8 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_is_element_obscured: ["macos", "linux", "windows"],
   // Storage partitions: macOS on WebKit and Windows on Chromium (CEF). The
   // remaining platforms drop their entry here as they land the same contract.
-  kelpie_get_partitions: ["ios", "android", "linux"],
-  kelpie_delete_partition: ["ios", "android", "linux"],
+  kelpie_get_partitions: ["ios", "android"],
+  kelpie_delete_partition: ["ios", "android"],
 } satisfies Partial<Record<BrowserMcpTool, readonly Platform[]>>;
 
 /** CLI-level MCP tools (discovery + group commands) */

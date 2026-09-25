@@ -53,7 +53,10 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.get_native_fullscreen=[this](bool* value) { *value=IsFullscreen(); return BrowserControlResult::Success(); };
   runtime.viewport_supplier=[this] { return json{{"width",impl_->view_width.load()},{"height",impl_->view_height.load()},{"devicePixelRatio",1.0},{"platform","linux"}}; };
   runtime.resize_viewport=[this](int w,int h) {
-    if(impl_->config.headless) return impl_->desktop.engine().ResizeViewport(w,h);
+    if(impl_->config.headless) {
+      if(!impl_->desktop.engine().ResizeViewport(w,h))return false;
+      impl_->view_width=w; impl_->view_height=h; return true;
+    }
     impl_->requested_width=w; impl_->requested_height=h;
     auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
     while(!impl_->closing && std::chrono::steady_clock::now()<deadline) {
@@ -62,7 +65,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
     }
     return false;
   };
-  runtime.reset_viewport=[this] { impl_->requested_width=impl_->config.width; impl_->requested_height=impl_->config.height; return true; };
+  runtime.reset_viewport=[resize=runtime.resize_viewport,width,height] { return resize(width,height); };
   auto& engine=runtime.engine;
   engine.mode=DesktopEngine::Mode::kOffscreen; engine.argc=impl_->argc; engine.argv=impl_->argv;
   engine.viewport={std::max(1,width),std::max(1,height)};

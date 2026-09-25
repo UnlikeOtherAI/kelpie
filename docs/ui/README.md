@@ -93,3 +93,28 @@ callback port are cached. Signing in is deliberately outside browser-control API
 On Mac and Windows, only the selected tab carries the sampled page color.
 Inactive tabs and the full title strip stay opaque light gray in every theme;
 inactive labels and caption controls retain dark ink for contrast.
+
+## Linux Shell Notes
+
+The Chromium GTK shell follows the Windows geometry: a 52-pixel static gray title
+strip with left-hand plus, curved active tab and right-hand window controls;
+a 72-pixel navigation row and 44-pixel address pill; and a 44-pixel favorites row
+that disappears when empty. Native GTK controls retain keyboard and IME input.
+Tabs support favicons, names, close controls, overflow, isolated storage markers,
+Ctrl+T/W/Tab/Shift+Tab and Ctrl+Shift+N. Settings includes Isolate every new tab.
+
+Only the selected tab and rows below it adopt the active page's top-edge color.
+The inactive tabs and title strip remain gray. Color changes ease over 220 ms,
+and a one-pixel contrasting divider uses 10% opacity. Sampling reads the active
+CEF paint buffer; background and stale-generation paints cannot replace it.
+Native select popups compose separately from the page buffer.
+
+The account menu provides hosted UOA PKCE sign-in in an external browser,
+identity/avatar, favorites refresh and sign-out. Local favorites remain separate.
+The shared desktop runtime provides authenticated HTTP/MCP, tab leases, storage
+partitions, trusted input, DOM/evaluation, screenshots, dialogs and inspection.
+Full persistent tab sessions restore on restart; transient partitions do not.
+Shutdown drains account and browser work before removing readiness and GTK views.
+
+For VNC verification on a host running both Wayland and X11, launch with
+`GDK_BACKEND=x11 DISPLAY=:2` to select the VNC desktop explicitly.

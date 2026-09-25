@@ -9,6 +9,7 @@
 #include "toast_view.h"
 #include "ui_theme.h"
 #include "url_bar.h"
+#include "window_geometry.h"
 #if KELPIE_LINUX_HAS_GTK
 #include <gdk/gdkkeysyms.h>
 #include <gtk/gtk.h>
@@ -20,6 +21,7 @@ int GUIShell::Run() {
   gtk_disable_setlocale(); gtk_init(nullptr,nullptr); ui::InstallTheme();
   auto* window=GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
   gtk_window_set_title(window,"Kelpie"); gtk_window_set_default_size(window,app_.config().width,app_.config().height);
+  WindowGeometry geometry(window,app_.config().profile_dir);
   auto* header=gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
   gtk_window_set_titlebar(window,header); // Client-side decoration keeps native resize handles.
   gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(window)),"kelpie-window");
@@ -79,7 +81,7 @@ int GUIShell::Run() {
     return G_SOURCE_CONTINUE;
   },&context);
   gtk_widget_show_all(GTK_WIDGET(window)); chrome.Sync(); gtk_main();
-  g_source_remove(timer); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
+  g_source_remove(timer); geometry.Save(); gtk_widget_destroy(GTK_WIDGET(window)); return 0;
 #else
   return 1;
 #endif

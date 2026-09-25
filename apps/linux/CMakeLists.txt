@@ -102,6 +102,7 @@ add_executable(kelpie-linux
   src/gtk_browser_input.cpp
   src/browser_chrome.cpp
   src/chrome_icons.cpp
+  src/window_geometry.cpp
   src/url_bar.cpp
   src/ui_theme.cpp
   src/settings_view.cpp

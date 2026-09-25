@@ -4,7 +4,7 @@ Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evalu
 
 For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
-On Windows, `get-viewport`, `resize-viewport`, `reset-viewport`, console, and
+On Windows and Linux, `get-viewport`, `resize-viewport`, `reset-viewport`, console, and
 network-log methods describe browser-wide shell state and reject `tabId` or
 `generation`. Tab-scoped methods return the resolved tab lease. Windows
 `screenshot` emits PNG viewport images only; JPEG, full-page, and annotated
@@ -220,7 +220,7 @@ Queued dialogs are tied to the current page. If a new navigation starts before t
 
 JavaScript dialog handling (`get-dialog`, `handle-dialog`, `set-dialog-auto-handler`) is fully supported on iOS, Android, and macOS. On macOS the active WebKit renderer's `WKUIDelegate` enqueues alert/confirm/prompt dialogs into a shared store that the handler reads, so queued and auto-handled dialogs behave the same as on mobile.
 
-On Windows, a trusted input call (`click`, `press-key`, `type`, …) whose page handler opens a dialog returns as soon as the dialog is showing, with `{"trusted": true, "dialogOpened": true}` in its `input` result, so the caller can read and answer it with `get-dialog` and `handle-dialog` instead of the input call blocking until it times out.
+On Windows and Linux, a trusted input call (`click`, `press-key`, `type`, …) whose page handler opens a dialog returns as soon as the dialog is showing, with `{"trusted": true, "dialogOpened": true}` in its `input` result, so the caller can read and answer it with `get-dialog` and `handle-dialog` instead of the input call blocking until it times out.
 
 ---
 
@@ -908,3 +908,4 @@ replaced `console.log`), the call resolves with `JavaScript evaluation timed
 out` instead of hanging the request.
 
 ---
+
