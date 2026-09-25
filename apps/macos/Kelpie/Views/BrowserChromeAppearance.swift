@@ -8,6 +8,7 @@ struct ChromeRGB: Equatable {
 
     static let white = Self(red: 1, green: 1, blue: 1)
     static let ink = Self(red: 0.15, green: 0.20, blue: 0.30)
+    static let tabGray = Self(red: 229 / 255, green: 234 / 255, blue: 243 / 255)
     var color: NSColor { NSColor(srgbRed: red, green: green, blue: blue, alpha: 1) }
     var luminance: Double {
         func linear(_ value: Double) -> Double { value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4) }
@@ -41,8 +42,8 @@ struct BrowserChromePalette: Equatable {
         let dark = sample.luminance < 0.35
         foreground = dark ? .white : .ink
         selectedTab = sample
-        selectedTabOpacity = collapsed ? 1 : 0
-        inactiveTab = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.13 : 0.06)
+        selectedTabOpacity = 1
+        inactiveTab = .tabGray
         field = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.10 : 0.05)
     }
 

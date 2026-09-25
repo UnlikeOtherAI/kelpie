@@ -23,7 +23,8 @@ extension BrowserView {
                 }
                 .padding(.leading, 14)
                 .frame(width: 210, height: 28)
-                .background(BrowserChromeStyle.surface, in: UnevenRoundedRectangle(topLeadingRadius: 9, topTrailingRadius: 9))
+                .foregroundStyle(Color(nsColor: chromeAppearance.palette.foreground.color))
+                .background(Color(nsColor: chromeAppearance.palette.selectedTab.color), in: UnevenRoundedRectangle(topLeadingRadius: 9, topTrailingRadius: 9))
                 .padding(.top, 4)
                 Spacer(minLength: 0)
             } else {
@@ -45,6 +46,7 @@ extension BrowserView {
             }
         }
         .frame(height: 32)
+        .background(BrowserChromeStyle.tabs)
 
         .zIndex(2)
     }

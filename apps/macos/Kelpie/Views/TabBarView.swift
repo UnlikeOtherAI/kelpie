@@ -126,7 +126,7 @@ final class TabBarCoordinator: NSObject {
             pill.refreshContent()
         }
 
-        container.addButton.contentTintColor = palette.foreground.color
+        container.addButton.contentTintColor = ChromeRGB.ink.color
 
         // Position add button
         let addX = min(totalTabsW + leftInset + 8, container.bounds.width - addButtonWidth - rightMargin)
@@ -346,10 +346,11 @@ final class TabPillView: NSView {
         layer?.backgroundColor = isActive
             ? palette.selectedTab.color.withAlphaComponent(palette.selectedTabOpacity).cgColor
             : palette.inactiveTab.color.cgColor
-        faviconView.layer?.backgroundColor = NSColor.white.withAlphaComponent(palette.foreground.luminance * 0.9).cgColor
+        let foreground = isActive ? palette.foreground : ChromeRGB.ink
+        faviconView.layer?.backgroundColor = NSColor.white.withAlphaComponent(foreground.luminance * 0.9).cgColor
         CATransaction.commit()
-        titleField.textColor = palette.foreground.color.withAlphaComponent(isActive ? 1 : 0.75)
-        closeButton.contentTintColor = palette.foreground.color.withAlphaComponent(0.7)
+        titleField.textColor = foreground.color.withAlphaComponent(isActive ? 1 : 0.75)
+        closeButton.contentTintColor = foreground.color.withAlphaComponent(0.7)
     }
 
     func refreshContent() {

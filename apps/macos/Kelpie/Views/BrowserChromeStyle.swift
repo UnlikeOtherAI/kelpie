@@ -4,7 +4,7 @@ import SwiftUI
 /// One adaptive palette for the browser chrome; web content keeps its own appearance.
 enum BrowserChromeStyle {
     static let surfaceColor = color(light: 0xffffff, dark: 0x24262c)
-    static let tabsColor = color(light: 0xe5eaf3, dark: 0x1b1d23)
+    static let tabsColor = ChromeRGB.tabGray.color
     static let inkColor = color(light: 0x26334d, dark: 0xe3e8f2)
     static let surface = Color(nsColor: surfaceColor)
     static let tabs = Color(nsColor: tabsColor)
