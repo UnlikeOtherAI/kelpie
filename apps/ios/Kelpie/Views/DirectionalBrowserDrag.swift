@@ -42,11 +42,9 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard let window, !isHidden else { return false }
             guard convert(bounds, to: window).contains(touch.location(in: window)) else { return false }
-            var responder: UIResponder? = self
-            while let current = responder, !(current is UIViewController) { responder = current.next }
-            guard let controller = responder as? UIViewController,
-                  controller.presentedViewController == nil,
-                  touch.view?.isDescendant(of: controller.view) == true else { return false }
+            var surface: UIView = self
+            while let parent = surface.superview, parent !== window { surface = parent }
+            guard touch.view?.isDescendant(of: surface) == true else { return false }
             var ancestor: UIView? = self
             while let view = ancestor {
                 if view.isHidden || view.alpha < 0.01 { return false }

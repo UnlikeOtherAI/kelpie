@@ -145,7 +145,7 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if !serverState.isScriptRecording {
+            if !serverState.isScriptRecording && !showTabOverview {
                 bottomChrome
             }
         }
