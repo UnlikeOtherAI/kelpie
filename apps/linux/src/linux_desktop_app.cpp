@@ -2,6 +2,7 @@
 #include "gui_shell.h"
 #include "headless_shell.h"
 #include "kelpie/response_helpers.h"
+#include "kelpie/private_login_window.h"
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -86,6 +87,7 @@ void LinuxApp::RequestShutdown() { impl_->closing=true; }
 bool LinuxApp::FinishShutdown() {
   if(!impl_->closing) return false;
   impl_->account.Shutdown(); impl_->desktop.BeginShutdown();
+  if(!ClosePrivateLoginWindow()) return false;
   if(!impl_->account.Drain() || !impl_->desktop.IsShutdownReady()) return false;
   if(impl_->started) impl_->Save();
   if(!impl_->desktop.Stop()) return false;
@@ -94,6 +96,7 @@ bool LinuxApp::FinishShutdown() {
 bool LinuxApp::IsRunning() const { return impl_->running && !impl_->closing; }
 void LinuxApp::PumpBrowser() {
   impl_->desktop.Tick(); impl_->account.Poll();
+  if(!impl_->account.State().signing_in) ClosePrivateLoginWindow();
   if(impl_->started && !impl_->closing && std::chrono::steady_clock::now()-impl_->last_save>std::chrono::seconds(1)) {
     impl_->Save(); impl_->last_save=std::chrono::steady_clock::now();
   }

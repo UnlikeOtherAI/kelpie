@@ -13,6 +13,7 @@ struct AccountLogin::Impl {
   std::mutex mutex;
   std::condition_variable changed;
   std::atomic<bool> cancelled{false};
+  std::atomic<bool> listener_done{false};
   bool completed=false;
   std::string code;
 };
@@ -69,7 +70,11 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
     res.set_content("<!doctype html><title>Kelpie</title><h1>Return to Kelpie</h1><p>You can close this window.</p>","text/html");
     p.changed.notify_all();
   });
-  p.listener=std::thread([&p] { p.server.listen_after_bind(); });
+  p.listener=std::thread([&p] { p.server.listen_after_bind(); p.listener_done=true; });
+  // stop() before listen_after_bind() becomes ready does nothing. Always finish
+  // startup before honoring cancellation so destruction cannot join forever.
+  while (!p.server.is_running() && !p.listener_done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  if (p.cancelled || p.listener_done) { p.server.stop(); throw AccountFailure(0); }
   if (client.empty()) {
     const auto result=request("/oauth/register","POST",{},json{{"client_name","Kelpie Desktop"},
         {"redirect_uris",{redirect}},{"token_endpoint_auth_method","none"},{"scope",kAccountScopes}}.dump(),{});

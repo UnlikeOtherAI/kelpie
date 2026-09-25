@@ -39,6 +39,8 @@ class AccountService {
   nlohmann::json bookmarks_=nlohmann::json::array();
   std::chrono::steady_clock::time_point expiry_{};
   std::shared_ptr<AccountLogin> login_;
+  std::function<bool(const std::string&)> open_browser_;
+  std::string pending_browser_url_;
   std::future<void> task_;
 };
 }  // namespace kelpie::account

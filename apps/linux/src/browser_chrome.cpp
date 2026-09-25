@@ -200,7 +200,9 @@ void BrowserChrome::Palette() {
 }
 void BrowserChrome::Sync() { Tabs(); Favorites(); Palette(); }
 void BrowserChrome::AccountMenu(GtkWidget* anchor) {
-  auto state=app_.AccountState(); auto* menu=gtk_menu_new();
+  auto state=app_.AccountState();
+  if(!state.signed_in && !state.signing_in) { app_.AccountSignIn(); return; }
+  auto* menu=gtk_menu_new();
   auto item=[&](const std::string& title,int action) {
     auto* value=gtk_menu_item_new_with_label(title.c_str()); gtk_menu_shell_append(GTK_MENU_SHELL(menu),value);
     if(action==0)gtk_widget_set_sensitive(value,FALSE);
@@ -211,10 +213,9 @@ void BrowserChrome::AccountMenu(GtkWidget* anchor) {
       }),&app_);
     }
   };
-  item("UnlikeOtherAI account",0);
+  item("Account",0);
   if(state.signed_in) { item(state.name.empty()?state.email:state.name,0); item(state.busy?"Syncing favorites…":"Refresh favorites",state.busy?0:3); item("Sign out and show local favorites",2); }
-  else if(state.signing_in) { item("Complete sign-in in your browser",0); item("Cancel sign-in",2); }
-  else item("Sign in with UOA",state.busy?0:1);
+  else if(state.signing_in) { item("Complete login/register",0); item("Cancel sign-in",2); }
   if(!state.error.empty())item(state.error,0);
   g_signal_connect_swapped(menu,"selection-done",G_CALLBACK(gtk_widget_destroy),menu);
   gtk_widget_show_all(menu); gtk_menu_popup_at_widget(GTK_MENU(menu),anchor,GDK_GRAVITY_SOUTH_EAST,GDK_GRAVITY_NORTH_EAST,nullptr);

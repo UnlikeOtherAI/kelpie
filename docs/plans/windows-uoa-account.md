@@ -65,3 +65,45 @@ that refactor. Windows tests pin the Mac-compatible first 16 SHA-256 bytes, UUID
 format and metadata-preserving intention semantics. Keep a cached public client
 and loopback port; allocate/re-register only when that port cannot be bound.
 No changes to the external authentication service are part of this task.
+
+## Direct login/register follow-up
+
+The signed-out account button currently always opens a descriptive menu, adding
+an unnecessary click. Linux also picks a hard-coded browser rather than the
+configured default, and no-browser launch failure stops authentication.
+
+Change the signed-out button on Windows, Linux and Mac to start authentication
+directly; retain a compact signed-in menu and pending-login cancellation. Use
+“Login/register” for signed-out accessible labels and remove provider jargon.
+Windows resolves the HTTPS association; Linux uses GIO's default HTTPS handler.
+If no external handler can launch (or it resolves to Kelpie itself), the shared
+account service queues the authorization URL for its owner-thread pump to open
+in a transient isolated Login/register tab. Cancellation clears queued URLs;
+repeated clicks do not create duplicate attempts. Existing PKCE/callback checks
+remain unchanged. Mac retains its OS authentication session.
+
+Test external-success versus fallback, duplicate clicks, cancellation before
+handoff, and the unchanged OAuth callback. Build on each native host and release
+only affected desktop versions. No CLI changes are needed.
+
+### Follow-up cross-provider review
+
+Claude's adversarial review identified that an ordinary isolated tab remains
+agent-accessible. Accept that finding: the fallback is a separate, ephemeral
+CEF login window outside the engine tab registry, history, DevTools and MCP
+surfaces. It renders the hosted authentication page, never a native login form.
+Move the entire browser handoff to the owner-thread Poll, including launching
+the system browser; clear pending handoffs on cancellation and report a failed
+handoff immediately. Close the private window on every terminal outcome and
+wait for its CEF close callback before engine shutdown. Detect absent/default-
+Kelpie handlers before launching, and remove the hard-coded Edge/Linux choices.
+Preserve pending cancellation controls. Fix the listener startup/cancel race
+with a readiness handshake and cover early cancellation in tests.
+
+The authentication server's current public OAuth profile synthesizes a neutral,
+password-only config. Merely enabling a Google button would not connect the
+existing confidential social flow to public PKCE code issuance. The branded
+config must be selected and verified server-side; neither its signing key nor
+a domain bearer credential belongs in the app. Resolve the existing product
+config before changing this server contract. Embedded-provider restrictions
+still apply; the system browser remains the first choice.

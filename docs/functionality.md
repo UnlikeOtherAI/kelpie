@@ -408,10 +408,17 @@ On macOS, Windows and Linux, the selected tab carries the sampled page colour co
 
 ### Desktop UOA account and favourites
 
-On macOS, Windows and Linux, the circular account control between History and More opens an account popup. Sign in
-with UOA opens the system authentication browser at authentication.unlikeotherai.com,
-using a public OAuth client and S256 PKCE. Password and authenticator verification stay
-on UOA's hosted screen. The popup displays the authoritative UOA name/email and avatar,
+On macOS, Windows and Linux, pressing the circular account control between History
+and More while signed out starts **Login/register** immediately, with no intermediary
+menu. It opens authentication.unlikeotherai.com in the default browser (the system
+authentication session on Mac), using a public OAuth client and S256 PKCE. Windows
+and Linux fall back to a separate, ephemeral Kelpie login window if the default
+HTTPS handler is absent, fails, or is Kelpie itself. This window loads the hosted
+page and is excluded from automation, tab lists, history and session persistence;
+it closes when login finishes or is cancelled. Social providers may restrict
+embedded browsers; the system browser is preferred. Repeated clicks during login
+offer cancellation. Password and authenticator verification stay on UOA's hosted
+screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
 with Sign out and Refresh favourites actions. Session expiry asks the user to sign in
 again; the public profile does not issue refresh tokens.
 

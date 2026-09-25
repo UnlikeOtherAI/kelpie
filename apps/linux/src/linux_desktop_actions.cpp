@@ -1,13 +1,12 @@
 #include "linux_desktop_internal.h"
 #include "account_protocol.h"
 #include "kelpie/response_helpers.h"
+#include "kelpie/private_login_window.h"
 #include <algorithm>
-#include <thread>
 #include <utility>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
-extern char** environ;
+#if KELPIE_LINUX_HAS_GTK
+#include <gio/gio.h>
+#endif
 
 namespace kelpie::linuxapp {
 namespace {
@@ -16,16 +15,22 @@ std::optional<TabLease> Active(LinuxApp& app) {
   return std::nullopt;
 }
 bool OpenExternal(const std::string& url) {
-  // Pick a separate browser executable even if Kelpie owns the desktop URL association.
-  for(const char* browser:{"firefox","google-chrome","chromium","chromium-browser"}) {
-    pid_t child;
-    char* args[]={const_cast<char*>(browser),const_cast<char*>(url.c_str()),nullptr};
-    if(posix_spawnp(&child,browser,nullptr,nullptr,args,environ)==0) {
-      std::thread([child] { int status; while(waitpid(child,&status,0)<0 && errno==EINTR) {} }).detach();
-      return true;
-    }
-  }
+#if KELPIE_LINUX_HAS_GTK
+  auto* handler=g_app_info_get_default_for_uri_scheme("https");
+  if (!handler) return false;
+  const char* id=g_app_info_get_id(handler);
+  const char* executable=g_app_info_get_executable(handler);
+  const auto name=executable?std::filesystem::path(executable).filename().string():std::string();
+  const bool self=(id && std::string(id)=="kelpie.desktop") || name=="kelpie-linux" || name=="kelpie";
+  GList uri{}; uri.data=const_cast<char*>(url.c_str());
+  GError* error=nullptr;
+  const bool launched=!self && g_app_info_launch_uris(handler,&uri,nullptr,&error);
+  if (error) g_error_free(error);
+  g_object_unref(handler);
+  return launched;
+#else
   return false;
+#endif
 }
 }
 std::vector<TabSnapshot> LinuxApp::Tabs() const {
@@ -92,7 +97,11 @@ void LinuxApp::ClearHistory() { impl_->desktop.history_store().Clear(); impl_->S
 std::string LinuxApp::BookmarksJson() const { return impl_->account.Bookmarks(); }
 std::string LinuxApp::HistoryJson() const { return impl_->desktop.history_store().ToJson(); }
 account::AccountState LinuxApp::AccountState() const { return impl_->account.State(); }
-void LinuxApp::AccountSignIn() { impl_->account.StartSignIn(impl_->config.profile_dir,OpenExternal); }
+void LinuxApp::AccountSignIn() {
+  if (!impl_->account.StartSignIn(impl_->config.profile_dir,[this](const std::string& url) {
+    return OpenExternal(url) || OpenPrivateLoginWindow(url,[this] { AccountSignOut(); });
+  })) ShowToast("Please wait for the current account request.");
+}
 void LinuxApp::AccountSignOut() { impl_->account.SignOut(); }
 void LinuxApp::AccountRefresh() { impl_->account.StartBookmarkAction("refresh"); }
 void LinuxApp::ShowToast(const std::string& message) { std::lock_guard lock(impl_->state_mutex); impl_->toast=message; }

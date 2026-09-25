@@ -26,7 +26,8 @@ void AccountService::SignOut() {
   std::shared_ptr<AccountLogin> login;
   std::shared_ptr<AccountTransport> transport;
   { std::lock_guard lock(mutex_); ++generation_; token_.clear(); state_={};
-    bookmarks_=json::array(); login=std::move(login_); transport=transport_; }
+    bookmarks_=json::array(); login=std::move(login_); transport=transport_;
+    pending_browser_url_.clear(); open_browser_={}; }
   if (login) login->Cancel();
   transport->Cancel();
 }
@@ -37,6 +38,24 @@ bool AccountService::Drain() {
   task_.get(); return true;
 }
 void AccountService::Poll() {
+  std::string url;
+  std::function<bool(const std::string&)> open;
+  std::uint64_t generation;
+  {
+    std::lock_guard lock(mutex_); generation=generation_;
+    if (state_.signing_in) { url=std::move(pending_browser_url_); pending_browser_url_.clear(); open=open_browser_; }
+  }
+  // OS launch APIs and the private fallback window belong to the UI owner thread.
+  if (!url.empty()) {
+    bool opened=false;
+    try { opened=open && open(url); } catch (...) {}
+    if (!opened) {
+      std::shared_ptr<AccountLogin> login;
+      { std::lock_guard lock(mutex_); if (generation==generation_) login=login_; }
+      if (login) login->Cancel();
+      Fail(generation,"Could not open login/register. Please try again.");
+    }
+  }
   if (task_.valid() && task_.wait_for(std::chrono::seconds(0))==std::future_status::ready) task_.get();
   bool expired;
   { std::lock_guard lock(mutex_); expired=state_.signed_in && std::chrono::steady_clock::now()>=expiry_; }
@@ -45,6 +64,7 @@ void AccountService::Poll() {
 void AccountService::Fail(std::uint64_t generation,const std::string& message,int status) {
   std::lock_guard lock(mutex_);
   if (generation!=generation_) return;
+  pending_browser_url_.clear(); open_browser_={};
   if (status==401) { ++generation_; token_.clear(); bookmarks_=json::array(); state_={}; }
   state_.error=message; state_.busy=false; state_.signing_in=false;
 }
@@ -65,13 +85,18 @@ bool AccountService::StartTask(std::function<void(std::uint64_t)> task,bool logi
 bool AccountService::StartSignIn(const std::filesystem::path& profile,const std::function<bool(const std::string&)>& open) {
   Poll();
   if (State().signed_in || task_.valid()) return false;
-  { std::lock_guard lock(mutex_); transport_=std::make_shared<AccountTransport>(); }
-  return StartTask([this,profile,open](std::uint64_t generation) {
+  { std::lock_guard lock(mutex_); transport_=std::make_shared<AccountTransport>(); open_browser_=open; }
+  return StartTask([this,profile](std::uint64_t generation) {
     auto login=std::make_shared<AccountLogin>();
     { std::lock_guard lock(mutex_); if (generation!=generation_) return; login_=login; }
     AccountRequest request;
     { std::lock_guard lock(mutex_); request=RequestLocked(); }
-    const auto token=login->Run(request,profile,open);
+    const auto token=login->Run(request,profile,[this,generation](const std::string& url) {
+      std::lock_guard lock(mutex_);
+      if (generation!=generation_ || !state_.signing_in) return false;
+      pending_browser_url_=url;
+      return true;
+    });
     CheckGeneration(generation);
     CompleteSignIn(token,generation);
   },true);

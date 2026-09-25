@@ -112,7 +112,72 @@ void CallbackAndPkce() {
   assert(login.Run(request,profile,open).token=="test-token");
   std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
 }
+void OwnerThreadHandoffAndCancellation() {
+  const auto profile=std::filesystem::temp_directory_path()/RandomAccountValue();
+  std::filesystem::create_directories(profile);
+  kelpie::BookmarkStore local;
+  std::mutex mutex; std::condition_variable cv;
+  bool registering=false,release=false;
+  AccountService account(local,[&](const auto& path,const auto&,const auto&,const auto&,const auto&) {
+    assert(path=="/oauth/register");
+    std::unique_lock lock(mutex); registering=true; cv.notify_all();
+    cv.wait(lock,[&]{return release;});
+    return AccountResponse{R"({"client_id":"public-handoff"})",{}};
+  });
+  int opened=0;
+  const auto owner=std::this_thread::get_id();
+  auto open=[&](const std::string& url) {
+    assert(std::this_thread::get_id()==owner && url.starts_with(kAccountOrigin));
+    ++opened; return true;
+  };
+  assert(account.StartSignIn(profile,open));
+  { std::unique_lock lock(mutex); cv.wait(lock,[&]{return registering;}); }
+  assert(!account.StartSignIn(profile,open));
+  account.SignOut();
+  { std::lock_guard lock(mutex); release=true; cv.notify_all(); }
+  const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+  while(!account.Drain() && std::chrono::steady_clock::now()<deadline) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  assert(account.Drain()); account.Poll(); assert(opened==0);
+  assert(account.StartSignIn(profile,open));
+  while(opened==0 && std::chrono::steady_clock::now()<deadline) {
+    account.Poll(); std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  assert(opened==1);
+  account.Poll(); assert(opened==1); // Consumed once, including repeated toolbar clicks.
+  account.SignOut();
+  while(!account.Drain() && std::chrono::steady_clock::now()<deadline) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  assert(account.Drain());
+  assert(account.StartSignIn(profile,[](const std::string&) { return false; }));
+  while(account.State().signing_in && std::chrono::steady_clock::now()<deadline) {
+    account.Poll(); std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  assert(!account.State().signing_in && !account.State().error.empty());
+  account.Shutdown();
+  while(!account.Drain() && std::chrono::steady_clock::now()<deadline) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  assert(account.Drain());
+  std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
+}
+void EarlyCancellationDoesNotHang() {
+  const auto profile=std::filesystem::temp_directory_path()/RandomAccountValue();
+  std::filesystem::create_directories(profile);
+  for(int i=0;i<30;++i) {
+    AccountLogin login;
+    auto pending=std::async(std::launch::async,[&] {
+      try {
+        login.Run([](const auto&,const auto&,const auto&,const auto&,const auto&) {
+          return AccountResponse{R"({"client_id":"public-cancel"})",{}};
+        },profile,[](const std::string&) { return false; });
+      } catch(const AccountFailure&) {}
+    });
+    if(i%2) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    login.Cancel();
+    assert(pending.wait_for(std::chrono::seconds(3))==std::future_status::ready);
+    pending.get();
+  }
+  std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
+}
 }
 int main() {
   MergeAndLocalSeparation(); SessionFailureAndExpiry(); LateResponseCannotReplaceLocal(); CallbackAndPkce();
+  OwnerThreadHandoffAndCancellation(); EarlyCancellationDoesNotHang();
 }
