@@ -9,8 +9,7 @@ extension BrowserView {
             onBack: goBack,
             onForward: goForward,
             onReload: {
-                if browserState.isLoading { browserState.webView?.stopLoading() }
-                else { reload() }
+                if browserState.isLoading { browserState.webView?.stopLoading() } else { reload() }
             },
             onBookmarks: { showBookmarks = true },
             onShowTabs: {

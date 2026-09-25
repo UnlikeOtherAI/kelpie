@@ -54,10 +54,8 @@ struct BottomBarView<MoreContent: View>: View {
     private func expandedBar(wide: Bool, showShare: Bool) -> some View {
         HStack(spacing: wide ? 14 : 5) {
             if !addressFocused {
-                BrowserChromeButton(symbol: "chevron.left", label: "Back", identifier: "browser.nav.back",
-                                    enabled: browserState.canGoBack, action: onBack)
-                BrowserChromeButton(symbol: "chevron.right", label: "Forward", identifier: "browser.nav.forward",
-                                    enabled: browserState.canGoForward, action: onForward)
+                BrowserChromeButton(symbol: "chevron.left", label: "Back", identifier: "browser.nav.back", enabled: browserState.canGoBack, action: onBack)
+                BrowserChromeButton(symbol: "chevron.right", label: "Forward", identifier: "browser.nav.forward", enabled: browserState.canGoForward, action: onForward)
             }
             if wide { Spacer(minLength: 0) }
             addressField

@@ -104,4 +104,3 @@ func tabletViewportSize(for preset: TabletViewportPreset, availableSize: CGSize)
         height: min(targetViewport.height, maxHeight)
     )
 }
-

@@ -37,6 +37,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         guard let webView = tabStore.activeBrowserTab?.webView else { return }
         context.coordinator.install(webView: webView, in: container)
         if webView.scrollView.contentInset.bottom != bottomClearance {
+            context.coordinator.resetChromeScroll()
             webView.scrollView.contentInset.bottom = bottomClearance
             webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomClearance
             webView.setMinimumViewportInset(
@@ -109,6 +110,8 @@ struct TabWebViewContainer: UIViewRepresentable {
             }
         }
 
+        func resetChromeScroll() { chromeScroll = BrowserChromeScroll() }
+
         private func clearObservations() {
             progressObservation = nil
             titleObservation = nil
@@ -163,7 +166,9 @@ struct TabWebViewContainer: UIViewRepresentable {
                 let offset = scrollView.contentOffset.y + inset.top
                 let maximum = max(0, scrollView.contentSize.height - scrollView.bounds.height + inset.top + inset.bottom)
                 let direction = self.chromeScroll.update(
-                    offset: offset, maximum: maximum, height: scrollView.bounds.height,
+                    offset: offset,
+                    maximum: maximum,
+                    height: scrollView.bounds.height,
                     userScrolling: scrollView.isDragging || scrollView.isDecelerating
                 )
                 if let direction { self.onScrollDirectionChange(direction) }

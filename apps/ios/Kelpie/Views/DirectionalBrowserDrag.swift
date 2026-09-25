@@ -41,10 +41,22 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard let window, !isHidden else { return false }
-            return convert(bounds, to: window).contains(touch.location(in: window))
+            guard convert(bounds, to: window).contains(touch.location(in: window)) else { return false }
+            var responder: UIResponder? = self
+            while let current = responder, !(current is UIViewController) { responder = current.next }
+            guard let controller = responder as? UIViewController,
+                  controller.presentedViewController == nil,
+                  touch.view?.isDescendant(of: controller.view) == true else { return false }
+            var ancestor: UIView? = self
+            while let view = ancestor {
+                if view.isHidden || view.alpha < 0.01 { return false }
+                if view.clipsToBounds && !view.bounds.contains(touch.location(in: view)) { return false }
+                ancestor = view.superview
+            }
+            return true
         }
 
-        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             let velocity = pan.velocity(in: window)
             switch configuration?.axis {
             case .horizontal: return abs(velocity.x) > abs(velocity.y) * 1.25

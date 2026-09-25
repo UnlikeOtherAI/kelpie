@@ -66,7 +66,6 @@ struct BrowserView: View {
 
                 browserViewport
 
-
             }
 
             if showWelcome && shouldShowWelcomeCard {
@@ -81,7 +80,6 @@ struct BrowserView: View {
                     .transition(.opacity)
                     .zIndex(10)
             }
-
 
             if externalDisplayManager.isConnected && !serverState.isScriptRecording {
                 TVControlsView(
@@ -156,8 +154,7 @@ struct BrowserView: View {
         .onChange(of: tabStore.activeBrowserTabID) { _ in bottomBarCollapsed = false }
         .onChange(of: browserState.webView) { _ in updateChromeSample() }
         .onChange(of: browserState.isLoading) { loading in
-            if loading { chromeSampler.navigationStarted(); bottomBarCollapsed = false }
-            else { updateChromeSample(); tabStore.activeBrowserTab?.capturePreview() }
+            if loading { chromeSampler.navigationStarted(); bottomBarCollapsed = false } else { updateChromeSample(); tabStore.activeBrowserTab?.capturePreview() }
         }
         .overlay(alignment: .bottomLeading) {
             if debugOverlayEnabled {
