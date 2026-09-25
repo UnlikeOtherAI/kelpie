@@ -61,3 +61,17 @@ directional pan recognizers arbitrate card swipes and address upward gestures
 before recognition; the home-indicator safe area is never a gesture target.
 `browser.tabs.count` now opens the overview and `browser.tabs.add` creates tabs.
 Documentation and the iOS version update ship with the implementation.
+
+## Implementation and verification
+
+Implemented in SwiftUI/UIKit with shared Mac palette/sampler adapters. The iOS
+bundle is 0.1.4 (4). Native unit tests, iPhone and iPad simulator journeys, strict
+Swift lint, and pnpm lint/build/test pass on the development hosts. The iPad
+journey covers eight overflowing tabs and the active close control. Both Debug
+simulator and unsigned Release device builds compile. Generated projects now
+receive the bundle identity/version and launch metadata required for installation.
+
+Signed distribution is blocked on dictator: Xcode reports that the existing
+Apple Development certificate private key is absent and no matching provisioning
+profile is available. No signing identity was revoked or replaced. The change
+remains in a draft PR until the required signed release/install can complete.

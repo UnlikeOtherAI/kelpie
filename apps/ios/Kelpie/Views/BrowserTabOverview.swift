@@ -7,7 +7,7 @@ struct BrowserTabOverview: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("\(tabStore.tabs.count) Tabs").font(.title2.bold())
+                Text(tabStore.tabs.count == 1 ? "1 Tab" : "\(tabStore.tabs.count) Tabs").font(.title2.bold())
                 Spacer()
                 Button("Done", action: onDismiss).frame(minHeight: 44)
             }

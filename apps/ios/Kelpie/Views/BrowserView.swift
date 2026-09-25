@@ -76,7 +76,8 @@ struct BrowserView: View {
                     welcomePresentationSource = .automatic
                     if let tab = tabStore.activeBrowserTab, tab.isStartPage {
                         tab.isStartPage = false
-                        navigate(browserState.currentURL)
+                        let home = UserDefaults.standard.string(forKey: "homeURL") ?? defaultHomeURL
+                        navigate(browserState.currentURL.isEmpty ? home : browserState.currentURL)
                     }
                 }
                     .transition(.opacity)

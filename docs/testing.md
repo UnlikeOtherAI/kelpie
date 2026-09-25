@@ -131,3 +131,22 @@ provenance sidecars. Signing happens after deterministic resource stamping when 
 certificate is supplied; no certificate is assumed here. Use the approved Windows
 release acceptance command documented above; CI packaging does not bypass a locally
 rejected browser launch.
+
+## Native iOS browser chrome
+
+Generate `apps/ios` with Tuist and run the Kelpie scheme on both an iPhone and
+an iPad simulator. `BrowserChromeScrollTests` covers user motion, rubber-band
+bounds, programmatic offsets and layout changes. `BrowserChromeUITests` exercises
+collapse, tap-to-expand, keyboard clearance, upward overview entry, horizontal
+card dismissal and selection. On iPad it additionally creates overflowing tabs
+and closes the active tab. Screenshot attachments are retained in the xcresult.
+The tests use a self-contained data-URL page and UserDefaults launch overrides;
+they do not depend on live websites or change the person's persisted settings.
+
+For interactive verification, build Debug with
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG APPREVEAL_ENABLED"`. AppReveal exposes
+a dynamic `_appreveal._tcp` endpoint; inspect its `launch_context` to confirm
+Kelpie's bundle, version and simulator before using its screenshot and UI tools.
+Release builds omit AppReveal. Browser chrome owns safe-area clearance and
+fixed WebView geometry; compare expanded/collapsed screenshots and test
+vertical grid scrolling as well as horizontal tab dismissal.

@@ -181,7 +181,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         private func syncBrowserState(from webView: WKWebView) {
             Task { @MainActor in
                 guard webView === currentWebView else { return }
-                browserState.currentURL = webView.url?.absoluteString ?? browserState.currentURL
+                browserState.currentURL = webView.url?.absoluteString ?? ""
                 browserState.pageTitle = webView.title ?? ""
                 browserState.isLoading = webView.isLoading
                 browserState.canGoBack = webView.canGoBack
