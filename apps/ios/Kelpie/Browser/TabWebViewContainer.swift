@@ -11,6 +11,7 @@ struct TabWebViewContainer: UIViewRepresentable {
     @ObservedObject var tabStore: TabStore
     @ObservedObject var browserState: BrowserState
     let handlerContext: HandlerContext?
+    var bottomClearance: CGFloat = 0
     let onScrollDirectionChange: (ScrollDirection) -> Void
     let onWebViewReady: (WKWebView) -> Void
 
@@ -35,6 +36,14 @@ struct TabWebViewContainer: UIViewRepresentable {
     func updateUIView(_ container: UIView, context: Context) {
         guard let webView = tabStore.activeBrowserTab?.webView else { return }
         context.coordinator.install(webView: webView, in: container)
+        if webView.scrollView.contentInset.bottom != bottomClearance {
+            webView.scrollView.contentInset.bottom = bottomClearance
+            webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomClearance
+            webView.setMinimumViewportInset(
+                UIEdgeInsets(top: 0, left: 0, bottom: bottomClearance == 0 ? 0 : 34, right: 0),
+                maximumViewportInset: UIEdgeInsets(top: 0, left: 0, bottom: bottomClearance == 0 ? 0 : 62, right: 0)
+            )
+        }
     }
 
     // MARK: - Coordinator
@@ -55,7 +64,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         private var contentOffsetObservation: NSKeyValueObservation?
         private var documentNavigationStart: Date?
         private var capturedDocumentResponseURL: String?
-        private var lastScrollOffset: CGFloat = 0
+        private var chromeScroll = BrowserChromeScroll()
 
         init(
             browserState: BrowserState,
@@ -75,6 +84,8 @@ struct TabWebViewContainer: UIViewRepresentable {
 
             let retiring = currentWebView
             clearObservations()
+            retiring?.navigationDelegate = nil
+            retiring?.uiDelegate = nil
 
             webView.frame = container.bounds
             webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -84,7 +95,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             container.addSubview(webView)
 
             currentWebView = webView
-            lastScrollOffset = webView.scrollView.contentOffset.y
+            chromeScroll = BrowserChromeScroll()
             observe(webView)
             syncBrowserState(from: webView)
             onWebViewReady(webView)
@@ -92,8 +103,9 @@ struct TabWebViewContainer: UIViewRepresentable {
             // Defer removal to after the current event cycle so any in-flight
             // UIGestureRecognizer state on the retiring view is fully drained
             // before UIKit releases the view from the hierarchy.
-            DispatchQueue.main.async {
-                retiring?.removeFromSuperview()
+            DispatchQueue.main.async { [weak self, weak retiring, weak container] in
+                guard let retiring, retiring !== self?.currentWebView, retiring.superview === container else { return }
+                retiring.removeFromSuperview()
             }
         }
 
@@ -109,41 +121,58 @@ struct TabWebViewContainer: UIViewRepresentable {
 
         private func observe(_ webView: WKWebView) {
             progressObservation = webView.observe(\.estimatedProgress) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.progress = wv.estimatedProgress }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.progress = wv.estimatedProgress
+                }
             }
             titleObservation = webView.observe(\.title) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.pageTitle = wv.title ?? "" }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.pageTitle = wv.title ?? ""
+                }
             }
             urlObservation = webView.observe(\.url) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.currentURL = wv.url?.absoluteString ?? "" }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.currentURL = wv.url?.absoluteString ?? ""
+                }
             }
             loadingObservation = webView.observe(\.isLoading) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.isLoading = wv.isLoading }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.isLoading = wv.isLoading
+                }
             }
             backObservation = webView.observe(\.canGoBack) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.canGoBack = wv.canGoBack }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.canGoBack = wv.canGoBack
+                }
             }
             forwardObservation = webView.observe(\.canGoForward) { [weak self] wv, _ in
-                Task { @MainActor in self?.browserState.canGoForward = wv.canGoForward }
+                Task { @MainActor in
+                    guard let self, wv === self.currentWebView else { return }
+                    self.browserState.canGoForward = wv.canGoForward
+                }
             }
             contentOffsetObservation = webView.scrollView.observe(\.contentOffset) { [weak self] scrollView, _ in
                 guard let self else { return }
-                let offset = scrollView.contentOffset.y
-                let delta = offset - self.lastScrollOffset
-                if offset <= 0 {
-                    self.onScrollDirectionChange(.up)
-                } else if delta > 12 {
-                    self.onScrollDirectionChange(.down)
-                    self.lastScrollOffset = offset
-                } else if delta < -12 {
-                    self.onScrollDirectionChange(.up)
-                    self.lastScrollOffset = offset
-                }
+                guard scrollView === self.currentWebView?.scrollView else { return }
+                let inset = scrollView.adjustedContentInset
+                let offset = scrollView.contentOffset.y + inset.top
+                let maximum = max(0, scrollView.contentSize.height - scrollView.bounds.height + inset.top + inset.bottom)
+                let direction = self.chromeScroll.update(
+                    offset: offset, maximum: maximum, height: scrollView.bounds.height,
+                    userScrolling: scrollView.isDragging || scrollView.isDecelerating
+                )
+                if let direction { self.onScrollDirectionChange(direction) }
             }
         }
 
         private func syncBrowserState(from webView: WKWebView) {
             Task { @MainActor in
+                guard webView === currentWebView else { return }
                 browserState.currentURL = webView.url?.absoluteString ?? browserState.currentURL
                 browserState.pageTitle = webView.title ?? ""
                 browserState.isLoading = webView.isLoading
@@ -159,6 +188,8 @@ struct TabWebViewContainer: UIViewRepresentable {
             _ webView: WKWebView,
             didStartProvisionalNavigation navigation: WKNavigation!
         ) {
+            guard webView === currentWebView else { return }
+            chromeScroll = BrowserChromeScroll()
             // Each new provisional navigation starts clean — clear any error captured
             // by a superseded load so a cancelled-then-successful sequence is not fatal.
             handlerContext?.lastNavigationError = nil
@@ -176,6 +207,7 @@ struct TabWebViewContainer: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            guard webView === currentWebView else { return }
             recordNavigationError(error)
             syncBrowserState(from: webView)
         }
@@ -185,6 +217,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
+            guard webView === currentWebView else { return }
             recordNavigationError(error)
             syncBrowserState(from: webView)
         }
@@ -205,6 +238,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             decidePolicyFor navigationResponse: WKNavigationResponse,
             decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
         ) {
+            guard webView === currentWebView else { decisionHandler(.allow); return }
             recordMainDocumentResponse(navigationResponse)
             decisionHandler(.allow)
         }

@@ -11,7 +11,26 @@
 
 ## Browser Screen (Main)
 
-The primary and only screen. Full-screen WebView with a thin toolbar.
+The native iOS shell uses a persistent iPad top tab strip and a collapsing bottom
+address toolbar. iPhone has a two-column tab overview opened by dragging the
+address capsule upward or choosing Tabs in More. Tabs can be selected, closed
+with their close button, or dismissed horizontally. A cached preview represents
+a visited page; restored tabs use a title/domain placeholder until first shown.
+
+The bottom bar uses native translucent materials, circular 44-point controls
+and a capsule address field. Its 62-point expanded surface becomes a 34-point
+domain lane while scrolling. It stays above the home indicator and keyboard.
+iPad tabs remain visible, including in narrow windows, and scroll horizontally.
+The active tab always has a close button, including the last tab. The iPad strip
+uses the Mac page-color sampler and coordinated transition. Reduce Motion skips
+the color and geometry animations.
+
+Share and Bookmarks move into More when space is limited. More also preserves
+History, Safari sign-in, AI, inspectors, viewport presets, Settings and Welcome.
+The old floating action fan is no longer part of the iOS browser screen.
+
+The legacy diagram and toolbar/status descriptions below describe Android;
+the iOS native chrome above supersedes that layout.
 
 ### Layout
 
@@ -170,7 +189,7 @@ On iPad specifically:
 - The app menu also exposes `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
 - The `View` menu lists `Full Width` plus every staged phone, tablet, and laptop viewport preset that currently fits the tablet geometry.
 - The URL bar includes a `3D` shortcut beside the address field so the 3D DOM inspector is always one tap away on tablets.
-- The floating menu includes a phone icon that opens a pill picker for staged device-class viewports.
+- More → Viewport opens the fitting device-class presets.
 - The floating menu also includes `AI` and `3D` actions, and the fan widens automatically as actions are added so the buttons stay separated on-screen.
 - The picker uses the shared fitting preset list from the staged viewport catalog, sorted by screen size, and shows full labels such as `6.1" Compact`, `11" iPad Pro`, and `13" Laptop`.
 - The picker opens in its own lane outside the floating action fan and spills into extra columns if needed, so the pills do not sit on top of the action buttons.
@@ -206,7 +225,7 @@ On iPad specifically:
 
 ## Theme
 
-- **Light mode only** for v1 (dark mode later)
+- iOS uses native light/dark materials and page-adaptive iPad tabs.
 - System font throughout
 - Minimal color: mostly neutral with green/red status indicators
 - No branding in the browser chrome — the app icon and name handle branding

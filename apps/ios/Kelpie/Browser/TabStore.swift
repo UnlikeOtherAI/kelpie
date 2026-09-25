@@ -39,6 +39,7 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addBrowserTab(url: String? = nil) -> BrowserTab {
+        activeBrowserTab?.capturePreview()
         let tab = createBrowserTab()
         bind(tab)
         tabs.append(tab)
@@ -76,6 +77,7 @@ final class TabStore: ObservableObject {
 
     func selectBrowserTab(id: UUID) {
         guard tabs.contains(where: { $0.id == id }) else { return }
+        if id != activeBrowserTabID { activeBrowserTab?.capturePreview() }
         activeBrowserTabID = id
         persistSession()
     }

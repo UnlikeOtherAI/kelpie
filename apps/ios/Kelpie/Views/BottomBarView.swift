@@ -1,213 +1,188 @@
 import SwiftUI
 
-/// Safari-style bottom bar with tab strip + URL field.
-/// Collapses to a minimal pill when scrolling down; expands on scroll up or tap.
-struct BottomBarView: View {
+/// One native bottom surface; tabs have their own top strip or overview.
+struct BottomBarView<MoreContent: View>: View {
     @ObservedObject var tabStore: TabStore
     @ObservedObject var browserState: BrowserState
     let onNavigate: (String) -> Void
     let onBack: () -> Void
     let onForward: () -> Void
+    let onReload: () -> Void
+    let onBookmarks: () -> Void
+    let onShowTabs: () -> Void
     @Binding var isCollapsed: Bool
+    @Binding var isEditing: Bool
+    @ViewBuilder let moreContent: () -> MoreContent
 
-    @State private var urlText: String = ""
-    private let barHeight: CGFloat = 44
+    @State private var urlText = ""
+    @FocusState private var addressFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            if isCollapsed {
-                collapsedPill
-                    .transition(.opacity)
-            } else {
-                expandedBar
-                    .transition(.opacity)
+        GeometryReader { geometry in
+            let wide = geometry.size.width > 600
+            Group {
+                if isCollapsed && !isEditing {
+                    collapsedPill
+                } else {
+                    expandedBar(wide: wide, showShare: geometry.size.width >= 390)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(height: isCollapsed && !isEditing ? 34 : 62)
+        .background {
+            if !isCollapsed || isEditing {
+                UnevenChromeBackground()
             }
         }
-        .background(.regularMaterial)
-        .animation(.easeInOut(duration: 0.2), value: isCollapsed)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isCollapsed)
         .onAppear { urlText = browserState.currentURL }
-        .onChange(of: browserState.currentURL) { newURL in urlText = newURL }
+        .onChange(of: browserState.currentURL) { value in
+            if !addressFocused { urlText = value }
+        }
+        .onChange(of: addressFocused) { focused in
+            isEditing = focused
+            if focused { isCollapsed = false }
+        }
+        .onChange(of: tabStore.activeBrowserTabID) { _ in
+            addressFocused = false
+            isCollapsed = false
+        }
     }
 
-    // MARK: - Expanded
-
-    @ViewBuilder
-    private var expandedBar: some View {
-        if tabStore.tabs.count > 1 {
-            tabStrip
-        }
-
-        HStack(spacing: 6) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .background(Color(.systemGray5))
-                    .clipShape(Circle())
+    private func expandedBar(wide: Bool, showShare: Bool) -> some View {
+        HStack(spacing: wide ? 14 : 5) {
+            if !addressFocused {
+                BrowserChromeButton(symbol: "chevron.left", label: "Back", identifier: "browser.nav.back",
+                                    enabled: browserState.canGoBack, action: onBack)
+                BrowserChromeButton(symbol: "chevron.right", label: "Forward", identifier: "browser.nav.forward",
+                                    enabled: browserState.canGoForward, action: onForward)
             }
-            .accessibilityIdentifier("browser.nav.back")
-            .disabled(!browserState.canGoBack)
-
-            Button(action: onForward) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .background(Color(.systemGray5))
-                    .clipShape(Circle())
-            }
-            .accessibilityIdentifier("browser.nav.forward")
-            .disabled(!browserState.canGoForward)
-
-            TextField("URL", text: $urlText)
-                .font(.system(size: 14))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray5))
-                .clipShape(Capsule())
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .keyboardType(.URL)
-                .accessibilityIdentifier("browser.url.field")
-                .onSubmit { navigate() }
-
-            tabCountButton
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-    }
-
-    // MARK: - BrowserTab Strip
-
-    private var tabStrip: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(tabStore.tabs) { tab in
-                        tabPill(tab)
-                            .id(tab.id)
-                    }
-
-                    Button {
-                        tabStore.addBrowserTab()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
-                            .background(Color(.systemGray5))
-                            .clipShape(Circle())
-                    }
-                    .accessibilityIdentifier("browser.tabs.add")
+            if wide { Spacer(minLength: 0) }
+            addressField
+                .frame(maxWidth: wide ? 620 : .infinity)
+            if wide { Spacer(minLength: 0) }
+            if addressFocused {
+                Button("Cancel") {
+                    addressFocused = false
+                    urlText = browserState.currentURL
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-            }
-            .onChange(of: tabStore.activeBrowserTabID) { newID in
-                if let newID {
-                    withAnimation { proxy.scrollTo(newID) }
+                .frame(minHeight: 44)
+            } else {
+                if showShare, let url = URL(string: browserState.currentURL), url.scheme != nil {
+                    ShareLink(item: url) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 19))
+                            .frame(width: 44, height: 44)
+                            .modifier(BrowserGlass())
+                    }
+                    .accessibilityLabel("Share page")
                 }
+                if wide {
+                    BrowserChromeButton(symbol: "book", label: "Bookmarks", identifier: "browser.bookmarks", action: onBookmarks)
+                }
+                Menu {
+                    Button("Tabs (\(tabStore.tabs.count))", systemImage: "square.on.square", action: onShowTabs)
+                        .accessibilityIdentifier("browser.tabs.count")
+                    Button("New tab", systemImage: "plus") { tabStore.addBrowserTab() }
+                        .accessibilityIdentifier("browser.tabs.add")
+                    Button("Bookmarks", systemImage: "book", action: onBookmarks)
+                    if let url = URL(string: browserState.currentURL) { ShareLink(item: url) }
+                    Divider()
+                    moreContent()
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 22, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .modifier(BrowserGlass())
+                }
+                .accessibilityLabel("More")
+                .accessibilityIdentifier("browser.more")
             }
         }
+        .padding(.horizontal, wide ? 20 : 8)
+        .tint(.primary)
     }
 
-    private func tabPill(_ tab: BrowserTab) -> some View {
-        let isActive = tab.id == tabStore.activeBrowserTabID
-        return HStack(spacing: 4) {
-            if tab.isStartPage {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 10))
+    private var addressField: some View {
+        HStack(spacing: 5) {
+            if !addressFocused {
+                Image(systemName: browserState.currentURL.hasPrefix("https:") ? "lock.fill" : "globe")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
-
-            Text(tabTitle(tab))
-                .font(.system(size: 12, weight: isActive ? .semibold : .regular))
-                .lineLimit(1)
-                .frame(maxWidth: 120)
-
-            if tabStore.tabs.count > 1 {
-                Button {
-                    tabStore.closeBrowserTab(id: tab.id)
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16, height: 16)
-                        .background(Color(.systemGray4))
-                        .clipShape(Circle())
+            TextField("Search or enter address", text: $urlText)
+                .font(.system(size: 14))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .submitLabel(.go)
+                .focused($addressFocused)
+                .accessibilityIdentifier("browser.url.field")
+                .onSubmit(navigate)
+            if !addressFocused {
+                Button(action: onReload) {
+                    Image(systemName: browserState.isLoading ? "xmark" : "arrow.clockwise")
+                        .font(.system(size: 17))
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .accessibilityIdentifier("browser.tabs.close.\(tab.id)")
+                .buttonStyle(.plain)
+                .accessibilityLabel(browserState.isLoading ? "Stop loading" : "Reload")
+                .accessibilityIdentifier("browser.nav.reload")
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(isActive ? Color(.systemGray4) : Color(.systemGray6))
-        .clipShape(Capsule())
-        .onTapGesture {
-            tabStore.selectBrowserTab(id: tab.id)
+        .padding(.leading, 12)
+        .padding(.trailing, addressFocused ? 12 : 0)
+        .frame(minWidth: 100, minHeight: 44)
+        .modifier(BrowserGlass())
+        .overlay {
+            DirectionalBrowserDrag(axis: .upward, enabled: !addressFocused, onChange: { _ in }, onEnd: { distance, speed in
+                if distance < -32 || (distance < -12 && speed < -450) { onShowTabs() }
+            })
         }
+        .accessibilityAction(named: "Show tabs", onShowTabs)
     }
-
-    // MARK: - Collapsed Pill
 
     private var collapsedPill: some View {
-        Button {
-            isCollapsed = false
-        } label: {
-            Text(domain(from: browserState.currentURL))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
+        Button { isCollapsed = false } label: {
+            Text(browserDomain(browserState.currentURL))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemGray5))
-                .clipShape(Capsule())
+                .padding(.horizontal, 20)
+                .frame(maxWidth: 220)
+                .frame(height: 28)
+                .modifier(BrowserGlass())
+                .frame(height: 44)
+                .contentShape(Rectangle())
         }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 6)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Expand address bar, \(browserDomain(browserState.currentURL))")
         .accessibilityIdentifier("browser.bottom-bar.collapsed")
-    }
-
-    // MARK: - BrowserTab Count Button
-
-    private var tabCountButton: some View {
-        Button {
-            tabStore.addBrowserTab()
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.primary, lineWidth: 1.5)
-                    .frame(width: 24, height: 24)
-                Text("\(tabStore.tabs.count)")
-                    .font(.system(size: 12, weight: .bold))
-            }
-            .frame(width: 36, height: 36)
+        .overlay {
+            DirectionalBrowserDrag(axis: .upward, onChange: { _ in }, onEnd: { distance, speed in
+                if distance < -32 || (distance < -12 && speed < -450) { onShowTabs() }
+            })
         }
-        .accessibilityIdentifier("browser.tabs.count")
     }
-
-    // MARK: - Helpers
 
     private func navigate() {
-        var url = urlText.trimmingCharacters(in: .whitespaces)
-        if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
-            url = "https://\(url)"
-        }
-        onNavigate(url)
+        var value = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        if !value.contains("://") { value = "https://\(value)" }
+        addressFocused = false
+        onNavigate(value)
     }
+}
 
-    private func tabTitle(_ tab: BrowserTab) -> String {
-        if tab.isStartPage { return "Start Page" }
-        if !tab.pageTitle.isEmpty { return tab.pageTitle }
-        return domain(from: tab.currentURL)
-    }
-
-    private func domain(from urlString: String) -> String {
-        guard let url = URL(string: urlString), let host = url.host else {
-            return urlString.isEmpty ? "New BrowserTab" : urlString
-        }
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+private struct UnevenChromeBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 30, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 30).stroke(.white.opacity(0.45), lineWidth: 0.75)
+            }
+            .ignoresSafeArea(edges: .bottom)
     }
 }

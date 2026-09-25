@@ -26,6 +26,8 @@ let kelpieApp = Target.target(
         // Shared from macOS — cross-project source references
         .glob("../macos/Kelpie/Handlers/Snapshot3DBridge.swift"),
         .glob("../macos/Kelpie/Storage/SecretStore.swift"),
+        .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
+        .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
@@ -54,7 +56,7 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.3",
+            "MARKETING_VERSION": "0.1.4",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "G42HP8BM2N",
             // Conditional native build dir — device vs simulator

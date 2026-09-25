@@ -14,6 +14,25 @@ final class BrowserTab: ObservableObject, Identifiable {
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
     @Published var isStartPage: Bool
+    @Published private(set) var preview: UIImage?
+    private var previewRequest = UUID()
+
+    /// A bounded thumbnail captured only while this tab is on screen.
+    func capturePreview() {
+        guard webView.window != nil, webView.bounds.width > 0, !isStartPage else { return }
+        let request = UUID()
+        previewRequest = request
+        let url = webView.url
+        let configuration = WKSnapshotConfiguration()
+        configuration.snapshotWidth = 260
+        configuration.rect = CGRect(origin: .zero, size: CGSize(
+            width: webView.bounds.width, height: min(webView.bounds.height, webView.bounds.width / 0.7)
+        ))
+        webView.takeSnapshot(with: configuration) { [weak self] image, _ in
+            guard let self, self.previewRequest == request, self.webView.url == url else { return }
+            self.preview = image
+        }
+    }
 
     private var observations: [NSKeyValueObservation] = []
     private var lastHistoryURL: String = ""
@@ -31,6 +50,7 @@ final class BrowserTab: ObservableObject, Identifiable {
             Task { @MainActor in
                 guard let self else { return }
                 let nextURL = wv.url?.absoluteString ?? ""
+                if self.currentURL != nextURL { self.preview = nil; self.previewRequest = UUID() }
                 self.currentURL = nextURL
                 self.recordHistoryIfNeeded(url: nextURL)
             }
@@ -88,6 +108,8 @@ final class BrowserTab: ObservableObject, Identifiable {
 
     /// Break WKUserContentController retain cycles before deallocation.
     func invalidate() {
+        previewRequest = UUID()
+        preview = nil
         observations.removeAll()
         let ucc = webView.configuration.userContentController
         ucc.removeScriptMessageHandler(forName: "kelpieNetwork")
