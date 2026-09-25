@@ -487,3 +487,12 @@ screen and the account menu. Other clients' opaque fields are preserved. Apple
 and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
 Paired browser automation operates on the currently displayed favourites store,
 including the account store while signed in.
+
+### Registered app sign-in
+
+Windows, Linux, macOS, iOS and Android identify Kelpie to UOA with the public
+`com.unlikeotherai.kelpie` app identifier. The hosted page loads its logo, colors and
+allowed Google/password methods from the administrator's Apps record. No shared
+secret or client-controlled authentication configuration is embedded. Every login
+registers a fresh client so policy changes take effect without clearing local state.
+State, exact callbacks and S256 PKCE still protect the authorization code return.

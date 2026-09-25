@@ -97,7 +97,7 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
 
     private func registeredClient() async throws -> String {
         let body = try JSONSerialization.data(withJSONObject: [
-            "client_name": UOAPresentation.clientName, "redirect_uris": [UOAAuthorization.callback],
+            "app_id": "com.unlikeotherai.kelpie", "client_name": UOAPresentation.clientName, "redirect_uris": [UOAAuthorization.callback],
             "token_endpoint_auth_method": "none", "scope": UOAAuthorization.scopes
         ])
         let response = try await transport.request("/oauth/register", method: "POST", body: body)

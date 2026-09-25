@@ -105,6 +105,7 @@ object UOAAccount {
                     run {
                         val body =
                             buildJsonObject {
+                                put("app_id", "com.unlikeotherai.kelpie")
                                 put("client_name", "Kelpie for Android")
                                 put("redirect_uris", JsonArray(listOf(JsonPrimitive(UOAAuthorization.CALLBACK))))
                                 put("token_endpoint_auth_method", "none")

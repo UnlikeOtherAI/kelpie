@@ -93,6 +93,7 @@ void CallbackAndPkce() {
   auto request=[&](const std::string& path,const std::string&,const std::string&,const std::string& body,const std::string&) {
     const auto parsed=json::parse(body);
     if (path=="/oauth/register") {
+      assert(parsed.at("app_id")=="com.unlikeotherai.kelpie");
       redirect=parsed.at("redirect_uris").at(0).get<std::string>();
       return AccountResponse{R"({"client_id":"public-test"})",{}};
     }
@@ -110,7 +111,8 @@ void CallbackAndPkce() {
     return true;
   };
   assert(login.Run(request,profile,open).token=="test-token");
-  std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
+  assert(!std::filesystem::exists(profile/"uoa-public-client.json"));
+  std::filesystem::remove(profile);
 }
 void OwnerThreadHandoffAndCancellation() {
   const auto profile=std::filesystem::temp_directory_path()/RandomAccountValue();
@@ -155,7 +157,8 @@ void OwnerThreadHandoffAndCancellation() {
   account.Shutdown();
   while(!account.Drain() && std::chrono::steady_clock::now()<deadline) std::this_thread::sleep_for(std::chrono::milliseconds(1));
   assert(account.Drain());
-  std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
+  assert(!std::filesystem::exists(profile/"uoa-public-client.json"));
+  std::filesystem::remove(profile);
 }
 void EarlyCancellationDoesNotHang() {
   const auto profile=std::filesystem::temp_directory_path()/RandomAccountValue();
@@ -174,7 +177,8 @@ void EarlyCancellationDoesNotHang() {
     assert(pending.wait_for(std::chrono::seconds(3))==std::future_status::ready);
     pending.get();
   }
-  std::filesystem::remove(profile/"uoa-public-client.json"); std::filesystem::remove(profile);
+  assert(!std::filesystem::exists(profile/"uoa-public-client.json"));
+  std::filesystem::remove(profile);
 }
 }
 int main() {

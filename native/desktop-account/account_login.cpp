@@ -1,7 +1,6 @@
 #include "account_login.h"
 #include <httplib.h>
 #include <condition_variable>
-#include <fstream>
 #include <thread>
 #include <cmath>
 #include <algorithm>
@@ -24,16 +23,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
     const std::function<bool(const std::string&)>& open) {
   using json=nlohmann::json;
   auto& p=*impl_;
-  const auto cache=profile/"uoa-public-client.json";
-  json registration;
-  { std::ifstream file(cache); if (file) registration=json::parse(file,nullptr,false); }
-  int preferred=0;
-  std::string client;
-  if (registration.is_object() && registration.contains("port") && registration["port"].is_number_integer() &&
-      registration.contains("client_id") && registration["client_id"].is_string()) {
-    preferred=registration["port"].get<int>(); client=registration["client_id"].get<std::string>();
-    if (preferred<1024||preferred>65535||client.size()>256) { preferred=0; client.clear(); }
-  }
+  (void)profile;
   p.server.set_read_timeout(2,0); p.server.set_write_timeout(2,0);
   p.server.set_payload_max_length(8192);
   p.server.set_keep_alive_max_count(1);
@@ -44,10 +34,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
       throw AccountFailure(0);
   });
 #endif
-  int port=preferred;
-  if (!preferred || !p.server.bind_to_port("127.0.0.1",preferred)) {
-    port=p.server.bind_to_any_port("127.0.0.1"); client.clear();
-  }
+  const int port=p.server.bind_to_any_port("127.0.0.1");
   if (port<=0 || p.cancelled) throw AccountFailure(0);
   const std::string redirect="http://127.0.0.1:"+std::to_string(port)+"/oauth/callback";
   const auto state=RandomAccountValue(), verifier=RandomAccountValue();
@@ -75,13 +62,12 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
   // startup before honoring cancellation so destruction cannot join forever.
   while (!p.server.is_running() && !p.listener_done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
   if (p.cancelled || p.listener_done) { p.server.stop(); throw AccountFailure(0); }
-  if (client.empty()) {
-    const auto result=request("/oauth/register","POST",{},json{{"client_name","Kelpie Desktop"},
-        {"redirect_uris",{redirect}},{"token_endpoint_auth_method","none"},{"scope",kAccountScopes}}.dump(),{});
-    client=json::parse(result.body).at("client_id").get<std::string>();
-    if (client.empty()||client.size()>256) throw AccountFailure(0);
-    std::ofstream file(cache,std::ios::trunc); file<<json{{"client_id",client},{"port",port}}.dump();
-  }
+  // A fresh public registration picks up administrator policy edits on every login.
+  const auto registration=request("/oauth/register","POST",{},json{{"client_name","Kelpie Desktop"},
+      {"app_id","com.unlikeotherai.kelpie"},{"redirect_uris",{redirect}},
+      {"token_endpoint_auth_method","none"},{"scope",kAccountScopes}}.dump(),{});
+  const auto client=json::parse(registration.body).at("client_id").get<std::string>();
+  if (client.empty()||client.size()>256) throw AccountFailure(0);
   if (p.cancelled || !open(AccountAuthorizationUrl(client,redirect,state,verifier))) throw AccountFailure(0);
   {
     std::unique_lock lock(p.mutex);
@@ -89,14 +75,8 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
     if (!p.completed || p.cancelled || p.code.empty()) throw AccountFailure(0);
   }
   p.server.stop();
-  AccountResponse response;
-  try {
-    response=request("/oauth/token","POST",{},json{{"grant_type","authorization_code"},{"code",p.code},
-        {"client_id",client},{"redirect_uri",redirect},{"code_verifier",verifier}}.dump(),{});
-  } catch (const AccountFailure& failure) {
-    if (failure.status==400 || failure.status==401) { std::error_code error; std::filesystem::remove(cache,error); }
-    throw;
-  }
+  const auto response=request("/oauth/token","POST",{},json{{"grant_type","authorization_code"},{"code",p.code},
+      {"client_id",client},{"redirect_uri",redirect},{"code_verifier",verifier}}.dump(),{});
   const auto token=json::parse(response.body);
   const auto value=token.at("access_token").get<std::string>();
   const auto seconds=token.at("expires_in").get<double>();
