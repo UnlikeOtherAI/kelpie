@@ -6,7 +6,12 @@ import kotlin.math.abs
 class ChromeScrollPolicy {
     private var anchor = 0f
 
-    fun update(translation: Float, offset: Float, maximum: Float, userDragging: Boolean): Boolean? {
+    fun update(
+        translation: Float,
+        offset: Float,
+        maximum: Float,
+        userDragging: Boolean,
+    ): Boolean? {
         if (!userDragging || maximum <= 24 || offset < 0 || offset > maximum) {
             anchor = translation
             return null

@@ -1,7 +1,5 @@
 package com.kelpie.browser.ui
 
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import android.app.Activity
 import android.content.Context
 import android.webkit.WebView
@@ -11,10 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -24,9 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -92,7 +92,11 @@ fun BrowserScreen(
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
     var showTabOverview by remember { mutableStateOf(false) }
-    val sampler = remember(activity) { com.kelpie.browser.browser.ChromeSampler(activity.window) }
+    val sampler =
+        remember(activity) {
+            com.kelpie.browser.browser
+                .ChromeSampler(activity.window)
+        }
     val activeTab = tabs.firstOrNull { it.id == activeTabId }
     val pageColor = Color(activeTab?.chromeColor ?: -1)
     LaunchedEffect(activeTabId, currentUrl, isLoading) {
@@ -175,10 +179,24 @@ fun BrowserScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding(),
+        ) {
             if (isTablet && !isScriptRecording) {
                 TabletTabStrip(tabs, activeTabId, pageColor, { tabStore.addTab() }, tabStore::selectTab, tabStore::closeTab)
-                Box(Modifier.fillMaxWidth().height(1.dp).background(Color(com.kelpie.browser.browser.ChromePalette.foreground(activeTab?.chromeColor ?: -1)).copy(alpha = 0.1f)))
+                Box(
+                    Modifier.fillMaxWidth().height(1.dp).background(
+                        Color(
+                            com.kelpie.browser.browser.ChromePalette
+                                .foreground(activeTab?.chromeColor ?: -1),
+                        ).copy(alpha = 0.1f),
+                    ),
+                )
             }
 
             if (isLoading && !isScriptRecording) {
@@ -189,11 +207,18 @@ fun BrowserScreen(
             }
 
             BrowserViewport(
-                tabStore, browserState, handlerContext, tabletMobileStagePresetId,
+                tabStore,
+                browserState,
+                handlerContext,
+                tabletMobileStagePresetId,
                 onAvailablePresets = { availableTabletViewportPresets = it },
                 onScrollDirectionChange = { bottomBarCollapsed = it == ScrollDirection.DOWN },
                 onScrolled = { activeTab?.let(sampler::request) },
-                onWebViewReady = { webView = it; router.webView = it; handlerContext.webView = it },
+                onWebViewReady = {
+                    webView = it
+                    router.webView = it
+                    handlerContext.webView = it
+                },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
@@ -215,38 +240,41 @@ fun BrowserScreen(
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
                     moreContent = { dismiss ->
-            BrowserMoreMenu(
-                onDismiss = dismiss,
-                onShowTabs = ::showTabs,
-                onAddTab = { tabStore.addTab() },
-                tabCount = tabs.size,
-                onShare = { sharePage(context, currentUrl) },
-                onWelcome = { forceShowWelcome = true; showWelcome = true },
-                onChromeAuth = {
-                    webView?.let { wv ->
-                        handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
-                    }
-                },
-                onSettings = { showSettings = true },
-                onBookmarks = { showBookmarks = true },
-                onHistory = { showHistory = true },
-                onNetworkInspector = { showNetworkInspector = true },
-                onAI = { showAI = true },
-                onSnapshot3D = {
-                    coroutineScope.launch { toggle3DInspector() }
-                },
-                show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
-                showMobileViewportToggle = isTablet,
-                mobileViewportPresets = availableTabletViewportPresets,
-                selectedMobileViewportPresetId =
-                    availableTabletViewportPresets
-                        .firstOrNull { it.id == tabletMobileStagePresetId }
-                        ?.id,
-                onSelectMobileViewportPreset = { presetId ->
-                    val nextPresetId = if (tabletMobileStagePresetId == presetId) null else presetId
-                    TabletViewportPresetStore.setSelectedPresetId(nextPresetId)
-                },
-            )
+                        BrowserMoreMenu(
+                            onDismiss = dismiss,
+                            onShowTabs = ::showTabs,
+                            onAddTab = { tabStore.addTab() },
+                            tabCount = tabs.size,
+                            onShare = { sharePage(context, currentUrl) },
+                            onWelcome = {
+                                forceShowWelcome = true
+                                showWelcome = true
+                            },
+                            onChromeAuth = {
+                                webView?.let { wv ->
+                                    handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
+                                }
+                            },
+                            onSettings = { showSettings = true },
+                            onBookmarks = { showBookmarks = true },
+                            onHistory = { showHistory = true },
+                            onNetworkInspector = { showNetworkInspector = true },
+                            onAI = { showAI = true },
+                            onSnapshot3D = {
+                                coroutineScope.launch { toggle3DInspector() }
+                            },
+                            show3DInspector = FeatureFlags.is3DInspectorEnabled(context),
+                            showMobileViewportToggle = isTablet,
+                            mobileViewportPresets = availableTabletViewportPresets,
+                            selectedMobileViewportPresetId =
+                                availableTabletViewportPresets
+                                    .firstOrNull { it.id == tabletMobileStagePresetId }
+                                    ?.id,
+                            onSelectMobileViewportPreset = { presetId ->
+                                val nextPresetId = if (tabletMobileStagePresetId == presetId) null else presetId
+                                TabletViewportPresetStore.setSelectedPresetId(nextPresetId)
+                            },
+                        )
                     },
                 )
             }
@@ -328,7 +356,13 @@ fun BrowserScreen(
 
     if (showTabOverview && !isScriptRecording) {
         ModalBottomSheet(onDismissRequest = { showTabOverview = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-            BrowserTabOverview(tabs, activeTabId, { tabStore.selectTab(it); showTabOverview = false }, tabStore::closeTab, { tabStore.addTab(); showTabOverview = false }, { showTabOverview = false })
+            BrowserTabOverview(tabs, activeTabId, {
+                tabStore.selectTab(it)
+                showTabOverview = false
+            }, tabStore::closeTab, {
+                tabStore.addTab()
+                showTabOverview = false
+            }, { showTabOverview = false })
         }
     }
 

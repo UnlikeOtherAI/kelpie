@@ -8,15 +8,34 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
 @Composable
-internal fun BrowserMoreMenu(onDismiss: () -> Unit, onShowTabs: () -> Unit, onAddTab: () -> Unit,
-    tabCount: Int, onShare: () -> Unit, onWelcome: () -> Unit, onChromeAuth: () -> Unit,
-    onSettings: () -> Unit, onBookmarks: () -> Unit, onHistory: () -> Unit,
-    onNetworkInspector: () -> Unit, onAI: () -> Unit, onSnapshot3D: () -> Unit,
-    show3DInspector: Boolean, showMobileViewportToggle: Boolean,
-    mobileViewportPresets: List<TabletViewportPreset>, selectedMobileViewportPresetId: String?,
-    onSelectMobileViewportPreset: (String) -> Unit) {
-    @Composable fun item(label: String, action: () -> Unit) {
-        DropdownMenuItem(text = { Text(label) }, onClick = { onDismiss(); action() })
+internal fun BrowserMoreMenu(
+    onDismiss: () -> Unit,
+    onShowTabs: () -> Unit,
+    onAddTab: () -> Unit,
+    tabCount: Int,
+    onShare: () -> Unit,
+    onWelcome: () -> Unit,
+    onChromeAuth: () -> Unit,
+    onSettings: () -> Unit,
+    onBookmarks: () -> Unit,
+    onHistory: () -> Unit,
+    onNetworkInspector: () -> Unit,
+    onAI: () -> Unit,
+    onSnapshot3D: () -> Unit,
+    show3DInspector: Boolean,
+    showMobileViewportToggle: Boolean,
+    mobileViewportPresets: List<TabletViewportPreset>,
+    selectedMobileViewportPresetId: String?,
+    onSelectMobileViewportPreset: (String) -> Unit,
+) {
+    @Composable fun item(
+        label: String,
+        action: () -> Unit,
+    ) {
+        DropdownMenuItem(text = { Text(label) }, onClick = {
+            onDismiss()
+            action()
+        })
     }
     item("Tabs ($tabCount)", onShowTabs)
     item("New tab", onAddTab)
@@ -39,10 +58,18 @@ internal fun BrowserMoreMenu(onDismiss: () -> Unit, onShowTabs: () -> Unit, onAd
     item("Show welcome screen", onWelcome)
 }
 
-internal fun sharePage(context: Context, url: String) {
+internal fun sharePage(
+    context: Context,
+    url: String,
+) {
     if (url.isBlank()) return
-    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, url)
-    }, "Share page"))
+    context.startActivity(
+        Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, url)
+            },
+            "Share page",
+        ),
+    )
 }

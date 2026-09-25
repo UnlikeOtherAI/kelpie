@@ -19,6 +19,7 @@ object ChromePalette {
     fun median(pixels: IntArray): Int {
         val visible = pixels.filter { (it ushr 24) > 127 }
         if (visible.isEmpty()) return -1
+
         fun channel(shift: Int) = visible.map { (it ushr shift) and 255 }.sorted()[visible.size / 2]
         return (255 shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
