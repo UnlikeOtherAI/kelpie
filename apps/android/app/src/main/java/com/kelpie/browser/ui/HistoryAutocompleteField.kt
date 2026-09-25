@@ -1,10 +1,15 @@
 package com.kelpie.browser.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,11 +18,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
 import com.kelpie.browser.browser.HistoryStore
 
 @Composable
@@ -28,6 +35,8 @@ fun HistoryAutocompleteField(
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
     textStyle: TextStyle = TextStyle.Default,
+    onEditingChanged: (Boolean) -> Unit = {},
+    trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     val historyEntries by HistoryStore.entries.collectAsState()
     var urlText by remember { mutableStateOf(currentUrl) }
@@ -56,28 +65,37 @@ fun HistoryAutocompleteField(
             )
         }
 
-    OutlinedTextField(
+    BasicTextField(
         value = urlText,
         onValueChange = { urlText = it },
         singleLine = true,
-        placeholder = { Text(placeholder) },
-        shape = shape,
-        textStyle = textStyle,
+        textStyle = textStyle.copy(color = if (isFocused) MaterialTheme.colorScheme.onSurface else androidx.compose.ui.graphics.Color.Transparent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
         keyboardActions =
             KeyboardActions(onGo = {
                 resolvedNavigationUrl(input = urlText, fullCompletion = completion)?.let(onNavigate)
             }),
-        suffix = {
-            if (!completionSuffix.isNullOrEmpty()) {
-                Text(
-                    text = completionSuffix,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    maxLines = 1,
-                )
+        decorationBox = { inner ->
+            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, shape).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    if (!isFocused) Text(if (currentUrl.isEmpty()) placeholder else domainFromUrl(currentUrl), style = textStyle, maxLines = 1)
+                    inner()
+                }
+                if (!completionSuffix.isNullOrEmpty()) {
+                    Text(
+                        text = completionSuffix,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1,
+                    )
+                }
+                trailingIcon?.invoke()
             }
         },
-        modifier = modifier.onFocusChanged { isFocused = it.isFocused },
+        modifier =
+            modifier.onFocusChanged {
+                isFocused = it.isFocused
+                onEditingChanged(it.isFocused)
+            },
     )
 }
 

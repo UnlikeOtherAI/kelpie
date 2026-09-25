@@ -40,13 +40,13 @@ API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; M
 
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
-On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell now uses matching rounded toolbar chrome, a Chromium brand badge in the URL field, and a warm orange floating menu treatment instead of stock GTK buttons.
+On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
 
-On Linux, the desktop shell runs in either GUI or headless mode. Both modes expose the same HTTP surface, advertise themselves over mDNS, persist profile-backed bookmarks/history/network/console state, support a persisted home page URL, and degrade cleanly when the CEF runtime is unavailable. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
+On Linux, the desktop shell runs in either GUI or headless mode. Both Chromium modes expose the shared authenticated loopback HTTP/MCP surface, persist profile-backed bookmarks, history, full tab sessions and a home page URL. They do not advertise the loopback listener over mDNS. The no-CEF build retains its limited legacy runtime. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
 
-On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with macOS-style close/minimize/maximize dots, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
+On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
-The Windows shell has the same quiet desktop chrome as the macOS app: native icon controls and an IME-capable rounded URL field in a 50-DIP toolbar, a separate native tab strip with per-tab close controls, and native bookmarks, history, network, settings, and toast surfaces. These controls keep standard Windows accessibility roles and keyboard navigation, scale from their owning window's DPI, respect high-contrast colors, and preserve inline history completion semantics.
+The Windows shell places curved tabs in the title bar, a new-tab plus at the top left, and window controls at the top right. The navigation row has unboxed controls and an IME-capable rounded address field. Home opens the saved home URL; the address-field star adds the current page to favorites. The favorites row disappears when empty and offers an overflow menu when crowded. Rendered page-edge colors animate into the chrome, with a one-pixel separator at 10% contrasting opacity. Native accessibility, high contrast, DPI scaling, tab shortcuts and inline history completion remain available. See [Windows shell notes](ui/README.md#windows-shell-notes) for sampling limits and viewport behavior.
 
 ### Safari / Chrome Authentication
 
@@ -169,7 +169,7 @@ Chronological log of every URL navigated to. Auto-recorded from real navigation 
 
 API: `history-list` (with limit), `history-clear`.
 
-## Start Page (macOS, Windows)
+## Start Page (macOS, Windows, Linux)
 
 New tabs open Kelpie's own start page instead of a blank document. It shows the
 app icon, a "Favourites" grid of bookmark tiles, a "Recent" list of the last 20
@@ -177,7 +177,7 @@ history entries, and the "Open a website to get started" empty state when both
 are empty. It follows the system light and dark appearance. Clicking a tile or a
 row navigates that tab.
 
-On macOS the page is the SwiftUI `StartPageView`. On Windows it is the same
+On macOS the page is the SwiftUI `StartPageView`. On Windows and Linux it is the same
 layout served to the tab as first-party content from Kelpie's own `kelpie://`
 scheme, which the browser registers as standard, secure, CORS- and
 fetch-enabled. The page reads its bookmarks and history from `data.json` on that
@@ -193,7 +193,7 @@ the replacement tab left behind after the last tab is closed.
 The `kelpie` scheme is never recorded in history and cannot be bookmarked, so the
 start page never appears inside its own Favourites grid or Recent list.
 
-## Favicons (macOS, Windows)
+## Favicons (macOS, Windows, Linux)
 
 Each tab shows the page's favicon in its pill. macOS fetches it per host and
 caches it on disk; Windows takes it from Chromium itself — the browser reports
@@ -209,7 +209,7 @@ is the same colour on both.
 
 ## Floating Menu
 
-The floating menu is used on iOS, Android, and Linux. On macOS these same actions live as icon buttons directly in the top toolbar instead (see the macOS section below).
+The floating menu is used on iOS and Android. On macOS these same actions live as icon buttons directly in the top toolbar instead (see the macOS section below).
 
 A 44-point circular flame button, vertically centered on the screen edge. Horizontally draggable — swipe it left or right so it's never in the way. Tap to expand a fan of icon-only menu items in a wide half-circle: reload, Safari/Chrome auth, bookmarks, history, network inspector, AI status, 3D inspector, and settings. The fan radius grows automatically with the number of visible actions so newly added buttons do not overlap. On tablets, the fan also includes a phone icon that opens a pill picker anchored off that icon instead of toggling immediately. The picker uses the same sorted fitting preset list shown by the iPad `View` menu and MCP APIs, including phone, tablet, and laptop classes when they fit the current device geometry. Pills use full visible labels such as `6.1" Compact`, `11" iPad Pro`, and `13" Laptop`, and they flow into extra columns outside the fan lane so they do not cover the action buttons. Tapping the active pill again returns the browser to full width. Opens with a blur overlay behind it.
 
@@ -266,7 +266,7 @@ Query elements inside shadow roots, even nested ones. List all shadow DOM hosts 
 
 List open tabs, create new ones, switch between them, close them. Each tab tracks its URL, title, and active state. Each tab owns its own WebView instance so page state, scroll position, and history are preserved across tab switches.
 
-On macOS and Windows, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab.
+On macOS, Windows and Linux, every tab-scoped browser command accepts an optional `tabId` and `generation` lease so multiple agents can control different tabs without switching the visible tab. When only one tab is open, `tabId` can be omitted; when multiple tabs are open, it is required and the server returns `TAB_REQUIRED` if it is missing. `new-tab` returns the tab identifier and generation. Background tabs are fully controllable: JavaScript evaluation, clicks, fills, screenshots, cookies, storage, and dialogs execute against the resolved lease. iOS and Android always operate on the active tab.
 
 macOS also supports multiple top-level windows. Each window has its own tab list, and tab IDs are scoped per window. Tab-related requests accept an optional `windowId` field, and `get-tabs` returns a `windows` array enumerating every window when more than one is open. iOS and Android only ever expose one window and report `windowId: "main"`.
 
@@ -274,13 +274,26 @@ Tabs can carry an optional display **name** and an optional storage **partition*
 
 This delivers isolated identities, **not** parallel execution: commands still serialise on each app's main thread, so an orchestrator drives twelve partitions in turn rather than all at once.
 
-Storage partitioning is available on **macOS with the WebKit engine** and on **Windows with the Chromium (CEF) engine**. macOS on the Chromium engine, iOS, Android, and Linux reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows each partition is a separate `CefRequestContext` — persistent ones stored as a Chromium profile directory `<profile>/cache/partition-<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart.
+Storage partitioning is available on **macOS with the WebKit engine** and on **Windows and Linux with the Chromium (CEF) engine**. macOS on the Chromium engine, iOS and Android reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows and Linux each partition is a separate `CefRequestContext` — persistent ones stored as a Chromium profile directory `<profile>/cache/partition-<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart.
 
-The Windows shell exposes the same feature without the API: the `+` control is a split button offering "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
+The Windows shell exposes the same feature without the API: the top-left `+` creates a tab, and its context menu offers "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
 
 On iOS, Android, macOS, and Linux, the current tab set is also persisted automatically while the browser is running and restored automatically on the next app launch. Restarting the browser reopens the same tabs and URLs that were active before exit instead of dropping back to a blank start state.
 
-On iOS and Android, the URL bar and tab strip are positioned at the bottom of the screen in a Safari-style bottom bar. The bar collapses to a compact domain pill when the user scrolls down, freeing screen space for the page content, and expands back to the full URL field and navigation controls when the user scrolls up or taps the pill. When more than one tab is open, a horizontally scrollable tab strip appears above the URL field showing tab pills with titles and close buttons. The mobile URL bar now also autocompletes previously visited URLs inline as you type and resolves the best history match on submit, so typing a remembered prefix like `deepwater` can reopen the prior page without retyping the full address.
+On iOS and Android, the bottom address toolbar expands to 62 points/dp and
+collapses to a 34-point/dp domain lane during deliberate finger scrolling.
+Programmatic scrolling leaves its geometry unchanged. Tablets keep a persistent
+top tab strip with a left-side plus button, neutral grey inactive tabs, and a
+page-coloured selected tab. Every tab can close, including the final tab, which
+creates a replacement. Phones expose a two-column tab overview through More or
+an upward address drag, with in-memory previews, close buttons and horizontal
+swipe dismissal. More also retains bookmarks, history, sharing, external-browser
+page sign-in, AI, inspectors, tablet viewport presets, settings and welcome help.
+Android's URL field retains inline history completion and reload/stop.
+Android preserves live tabs during resizing and orientation changes. Its network
+service stops only the server instance owned by the departing Activity, so other
+configuration changes cannot leak an old listener or stop the replacement server.
+
 
 ## Iframes
 
@@ -302,7 +315,7 @@ Show or hide the soft keyboard, check its state, and see how it affects the visi
 
 On Android, keyboard visibility and height now come from live `WindowInsets` tracking instead of a stubbed value. Kelpie subtracts the navigation-bar inset from the IME inset and reports the resulting keyboard height plus the remaining visible viewport in dp.
 
-On iPad and Android tablets, the browser shell also has a floating-menu phone viewport picker that stages the live browser view inside a centered device-class viewport instead of stretching edge to edge. The staged viewport honors the current tablet orientation: portrait uses a portrait frame, landscape uses a landscape frame, and the preset list only shows the shared phone, tablet, and laptop sizes that fit the current device geometry. When staged mode is active, a persistent black close button with a white border sits outside the browser frame at the upper-left, and a centered black summary pill sits above the viewport with clear spacing and shows the simulated inches band and pixel range.
+On iPad and Android tablets, the browser shell also has a More-menu phone viewport picker that stages the live browser view inside a centered device-class viewport instead of stretching edge to edge. The staged viewport honors the current tablet orientation: portrait uses a portrait frame, landscape uses a landscape frame, and the preset list only shows the shared phone, tablet, and laptop sizes that fit the current device geometry. When staged mode is active, a persistent black close button with a white border sits outside the browser frame at the upper-left, and a centered black summary pill sits above the viewport with clear spacing and shows the simulated inches band and pixel range.
 
 On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native window retains the current page title for system menus; the tabs show it visually, and the three-dot popup shows the live viewport resolution. The shell persists the user-resized shell window size and on-screen position across launches — the saved position is restored only when it still lands on a connected screen, otherwise the window is re-centered — and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets, sorted by screen size: `Flip Fold (Cover)`, `Compact / Base`, `Standard / Pro`, `Book Fold (Cover)`, `Large / Plus`, `Flip Fold (Internal)`, `Ultra / Pro Max`, `Book Fold (Internal)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Kelpie clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`. macOS keeps back, forward, reload, Home, bookmark, native page sharing and history in the navigation row. The right-hand three-dot popup contains bookmark management, Safari authentication, network inspector, settings, AI, 3D inspection, renderer selection, viewport presets, orientation and scale. All chrome controls use AppKit-backed hit targets. Tabs stay pinned while downward page scrolling hides the address and favourites rows; the first upward scroll reveals them, as do navigation, Home, reload and tab selection. The compact bars use native translucent blur. On macOS 26+ in full-size WebKit mode, page content renders beneath that blur while native insets keep fixed/sticky headers and the visible automation viewport correctly positioned. Other engines, older macOS and staged viewports retain their reserved content area. Chrome samples a narrow visible WebKit page strip during navigation and throttled scrolling, then transitions background, selected tabs, text and toolbar icons together over 200 ms. Sampling stays in memory, ignores bright foreground details when choosing the background, and stops when idle. A bottom status bar shows hovered link destinations, including same-origin frames and open shadow roots, and clears on exit, scrolling or navigation; cross-origin frame links cannot be inspected through the native tracker’s one-shot DOM query. The favourites row contains real saved bookmarks and is hidden while the store is empty. Cmd+D, Add bookmark in the application or three-dot menu, and the address star save the current window’s page, avoiding duplicates and start pages, and reveal the row. Favourites open their saved URLs; removing the last bookmark removes the row and its 29-point WebKit underlap. The divider moves with the bottom of the visible rows and uses adaptive foreground colour at 10% opacity. History opens in an anchored 320-by-420-point popover matching the additional-controls menu, retaining entry navigation and Clear history with AppKit-backed hit targets. Bookmarks, network and settings open native macOS sheets backed by the same stores and inspector data as iOS, with full-row hit targets.
 
@@ -393,7 +406,7 @@ Overriding the device GPS location (latitude, longitude, accuracy) is part of th
 
 ## Windows local control
 
-Windows `0.1.3` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
+Windows `0.1.4` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
 file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
@@ -404,14 +417,21 @@ provides a token-free stdio bridge for local development agents and local Nessie
 that launch removes readiness. Windows home, native toast, and fullscreen are callable through
 HTTP and MCP; remote browser control is not shipped.
 
-On macOS, the selected tab shares the lighter glass surface while the address bar is visible, then transitions to the sampled page-header background when scrolling hides the address bar. A bounded trailing sample catches sticky-header colour transitions after the last scroll event. Inactive tabs use a lighter tint on dark pages and a subtle darker tint on light pages; both tab fills transition on the same clock as the chrome text and icons.
+On macOS, Windows and Linux, the selected tab carries the sampled page colour continuously into the navigation area below. Inactive tabs and the entire title strip stay static light gray, including on dark pages. Page colours animate while the gray strip remains unchanged. On macOS, a bounded trailing sample catches sticky-header colour transitions after the last scroll event.
 
-### macOS UOA account and favourites
+### Desktop UOA account and favourites
 
-The circular account control between History and More opens an account popup. Sign in
-with UOA opens the system authentication browser at authentication.unlikeotherai.com,
-using a public OAuth client and S256 PKCE. Password and authenticator verification stay
-on UOA's hosted screen. The popup displays the authoritative UOA name/email and avatar,
+On macOS, Windows and Linux, pressing the circular account control between History
+and More while signed out starts **Login/register** immediately, with no intermediary
+menu. It opens authentication.unlikeotherai.com in the default browser (the system
+authentication session on Mac), using a public OAuth client and S256 PKCE. Windows
+and Linux fall back to a separate, ephemeral Kelpie login window if the default
+HTTPS handler is absent, fails, or is Kelpie itself. This window loads the hosted
+page and is excluded from automation, tab lists, history and session persistence;
+it closes when login finishes or is cancelled. Social providers may restrict
+embedded browsers; the system browser is preferred. Repeated clicks during login
+offer cancellation. Password and authenticator verification stay on UOA's hosted
+screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
 with Sign out and Refresh favourites actions. Session expiry asks the user to sign in
 again; the public profile does not issue refresh tokens.
 
@@ -443,3 +463,36 @@ Editing locks the bar open above a docked keyboard; floating iPad keyboards leav
 the bar at the bottom. iPad tabs remain visible throughout. Programmatic scrolling does not
 collapse chrome. WebView geometry and staged viewport selection stay stable
 during collapse. Script recording hides all browser chrome.
+
+
+### Mobile accounts
+
+Android and iOS expose Login/register directly from the bottom toolbar's account
+button. Authentication is hosted by UOA and uses public OAuth with random state
+and S256 PKCE. Android opens the default browser; when unavailable it uses a
+separate login Activity/process and WebView profile with no automation bridge and
+WebView inspection disabled. Android userdebug/eng system images can override
+that inspection setting; verify isolation on a production system image.
+iOS uses ASWebAuthenticationSession. Cancellation, expiry and
+process loss return to a signed-out state; no tokens or profiles are persisted.
+Apple and Android register a fresh public client for each login so revoked cached
+registrations cannot strand the app. Signing keys and branded configuration stay
+on the authentication server; no shared secret ships in the applications.
+
+Mobile favourites use the same account settings and compare-and-set updates as
+desktop. Local favourites are retained and restored on logout. Each queued change
+has its own success/failure result, so concurrent API mutations cannot mask each
+other's failures. Cloud data stays in memory; errors appear in the favourites
+screen and the account menu. Other clients' opaque fields are preserved. Apple
+and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
+Paired browser automation operates on the currently displayed favourites store,
+including the account store while signed in.
+
+### Registered app sign-in
+
+Windows, Linux, macOS, iOS and Android identify Kelpie to UOA with the public
+`com.unlikeotherai.kelpie` app identifier. The hosted page loads its logo, colors and
+allowed Google/password methods from the administrator's Apps record. No shared
+secret or client-controlled authentication configuration is embedded. Every login
+registers a fresh client so policy changes take effect without clearing local state.
+State, exact callbacks and S256 PKCE still protect the authorization code return.

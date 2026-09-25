@@ -84,6 +84,8 @@ class DesktopCefClient final : public CefClient,
   void OnResetDialogState(CefRefPtr<CefBrowser> browser) override;
 
   void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
+  void OnPopupShow(CefRefPtr<CefBrowser> browser, bool show) override;
+  void OnPopupSize(CefRefPtr<CefBrowser> browser, const CefRect& rect) override;
   void OnPaint(CefRefPtr<CefBrowser> browser,
                PaintElementType type,
                const RectList& dirty_rects,

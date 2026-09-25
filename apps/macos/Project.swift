@@ -27,6 +27,9 @@ let embedCEFFramework = TargetScript.post(
     ln -sf A "$CEF_DST/Versions/Current"
     ln -sf "Versions/Current/Chromium Embedded Framework" "$CEF_DST/Chromium Embedded Framework"
     ln -sf Versions/Current/Resources "$CEF_DST/Resources"
+    # Reconstructing the versioned framework changes its resource layout. Seal
+    # that final bundle before Xcode signs the containing app.
+    codesign --force --sign - "$CEF_DST"
     """,
     name: "Embed CEF Framework"
 )

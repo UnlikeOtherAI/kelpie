@@ -17,6 +17,9 @@ namespace kelpie::windows::ui {
 // no edges to antialias, so GDI+ would only cost time.
 void FillSolid(HDC dc, const RECT& rect, COLORREF color);
 
+// Browser tab silhouette: rounded shoulders and outward feet, open at its base.
+void PaintBrowserTab(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius);
+
 // An antialiased rounded rectangle. The macOS controls this mirrors are
 // CALayer-backed with smooth corners, and GDI's RoundRect stair-steps badly
 // at the 8- and 15-point radii the toolbar uses.

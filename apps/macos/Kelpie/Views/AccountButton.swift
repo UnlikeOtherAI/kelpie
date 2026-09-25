@@ -19,8 +19,12 @@ struct AccountButton: View {
         .frame(width: 28, height: 28)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color(nsColor: tintColor).opacity(0.18), lineWidth: 0.5))
-        .overlay(AppKitInvisibleButton(accessibilityID: "browser.account", accessibilityLabel: "UOA account", isEnabled: true) {
-            isPresented.toggle()
+        .overlay(AppKitInvisibleButton(accessibilityID: "browser.account", accessibilityLabel: account.profile == nil ? "Login/register" : "Account", isEnabled: true) {
+            if account.profile == nil && !account.signingIn {
+                account.signIn()
+            } else {
+                isPresented.toggle()
+            }
         })
         .overlay(alignment: .bottomTrailing) {
             if account.error != nil || bookmarks.syncError != nil {
@@ -29,20 +33,19 @@ struct AccountButton: View {
         }
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("UnlikeOtherAI account").font(.headline)
+                Text("Account").font(.headline)
                 if let profile = account.profile {
                     Text(profile.name ?? profile.email).font(.subheadline.weight(.semibold))
                     if profile.name != nil { Text(profile.email).foregroundStyle(.secondary) }
-                    Text(bookmarks.isSyncing ? "Syncing favourites…" : "Favourites use your UOA account")
+                    Text(bookmarks.isSyncing ? "Syncing favourites…" : "Account favourites")
                         .font(.caption).foregroundStyle(.secondary)
                     action("Refresh favourites", id: "refresh", action: bookmarks.refreshAccountBookmarks)
                     action("Sign out", id: "sign-out", action: account.signOut)
                 } else if account.signingIn {
-                    Text("Complete sign-in in the UOA window.").foregroundStyle(.secondary)
+                    Text("Complete login/register.").foregroundStyle(.secondary)
                     action("Cancel sign-in", id: "cancel", action: account.cancelSignIn)
                 } else {
-                    Text("Sign in to use your account favourites on this Mac.").foregroundStyle(.secondary)
-                    action("Sign in with UOA", id: "sign-in", action: account.signIn)
+                    action("Login/register", id: "sign-in", action: account.signIn)
                 }
                 if let error = account.error ?? bookmarks.syncError {
                     Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)

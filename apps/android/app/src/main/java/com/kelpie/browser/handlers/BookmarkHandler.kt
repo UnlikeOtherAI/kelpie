@@ -15,23 +15,29 @@ class BookmarkHandler(
         router.register("bookmarks-clear") { clear() }
     }
 
-    private suspend fun list(): Map<String, Any?> = successResponse(mapOf("bookmarks" to BookmarkStore.toJSON()))
+    private suspend fun list(): Map<String, Any?> = savedResponse()
 
     private suspend fun add(body: Map<String, Any?>): Map<String, Any?> {
         val url = body["url"] as? String ?: return errorResponse("MISSING_PARAM", "url is required")
         val title = body["title"] as? String ?: url
-        BookmarkStore.add(title, url)
-        return successResponse(mapOf("bookmarks" to BookmarkStore.toJSON()))
+        return savedResponse(BookmarkStore.add(title, url))
     }
 
     private suspend fun remove(body: Map<String, Any?>): Map<String, Any?> {
         val id = body["id"] as? String ?: return errorResponse("MISSING_PARAM", "id is required")
-        BookmarkStore.remove(id)
-        return successResponse(mapOf("bookmarks" to BookmarkStore.toJSON()))
+        return savedResponse(BookmarkStore.remove(id))
     }
 
-    private suspend fun clear(): Map<String, Any?> {
-        BookmarkStore.clear()
-        return successResponse(mapOf("cleared" to true))
-    }
+    private suspend fun clear(): Map<String, Any?> = savedResponse(BookmarkStore.clear(), cleared = true)
+
+    private suspend fun savedResponse(
+        operation: kotlinx.coroutines.Deferred<Unit>? = null,
+        cleared: Boolean = false,
+    ): Map<String, Any?> =
+        try {
+            operation?.await()
+            if (cleared) successResponse(mapOf("cleared" to true)) else successResponse(mapOf("bookmarks" to BookmarkStore.toJSON()))
+        } catch (error: Exception) {
+            errorResponse("BOOKMARK_SYNC_FAILED", error.message ?: "Favourites could not be synced.")
+        }
 }

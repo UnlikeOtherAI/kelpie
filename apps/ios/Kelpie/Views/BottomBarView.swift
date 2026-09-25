@@ -22,7 +22,7 @@ struct BottomBarView<MoreContent: View>: View {
         GeometryReader { geometry in
             let wide = geometry.size.width > 600
             let compact = isCollapsed && !isEditing
-            let showShare = geometry.size.width >= 390
+            let showShare = geometry.size.width >= 600
             let spacing: CGFloat = wide ? 14 : 5
             let padding: CGFloat = wide ? 20 : 8
             let left = addressFocused ? padding : padding + 88 + spacing * 2
@@ -82,6 +82,7 @@ struct BottomBarView<MoreContent: View>: View {
                 }
                 .frame(width: 64, height: 44)
             } else {
+                AccountButton()
                 if showShare, let url = URL(string: browserState.currentURL), url.scheme != nil {
                     ShareLink(item: url) {
                         Image(systemName: "square.and.arrow.up")
@@ -121,7 +122,7 @@ struct BottomBarView<MoreContent: View>: View {
     private func trailingWidth(wide: Bool, showShare: Bool, spacing: CGFloat) -> CGFloat {
         if addressFocused { return 64 }
         let share = showShare && URL(string: browserState.currentURL)?.scheme != nil
-        let count = 1 + (wide || showShare ? 1 : 0) + (share ? 1 : 0)
+        let count = 2 + (wide || showShare ? 1 : 0) + (share ? 1 : 0)
         return CGFloat(count) * 44 + CGFloat(count - 1) * spacing
     }
 

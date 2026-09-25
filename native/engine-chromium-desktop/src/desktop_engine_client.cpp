@@ -268,19 +268,36 @@ void DesktopCefClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect& rect) {
   rect = CefRect(0, 0, owner_->viewport.width, owner_->viewport.height);
 }
 
-void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser>,
-                               PaintElementType,
+void DesktopCefClient::OnPopupShow(CefRefPtr<CefBrowser> browser, bool show) {
+  if (!show && owner_->browser && browser->IsSame(owner_->browser)) {
+    std::lock_guard<std::mutex> lock(owner_->mutex); owner_->popup = {};
+  }
+}
+void DesktopCefClient::OnPopupSize(CefRefPtr<CefBrowser> browser, const CefRect& rect) {
+  if (owner_->browser && browser->IsSame(owner_->browser)) {
+    std::lock_guard<std::mutex> lock(owner_->mutex); owner_->popup_rect = rect;
+  }
+}
+
+void DesktopCefClient::OnPaint(CefRefPtr<CefBrowser> browser,
+                               PaintElementType type,
                                const RectList&,
                                const void* buffer,
                                int width,
                                int height) {
-  if (buffer == nullptr || width <= 0 || height <= 0) {
+  const auto* tab = owner_->FindTab(browser);
+  if (!tab || tab->closing || !owner_->browser || !browser->IsSame(owner_->browser) ||
+      buffer == nullptr || width <= 0 || height <= 0 ||
+      (type == PET_VIEW && (width != owner_->viewport.width || height != owner_->viewport.height)) ||
+      width > 16384 || height > 16384) {
     return;
   }
   const std::size_t size = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
   std::lock_guard<std::mutex> lock(owner_->mutex);
-  owner_->snapshot_bytes.assign(static_cast<const std::uint8_t*>(buffer),
-                                static_cast<const std::uint8_t*>(buffer) + size);
+  auto& frame = type == PET_VIEW ? owner_->frame : owner_->popup;
+  frame = {tab->id, tab->generation, width, height,
+      std::vector<std::uint8_t>(static_cast<const std::uint8_t*>(buffer),
+                               static_cast<const std::uint8_t*>(buffer) + size)};
 }
 
 }  // namespace kelpie

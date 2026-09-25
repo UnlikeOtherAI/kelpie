@@ -9,11 +9,14 @@
 #include <windows.h>
 
 #include <vector>
+#include "theme/chrome_palette.h"
 
 namespace kelpie::windows {
 
 class WindowChrome {
  public:
+  void SetPalette(ui::ChromePalette palette) { palette_ = palette; }
+  int ControlsWidth() const { return Scale(150); }
   void Attach(HWND window, HINSTANCE instance);
   void Draw(HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
@@ -39,6 +42,8 @@ class WindowChrome {
   int Scale(int value) const;
   void SetControlsHovered(bool hovered);
 
+  ui::ChromePalette palette_ = ui::ChromeColors(ui::DefaultChromeColor());
+  HWND hovered_control_ = nullptr;
   HWND window_ = nullptr;
   HWND close_button_ = nullptr;
   HWND minimize_button_ = nullptr;

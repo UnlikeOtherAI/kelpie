@@ -107,6 +107,17 @@ TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
 
 void DesktopEngine::Impl::UpdateActiveState() {
   if (auto* active = ActiveTab()) {
+    if (viewport.offscreen) {
+      bool changed;
+      { std::lock_guard<std::mutex> lock(mutex);
+        changed = frame.tab_id != active->id || frame.generation != active->generation;
+        if (changed) { frame = {active->id, active->generation, 0, 0, {}}; popup = {}; }
+      }
+      if (changed) {
+        active->browser->GetHost()->SetFocus(page_focused);
+        active->browser->GetHost()->WasResized(); active->browser->GetHost()->Invalidate(PET_VIEW);
+      }
+    }
     current_url = active->url;
     current_title = active->title;
     loading = active->loading;
@@ -373,6 +384,7 @@ BrowserControlResult DesktopEngine::ActivateTab(TabLease lease, Timeout timeout)
     if (impl->browser && impl->browser->GetHost()) ShowWindow(impl->browser->GetHost()->GetWindowHandle(), SW_HIDE);
     if (tab->browser && tab->browser->GetHost()) ShowWindow(tab->browser->GetHost()->GetWindowHandle(), SW_SHOW);
 #endif
+    if (impl->viewport.offscreen && impl->browser) impl->browser->GetHost()->SetFocus(false);
     impl->browser = tab->browser;
     impl->UpdateActiveState();
     return BrowserControlResult::Success(impl->Snapshot(*tab));

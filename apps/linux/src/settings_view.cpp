@@ -52,6 +52,12 @@ void SettingsView::Refresh() {
       "\nModel: " + info["device"]["model"].get<std::string>() +
       "\nmDNS: " + app_.MdnsStatusText();
   gtk_box_pack_start(GTK_BOX(content_), gtk_label_new(summary.c_str()), FALSE, FALSE, 0);
+  auto* isolation=gtk_check_button_new_with_label("Isolate every new tab");
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(isolation),app_.IsolateNewTabs());
+  g_signal_connect(isolation,"toggled",G_CALLBACK(+[](GtkToggleButton* button,gpointer raw) {
+    static_cast<LinuxApp*>(raw)->SetIsolateNewTabs(gtk_toggle_button_get_active(button));
+  }),&app_);
+  gtk_box_pack_start(GTK_BOX(content_),isolation,FALSE,FALSE,0);
 #endif
 }
 

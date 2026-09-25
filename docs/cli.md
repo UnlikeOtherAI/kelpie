@@ -193,7 +193,7 @@ kelpie browser register claude-a
 kelpie browser register codex-b --app-path /Applications/Kelpie.app
 ```
 
-`--platform` defaults to this machine's platform. A Windows alias also needs an absolute `--profile-dir` (see [Windows aliases and agent stdio](#windows-aliases-and-agent-stdio)).
+`--platform` defaults to this machine's platform. A Windows or Linux alias also needs an absolute `--profile-dir` (see [Windows aliases and agent stdio](#windows-aliases-and-agent-stdio)).
 
 ### `kelpie browser launch <name>`
 Launch a new local Kelpie app instance for a registered alias. If `--port` is omitted, the CLI picks the first port from `8420` upward that it can bind on `127.0.0.1`, skipping `8421` (AppReveal and CLI MCP). An explicit `--port` is used exactly as given. The Windows app fails its startup on an occupied port rather than moving, so this is how a second Windows alias avoids the first one's port. Two launches started at the same moment can still pick the same port. If no port from `8420` to `8519` is free, the launch fails with `BROWSER_LAUNCH_FAILED` before starting the app.
@@ -677,10 +677,10 @@ before sending the request; the device validates independently.
 independent identities on one device, driven one command at a time — requests
 still serialise on the app's main thread.
 
-Supported on macOS with the WebKit engine and on Windows with the Chromium
+Supported on macOS with the WebKit engine and on Windows and Linux with the Chromium
 (CEF) engine. On the macOS Chromium engine the request fails with
 `PARTITION_UNSUPPORTED` and `reason: "chromium-engine"`; switch back with
-`kelpie renderer set webkit`. iOS, Android, and Linux do not support partitions
+`kelpie renderer set webkit`. iOS and Android do not support partitions
 yet and answer with `reason: "platform-single-tab"`.
 
 On Windows a persistent partition is stored under
@@ -1130,3 +1130,19 @@ orderly and waits for the matching readiness record to disappear.
 Windows aliases deliberately reject `kelpie --browser win mcp --http`: proxying their local
 capability token through another HTTP listener would widen the local trust boundary. Use stdio,
 or connect a same-user local client directly to the browser's authenticated `/mcp` endpoint.
+
+### Linux aliases and agent stdio
+
+Linux Chromium uses the same protected readiness and alias lifecycle as Windows.
+Register an absolute executable and profile path:
+
+```sh
+kelpie browser register linux --platform linux --app-path /home/me/.local/opt/kelpie/kelpie-linux --profile-dir /home/me/.local/share/kelpie/agent
+kelpie browser launch linux
+kelpie --browser linux mcp
+kelpie browser stop linux
+```
+
+The profile is owner-only (0700), readiness is 0600, and each launch holds an
+exclusive profile lock. The CLI reads the bearer capability locally and rejects
+`mcp --http` for this alias. Persistent partitions live under `cef-cache` on Linux.

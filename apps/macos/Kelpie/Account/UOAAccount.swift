@@ -1,4 +1,5 @@
-import AppKit
+import Foundation
+import Combine
 import AuthenticationServices
 
 /// UOA is the identity authority. Tokens, profile and avatar live only in memory.
@@ -13,7 +14,7 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     }
 
     @Published private(set) var profile: Profile?
-    @Published private(set) var avatar: NSImage?
+    @Published private(set) var avatar: UOAAvatar?
     @Published private(set) var signingIn = false
     @Published var error: String?
     private let transport = UOATransport()
@@ -22,7 +23,6 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     private var generation = UUID()
     private var accessToken: String?
     private var expiresAt = Date.distantPast
-    private let clientKey = "kelpie_uoa_public_client_id"
 
     func signIn() {
         guard !signingIn else { return }
@@ -96,15 +96,13 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     }
 
     private func registeredClient() async throws -> String {
-        if let clientID = UserDefaults.standard.string(forKey: clientKey) { return clientID }
         let body = try JSONSerialization.data(withJSONObject: [
-            "client_name": "Kelpie for Mac", "redirect_uris": [UOAAuthorization.callback],
+            "app_id": "com.unlikeotherai.kelpie", "client_name": UOAPresentation.clientName, "redirect_uris": [UOAAuthorization.callback],
             "token_endpoint_auth_method": "none", "scope": UOAAuthorization.scopes
         ])
         let response = try await transport.request("/oauth/register", method: "POST", body: body)
         struct Registration: Decodable { let client_id: String }
         let clientID = try JSONDecoder().decode(Registration.self, from: response.data).client_id
-        UserDefaults.standard.set(clientID, forKey: clientKey)
         return clientID
     }
 
@@ -134,7 +132,7 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
                 self.error = "Your UOA session has expired. Sign in again."
             }
             if let picture = try? await request("/oauth/me/avatar"), generation == attempt {
-                avatar = NSImage(data: picture.data)
+                avatar = UOAAvatar(data: picture.data)
             }
         } catch {
             guard generation == attempt else { return }
@@ -144,6 +142,6 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     }
 
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated { NSApplication.shared.keyWindow ?? ASPresentationAnchor() }
+        MainActor.assumeIsolated { UOAPresentation.anchor }
     }
 }

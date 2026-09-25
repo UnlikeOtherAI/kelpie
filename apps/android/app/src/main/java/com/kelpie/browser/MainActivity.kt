@@ -51,11 +51,35 @@ import com.kelpie.browser.ui.BrowserScreen
 import com.kelpie.browser.ui.theme.KelpieTheme
 
 class MainActivity : ComponentActivity() {
+    private val accountLogin =
+        registerForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts
+                .StartActivityForResult(),
+        ) { result ->
+            com.kelpie.browser.account.UOAAccount.finishFallback(
+                if (result.resultCode == RESULT_OK) result.data?.dataString else null,
+                result.data?.getStringExtra("nonce"),
+            )
+        }
+
+    fun openAccountFallback(
+        url: String,
+        nonce: String,
+    ) {
+        accountLogin.launch(
+            android.content
+                .Intent(this, com.kelpie.browser.account.AccountLoginActivity::class.java)
+                .putExtra("url", url)
+                .putExtra("nonce", nonce),
+        )
+    }
+
     private val router = Router()
     private val handlerContext = HandlerContext()
     private val scriptPlaybackState = ScriptPlaybackState()
     private var httpServer: HTTPServer? = null
     private var mdnsAdvertiser: MDNSAdvertiser? = null
+    private var networkStage: NetworkServiceStage? = null
     private lateinit var pairingStore: PairingStore
     private lateinit var pairingCoordinator: PairApprovalCoordinator
 
@@ -66,6 +90,8 @@ class MainActivity : ComponentActivity() {
         val deviceInfo = DeviceInfo.collect(this)
         HomeStore.init(this)
         BookmarkStore.init(this)
+        com.kelpie.browser.account.UOAAccount
+            .attach(this)
         HistoryStore.init(this)
         TapCalibrationStore.init(this)
         pairingStore = PairingStore.forContext(this)
@@ -201,7 +227,9 @@ class MainActivity : ComponentActivity() {
         // Hand off lifecycle to the foreground service so Doze cannot stall
         // incoming HTTP requests and the user sees a persistent "reachable"
         // notification.
-        NetworkServiceState.stage(NetworkServiceStage(server, advertiser))
+        val stage = NetworkServiceStage(server, advertiser)
+        networkStage = stage
+        NetworkServiceState.stage(stage)
         KelpieNetworkService.start(applicationContext)
     }
 
@@ -210,16 +238,25 @@ class MainActivity : ComponentActivity() {
         handlerContext.chromeAuth.onResume(handlerContext.webView)
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        handlerContext.tabStore?.discardPreviews()
+    }
+
     override fun onDestroy() {
+        com.kelpie.browser.account.UOAAccount
+            .detach(this)
         handlerContext.dialogState.dismissPending()
         handlerContext.tabStore?.destroyAllTabs()
         super.onDestroy()
-        // Mirrors the previous unconditional onDestroy teardown: the network
-        // stack is tied to the Activity lifecycle. Surviving Activity
-        // recreation (rotation) without rebuilding the HTTP listener is a
-        // separate refactor — out of scope here.
-        KelpieNetworkService.stop(applicationContext)
-        NetworkServiceState.clear()
+        // Release this Activity's listener before its replacement binds the port.
+        // Keep foreground promotion intact across configuration changes.
+        networkStage?.let {
+            it.stop()
+            NetworkServiceState.clearIf(it)
+        }
+        networkStage = null
+        if (!isChangingConfigurations) KelpieNetworkService.stop(applicationContext)
         httpServer = null
         mdnsAdvertiser = null
     }

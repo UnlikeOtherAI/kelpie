@@ -58,6 +58,27 @@ void FillSolid(HDC dc, const RECT& rect, COLORREF color) {
   DeleteObject(brush);
 }
 
+void PaintBrowserTab(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius) {
+  EnsureGdiPlus();
+  Gdiplus::Graphics graphics(dc);
+  graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+  const float l = static_cast<float>(rect.left), r = static_cast<float>(rect.right);
+  const float t = static_cast<float>(rect.top)+0.5f, b = static_cast<float>(rect.bottom);
+  const float c = static_cast<float>(radius);
+  Gdiplus::GraphicsPath path;
+  path.AddBezier(l,b,l+c,b,l+c,b-c,l+c,b-c);
+  path.AddLine(l+c,b-c,l+c,t+c);
+  path.AddBezier(l+c,t+c,l+c,t,l+c*2,t,l+c*2,t);
+  path.AddLine(l+c*2,t,r-c*2,t);
+  path.AddBezier(r-c*2,t,r-c,t,r-c,t+c,r-c,t+c);
+  path.AddLine(r-c,t+c,r-c,b-c);
+  path.AddBezier(r-c,b-c,r-c,b,r,b,r,b);
+  Gdiplus::SolidBrush brush(ToGdiPlus(fill));
+  graphics.FillPath(&brush, &path);
+  Gdiplus::Pen pen(ToGdiPlus(border), 1.0f);
+  graphics.DrawPath(&pen, &path);
+}
+
 void PaintRounded(HDC dc, RECT rect, COLORREF fill, COLORREF border, int radius,
                   int border_width) {
   if (rect.right <= rect.left || rect.bottom <= rect.top) return;

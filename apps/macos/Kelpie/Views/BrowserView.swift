@@ -48,7 +48,7 @@ struct BrowserView: View {
                             Color.clear.frame(height: 32)
                         }
                     }
-                        .background(BrowserGlassBackground(appearance: chromeAppearance))
+                        .background(BrowserChromeStyle.tabs)
                         .zIndex(2)
                     if !isChromeCollapsed {
                     // URL bar — above all overlays so buttons are always clickable

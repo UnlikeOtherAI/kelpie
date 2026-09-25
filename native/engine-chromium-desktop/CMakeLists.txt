@@ -113,6 +113,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     message(FATAL_ERROR "CEF desktop engine requires libcef and libcef_dll_wrapper")
   endif()
   list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES
+    src/private_login_window.cpp
     src/desktop_engine.cpp
     src/desktop_engine_client.cpp
     src/desktop_engine_events.cpp
@@ -126,7 +127,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_favicon.cpp
     src/start_page_scheme.cpp)
 else()
-  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp)
+  list(APPEND MOLOTOV_DESKTOP_ENGINE_SOURCES src/desktop_engine_stub.cpp src/private_login_window_stub.cpp)
 endif()
 
 add_library(kelpie_engine_chromium_desktop STATIC

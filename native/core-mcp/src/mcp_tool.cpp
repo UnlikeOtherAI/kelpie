@@ -13,10 +13,10 @@ const StringList kWebkitOnly = {"webkit"};
 const std::vector<P> kApplePlatforms = {P::kIos, P::kMacos};
 const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
-const std::vector<P> kWindowsOnly = {P::kWindows};
+const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
 // Per-tab storage isolation. macOS has it on the WebKit path and Windows on
 // the CEF path; iOS, Android and Linux drop their exclusion as they land it.
-const std::vector<P> kPartitionPlatforms = {P::kMacos, P::kWindows};
+const std::vector<P> kPartitionPlatforms = {P::kMacos, P::kWindows, P::kLinux};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
@@ -92,7 +92,7 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_set_home", "set-home", "Set the device home page URL. Persisted across app restarts."),
       Tool("kelpie_get_home", "get-home", "Get the device home page URL"),
       Tool("kelpie_close_browser", "close-browser", "Request an orderly local browser shutdown.",
-           CapabilityAvailability(kWindowsOnly, kAllEngines, {"local-browser-shutdown"})),
+           CapabilityAvailability(kLocalDesktop, kAllEngines, {"local-browser-shutdown"})),
       Tool("kelpie_bookmarks_list", "bookmarks-list", "List saved bookmarks"),
       Tool("kelpie_bookmarks_add", "bookmarks-add", "Add a saved bookmark"),
       Tool("kelpie_bookmarks_remove", "bookmarks-remove", "Remove a saved bookmark"),
@@ -115,7 +115,7 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_fill", "fill", "Fill a form field with a value. Shows a touch indicator at the field."),
       Tool("kelpie_type", "type", "Type text character by character"),
       Tool("kelpie_press_key", "press-key", "Send a trusted native key press to the focused browser element.",
-           CapabilityAvailability(kWindowsOnly, kAllEngines, {"trusted-key-input"})),
+           CapabilityAvailability(kLocalDesktop, kAllEngines, {"trusted-key-input"})),
       Tool("kelpie_select_option", "select-option", "Select an option from a dropdown"),
       Tool("kelpie_check", "check", "Check a checkbox"),
       Tool("kelpie_uncheck", "uncheck", "Uncheck a checkbox"),

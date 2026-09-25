@@ -62,6 +62,10 @@ int main(int argc, char* argv[]) {
     const std::string arg = argv[index];
     if (arg == "--headless") {
       config.headless = true;
+    } else if (arg == "--mcp-stdio") {
+      config.mcp_stdio = true;
+    } else if (arg == "--readiness-file" && index + 1 < argc) {
+      config.readiness_path = argv[++index];
     } else if (arg == "--port" && index + 1 < argc) {
       if (!ParseInt(argv[++index], &config.port)) {
         std::cerr << "Invalid --port value\n";
@@ -91,6 +95,10 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  kelpie::linuxapp::LinuxApp app(config, argc, argv);
-  return app.Run();
+  try {
+    kelpie::linuxapp::LinuxApp app(config, argc, argv);
+    return app.Run();
+  } catch (const std::exception& error) {
+    std::cerr << error.what() << '\n'; return 1;
+  }
 }

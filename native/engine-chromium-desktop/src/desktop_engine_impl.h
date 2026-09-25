@@ -90,7 +90,11 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   bool can_go_forward = false;
   std::string current_url = "about:blank";
   std::string current_title;
-  std::vector<std::uint8_t> snapshot_bytes;
+  OffscreenFrame frame;
+  OffscreenFrame popup;
+  CefRect popup_rect;
+  unsigned input_modifiers = 0;
+  bool page_focused = false;
   std::mutex mutex;
 
   Tab* FindTab(const TabLease& lease);

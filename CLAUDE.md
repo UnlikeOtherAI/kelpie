@@ -42,5 +42,5 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 ## Windows release ownership
 
 The Windows desktop version is `KELPIE_WINDOWS_VERSION` in `apps/windows/CMakeLists.txt`
-(currently `0.1.3`). Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
+(currently `0.1.4`). Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
 loopback readiness-token control and the CLI stdio alias bridge before publication.

@@ -9,12 +9,10 @@
 namespace kelpie::linuxapp {
 namespace {
 
-LinuxApp* g_signal_app = nullptr;
+volatile std::sig_atomic_t g_stop = 0;
 
 void HandleSignal(int) {
-  if (g_signal_app != nullptr) {
-    g_signal_app->RequestShutdown();
-  }
+  g_stop = 1;
 }
 
 }  // namespace
@@ -22,16 +20,16 @@ void HandleSignal(int) {
 HeadlessShell::HeadlessShell(LinuxApp& app) : app_(app) {}
 
 int HeadlessShell::Run() {
-  g_signal_app = &app_;
+  g_stop = 0;
   std::signal(SIGINT, HandleSignal);
   std::signal(SIGTERM, HandleSignal);
 
-  std::cout << "Kelpie headless browser running on port " << app_.port() << '\n';
+  std::cerr << "Kelpie headless browser running on port " << app_.port() << '\n';
   while (app_.IsRunning()) {
+    if (g_stop) app_.RequestShutdown();
     app_.PumpBrowser();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
-  g_signal_app = nullptr;
   return 0;
 }
 

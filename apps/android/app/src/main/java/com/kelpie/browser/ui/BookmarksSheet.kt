@@ -28,6 +28,8 @@ fun BookmarksSheet(
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val syncError by BookmarkStore.syncError.collectAsState()
+    val syncing by BookmarkStore.isSyncing.collectAsState()
     val bookmarks by BookmarkStore.bookmarks.collectAsState()
     val isCurrentPageBookmarked = bookmarks.any { it.url == currentUrl }
 
@@ -50,6 +52,8 @@ fun BookmarksSheet(
                 }) { Text(if (isCurrentPageBookmarked) "Unbookmark" else "Add") }
             }
         }
+        syncError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (syncing) Text("Syncing favourites…", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
         if (bookmarks.isEmpty()) {
             Text("No bookmarks yet. Tap Add to bookmark this page.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

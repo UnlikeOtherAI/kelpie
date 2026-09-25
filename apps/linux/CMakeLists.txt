@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(kelpie_linux LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -54,7 +54,7 @@ if(KELPIE_LINUX_CEF_ROOT
   set(KELPIE_LINUX_HAS_CEF 1)
 endif()
 
-set(BUILD_TESTING OFF CACHE BOOL "Disable native library tests for app builds" FORCE)
+include(CTest)
 if(KELPIE_LINUX_HAS_CEF)
   message(STATUS "Linux app: enabling CEF from ${KELPIE_LINUX_CEF_ROOT}")
   set(KELPIE_ENABLE_CHROMIUM_DESKTOP ON CACHE BOOL
@@ -95,14 +95,14 @@ endif()
 
 add_executable(kelpie-linux
   src/main.cpp
-  src/http_server.cpp
-  src/linux_app.cpp
-  src/linux_app_api.cpp
-  src/tap_runtime_utils.cpp
-  src/web_runtime_utils.cpp
+
   src/headless_shell.cpp
   src/gui_shell.cpp
   src/gtk_browser_view.cpp
+  src/gtk_browser_input.cpp
+  src/browser_chrome.cpp
+  src/chrome_icons.cpp
+  src/window_geometry.cpp
   src/url_bar.cpp
   src/ui_theme.cpp
   src/settings_view.cpp
@@ -111,8 +111,6 @@ add_executable(kelpie-linux
   src/network_inspector.cpp
   src/toast_view.cpp
   src/device_info_linux.cpp
-  src/mdns_avahi.cpp
-  src/stub_renderer.cpp
 )
 
 target_include_directories(kelpie-linux
@@ -126,7 +124,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_AVAHI=${KELPIE_LINUX_HAS_AVAHI}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.1.0-dev"
+    KELPIE_LINUX_VERSION="0.1.3"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -219,4 +217,20 @@ if(KELPIE_LINUX_HAS_CEF)
       )
     endif()
   endforeach()
+endif()
+
+if(KELPIE_LINUX_HAS_CEF)
+  add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
+  target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account)
+  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp src/profile_session.cpp)
+  if(BUILD_TESTING)
+    add_executable(linux_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
+    target_include_directories(linux_profile_session_test PRIVATE src)
+    target_compile_options(linux_profile_session_test PRIVATE -UNDEBUG)
+    target_link_libraries(linux_profile_session_test PRIVATE kelpie_desktop_account)
+    add_test(NAME linux_profile_session_test COMMAND linux_profile_session_test)
+  endif()
+else()
+  target_include_directories(kelpie-linux PRIVATE "${KELPIE_NATIVE_ROOT}/desktop-account")
+  target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/mdns_avahi.cpp src/stub_renderer.cpp)
 endif()

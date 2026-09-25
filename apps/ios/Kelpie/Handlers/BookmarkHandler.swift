@@ -13,7 +13,7 @@ struct BookmarkHandler {
 
     @MainActor
     private func list() async -> [String: Any] {
-        successResponse(["bookmarks": BookmarkStore.shared.toJSON()])
+        await savedResponse()
     }
 
     @MainActor
@@ -22,8 +22,7 @@ struct BookmarkHandler {
             return errorResponse(code: "MISSING_PARAM", message: "url is required")
         }
         let title = body["title"] as? String ?? url
-        BookmarkStore.shared.add(title: title, url: url)
-        return successResponse(["bookmarks": BookmarkStore.shared.toJSON()])
+        return await savedResponse(BookmarkStore.shared.add(title: title, url: url))
     }
 
     @MainActor
@@ -31,13 +30,21 @@ struct BookmarkHandler {
         guard let idStr = body["id"] as? String, let id = UUID(uuidString: idStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "id is required")
         }
-        BookmarkStore.shared.remove(id: id)
-        return successResponse(["bookmarks": BookmarkStore.shared.toJSON()])
+        return await savedResponse(BookmarkStore.shared.remove(id: id))
     }
 
     @MainActor
     private func clear() async -> [String: Any] {
-        BookmarkStore.shared.removeAll()
-        return successResponse(["cleared": true])
+        await savedResponse(BookmarkStore.shared.removeAll(), cleared: true)
+    }
+
+    @MainActor
+    private func savedResponse(_ operation: Task<Void, Error>? = nil, cleared: Bool = false) async -> [String: Any] {
+        do {
+            try await operation?.value
+            return cleared ? successResponse(["cleared": true]) : successResponse(["bookmarks": BookmarkStore.shared.toJSON()])
+        } catch {
+            return errorResponse(code: "BOOKMARK_SYNC_FAILED", message: error.localizedDescription)
+        }
     }
 }

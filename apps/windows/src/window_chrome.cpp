@@ -13,12 +13,9 @@
 namespace kelpie::windows {
 namespace {
 
-constexpr int kTitleBarHeight = 38;
+constexpr int kTitleBarHeight = 52;
 constexpr int kResizeBorderWidth = 8;
-constexpr int kControlBoxSize = 20;
-constexpr int kControlDiameter = 14;
-constexpr int kControlGap = 4;
-constexpr int kControlInset = 12;
+constexpr int kControlBoxSize = 50;
 constexpr DWORD kDwmWindowCornerPreference = 33;
 constexpr DWORD kDwmBorderColor = 34;
 constexpr DWORD kDwmRound = 2;
@@ -64,96 +61,45 @@ void WindowChrome::Draw(HDC device_context) const {
   const int title_bar_height = TitleBarHeight();
   RECT title_rect{rect.left, rect.top, rect.right,
                   std::min(rect.bottom, static_cast<LONG>(title_bar_height))};
-  const auto colors = ui::Colors();
-  HBRUSH chrome_brush = CreateSolidBrush(colors.canvas);
-  FillRect(device_context, &title_rect, chrome_brush);
-  DeleteObject(chrome_brush);
-
-  const COLORREF separator_color = active_ ? colors.border : colors.muted_text;
-  HPEN separator_pen = CreatePen(PS_SOLID, 1, separator_color);
-  HGDIOBJ old_pen = SelectObject(device_context, separator_pen);
-  MoveToEx(device_context, rect.left, title_rect.bottom - 1, nullptr);
-  LineTo(device_context, rect.right, title_rect.bottom - 1);
-  SelectObject(device_context, old_pen);
-  DeleteObject(separator_pen);
-
-  wchar_t title[512]{};
-  GetWindowTextW(window_, title,
-                 static_cast<int>(sizeof(title) / sizeof(title[0])));
-  RECT text_rect{Scale(88), 0, rect.right - Scale(88), title_bar_height};
-  SetBkMode(device_context, TRANSPARENT);
-  SetTextColor(device_context, colors.text);
-  HFONT title_font = ui::MakeFont(window_, 13, FW_NORMAL);
-  HGDIOBJ old_font = SelectObject(device_context, title_font);
-  DrawTextW(
-      device_context, title, -1, &text_rect,
-      DT_CENTER | DT_END_ELLIPSIS | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-  SelectObject(device_context, old_font);
-  DeleteObject(title_font);
-
+  ui::FillSolid(device_context, title_rect, palette_.caption);
   if (!IsZoomed(window_)) {
-    HBRUSH border_brush = CreateSolidBrush(separator_color);
+    HBRUSH border_brush = CreateSolidBrush(palette_.line);
     FrameRect(device_context, &rect, border_brush);
     DeleteObject(border_brush);
-  }
+}
 }
 
 bool WindowChrome::DrawControl(const DRAWITEMSTRUCT& item) const {
   if (!IsControlId(item.CtlID)) return false;
-
-  const auto colors = ui::Colors();
-  HBRUSH chrome_brush = CreateSolidBrush(colors.canvas);
-  FillRect(item.hDC, &item.rcItem, chrome_brush);
-  DeleteObject(chrome_brush);
-
-  const int diameter = Scale(kControlDiameter);
-  const int left = item.rcItem.left +
-                   ((item.rcItem.right - item.rcItem.left) - diameter) / 2;
-  const int top =
-      item.rcItem.top + ((item.rcItem.bottom - item.rcItem.top) - diameter) / 2;
-  RECT dot{left, top, left + diameter, top + diameter};
-  COLORREF color = ui::HighContrast() ? colors.muted_text : RGB(184, 184, 184);
-  if (active_) {
-    if (item.CtlID == IDC_WINDOW_CLOSE) color = ui::HighContrast() ? colors.focus : RGB(255, 95, 87);
-    if (item.CtlID == IDC_WINDOW_MINIMIZE) color = ui::HighContrast() ? colors.focus : RGB(254, 188, 46);
-    if (item.CtlID == IDC_WINDOW_MAXIMIZE) color = ui::HighContrast() ? colors.focus : RGB(40, 200, 64);
+  const bool hovered = item.hwndItem == hovered_control_;
+  const bool pressed = (item.itemState & ODS_SELECTED) != 0;
+  const bool close = item.CtlID == IDC_WINDOW_CLOSE;
+  const COLORREF fill = close && (hovered || pressed) ? RGB(196, 43, 28)
+      : (hovered || pressed) ? ui::Blend(palette_.caption_text, palette_.caption, 0.08) : palette_.caption;
+  ui::FillSolid(item.hDC, item.rcItem, fill);
+  const COLORREF ink = close && (hovered || pressed) ? RGB(255,255,255) : palette_.caption_text;
+  const int x = (item.rcItem.left + item.rcItem.right) / 2;
+  const int y = (item.rcItem.top + item.rcItem.bottom) / 2;
+  const int r = Scale(5);
+  HPEN pen = CreatePen(PS_SOLID, std::max(1, Scale(1)), ink);
+  const auto old = SelectObject(item.hDC, pen);
+  const auto brush = SelectObject(item.hDC, GetStockObject(NULL_BRUSH));
+  if (close) {
+    MoveToEx(item.hDC, x-r, y-r, nullptr); LineTo(item.hDC, x+r+1, y+r+1);
+    MoveToEx(item.hDC, x+r, y-r, nullptr); LineTo(item.hDC, x-r-1, y+r+1);
+  } else if (item.CtlID == IDC_WINDOW_MINIMIZE) {
+    MoveToEx(item.hDC, x-r, y, nullptr); LineTo(item.hDC, x+r+1, y);
+  } else if (IsZoomed(window_)) {
+    Rectangle(item.hDC, x-r+2, y-r, x+r+1, y+r-1);
+    ui::FillSolid(item.hDC, RECT{x-r,y-r+2,x+r-1,y+r+1}, fill);
+    Rectangle(item.hDC, x-r, y-r+2, x+r-1, y+r+1);
+  } else {
+    Rectangle(item.hDC, x-r, y-r, x+r+1, y+r+1);
   }
-  HBRUSH dot_brush = CreateSolidBrush(color);
-  HPEN outline_pen = CreatePen(PS_SOLID, 1, color);
-  HGDIOBJ old_brush = SelectObject(item.hDC, dot_brush);
-  HGDIOBJ old_pen = SelectObject(item.hDC, outline_pen);
-  Ellipse(item.hDC, dot.left, dot.top, dot.right, dot.bottom);
-  SelectObject(item.hDC, old_brush);
-  SelectObject(item.hDC, old_pen);
-  DeleteObject(dot_brush);
-  DeleteObject(outline_pen);
-
-  if (controls_hovered_ || (item.itemState & ODS_FOCUS) != 0) {
-    const int center_x = (dot.left + dot.right) / 2;
-    const int center_y = (dot.top + dot.bottom) / 2;
-    const int mark_radius = std::max(2, Scale(3));
-    HPEN mark_pen = CreatePen(PS_SOLID, std::max(1, Scale(1)),
-                              ui::HighContrast() ? colors.text : RGB(62, 45, 44));
-    old_pen = SelectObject(item.hDC, mark_pen);
-    if (item.CtlID == IDC_WINDOW_CLOSE) {
-      MoveToEx(item.hDC, center_x - mark_radius, center_y - mark_radius,
-               nullptr);
-      LineTo(item.hDC, center_x + mark_radius + 1, center_y + mark_radius + 1);
-      MoveToEx(item.hDC, center_x + mark_radius, center_y - mark_radius,
-               nullptr);
-      LineTo(item.hDC, center_x - mark_radius - 1, center_y + mark_radius + 1);
-    } else if (item.CtlID == IDC_WINDOW_MINIMIZE) {
-      MoveToEx(item.hDC, center_x - mark_radius, center_y, nullptr);
-      LineTo(item.hDC, center_x + mark_radius + 1, center_y);
-    } else {
-      MoveToEx(item.hDC, center_x - mark_radius, center_y, nullptr);
-      LineTo(item.hDC, center_x + mark_radius + 1, center_y);
-      MoveToEx(item.hDC, center_x, center_y - mark_radius, nullptr);
-      LineTo(item.hDC, center_x, center_y + mark_radius + 1);
-    }
-    SelectObject(item.hDC, old_pen);
-    DeleteObject(mark_pen);
-  }
+  SelectObject(item.hDC, brush);
+  SelectObject(item.hDC, old);
+  DeleteObject(pen);
+  if ((item.itemState & ODS_FOCUS) != 0) DrawFocusRect(item.hDC, &item.rcItem);
   return true;
 }
 
@@ -161,7 +107,7 @@ bool WindowChrome::EraseBackground(HDC device_context) const {
   if (window_ == nullptr) return false;
   RECT rect{};
   GetClientRect(window_, &rect);
-  HBRUSH brush = CreateSolidBrush(ui::Colors().canvas);
+  HBRUSH brush = CreateSolidBrush(palette_.bar);
   FillRect(device_context, &rect, brush);
   DeleteObject(brush);
   return true;
@@ -217,15 +163,16 @@ int WindowChrome::Inset() const {
 void WindowChrome::LayoutControls() {
   if (window_ == nullptr) return;
   const int control_size = Scale(kControlBoxSize);
-  const int control_gap = Scale(kControlGap);
-  int control_left = Scale(kControlInset);
-  const int control_top = (TitleBarHeight() - control_size) / 2;
-  for (HWND control : {close_button_, minimize_button_, maximize_button_}) {
+  RECT bounds{};
+  GetClientRect(window_, &bounds);
+  int control_left = bounds.right - Inset() - control_size * 3;
+  const int control_top = Inset();
+  for (HWND control : {minimize_button_, maximize_button_, close_button_}) {
     if (control != nullptr) {
       SetWindowPos(control, HWND_TOP, control_left, control_top, control_size,
-                   control_size, SWP_NOACTIVATE);
+                   TitleBarHeight() - control_top, SWP_NOACTIVATE);
     }
-    control_left += control_size + control_gap;
+    control_left += control_size;
   }
 }
 
@@ -275,11 +222,19 @@ LRESULT CALLBACK WindowChrome::ControlProc(HWND hwnd, UINT message,
                                            UINT_PTR subclass_id,
                                            DWORD_PTR reference_data) {
   auto* self = reinterpret_cast<WindowChrome*>(reference_data);
+  if (message == WM_NCHITTEST && self != nullptr) {
+    const auto hit = self->HitTest(wparam, lparam);
+    if (hit >= HTLEFT && hit <= HTBOTTOMRIGHT) return HTTRANSPARENT;
+  }
   if (message == WM_MOUSEMOVE && self != nullptr) {
+    self->hovered_control_ = hwnd;
     self->SetControlsHovered(true);
+    InvalidateRect(hwnd, nullptr, FALSE);
     TRACKMOUSEEVENT tracking{sizeof(tracking), TME_LEAVE, hwnd, 0};
     TrackMouseEvent(&tracking);
   } else if (message == WM_MOUSELEAVE && self != nullptr) {
+    self->hovered_control_ = nullptr;
+    InvalidateRect(hwnd, nullptr, FALSE);
     POINT point{};
     GetCursorPos(&point);
     ScreenToClient(self->window_, &point);
@@ -294,8 +249,8 @@ bool WindowChrome::IsPointInControls(POINT point) const {
   if (close_button_ == nullptr || maximize_button_ == nullptr) return false;
   RECT first{};
   RECT last{};
-  GetWindowRect(close_button_, &first);
-  GetWindowRect(maximize_button_, &last);
+  GetWindowRect(minimize_button_, &first);
+  GetWindowRect(close_button_, &last);
   MapWindowPoints(HWND_DESKTOP, window_, reinterpret_cast<POINT*>(&first), 2);
   MapWindowPoints(HWND_DESKTOP, window_, reinterpret_cast<POINT*>(&last), 2);
   RECT controls{first.left, std::min(first.top, last.top), last.right,

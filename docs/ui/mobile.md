@@ -11,72 +11,40 @@
 
 ## Browser Screen (Main)
 
-The native iOS shell uses a persistent iPad top tab strip and a collapsing bottom
-address toolbar. iPhone has a two-column tab overview opened by dragging the
-address capsule upward or choosing Tabs in More. Tabs can be selected, closed
-with their close button, or dismissed horizontally. A cached preview represents
-a visited page; restored tabs use a title/domain placeholder until first shown.
+The iOS and Android shells use a persistent top tab strip on tablets and a
+collapsing bottom address toolbar on phones and tablets. The phone tab overview
+has two columns and opens through Tabs in More or an upward address drag. Tabs
+can be selected, closed with their close button, or dismissed horizontally.
+Previews stay in memory, with a maximum of 12; restored pages use a title/domain
+placeholder until viewed.
 
-The bottom bar uses native translucent materials, circular 44-point controls
-and a capsule address field. Its 62-point expanded surface becomes a 34-point
-domain lane while scrolling. It stays above the home indicator and keyboard.
-iPad tabs remain visible, including in narrow windows, and scroll horizontally.
-The active tab always has a close button, including the last tab. The iPad strip
-uses the Mac page-color sampler and coordinated transition. Reduce Motion skips
-the color and geometry animations.
+The toolbar has 44-point/dp controls and a capsule address field. Its expanded
+height is 62 points/dp, collapsing to a 34-point/dp domain lane after deliberate
+finger scrolling. Programmatic scrolling does not change chrome geometry. The
+bar stays above system navigation and the keyboard, and expands on tab changes.
+Android retains history autocomplete and reload/stop in the address field.
+Tablet address fields are centered and capped at 620 points/dp. Account, Share,
+Bookmarks and More remain directly accessible beside them; phones put Share and
+Bookmarks in More to preserve typing space. A signed-out account button starts
+Login/register immediately in the system browser, with an isolated hosted-page
+fallback on Android when no browser is available.
 
-Share and Bookmarks move into More when space is limited. More also preserves
-History, Safari sign-in, AI, inspectors, viewport presets, Settings and Welcome.
-The old floating action fan is no longer part of the iOS browser screen.
+Tablet tabs remain visible with one tab and in narrow windows. The plus button
+sits at the far left. Each tab can close; closing the last creates a replacement.
+The strip and inactive tabs stay neutral grey. Only the selected tab takes the
+visible page-edge colour, with an animated transition and a 10% inverse hairline.
+Android samples the rendered hardware surface with PixelCopy; iOS uses WebKit
+snapshots. Neither needs a persistent page script. System reduced-animation
+preferences are respected.
 
-The legacy diagram and toolbar/status descriptions below describe Android;
-the iOS native chrome above supersedes that layout.
-
-### Layout
-
-```
-┌──────────────────────────────────────────┐
-│ Status Bar (OS)                          │
-├──────────────────────────────────────────┤
-│ ┌────────────────────────────┐  ┌──┐    │
-│ │ https://example.com        │  │⚙ │    │
-│ └────────────────────────────┘  └──┘    │
-├──────────────────────────────────────────┤
-│                                          │
-│                                          │
-│                                          │
-│              WebView                     │
-│           (full content)                 │
-│                                          │
-│                                          │
-│                                          │
-│                                          │
-├──────────────────────────────────────────┤
-│ ● Connected  192.168.1.42:8420     MCP ● │
-└──────────────────────────────────────────┘
-```
-
-### Toolbar (Top)
-
-- **URL Bar** — left-aligned, takes most of the width
-  - Editable text field
-  - Shows current URL
-  - Tap to focus and type a new URL
-  - Submit navigates to the URL
-- **Settings Icon** — right side, gear icon
-  - Tap opens the settings panel
-
-### Status Bar (Bottom)
-
-A thin bar showing connection state:
-
-- **Connection indicator** — green dot when HTTP server is running, red when stopped
-- **IP:Port** — current device IP and port (e.g., `192.168.1.42:8420`)
-- **MCP indicator** — green dot when MCP server is active
+More contains Tabs, New tab, Bookmarks, Share, History, external-browser page
+sign-in, AI, inspectors, tablet viewport presets, Settings, and Welcome. The
+floating fan menu is no longer used. Connection and pairing details remain in
+Settings.
 
 ### WebView (Center)
 
-- Takes all remaining space between toolbar and status bar
+- Takes all remaining space above the bottom toolbar
 - Standard web content rendering
 - No custom overlays, no injected UI elements
 - Handles all gestures normally (scroll, pinch zoom, tap)
@@ -200,7 +168,7 @@ On iPad specifically:
 - Pinch still zooms the 3D camera on iPad in either mode.
 - Android tablets mirror the same staged viewport picker, colors, close button, summary pill, and larger navigation targets.
 - Android mirrors the same settings help actions and welcome-screen trigger behavior as iPad.
-- Android mirrors the same AI entry points, 3D inspector floating-menu entry, and native 3D control strip behavior as iPad.
+- Android mirrors the same AI entry points, 3D inspector More-menu entry, and native 3D control strip behavior as iPad.
 
 ---
 

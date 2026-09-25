@@ -39,17 +39,82 @@
 
 ## Windows Shell Notes
 
-- The Windows shell uses the shared custom frame with normal Windows resize, maximize, and system-menu behavior. Its native toolbar follows the desktop visual system: 34-DIP icon controls on a 50-DIP row, 12-DIP outer padding, and a separate rounded tab row. Native buttons retain accessible names, tooltips, and keyboard focus; bare `Tab` / `Shift+Tab` traverse native chrome once it has focus and stay with the renderer during ordinary page form traversal. Tabs have native close buttons tied to their stable tab models. The shell also hosts the child browser, a native settings dialog, a native toast card, and separate bookmarks/history/network inspector utility windows. `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+Shift+Tab`, and `Ctrl+L` remain available after page focus.
-- The frame is borderless: restored, `WM_NCCALCSIZE` makes the whole window the client area, and the shell paints its own 1 px border and supplies 8-DIP resize edges from `WM_NCHITTEST`. Maximized, the client area is exactly the monitor's work area. Windows places a maximized resizable window with its sizing frame (`SM_CXFRAME`/`SM_CYFRAME` plus `SM_CXPADDEDBORDER` at the window's DPI, 8 px at 100%) hanging past every edge of the work area, so without taking that frame back off the caption dots, toolbar, tab strip and page would each lose 8 px off screen and under the taskbar (`apps/windows/src/maximized_frame.{h,cpp}`). On an edge that holds an auto-hide taskbar the maximized window stops 2 px short, as Chromium and Windows Terminal do; a window covering the whole monitor counts as full screen, and the taskbar would no longer slide in over it.
-- The URL bar keeps a native `EDIT` control for IME, selection, and UI Automation, inside a painted rounded surface with a focus ring. Its history completion is an inline selected suffix, offered only for a typed insertion at the end of unselected text; deletion, paste, IME composition, and text replacement do not offer a completion. Escape rejects and Enter accepts it. Browser chrome and panel controls use the owning window's DPI, support per-monitor moves, and use system colors in high contrast. Bookmarks, history, network, settings, and toast surfaces use the same native color, spacing, and typography helpers. The network inspector mirrors the three desktop/mobile filter groups: Method, Type, and Source.
-- The shell paints from one theme module (`apps/windows/src/theme/`) rather than from literal colours: a palette with light, dark and high-contrast variants named after the macOS semantic colours, per-window DPI metrics, a font cache keyed by DPI, size and weight, and antialiased rounded drawing through GDI+. Dark mode follows the system app theme, applies the immersive dark title bar, and rebuilds fonts and themed child controls on `WM_SETTINGCHANGE`, `WM_THEMECHANGED` and DPI changes. The traffic-light window controls keep their literal red, amber and green, which are the same in either appearance.
-- Toolbar icons are Segoe Fluent Icons glyphs with a Segoe MDL2 Assets fallback, chosen to match the SF Symbols in the macOS toolbar. Icon buttons have hover, pressed, disabled and focused states. The address field shows the placeholder "Search or enter website name" and a lock glyph in a reserved left gutter. Unlike the macOS field, the lock is drawn only for `https`, so it never claims a secure transport that does not exist; the gutter is reserved either way so the text does not shift when the scheme changes.
-- Tab pills share the strip like the macOS tab bar, clamped to 80–200 DIP so a single tab does not stretch across the window and a crowded strip stays readable. The strip is `TCS_FIXEDWIDTH`; without that style the tab control sizes every tab to its own label and the shared-width rule cannot apply. Pill width is recomputed when the tab set changes as well as on resize. The active pill is filled with the accent blended toward the canvas, so it follows the palette in both appearances.
-- Tab pills show the page favicon, captured by Chromium itself through `OnFaviconURLChange` and `DownloadImage` (no cookies, capped at 32 DIP). The shell decodes it into a premultiplied 32-bpp bitmap in a 32-entry host-keyed LRU (`apps/windows/src/favicon_cache.{h,cpp}`) that deletes each bitmap on eviction. A site with no favicon falls back to a letter avatar (`apps/windows/src/letter_avatar.{h,cpp}`) using the same six colours and the same domain hash as the macOS `LetterAvatarView`, so one site is one colour on both platforms. A start page tab shows a star instead, matching macOS. `DrawTabIcon` is the single call the tab strip makes for the 14-DIP icon; it decides between star, favicon, and avatar in that order.
-- New tabs open `kelpie://start`, Kelpie's start page, served as first-party content from a custom CEF scheme registered as standard, secure, CORS- and fetch-enabled. The page mirrors the macOS `StartPageView` — 120 px app icon with a 26 px corner radius and a soft shadow, an adaptive 72–96 px "Favourites" grid, a rounded "Recent" card of the last 20 history entries, the "Open a website to get started" empty state, and a 720 px content column — and follows light and dark through `prefers-color-scheme`. Its HTML, CSS, JS, and icon live in `native/engine-chromium-desktop/resources/start_page/` and are embedded at configure time. Bookmarks and history reach it as JSON on the same origin; no script is injected into any third-party page. The Windows page does not carry the macOS background watermark or the hover-to-delete control on history rows.
-- Per-tab storage isolation is reachable from the chrome, not only the API. The `+` control is a split button: the plus opens an ordinary tab, the chevron beside it offers "New tab" and "New isolated tab", and `Ctrl+Shift+N` opens an isolated one directly. An isolated tab gets a freshly generated partition id, so each one is a separate identity.
-- A partitioned pill carries a 2-DIP accent stripe along its foot — the always-visible sign that the tab does not share the default store — and prints the tab's `name` in place of the page title when one was set. Its tooltip shows the real page title, the partition id, and whether that partition is in memory only. In high contrast the stripe uses the system highlight colour so it never disappears into the fill.
-- Settings has an **Isolate every new tab** toggle, off by default. Isolating every tab would break ordinary browsing — a login would not carry into a tab opened from a link — so the shared store stays the default and the toggle is the opt-in for separate identities.
-- The browser host can compile without a real CEF SDK. In that mode the shell still launches and the HTTP server still runs, but browser-engine methods that need the shared desktop Chromium runtime stay explicitly unsupported.
+- The Windows reference chrome places tabs in a 52-DIP title row, with a single
+  new-tab plus on the far left and minimize, maximize/restore and close on the
+  right. A reserved gap remains draggable even when tabs overflow. Right-click
+  the plus (or Shift+F10 while focused) for isolated tabs; Ctrl+Shift+N remains.
+- Selected tabs have curved shoulders and outward feet meeting the navigation
+  surface. Inactive tabs and the caption stay static light gray with fine separators.
+  Real favicons, start-page stars, letter fallbacks, names and partition stripes
+  are retained. Native tab selection, overflow, close buttons and tooltips remain.
+- The 72-DIP navigation row has unboxed Back, Forward, Reload/Stop and Home
+  controls, a 44-DIP pill address field with a secure-transport lock and
+  Add favorite star, followed by bookmarks, network inspector, history and
+  account and settings. Home uses the persisted home URL. The star stores the
+  current page once, locally when signed out or in UOA when signed in.
+- The native EDIT preserves IME, text selection, accessibility and inline
+  history completion. Escape rejects completion; Enter accepts. Ctrl+L focuses
+  the address. Ctrl+T/W/Tab/Shift+Tab retain their tab behavior after page focus.
+- Favorites use the active local or UOA bookmark list. The 44-DIP row exists only when it
+  has entries, opens entries with one click and moves excess entries to a menu.
+  Changes through HTTP/MCP refresh it without requiring navigation. Showing or
+  hiding favorites changes the browser viewport height by 44 DIP, so automation
+  should acquire fresh screenshot coordinates after changing the bookmark set.
+- Chromium captures the current viewport without changing its dimensions,
+  then samples the top 24 pixels into a soft chrome tint twice per second. This follows actual
+  backgrounds, images, video and gradients as the page scrolls. A single bounded
+  request runs off the CEF owner thread and drains before engine teardown. URL,
+  document time origin, scroll position and navigation/selection epochs discard
+  stale results. No listeners or persistent page scripts are installed. Colors
+  ease over 220 ms; reduced animation and high contrast are respected. Utility
+  panels continue to use the system palette.
+- A single physical-pixel separator sits immediately above the browser. It is
+  black over light chrome or white over dark chrome at 10% opacity, and follows
+  the same color transition as the surrounding surface.
+- Dimensions and fonts scale with each window's DPI. Caption controls retain
+  native accessibility and keyboard focus. Maximize respects the monitor work
+  area. The custom accessible caption buttons do not provide Windows 11's
+  native Snap Layout hover flyout; dragging to screen edges remains available.
+- New tabs open the shared Chromium start page at `kelpie://start`, with
+  favorites and recent history. Settings retains **Isolate every new tab**,
+  off by default. Panels, settings, native toasts, agent control and Chromium's
+  sandbox continue to use the existing Windows runtime.
 
-On macOS, the selected tab shares the lighter glass surface while the address bar is visible, then transitions to the sampled page-header background when scrolling hides the address bar. A bounded trailing sample catches sticky-header colour transitions after the last scroll event. Inactive tabs use a lighter tint on dark pages and a subtle darker tint on light pages; both tab fills transition on the same clock as the chrome text and icons.
+Windows remembers window size, position and maximized state in the profile.
+Maximization preserves access to auto-hide taskbars.
+
+The account menu opens hosted UOA sign-in in the external browser using PKCE.
+It shows identity/avatar, pending sign-in, sync errors, refresh and sign-out.
+Signed-in favorites preserve metadata and retry version conflicts; failed saves
+retain the visible list. Sign-out restores local favorites without uploading
+them. Tokens and account data remain in memory; only the public client ID and
+callback port are cached. Signing in is deliberately outside browser-control APIs.
+
+On Mac and Windows, only the selected tab carries the sampled page color.
+Inactive tabs and the full title strip stay opaque light gray in every theme;
+inactive labels and caption controls retain dark ink for contrast.
+
+## Linux Shell Notes
+
+The Chromium GTK shell follows the Windows geometry: a 52-pixel static gray title
+strip with left-hand plus, curved active tab and right-hand window controls;
+a 72-pixel navigation row and 44-pixel address pill; and a 44-pixel favorites row
+that disappears when empty. Native GTK controls retain keyboard and IME input.
+Tabs support favicons, names, close controls, overflow, isolated storage markers,
+Ctrl+T/W/Tab/Shift+Tab and Ctrl+Shift+N. Settings includes Isolate every new tab.
+
+Only the selected tab and rows below it adopt the active page's top-edge color.
+The inactive tabs and title strip remain gray. Color changes ease over 220 ms,
+and a one-pixel contrasting divider uses 10% opacity. Sampling reads the active
+CEF paint buffer; background and stale-generation paints cannot replace it.
+Native select popups compose separately from the page buffer.
+
+The account menu provides hosted UOA PKCE sign-in in an external browser,
+identity/avatar, favorites refresh and sign-out. Local favorites remain separate.
+The shared desktop runtime provides authenticated HTTP/MCP, tab leases, storage
+partitions, trusted input, DOM/evaluation, screenshots, dialogs and inspection.
+Full persistent tab sessions restore on restart; transient partitions do not.
+Shutdown drains account and browser work before removing readiness and GTK views.
+
+For VNC verification on a host running both Wayland and X11, launch with
+`GDK_BACKEND=x11 DISPLAY=:2` to select the VNC desktop explicitly.

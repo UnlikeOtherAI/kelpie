@@ -71,6 +71,8 @@ Summary:        Kelpie LLM-first browser for Linux
 License:        MIT
 BuildArch:      ${ARCH}
 AutoReqProv:    no
+Requires:       libcurl
+Requires:       openssl-libs
 Requires:       alsa-lib
 Requires:       at-spi2-atk
 Requires:       atk

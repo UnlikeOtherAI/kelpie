@@ -17,13 +17,15 @@
 
 #include "resource.h"
 #include "theme/theme.h"
+#include "theme/chrome_palette.h"
 #include "win32_shell.h"
 
 namespace {
 
 class PreviewDelegate final : public kelpie::windows::ShellDelegate {
  public:
-  std::string GetBookmarksJson() const override { return "[]"; }
+  std::string GetBookmarksJson() const override { return bookmarks; }
+  std::string bookmarks = "[]";
   std::string GetHistoryJson() const override { return "[]"; }
   std::string GetNetworkJson() const override { return "[]"; }
   std::string GetTabsJson() const override {
@@ -98,6 +100,35 @@ int main() {
   const kelpie::windows::BrowserState state{"https://kelpie.dev", "Kelpie workspace", false, true, true};
   shell.UpdateBrowserState(state);
   bool passed = true;
+  const auto rect = [](HWND hwnd) { RECT r{}; GetWindowRect(hwnd, &r); return r; };
+  const auto caption = rect(GetDlgItem(shell.hwnd(), IDC_WINDOW_CLOSE));
+  const auto plus = rect(GetDlgItem(shell.hwnd(), IDC_NEW_TAB_BUTTON));
+  const auto tabs = rect(GetDlgItem(shell.hwnd(), IDC_TAB_STRIP));
+  const auto address = rect(GetDlgItem(shell.hwnd(), IDC_URL_EDIT));
+  passed &= Expect(plus.right <= tabs.left && tabs.right < caption.left, "caption row overlaps controls");
+  passed &= Expect(tabs.bottom < address.top, "tabs must be above navigation");
+  const auto empty_page = rect(browser.hwnd());
+  delegate.bookmarks = R"([{"title":"Example","url":"https://example.com"}])";
+  shell.UpdateBrowserState(state);
+  const auto favorites_page = rect(browser.hwnd());
+  passed &= Expect(favorites_page.top-empty_page.top == kelpie::windows::ui::Dip(shell.hwnd(),44),
+                   "favorites added without navigation did not expand the row");
+  passed &= Expect(GetDlgItem(shell.hwnd(), 3000) != nullptr, "favorite has no native button");
+  delegate.bookmarks = "[]";
+  shell.UpdateBrowserState(state);
+  passed &= Expect(rect(browser.hwnd()).top == empty_page.top, "empty favorites left a blank row");
+  const auto light = kelpie::windows::ui::ChromeColors(RGB(255,255,255), false);
+  const auto dark = kelpie::windows::ui::ChromeColors(RGB(0,0,0), false);
+  passed &= Expect(light.line == RGB(230,230,230) && dark.line == RGB(26,26,26),
+                   "separator is not ten percent opposite color");
+  passed &= Expect(light.caption == dark.caption && light.caption_text == dark.caption_text,
+                   "inactive tabs and caption must stay gray with dark ink");
+  kelpie::windows::ui::ChromeTransition transition(RGB(255,255,255));
+  transition.Retarget(RGB(0,0,0),1000,true);
+  const auto midpoint = transition.Color(1110);
+  transition.Retarget(RGB(40,80,160),1110,true);
+  passed &= Expect(transition.Color(1110)==midpoint && transition.Color(1330)==RGB(40,80,160),
+                   "color retargeting jumps instead of continuing smoothly");
   MSG tab{shell.hwnd(), WM_KEYDOWN, VK_TAB, 0, 0, {0, 0}};
   passed &= Expect(!shell.HandleKeyboardNavigation(tab),
                    "bare Tab without a chrome focus owner was consumed");

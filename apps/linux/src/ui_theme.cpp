@@ -184,7 +184,7 @@ void InstallTheme() {
 GtkWidget* CreateSymbolButton(const char* icon_name, const char* tooltip_text) {
 #if KELPIE_LINUX_HAS_GTK
   auto* button = gtk_button_new();
-  auto* image = gtk_image_new_from_icon_name(icon_name, GTK_ICON_SIZE_BUTTON);
+  auto* image = CreateChromeIcon(icon_name);
   gtk_button_set_image(GTK_BUTTON(button), image);
   gtk_widget_set_tooltip_text(button, tooltip_text);
   AddCssClass(button, "kelpie-nav-button");

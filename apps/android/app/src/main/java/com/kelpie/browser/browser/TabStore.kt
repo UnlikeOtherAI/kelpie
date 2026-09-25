@@ -1,6 +1,7 @@
 package com.kelpie.browser.browser
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.webkit.WebView
 import com.kelpie.browser.handlers.HandlerContext
@@ -14,6 +15,29 @@ class TabStore(
     private val handlerContext: HandlerContext,
     private val browserState: BrowserState,
 ) {
+    private val previewSampler = (context as? Activity)?.window?.let(::ChromeSampler)
+    private val previewTabs = mutableListOf<String>()
+
+    fun captureActivePreview() {
+        val tab = activeTab ?: return
+        if (tab.isStartPage) return
+        previewTabs.remove(tab.id)
+        previewTabs.add(tab.id)
+        while (previewTabs.size > 12) {
+            val oldest = previewTabs.removeAt(0)
+            _tabs.value.firstOrNull { it.id == oldest }?.preview = null
+        }
+        val url = tab.currentUrl
+        previewSampler?.capture(tab.webView) { preview ->
+            if (_tabs.value.any { it === tab } && tab.currentUrl == url && tab.id in previewTabs) tab.preview = preview
+        }
+    }
+
+    fun discardPreviews() {
+        previewTabs.clear()
+        _tabs.value.forEach { it.preview = null }
+    }
+
     private val _tabs = MutableStateFlow<List<BrowserTab>>(emptyList())
     val tabs: StateFlow<List<BrowserTab>> = _tabs
 
@@ -47,6 +71,7 @@ class TabStore(
     }
 
     fun addTab(url: String? = null): BrowserTab {
+        captureActivePreview()
         val tab = createTab()
         _tabs.value = _tabs.value + tab
         _activeTabId.value = tab.id
@@ -60,6 +85,7 @@ class TabStore(
     }
 
     fun closeTab(id: String) {
+        previewTabs.remove(id)
         val index = _tabs.value.indexOfFirst { it.id == id }
         if (index < 0) return
 
@@ -84,6 +110,7 @@ class TabStore(
 
     fun selectTab(id: String) {
         if (_tabs.value.any { it.id == id }) {
+            if (id != _activeTabId.value) captureActivePreview()
             _activeTabId.value = id
             persistSession()
         }
@@ -94,6 +121,8 @@ class TabStore(
      * JavaScript interface, and WebChromeClient references do not leak across Activity recreation.
      */
     fun destroyAllTabs() {
+        discardPreviews()
+        previewSampler?.cancel()
         val snapshot = _tabs.value
         _tabs.value = emptyList()
         _activeTabId.value = null
