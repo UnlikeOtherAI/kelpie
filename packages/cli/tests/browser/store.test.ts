@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -31,8 +31,29 @@ describe("browser store", () => {
       version: 1, launchId: "launch", deviceId: "device", port: 8420,
       token: "a".repeat(32), controlMode: "loopback",
       mcp: { http: "true", stdio: false, endpoint: "/mcp" },
-    }));
+    }), { mode: 0o600 });
     await expect(readLocalReadiness(file)).resolves.toBeUndefined();
+  });
+  const capability = {
+    version: 1, launchId: "launch", deviceId: "device", port: 8420,
+    token: "a".repeat(32), controlMode: "loopback",
+    mcp: { http: true, stdio: false, endpoint: "/mcp" },
+  };
+  it("reads a private regular readiness file", async () => {
+    const file = path.join(homeDir, "readiness.json");
+    await writeFile(file, JSON.stringify(capability), { mode: 0o600 });
+    await expect(readLocalReadiness(file)).resolves.toEqual(capability);
+    await expect(readLocalReadiness(homeDir)).resolves.toBeUndefined();
+  });
+  it.skipIf(process.platform === "win32")("rejects shared POSIX permissions and symlinks", async () => {
+    const file = path.join(homeDir, "readiness.json");
+    await writeFile(file, JSON.stringify(capability), { mode: 0o600 });
+    await chmod(file, 0o644);
+    await expect(readLocalReadiness(file)).resolves.toBeUndefined();
+    await chmod(file, 0o600);
+    const link = path.join(homeDir, "linked-readiness.json");
+    await symlink(file, link);
+    await expect(readLocalReadiness(link)).resolves.toBeUndefined();
   });
   it("persists aliases and running state under ~/.kelpie", async () => {
     await upsertBrowserAlias("claude-a", {

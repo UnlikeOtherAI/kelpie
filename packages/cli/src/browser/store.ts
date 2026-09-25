@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import type { Platform } from "@unlikeotherai/kelpie-shared";
 
 export interface BrowserAlias {
@@ -103,9 +104,13 @@ export function readinessPath(alias: BrowserAlias): string | undefined {
 
 /** Read the app-written local capability without persisting or printing it. */
 export async function readLocalReadiness(file: string): Promise<LocalReadiness | undefined> {
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    if ((await stat(file)).size > 16 * 1024) return undefined;
-    const value = JSON.parse(await readFile(file, "utf8")) as Partial<LocalReadiness>;
+    handle = await open(file, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > 16 * 1024) return undefined;
+    if (process.platform !== "win32" && (info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)) return undefined;
+    const value = JSON.parse(await handle.readFile("utf8")) as Partial<LocalReadiness>;
     const boundedId = (input: unknown): input is string => typeof input === "string" && input.length > 0 && input.length <= 128;
     if (value.version !== 1 || !boundedId(value.launchId) || !boundedId(value.deviceId) ||
         !Number.isInteger(value.port) || (value.port ?? 0) < 1 || (value.port ?? 0) > 65_535 ||
@@ -116,5 +121,7 @@ export async function readLocalReadiness(file: string): Promise<LocalReadiness |
     return value as LocalReadiness;
   } catch {
     return undefined;
+  } finally {
+    await handle?.close();
   }
 }

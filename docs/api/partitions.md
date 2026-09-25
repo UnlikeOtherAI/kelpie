@@ -20,8 +20,8 @@ storage identities. They do **not** give N parallel command streams — handlers
 still serialise on each platform's main thread, so an orchestrator drives each
 partition in turn.
 
-**Platform support:** macOS on the WebKit engine, and Windows on the Chromium
-(CEF) engine. macOS on the Chromium engine, iOS, Android, and Linux return
+**Platform support:** macOS on the WebKit engine, and Windows and Linux on the Chromium
+(CEF) engine. macOS on the Chromium engine and iOS return
 `PARTITION_UNSUPPORTED`.
 
 ### Partition errors
@@ -54,7 +54,7 @@ without guessing. A single error code with a `reason` discriminator:
 |---|---|---|
 | `chromium-engine` | macOS running CEF | `set-renderer` with `{"engine": "webkit"}`, then retry. |
 | `webview-multi-profile-missing` | Android | Update Android System WebView to M114 or later. |
-| `platform-single-tab` | iOS, Linux | Not available; use a macOS or Windows device for partitioned work. |
+| `platform-single-tab` | iOS | Not available; use a desktop device for partitioned work. |
 
 ### `getPartitions`
 List live partitions.
@@ -115,9 +115,9 @@ set, a `new-tab` naming the same partition fails with `PARTITION_DELETING`
 rather than binding to a store that is about to disappear. Once the delete
 returns, a retry creates a fresh store under a fresh engine handle.
 
-### Windows (Chromium/CEF)
+### Windows and Linux (Chromium/CEF)
 
-Windows maps one partition onto one `CefRequestContext`. A persistent partition
+Windows and Linux map one partition onto one `CefRequestContext`. A persistent partition
 gets `CefRequestContextSettings.cache_path = <profile>/cache/partition-<id>`;
 a
 non-persistent one is created with an empty `cache_path`, which is CEF's
@@ -150,7 +150,7 @@ that is Chromium's own behaviour, not a partition limitation. A login that must
 survive a restart needs a cookie with an expiry; `localStorage` and IndexedDB
 persist either way.
 
-`window.open` inherits the opener's context. Windows cancels the CEF popup and
+`window.open` inherits the opener's context. Windows and Linux cancel the CEF popup and
 reopens the target as one of its own tabs, so the opener's partition is copied
 onto the new tab explicitly — an isolated tab cannot open its way out of its
 partition.
@@ -225,3 +225,5 @@ Response:
 ```
 
 If the last tab is closed, a new blank tab replaces it — `tabCount` will be `1`, not `0`.
+
+Linux uses the same partition implementation under <profile>/cef-cache to preserve its existing profile location.
