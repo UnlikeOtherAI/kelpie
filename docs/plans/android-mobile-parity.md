@@ -112,9 +112,9 @@ Activity stages a new server. KelpieNetworkService.onDestroy reads that mutable
 global instead of its own server, leaking the old listener. Repeated configuration
 changes can also stop a newly requested foreground service before promotion.
 
-The service will retain the exact stage it started, stop that stage on replacement
-or destruction, and promote itself in onCreate. MainActivity will handle screen,
-density, orientation and keyboard configuration changes itself, as a WebView host;
+The service retains the exact stage it started and stops that stage on replacement
+or destruction. MainActivity handles screen, density, orientation and keyboard
+configuration changes itself, as a WebView host;
 Compose still receives configuration updates. This preserves tabs and account
 presentation across resize and avoids unnecessary foreground-service restarts.
 Verify repeated phone/tablet switches, one live listener, unchanged process,
@@ -129,3 +129,27 @@ The optional configuration declaration is separate, for preserving browser tabs;
 it is not relied upon to fix service teardown. Verify with resize and rotation
 plus unhandled configuration recreation. Shutdown already ran on the main thread;
 this correction does not add a new blocking operation.
+
+## Verification results
+
+- Ubuntu: Gradle build and bundleRelease pass, including ktlint, Android lint,
+  all four native architectures, and 23 JVM tests in each build variant.
+- Android API 34: phone/tablet layouts, page-edge dark-to-light tab colours,
+  static inactive strip, collapsed toolbar, tab overview, new tab and horizontal
+  dismissal verified in the emulator displayed on the Linux VNC desktop.
+- The development-signed release APK is not debuggable. Default-browser login
+  and no-browser hosted fallback both launch. On the production `user` image,
+  the fallback process has no DevTools socket; Back returns to Kelpie. WebView 113
+  deliberately ignores disable-inspection requests on userdebug/eng systems;
+  this was reproduced and checked against Chromium's SharedStatics source.
+- Six phone/tablet transitions and two unhandled night-mode Activity recreations
+  retain the process, recover HTTP readiness, and leave exactly one listener on
+  8420, with no fatal exception or occupied-port error. Public device info reports
+  Android 0.1.4 and requires pairing.
+- Mac: strict Swift lint, arm64 Release build, deep codesign verification and four
+  shared account tests pass. iOS: eight shared/chrome tests and browser UI tests
+  on iPhone 17 Pro and iPad Pro 11-inch pass.
+- No live user credentials were entered. Branding, social-provider configuration
+  and successful user sign-in still require the intended server profile. The APK
+  uses a development signing certificate; the AAB is unsigned and the iOS zip is
+  a simulator build, not a physical-device IPA or store submission.

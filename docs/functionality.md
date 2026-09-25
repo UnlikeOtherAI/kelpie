@@ -290,6 +290,9 @@ an upward address drag, with in-memory previews, close buttons and horizontal
 swipe dismissal. More also retains bookmarks, history, sharing, external-browser
 page sign-in, AI, inspectors, tablet viewport presets, settings and welcome help.
 Android's URL field retains inline history completion and reload/stop.
+Android preserves live tabs during resizing and orientation changes. Its network
+service stops only the server instance owned by the departing Activity, so other
+configuration changes cannot leak an old listener or stop the replacement server.
 
 
 ## Iframes
