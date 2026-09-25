@@ -91,7 +91,7 @@ private struct BrowserTabPreview: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay { RoundedRectangle(cornerRadius: 18).stroke(selected ? Color.accentColor : .clear, lineWidth: 3) }
         .offset(x: drag)
-        .opacity(closing ? 0 : max(0.25, 1 - abs(drag) / 400))
+        .opacity(closing ? 0 : max(0.25, 1 - Double(abs(drag)) / 400))
         .overlay {
             DirectionalBrowserDrag(axis: .horizontal, enabled: !closing, onChange: { drag = $0 }, onEnd: endDrag)
         }
