@@ -27,6 +27,8 @@ import com.kelpie.browser.R
  * connect to — the closest fit among the Android 14 mandatory types.
  */
 class KelpieNetworkService : Service() {
+    private var current: NetworkServiceStage? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(
@@ -43,6 +45,9 @@ class KelpieNetworkService : Service() {
             return START_NOT_STICKY
         }
 
+        if (current !== stage) current?.stop()
+        current = stage
+
         if (!stage.httpServer.isRunning) {
             try {
                 stage.httpServer.start()
@@ -58,19 +63,11 @@ class KelpieNetworkService : Service() {
     }
 
     override fun onDestroy() {
-        val stage = NetworkServiceState.snapshot()
-        if (stage != null) {
-            try {
-                stage.mdnsAdvertiser.shutdown()
-            } catch (e: Exception) {
-                Log.w(TAG, "mDNS shutdown error: ${e.message}")
-            }
-            try {
-                stage.httpServer.stop()
-            } catch (e: Exception) {
-                Log.w(TAG, "HTTPServer stop error: ${e.message}")
-            }
+        current?.let {
+            it.stop()
+            NetworkServiceState.clearIf(it)
         }
+        current = null
         super.onDestroy()
     }
 

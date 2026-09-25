@@ -64,7 +64,7 @@ phones retain their mobile bottom toolbar rather than desktop window controls.
 
 ## Cross-Provider Review
 
-Pending adversarial review before implementation.
+Completed before implementation; dispositions follow.
 
 ### Review disposition (Claude, 2026-09-25)
 
@@ -103,3 +103,29 @@ ISO dates and keep one UI item per stable identifier. Malformed foreign entries
 remain opaque instead of being discarded when adding a different favourite.
 The existing paired-browser automation contract is retained; no new protocol
 scope field or unsolicited extra permission step is introduced.
+
+### Android screen-change lifecycle correction
+
+Tablet-to-phone verification exposed an existing service race: MainActivity's
+onDestroy queues stopService and clears a global stage, then the replacement
+Activity stages a new server. KelpieNetworkService.onDestroy reads that mutable
+global instead of its own server, leaking the old listener. Repeated configuration
+changes can also stop a newly requested foreground service before promotion.
+
+The service will retain the exact stage it started, stop that stage on replacement
+or destruction, and promote itself in onCreate. MainActivity will handle screen,
+density, orientation and keyboard configuration changes itself, as a WebView host;
+Compose still receives configuration updates. This preserves tabs and account
+presentation across resize and avoids unnecessary foreground-service restarts.
+Verify repeated phone/tablet switches, one live listener, unchanged process,
+session restoration and hosted-login cancellation. No HTTP protocol change.
+
+Claude's adversarial review caught the remaining asynchronous teardown race.
+Accepted: the Activity synchronously stops its own stage before recreation, clears
+only that stage by identity, and leaves the foreground service alive during
+configuration changes. The service retains and stops its exact stage rather than
+reading mutable global state in onDestroy. This makes actual ownership explicit.
+The optional configuration declaration is separate, for preserving browser tabs;
+it is not relied upon to fix service teardown. Verify with resize and rotation
+plus unhandled configuration recreation. Shutdown already ran on the main thread;
+this correction does not add a new blocking operation.

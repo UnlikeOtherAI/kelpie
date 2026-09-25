@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private val scriptPlaybackState = ScriptPlaybackState()
     private var httpServer: HTTPServer? = null
     private var mdnsAdvertiser: MDNSAdvertiser? = null
+    private var networkStage: NetworkServiceStage? = null
     private lateinit var pairingStore: PairingStore
     private lateinit var pairingCoordinator: PairApprovalCoordinator
 
@@ -226,7 +227,9 @@ class MainActivity : ComponentActivity() {
         // Hand off lifecycle to the foreground service so Doze cannot stall
         // incoming HTTP requests and the user sees a persistent "reachable"
         // notification.
-        NetworkServiceState.stage(NetworkServiceStage(server, advertiser))
+        val stage = NetworkServiceStage(server, advertiser)
+        networkStage = stage
+        NetworkServiceState.stage(stage)
         KelpieNetworkService.start(applicationContext)
     }
 
@@ -246,12 +249,14 @@ class MainActivity : ComponentActivity() {
         handlerContext.dialogState.dismissPending()
         handlerContext.tabStore?.destroyAllTabs()
         super.onDestroy()
-        // Mirrors the previous unconditional onDestroy teardown: the network
-        // stack is tied to the Activity lifecycle. Surviving Activity
-        // recreation (rotation) without rebuilding the HTTP listener is a
-        // separate refactor — out of scope here.
-        KelpieNetworkService.stop(applicationContext)
-        NetworkServiceState.clear()
+        // Release this Activity's listener before its replacement binds the port.
+        // Keep foreground promotion intact across configuration changes.
+        networkStage?.let {
+            it.stop()
+            NetworkServiceState.clearIf(it)
+        }
+        networkStage = null
+        if (!isChangingConfigurations) KelpieNetworkService.stop(applicationContext)
         httpServer = null
         mdnsAdvertiser = null
     }
