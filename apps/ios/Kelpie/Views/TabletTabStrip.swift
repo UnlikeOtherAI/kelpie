@@ -38,6 +38,9 @@ struct TabletTabStrip: View {
             .frame(height: 48)
             .foregroundStyle(Color(uiColor: appearance.palette.foreground.color))
             .background(Color(uiColor: appearance.palette.background.color).ignoresSafeArea(edges: .top))
+            .onAppear {
+                proxy.scrollTo(tabStore.activeBrowserTabID, anchor: .center)
+            }
             .onChange(of: tabStore.activeBrowserTabID) { identifier in
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     proxy.scrollTo(identifier, anchor: .center)

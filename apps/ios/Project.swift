@@ -88,11 +88,23 @@ let kelpieTests = Target.target(
 
 // MARK: - Schemes
 
+let kelpieUITests = Target.target(
+    name: "KelpieUITests",
+    destinations: [.iPhone, .iPad],
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.uitests",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("UITests/**/*.swift")],
+    dependencies: [.target(name: "Kelpie")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests"])
+    testAction: .targets(["KelpieTests", "KelpieUITests"])
 )
 
 // MARK: - Project
@@ -105,6 +117,7 @@ let project = Project(
     targets: [
         kelpieApp,
         kelpieTests,
+        kelpieUITests,
     ],
     schemes: [
         kelpieScheme,
