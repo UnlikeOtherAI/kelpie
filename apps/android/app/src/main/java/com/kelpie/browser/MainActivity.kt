@@ -210,6 +210,11 @@ class MainActivity : ComponentActivity() {
         handlerContext.chromeAuth.onResume(handlerContext.webView)
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        handlerContext.tabStore?.discardPreviews()
+    }
+
     override fun onDestroy() {
         handlerContext.dialogState.dismissPending()
         handlerContext.tabStore?.destroyAllTabs()

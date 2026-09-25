@@ -96,6 +96,7 @@ fun BrowserScreen(
     val activeTab = tabs.firstOrNull { it.id == activeTabId }
     val pageColor = Color(activeTab?.chromeColor ?: -1)
     LaunchedEffect(activeTabId, currentUrl, isLoading) {
+        sampler.cancel()
         if (!isLoading) activeTab?.let(sampler::request)
     }
     DisposableEffect(sampler) { onDispose { sampler.cancel() } }
@@ -104,13 +105,7 @@ fun BrowserScreen(
     LaunchedEffect(activeTabId) { bottomBarCollapsed = false }
 
     fun showTabs() {
-        activeTab?.let { tab ->
-            val url = tab.currentUrl
-            sampler.capture(tab.webView) { preview ->
-                if (tabs.any { it.id == tab.id } && tab.currentUrl == url) tab.preview = preview
-            }
-        }
-        tabs.filter { it.preview != null }.dropLast(11).forEach { it.preview = null }
+        tabStore.captureActivePreview()
         showTabOverview = true
         bottomBarCollapsed = false
     }
