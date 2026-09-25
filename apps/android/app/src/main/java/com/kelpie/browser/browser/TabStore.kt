@@ -1,8 +1,8 @@
 package com.kelpie.browser.browser
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.app.Activity
+import android.content.Context
 import android.webkit.WebView
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.WebSocketHandler
