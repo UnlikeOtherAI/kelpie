@@ -55,12 +55,22 @@ final class BrowserChromeUITests: XCTestCase {
         capture("dismissed-tab", app)
         cards.firstMatch.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        if tablet { verifyTabletOverflow(app) }
+        if tablet {
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: overview)
+            waitForExpectations(timeout: 5)
+            verifyTabletOverflow(app)
+        }
     }
 
     @MainActor
     private func verifyTabletOverflow(_ app: XCUIApplication) {
-        for _ in 0..<7 { app.buttons["browser.tabs.add"].tap() }
+        let add = app.buttons["browser.tabs.add"]
+        for count in 2...8 {
+            add.tap()
+            let updated = NSPredicate(format: "value == %@", "\(count) tabs")
+            expectation(for: updated, evaluatedWith: add)
+            waitForExpectations(timeout: 5)
+        }
         let closeButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "browser.tabs.close."))
         verifyTabCount(8, app)
         let activeClose = closeButtons.allElementsBoundByIndex.last
@@ -83,7 +93,7 @@ final class BrowserChromeUITests: XCTestCase {
 
     @MainActor
     private func capture(_ name: String, _ app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

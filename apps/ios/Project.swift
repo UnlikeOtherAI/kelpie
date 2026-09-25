@@ -59,7 +59,7 @@ let kelpieApp = Target.target(
             "MARKETING_VERSION": "0.1.4",
             "CURRENT_PROJECT_VERSION": "4",
             "TARGETED_DEVICE_FAMILY": "1,2",
-            "DEVELOPMENT_TEAM": "G42HP8BM2N",
+            "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
             "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../native/.build-iphoneos",
             "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../native/.build-ios-sim",

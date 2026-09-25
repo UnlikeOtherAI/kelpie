@@ -34,6 +34,7 @@ struct TabletTabStrip: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("New tab")
+                    .accessibilityValue("\(tabStore.tabs.count) tabs")
                     .accessibilityIdentifier("browser.tabs.add")
                     .padding(.trailing, 8)
                     Spacer(minLength: 0)
