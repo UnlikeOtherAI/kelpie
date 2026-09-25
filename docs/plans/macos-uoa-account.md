@@ -25,3 +25,18 @@ Native tests cover PKCE/state/callback parsing, cancellation, expiration, bounde
 ## Cross-provider review
 
 The cross-provider review rule was removed from AGENTS.md and CLAUDE.md at the user’s request. No external review is claimed. Implementation uses focused tests and code review without a provider gate.
+
+## Implemented direct account flow
+
+The native app now uses public registration, ASWebAuthenticationSession, exact callback
+and state validation, and S256 PKCE against UOA. No Kelpie backend is introduced. UOA's
+hosted password flow completes replay-protected TOTP or context-bound required setup,
+then retains the existing signature gate. Scoped `/oauth/me` profile/avatar and
+`/oauth/me/settings/:namespace/:key` endpoints validate current authority. Settings
+writes use conditional versions and the existing per-user quota transaction.
+
+Kelpie's account button uses AppKit hit testing, as do its popup actions. Account data
+is memory-only, and account favourites are separate from local signed-out favourites.
+A serialized mutation queue retries conflicts against the latest server list and
+suppresses stale responses after logout. Public sessions currently expire without a
+refresh token; the hosted native profile supports password and authenticator login.

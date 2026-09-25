@@ -1,6 +1,8 @@
 import Foundation
+import CryptoKit
 
 /// Persists bookmarks to UserDefaults; accessible from UI and API handlers.
+@MainActor
 final class BookmarkStore: ObservableObject {
     static let shared = BookmarkStore()
 
@@ -30,16 +32,20 @@ final class BookmarkStore: ObservableObject {
             case url
             case createdAt
             case created_at
+            case name
         }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: DecodingKeys.self)
 
             let identifier = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
-            id = UUID(uuidString: identifier) ?? UUID()
-            title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
             url = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
-            createdAt = Self.decodeDate(from: container) ?? Date()
+            let digest = Array(SHA256.hash(data: Data(url.utf8)).prefix(16))
+            let stableID = digest.withUnsafeBytes { raw in UUID(uuid: raw.loadUnaligned(as: uuid_t.self)) }
+            id = UUID(uuidString: identifier) ?? stableID
+            title = try container.decodeIfPresent(String.self, forKey: .title)
+                ?? container.decodeIfPresent(String.self, forKey: .name) ?? url
+            createdAt = Self.decodeDate(from: container) ?? Date(timeIntervalSince1970: 0)
         }
 
         func encode(to encoder: Encoder) throws {
@@ -68,16 +74,45 @@ final class BookmarkStore: ObservableObject {
 
     @Published private(set) var bookmarks: [Bookmark] = []
 
+    @Published private(set) var syncError: String?
+    @Published private(set) var isSyncing = false
+    private var accountBookmarks: AccountBookmarks?
+
+    func useAccount(_ account: UOAAccount) {
+        accountBookmarks?.invalidate()
+        bookmarks = []
+        accountBookmarks = AccountBookmarks(account: account, store: self)
+        accountBookmarks?.enqueue()
+    }
+
+    func useLocalBookmarks() {
+        accountBookmarks?.invalidate()
+        accountBookmarks = nil
+        syncError = nil
+        isSyncing = false
+        load()
+    }
+
+    func refreshAccountBookmarks() { accountBookmarks?.enqueue() }
+    func flush() async throws {
+        let current = accountBookmarks
+        await current?.flush()
+        guard current === accountBookmarks else { throw CancellationError() }
+        if let syncError { throw NSError(domain: "UOABookmarks", code: 1, userInfo: [NSLocalizedDescriptionKey: syncError]) }
+    }
+    func setAccountBookmarks(_ value: [Bookmark]) { bookmarks = value }
+    func setSyncState(busy: Bool, error: String?) { isSyncing = busy; syncError = error }
+
     private let defaults: UserDefaults
     private let key = "kelpie_bookmarks"
     private let storeHandle = kelpie_bookmark_store_create()
 
-    fileprivate static let iso8601Formatter: ISO8601DateFormatter = {
+    nonisolated fileprivate static var iso8601Formatter: ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
-    }()
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -89,6 +124,10 @@ final class BookmarkStore: ObservableObject {
     }
 
     func add(title: String, url: String) {
+        if let accountBookmarks {
+            accountBookmarks.enqueue(.add(Bookmark(title: title, url: url)))
+            return
+        }
         guard let storeHandle else { return }
         title.withCString { titlePointer in
             url.withCString { urlPointer in
@@ -111,6 +150,7 @@ final class BookmarkStore: ObservableObject {
     }
 
     func remove(id: UUID) {
+        if let accountBookmarks { accountBookmarks.enqueue(.remove(id)); return }
         guard let storeHandle else { return }
         id.uuidString.withCString { idPointer in
             kelpie_bookmark_store_remove(storeHandle, idPointer)
@@ -120,6 +160,7 @@ final class BookmarkStore: ObservableObject {
     }
 
     func removeAll() {
+        if let accountBookmarks { accountBookmarks.enqueue(.clear); return }
         guard let storeHandle else { return }
         kelpie_bookmark_store_remove_all(storeHandle)
         refreshFromCore()
