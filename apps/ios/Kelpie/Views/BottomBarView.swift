@@ -57,7 +57,10 @@ struct BottomBarView<MoreContent: View>: View {
         }
         .onChange(of: addressFocused) { focused in
             isEditing = focused
-            if focused { isCollapsed = false }
+            if focused {
+                urlText = browserState.currentURL
+                isCollapsed = false
+            }
         }
         .onChange(of: tabStore.activeBrowserTabID) { _ in
             addressFocused = false
@@ -122,13 +125,6 @@ struct BottomBarView<MoreContent: View>: View {
         return CGFloat(count) * 44 + CGFloat(count - 1) * spacing
     }
 
-    private var displayedAddress: Binding<String> {
-        Binding(
-            get: { addressFocused ? urlText : (browserState.currentURL.isEmpty ? "" : browserDomain(browserState.currentURL)) },
-            set: { urlText = $0 }
-        )
-    }
-
     private func addressField(compact: Bool) -> some View {
         HStack(spacing: compact ? 0 : 5) {
             if !addressFocused {
@@ -138,8 +134,17 @@ struct BottomBarView<MoreContent: View>: View {
                     .frame(width: compact ? 0 : 12)
                     .opacity(compact ? 0 : 1)
             }
-            TextField("Search or enter address", text: displayedAddress)
+            TextField("Search or enter address", text: $urlText)
                 .font(.system(size: 14))
+                .foregroundStyle(addressFocused ? Color.primary : .clear)
+                .overlay {
+                    Text(browserDomain(browserState.currentURL))
+                        .font(.system(size: 14))
+                        .lineLimit(1)
+                        .opacity(addressFocused || browserState.currentURL.isEmpty ? 0 : 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 .scaleEffect(compact ? 12.0 / 14.0 : 1)
                 .multilineTextAlignment(addressFocused ? .leading : .center)
                 .allowsHitTesting(!compact)

@@ -41,6 +41,7 @@ final class BrowserChromeUITests: XCTestCase {
 
         field.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, url)
         capture("keyboard", app)
         let keyboard = app.keyboards.firstMatch
         if keyboard.frame.width >= app.frame.width * 0.9 {
