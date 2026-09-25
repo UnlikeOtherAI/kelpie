@@ -48,7 +48,7 @@ final class BrowserChromeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2 Tabs"].exists)
         capture("overview", app)
 
-        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "browser.tabs.select."))
+        let cards = overview.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "browser.tabs.select."))
         cards.firstMatch.swipeLeft()
         XCTAssertTrue(app.staticTexts["1 Tabs"].waitForExistence(timeout: 5))
         capture("dismissed-tab", app)

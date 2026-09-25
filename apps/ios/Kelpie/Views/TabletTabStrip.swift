@@ -8,44 +8,49 @@ struct TabletTabStrip: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            HStack(spacing: 4) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 3) {
-                        ForEach(tabStore.tabs) { tab in
-                            TabletBrowserTab(
-                                tab: tab,
-                                selected: tab.id == tabStore.activeBrowserTabID,
-                                palette: appearance.palette,
-                                onSelect: { tabStore.selectBrowserTab(id: tab.id) },
-                                onClose: { tabStore.closeBrowserTab(id: tab.id) }
-                            )
-                            .id(tab.id)
+            GeometryReader { geometry in
+                HStack(spacing: 4) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 3) {
+                            ForEach(tabStore.tabs) { tab in
+                                TabletBrowserTab(
+                                    tab: tab,
+                                    selected: tab.id == tabStore.activeBrowserTabID,
+                                    palette: appearance.palette,
+                                    onSelect: { tabStore.selectBrowserTab(id: tab.id) },
+                                    onClose: { tabStore.closeBrowserTab(id: tab.id) }
+                                )
+                                .id(tab.id)
+                            }
                         }
+                        .padding(.horizontal, 8)
                     }
-                    .padding(.horizontal, 8)
+                    .frame(width: min(CGFloat(tabStore.tabs.count) * 213 + 16, max(0, geometry.size.width - 64)))
+                    Button { tabStore.addBrowserTab() } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 21))
+                            .frame(width: 44, height: 44)
+                            .background(Color(uiColor: appearance.palette.inactiveTab.color), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New tab")
+                    .accessibilityIdentifier("browser.tabs.add")
+                    .padding(.trailing, 8)
+                    Spacer(minLength: 0)
                 }
-                Button { tabStore.addBrowserTab() } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 21))
-                        .frame(width: 44, height: 44)
-                        .background(Color(uiColor: appearance.palette.inactiveTab.color), in: RoundedRectangle(cornerRadius: 12))
+                .frame(height: 48)
+                .foregroundStyle(Color(uiColor: appearance.palette.foreground.color))
+                .background(Color(uiColor: appearance.palette.background.color).ignoresSafeArea(edges: .top))
+                .onAppear {
+                    proxy.scrollTo(tabStore.activeBrowserTabID, anchor: .center)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("New tab")
-                .accessibilityIdentifier("browser.tabs.add")
-                .padding(.trailing, 8)
+                .onChange(of: tabStore.activeBrowserTabID) { identifier in
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(identifier, anchor: .center)
+                    }
+                }
             }
             .frame(height: 48)
-            .foregroundStyle(Color(uiColor: appearance.palette.foreground.color))
-            .background(Color(uiColor: appearance.palette.background.color).ignoresSafeArea(edges: .top))
-            .onAppear {
-                proxy.scrollTo(tabStore.activeBrowserTabID, anchor: .center)
-            }
-            .onChange(of: tabStore.activeBrowserTabID) { identifier in
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                    proxy.scrollTo(identifier, anchor: .center)
-                }
-            }
         }
     }
 }

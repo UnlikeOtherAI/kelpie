@@ -150,6 +150,7 @@ struct BrowserView: View {
                 bottomChrome
             }
         }
+        .accessibilityHidden(showTabOverview)
         .fullScreenCover(isPresented: $showTabOverview) {
             BrowserTabOverview(tabStore: tabStore) { showTabOverview = false }
         }

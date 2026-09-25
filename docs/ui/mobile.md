@@ -188,16 +188,13 @@ On iPad specifically:
 - The settings help section can reopen the welcome card even when automatic launch presentation was previously disabled.
 - The app menu also exposes `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
 - The `View` menu lists `Full Width` plus every staged phone, tablet, and laptop viewport preset that currently fits the tablet geometry.
-- The URL bar includes a `3D` shortcut beside the address field so the 3D DOM inspector is always one tap away on tablets.
+- More exposes the 3D inspector alongside the other browser tools.
 - More → Viewport opens the fitting device-class presets.
-- The floating menu also includes `AI` and `3D` actions, and the fan widens automatically as actions are added so the buttons stay separated on-screen.
-- The picker uses the shared fitting preset list from the staged viewport catalog, sorted by screen size, and shows full labels such as `6.1" Compact`, `11" iPad Pro`, and `13" Laptop`.
-- The picker opens in its own lane outside the floating action fan and spills into extra columns if needed, so the pills do not sit on top of the action buttons.
+- The Viewport submenu uses the shared fitting preset list, sorted by screen size, with labels such as `6.1" Compact`, `11" iPad Pro`, and `13" Laptop`.
 - When a preset is enabled, the browser renders inside a centered phone-sized stage instead of taking the full tablet width.
 - The staged viewport follows tablet orientation: portrait tablet -> phone portrait frame, landscape tablet -> phone landscape frame.
 - The staged viewport shows a persistent black close button with a white border above and to the left of the browser frame, so the smaller viewport can always be dismissed directly without sharing the browser edge.
 - A centered pill sits above the staged viewport with clear spacing and shows the simulated inches band and pixel range for the active preset.
-- The floating-menu fan widens automatically as actions are added, so the icon buttons keep comfortable spacing instead of colliding.
 - While the 3D DOM inspector is active, iPad shows a native bottom control strip with rotate mode (`hand`), scroll mode (`vertical arrows`), zoom in, zoom out, reset, and exit buttons.
 - In rotate mode, one-finger drag rotates the 3D scene; in scroll mode, one-finger vertical drag scrolls the underlying page without leaving 3D.
 - Pinch still zooms the 3D camera on iPad in either mode.
