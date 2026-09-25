@@ -460,3 +460,25 @@ Editing locks the bar open above a docked keyboard; floating iPad keyboards leav
 the bar at the bottom. iPad tabs remain visible throughout. Programmatic scrolling does not
 collapse chrome. WebView geometry and staged viewport selection stay stable
 during collapse. Script recording hides all browser chrome.
+
+
+### Mobile accounts
+
+Android and iOS expose Login/register directly from the bottom toolbar's account
+button. Authentication is hosted by UOA and uses public OAuth with random state
+and S256 PKCE. Android opens the default browser; when unavailable it uses a
+separate login Activity/process and WebView profile with no automation bridge or
+DevTools access. iOS uses ASWebAuthenticationSession. Cancellation, expiry and
+process loss return to a signed-out state; no tokens or profiles are persisted.
+Apple and Android register a fresh public client for each login so revoked cached
+registrations cannot strand the app. Signing keys and branded configuration stay
+on the authentication server; no shared secret ships in the applications.
+
+Mobile favourites use the same account settings and compare-and-set updates as
+desktop. Local favourites are retained and restored on logout. Each queued change
+has its own success/failure result, so concurrent API mutations cannot mask each
+other's failures. Cloud data stays in memory; errors appear in the favourites
+screen and the account menu. Other clients' opaque fields are preserved. Apple
+and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
+Paired browser automation operates on the currently displayed favourites store,
+including the account store while signed in.

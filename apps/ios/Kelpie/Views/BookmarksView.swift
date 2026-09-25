@@ -55,6 +55,10 @@ struct BookmarksView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .top) {
+                if let error = store.syncError { Text(error).font(.caption).foregroundStyle(.red).padding() }
+                else if store.isSyncing { ProgressView("Syncing favourites…").padding(8) }
+            }
             .navigationTitle("Bookmarks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

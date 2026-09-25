@@ -22,8 +22,7 @@ struct BookmarkHandler {
             return errorResponse(code: "MISSING_PARAM", message: "url is required")
         }
         let title = body["title"] as? String ?? url
-        BookmarkStore.shared.add(title: title, url: url)
-        return await savedResponse()
+        return await savedResponse(BookmarkStore.shared.add(title: title, url: url))
     }
 
     @MainActor
@@ -31,20 +30,18 @@ struct BookmarkHandler {
         guard let idStr = body["id"] as? String, let id = UUID(uuidString: idStr) else {
             return errorResponse(code: "MISSING_PARAM", message: "id is required")
         }
-        BookmarkStore.shared.remove(id: id)
-        return await savedResponse()
+        return await savedResponse(BookmarkStore.shared.remove(id: id))
     }
 
     @MainActor
     private func clear() async -> [String: Any] {
-        BookmarkStore.shared.removeAll()
-        return await savedResponse(cleared: true)
+        return await savedResponse(BookmarkStore.shared.removeAll(), cleared: true)
     }
 
     @MainActor
-    private func savedResponse(cleared: Bool = false) async -> [String: Any] {
+    private func savedResponse(_ operation: Task<Void, Error>? = nil, cleared: Bool = false) async -> [String: Any] {
         do {
-            try await BookmarkStore.shared.flush()
+            try await operation?.value
             return cleared ? successResponse(["cleared": true]) : successResponse(["bookmarks": BookmarkStore.shared.toJSON()])
         } catch {
             return errorResponse(code: "BOOKMARK_SYNC_FAILED", message: error.localizedDescription)

@@ -53,6 +53,7 @@ enum class ScrollDirection { UP, DOWN }
 /** One bottom navigation surface; tab management lives above the page or in overview. */
 @Composable
 fun BottomBar(
+    activity: android.app.Activity,
     currentUrl: String,
     canGoBack: Boolean,
     canGoForward: Boolean,
@@ -148,6 +149,7 @@ fun BottomBar(
                             editing = false
                         }) { Text("Cancel") }
                     } else {
+                        AccountButton(activity)
                         if (wide) ChromeButton(Icons.Default.Bookmarks, "Bookmarks", action = onBookmarks)
                         Box {
                             ChromeButton(Icons.Default.MoreHoriz, "More", action = {

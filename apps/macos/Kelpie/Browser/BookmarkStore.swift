@@ -38,13 +38,13 @@ final class BookmarkStore: ObservableObject {
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: DecodingKeys.self)
 
-            let identifier = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+            let identifier = (try? container.decode(String.self, forKey: .id)) ?? ""
             url = try container.decodeIfPresent(String.self, forKey: .url) ?? ""
             let digest = Array(SHA256.hash(data: Data(url.utf8)).prefix(16))
             let stableID = digest.withUnsafeBytes { raw in UUID(uuid: raw.loadUnaligned(as: uuid_t.self)) }
             id = UUID(uuidString: identifier) ?? stableID
-            title = try container.decodeIfPresent(String.self, forKey: .title)
-                ?? container.decodeIfPresent(String.self, forKey: .name) ?? url
+            title = (try? container.decode(String.self, forKey: .title))
+                ?? (try? container.decode(String.self, forKey: .name)) ?? url
             createdAt = Self.decodeDate(from: container) ?? Date(timeIntervalSince1970: 0)
         }
 
@@ -53,7 +53,7 @@ final class BookmarkStore: ObservableObject {
             try container.encode(id.uuidString, forKey: .id)
             try container.encode(title, forKey: .title)
             try container.encode(url, forKey: .url)
-            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(BookmarkStore.iso8601Formatter.string(from: createdAt), forKey: .createdAt)
         }
 
         private static func decodeDate(from container: KeyedDecodingContainer<DecodingKeys>) -> Date? {
@@ -61,11 +61,11 @@ final class BookmarkStore: ObservableObject {
                 return date
             }
             if let string = try? container.decode(String.self, forKey: .createdAt),
-               let date = BookmarkStore.iso8601Formatter.date(from: string) {
+               let date = BookmarkStore.date(from: string) {
                 return date
             }
             if let string = try? container.decode(String.self, forKey: .created_at),
-               let date = BookmarkStore.iso8601Formatter.date(from: string) {
+               let date = BookmarkStore.date(from: string) {
                 return date
             }
             return nil
@@ -96,7 +96,7 @@ final class BookmarkStore: ObservableObject {
     func refreshAccountBookmarks() { accountBookmarks?.enqueue() }
     func flush() async throws {
         let current = accountBookmarks
-        await current?.flush()
+        try await current?.flush()
         guard current === accountBookmarks else { throw CancellationError() }
         if let syncError { throw NSError(domain: "UOABookmarks", code: 1, userInfo: [NSLocalizedDescriptionKey: syncError]) }
     }
@@ -106,6 +106,13 @@ final class BookmarkStore: ObservableObject {
     private let defaults: UserDefaults
     private let key = "kelpie_bookmarks"
     private let storeHandle = kelpie_bookmark_store_create()
+
+    nonisolated fileprivate static func date(from value: String) -> Date? {
+        if let date = iso8601Formatter.date(from: value) { return date }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value)
+    }
 
     nonisolated fileprivate static var iso8601Formatter: ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
@@ -123,12 +130,12 @@ final class BookmarkStore: ObservableObject {
         kelpie_bookmark_store_destroy(storeHandle)
     }
 
-    func add(title: String, url: String) {
+    @discardableResult
+    func add(title: String, url: String) -> Task<Void, Error>? {
         if let accountBookmarks {
-            accountBookmarks.enqueue(.add(Bookmark(title: title, url: url)))
-            return
+            return accountBookmarks.enqueue(.add(Bookmark(title: title, url: url)))
         }
-        guard let storeHandle else { return }
+        guard let storeHandle else { return nil }
         title.withCString { titlePointer in
             url.withCString { urlPointer in
                 kelpie_bookmark_store_add(storeHandle, titlePointer, urlPointer)
@@ -136,6 +143,7 @@ final class BookmarkStore: ObservableObject {
         }
         refreshFromCore()
         persist()
+        return nil
     }
 
     /// Shared by the active-window shortcut and chrome actions; never save the start page.
@@ -149,22 +157,26 @@ final class BookmarkStore: ObservableObject {
         return true
     }
 
-    func remove(id: UUID) {
-        if let accountBookmarks { accountBookmarks.enqueue(.remove(id)); return }
-        guard let storeHandle else { return }
+    @discardableResult
+    func remove(id: UUID) -> Task<Void, Error>? {
+        if let accountBookmarks { return accountBookmarks.enqueue(.remove(id)) }
+        guard let storeHandle else { return nil }
         id.uuidString.withCString { idPointer in
             kelpie_bookmark_store_remove(storeHandle, idPointer)
         }
         refreshFromCore()
         persist()
+        return nil
     }
 
-    func removeAll() {
-        if let accountBookmarks { accountBookmarks.enqueue(.clear); return }
-        guard let storeHandle else { return }
+    @discardableResult
+    func removeAll() -> Task<Void, Error>? {
+        if let accountBookmarks { return accountBookmarks.enqueue(.clear) }
+        guard let storeHandle else { return nil }
         kelpie_bookmark_store_remove_all(storeHandle)
         refreshFromCore()
         persist()
+        return nil
     }
 
     func toJSON() -> [[String: Any]] {

@@ -69,7 +69,7 @@ fun HistoryAutocompleteField(
         value = urlText,
         onValueChange = { urlText = it },
         singleLine = true,
-        textStyle = textStyle,
+        textStyle = textStyle.copy(color = if (isFocused) MaterialTheme.colorScheme.onSurface else androidx.compose.ui.graphics.Color.Transparent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
         keyboardActions =
             KeyboardActions(onGo = {
@@ -78,7 +78,7 @@ fun HistoryAutocompleteField(
         decorationBox = { inner ->
             Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, shape).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
-                    if (urlText.isEmpty()) Text(placeholder, style = textStyle, maxLines = 1)
+                    if (!isFocused) Text(if (currentUrl.isEmpty()) placeholder else domainFromUrl(currentUrl), style = textStyle, maxLines = 1)
                     inner()
                 }
                 if (!completionSuffix.isNullOrEmpty()) {

@@ -40,7 +40,7 @@ final class UOAAccountTests: XCTestCase {
             return UOATransport.Response(data: try JSONSerialization.data(withJSONObject: object), version: "version")
         }
         sync.enqueue(.add(added))
-        await sync.flush()
+        try await sync.flush()
         XCTAssertEqual(puts, 2)
         XCTAssertEqual(store.bookmarks.map(\.url), [other.url, added.url])
         XCTAssertEqual(BookmarkStore(defaults: defaults).bookmarks.map(\.url), ["https://local.example"])
@@ -52,7 +52,7 @@ final class UOAAccountTests: XCTestCase {
         store.add(title: "Local", url: "https://local.example")
         let sync = AccountBookmarks(store: store) { _, _, _, _ in throw UOATransport.Failure(status: 503) }
         sync.enqueue(.clear)
-        await sync.flush()
+        try? await sync.flush()
         XCTAssertNotNil(store.syncError)
         XCTAssertEqual(store.bookmarks.count, 1)
         let delayed = AccountBookmarks(store: store) { _, _, _, _ in
@@ -62,7 +62,31 @@ final class UOAAccountTests: XCTestCase {
         delayed.enqueue()
         await Task.yield()
         delayed.invalidate()
-        await delayed.flush()
+        try? await delayed.flush()
         XCTAssertEqual(store.bookmarks.count, 1)
+    }
+
+    func testAndroidDatesRoundTripAndEachSaveKeepsItsOwnFailure() async throws {
+        let raw = Data(#"{"url":"https://android.example","createdAt":"2026-09-25T10:20:30.123Z"}"#.utf8)
+        let bookmark = try JSONDecoder().decode(BookmarkStore.Bookmark.self, from: raw)
+        XCTAssertGreaterThan(bookmark.createdAt.timeIntervalSince1970, 1_700_000_000)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(bookmark)) as? [String: Any]
+        XCTAssertTrue((encoded?["createdAt"] as? String)?.hasSuffix("Z") == true)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let store = BookmarkStore(defaults: defaults)
+        var puts = 0
+        let sync = AccountBookmarks(store: store) { _, method, body, _ in
+            if method == "PUT" {
+                puts += 1
+                if puts == 1 { throw UOATransport.Failure(status: 503) }
+                return UOATransport.Response(data: try XCTUnwrap(body), version: "v2")
+            }
+            return UOATransport.Response(data: Data(#"{"value":[]}"#.utf8), version: "v1")
+        }
+        let failed = sync.enqueue(.clear)
+        let saved = sync.enqueue(.add(bookmark))
+        do { try await failed.value; XCTFail("The first save must fail") } catch { }
+        try await saved.value
+        do { try await failed.value; XCTFail("A later save must not hide the failure") } catch { }
     }
 }

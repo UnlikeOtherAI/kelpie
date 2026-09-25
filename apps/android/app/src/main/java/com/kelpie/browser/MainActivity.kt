@@ -51,6 +51,17 @@ import com.kelpie.browser.ui.BrowserScreen
 import com.kelpie.browser.ui.theme.KelpieTheme
 
 class MainActivity : ComponentActivity() {
+    private val accountLogin = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        com.kelpie.browser.account.UOAAccount.finishFallback(
+            if (result.resultCode == RESULT_OK) result.data?.dataString else null,
+            result.data?.getStringExtra("nonce"),
+        )
+    }
+
+    fun openAccountFallback(url: String, nonce: String) {
+        accountLogin.launch(android.content.Intent(this, com.kelpie.browser.account.AccountLoginActivity::class.java).putExtra("url", url).putExtra("nonce", nonce))
+    }
+
     private val router = Router()
     private val handlerContext = HandlerContext()
     private val scriptPlaybackState = ScriptPlaybackState()
@@ -66,6 +77,7 @@ class MainActivity : ComponentActivity() {
         val deviceInfo = DeviceInfo.collect(this)
         HomeStore.init(this)
         BookmarkStore.init(this)
+        com.kelpie.browser.account.UOAAccount.attach(this)
         HistoryStore.init(this)
         TapCalibrationStore.init(this)
         pairingStore = PairingStore.forContext(this)
@@ -216,6 +228,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        com.kelpie.browser.account.UOAAccount.detach(this)
         handlerContext.dialogState.dismissPending()
         handlerContext.tabStore?.destroyAllTabs()
         super.onDestroy()

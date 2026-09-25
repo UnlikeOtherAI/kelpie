@@ -85,3 +85,21 @@ PKCE protects intercepted authorization codes for a public native client; a
 verified App Link requires operator domain deployment and is not manufactured by
 this app change. Config selection cannot be trusted to client_name. The secure
 server profile remains a separate dependency, and no client secret is introduced.
+
+
+### Implementation security review
+
+A second Claude review identified per-mutation error attribution, bookmark date
+interoperability, launcher ownership during rotation, denied callback handling,
+and fallback cancellation. These are fixed in the account implementation. Apple
+uses one shared coordinator and platform presentation adapter. Android's launcher
+lives in MainActivity with a weak current host; pending login survives Activity
+recreation, and an application-private cancellation broadcast closes the isolated
+fallback. Each login registers a fresh public client rather than persisting an
+unverifiable stale registration. Auth state never becomes a normal browser tab.
+
+Shared Apple favourites now retain raw entries during mutation, accept fractional
+ISO dates and keep one UI item per stable identifier. Malformed foreign entries
+remain opaque instead of being discarded when adding a different favourite.
+The existing paired-browser automation contract is retained; no new protocol
+scope field or unsolicited extra permission step is introduced.

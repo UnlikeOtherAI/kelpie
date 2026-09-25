@@ -1,5 +1,6 @@
 package com.kelpie.browser.browser
 
+import com.kelpie.browser.account.AccountBookmarks
 import android.content.Context
 import android.content.SharedPreferences
 import com.kelpie.browser.nativecore.NativeCore
@@ -7,21 +8,47 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 
 data class Bookmark(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val url: String,
-    val createdAt: String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
+    val createdAt: String = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).toString(),
 )
 
 object BookmarkStore {
     private const val PREFS_NAME = "kelpie_bookmarks"
     private const val DATA_KEY = "data"
+
+    private var account: AccountBookmarks? = null
+    val syncError = MutableStateFlow<String?>(null)
+    val isSyncing = MutableStateFlow(false)
+
+    fun useAccount() = synchronized(lock) {
+        account?.invalidate()
+        _bookmarks.value = emptyList()
+        account = AccountBookmarks({ bookmarks -> synchronized(lock) { _bookmarks.value = bookmarks } }, { busy, error -> isSyncing.value = busy; syncError.value = error })
+        account?.enqueue()
+    }
+
+    fun useLocalBookmarks() = synchronized(lock) {
+        account?.invalidate()
+        account = null
+        syncError.value = null
+        isSyncing.value = false
+        if (::prefs.isInitialized) refreshFromNative(save = false)
+    }
+
+    fun refreshAccountBookmarks() = synchronized(lock) { account?.enqueue() }
+    suspend fun flush() {
+        val current = synchronized(lock) { account }
+        current?.flush()
+        synchronized(lock) {
+            if (current !== account) throw kotlinx.coroutines.CancellationException()
+            syncError.value?.let { throw IllegalStateException(it) }
+        }
+    }
 
     private lateinit var prefs: SharedPreferences
     private val nativeHandle = NativeCore.bookmarkStoreCreate()
@@ -33,32 +60,29 @@ object BookmarkStore {
         synchronized(lock) {
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             NativeCore.bookmarkStoreLoadJson(nativeHandle, prefs.getString(DATA_KEY, null))
-            _bookmarks.value = parseBookmarks(NativeCore.bookmarkStoreToJson(nativeHandle))
+            if (account == null) _bookmarks.value = parseBookmarks(NativeCore.bookmarkStoreToJson(nativeHandle))
         }
     }
 
-    fun add(
-        title: String,
-        url: String,
-    ) {
-        synchronized(lock) {
-            NativeCore.bookmarkStoreAdd(nativeHandle, title, url)
-            refreshFromNative(save = true)
-        }
+    fun add(title: String, url: String): kotlinx.coroutines.Deferred<Unit>? = synchronized(lock) {
+        account?.let { return@synchronized it.enqueue(AccountBookmarks.Mutation.Add(Bookmark(title = title, url = url))) }
+        NativeCore.bookmarkStoreAdd(nativeHandle, title, url)
+        refreshFromNative(save = true)
+        null
     }
 
-    fun remove(id: String) {
-        synchronized(lock) {
-            NativeCore.bookmarkStoreRemove(nativeHandle, id)
-            refreshFromNative(save = true)
-        }
+    fun remove(id: String): kotlinx.coroutines.Deferred<Unit>? = synchronized(lock) {
+        account?.let { return@synchronized it.enqueue(AccountBookmarks.Mutation.Remove(id)) }
+        NativeCore.bookmarkStoreRemove(nativeHandle, id)
+        refreshFromNative(save = true)
+        null
     }
 
-    fun clear() {
-        synchronized(lock) {
-            NativeCore.bookmarkStoreRemoveAll(nativeHandle)
-            refreshFromNative(save = true)
-        }
+    fun clear(): kotlinx.coroutines.Deferred<Unit>? = synchronized(lock) {
+        account?.let { return@synchronized it.enqueue(AccountBookmarks.Mutation.Clear) }
+        NativeCore.bookmarkStoreRemoveAll(nativeHandle)
+        refreshFromNative(save = true)
+        null
     }
 
     fun toJSON(): List<Map<String, Any>> =

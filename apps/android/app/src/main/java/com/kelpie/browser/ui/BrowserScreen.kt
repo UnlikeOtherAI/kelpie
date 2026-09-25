@@ -224,6 +224,7 @@ fun BrowserScreen(
 
             if (!isScriptRecording) {
                 BottomBar(
+                    activity = activity,
                     currentUrl = currentUrl,
                     canGoBack = canGoBack,
                     canGoForward = canGoForward,
