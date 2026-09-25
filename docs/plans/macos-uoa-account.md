@@ -24,4 +24,4 @@ Native tests cover PKCE/state/callback parsing, cancellation, expiration, bounde
 
 ## Cross-provider review
 
-Required before the authentication implementation. Claude CLI cannot authenticate because its OAuth session expired. No successful cross-provider review is claimed yet.
+The cross-provider review rule was removed from AGENTS.md and CLAUDE.md at the user’s request. No external review is claimed. Implementation uses focused tests and code review without a provider gate.

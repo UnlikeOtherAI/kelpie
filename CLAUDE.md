@@ -28,25 +28,6 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 - The release cycle is not complete until the affected version is bumped, the affected artifact is published, the GitHub release is created, and the published artifact is installed locally and verified from that installed release.
 - **Install the latest app on this Mac after every release.** When the macOS app is part of a release, build it, replace `/Applications/Kelpie.app` with the freshly built bundle (kill any running instance first, then `ditto` the build product into `/Applications`), and relaunch from `/Applications` so the running app always matches the release. A GitHub release alone does not update the installed app.
 
-## How to Run Parallel Adversarial Reviews
-
-When a design requires cross-provider review, dispatch two reviewers **simultaneously** by sending a single message with two tool calls.
-
-**Call 1 — Claude reviewer:**
-```
-Agent tool:
-  subagent_type: superpowers:code-reviewer
-  prompt: "Adversarial review of [content]. Be harsh. Do not suggest over-engineering."
-```
-
-**Call 2 — Codex reviewer:**
-```
-Bash tool:
-  timeout 1800 codex exec "[adversarial review prompt]"
-```
-
-Both calls go in a **single message** so they execute in parallel.
-
 ## Using Codex as an External Agent
 
 When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize Claude token spend:
