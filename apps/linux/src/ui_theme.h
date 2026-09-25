@@ -15,6 +15,7 @@ constexpr const char* kFontAwesomeSafari = "\uf267";
 void InstallTheme();
 
 GtkWidget* CreateSymbolButton(const char* icon_name, const char* tooltip_text);
+GtkWidget* CreateChromeIcon(const char* icon_name);
 GtkWidget* CreateBrandBadge(const char* icon_text, const char* tooltip_text);
 GtkWidget* CreateFabChild();
 GtkWidget* CreateMenuRow(const char* icon_name, const char* label_text);

@@ -3,6 +3,8 @@ namespace kelpie::linuxapp {
 bool LinuxApp::FinishShutdown(){ return true; }
 std::vector<TabSnapshot> LinuxApp::Tabs() const { return {}; }
 void LinuxApp::NewTab(bool) {}
+bool LinuxApp::IsolateNewTabs() const { return false; }
+void LinuxApp::SetIsolateNewTabs(bool) {}
 void LinuxApp::ActivateTab(const std::string&) {}
 void LinuxApp::CloseTab(const std::string&) {}
 void LinuxApp::CycleTab(int) {}

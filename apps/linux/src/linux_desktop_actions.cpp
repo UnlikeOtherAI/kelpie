@@ -35,10 +35,17 @@ std::vector<TabSnapshot> LinuxApp::Tabs() const {
 }
 void LinuxApp::NewTab(bool isolated) {
   NewTabRequest request;
-  if(isolated) request.partition="isolated-"+account::RandomAccountValue();
+  if(isolated || impl_->isolate_new_tabs) request.partition="isolated-"+account::RandomAccountValue();
   TabSnapshot tab;
   auto result=impl_->desktop.engine().CreateTab(request,&tab,std::chrono::seconds(3));
   if(result.ok) ActivateTab(tab.id); else ShowToast(result.message);
+}
+bool LinuxApp::IsolateNewTabs() const { return impl_->isolate_new_tabs; }
+void LinuxApp::SetIsolateNewTabs(bool enabled) {
+  try {
+    AtomicWrite(std::filesystem::path(impl_->config.profile_dir)/"isolate_new_tabs.txt",enabled?"true":"false");
+    impl_->isolate_new_tabs=enabled;
+  } catch(const std::exception& error) { ShowToast(error.what()); }
 }
 void LinuxApp::ActivateTab(const std::string& id) {
   for(const auto& tab:Tabs()) if(tab.id==id) {

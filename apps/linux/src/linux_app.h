@@ -38,6 +38,8 @@ class LinuxApp {
   bool FinishShutdown();
   std::vector<TabSnapshot> Tabs() const;
   void NewTab(bool isolated=false);
+  bool IsolateNewTabs() const;
+  void SetIsolateNewTabs(bool enabled);
   void ActivateTab(const std::string& id);
   void CloseTab(const std::string& id);
   void CycleTab(int direction);

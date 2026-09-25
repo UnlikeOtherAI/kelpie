@@ -20,6 +20,7 @@ LinuxApp::Impl::Impl(AppConfig settings,int count,char** args)
   home=ReadProfile(root/"home_url.txt");
   while(!home.empty() && (home.back()=='\n'||home.back()=='\r')) home.pop_back();
   if(home.empty()) home="kelpie://start";
+  isolate_new_tabs=ReadProfile(root/"isolate_new_tabs.txt")=="true";
 }
 LinuxApp::LinuxApp(AppConfig config,int argc,char* argv[])
     :impl_(std::make_unique<Impl>(std::move(config),argc,argv)) {}
@@ -97,10 +98,13 @@ void LinuxApp::PumpBrowser() {
 void LinuxApp::Impl::LoadSession(DesktopEngine::Config& engine) {
   auto saved=json::parse(ReadProfile(std::filesystem::path(config.profile_dir)/"session.json"),nullptr,false);
   if(saved.is_object() && saved.contains("tabs") && saved["tabs"].is_array()) {
-    engine.restored_next_tab_id=saved.value("nextTabId",std::uint64_t{1});
+    if(saved.contains("nextTabId") && saved["nextTabId"].is_number_unsigned())
+      engine.restored_next_tab_id=std::max(std::uint64_t{1},saved["nextTabId"].get<std::uint64_t>());
     for(const auto& tab:saved["tabs"]) {
-      if(!tab.is_object() || !tab.contains("id") || !tab.contains("url")) continue;
-      DesktopEngine::RestoredTab value{tab.value("id",""),tab.value("url",""),tab.value("active",false)};
+      if(!tab.is_object() || !tab.contains("id") || !tab["id"].is_string() ||
+         !tab.contains("url") || !tab["url"].is_string()) continue;
+      DesktopEngine::RestoredTab value{tab["id"].get<std::string>(),tab["url"].get<std::string>(),
+          tab.contains("active") && tab["active"].is_boolean() && tab["active"].get<bool>()};
       if(tab.contains("partition")&&tab["partition"].is_string()) value.partition=tab["partition"].get<std::string>();
       if(tab.contains("name")&&tab["name"].is_string()) value.name=tab["name"].get<std::string>();
       if(!value.id.empty()) engine.restored_tabs.push_back(std::move(value));

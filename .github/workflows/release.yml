@@ -41,6 +41,8 @@ jobs:
                 libavahi-client-dev \
                 libcups2-dev \
                 libdbus-1-dev \
+                libcurl4-openssl-dev \
+                libssl-dev \
                 libdrm-dev \
                 libfontconfig1-dev \
                 libgbm-dev \
@@ -92,6 +94,8 @@ jobs:
                 pkgconf-pkg-config \
                 avahi-devel \
                 cups-devel \
+                libcurl-devel \
+                openssl-devel \
                 dbus-devel \
                 ninja-build \
                 rpm-build \

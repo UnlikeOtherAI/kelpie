@@ -24,7 +24,7 @@ UrlBar::UrlBar(LinuxApp& app):app_(app) {
   gtk_style_context_add_class(gtk_widget_get_style_context(entry_shell_),"chrome-address");
   gtk_widget_set_hexpand(entry_shell_,TRUE); gtk_widget_set_valign(entry_shell_,GTK_ALIGN_CENTER);
   gtk_widget_set_size_request(entry_shell_,-1,44);
-  brand_badge_=gtk_image_new_from_icon_name("channel-secure-symbolic",GTK_ICON_SIZE_MENU);
+  brand_badge_=ui::CreateChromeIcon("channel-secure-symbolic");
   gtk_box_pack_start(GTK_BOX(entry_shell_),brand_badge_,FALSE,FALSE,0);
   entry_=gtk_entry_new(); gtk_entry_set_has_frame(GTK_ENTRY(entry_),FALSE);
   gtk_entry_set_placeholder_text(GTK_ENTRY(entry_),"Search or enter website name");

@@ -54,6 +54,11 @@ BrowserChrome::BrowserChrome(LinuxApp& app,GtkWindow* window):app_(app),window_(
   favorites_=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,14); Class(favorites_,"chrome-favorites");
   gtk_widget_set_no_show_all(favorites_,TRUE); gtk_widget_set_size_request(favorites_,-1,44);
   separator_=gtk_drawing_area_new(); gtk_widget_set_size_request(separator_,-1,1); Class(separator_,"chrome-separator");
+  g_signal_connect(separator_,"draw",G_CALLBACK(+[](GtkWidget* widget,cairo_t* cr,gpointer)->gboolean {
+    gtk_render_background(gtk_widget_get_style_context(widget),cr,0,0,
+        gtk_widget_get_allocated_width(widget),gtk_widget_get_allocated_height(widget));
+    return TRUE;
+  }),nullptr);
   Palette();
 }
 BrowserChrome::~BrowserChrome() {
@@ -68,6 +73,8 @@ void BrowserChrome::Tabs() {
   for(const auto& tab:tabs) {
     auto* item=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0); Class(item,"chrome-tab");
     if(tab.active)Class(item,"active");
+    if(tab.partition)Class(item,"isolated");
+    if(tab.partition)gtk_widget_set_tooltip_text(item,("Isolated storage: "+*tab.partition).c_str());
     if(tab.active) g_signal_connect(item,"size-allocate",G_CALLBACK(+[](GtkWidget* widget,GtkAllocation* bounds,gpointer raw) {
       auto* scroll=gtk_widget_get_ancestor(widget,GTK_TYPE_SCROLLED_WINDOW);
       if(!scroll) return;
@@ -108,7 +115,7 @@ void BrowserChrome::Tabs() {
     }
     if(!icon)icon=gtk_image_new_from_icon_name("web-browser-symbolic",GTK_ICON_SIZE_MENU);
     gtk_box_pack_start(GTK_BOX(row),icon,FALSE,FALSE,0);
-    auto* label=gtk_label_new((tab.title.empty()?"New tab":tab.title).c_str()); gtk_label_set_ellipsize(GTK_LABEL(label),PANGO_ELLIPSIZE_END);
+    auto* label=gtk_label_new((tab.name?*tab.name:(tab.title.empty()?"New tab":tab.title)).c_str()); gtk_label_set_ellipsize(GTK_LABEL(label),PANGO_ELLIPSIZE_END);
     gtk_label_set_max_width_chars(GTK_LABEL(label),21); gtk_label_set_xalign(GTK_LABEL(label),0);
     gtk_box_pack_start(GTK_BOX(row),label,TRUE,TRUE,0); gtk_container_add(GTK_CONTAINER(select),row);
     gtk_box_pack_start(GTK_BOX(item),select,TRUE,TRUE,0);
@@ -174,6 +181,7 @@ void BrowserChrome::Palette() {
 .chrome-close:hover { background:#e81123; color:white; }
 .chrome-tab { background:transparent; color:#0d1731; padding:0 8px; }
 .chrome-tab label { font-size:13px; }
+.chrome-tab.isolated { border-top:2px solid #4285f4; }
 .chrome-nav { padding:0 14px; }
 .chrome-address { border-radius:24px; padding:0 12px; border:1px solid rgba(128,128,128,.13); }
 .chrome-address entry { background:transparent; color:inherit; box-shadow:none; border:0; font-size:16px; padding:0; }

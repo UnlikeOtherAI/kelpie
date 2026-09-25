@@ -20,6 +20,7 @@ struct LinuxApp::Impl final : DeviceInfoProvider {
   std::atomic<bool> running{true}, closing{false}, fullscreen{false}, desired_fullscreen{false};
   std::atomic<int> requested_width{0},requested_height{0};
   std::atomic<bool> started{false};
+  bool isolate_new_tabs=false;
   std::atomic<int> view_width{1},view_height{1};
   mutable std::mutex state_mutex;
   std::string home,toast,last_session,last_bookmarks,last_history;
