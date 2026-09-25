@@ -107,3 +107,27 @@ config must be selected and verified server-side; neither its signing key nor
 a domain bearer credential belongs in the app. Resolve the existing product
 config before changing this server contract. Embedded-provider restrictions
 still apply; the system browser remains the first choice.
+
+### Verification and remaining server integration
+
+Windows 0.1.5 passes all 40 native tests and the native release acceptance suite;
+one account click was observed opening a fresh Chrome `/oauth/authorize` tab.
+Linux 0.1.2 passes 23 native tests and HTTP/MCP/session acceptance. In an isolated
+test XDG configuration with Kelpie as HTTPS handler, VNC verification confirmed
+the hosted login fallback opens directly, closes on cancellation, restarts, and
+drains during application shutdown. API reads and the persisted session contain
+only the ordinary test page, not the private authentication URL. Mac 0.1.20
+passes strict Swift lint, all three account tests, arm64 Release build and deep
+code-signature verification. CLI/shared lint/build/tests remain green (476 tests,
+64 skipped); no CLI package is changed by this follow-up.
+
+The installed server at this point still supplies its synthetic public profile
+(empty logo, email/password only, no registration). No native form was created.
+Do not describe the branded Google/registration flow as fixed. The next server
+change needs the intended existing public config URL or product/domain. Keep its
+verified configuration and signing/domain credentials on the server. Bind an
+operator-approved native public-client profile to that config and issue only
+PKCE-bound, one-use public authorization codes after hosted authentication.
+An arbitrary client-supplied config or client name must not confer another
+domain's privileges. Existing confidential `/auth/token` exchange must remain
+confidential; exposing its secret or weakening it is not a native-client fix.
