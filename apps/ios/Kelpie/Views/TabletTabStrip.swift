@@ -24,6 +24,7 @@ struct TabletTabStrip: View {
                             }
                         }
                         .padding(.horizontal, 8)
+                        .frame(height: 48, alignment: .bottom)
                     }
                     .frame(width: min(CGFloat(tabStore.tabs.count) * 213 + 16, max(0, geometry.size.width - 64)))
                     Button { tabStore.addBrowserTab() } label: {
@@ -103,7 +104,6 @@ private struct BrowserTabShape: Shape {
             path.addLine(to: CGPoint(x: width - 25, y: 0))
             path.addQuadCurve(to: CGPoint(x: width - 10, y: 14), control: CGPoint(x: width - 12, y: 0))
             path.addCurve(to: CGPoint(x: width, y: height), control1: CGPoint(x: width - 7, y: 24), control2: CGPoint(x: width - 8, y: height))
-            path.closeSubpath()
         }
     }
 }
