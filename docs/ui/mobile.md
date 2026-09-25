@@ -226,3 +226,9 @@ On iPad specifically:
 - System font throughout
 - Minimal color: mostly neutral with green/red status indicators
 - No branding in the browser chrome — the app icon and name handle branding
+
+The iOS address capsule retains one view identity during collapse: its width,
+height and center animate into the compact position while the surrounding
+controls and toolbar material fade away. The unfocused address stays centered
+on the domain; focusing it reveals the complete editable URL. Tapping the
+compact capsule reverses the same geometry animation.

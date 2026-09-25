@@ -56,8 +56,8 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.4",
-            "CURRENT_PROJECT_VERSION": "4",
+            "MARKETING_VERSION": "0.1.5",
+            "CURRENT_PROJECT_VERSION": "5",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator

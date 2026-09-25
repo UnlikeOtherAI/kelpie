@@ -65,13 +65,28 @@ Documentation and the iOS version update ship with the implementation.
 ## Implementation and verification
 
 Implemented in SwiftUI/UIKit with shared Mac palette/sampler adapters. The iOS
-bundle is 0.1.4 (4). Native unit tests, iPhone and iPad simulator journeys, strict
+bundle is 0.1.5 (5). Native unit tests, iPhone and iPad simulator journeys, strict
 Swift lint, and pnpm lint/build/test pass on the development hosts. The iPad
 journey covers eight overflowing tabs and the active close control. Both Debug
 simulator and unsigned Release device builds compile. Generated projects now
 receive the bundle identity/version and launch metadata required for installation.
 
-Signed distribution is blocked on dictator: Xcode reports that the existing
-Apple Development certificate private key is absent and no matching provisioning
-profile is available. No signing identity was revoked or replaced. The change
-remains in a draft PR until the required signed release/install can complete.
+The KiloMayo signing team is `59S95D279D`. Signed Release archive/export and
+physical installation of 0.1.4 succeeded on the iPhone 16 Pro Max and iPad Air
+13-inch (M3). Migrating the older apps from their previous signing team required
+app container backups before reinstalling; settings and saved tab counts were
+verified after restoration. The app and welcome icons match the current
+multicolour K artwork.
+
+Follow-up: the address capsule retains one view identity while its geometry
+shrinks and moves. Surrounding controls and material fade out; no separate
+compact view is inserted. Domain text stays centered through the motion;
+editing reveals the complete URL. Version 0.1.5 carries this refinement.
+
+The physical devices on iOS 26.6.2 reported UIKit touch-delay exceptions during
+scroll-triggered toolbar replacement. The persistent address surface avoids
+removing its recognizer mid-scroll. Directional observers do not delay or cancel
+underlying control touches, and overview presentation waits until the current
+touch dispatch finishes. The UI journey now repeats collapse/expand cycles and
+asserts that the app remains in the foreground; physical-device runs are part
+of verification for this regression.

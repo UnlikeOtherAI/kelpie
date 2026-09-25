@@ -23,6 +23,13 @@ final class BrowserChromeUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 10))
         capture("expanded", app)
+        for _ in 0..<4 {
+            app.webViews.firstMatch.swipeUp()
+            XCTAssertTrue(app.buttons["browser.bottom-bar.collapsed"].waitForExistence(timeout: 5))
+            app.webViews.firstMatch.swipeDown()
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            XCTAssertEqual(app.state, .runningForeground)
+        }
 
         app.webViews.firstMatch.swipeUp()
         let collapsed = app.buttons["browser.bottom-bar.collapsed"]

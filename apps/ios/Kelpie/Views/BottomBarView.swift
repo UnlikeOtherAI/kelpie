@@ -21,22 +21,36 @@ struct BottomBarView<MoreContent: View>: View {
     var body: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width > 600
-            Group {
-                if isCollapsed && !isEditing {
-                    collapsedPill
-                } else {
-                    expandedBar(wide: wide, showShare: geometry.size.width >= 390)
-                }
+            let compact = isCollapsed && !isEditing
+            let showShare = geometry.size.width >= 390
+            let spacing: CGFloat = wide ? 14 : 5
+            let padding: CGFloat = wide ? 20 : 8
+            let left = addressFocused ? padding : padding + 88 + spacing * 2
+            let right = padding + trailingWidth(wide: wide, showShare: showShare, spacing: spacing) + spacing
+            let available = max(100, geometry.size.width - left - right)
+            ZStack {
+                expandedControls(wide: wide, showShare: showShare)
+                    .opacity(compact ? 0 : 1)
+                    .allowsHitTesting(!compact)
+                    .accessibilityHidden(compact)
+                // This is the same address surface in both states. Only its bounds
+                // and center move; no insertion, removal or matched-view crossfade.
+                addressField(compact: compact)
+                    .frame(width: compact ? min(180, available * 0.85) : min(available, wide ? 620 : available))
+                    .position(
+                        x: compact ? geometry.size.width / 2 : left + available / 2,
+                        y: compact ? 17 : 31
+                    )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(height: isCollapsed && !isEditing ? 34 : 62)
         .background {
-            if !isCollapsed || isEditing {
-                UnevenChromeBackground()
-            }
+            UnevenChromeBackground()
+                .opacity(isCollapsed && !isEditing ? 0 : 1)
+                .allowsHitTesting(false)
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isCollapsed)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: isCollapsed)
         .onAppear { urlText = browserState.currentURL }
         .onChange(of: browserState.currentURL) { value in
             if !addressFocused { urlText = value }
@@ -51,22 +65,19 @@ struct BottomBarView<MoreContent: View>: View {
         }
     }
 
-    private func expandedBar(wide: Bool, showShare: Bool) -> some View {
+    private func expandedControls(wide: Bool, showShare: Bool) -> some View {
         HStack(spacing: wide ? 14 : 5) {
             if !addressFocused {
                 BrowserChromeButton(symbol: "chevron.left", label: "Back", identifier: "browser.nav.back", enabled: browserState.canGoBack, action: onBack)
                 BrowserChromeButton(symbol: "chevron.right", label: "Forward", identifier: "browser.nav.forward", enabled: browserState.canGoForward, action: onForward)
             }
-            if wide { Spacer(minLength: 0) }
-            addressField
-                .frame(maxWidth: wide ? 620 : .infinity)
-            if wide { Spacer(minLength: 0) }
+            Spacer(minLength: 0)
             if addressFocused {
                 Button("Cancel") {
                     addressFocused = false
                     urlText = browserState.currentURL
                 }
-                .frame(minHeight: 44)
+                .frame(width: 64, height: 44)
             } else {
                 if showShare, let url = URL(string: browserState.currentURL), url.scheme != nil {
                     ShareLink(item: url) {
@@ -100,18 +111,39 @@ struct BottomBarView<MoreContent: View>: View {
             }
         }
         .padding(.horizontal, wide ? 20 : 8)
+        .frame(height: 44)
         .tint(.accentColor)
     }
 
-    private var addressField: some View {
-        HStack(spacing: 5) {
+    private func trailingWidth(wide: Bool, showShare: Bool, spacing: CGFloat) -> CGFloat {
+        if addressFocused { return 64 }
+        let share = showShare && URL(string: browserState.currentURL)?.scheme != nil
+        let count = 1 + (wide || showShare ? 1 : 0) + (share ? 1 : 0)
+        return CGFloat(count) * 44 + CGFloat(count - 1) * spacing
+    }
+
+    private var displayedAddress: Binding<String> {
+        Binding(
+            get: { addressFocused ? urlText : (browserState.currentURL.isEmpty ? "" : browserDomain(browserState.currentURL)) },
+            set: { urlText = $0 }
+        )
+    }
+
+    private func addressField(compact: Bool) -> some View {
+        HStack(spacing: compact ? 0 : 5) {
             if !addressFocused {
                 Image(systemName: browserState.currentURL.hasPrefix("https:") ? "lock.fill" : "globe")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .frame(width: compact ? 0 : 12)
+                    .opacity(compact ? 0 : 1)
             }
-            TextField("Search or enter address", text: $urlText)
+            TextField("Search or enter address", text: displayedAddress)
                 .font(.system(size: 14))
+                .scaleEffect(compact ? 12.0 / 14.0 : 1)
+                .multilineTextAlignment(addressFocused ? .leading : .center)
+                .allowsHitTesting(!compact)
+                .accessibilityHidden(compact)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
@@ -129,40 +161,33 @@ struct BottomBarView<MoreContent: View>: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(browserState.isLoading ? "Stop loading" : "Reload")
                 .accessibilityIdentifier("browser.nav.reload")
+                .frame(width: compact ? 0 : 36)
+                .opacity(compact ? 0 : 1)
+                .allowsHitTesting(!compact)
+                .accessibilityHidden(compact)
             }
         }
         .padding(.leading, 12)
-        .padding(.trailing, addressFocused ? 12 : 0)
-        .frame(minWidth: 100, minHeight: 44)
+        .padding(.trailing, compact || addressFocused ? 12 : 0)
+        .frame(height: compact ? 28 : 44)
         .modifier(BrowserGlass())
+        .overlay {
+            if compact {
+                Button { isCollapsed = false } label: {
+                    Color.clear.frame(height: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Expand address bar, \(browserDomain(browserState.currentURL))")
+                .accessibilityIdentifier("browser.bottom-bar.collapsed")
+                .transition(.identity)
+            }
+        }
         .overlay {
             DirectionalBrowserDrag(axis: .upward, enabled: !addressFocused, onChange: { _ in }, onEnd: { distance, speed in
                 if distance < -32 || (distance < -12 && speed < -450) { onShowTabs() }
             })
         }
         .accessibilityAction(named: "Show tabs", onShowTabs)
-    }
-
-    private var collapsedPill: some View {
-        Button { isCollapsed = false } label: {
-            Text(browserDomain(browserState.currentURL))
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .padding(.horizontal, 20)
-                .frame(maxWidth: 220)
-                .frame(height: 28)
-                .modifier(BrowserGlass())
-                .frame(height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Expand address bar, \(browserDomain(browserState.currentURL))")
-        .accessibilityIdentifier("browser.bottom-bar.collapsed")
-        .overlay {
-            DirectionalBrowserDrag(axis: .upward, onChange: { _ in }, onEnd: { distance, speed in
-                if distance < -32 || (distance < -12 && speed < -450) { onShowTabs() }
-            })
-        }
     }
 
     private func navigate() {

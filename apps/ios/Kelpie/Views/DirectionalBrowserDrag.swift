@@ -25,17 +25,23 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
 
         func configure(_ configuration: DirectionalBrowserDrag) {
             self.configuration = configuration
-            pan.isEnabled = configuration.enabled
+            if pan.isEnabled != configuration.enabled { pan.isEnabled = configuration.enabled }
         }
 
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            guard installedWindow !== window else { return }
             installedWindow?.removeGestureRecognizer(pan)
             installedWindow = window
             pan.delegate = self
             pan.maximumNumberOfTouches = 1
+            // This observer must not queue or cancel touches owned by WebKit
+            // or SwiftUI controls while their layout reacts to scrolling.
+            pan.delaysTouchesBegan = false
+            pan.delaysTouchesEnded = false
+            pan.cancelsTouchesInView = false
             window?.addGestureRecognizer(pan)
         }
 
@@ -76,7 +82,10 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
             let speed = configuration.axis == .horizontal ? velocity.x : velocity.y
             switch pan.state {
             case .changed: configuration.onChange(distance)
-            case .ended: configuration.onEnd(distance, speed)
+            case .ended:
+                // Presenting the overview can detach this view. Let UIKit finish
+                // dispatching the event before changing the view hierarchy.
+                DispatchQueue.main.async { configuration.onEnd(distance, speed) }
             case .cancelled, .failed: configuration.onEnd(0, 0)
             default: break
             }
