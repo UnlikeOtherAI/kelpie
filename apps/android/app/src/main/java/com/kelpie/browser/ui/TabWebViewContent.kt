@@ -1,6 +1,10 @@
 package com.kelpie.browser.ui
 
+import androidx.compose.runtime.setValue
 import android.view.ViewGroup
+import android.view.MotionEvent
+import com.kelpie.browser.browser.ChromeScrollPolicy
+import androidx.compose.runtime.rememberUpdatedState
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
@@ -21,9 +25,12 @@ fun TabWebViewContent(
     browserState: BrowserState,
     handlerContext: HandlerContext,
     onScrollDirectionChange: (ScrollDirection) -> Unit,
+    onScrolled: () -> Unit = {},
     onWebViewReady: (WebView) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scrollCallback by rememberUpdatedState(onScrolled)
+    val directionCallback by rememberUpdatedState(onScrollDirectionChange)
     val tabs by tabStore.tabs.collectAsState()
     val activeTabId by tabStore.activeTabId.collectAsState()
     val installedWebViewRef = remember { mutableStateOf<WebView?>(null) }
@@ -47,15 +54,26 @@ fun TabWebViewContent(
                 ),
             )
 
-            wv.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                val delta = scrollY - oldScrollY
-                if (scrollY <= 0) {
-                    onScrollDirectionChange(ScrollDirection.UP)
-                } else if (delta > 12) {
-                    onScrollDirectionChange(ScrollDirection.DOWN)
-                } else if (delta < -12) {
-                    onScrollDirectionChange(ScrollDirection.UP)
+            val policy = ChromeScrollPolicy()
+            var dragging = false
+            var translation = 0f
+            var start = 0f
+            val density = wv.resources.displayMetrics.density
+            wv.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { start = event.y; translation = 0f; dragging = true; policy.update(0f, 0f, 0f, false) }
+                    MotionEvent.ACTION_MOVE -> translation = (event.y - start) / density
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> dragging = false
                 }
+                false
+            }
+            wv.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+                @Suppress("DEPRECATION")
+                val maximum = (wv.contentHeight * wv.scale - wv.height).coerceAtLeast(0f) / density
+                policy.update(translation, scrollY / density, maximum, dragging)?.let {
+                    directionCallback(if (it) ScrollDirection.DOWN else ScrollDirection.UP)
+                }
+                scrollCallback()
             }
 
             syncBrowserStateFromWebView(wv, browserState)

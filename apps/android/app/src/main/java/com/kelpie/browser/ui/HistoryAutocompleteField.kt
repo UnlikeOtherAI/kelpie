@@ -3,16 +3,21 @@ package com.kelpie.browser.ui
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Shape
@@ -28,6 +33,8 @@ fun HistoryAutocompleteField(
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
     textStyle: TextStyle = TextStyle.Default,
+    onEditingChanged: (Boolean) -> Unit = {},
+    trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     val historyEntries by HistoryStore.entries.collectAsState()
     var urlText by remember { mutableStateOf(currentUrl) }
@@ -56,19 +63,22 @@ fun HistoryAutocompleteField(
             )
         }
 
-    OutlinedTextField(
+    BasicTextField(
         value = urlText,
         onValueChange = { urlText = it },
         singleLine = true,
-        placeholder = { Text(placeholder) },
-        shape = shape,
         textStyle = textStyle,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
         keyboardActions =
             KeyboardActions(onGo = {
                 resolvedNavigationUrl(input = urlText, fullCompletion = completion)?.let(onNavigate)
             }),
-        suffix = {
+        decorationBox = { inner ->
+            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, shape).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    if (urlText.isEmpty()) Text(placeholder, style = textStyle, maxLines = 1)
+                    inner()
+                }
             if (!completionSuffix.isNullOrEmpty()) {
                 Text(
                     text = completionSuffix,
@@ -76,8 +86,10 @@ fun HistoryAutocompleteField(
                     maxLines = 1,
                 )
             }
+                trailingIcon?.invoke()
+            }
         },
-        modifier = modifier.onFocusChanged { isFocused = it.isFocused },
+        modifier = modifier.onFocusChanged { isFocused = it.isFocused; onEditingChanged(it.isFocused) },
     )
 }
 

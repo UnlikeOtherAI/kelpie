@@ -1,6 +1,10 @@
 package com.kelpie.browser.browser
 
 import android.webkit.WebView
+import android.graphics.Bitmap
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import java.util.UUID
 
 /** A single browser tab. Owns a WebView and tracks its page state. */
@@ -9,9 +13,11 @@ class BrowserTab(
     val webView: WebView,
     var isStartPage: Boolean = true,
 ) {
-    var currentUrl: String = ""
-    var pageTitle: String = ""
-    var isLoading: Boolean = false
+    var currentUrl: String by mutableStateOf("")
+    var pageTitle: String by mutableStateOf("")
+    var isLoading: Boolean by mutableStateOf(false)
+    var chromeColor: Int by mutableStateOf(-1)
+    var preview: Bitmap? by mutableStateOf(null)
 
     private var lastHistoryUrl: String = ""
     private var lastHistoryTitle: String = ""

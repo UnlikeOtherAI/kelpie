@@ -10,6 +10,17 @@ struct TabletTabStrip: View {
         ScrollViewReader { proxy in
             GeometryReader { geometry in
                 HStack(spacing: 4) {
+                    Button { tabStore.addBrowserTab() } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 21))
+                            .frame(width: 44, height: 44)
+                            .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New tab")
+                    .accessibilityValue("\(tabStore.tabs.count) tabs")
+                    .accessibilityIdentifier("browser.tabs.add")
+                    .padding(.leading, 8)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 3) {
                             ForEach(tabStore.tabs) { tab in
@@ -27,17 +38,6 @@ struct TabletTabStrip: View {
                         .frame(height: 48, alignment: .bottom)
                     }
                     .frame(width: min(CGFloat(tabStore.tabs.count) * 213 + 16, max(0, geometry.size.width - 64)))
-                    Button { tabStore.addBrowserTab() } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 21))
-                            .frame(width: 44, height: 44)
-                            .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("New tab")
-                    .accessibilityValue("\(tabStore.tabs.count) tabs")
-                    .accessibilityIdentifier("browser.tabs.add")
-                    .padding(.trailing, 8)
                     Spacer(minLength: 0)
                 }
                 .frame(height: 48)
