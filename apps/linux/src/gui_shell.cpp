@@ -53,7 +53,7 @@ int GUIShell::Run() {
     static_cast<LinuxApp*>(raw)->RequestShutdown(); return TRUE; // Keep renderer and pump alive until drained.
   }),&app_);
   g_signal_connect(window,"key-press-event",G_CALLBACK(+[](GtkWidget*,GdkEventKey* e,gpointer raw)->gboolean {
-    auto& c=*static_cast<Context*>(raw); const bool control=e->state&GDK_CONTROL_MASK,shift=e->state&GDK_SHIFT_MASK;
+    auto& c=*static_cast<Context*>(raw); const bool control=e->state&GDK_CONTROL_MASK; const bool shift=e->state&GDK_SHIFT_MASK;
     const auto key=gdk_keyval_to_lower(e->keyval);
     if(control&&key==GDK_KEY_l) { c.url.Focus(); return TRUE; }
     if(control&&key==GDK_KEY_t) { c.app.NewTab(); return TRUE; }
