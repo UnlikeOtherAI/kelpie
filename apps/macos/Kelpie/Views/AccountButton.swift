@@ -27,14 +27,13 @@ struct AccountButton: View {
                 Circle().fill(.red).frame(width: 7, height: 7).allowsHitTesting(false)
             }
         }
-        .onChange(of: isPresented) { _, open in if open { bookmarks.refreshAccountBookmarks() } }
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("UnlikeOtherAI account").font(.headline)
                 if let profile = account.profile {
                     Text(profile.name ?? profile.email).font(.subheadline.weight(.semibold))
                     if profile.name != nil { Text(profile.email).foregroundStyle(.secondary) }
-                    Text(bookmarks.isSyncing ? "Syncing favourites…" : "Favourites saved to your UOA account")
+                    Text(bookmarks.isSyncing ? "Syncing favourites…" : "Favourites use your UOA account")
                         .font(.caption).foregroundStyle(.secondary)
                     action("Refresh favourites", id: "refresh", action: bookmarks.refreshAccountBookmarks)
                     action("Sign out", id: "sign-out", action: account.signOut)
