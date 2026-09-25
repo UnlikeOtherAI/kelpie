@@ -35,7 +35,7 @@ struct BookmarkHandler {
 
     @MainActor
     private func clear() async -> [String: Any] {
-        return await savedResponse(BookmarkStore.shared.removeAll(), cleared: true)
+        await savedResponse(BookmarkStore.shared.removeAll(), cleared: true)
     }
 
     @MainActor

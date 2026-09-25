@@ -7,8 +7,7 @@ struct AccountButton: View {
 
     var body: some View {
         Button {
-            if account.profile == nil && !account.signingIn { account.signIn() }
-            else { showMenu = true }
+            if account.profile == nil && !account.signingIn { account.signIn() } else { showMenu = true }
         } label: {
             Group {
                 if let avatar = account.avatar {
