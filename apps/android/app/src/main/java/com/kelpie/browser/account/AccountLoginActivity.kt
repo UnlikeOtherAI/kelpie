@@ -50,6 +50,8 @@ class AccountLoginActivity : Activity() {
             }
         layout.addView(location)
         val view = WebView(this)
+        // Debuggable builds can enable inspection when the first WebView is created.
+        WebView.setWebContentsDebuggingEnabled(false)
         webView = view
         view.settings.javaScriptEnabled = true
         view.settings.domStorageEnabled = true
