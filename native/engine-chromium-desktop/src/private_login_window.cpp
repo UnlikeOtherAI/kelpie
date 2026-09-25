@@ -28,7 +28,7 @@ class LoginWindow final : public CefClient,
   CefRefPtr<CefContextMenuHandler> GetContextMenuHandler() override { return this; }
   CefRefPtr<CefKeyboardHandler> GetKeyboardHandler() override { return this; }
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override { browser_=browser; }
-  void OnBeforeClose(CefRefPtr<CefBrowser>) override { browser_=nullptr; }
+  void OnBeforeClose(CefRefPtr<CefBrowser>) override { browser_=nullptr; FinishClose(); }
   void OnAddressChange(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, const CefString& url) override {
     if (!frame->IsMain() || !window_) return;
     CefURLParts parts;
@@ -69,9 +69,7 @@ class LoginWindow final : public CefClient,
   }
   void OnWindowDestroyed(CefRefPtr<CefWindow>) override {
     window_=nullptr; view_=nullptr;
-    auto cancelled=std::move(cancelled_);
-    current=nullptr;
-    if (cancelled) cancelled();
+    FinishClose();
   }
 #if CEF_VERSION_MAJOR >= 130
   cef_runtime_style_t GetWindowRuntimeStyle() override { return CEF_RUNTIME_STYLE_ALLOY; }
@@ -91,6 +89,12 @@ class LoginWindow final : public CefClient,
     else if (window_) window_->Close();
   }
  private:
+  void FinishClose() {
+    if (browser_ || window_) return;
+    auto cancelled=std::move(cancelled_);
+    current=nullptr;
+    if (cancelled) cancelled();
+  }
   CefRefPtr<CefBrowser> browser_;
   CefRefPtr<CefBrowserView> view_;
   CefRefPtr<CefWindow> window_;
