@@ -343,7 +343,9 @@ final class TabPillView: NSView {
     private func updateAppearance() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        layer?.backgroundColor = isActive ? palette.selectedTab.color.cgColor : NSColor.clear.cgColor
+        layer?.backgroundColor = isActive
+            ? palette.selectedTab.color.withAlphaComponent(palette.selectedTabOpacity).cgColor
+            : palette.inactiveTab.color.cgColor
         faviconView.layer?.backgroundColor = NSColor.white.withAlphaComponent(palette.foreground.luminance * 0.9).cgColor
         CATransaction.commit()
         titleField.textColor = palette.foreground.color.withAlphaComponent(isActive ? 1 : 0.75)

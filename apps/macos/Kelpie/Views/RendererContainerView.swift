@@ -36,7 +36,7 @@ struct RendererContainerView: NSViewRepresentable {
                       let collapsed = BrowserChromeScroll.collapsed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
                 else { return event }
                 self?.hoverTracker.clear()
-                self?.chromeSampler.requestSample()
+                self?.chromeSampler.sampleAfterScroll()
                 self?.onChromeScroll(collapsed)
                 return event
             }

@@ -17,6 +17,7 @@ struct BrowserCommandActions {
     let hardReload: () -> Void
     let newTab: () -> Void
     let closeTab: () -> Void
+    let addBookmark: () -> Void
 }
 
 @MainActor
@@ -50,6 +51,10 @@ final class BrowserCommandRouter {
 
     func newTab() {
         activeActions?.newTab()
+    }
+
+    func addBookmark() {
+        activeActions?.addBookmark()
     }
 
     func closeTab() {
@@ -180,6 +185,12 @@ private struct BrowserCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
+            Button("Add bookmark") {
+                BrowserCommandRouter.shared.addBookmark()
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(serverState.isScriptRecording)
+
             Button("Hard Refresh") {
                 BrowserCommandRouter.shared.hardReload()
             }

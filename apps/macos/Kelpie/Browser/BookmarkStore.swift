@@ -68,6 +68,7 @@ final class BookmarkStore: ObservableObject {
 
     @Published private(set) var bookmarks: [Bookmark] = []
 
+    private let defaults: UserDefaults
     private let key = "kelpie_bookmarks"
     private let storeHandle = kelpie_bookmark_store_create()
 
@@ -78,7 +79,8 @@ final class BookmarkStore: ObservableObject {
         return formatter
     }()
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -95,6 +97,17 @@ final class BookmarkStore: ObservableObject {
         }
         refreshFromCore()
         persist()
+    }
+
+    /// Shared by the active-window shortcut and chrome actions; never save the start page.
+    @discardableResult
+    func addPage(title: String, url: String, isStartPage: Bool) -> Bool {
+        guard !isStartPage, let pageURL = URL(string: url),
+              ["http", "https"].contains(pageURL.scheme?.lowercased() ?? ""),
+              let host = pageURL.host, !host.isEmpty,
+              !bookmarks.contains(where: { $0.url == pageURL.absoluteString }) else { return false }
+        add(title: title.isEmpty ? pageURL.absoluteString : title, url: pageURL.absoluteString)
+        return true
     }
 
     func remove(id: UUID) {
@@ -146,7 +159,7 @@ final class BookmarkStore: ObservableObject {
 
     private func persist() {
         let payload = Self.jsonData(from: toJSON()) ?? Data("[]".utf8)
-        UserDefaults.standard.set(payload, forKey: key)
+        defaults.set(payload, forKey: key)
     }
 
     private func exportedJSON() -> String? {
@@ -157,11 +170,11 @@ final class BookmarkStore: ObservableObject {
     }
 
     private func loadPersistedJSON() -> String? {
-        if let data = UserDefaults.standard.data(forKey: key) {
+        if let data = defaults.data(forKey: key) {
             return normalizedPersistedJSON(from: data)
         }
 
-        if let string = UserDefaults.standard.string(forKey: key) {
+        if let string = defaults.string(forKey: key) {
             return normalizedPersistedJSON(from: Data(string.utf8))
         }
 

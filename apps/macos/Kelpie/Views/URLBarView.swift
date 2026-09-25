@@ -27,6 +27,7 @@ struct URLBarView: View {
     let onSwitchRenderer: (RendererState.Engine) -> Void
     let onSafariAuth: () -> Void
     let onBookmarks: () -> Void
+    let onAddBookmark: () -> Void
     let onNetworkInspector: () -> Void
     let onSettings: () -> Void
 
@@ -103,11 +104,13 @@ struct URLBarView: View {
                 .popover(isPresented: $showTools, arrowEdge: .bottom) { toolsPopup }
             }
             .padding(.horizontal, 12)
-            .frame(height: 44)
-            FavouritesBarView(appearance: appearance, onNavigate: onNavigate, onAddBookmark: addBookmark, canAddBookmark: pageURL != nil && !isBookmarked)
+            .frame(height: BrowserChromeLayout.navigationHeight)
+            if !bookmarkStore.bookmarks.isEmpty {
+                FavouritesBarView(appearance: appearance, bookmarks: bookmarkStore.bookmarks, onNavigate: onNavigate)
+            }
         }
         .background(BrowserGlassBackground(appearance: appearance))
-        .overlay(alignment: .bottom) { BrowserChromeStyle.separator.frame(height: 1) }
+        .overlay(alignment: .bottom) { Color(nsColor: appearance.palette.foreground.color).opacity(0.1).frame(height: 1) }
         .onAppear { syncAddress() }
         .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
         .onChange(of: isStartPage) { _, _ in syncAddress() }
@@ -115,16 +118,11 @@ struct URLBarView: View {
 
     private func syncAddress() { urlText = isStartPage ? "" : browserState.currentURL }
 
-    private func addBookmark() {
-        guard let pageURL, !isBookmarked else { return }
-        bookmarkStore.add(title: browserState.pageTitle.isEmpty ? pageURL.absoluteString : browserState.pageTitle,
-                          url: pageURL.absoluteString)
-    }
-
     private var toolsPopup: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Browser controls").font(.headline)
+                popupAction("Add bookmark", icon: "star", id: "add-bookmark", enabled: pageURL != nil && !isBookmarked, action: onAddBookmark)
                 popupAction("Bookmarks", icon: "bookmark", id: "bookmarks", action: onBookmarks)
                 popupAction("Safari authentication", icon: "safari", id: "safari-auth", enabled: pageURL != nil, action: onSafariAuth)
                 popupAction("Network inspector", icon: "antenna.radiowaves.left.and.right", id: "network", action: onNetworkInspector)
@@ -199,7 +197,7 @@ struct URLBarView: View {
                     accessibilityLabel: isBookmarked ? "Page bookmarked" : "Bookmark this page",
                     isEnabled: pageURL != nil && !isBookmarked,
                     tintColor: appearance.palette.foreground.color,
-                    action: addBookmark
+                    action: onAddBookmark
                 )
             PageShareButton(url: pageURL, tintColor: appearance.palette.foreground.color)
         }
