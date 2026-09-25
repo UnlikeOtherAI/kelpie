@@ -62,7 +62,10 @@ private struct BrowserTabPreview: View {
                 .accessibilityLabel("Close tab")
                 .accessibilityIdentifier("browser.tabs.close.\(tab.id)")
             }
-            Button(action: onSelect) {
+            Button {
+                guard !closing, abs(drag) < 8 else { return }
+                onSelect()
+            } label: {
                 GeometryReader { geometry in
                     if let preview = tab.preview {
                         Image(uiImage: preview).resizable().scaledToFill()
