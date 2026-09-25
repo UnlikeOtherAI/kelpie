@@ -237,7 +237,7 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
 
   renderer->SetCallbacks({
       [this](const std::string& script) { return EvaluateJs(script); },
-      [this]() { return snapshot_bytes; },
+      [this]() { std::lock_guard<std::mutex> lock(mutex); return frame.pixels; },
       [this](const std::string& url) {
         if (browser && browser->GetMainFrame()) {
           browser->GetMainFrame()->LoadURL(url);
@@ -353,6 +353,7 @@ DesktopEngine::ViewportState DesktopEngine::viewport() const {
 bool DesktopEngine::ResizeViewport(int width, int height) {
   const auto impl = impl_;
   return impl->RunOnUi([impl, width, height] {
+    { std::lock_guard<std::mutex> lock(impl->mutex); impl->frame = {}; }
     impl->viewport.width = std::max(1, width);
     impl->viewport.height = std::max(1, height);
     if (impl->browser && impl->browser->GetHost()) impl->browser->GetHost()->WasResized();
@@ -375,6 +376,7 @@ bool DesktopEngine::SendMouseMoveEvent(int x, int y, bool mouse_leave) {
   CefMouseEvent event;
   event.x = x;
   event.y = y;
+  event.modifiers = impl_->input_modifiers;
   impl_->browser->GetHost()->SendMouseMoveEvent(event, mouse_leave);
   return true;
 }

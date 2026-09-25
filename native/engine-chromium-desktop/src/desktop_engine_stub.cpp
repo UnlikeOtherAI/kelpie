@@ -98,6 +98,10 @@ bool DesktopEngine::SendMouseWheelEvent(int x, int y, int delta_x, int delta_y) 
 }
 
 void DesktopEngine::SetConsoleSink(JsonEventSink) {}
+OffscreenFrame DesktopEngine::ViewFrame() const { return {}; }
+void DesktopEngine::SetInputModifiers(unsigned) {}
+bool DesktopEngine::SendKeyEvent(int, int, unsigned, bool) { return false; }
+bool DesktopEngine::CommitText(const std::string&) { return false; }
 
 void DesktopEngine::SetNetworkSink(JsonEventSink) {}
 

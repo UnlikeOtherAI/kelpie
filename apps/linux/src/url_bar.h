@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 #if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
@@ -16,6 +17,8 @@ class UrlBar {
 
   GtkWidget* widget() const;
   void Sync();
+  void Focus();
+  std::function<void(int)> tool_action;
 
  private:
   LinuxApp& app_;
@@ -27,6 +30,10 @@ class UrlBar {
   GtkWidget* entry_shell_ = nullptr;
   GtkWidget* entry_ = nullptr;
   bool editing_ = false;
+  GtkWidget* account_button_ = nullptr;
+#if KELPIE_LINUX_HAS_GTK
+  GtkListStore* completion_ = nullptr;
+#endif
 };
 
 }  // namespace kelpie::linuxapp

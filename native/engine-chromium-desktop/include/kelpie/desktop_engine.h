@@ -11,6 +11,7 @@
 #include "kelpie/desktop_browser_control.h"
 #include "kelpie/cef_renderer.h"
 #include "kelpie/favicon_registry.h"
+#include "kelpie/offscreen_frame.h"
 
 namespace kelpie {
 
@@ -113,6 +114,11 @@ class DesktopEngine final : public DesktopBrowserControl {
   bool SendMouseMoveEvent(int x, int y, bool mouse_leave);
   bool SendMouseClickEvent(int x, int y, int button, bool mouse_up, int click_count);
   bool SendMouseWheelEvent(int x, int y, int delta_x, int delta_y);
+  OffscreenFrame ViewFrame() const;
+  // Native offscreen input, called only by the shell's CEF owner thread.
+  void SetInputModifiers(unsigned modifiers);
+  bool SendKeyEvent(int key, int native_key, unsigned modifiers, bool released);
+  bool CommitText(const std::string& text);
 
   void SetConsoleSink(JsonEventSink sink);
   void SetNetworkSink(JsonEventSink sink);

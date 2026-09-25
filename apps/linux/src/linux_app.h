@@ -8,11 +8,15 @@
 #include <vector>
 
 #include <nlohmann/json.hpp>
+#include "kelpie/desktop_engine.h"
+#include "account_service.h"
 
 namespace kelpie::linuxapp {
 
 struct AppConfig {
   bool headless = false;
+  bool mcp_stdio = false;
+  std::string readiness_path;
   int port = 8420;
   std::string profile_dir;
   std::string url;
@@ -31,6 +35,21 @@ class LinuxApp {
   void RequestShutdown();
   bool IsRunning() const;
   void PumpBrowser();
+  bool FinishShutdown();
+  std::vector<TabSnapshot> Tabs() const;
+  void NewTab(bool isolated=false);
+  void ActivateTab(const std::string& id);
+  void CloseTab(const std::string& id);
+  void CycleTab(int direction);
+  OffscreenFrame ViewFrame() const;
+  void InputModifiers(unsigned modifiers);
+  bool Key(int key,int native_key,unsigned modifiers,bool released);
+  bool CommitText(const std::string& text);
+  account::AccountState AccountState() const;
+  void AccountSignIn();
+  void AccountSignOut();
+  void AccountRefresh();
+  std::pair<int,int> TakeResizeRequest();
   bool AttachBrowserHost(std::uintptr_t parent_window, int width, int height);
   void ResizeBrowserHost(int width, int height);
   bool HasNativeBrowser() const;

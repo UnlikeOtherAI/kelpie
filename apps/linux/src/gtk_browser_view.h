@@ -23,6 +23,10 @@ class GtkBrowserView {
   GtkWidget* canvas_ = nullptr;
   GtkWidget* label_ = nullptr;
   bool attached_ = false;
+#if KELPIE_LINUX_HAS_GTK
+  void ConnectKeyboard();
+  GtkIMContext* input_ = nullptr;
+#endif
 };
 
 }  // namespace kelpie::linuxapp

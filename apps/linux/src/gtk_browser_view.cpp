@@ -35,6 +35,7 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
                             GDK_LEAVE_NOTIFY_MASK |
                             GDK_FOCUS_CHANGE_MASK);
   Sync();
+  ConnectKeyboard();
 
   g_signal_connect(canvas_, "realize", G_CALLBACK(+[](GtkWidget* widget, gpointer user_data) {
                      auto* self = static_cast<GtkBrowserView*>(user_data);
@@ -64,10 +65,11 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 
   g_signal_connect(canvas_, "draw", G_CALLBACK(+[](GtkWidget* widget, cairo_t* cr, gpointer user_data) {
                      auto* self = static_cast<GtkBrowserView*>(user_data);
-                     const auto snapshot = self->app_.SnapshotBytes();
-                     const int width = gtk_widget_get_allocated_width(widget);
-                     const int height = gtk_widget_get_allocated_height(widget);
-                     if (snapshot.empty() || width <= 0 || height <= 0) {
+                     const auto frame = self->app_.ViewFrame();
+                     const auto& snapshot = frame.pixels;
+                     const int width = frame.width;
+                     const int height = frame.height;
+                     if (!frame.valid()) {
                        cairo_set_source_rgb(cr, 0.12, 0.12, 0.12);
                        cairo_paint(cr);
                        return FALSE;
@@ -98,6 +100,7 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
   g_signal_connect(canvas_, "focus-in-event", G_CALLBACK(+[](GtkWidget*, GdkEventFocus*, gpointer user_data) -> gboolean {
                      auto* self = static_cast<GtkBrowserView*>(user_data);
                      self->app_.FocusBrowser(true);
+                     gtk_im_context_focus_in(self->input_);
                      return FALSE;
                    }),
                    this);
@@ -105,6 +108,7 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
   g_signal_connect(canvas_, "focus-out-event", G_CALLBACK(+[](GtkWidget*, GdkEventFocus*, gpointer user_data) -> gboolean {
                      auto* self = static_cast<GtkBrowserView*>(user_data);
                      self->app_.FocusBrowser(false);
+                     gtk_im_context_focus_out(self->input_);
                      return FALSE;
                    }),
                    this);
