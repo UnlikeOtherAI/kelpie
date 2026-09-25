@@ -26,63 +26,62 @@ internal fun BrowserViewport(
     onWebViewReady: (WebView) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-            BoxWithConstraints(
-                modifier = modifier,
-            ) {
-                val fittingPresets = tabletViewportPresetsThatFit(maxWidth = maxWidth, maxHeight = maxHeight)
-                val selectedPreset = fittingPresets.firstOrNull { it.id == tabletMobileStagePresetId }
-                val mobileStageActive = selectedPreset != null
-                val stageSize =
-                    selectedPreset?.let {
-                        tabletMobileStageSize(
-                            preset = it,
-                            maxWidth = maxWidth,
-                            maxHeight = maxHeight,
-                        )
-                    }
-
-                LaunchedEffect(maxWidth, maxHeight) {
-                    onAvailablePresets(fittingPresets)
-                    TabletViewportPresetStore.updateAvailableState(
-                        availablePresetIds = fittingPresets.map { it.id },
-                        stageWidthDp = maxWidth.value,
-                        stageHeightDp = maxHeight.value,
-                    )
-                }
-
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .background(
-                                if (mobileStageActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background,
-                            ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val tabWebView: @Composable (Modifier) -> Unit = { mod ->
-                        TabWebViewContent(
-                            tabStore = tabStore,
-                            browserState = browserState,
-                            handlerContext = handlerContext,
-                            onScrollDirectionChange = onScrollDirectionChange,
-                            onScrolled = onScrolled,
-                            onWebViewReady = onWebViewReady,
-                            modifier = mod,
-                        )
-                    }
-
-                    if (mobileStageActive && stageSize != null) {
-                        TabletViewportStage(
-                            preset = selectedPreset,
-                            stageSize = stageSize,
-                            onClose = { TabletViewportPresetStore.setSelectedPresetId(null) },
-                        ) {
-                            tabWebView(Modifier.fillMaxSize())
-                        }
-                    } else {
-                        tabWebView(Modifier.fillMaxSize())
-                    }
-                }
+    BoxWithConstraints(
+        modifier = modifier,
+    ) {
+        val fittingPresets = tabletViewportPresetsThatFit(maxWidth = maxWidth, maxHeight = maxHeight)
+        val selectedPreset = fittingPresets.firstOrNull { it.id == tabletMobileStagePresetId }
+        val mobileStageActive = selectedPreset != null
+        val stageSize =
+            selectedPreset?.let {
+                tabletMobileStageSize(
+                    preset = it,
+                    maxWidth = maxWidth,
+                    maxHeight = maxHeight,
+                )
             }
 
+        LaunchedEffect(maxWidth, maxHeight) {
+            onAvailablePresets(fittingPresets)
+            TabletViewportPresetStore.updateAvailableState(
+                availablePresetIds = fittingPresets.map { it.id },
+                stageWidthDp = maxWidth.value,
+                stageHeightDp = maxHeight.value,
+            )
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (mobileStageActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            val tabWebView: @Composable (Modifier) -> Unit = { mod ->
+                TabWebViewContent(
+                    tabStore = tabStore,
+                    browserState = browserState,
+                    handlerContext = handlerContext,
+                    onScrollDirectionChange = onScrollDirectionChange,
+                    onScrolled = onScrolled,
+                    onWebViewReady = onWebViewReady,
+                    modifier = mod,
+                )
+            }
+
+            if (mobileStageActive && stageSize != null) {
+                TabletViewportStage(
+                    preset = selectedPreset,
+                    stageSize = stageSize,
+                    onClose = { TabletViewportPresetStore.setSelectedPresetId(null) },
+                ) {
+                    tabWebView(Modifier.fillMaxSize())
+                }
+            } else {
+                tabWebView(Modifier.fillMaxSize())
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 package com.kelpie.browser.browser
 
-import android.webkit.WebView
 import android.graphics.Bitmap
+import android.webkit.WebView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue

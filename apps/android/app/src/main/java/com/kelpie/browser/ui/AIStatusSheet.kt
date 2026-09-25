@@ -63,4 +63,3 @@ private fun AIInfoRow(
         Text(value)
     }
 }
-

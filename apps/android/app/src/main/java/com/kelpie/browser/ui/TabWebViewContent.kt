@@ -1,10 +1,7 @@
 package com.kelpie.browser.ui
 
-import androidx.compose.runtime.setValue
-import android.view.ViewGroup
 import android.view.MotionEvent
-import com.kelpie.browser.browser.ChromeScrollPolicy
-import androidx.compose.runtime.rememberUpdatedState
+import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
@@ -12,9 +9,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kelpie.browser.browser.BrowserState
+import com.kelpie.browser.browser.ChromeScrollPolicy
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.handlers.HandlerContext
 
@@ -61,7 +61,12 @@ fun TabWebViewContent(
             val density = wv.resources.displayMetrics.density
             wv.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> { start = event.y; translation = 0f; dragging = true; policy.update(0f, 0f, 0f, false) }
+                    MotionEvent.ACTION_DOWN -> {
+                        start = event.y
+                        translation = 0f
+                        dragging = true
+                        policy.update(0f, 0f, 0f, false)
+                    }
                     MotionEvent.ACTION_MOVE -> translation = (event.y - start) / density
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> dragging = false
                 }
