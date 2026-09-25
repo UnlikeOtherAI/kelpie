@@ -30,7 +30,8 @@ BrowserChrome::BrowserChrome(LinuxApp& app,GtkWindow* window):app_(app),window_(
   auto* scroll=gtk_scrolled_window_new(nullptr,nullptr);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_EXTERNAL,GTK_POLICY_NEVER);
   gtk_scrolled_window_set_overlay_scrolling(GTK_SCROLLED_WINDOW(scroll),FALSE);
-  tabs_=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0); gtk_container_add(GTK_CONTAINER(scroll),tabs_);
+  tabs_=gtk_layout_new(nullptr,nullptr); gtk_layout_set_size(GTK_LAYOUT(tabs_),1,52);
+  gtk_container_add(GTK_CONTAINER(scroll),tabs_);
   gtk_box_pack_start(GTK_BOX(title_),scroll,TRUE,TRUE,0);
   auto* drag=gtk_event_box_new(); gtk_widget_set_size_request(drag,40,52); gtk_box_pack_start(GTK_BOX(title_),drag,FALSE,FALSE,0);
   g_signal_connect(drag,"button-press-event",G_CALLBACK(+[](GtkWidget*,GdkEventButton* event,gpointer raw)->gboolean {
@@ -62,6 +63,8 @@ void BrowserChrome::Tabs() {
   auto tabs=app_.Tabs(); std::string key;
   for(auto& tab:tabs)key+=tab.id+tab.title+(tab.active?"1":"0")+(tab.favicon_png_base64?*tab.favicon_png_base64:"");
   if(key==tabs_key_)return; tabs_key_=key; Clear(tabs_);
+  int tab_x=0;
+  gtk_layout_set_size(GTK_LAYOUT(tabs_),std::max(1,static_cast<int>(tabs.size())*220),52);
   for(const auto& tab:tabs) {
     auto* item=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0); Class(item,"chrome-tab");
     if(tab.active)Class(item,"active");
@@ -90,7 +93,7 @@ void BrowserChrome::Tabs() {
       }
       return FALSE;
     }),this);
-    gtk_widget_set_size_request(item,190,44); gtk_widget_set_margin_top(item,8);
+    gtk_widget_set_size_request(item,220,44);
     auto* select=gtk_button_new(); Class(select,"chrome-button"); gtk_widget_set_hexpand(select,TRUE);
     auto* row=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,8);
     GtkWidget* icon=nullptr;
@@ -113,7 +116,7 @@ void BrowserChrome::Tabs() {
     for(auto* button:{select,close})g_object_set_data_full(G_OBJECT(button),"tab",g_strdup(tab.id.c_str()),g_free);
     g_signal_connect(select,"clicked",G_CALLBACK(+[](GtkButton* b,gpointer raw){static_cast<LinuxApp*>(raw)->ActivateTab(static_cast<const char*>(g_object_get_data(G_OBJECT(b),"tab")));}),&app_);
     g_signal_connect(close,"clicked",G_CALLBACK(+[](GtkButton* b,gpointer raw){static_cast<LinuxApp*>(raw)->CloseTab(static_cast<const char*>(g_object_get_data(G_OBJECT(b),"tab")));}),&app_);
-    gtk_box_pack_start(GTK_BOX(tabs_),item,FALSE,FALSE,0);
+    gtk_layout_put(GTK_LAYOUT(tabs_),item,tab_x,8); tab_x+=220;
   }
   gtk_widget_show_all(tabs_);
 }
@@ -157,7 +160,8 @@ void BrowserChrome::Palette() {
   }
   double p=std::clamp((now-transition_)/220000.0,0.0,1.0); p=p*p*(3-2*p);
   for(int c=0;c<3;++c)color_[c]=from_[c]+(target_[c]-from_[c])*p;
-  bool dark=color_[0]*.2126+color_[1]*.7152+color_[2]*.0722<130;
+  auto linear=[](double c){c/=255;return c<=.04045?c/12.92:std::pow((c+.055)/1.055,2.4);};
+  bool dark=linear(color_[0])*.2126+linear(color_[1])*.7152+linear(color_[2])*.0722<.179;
   auto rgb=[&](double wash) { std::ostringstream s; s<<"rgb("; for(int c=0;c<3;++c){if(c)s<<',';s<<int(color_[c]*(1-wash)+(dark?255:0)*wash);}s<<')';return s.str(); };
   const auto ink=dark?"#f7f8fc":"#0d1731";
   std::string css=R"CSS(
@@ -176,8 +180,12 @@ void BrowserChrome::Palette() {
 .chrome-favorites { padding:0 14px; font-size:13px; }
 )CSS";
   css+=".chrome-nav,.chrome-favorites { background:"+rgb(0)+"; color:"+ink+"; }.chrome-tab.active { color:"+ink+"; }";
-  css+=".chrome-address { background:"+rgb(.09)+"; }.chrome-separator { background:"+rgb(.10)+"; }";
+  std::ostringstream field; field<<"rgb(";
+  const int light_field[]={112,135,176};
+  for(int c=0;c<3;++c){if(c)field<<',';field<<int(color_[c]*.91+(dark?255:light_field[c])*.09);}field<<')';
+  css+=".chrome-address { background:"+field.str()+"; }.chrome-separator { background:"+rgb(.10)+"; }";
   gtk_css_provider_load_from_data(css_,css.c_str(),-1,nullptr);
+  gtk_widget_queue_draw(tabs_);
 }
 void BrowserChrome::Sync() { Tabs(); Favorites(); Palette(); }
 void BrowserChrome::AccountMenu(GtkWidget* anchor) {

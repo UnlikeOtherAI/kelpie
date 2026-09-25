@@ -11,7 +11,7 @@ nlohmann::json HfCloudClient::infer(const std::string& model_id,
                                      const nlohmann::json& request) const {
   using json = nlohmann::json;
 
-#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#if !KELPIE_AI_HAS_HF_HTTPS
   (void)model_id;
   (void)hf_token;
   (void)request;
@@ -139,6 +139,6 @@ nlohmann::json HfCloudClient::infer(const std::string& model_id,
               {"backend", "hf_cloud"},
               {"model_id", model_id}};
 }
-#endif  // CPPHTTPLIB_OPENSSL_SUPPORT
+#endif  // KELPIE_AI_HAS_HF_HTTPS
 
 }  // namespace kelpie
