@@ -52,8 +52,22 @@ final class BrowserChromeUITests: XCTestCase {
         cards.firstMatch.swipeLeft()
         XCTAssertTrue(app.staticTexts["1 Tabs"].waitForExistence(timeout: 5))
         capture("dismissed-tab", app)
-        app.buttons["Done"].tap()
+        cards.firstMatch.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 5))
+        if tablet { verifyTabletOverflow(app) }
+    }
+
+    @MainActor
+    private func verifyTabletOverflow(_ app: XCUIApplication) {
+        for _ in 0..<7 { app.buttons["browser.tabs.add"].tap() }
+        let closeButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "browser.tabs.close."))
+        XCTAssertEqual(closeButtons.count, 8)
+        let activeClose = closeButtons.allElementsBoundByIndex.last
+        XCTAssertTrue(activeClose?.isHittable == true)
+        capture("tablet-overflow", app)
+        activeClose?.tap()
+        XCTAssertEqual(closeButtons.count, 7)
+        capture("tablet-active-closed", app)
     }
 
     @MainActor

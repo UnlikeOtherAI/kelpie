@@ -17,6 +17,11 @@ final class BrowserTab: ObservableObject, Identifiable {
     @Published private(set) var preview: UIImage?
     private var previewRequest = UUID()
 
+    func discardPreview() {
+        previewRequest = UUID()
+        preview = nil
+    }
+
     /// A bounded thumbnail captured only while this tab is on screen.
     func capturePreview() {
         guard webView.window != nil, webView.bounds.width > 0, !isStartPage else { return }

@@ -13,7 +13,7 @@ extension BrowserView {
             },
             onBookmarks: { showBookmarks = true },
             onShowTabs: {
-                tabStore.activeBrowserTab?.capturePreview()
+                tabStore.captureActivePreview()
                 showTabOverview = true
                 bottomBarCollapsed = false
             },

@@ -100,7 +100,7 @@ struct BottomBarView<MoreContent: View>: View {
             }
         }
         .padding(.horizontal, wide ? 20 : 8)
-        .tint(.primary)
+        .tint(.accentColor)
     }
 
     private var addressField: some View {

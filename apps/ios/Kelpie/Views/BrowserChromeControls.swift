@@ -26,6 +26,7 @@ struct BrowserChromeButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 19, weight: .regular))
+                .foregroundStyle(.tint)
                 .frame(width: 44, height: 44)
                 .modifier(BrowserGlass())
                 .contentShape(Circle())

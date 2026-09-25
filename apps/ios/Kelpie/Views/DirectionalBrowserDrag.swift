@@ -56,9 +56,6 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
 
         override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             let velocity = pan.velocity(in: window)
-            #if DEBUG
-            print("Kelpie drag begin", configuration?.axis as Any, velocity, bounds)
-            #endif
             switch configuration?.axis {
             case .horizontal: return abs(velocity.x) > abs(velocity.y) * 1.25
             case .upward: return velocity.y < 0 && abs(velocity.y) > abs(velocity.x) * 1.25
@@ -76,9 +73,6 @@ struct DirectionalBrowserDrag: UIViewRepresentable {
             let translation = pan.translation(in: window)
             let velocity = pan.velocity(in: window)
             let distance = configuration.axis == .horizontal ? translation.x : translation.y
-            #if DEBUG
-            print("Kelpie drag event", configuration.axis, pan.state.rawValue, distance)
-            #endif
             let speed = configuration.axis == .horizontal ? velocity.x : velocity.y
             switch pan.state {
             case .changed: configuration.onChange(distance)

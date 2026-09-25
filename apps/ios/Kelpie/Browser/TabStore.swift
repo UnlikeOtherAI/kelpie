@@ -11,6 +11,7 @@ final class TabStore: ObservableObject {
     var activeBrowserTab: BrowserTab? { tabs.first { $0.id == activeBrowserTabID } }
 
     private weak var handlerContext: HandlerContext?
+    private var previewTabs: [UUID] = []
     private var tabSinks: [UUID: AnyCancellable] = [:]
 
     init(handlerContext: HandlerContext?) {
@@ -39,7 +40,7 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addBrowserTab(url: String? = nil) -> BrowserTab {
-        activeBrowserTab?.capturePreview()
+        captureActivePreview()
         let tab = createBrowserTab()
         bind(tab)
         tabs.append(tab)
@@ -77,9 +78,20 @@ final class TabStore: ObservableObject {
 
     func selectBrowserTab(id: UUID) {
         guard tabs.contains(where: { $0.id == id }) else { return }
-        if id != activeBrowserTabID { activeBrowserTab?.capturePreview() }
+        if id != activeBrowserTabID { captureActivePreview() }
         activeBrowserTabID = id
         persistSession()
+    }
+
+    func captureActivePreview() {
+        guard let tab = activeBrowserTab, !tab.isStartPage else { return }
+        previewTabs.removeAll { $0 == tab.id }
+        previewTabs.append(tab.id)
+        while previewTabs.count > 12 {
+            let oldest = previewTabs.removeFirst()
+            tabs.first { $0.id == oldest }?.discardPreview()
+        }
+        tab.capturePreview()
     }
 
     private func createBrowserTab(isStartPage: Bool = true) -> BrowserTab {
@@ -124,6 +136,7 @@ final class TabStore: ObservableObject {
     }
 
     private func unbind(_ tab: BrowserTab) {
+        previewTabs.removeAll { $0 == tab.id }
         tabSinks.removeValue(forKey: tab.id)
     }
 
