@@ -65,7 +65,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   if(engine.initial_url.empty()) impl_->LoadSession(engine);
   if(!impl_->desktop.Start(runtime)) { ShowToast(impl_->desktop.last_error()); return false; }
   impl_->started=true;
-  impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().port(),runtime.start_stdio_mcp);
+  impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
   return true;
 }
 void LinuxApp::RequestShutdown() { impl_->closing=true; }
@@ -118,7 +118,7 @@ void LinuxApp::Impl::Save() {
   write_changed("session.json",data.dump(),last_session);
 }
 const AppConfig& LinuxApp::config() const { return impl_->config; }
-int LinuxApp::port() const { return impl_->desktop.http_server().port(); }
+int LinuxApp::port() const { return impl_->desktop.http_server().bound_port(); }
 bool LinuxApp::GuiAvailable() const { return KELPIE_LINUX_HAS_GTK; }
 bool LinuxApp::MdnsActive() const { return false; }
 std::string LinuxApp::MdnsStatusText() const { return "Local agent control"; }

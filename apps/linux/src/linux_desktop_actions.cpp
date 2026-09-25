@@ -93,7 +93,7 @@ std::string LinuxApp::ConsumeToast() { std::lock_guard lock(impl_->state_mutex);
 LinuxApp::json LinuxApp::Impl::GetDeviceInfo() const {
   auto snapshot=device.Collect(); snapshot.ip="127.0.0.1";
   auto view=desktop.engine().viewport();
-  auto data=device.ToJson(snapshot,desktop.http_server().port(),view.width,view.height,false,started,"",KELPIE_LINUX_VERSION,0);
+  auto data=device.ToJson(snapshot,desktop.http_server().bound_port(),view.width,view.height,false,started,"",KELPIE_LINUX_VERSION,0);
   data["controlMode"]="loopback"; data["success"]=true; return data;
 }
 LinuxApp::json LinuxApp::DeviceInfo() const { return impl_->GetDeviceInfo(); }
