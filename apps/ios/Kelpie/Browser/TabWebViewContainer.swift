@@ -99,7 +99,10 @@ struct TabWebViewContainer: UIViewRepresentable {
             chromeScroll = BrowserChromeScroll()
             observe(webView)
             syncBrowserState(from: webView)
-            onWebViewReady(webView)
+            DispatchQueue.main.async { [weak self, weak webView] in
+                guard let self, let webView, webView === self.currentWebView else { return }
+                self.onWebViewReady(webView)
+            }
 
             // Defer removal to after the current event cycle so any in-flight
             // UIGestureRecognizer state on the retiring view is fully drained

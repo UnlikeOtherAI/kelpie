@@ -1,7 +1,7 @@
 import SwiftUI
 import WebKit
 
-/// Main browser screen: WebView + floating action menu + bottom bar with tabs.
+/// Native browser surface with persistent iPad tabs and collapsing bottom chrome.
 struct BrowserView: View {
     @ObservedObject var browserState: BrowserState
     @ObservedObject var serverState: ServerState
@@ -65,6 +65,7 @@ struct BrowserView: View {
                 }
 
                 browserViewport
+                    .ignoresSafeArea(.container, edges: .bottom)
 
             }
 

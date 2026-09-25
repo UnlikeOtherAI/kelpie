@@ -77,7 +77,7 @@ struct BottomBarView<MoreContent: View>: View {
                     }
                     .accessibilityLabel("Share page")
                 }
-                if wide {
+                if wide || showShare {
                     BrowserChromeButton(symbol: "book", label: "Bookmarks", identifier: "browser.bookmarks", action: onBookmarks)
                 }
                 Menu {

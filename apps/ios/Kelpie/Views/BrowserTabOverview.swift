@@ -34,6 +34,7 @@ struct BrowserTabOverview: View {
             .accessibilityIdentifier("browser.tabs.add")
         }
         .background(.regularMaterial)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("browser.tabs.overview")
     }
 }
