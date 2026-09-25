@@ -2,6 +2,7 @@ import AppKit
 import XCTest
 @testable import Kelpie
 
+@MainActor
 final class BookmarkChromeTests: XCTestCase {
     func testSavedPagesPersistWithoutDuplicatesAndRemovingLastHidesRow() throws {
         let suite = "BookmarkChromeTests.\(UUID().uuidString)"

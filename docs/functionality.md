@@ -405,3 +405,20 @@ that launch removes readiness. Windows home, native toast, and fullscreen are ca
 HTTP and MCP; remote browser control is not shipped.
 
 On macOS, the selected tab shares the lighter glass surface while the address bar is visible, then transitions to the sampled page-header background when scrolling hides the address bar. A bounded trailing sample catches sticky-header colour transitions after the last scroll event. Inactive tabs use a lighter tint on dark pages and a subtle darker tint on light pages; both tab fills transition on the same clock as the chrome text and icons.
+
+### macOS UOA account and favourites
+
+The circular account control between History and More opens an account popup. Sign in
+with UOA opens the system authentication browser at authentication.unlikeotherai.com,
+using a public OAuth client and S256 PKCE. Password and authenticator verification stay
+on UOA's hosted screen. The popup displays the authoritative UOA name/email and avatar,
+with Sign out and Refresh favourites actions. Session expiry asks the user to sign in
+again; the public profile does not issue refresh tokens.
+
+While signed in, favourites load and save directly in UOA's personal settings store
+(`browser` / `bookmarks`). Add, remove and clear wait for durable saves; conflicts fetch
+the current server list and reapply the intended change. Sync failures appear in the
+account popup and are returned by bookmark API mutations. Refresh favourites reloads
+changes from another device. Signed-out favourites remain local and are restored on
+sign-out; they are never silently uploaded. Tokens, identity, avatar and signed-in
+favourites remain in memory and are cleared on sign-out, account change or expiry.

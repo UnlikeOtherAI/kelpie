@@ -91,6 +91,7 @@ struct URLBarView: View {
                 .popover(isPresented: $showHistory, arrowEdge: .bottom) {
                     HistoryView(onNavigate: onNavigate)
                 }
+                AccountButton(tintColor: appearance.palette.foreground.color)
                 AppKitToolbarButton(
                     systemName: "ellipsis.vertical",
                     accessibilityID: "browser.action.more",
