@@ -5,6 +5,7 @@ import SwiftUI
 // MARK: - Public NSViewRepresentable
 
 struct TabBarView: NSViewRepresentable {
+    @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var tabStore: TabStore
     let onNewTab: () -> Void
     let onCloseTab: (UUID) -> Void
@@ -19,6 +20,7 @@ struct TabBarView: NSViewRepresentable {
         container.addButton.target = context.coordinator
         container.addButton.action = #selector(TabBarCoordinator.handleAddTab)
         context.coordinator.container = container
+        context.coordinator.palette = appearance.palette
         context.coordinator.update(in: container, tabStore: tabStore)
         let coordinator = context.coordinator
         container.onFrameChange = { [weak coordinator, weak container] _ in
@@ -29,6 +31,7 @@ struct TabBarView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: TabBarContainerView, context: Context) {
+        context.coordinator.palette = appearance.palette
         context.coordinator.onNewTab = onNewTab
         context.coordinator.onCloseTab = onCloseTab
         context.coordinator.onSelectTab = onSelectTab
@@ -47,6 +50,7 @@ final class TabBarCoordinator: NSObject {
     weak var container: TabBarContainerView?
     private var pillsByID: [UUID: TabPillView] = [:]
     var currentTabStore: TabStore?
+    var palette = BrowserChromePalette.neutral
 
     init(onNewTab: @escaping () -> Void, onCloseTab: @escaping (UUID) -> Void, onSelectTab: @escaping (UUID) -> Void) {
         self.onNewTab = onNewTab
@@ -117,9 +121,12 @@ final class TabBarCoordinator: NSObject {
             let x = leftInset + CGFloat(idx) * tabW
             let y: CGFloat = 4
             pill.frame = CGRect(x: x, y: y, width: tabW - 2, height: height)
+            pill.setPalette(palette)
             pill.setActive(tab.id == tabStore.activeTabID)
             pill.refreshContent()
         }
+
+        container.addButton.contentTintColor = palette.foreground.color
 
         // Position add button
         let addX = min(totalTabsW + leftInset + 8, container.bounds.width - addButtonWidth - rightMargin)
@@ -218,6 +225,7 @@ final class TabPillView: NSView {
     private let closeButton = NSButton()
     private var cancellables = Set<AnyCancellable>()
     private var isActive = false
+    private var palette = BrowserChromePalette.neutral
 
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -236,6 +244,8 @@ final class TabPillView: NSView {
         addSubview(letterAvatar)
 
         // Favicon image view (hidden until favicon is set)
+        faviconView.wantsLayer = true
+        faviconView.layer?.cornerRadius = 3
         faviconView.translatesAutoresizingMaskIntoConstraints = false
         faviconView.imageScaling = .scaleProportionallyUpOrDown
         faviconView.isHidden = true
@@ -325,11 +335,19 @@ final class TabPillView: NSView {
         updateAppearance()
     }
 
+    func setPalette(_ palette: BrowserChromePalette) {
+        self.palette = palette
+        updateAppearance()
+    }
+
     private func updateAppearance() {
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = isActive ? BrowserChromeStyle.surfaceColor.cgColor : NSColor.clear.cgColor
-        }
-        titleField.textColor = isActive ? NSColor.labelColor : NSColor.secondaryLabelColor
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.backgroundColor = isActive ? palette.selectedTab.color.cgColor : NSColor.clear.cgColor
+        faviconView.layer?.backgroundColor = NSColor.white.withAlphaComponent(palette.foreground.luminance * 0.9).cgColor
+        CATransaction.commit()
+        titleField.textColor = palette.foreground.color.withAlphaComponent(isActive ? 1 : 0.75)
+        closeButton.contentTintColor = palette.foreground.color.withAlphaComponent(0.7)
     }
 
     func refreshContent() {

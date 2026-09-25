@@ -200,6 +200,7 @@ extension BrowserView {
         ) {
             ZStack {
                 RendererContainerView(
+                    chromeAppearance: chromeAppearance,
                     serverState: serverState,
                     rendererState: rendererState,
                     tabStore: tabStore,

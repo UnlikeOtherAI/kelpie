@@ -9,6 +9,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
     let accessibilityLabel: String
     var isEnabled: Bool = true
     var isSelected: Bool = false
+    var tintColor: NSColor?
     let action: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(action: action) }
@@ -25,6 +26,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
 
     func updateNSView(_ nsView: ToolbarButtonView, context: Context) {
         context.coordinator.action = action
+        nsView.chromeTintColor = tintColor
         nsView.isEnabled = isEnabled
         nsView.isButtonSelected = isSelected
         nsView.updateIcon(systemName: systemName)
@@ -43,7 +45,9 @@ struct AppKitToolbarButton: NSViewRepresentable {
 
 final class ToolbarButtonView: NSButton {
     private let iconView = NSImageView()
+    private var iconName: String?
     var isButtonSelected = false { didSet { applyAppearance() } }
+    var chromeTintColor: NSColor? { didSet { applyAppearance() } }
 
     init(systemName: String) {
         super.init(frame: NSRect(x: 0, y: 0, width: 40, height: 34))
@@ -72,9 +76,9 @@ final class ToolbarButtonView: NSButton {
     }
 
     func updateIcon(systemName: String) {
-        iconView.frameCenterRotation = systemName == "ellipsis.vertical" ? 90 : 0
-        iconView.image = NSImage(systemSymbolName: systemName == "ellipsis.vertical" ? "ellipsis" : systemName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 17, weight: .regular))
+        guard iconName != systemName else { return }
+        iconName = systemName
+        iconView.image = ToolbarIcon.image(systemName: systemName)
         applyAppearance()
     }
 
@@ -88,7 +92,7 @@ final class ToolbarButtonView: NSButton {
             layer?.backgroundColor = isButtonSelected
                 ? NSColor.selectedControlColor.withAlphaComponent(0.75).cgColor
                 : NSColor.separatorColor.withAlphaComponent(0.18).cgColor
-            iconView.contentTintColor = isButtonSelected ? .white : NSColor.labelColor
+            iconView.contentTintColor = isButtonSelected ? .white : (chromeTintColor ?? NSColor.labelColor)
         } else if isButtonSelected {
             layer?.backgroundColor = NSColor.selectedControlColor.withAlphaComponent(0.92).cgColor
             layer?.borderColor = NSColor.selectedControlColor.withAlphaComponent(0.5).cgColor
@@ -96,7 +100,7 @@ final class ToolbarButtonView: NSButton {
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
             layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
-            iconView.contentTintColor = BrowserChromeStyle.inkColor
+            iconView.contentTintColor = chromeTintColor ?? BrowserChromeStyle.inkColor
         }
     }
 

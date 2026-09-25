@@ -28,6 +28,7 @@ enum BrowserChromeStyle {
 
 /// Illustrative favourites requested for the reference design. Never persisted as user bookmarks.
 struct FavouritesBarView: View {
+    @ObservedObject var appearance: BrowserChromeAppearance
     let onNavigate: (String) -> Void
     let onAddBookmark: () -> Void
     let canAddBookmark: Bool
@@ -54,13 +55,13 @@ struct FavouritesBarView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 24) {
                 ForEach(favourites) { favourite in
-                    label(favourite.title, icon: favourite.icon, color: favourite.color)
+                    label(favourite.title, icon: favourite.icon, color: favourite.icon == "folder" ? Color(nsColor: appearance.palette.foreground.color) : favourite.color)
                         .overlay(AppKitInvisibleButton(
                     accessibilityID: "browser.favourite.\(favourite.id)",
                     accessibilityLabel: favourite.title
                 ) { onNavigate(favourite.url) })
                 }
-                label("Add bookmark…", icon: "plus", color: BrowserChromeStyle.muted)
+                label("Add bookmark…", icon: "plus", color: Color(nsColor: appearance.palette.foreground.color.withAlphaComponent(0.7)))
                     .overlay(AppKitInvisibleButton(
                     accessibilityID: "browser.favourite.add",
                     accessibilityLabel: "Add bookmark",
@@ -77,7 +78,7 @@ struct FavouritesBarView: View {
     private func label(_ title: String, icon: String, color: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon).font(.system(size: 15)).foregroundStyle(color)
-            Text(title).font(.system(size: 12)).foregroundStyle(BrowserChromeStyle.ink)
+            Text(title).font(.system(size: 12)).foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
         }
         .fixedSize()
         .frame(height: 28)
@@ -87,6 +88,7 @@ struct FavouritesBarView: View {
 
 struct PageShareButton: NSViewRepresentable {
     let url: URL?
+    var tintColor: NSColor?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -102,6 +104,7 @@ struct PageShareButton: NSViewRepresentable {
     func updateNSView(_ button: ToolbarButtonView, context: Context) {
         context.coordinator.url = url
         button.isEnabled = url != nil
+        button.chromeTintColor = tintColor
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: ToolbarButtonView, context: Context) -> CGSize? {
