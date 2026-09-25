@@ -12,6 +12,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include "theme/chrome_palette.h"
 
 namespace kelpie::windows {
 
@@ -25,6 +26,9 @@ class UrlBarDelegate {
   virtual void OnBackRequested() = 0;
   virtual void OnForwardRequested() = 0;
   virtual void OnReloadRequested() = 0;
+  virtual void OnAccountRequested() {}
+  virtual void OnHomeRequested() {}
+  virtual void OnAddFavoriteRequested() {}
   virtual void OnOpenSettingsRequested() = 0;
   virtual std::optional<std::wstring> BestUrlCompletion(std::wstring_view typed) const = 0;
 };
@@ -35,6 +39,8 @@ class UrlBar {
   void Resize(const RECT& bounds);
   // Rebuilds fonts and themed colours after a DPI or app-theme change.
   void RefreshTheme();
+  void SetPalette(ui::ChromePalette palette);
+  void SetAccount(const std::string& avatar, const std::wstring& label, bool error, bool busy);
   void SetUrl(const std::wstring& url, bool force = false);
   void SetNavigationState(bool can_go_back, bool can_go_forward, bool is_loading);
   void Focus();
@@ -56,7 +62,17 @@ class UrlBar {
   void SubmitCurrentUrl(std::optional<std::wstring_view> completion_url = std::nullopt);
   void InvalidateSurface() const;
   void RefreshFont();
+  void DrawAccount(const DRAWITEMSTRUCT& item) const;
 
+  ui::ChromePalette palette_ = ui::ChromeColors(ui::DefaultChromeColor());
+  mutable COLORREF brush_color_ = CLR_INVALID;
+  RECT surface_{};
+  HWND account_button_ = nullptr;
+  HBITMAP account_avatar_ = nullptr;
+  std::string account_avatar_source_;
+  bool account_error_ = false, account_busy_ = false;
+  HWND home_button_ = nullptr;
+  HWND add_favorite_button_ = nullptr;
   HWND parent_ = nullptr;
   UrlBarDelegate* delegate_ = nullptr;
   HWND back_button_ = nullptr;

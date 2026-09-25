@@ -19,6 +19,7 @@ void BookmarkHandler::Register(DesktopRouter& router) const {
 }
 
 nlohmann::json BookmarkHandler::List() const {
+  if (runtime_.bookmark_action) return runtime_.bookmark_action("list", {});
   if (runtime_.bookmark_store == nullptr) {
     return SuccessResponse({{"bookmarks", nlohmann::json::array()}});
   }
@@ -26,6 +27,11 @@ nlohmann::json BookmarkHandler::List() const {
 }
 
 nlohmann::json BookmarkHandler::Add(const nlohmann::json& params) const {
+  if (runtime_.bookmark_action) {
+    const auto url = RequireString(params, "url");
+    const auto title = params.contains("title") && params["title"].is_string() ? params["title"].get<std::string>() : url;
+    return runtime_.bookmark_action("add", {{"url", url}, {"title", title}});
+  }
   if (runtime_.bookmark_store == nullptr) {
     return Unsupported("bookmarks-add");
   }
@@ -42,6 +48,10 @@ nlohmann::json BookmarkHandler::Add(const nlohmann::json& params) const {
 }
 
 nlohmann::json BookmarkHandler::Remove(const nlohmann::json& params) const {
+  if (runtime_.bookmark_action) {
+    RequireString(params, "id");
+    return runtime_.bookmark_action("remove", params);
+  }
   if (runtime_.bookmark_store == nullptr) {
     return Unsupported("bookmarks-remove");
   }
@@ -54,6 +64,7 @@ nlohmann::json BookmarkHandler::Remove(const nlohmann::json& params) const {
 }
 
 nlohmann::json BookmarkHandler::Clear() const {
+  if (runtime_.bookmark_action) return runtime_.bookmark_action("clear", {});
   if (runtime_.bookmark_store == nullptr) {
     return SuccessResponse({{"cleared", true}});
   }

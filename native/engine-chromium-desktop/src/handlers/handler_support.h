@@ -55,6 +55,8 @@ struct DesktopHandlerRuntime {
   std::function<BrowserControlResult(std::string)> set_home;
   std::function<BrowserControlResult(std::string*)> get_home;
   std::function<BrowserControlResult(std::string)> show_native_toast;
+  // Optional account-aware favorites; callbacks must be thread-safe.
+  std::function<nlohmann::json(const std::string&, const nlohmann::json&)> bookmark_action;
   Platform platform = Platform::kLinux;
   std::string engine_name = "chromium";
 };

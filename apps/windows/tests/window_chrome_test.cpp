@@ -109,14 +109,14 @@ bool MaximizedClientAreaIsTheWorkArea(HINSTANCE instance) {
 
   RECT close_rect{};
   GetWindowRect(GetDlgItem(window, IDC_WINDOW_CLOSE), &close_rect);
-  passed &= Expect(close_rect.left == expected.left + kelpie::windows::ui::Dip(window, 12),
-                   "maximized caption dots do not start 12 DIP inside the work area");
-  passed &= Expect(close_rect.top > expected.top,
-                   "maximized caption dots are clipped at the top of the work area");
+  passed &= Expect(close_rect.right == expected.right && close_rect.left == expected.right - kelpie::windows::ui::Dip(window, 50),
+                   "maximized close button does not meet the right work-area edge");
+  passed &= Expect(close_rect.top == expected.top && close_rect.bottom == expected.top + chrome.TitleBarHeight(),
+                   "maximized caption controls do not fit the title strip");
   const LPARAM close_centre = ScreenPoint((close_rect.left + close_rect.right) / 2,
                                           (close_rect.top + close_rect.bottom) / 2);
   passed &= Expect(SendMessageW(window, WM_NCHITTEST, 0, close_centre) == HTCLIENT,
-                   "maximized caption dots are covered by the drag region");
+                   "maximized caption controls are covered by the drag region");
   const LPARAM title_centre = ScreenPoint((expected.left + expected.right) / 2, expected.top + 5);
   passed &= Expect(SendMessageW(window, WM_NCHITTEST, 0, title_centre) == HTCAPTION,
                    "maximized title strip is not draggable");

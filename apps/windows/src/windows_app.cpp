@@ -172,7 +172,7 @@ void WindowsApp::OnOpenSettingsRequested() {
 }
 
 std::string WindowsApp::GetBookmarksJson() const {
-  return desktop_app_ ? desktop_app_->bookmark_store().ToJson() : "[]";
+  return account_ ? account_->Bookmarks() : desktop_app_ ? desktop_app_->bookmark_store().ToJson() : "[]";
 }
 
 std::string WindowsApp::GetHistoryJson() const {
@@ -190,7 +190,8 @@ std::string WindowsApp::GetTabsJson() const {
   json items = json::array();
   for (const auto& tab : tabs) {
     json entry = {{"id", tab.id}, {"generation", tab.generation}, {"title", tab.title},
-                  {"url", tab.url}, {"active", tab.active}};
+                  {"url", tab.url}, {"active", tab.active}, {"isStartPage", tab.is_start_page},
+                  {"favicon", tab.favicon_png_base64 ? *tab.favicon_png_base64 : ""}};
     // The shell prints `name` instead of the title and marks a partitioned
     // pill, so both have to reach it.
     if (tab.name) entry["name"] = *tab.name;
@@ -220,7 +221,6 @@ void WindowsApp::OnCreateIsolatedTabRequested() {
 void WindowsApp::CreateTabFromShell(bool isolated) {
   if (!desktop_app_) return;
   NewTabRequest request;
-  request.url = "about:blank";
   if (isolated) {
     const std::string partition = NewIsolatedPartitionId();
     if (partition.empty()) {
@@ -304,6 +304,7 @@ bool WindowsApp::TryCompleteClose() {
 }
 
 void WindowsApp::OnWindowCloseRequested() {
+  if (account_) account_->Shutdown();
   close_lifecycle_.Request();
   if (desktop_app_ != nullptr) desktop_app_->BeginShutdown();
   TryCompleteClose();

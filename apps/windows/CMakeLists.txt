@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(kelpie_windows VERSION 0.1.3 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.1.4 LANGUAGES CXX RC)
 
 include(CTest)
 
@@ -91,6 +91,8 @@ set(WINDOWS_THEME_HEADERS
   src/theme/icons.h
 )
 
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
+
 set(WINDOWS_APP_SOURCES
   ${WINDOWS_THEME_SOURCES}
   src/main.cpp
@@ -100,13 +102,20 @@ set(WINDOWS_APP_SOURCES
   src/close_lifecycle.h
   src/windows_app.cpp
   src/windows_app_persistence.cpp
+  src/shell_actions.cpp
+  src/account_menu.cpp
   src/windows_runtime.cpp
+  src/page_color_sampler.cpp
   src/win32_shell.cpp
   src/window_placement.cpp
+  src/shell_tabs.cpp
+  src/shell_chrome.cpp
+  src/favorites_bar.cpp
   src/window_chrome.cpp
   src/maximized_frame.cpp
   src/win32_browser_view.cpp
   src/url_bar.cpp
+  src/account_avatar.cpp
   src/favicon_cache.cpp
   src/letter_avatar.cpp
   src/settings_view.cpp
@@ -191,6 +200,8 @@ target_include_directories(kelpie
     "${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
+target_link_libraries(kelpie PRIVATE kelpie_desktop_account shlwapi)
+
 target_link_libraries(kelpie
   PRIVATE
     httplib::httplib
@@ -211,6 +222,7 @@ target_link_libraries(kelpie
     dnsapi
     advapi32
     bcrypt
+    crypt32
     comctl32
     ole32
     Rpcrt4
@@ -271,6 +283,12 @@ if(HAS_CEF)
 endif()
 
 if(BUILD_TESTING)
+  add_executable(page_color_sampler_test tests/page_color_sampler_test.cpp src/page_color_sampler.cpp ${WINDOWS_THEME_SOURCES})
+  target_include_directories(page_color_sampler_test PRIVATE src "${KELPIE_NATIVE_ROOT}/engine-chromium-desktop/include")
+  target_link_libraries(page_color_sampler_test PRIVATE nlohmann_json::nlohmann_json user32 gdi32 gdiplus uxtheme dwmapi crypt32 ole32)
+  target_compile_options(page_color_sampler_test PRIVATE /UNDEBUG)
+  add_test(NAME page_color_sampler_test COMMAND page_color_sampler_test)
+
   add_executable(kelpie_windows_utf_test tests/windows_utf_test.cpp)
   target_include_directories(kelpie_windows_utf_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_link_libraries(kelpie_windows_utf_test PRIVATE user32)
@@ -419,10 +437,16 @@ if(BUILD_TESTING)
     tests/test_manifest.rc
     ${WINDOWS_THEME_SOURCES}
     src/win32_shell.cpp
+    src/shell_tabs.cpp
+    src/shell_chrome.cpp
+    src/favorites_bar.cpp
     src/window_chrome.cpp
     src/maximized_frame.cpp
     src/url_bar.cpp
+    src/account_avatar.cpp
     src/win32_browser_view.cpp
+    src/favicon_cache.cpp
+    src/letter_avatar.cpp
     src/tab_tooltips.cpp
     src/toast_view.cpp
     src/bookmarks_view.cpp
@@ -434,7 +458,7 @@ if(BUILD_TESTING)
   # win32_browser_view.h includes kelpie/renderer_interface.h, which the
   # automation core owns; without it this target cannot compile.
   target_link_libraries(windows_shell_preview_test PRIVATE nlohmann_json::nlohmann_json
-    kelpie_core_automation user32 gdi32 gdiplus uxtheme dwmapi comctl32 shell32 ole32)
+    kelpie_core_automation user32 gdi32 gdiplus uxtheme dwmapi comctl32 shell32 ole32 msimg32)
   if(MSVC)
     # tests/test_manifest.rc supplies the manifest; the linker would otherwise
     # add its own and the two collide as a duplicate resource.

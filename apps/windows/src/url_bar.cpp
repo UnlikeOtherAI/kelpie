@@ -24,24 +24,24 @@ std::wstring ReadWindowText(HWND hwnd) {
 bool IsIconButton(UINT id) {
   return id == IDC_BACK_BUTTON || id == IDC_FORWARD_BUTTON || id == IDC_RELOAD_BUTTON ||
          id == IDC_BOOKMARKS_BUTTON || id == IDC_HISTORY_BUTTON || id == IDC_NETWORK_BUTTON ||
-         id == IDC_SETTINGS_BUTTON;
+         id == IDC_SETTINGS_BUTTON || id == IDC_HOME_BUTTON || id == IDC_ACCOUNT_BUTTON || id == IDC_ADD_FAVORITE_BUTTON;
 }
 
 wchar_t IconFor(UINT id, bool loading) {
   switch (id) {
+    case IDC_HOME_BUTTON: return L'';
+    case IDC_ADD_FAVORITE_BUTTON: return ui::icon::kBookmarks;
     case IDC_BACK_BUTTON: return ui::icon::kBack;
     case IDC_FORWARD_BUTTON: return ui::icon::kForward;
     case IDC_RELOAD_BUTTON: return loading ? ui::icon::kStop : ui::icon::kReload;
-    case IDC_BOOKMARKS_BUTTON: return ui::icon::kBookmarks;
+    case IDC_BOOKMARKS_BUTTON: return L'\ue80a';
     case IDC_HISTORY_BUTTON: return ui::icon::kHistory;
     case IDC_NETWORK_BUTTON: return ui::icon::kNetwork;
-    default: return ui::icon::kSettings;
+    default: return L'';
   }
 }
 
-// A lock is only honest for a transport that is actually secure. The macOS
-// address field shows one unconditionally; that is the one detail of it this
-// deliberately does not copy.
+// Show the transport lock only for secure URLs.
 bool IsSecureUrl(const std::wstring& url) {
   return url.rfind(L"https://", 0) == 0;
 }
@@ -63,9 +63,12 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   if (!make_button(IDC_BACK_BUTTON, L"Back", &back_button_) ||
       !make_button(IDC_FORWARD_BUTTON, L"Forward", &forward_button_) ||
       !make_button(IDC_RELOAD_BUTTON, L"Reload", &reload_button_) ||
+      !make_button(IDC_HOME_BUTTON, L"Home", &home_button_) ||
+      !make_button(IDC_ADD_FAVORITE_BUTTON, L"Add favorite", &add_favorite_button_) ||
       !make_button(IDC_BOOKMARKS_BUTTON, L"Bookmarks", &bookmarks_button_) ||
       !make_button(IDC_HISTORY_BUTTON, L"History", &history_button_) ||
       !make_button(IDC_NETWORK_BUTTON, L"Network Inspector", &network_button_) ||
+      !make_button(IDC_ACCOUNT_BUTTON, L"UOA account", &account_button_) ||
       !make_button(IDC_SETTINGS_BUTTON, L"Settings", &settings_button_)) return false;
   url_edit_ = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                               0, 0, 0, 0, parent, reinterpret_cast<HMENU>(IDC_URL_EDIT), instance, nullptr);
@@ -76,12 +79,15 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   if (tooltip_ != nullptr) {
     const auto add_tooltip = [&](HWND control, const wchar_t* text) {
       TOOLINFOW tool{sizeof(tool)};
-      tool.uFlags = TTF_SUBCLASS;
+      tool.uFlags = TTF_SUBCLASS | TTF_IDISHWND;
       tool.hwnd = parent;
       tool.uId = reinterpret_cast<UINT_PTR>(control);
       tool.lpszText = const_cast<wchar_t*>(text);
       SendMessageW(tooltip_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
     };
+    add_tooltip(account_button_, L"UnlikeOtherAI account");
+    add_tooltip(home_button_, L"Home");
+    add_tooltip(add_favorite_button_, L"Add current page to favorites");
     add_tooltip(back_button_, L"Back");
     add_tooltip(forward_button_, L"Forward");
     add_tooltip(reload_button_, L"Reload or stop loading");
@@ -104,31 +110,28 @@ bool UrlBar::Create(HWND parent, HINSTANCE instance, const RECT& bounds, UrlBarD
   return true;
 }
 
-int UrlBar::Height() const { return ui::Dip(parent_, 50); }
+int UrlBar::Height() const { return ui::Dip(parent_, 72); }
 
 void UrlBar::Resize(const RECT& bounds) {
-  RefreshFont();
-  const int control_height = ui::Dip(parent_, 34);
+  const int control_height = ui::Dip(parent_, 44);
   const int button_width = ui::Dip(parent_, 40);
   const int gap = ui::Dip(parent_, 8);
   const int padding = ui::Dip(parent_, 12);
-  const int top = bounds.top + ui::Dip(parent_, 8);
+  const int top = bounds.top + ui::Dip(parent_, 14);
   int left = bounds.left + padding;
-  for (HWND button : {back_button_, forward_button_, reload_button_}) {
+  for (HWND button : {back_button_, forward_button_, reload_button_, home_button_}) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
-  const int actions_width = 4 * button_width + 3 * gap;
-  const int edit_right = bounds.right - padding - actions_width - gap;
-  const int edit_width = std::max(1, edit_right - left);
-  // The lock is painted on the shell behind this control, so the EDIT has to
-  // start clear of it: a child window is opaque and would cover the glyph.
-  const int lock_gutter = ui::Dip(parent_, kLockGutterDip);
-  SetWindowPos(url_edit_, nullptr, left + lock_gutter, top + ui::Dip(parent_, 2),
-               std::max(1, edit_width - lock_gutter - ui::Dip(parent_, 8)),
-               control_height - ui::Dip(parent_, 4), SWP_NOZORDER);
+  const int edit_right = bounds.right - padding - 5 * (button_width + gap);
+  surface_ = {left, top, edit_right, top + control_height};
+  const int edit_height = ui::Dip(parent_, 24);
+  SetWindowPos(url_edit_, nullptr, left + ui::Dip(parent_, 48), top + (control_height-edit_height)/2,
+      std::max(1, edit_right - left - ui::Dip(parent_, 96)), edit_height, SWP_NOZORDER);
+  SetWindowPos(add_favorite_button_, nullptr, edit_right-ui::Dip(parent_, 46), top+ui::Dip(parent_, 5),
+      ui::Dip(parent_, 34), ui::Dip(parent_, 34), SWP_NOZORDER);
   left = edit_right + gap;
-  for (HWND button : {bookmarks_button_, history_button_, network_button_, settings_button_}) {
+  for (HWND button : {bookmarks_button_, network_button_, history_button_, account_button_, settings_button_}) {
     SetWindowPos(button, nullptr, left, top, button_width, control_height, SWP_NOZORDER);
     left += button_width + gap;
   }
@@ -137,14 +140,16 @@ void UrlBar::Resize(const RECT& bounds) {
 
 std::vector<HWND> UrlBar::FocusableControls() const {
   std::vector<HWND> controls;
-  for (HWND control : {back_button_, forward_button_, reload_button_, url_edit_, bookmarks_button_,
-                       history_button_, network_button_, settings_button_}) {
+  for (HWND control : {back_button_, forward_button_, reload_button_, home_button_, url_edit_, add_favorite_button_, bookmarks_button_,
+                       history_button_, network_button_, account_button_, settings_button_}) {
     if (control != nullptr && IsWindowVisible(control) && IsWindowEnabled(control)) controls.push_back(control);
   }
   return controls;
 }
 
 void UrlBar::Destroy() {
+  if (account_avatar_) DeleteObject(account_avatar_);
+  account_avatar_ = nullptr;
   if (edit_brush_ != nullptr) DeleteObject(edit_brush_);
   if (edit_font_ != nullptr) DeleteObject(edit_font_);
   edit_brush_ = nullptr;
@@ -153,13 +158,15 @@ void UrlBar::Destroy() {
 
 void UrlBar::RefreshFont() {
   if (url_edit_ == nullptr) return;
-  // 13 DIP matches the macOS address field, whose text is 13pt.
-  HFONT next = ui::MakeFont(parent_, 13, FW_NORMAL);
+  // Keep the address readable at the reference navigation-row size.
+  HFONT next = ui::MakeFont(parent_, 16, FW_NORMAL);
   if (next == nullptr) return;
   SendMessageW(url_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(next), TRUE);
   if (edit_font_ != nullptr) DeleteObject(edit_font_);
   edit_font_ = next;
 }
+
+void UrlBar::SetPalette(ui::ChromePalette palette) { palette_ = palette; }
 
 void UrlBar::RefreshTheme() {
   RefreshFont();
@@ -206,19 +213,19 @@ bool UrlBar::HandleCommand(WORD control_id, WORD notification_code) {
 }
 
 bool UrlBar::DrawControl(const DRAWITEMSTRUCT& item) const {
+  if (item.CtlID == IDC_ACCOUNT_BUTTON) { DrawAccount(item); return true; }
   if (!IsIconButton(item.CtlID)) return false;
-  const auto colors = ui::Colors();
   const bool disabled = (item.itemState & ODS_DISABLED) != 0;
   const bool pressed = (item.itemState & ODS_SELECTED) != 0;
   const bool focused = (item.itemState & ODS_FOCUS) != 0;
   const bool hovered = item.hwndItem == hovered_button_;
-  const COLORREF fill = (pressed || hovered) ? colors.surface_hover : colors.surface;
-  ui::PaintRounded(item.hDC, item.rcItem, fill, focused ? colors.focus : colors.border,
-                   ui::Dip(parent_, 8), focused ? ui::Dip(parent_, 2) : 1);
+  const auto base = item.CtlID == IDC_ADD_FAVORITE_BUTTON ? palette_.field : palette_.bar;
+  ui::FillSolid(item.hDC, item.rcItem, base);
+  if (pressed || hovered || focused) ui::PaintRounded(item.hDC, item.rcItem, palette_.hover,
+      focused ? ui::Colors().focus : palette_.hover, ui::Dip(parent_, 8), focused ? 2 : 0);
   const bool loading = item.CtlID == IDC_RELOAD_BUTTON && GetWindowLongPtrW(item.hwndItem, GWLP_USERDATA) != 0;
-  const COLORREF glyph_color = disabled ? colors.muted_text :
-      (ui::HighContrast() && pressed ? GetSysColor(COLOR_HIGHLIGHTTEXT) : colors.text);
-  ui::DrawGlyph(item.hDC, parent_, item.rcItem, IconFor(item.CtlID, loading), glyph_color);
+  ui::DrawGlyph(item.hDC, parent_, item.rcItem, IconFor(item.CtlID, loading),
+                 disabled ? palette_.muted : palette_.text, 20);
   return true;
 }
 
@@ -248,34 +255,28 @@ void UrlBar::SetHoveredButton(HWND button) {
 
 bool UrlBar::ControlColor(HDC device_context, HWND control, HBRUSH* brush) const {
   if (control != url_edit_) return false;
-  const auto colors = ui::Colors();
-  SetTextColor(device_context, colors.text);
-  SetBkColor(device_context, colors.surface);
-  if (edit_brush_ != nullptr) DeleteObject(edit_brush_);
-  edit_brush_ = CreateSolidBrush(colors.surface);
+  SetTextColor(device_context, palette_.text);
+  SetBkColor(device_context, palette_.field);
+  if (!edit_brush_ || brush_color_ != palette_.field) {
+    if (edit_brush_) DeleteObject(edit_brush_);
+    edit_brush_ = CreateSolidBrush(palette_.field);
+    brush_color_ = palette_.field;
+  }
   *brush = edit_brush_;
   return true;
 }
 
 void UrlBar::Paint(HDC device_context) const {
   if (url_edit_ == nullptr) return;
-  RECT edit{};
-  GetWindowRect(url_edit_, &edit);
-  MapWindowPoints(HWND_DESKTOP, parent_, reinterpret_cast<POINT*>(&edit), 2);
-  // Resize positions the EDIT one gutter in from the surface's left edge, so
-  // the surface has to start there too. Hugging the control with a uniform
-  // inset would put the lock underneath it, where an opaque child hides it.
-  edit.left -= ui::Dip(parent_, kLockGutterDip);
-  edit.right += ui::Dip(parent_, 4);
-  edit.top -= ui::Dip(parent_, 2);
-  edit.bottom += ui::Dip(parent_, 2);
-  const auto colors = ui::Colors();
   const bool focused = GetFocus() == url_edit_;
-  ui::PaintRounded(device_context, edit, colors.surface, focused ? colors.focus : colors.border,
-                   ui::Dip(parent_, 15), focused ? ui::Dip(parent_, 2) : 1);
+  ui::PaintRounded(device_context, surface_, palette_.field,
+      focused ? ui::Colors().focus : ui::Blend(palette_.text, palette_.bar, 0.12),
+      ui::Dip(parent_, 22), focused ? 2 : 1);
   if (secure_) {
-    const RECT lock{edit.left, edit.top, edit.left + ui::Dip(parent_, kLockGutterDip), edit.bottom};
-    ui::DrawGlyph(device_context, parent_, lock, ui::icon::kLock, colors.muted_text, 11);
+    const RECT lock{surface_.left+ui::Dip(parent_, 12), surface_.top,
+                    surface_.left+ui::Dip(parent_, 42), surface_.bottom};
+    ui::DrawGlyph(device_context, parent_, lock, ui::icon::kLock,
+        ui::HighContrast() ? palette_.text : ui::IsDark(palette_.bar) ? RGB(92,220,130) : RGB(25,154,52), 17);
   }
 }
 

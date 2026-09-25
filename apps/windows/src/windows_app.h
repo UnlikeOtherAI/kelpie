@@ -31,6 +31,8 @@
 #include "win32_browser_view.h"
 #include "win32_shell.h"
 #include "window_placement.h"
+#include "page_color_sampler.h"
+#include "account_service.h"
 
 namespace kelpie::windows {
 
@@ -66,6 +68,9 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   void OnBackRequested() override;
   void OnForwardRequested() override;
   void OnReloadRequested() override;
+  void OnHomeRequested() override;
+  void OnAccountRequested() override;
+  void OnAddFavoriteRequested() override;
   void OnOpenSettingsRequested() override;
   std::string GetBookmarksJson() const override;
   std::string GetHistoryJson() const override;
@@ -123,6 +128,8 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<Win32BrowserView> browser_view_;
   std::unique_ptr<SettingsView> settings_view_;
   std::unique_ptr<DesktopApp> desktop_app_;
+  PageColorSampler page_color_sampler_;
+  std::unique_ptr<account::AccountService> account_;
   ProfileSession profile_session_;
   StartupDiagnostics startup_diagnostics_;
 

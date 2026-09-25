@@ -51,6 +51,9 @@ class DesktopApp {
     std::function<nlohmann::json()> viewport_supplier;
     std::function<bool(int width, int height)> resize_viewport;
     std::function<bool()> reset_viewport;
+    // Optional account-aware favorites; callbacks must be thread-safe.
+    std::function<nlohmann::json(const std::string&, const nlohmann::json&)> bookmark_action;
+    std::function<std::string()> bookmarks_supplier;
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;

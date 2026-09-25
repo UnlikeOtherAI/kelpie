@@ -44,9 +44,9 @@ On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigatio
 
 On Linux, the desktop shell runs in either GUI or headless mode. Both modes expose the same HTTP surface, advertise themselves over mDNS, persist profile-backed bookmarks/history/network/console state, support a persisted home page URL, and degrade cleanly when the CEF runtime is unavailable. In GUI mode, the browser window can also be toggled into fullscreen via API/MCP. Published GitHub releases now attach Linux `.tar.gz`, `.deb`, `.rpm`, and `.AppImage` artifacts automatically and refresh Debian/Ubuntu `apt` plus Fedora-compatible `dnf` package repositories on GitHub Pages from the same release event.
 
-On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with macOS-style close/minimize/maximize dots, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
+On Windows, the desktop shell under `apps/windows/` now combines an undecorated rounded Win32 frame (maximized, it fills the monitor's work area exactly, clearing the taskbar and leaving an auto-hide taskbar reachable) with Windows-style minimize/maximize/close controls, a native tab strip, URL bar, native settings dialog, bookmarks/history/network inspector windows, native toast overlay, and the shared Chromium desktop runtime. Like macOS, it remembers the window size, on-screen position, and maximized state across launches in the profile's `settings.json`: the saved position is reused only when at least 120x40 px of the window still lands on a connected monitor, otherwise Windows places it, and explicit `--width`/`--height` flags override the remembered size. A failed startup (for example an occupied `--port`) shows its reason in the window; a launch started hidden exits with a failure code instead. Its agent-control server listens only on loopback and requires the per-launch capability from the protected readiness file. Windows screenshots are viewport PNG only; full-page, JPEG, and annotated screenshot requests return an explicit unsupported-parameter error. Console/network logs and viewport size are browser-wide state, so those methods reject `tabId` and `generation` rather than silently using a different tab.
 
-The Windows shell has the same quiet desktop chrome as the macOS app: native icon controls and an IME-capable rounded URL field in a 50-DIP toolbar, a separate native tab strip with per-tab close controls, and native bookmarks, history, network, settings, and toast surfaces. These controls keep standard Windows accessibility roles and keyboard navigation, scale from their owning window's DPI, respect high-contrast colors, and preserve inline history completion semantics.
+The Windows shell places curved tabs in the title bar, a new-tab plus at the top left, and window controls at the top right. The navigation row has unboxed controls and an IME-capable rounded address field. Home opens the saved home URL; the address-field star adds the current page to favorites. The favorites row disappears when empty and offers an overflow menu when crowded. Rendered page-edge colors animate into the chrome, with a one-pixel separator at 10% contrasting opacity. Native accessibility, high contrast, DPI scaling, tab shortcuts and inline history completion remain available. See [Windows shell notes](ui/README.md#windows-shell-notes) for sampling limits and viewport behavior.
 
 ### Safari / Chrome Authentication
 
@@ -276,7 +276,7 @@ This delivers isolated identities, **not** parallel execution: commands still se
 
 Storage partitioning is available on **macOS with the WebKit engine** and on **Windows with the Chromium (CEF) engine**. macOS on the Chromium engine, iOS, Android, and Linux reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows each partition is a separate `CefRequestContext` — persistent ones stored as a Chromium profile directory `<profile>/cache/partition-<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart.
 
-The Windows shell exposes the same feature without the API: the `+` control is a split button offering "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
+The Windows shell exposes the same feature without the API: the top-left `+` creates a tab, and its context menu offers "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
 
 On iOS, Android, macOS, and Linux, the current tab set is also persisted automatically while the browser is running and restored automatically on the next app launch. Restarting the browser reopens the same tabs and URLs that were active before exit instead of dropping back to a blank start state.
 
@@ -393,7 +393,7 @@ Overriding the device GPS location (latitude, longitude, accuracy) is part of th
 
 ## Windows local control
 
-Windows `0.1.3` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
+Windows `0.1.4` uses the shared CEF desktop runtime for tabs, navigation, trusted input,
 DOM/evaluation, screenshots, cookies, storage, dialogs, console and network inspection.
 The GUI listens only on loopback. Each launch writes a current-user ACL-protected readiness
 file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
@@ -404,11 +404,11 @@ provides a token-free stdio bridge for local development agents and local Nessie
 that launch removes readiness. Windows home, native toast, and fullscreen are callable through
 HTTP and MCP; remote browser control is not shipped.
 
-On macOS, the selected tab shares the lighter glass surface while the address bar is visible, then transitions to the sampled page-header background when scrolling hides the address bar. A bounded trailing sample catches sticky-header colour transitions after the last scroll event. Inactive tabs use a lighter tint on dark pages and a subtle darker tint on light pages; both tab fills transition on the same clock as the chrome text and icons.
+On macOS and Windows, the selected tab carries the sampled page colour continuously into the navigation area below. Inactive tabs and the entire title strip stay static light gray, including on dark pages. Page colours animate while the gray strip remains unchanged. On macOS, a bounded trailing sample catches sticky-header colour transitions after the last scroll event.
 
-### macOS UOA account and favourites
+### Desktop UOA account and favourites
 
-The circular account control between History and More opens an account popup. Sign in
+On macOS and Windows, the circular account control between History and More opens an account popup. Sign in
 with UOA opens the system authentication browser at authentication.unlikeotherai.com,
 using a public OAuth client and S256 PKCE. Password and authenticator verification stay
 on UOA's hosted screen. The popup displays the authoritative UOA name/email and avatar,

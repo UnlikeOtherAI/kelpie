@@ -144,6 +144,7 @@ class DesktopApp::Impl {
     runtime.handler_context = handler_context.get();
     runtime.browser_control = &engine;
     runtime.bookmark_store = &bookmark_store;
+    runtime.bookmark_action = config.bookmark_action;
     runtime.history_store = &history_store;
     runtime.console_store = &console_store;
     runtime.network_store = &network_store;
@@ -330,7 +331,8 @@ bool DesktopApp::Start(const Config& config) {
   DesktopEngine::Config engine_config = config.engine;
   engine_config.start_page_data_supplier = [this]() {
     return start_page::BuildDataJson(
-        impl_->bookmark_store.ToJson(), impl_->history_store.ToJson(), 20,
+        impl_->config.bookmarks_supplier ? impl_->config.bookmarks_supplier() : impl_->bookmark_store.ToJson(),
+        impl_->history_store.ToJson(), 20,
         [this](const std::string& host) {
           return impl_->engine.favicons().Peek(host).value_or(std::string());
         });

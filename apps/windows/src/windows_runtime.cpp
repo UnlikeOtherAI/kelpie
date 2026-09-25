@@ -134,13 +134,16 @@ bool WindowsApp::InitializeDesktopRuntime() {
   // Navigation callbacks may persist history immediately, so restore stores
   // before Chromium begins loading any page.
   LoadStores();
+  account_ = std::make_unique<account::AccountService>(desktop_app_->bookmark_store());
 
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.3";
+  runtime.app_version = "0.1.4";
+  runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
+  runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;
   runtime.bind_host = "127.0.0.1";
   runtime.control_token = profile_session_.token();
@@ -269,6 +272,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   if (!desktop_app_->Start(runtime)) {
     startup_diagnostics_.Fail(StartupStage::kCefBrowser, desktop_app_->last_error());
     if (!desktop_app_->is_running()) {
+      account_.reset();
       desktop_app_.reset();
     } else {
       ShutdownDesktopRuntime();
@@ -300,6 +304,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
     return false;
   }
   browser_view_->ShowFallback(false);
+  SetTimer(shell_->hwnd(), 3, 300, nullptr);
   startup_diagnostics_.Ready();
   return true;
 }
@@ -308,7 +313,10 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // CEF must deliver every OnBeforeClose before CefShutdown. Keep the owner
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
+    if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
+    if (!page_color_sampler_.Drain()) return false;
     if (!desktop_app_->Stop()) return false;
+    account_.reset();
     desktop_app_.reset();
   }
   native_control_.Shutdown();
@@ -327,10 +335,20 @@ bool WindowsApp::ShutdownDesktopRuntime() {
 
 void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
+  if (account_ && !close_lifecycle_.requested()) {
+    account_->Poll();
+    const auto state = account_->State();
+    shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(state.signed_in ? state.email : "UOA account"),
+                          !state.error.empty(), state.busy);
+  }
   std::vector<TabSnapshot> tabs;
   if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::milliseconds(20)).ok) return;
   for (const auto& tab : tabs) {
     if (tab.active) {
+      if (!close_lifecycle_.requested()) {
+        const auto color = page_color_sampler_.Poll(desktop_app_->engine(), tab, GetTickCount64());
+        if (color) shell_->SetPageColor(*color);
+      }
       OnBrowserStateChanged({tab.url, tab.title, tab.is_loading, tab.can_go_back, tab.can_go_forward});
       SaveSession();
       return;

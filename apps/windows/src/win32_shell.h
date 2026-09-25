@@ -15,6 +15,9 @@
 
 #include "bookmarks_view.h"
 #include "history_view.h"
+#include "favorites_bar.h"
+#include "favicon_cache.h"
+#include "theme/chrome_palette.h"
 #include "network_inspector.h"
 #include "settings_view.h"
 #include "tab_tooltips.h"
@@ -27,11 +30,7 @@ namespace kelpie::windows {
 
 // The macOS tab bar clamps pill widths to this range before spreading them.
 inline constexpr int kTabMinWidthDip = 80;
-inline constexpr int kTabMaxWidthDip = 200;
-
-// The chevron half of the split "+" control. Clicking the plus opens an
-// ordinary tab; clicking here offers the isolated one too.
-inline constexpr int kNewTabDropdownWidthDip = 16;
+inline constexpr int kTabMaxWidthDip = 220;
 
 class ShellDelegate : public UrlBarDelegate {
  public:
@@ -60,6 +59,10 @@ class Win32Shell {
   HACCEL accelerators() const { return accelerators_; }
   bool HandleKeyboardNavigation(const MSG& message);
   void UpdateBrowserState(const BrowserState& state);
+  void SetPageColor(COLORREF color);
+  void UpdateAccount(const std::string& avatar, const std::wstring& label, bool error, bool busy) {
+    url_bar_.SetAccount(avatar, label, error, busy);
+  }
   void ShowToast(const std::wstring& message);
   void Close();
 
@@ -69,6 +72,7 @@ class Win32Shell {
     std::uint64_t generation = 0;
     // What the pill prints: the caller's `name` when it set one, otherwise the
     // page title. `title` is kept for the tooltip, which stays truthful.
+    TabIcon icon;
     std::string label;
     std::string title;
     std::string partition;
@@ -82,6 +86,7 @@ class Win32Shell {
   };
 
   static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  static LRESULT CALLBACK NewTabProc(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR);
   static LRESULT CALLBACK TabStripProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
                                        UINT_PTR subclass_id, DWORD_PTR reference_data);
   LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
@@ -100,8 +105,8 @@ class Win32Shell {
   void RefreshTabTooltips();
   // Offers "New tab" and "New isolated tab" under the split "+" control.
   void ShowNewTabMenu();
-  // True when the click that produced a WM_COMMAND landed on the chevron.
-  bool NewTabDropdownHit() const;
+  void UpdateChromePalette();
+  void PaintTabStrip(HDC dc) const;
   void PaintClient(HDC device_context) const;
   bool DrawControl(const DRAWITEMSTRUCT& item) const;
   static bool SameTabs(const std::vector<TabItem>& left, const std::vector<TabItem>& right);
@@ -118,6 +123,10 @@ class Win32Shell {
   HWND tab_strip_ = nullptr;
   HWND new_tab_button_ = nullptr;
   HACCEL accelerators_ = nullptr;
+  ui::ChromeTransition chrome_transition_;
+  ui::ChromePalette chrome_palette_ = ui::ChromeColors(ui::DefaultChromeColor());
+  mutable FaviconCache favicon_cache_;
+  FavoritesBar favorites_bar_;
   WindowChrome window_chrome_;
   UrlBar url_bar_;
   ToastView toast_;
