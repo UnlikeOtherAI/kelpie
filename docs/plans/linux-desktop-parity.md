@@ -125,3 +125,19 @@ tabs with background animation, select popups, resizing during paint, focused
 page typing/IME and tab switching, and persistent versus transient partition
 restoration. These are acceptance checks for the identified failure modes,
 in addition to the build and API checks above.
+
+## Verification completed
+
+On the Ubuntu development host: CEF Release build, all 23 native tests, no-CEF
+build and all 20 tests, shared HTTP/direct MCP acceptance, profile exclusion,
+restricted readiness permissions, persistent/transient session restoration,
+and CLI register/launch/navigate/stdio MCP/stop passed. VNC verified physical
+keyboard input, multiline Enter, continued typing after tab switching, native
+select popup composition, account menu, favorite visibility and restoration,
+and dark-to-light page colors while the title strip remained gray.
+
+Windows: 40 native tests and the real release acceptance harness passed,
+including the sandbox, direct MCP and CLI/Nessie stdio bridge. Mac: strict Swift
+lint, native build and seven chrome tests passed; arm64 Release build succeeded.
+Live UOA credentials were not entered; account protocol, cancellation and
+conflict behavior were verified through the shared integration tests.

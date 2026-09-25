@@ -62,7 +62,7 @@ Section: net
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: ${MAINTAINER}
-Depends: libasound2, libatk-bridge2.0-0, libatk1.0-0, libavahi-client3, libc6, libcups2, libdbus-1-3, libdrm2, libfontconfig1, libgbm1, libglib2.0-0, libgtk-3-0, libnspr4, libnss3, libpango-1.0-0, libstdc++6, libx11-6, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, zlib1g
+Depends: libcurl4, libssl3, libasound2, libatk-bridge2.0-0, libatk1.0-0, libavahi-client3, libc6, libcups2, libdbus-1-3, libdrm2, libfontconfig1, libgbm1, libglib2.0-0, libgtk-3-0, libnspr4, libnss3, libpango-1.0-0, libstdc++6, libx11-6, libxcomposite1, libxdamage1, libxext6, libxfixes3, libxrandr2, zlib1g
 Description: Kelpie LLM-first browser for Linux
  Linux desktop browser shell for Kelpie with embedded Chromium runtime,
  local HTTP/MCP control surface, and mDNS discovery.
