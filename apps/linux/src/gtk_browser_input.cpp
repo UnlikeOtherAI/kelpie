@@ -44,8 +44,10 @@ void GtkBrowserView::ConnectKeyboard() {
     auto* self=static_cast<GtkBrowserView*>(raw); gtk_im_context_set_client_window(self->input_,gtk_widget_get_window(canvas));
   }),this);
   g_signal_connect(input_,"commit",G_CALLBACK(+[](GtkIMContext*,const char* text,gpointer raw) {
-    static_cast<GtkBrowserView*>(raw)->app_.CommitText(text);
+    auto* self=static_cast<GtkBrowserView*>(raw); self->app_.CommitText(text,self->composing_);
   }),this);
+  g_signal_connect(input_,"preedit-start",G_CALLBACK(+[](GtkIMContext*,gpointer raw){static_cast<GtkBrowserView*>(raw)->composing_=true;}),this);
+  g_signal_connect(input_,"preedit-end",G_CALLBACK(+[](GtkIMContext*,gpointer raw){static_cast<GtkBrowserView*>(raw)->composing_=false;}),this);
   g_signal_connect(canvas_,"event",G_CALLBACK(+[](GtkWidget*,GdkEvent* event,gpointer raw)->gboolean {
     auto* self=static_cast<GtkBrowserView*>(raw); GdkModifierType state{};
     if(gdk_event_get_state(event,&state))self->app_.InputModifiers(Modifiers(state));
@@ -58,7 +60,7 @@ void GtkBrowserView::ConnectKeyboard() {
     if(gtk_im_context_filter_keypress(self->input_,event))return TRUE;
     if(!up && !(event->state&(GDK_CONTROL_MASK|GDK_MOD1_MASK))) {
       const auto character=gdk_keyval_to_unicode(event->keyval);
-      if(character>=32) { char text[8]{}; g_unichar_to_utf8(character,text); self->app_.CommitText(text); }
+      if(character>=32 || character==13 || character==9) { char text[8]{}; g_unichar_to_utf8(character,text); self->app_.CommitText(text); }
     }
     return TRUE;
   };

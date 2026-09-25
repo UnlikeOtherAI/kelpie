@@ -101,7 +101,7 @@ void DesktopEngine::SetConsoleSink(JsonEventSink) {}
 OffscreenFrame DesktopEngine::ViewFrame() const { return {}; }
 void DesktopEngine::SetInputModifiers(unsigned) {}
 bool DesktopEngine::SendKeyEvent(int, int, unsigned, bool) { return false; }
-bool DesktopEngine::CommitText(const std::string&) { return false; }
+bool DesktopEngine::CommitText(const std::string&, bool) { return false; }
 
 void DesktopEngine::SetNetworkSink(JsonEventSink) {}
 

@@ -24,7 +24,7 @@ int HeadlessShell::Run() {
   std::signal(SIGINT, HandleSignal);
   std::signal(SIGTERM, HandleSignal);
 
-  std::cout << "Kelpie headless browser running on port " << app_.port() << '\n';
+  std::cerr << "Kelpie headless browser running on port " << app_.port() << '\n';
   while (app_.IsRunning()) {
     if (g_stop) app_.RequestShutdown();
     app_.PumpBrowser();

@@ -61,9 +61,18 @@ bool DesktopEngine::SendKeyEvent(int key, int native_key, unsigned modifiers, bo
   impl_->browser->GetHost()->SendKeyEvent(event);
   return true;
 }
-bool DesktopEngine::CommitText(const std::string& text) {
+bool DesktopEngine::CommitText(const std::string& text, bool composition) {
   if (!impl_->browser) return false;
-  impl_->browser->GetHost()->ImeCommitText(text, CefRange(UINT32_MAX, UINT32_MAX), 0);
+  if (composition) impl_->browser->GetHost()->ImeCommitText(text, CefRange(UINT32_MAX, UINT32_MAX), 0);
+  else {
+    const CefString characters(text);
+    for (std::size_t i=0; i<characters.length(); ++i) {
+      CefKeyEvent event; event.type=KEYEVENT_CHAR;
+      event.character=characters.c_str()[i]; event.unmodified_character=event.character;
+      event.windows_key_code=event.character; event.modifiers=impl_->input_modifiers;
+      impl_->browser->GetHost()->SendKeyEvent(event);
+    }
+  }
   return true;
 }
 

@@ -9,7 +9,7 @@
 
 #include <nlohmann/json.hpp>
 #include "kelpie/desktop_engine.h"
-#include "account_service.h"
+#include "account_state.h"
 
 namespace kelpie::linuxapp {
 
@@ -44,7 +44,7 @@ class LinuxApp {
   OffscreenFrame ViewFrame() const;
   void InputModifiers(unsigned modifiers);
   bool Key(int key,int native_key,unsigned modifiers,bool released);
-  bool CommitText(const std::string& text);
+  bool CommitText(const std::string& text,bool composition=false);
   account::AccountState AccountState() const;
   void AccountSignIn();
   void AccountSignOut();

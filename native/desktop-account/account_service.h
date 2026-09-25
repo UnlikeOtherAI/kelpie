@@ -4,13 +4,10 @@
 #include <mutex>
 #include <optional>
 #include "account_login.h"
+#include "account_state.h"
 #include "kelpie/bookmark_store.h"
 
 namespace kelpie::account {
-struct AccountState {
-  bool signed_in=false, signing_in=false, busy=false;
-  std::string name, email, avatar, error;
-};
 class AccountService {
  public:
   explicit AccountService(BookmarkStore& local, AccountRequest request={});

@@ -19,7 +19,8 @@ struct LinuxApp::Impl final : DeviceInfoProvider {
   account::AccountService account;
   std::atomic<bool> running{true}, closing{false}, fullscreen{false}, desired_fullscreen{false};
   std::atomic<int> requested_width{0},requested_height{0};
-  bool started=false;
+  std::atomic<bool> started{false};
+  std::atomic<int> view_width{1},view_height{1};
   mutable std::mutex state_mutex;
   std::string home,toast,last_session,last_bookmarks,last_history;
   std::chrono::steady_clock::time_point last_save{};

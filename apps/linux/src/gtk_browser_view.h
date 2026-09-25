@@ -26,6 +26,7 @@ class GtkBrowserView {
 #if KELPIE_LINUX_HAS_GTK
   void ConnectKeyboard();
   GtkIMContext* input_ = nullptr;
+  bool composing_ = false;
 #endif
 };
 

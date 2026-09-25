@@ -50,12 +50,22 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   runtime.show_native_toast=[this](std::string message) { ShowToast(message); return BrowserControlResult::Success(); };
   runtime.set_native_fullscreen=[this](bool value) { SetFullscreen(value); return BrowserControlResult::Success(); };
   runtime.get_native_fullscreen=[this](bool* value) { *value=IsFullscreen(); return BrowserControlResult::Success(); };
-  runtime.viewport_supplier=[this] { auto view=impl_->desktop.engine().viewport(); return json{{"width",view.width},{"height",view.height},{"devicePixelRatio",1.0},{"platform","linux"}}; };
-  runtime.resize_viewport=[this](int w,int h) { impl_->requested_width=w; impl_->requested_height=h; return true; };
+  runtime.viewport_supplier=[this] { return json{{"width",impl_->view_width.load()},{"height",impl_->view_height.load()},{"devicePixelRatio",1.0},{"platform","linux"}}; };
+  runtime.resize_viewport=[this](int w,int h) {
+    if(impl_->config.headless) return impl_->desktop.engine().ResizeViewport(w,h);
+    impl_->requested_width=w; impl_->requested_height=h;
+    auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
+    while(!impl_->closing && std::chrono::steady_clock::now()<deadline) {
+      if(impl_->view_width==w && impl_->view_height==h) return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+  };
   runtime.reset_viewport=[this] { impl_->requested_width=impl_->config.width; impl_->requested_height=impl_->config.height; return true; };
   auto& engine=runtime.engine;
   engine.mode=DesktopEngine::Mode::kOffscreen; engine.argc=impl_->argc; engine.argv=impl_->argv;
   engine.viewport={std::max(1,width),std::max(1,height)};
+  impl_->view_width=engine.viewport.width; impl_->view_height=engine.viewport.height;
   engine.initial_url=impl_->config.url;
   const auto executable=std::filesystem::read_symlink("/proc/self/exe");
   engine.browser_subprocess_path=executable.string(); engine.resources_dir_path=executable.parent_path().string();
@@ -99,6 +109,7 @@ void LinuxApp::Impl::LoadSession(DesktopEngine::Config& engine) {
   if(engine.restored_tabs.empty()) engine.initial_url=ReadProfile(std::filesystem::path(config.profile_dir)/"session_url.txt");
 }
 void LinuxApp::Impl::Save() {
+  try {
   const std::filesystem::path root(config.profile_dir);
   auto write_changed=[&](const char* file,std::string data,std::string& previous) {
     if(data!=previous) { AtomicWrite(root/file,data); previous=std::move(data); }
@@ -116,6 +127,10 @@ void LinuxApp::Impl::Save() {
     data["tabs"].push_back(item);
   }
   write_changed("session.json",data.dump(),last_session);
+  } catch (const std::exception& error) {
+    // Keep unsaved snapshots dirty and retry without unwinding through GTK.
+    std::lock_guard lock(state_mutex); toast="Could not save browser data: "+std::string(error.what());
+  }
 }
 const AppConfig& LinuxApp::config() const { return impl_->config; }
 int LinuxApp::port() const { return impl_->desktop.http_server().bound_port(); }
@@ -125,14 +140,17 @@ std::string LinuxApp::MdnsStatusText() const { return "Local agent control"; }
 std::string LinuxApp::RuntimeMode() const { return impl_->config.headless?"headless":"gui"; }
 bool LinuxApp::HasNativeBrowser() const { return impl_->started; }
 bool LinuxApp::ScreenshotSupported() const { return impl_->started; }
-void LinuxApp::ResizeBrowserHost(int w,int h) { if(impl_->started) impl_->desktop.engine().ResizeViewport(w,h); }
+void LinuxApp::ResizeBrowserHost(int w,int h) {
+  impl_->view_width=std::max(1,w); impl_->view_height=std::max(1,h);
+  if(impl_->started) impl_->desktop.engine().ResizeViewport(w,h);
+}
 bool LinuxApp::FocusBrowser(bool value) { return impl_->desktop.engine().SendFocusEvent(value); }
 bool LinuxApp::SendBrowserMouseMove(int x,int y,bool leave) { return impl_->desktop.engine().SendMouseMoveEvent(x,y,leave); }
 bool LinuxApp::SendBrowserMouseClick(int x,int y,int button,bool up,int count) { return impl_->desktop.engine().SendMouseClickEvent(x,y,button,up,count); }
 bool LinuxApp::SendBrowserMouseWheel(int x,int y,int dx,int dy) { return impl_->desktop.engine().SendMouseWheelEvent(x,y,dx,dy); }
 void LinuxApp::InputModifiers(unsigned value) { impl_->desktop.engine().SetInputModifiers(value); }
 bool LinuxApp::Key(int key,int native,unsigned modifiers,bool up) { return impl_->desktop.engine().SendKeyEvent(key,native,modifiers,up); }
-bool LinuxApp::CommitText(const std::string& text) { return impl_->desktop.engine().CommitText(text); }
+bool LinuxApp::CommitText(const std::string& text,bool composition) { return impl_->desktop.engine().CommitText(text,composition); }
 OffscreenFrame LinuxApp::ViewFrame() const { return impl_->desktop.engine().ViewFrame(); }
 std::vector<std::uint8_t> LinuxApp::SnapshotBytes() const { return ViewFrame().pixels; }
 void LinuxApp::SetFullscreen(bool value) { impl_->desired_fullscreen=value; }

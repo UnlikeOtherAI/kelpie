@@ -83,6 +83,26 @@ void UrlBar::Sync() {
     }
   }
   const auto account=app_.AccountState();
+  if(account.avatar!=avatar_) {
+    avatar_=account.avatar;
+    GtkWidget* image=nullptr;
+    if(!avatar_.empty() && avatar_.size()<=2*1024*1024) {
+      auto* loader=gdk_pixbuf_loader_new();
+      if(gdk_pixbuf_loader_write(loader,reinterpret_cast<const guchar*>(avatar_.data()),avatar_.size(),nullptr) && gdk_pixbuf_loader_close(loader,nullptr)) {
+        auto* source=gdk_pixbuf_loader_get_pixbuf(loader);
+        if(source && gdk_pixbuf_get_width(source)<=2048 && gdk_pixbuf_get_height(source)<=2048) {
+          auto* scaled=gdk_pixbuf_scale_simple(source,34,34,GDK_INTERP_BILINEAR);
+          auto* rounded=gdk_pixbuf_add_alpha(scaled,FALSE,0,0,0); g_object_unref(scaled);
+          auto* pixels=gdk_pixbuf_get_pixels(rounded); const auto stride=gdk_pixbuf_get_rowstride(rounded);
+          for(int y=0;y<34;++y)for(int x=0;x<34;++x)if((x-16.5)*(x-16.5)+(y-16.5)*(y-16.5)>17*17)pixels[y*stride+x*4+3]=0;
+          image=gtk_image_new_from_pixbuf(rounded); g_object_unref(rounded);
+        }
+      }
+      g_object_unref(loader);
+    }
+    if(!image)image=gtk_image_new_from_icon_name("avatar-default-symbolic",GTK_ICON_SIZE_LARGE_TOOLBAR);
+    gtk_button_set_image(GTK_BUTTON(account_button_),image);
+  }
   auto label=account.signed_in?account.email:std::string("UOA account");
   if(account.busy)label+=" — syncing"; if(!account.error.empty())label+=" — "+account.error;
   gtk_widget_set_tooltip_text(account_button_,label.c_str());

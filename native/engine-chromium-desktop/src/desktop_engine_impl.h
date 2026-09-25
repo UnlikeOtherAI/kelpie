@@ -94,6 +94,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   OffscreenFrame popup;
   CefRect popup_rect;
   unsigned input_modifiers = 0;
+  bool page_focused = false;
   std::mutex mutex;
 
   Tab* FindTab(const TabLease& lease);

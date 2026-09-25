@@ -65,6 +65,31 @@ void BrowserChrome::Tabs() {
   for(const auto& tab:tabs) {
     auto* item=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0); Class(item,"chrome-tab");
     if(tab.active)Class(item,"active");
+    if(tab.active) g_signal_connect(item,"size-allocate",G_CALLBACK(+[](GtkWidget* widget,GtkAllocation* bounds,gpointer raw) {
+      auto* scroll=gtk_widget_get_ancestor(widget,GTK_TYPE_SCROLLED_WINDOW);
+      if(!scroll) return;
+      auto* adjustment=gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroll));
+      const auto left=gtk_adjustment_get_value(adjustment); const auto page=gtk_adjustment_get_page_size(adjustment);
+      if(bounds->x<left)gtk_adjustment_set_value(adjustment,bounds->x);
+      else if(bounds->x+bounds->width>left+page)gtk_adjustment_set_value(adjustment,bounds->x+bounds->width-page);
+      (void)raw;
+    }),nullptr);
+    g_object_set_data(G_OBJECT(item),"active",GINT_TO_POINTER(tab.active));
+    g_signal_connect(item,"draw",G_CALLBACK(+[](GtkWidget* widget,cairo_t* cr,gpointer raw)->gboolean {
+      auto* self=static_cast<BrowserChrome*>(raw);
+      const double w=gtk_widget_get_allocated_width(widget); const double h=gtk_widget_get_allocated_height(widget);
+      if(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget),"active"))) {
+        cairo_set_source_rgb(cr,self->color_[0]/255,self->color_[1]/255,self->color_[2]/255);
+        cairo_move_to(cr,0,h); cairo_curve_to(cr,8,h,8,h-3,8,h-8); cairo_line_to(cr,8,10);
+        cairo_curve_to(cr,8,3,11,0,18,0); cairo_line_to(cr,w-18,0);
+        cairo_curve_to(cr,w-11,0,w-8,3,w-8,10); cairo_line_to(cr,w-8,h-8);
+        cairo_curve_to(cr,w-8,h-3,w-8,h,w,h); cairo_close_path(cr); cairo_fill(cr);
+      } else {
+        cairo_set_source_rgba(cr,.05,.09,.19,.15); cairo_set_line_width(cr,1);
+        cairo_move_to(cr,w-.5,10); cairo_line_to(cr,w-.5,h-10); cairo_stroke(cr);
+      }
+      return FALSE;
+    }),this);
     gtk_widget_set_size_request(item,190,44); gtk_widget_set_margin_top(item,8);
     auto* select=gtk_button_new(); Class(select,"chrome-button"); gtk_widget_set_hexpand(select,TRUE);
     auto* row=gtk_box_new(GTK_ORIENTATION_HORIZONTAL,8);
@@ -143,14 +168,14 @@ void BrowserChrome::Palette() {
 .chrome-button:disabled { opacity:.35; }
 .chrome-caption { color:#0d1731; border-radius:0; }
 .chrome-close:hover { background:#e81123; color:white; }
-.chrome-tab { background:#e5eaf3; color:#0d1731; border-radius:10px 10px 0 0; padding:0 5px; }
+.chrome-tab { background:transparent; color:#0d1731; padding:0 8px; }
 .chrome-tab label { font-size:13px; }
 .chrome-nav { padding:0 14px; }
 .chrome-address { border-radius:24px; padding:0 12px; border:1px solid rgba(128,128,128,.13); }
 .chrome-address entry { background:transparent; color:inherit; box-shadow:none; border:0; font-size:16px; padding:0; }
 .chrome-favorites { padding:0 14px; font-size:13px; }
 )CSS";
-  css+=".chrome-nav,.chrome-favorites,.chrome-tab.active { background:"+rgb(0)+"; color:"+ink+"; }";
+  css+=".chrome-nav,.chrome-favorites { background:"+rgb(0)+"; color:"+ink+"; }.chrome-tab.active { color:"+ink+"; }";
   css+=".chrome-address { background:"+rgb(.09)+"; }.chrome-separator { background:"+rgb(.10)+"; }";
   gtk_css_provider_load_from_data(css_,css.c_str(),-1,nullptr);
 }

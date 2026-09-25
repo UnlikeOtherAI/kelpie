@@ -362,6 +362,7 @@ bool DesktopEngine::ResizeViewport(int width, int height) {
 }
 
 bool DesktopEngine::SendFocusEvent(bool focused) {
+  impl_->page_focused = focused;
   if (!impl_->browser || !impl_->browser->GetHost()) {
     return false;
   }

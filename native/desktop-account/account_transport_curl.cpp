@@ -43,7 +43,7 @@ AccountResponse AccountTransport::Request(const std::string& path,const std::str
   curl_easy_setopt(curl.get(),CURLOPT_HEADERFUNCTION,+[](char* data,size_t size,size_t count,void* raw)->size_t {
     auto& c=*static_cast<Context*>(raw); std::string line(data,size*count);
     if (line.size()>5 && strncasecmp(line.c_str(),"etag:",5)==0) {
-      const auto first=line.find_first_not_of(" \t",5),last=line.find_last_not_of(" \r\n\t");
+      const auto first=line.find_first_not_of(" \t",5); const auto last=line.find_last_not_of(" \r\n\t");
       if (first!=std::string::npos && last>=first) c.response.version=line.substr(first,last-first+1);
     }
     return size*count;

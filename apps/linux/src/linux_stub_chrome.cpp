@@ -9,7 +9,7 @@ void LinuxApp::CycleTab(int) {}
 OffscreenFrame LinuxApp::ViewFrame() const { return {}; }
 void LinuxApp::InputModifiers(unsigned) {}
 bool LinuxApp::Key(int,int,unsigned,bool) { return false; }
-bool LinuxApp::CommitText(const std::string&) { return false; }
+bool LinuxApp::CommitText(const std::string&,bool) { return false; }
 account::AccountState LinuxApp::AccountState() const { return {}; }
 void LinuxApp::AccountSignIn() { ShowToast("Accounts require the Chromium build"); }
 void LinuxApp::AccountSignOut() {}

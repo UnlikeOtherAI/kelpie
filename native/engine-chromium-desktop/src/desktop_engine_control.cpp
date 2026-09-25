@@ -113,7 +113,10 @@ void DesktopEngine::Impl::UpdateActiveState() {
         changed = frame.tab_id != active->id || frame.generation != active->generation;
         if (changed) { frame = {active->id, active->generation, 0, 0, {}}; popup = {}; }
       }
-      if (changed) { active->browser->GetHost()->WasResized(); active->browser->GetHost()->Invalidate(PET_VIEW); }
+      if (changed) {
+        active->browser->GetHost()->SetFocus(page_focused);
+        active->browser->GetHost()->WasResized(); active->browser->GetHost()->Invalidate(PET_VIEW);
+      }
     }
     current_url = active->url;
     current_title = active->title;

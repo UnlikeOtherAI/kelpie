@@ -118,7 +118,7 @@ class DesktopEngine final : public DesktopBrowserControl {
   // Native offscreen input, called only by the shell's CEF owner thread.
   void SetInputModifiers(unsigned modifiers);
   bool SendKeyEvent(int key, int native_key, unsigned modifiers, bool released);
-  bool CommitText(const std::string& text);
+  bool CommitText(const std::string& text, bool composition = false);
 
   void SetConsoleSink(JsonEventSink sink);
   void SetNetworkSink(JsonEventSink sink);

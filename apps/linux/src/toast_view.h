@@ -13,6 +13,7 @@ namespace kelpie::linuxapp {
 class ToastView {
  public:
   ToastView();
+  ~ToastView();
 
   GtkWidget* widget() const;
   void Show(const std::string& message);
@@ -20,6 +21,7 @@ class ToastView {
  private:
   GtkWidget* revealer_ = nullptr;
   GtkWidget* label_ = nullptr;
+  unsigned timer_ = 0;
 };
 
 }  // namespace kelpie::linuxapp
