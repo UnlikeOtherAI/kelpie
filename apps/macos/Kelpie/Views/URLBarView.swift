@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Reference-style navigation row. Developer tools live in the trailing popup.
 struct URLBarView: View {
+    @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var browserState: BrowserState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
@@ -26,12 +27,12 @@ struct URLBarView: View {
     let onSwitchRenderer: (RendererState.Engine) -> Void
     let onSafariAuth: () -> Void
     let onBookmarks: () -> Void
-    let onHistory: () -> Void
     let onNetworkInspector: () -> Void
     let onSettings: () -> Void
 
     @ObservedObject var bookmarkStore = BookmarkStore.shared
     @State var showTools = false
+    @State private var showHistory = false
     @State private var urlText = ""
     @FocusState private var isAddressFieldFocused: Bool
 
@@ -52,6 +53,7 @@ struct URLBarView: View {
                     accessibilityID: "browser.nav.back",
                     accessibilityLabel: "Back",
                     isEnabled: browserState.canGoBack,
+                    tintColor: appearance.palette.foreground.color,
                     action: onBack
                 )
                 AppKitToolbarButton(
@@ -59,18 +61,21 @@ struct URLBarView: View {
                     accessibilityID: "browser.nav.forward",
                     accessibilityLabel: "Forward",
                     isEnabled: browserState.canGoForward,
+                    tintColor: appearance.palette.foreground.color,
                     action: onForward
                 )
                 AppKitToolbarButton(
                     systemName: "arrow.clockwise",
                     accessibilityID: "browser.nav.reload",
                     accessibilityLabel: "Reload",
+                    tintColor: appearance.palette.foreground.color,
                     action: onReload
                 )
                 AppKitToolbarButton(
                     systemName: "house",
                     accessibilityID: "browser.nav.home",
                     accessibilityLabel: "Home",
+                    tintColor: appearance.palette.foreground.color,
                     action: onHome
                 )
                 addressField.layoutPriority(1)
@@ -78,23 +83,30 @@ struct URLBarView: View {
                     systemName: "clock",
                     accessibilityID: "browser.action.history",
                     accessibilityLabel: "History",
-                    action: onHistory
+                    isSelected: showHistory,
+                    tintColor: appearance.palette.foreground.color,
+                    action: { showTools = false; showHistory.toggle() }
                 )
+                .popover(isPresented: $showHistory, arrowEdge: .bottom) {
+                    HistoryView(onNavigate: onNavigate)
+                }
                 AppKitToolbarButton(
                     systemName: "ellipsis.vertical",
                     accessibilityID: "browser.action.more",
                     accessibilityLabel: "More browser controls",
-                    isSelected: showTools
+                    isSelected: showTools,
+                    tintColor: appearance.palette.foreground.color
                 ) {
+                    showHistory = false
                     showTools.toggle()
                 }
                 .popover(isPresented: $showTools, arrowEdge: .bottom) { toolsPopup }
             }
             .padding(.horizontal, 12)
             .frame(height: 44)
-            FavouritesBarView(onNavigate: onNavigate, onAddBookmark: addBookmark, canAddBookmark: pageURL != nil && !isBookmarked)
+            FavouritesBarView(appearance: appearance, onNavigate: onNavigate, onAddBookmark: addBookmark, canAddBookmark: pageURL != nil && !isBookmarked)
         }
-        .background(BrowserGlassBackground())
+        .background(BrowserGlassBackground(appearance: appearance))
         .overlay(alignment: .bottom) { BrowserChromeStyle.separator.frame(height: 1) }
         .onAppear { syncAddress() }
         .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
@@ -156,7 +168,7 @@ struct URLBarView: View {
         HStack(spacing: 6) {
             Image(systemName: isSecurePage ? "lock.fill" : "globe")
                 .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(isSecurePage ? Color.green : BrowserChromeStyle.muted)
+                .foregroundStyle(isSecurePage ? Color.green : Color(nsColor: appearance.palette.foreground.color.withAlphaComponent(0.7)))
 
             ZStack(alignment: .leading) {
                 if let suffix = inlineCompletionSuffix {
@@ -174,6 +186,7 @@ struct URLBarView: View {
 
                 TextField("Search or enter website name", text: $urlText)
                     .textFieldStyle(.plain)
+                    .foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
                     .font(.system(size: 14))
                     .lineLimit(1)
                     .focused($isAddressFieldFocused)
@@ -185,15 +198,16 @@ struct URLBarView: View {
                     accessibilityID: "browser.action.bookmark-current",
                     accessibilityLabel: isBookmarked ? "Page bookmarked" : "Bookmark this page",
                     isEnabled: pageURL != nil && !isBookmarked,
+                    tintColor: appearance.palette.foreground.color,
                     action: addBookmark
                 )
-            PageShareButton(url: pageURL)
+            PageShareButton(url: pageURL, tintColor: appearance.palette.foreground.color)
         }
         .padding(.horizontal, 12)
         .frame(height: 28)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(BrowserChromeStyle.address)
+                .fill(Color(nsColor: appearance.palette.field.color))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

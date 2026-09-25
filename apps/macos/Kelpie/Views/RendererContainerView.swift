@@ -3,6 +3,7 @@ import WebKit
 
 /// Wraps the active renderer's NSView in SwiftUI.
 struct RendererContainerView: NSViewRepresentable {
+    let chromeAppearance: BrowserChromeAppearance
     @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var tabStore: TabStore
@@ -17,6 +18,7 @@ struct RendererContainerView: NSViewRepresentable {
         private var eventMonitor: Any?
         private var scrollMonitor: Any?
         let hoverTracker = RendererHoverTracker()
+        let chromeSampler = BrowserChromeSampler()
         var chromeUnderlap: CGFloat = 0
         var onChromeScroll: (Bool) -> Void = { _ in }
 
@@ -34,6 +36,7 @@ struct RendererContainerView: NSViewRepresentable {
                       let collapsed = BrowserChromeScroll.collapsed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
                 else { return event }
                 self?.hoverTracker.clear()
+                self?.chromeSampler.requestSample()
                 self?.onChromeScroll(collapsed)
                 return event
             }
@@ -62,6 +65,7 @@ struct RendererContainerView: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
         coordinator.hoverTracker.detach()
+        coordinator.chromeSampler.update(webView: nil, onSample: { _ in })
     }
 
     func makeCoordinator() -> Coordinator {
@@ -100,6 +104,9 @@ struct RendererContainerView: NSViewRepresentable {
     }
 
     private func updateHover(in container: NSView, coordinator: Coordinator) {
+        let webView = rendererState.activeEngine == .webkit && tabStore.activeTab?.isStartPage != true
+            ? serverState.handlerContext.renderer?.makeView() as? WKWebView : nil
+        coordinator.chromeSampler.update(webView: webView, onSample: chromeAppearance.setSample)
         coordinator.hoverTracker.update(
             container: container,
             renderer: serverState.handlerContext.renderer,

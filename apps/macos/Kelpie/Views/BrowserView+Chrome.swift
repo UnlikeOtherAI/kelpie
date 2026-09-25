@@ -28,6 +28,7 @@ extension BrowserView {
                 Spacer(minLength: 0)
             } else {
                 TabBarView(
+                    appearance: chromeAppearance,
                     tabStore: tabStore,
                     onNewTab: handleNewTabCommand,
                     onCloseTab: { id in

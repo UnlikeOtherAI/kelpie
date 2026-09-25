@@ -16,7 +16,7 @@ struct BrowserView: View {
     @State var hoveredLinkURL = ""
     @State private var showSettings = false
     @State private var showBookmarks = false
-    @State private var showHistory = false
+    @State var chromeAppearance = BrowserChromeAppearance()
     @State private var showNetworkInspector = false
     @StateObject private var aiChatSession = AIChatSession()
     @State var isAIPanelOpen: Bool = UserDefaults.standard.bool(forKey: "com.kelpie.macos.ai-panel-open")
@@ -47,11 +47,12 @@ struct BrowserView: View {
                             Color.clear.frame(height: 32)
                         }
                     }
-                        .background(BrowserGlassBackground())
+                        .background(BrowserGlassBackground(appearance: chromeAppearance))
                         .zIndex(2)
                     if !isChromeCollapsed {
                     // URL bar — above all overlays so buttons are always clickable
                     URLBarView(
+                        appearance: chromeAppearance,
                         browserState: browserState,
                         rendererState: rendererState,
                         viewportState: viewportState,
@@ -110,7 +111,6 @@ struct BrowserView: View {
                             }
                         },
                         onBookmarks: { showBookmarks = true },
-                        onHistory: { showHistory = true },
                         onNetworkInspector: { showNetworkInspector = true },
                         onSettings: { showSettings = true }
                     )
@@ -174,19 +174,7 @@ struct BrowserView: View {
                     }
                 }
                 if !serverState.isScriptRecording {
-                    HStack {
-                        Text(hoveredLinkURL)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .accessibilityLabel("Link destination")
-                            .accessibilityIdentifier("browser.status.link")
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 24)
-                    .background(BrowserGlassBackground())
-                    .overlay(alignment: .top) { BrowserChromeStyle.separator.frame(height: 0.5) }
+                    BrowserLinkStatusBar(appearance: chromeAppearance, url: hoveredLinkURL)
                 }
             }
             .clipped()
@@ -256,9 +244,6 @@ struct BrowserView: View {
                 currentURL: browserState.currentURL,
                 onNavigate: navigate
             )
-        }
-        .sheet(isPresented: $showHistory) {
-            HistoryView(onNavigate: navigate)
         }
         .sheet(isPresented: $showNetworkInspector) {
             NetworkInspectorView()
@@ -345,7 +330,6 @@ struct BrowserView: View {
             guard isRecording else { return }
             showSettings = false
             showBookmarks = false
-            showHistory = false
             showNetworkInspector = false
             showWelcome = false
             pendingInsecureURL = nil
