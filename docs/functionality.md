@@ -422,3 +422,24 @@ account popup and are returned by bookmark API mutations. Refresh favourites rel
 changes from another device. Signed-out favourites remain local and are restored on
 sign-out; they are never silently uploaded. Tokens, identity, avatar and signed-in
 favourites remain in memory and are cleared on sign-out, account change or expiry.
+
+## iPhone and iPad browser chrome
+
+iPad keeps a horizontally scrolling tab strip at the top, with curved tab
+shoulders, active-tab close and a New Tab control. Only the active tab follows
+the visible page background using the same median color sampler and 200ms
+transition as Mac; inactive tabs and the strip remain neutral grey.
+iPhone opens a two-column tab overview by dragging upward on the bottom address
+bar, or selecting Tabs in More. Tap a preview to switch; swipe a card sideways
+or use its close button to close it. Closing the last tab creates a start tab.
+
+The native bottom toolbar provides Back, Forward, address/reload, Share and More;
+iPad also shows Bookmarks directly. More holds Bookmarks, History, Safari sign-in,
+AI, network and 3D inspectors, viewport presets and Settings. Narrow phones put
+Share in More. Scrolling down shrinks the toolbar to a small domain capsule;
+scrolling upward or tapping it expands it. The same address capsule shrinks and
+moves continuously while the surrounding controls and material fade away.
+Editing locks the bar open above a docked keyboard; floating iPad keyboards leave
+the bar at the bottom. iPad tabs remain visible throughout. Programmatic scrolling does not
+collapse chrome. WebView geometry and staged viewport selection stay stable
+during collapse. Script recording hides all browser chrome.

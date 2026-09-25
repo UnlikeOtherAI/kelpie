@@ -1,4 +1,10 @@
+#if os(macOS)
 import AppKit
+typealias ChromeSampleImage = NSImage
+#else
+import UIKit
+typealias ChromeSampleImage = UIImage
+#endif
 import WebKit
 
 /// Samples only a tiny visible page strip, on demand. No page scripts or idle polling.
@@ -13,6 +19,13 @@ final class BrowserChromeSampler {
     private var needsSample = false
     private var currentURL: URL?
     private var onSample: (ChromeRGB?) -> Void = { _ in }
+
+    func navigationStarted() {
+        generation += 1
+        settledSample?.cancel()
+        pending?.cancel()
+        pending = nil
+    }
 
     func update(webView: WKWebView?, onSample: @escaping (ChromeRGB?) -> Void) {
         self.onSample = onSample
@@ -79,17 +92,22 @@ final class BrowserChromeSampler {
         }
     }
 
-    static func backgroundColor(_ image: NSImage) -> ChromeRGB? {
+    static func backgroundColor(_ image: ChromeSampleImage) -> ChromeRGB? {
         // Draw into explicit sRGB: TIFF round-tripping loses the drawing image's
         // colour profile and skews dark page colours on wide-gamut displays.
         let width = 64, height = 4
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        #if os(macOS)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
         image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
         NSGraphicsContext.restoreGraphicsState()
+        #else
+        guard let cgImage = image.cgImage else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        #endif
         var red: [Double] = [], green: [Double] = [], blue: [Double] = []
         for offset in stride(from: 0, to: width * height * 4, by: 4) where pixels[offset + 3] > 127 {
             let alpha = Double(pixels[offset + 3])

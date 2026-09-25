@@ -26,6 +26,8 @@ let kelpieApp = Target.target(
         // Shared from macOS — cross-project source references
         .glob("../macos/Kelpie/Handlers/Snapshot3DBridge.swift"),
         .glob("../macos/Kelpie/Storage/SecretStore.swift"),
+        .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
+        .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
@@ -54,9 +56,10 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.3",
+            "MARKETING_VERSION": "0.1.5",
+            "CURRENT_PROJECT_VERSION": "5",
             "TARGETED_DEVICE_FAMILY": "1,2",
-            "DEVELOPMENT_TEAM": "G42HP8BM2N",
+            "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
             "KELPIE_NATIVE_BUILD_DIR": "$(PROJECT_DIR)/../../native/.build-iphoneos",
             "KELPIE_NATIVE_BUILD_DIR[sdk=iphonesimulator*]": "$(PROJECT_DIR)/../../native/.build-ios-sim",
@@ -86,11 +89,23 @@ let kelpieTests = Target.target(
 
 // MARK: - Schemes
 
+let kelpieUITests = Target.target(
+    name: "KelpieUITests",
+    destinations: [.iPhone, .iPad],
+    product: .uiTests,
+    bundleId: "com.unlikeotherai.kelpie.uitests",
+    deploymentTargets: .iOS("16.0"),
+    infoPlist: .default,
+    sources: [.glob("UITests/**/*.swift")],
+    dependencies: [.target(name: "Kelpie")],
+    settings: .settings(base: ["SWIFT_VERSION": "5.0"])
+)
+
 let kelpieScheme = Scheme.scheme(
     name: "Kelpie",
     shared: true,
     buildAction: .buildAction(targets: ["Kelpie"]),
-    testAction: .targets(["KelpieTests"])
+    testAction: .targets(["KelpieTests", "KelpieUITests"])
 )
 
 // MARK: - Project
@@ -103,6 +118,7 @@ let project = Project(
     targets: [
         kelpieApp,
         kelpieTests,
+        kelpieUITests,
     ],
     schemes: [
         kelpieScheme,
