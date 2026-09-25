@@ -153,7 +153,13 @@ fun BottomBar(
                         }) { Text("Cancel") }
                     } else {
                         AccountButton(activity)
-                        if (wide && android.net.Uri.parse(currentUrl).scheme != null) ChromeButton(Icons.Default.Share, "Share page", action = onShare)
+                        if (wide &&
+                            android.net.Uri
+                                .parse(currentUrl)
+                                .scheme != null
+                        ) {
+                            ChromeButton(Icons.Default.Share, "Share page", action = onShare)
+                        }
                         if (wide) ChromeButton(Icons.Default.Bookmarks, "Bookmarks", action = onBookmarks)
                         Box {
                             ChromeButton(Icons.Default.MoreHoriz, "More", action = {
