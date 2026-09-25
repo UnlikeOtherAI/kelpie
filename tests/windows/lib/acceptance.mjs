@@ -449,10 +449,14 @@ export async function runNessieStdioClient({ cliPath, cliHome, alias, fixtureUrl
   }
 }
 
-export async function runLiveAcceptance(readiness, fixtureUrl, nessieRoot) {
+export async function runCoreAcceptance(readiness, fixtureUrl) {
   await runSecurity(readiness);
   await runBrowserActions(readiness, fixtureUrl);
   await runMcp(readiness, fixtureUrl);
+}
+
+export async function runLiveAcceptance(readiness, fixtureUrl, nessieRoot) {
+  await runCoreAcceptance(readiness, fixtureUrl);
   await runNessieClient(readiness, fixtureUrl, nessieRoot);
   return prepareRestoration(readiness, fixtureUrl);
 }
