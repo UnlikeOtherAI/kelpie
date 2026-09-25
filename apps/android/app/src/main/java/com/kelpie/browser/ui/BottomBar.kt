@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ fun BottomBar(
     onForward: () -> Unit,
     onReload: () -> Unit,
     onBookmarks: () -> Unit,
+    onShare: () -> Unit,
     onShowTabs: () -> Unit,
     onExpand: () -> Unit,
     moreContent: @Composable ColumnScope.(() -> Unit) -> Unit,
@@ -151,6 +153,7 @@ fun BottomBar(
                         }) { Text("Cancel") }
                     } else {
                         AccountButton(activity)
+                        if (wide && android.net.Uri.parse(currentUrl).scheme != null) ChromeButton(Icons.Default.Share, "Share page", action = onShare)
                         if (wide) ChromeButton(Icons.Default.Bookmarks, "Bookmarks", action = onBookmarks)
                         Box {
                             ChromeButton(Icons.Default.MoreHoriz, "More", action = {

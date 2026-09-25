@@ -238,6 +238,7 @@ fun BrowserScreen(
                     isLoading = isLoading,
                     onReload = { if (isLoading) webView?.stopLoading() else webView?.reload() },
                     onBookmarks = { showBookmarks = true },
+                    onShare = { sharePage(context, currentUrl) },
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
                     moreContent = { dismiss ->
