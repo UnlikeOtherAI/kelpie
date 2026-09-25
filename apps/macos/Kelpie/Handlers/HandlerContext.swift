@@ -402,12 +402,12 @@ final class HandlerContext {
     var pageCanGoForward: Bool { renderer?.canGoForward ?? false }
 
     func goBack() {
-        reset3DInspectorForNavigation()
+        prepareForNavigation()
         renderer?.goBack()
     }
 
     func goForward() {
-        reset3DInspectorForNavigation()
+        prepareForNavigation()
         renderer?.goForward()
     }
 

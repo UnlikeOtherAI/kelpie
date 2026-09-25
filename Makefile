@@ -6,6 +6,8 @@
         gecko-runtime \
         lint-swift
 
+SWIFTLINT ?= swiftlint
+
 REPO_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # ── Android SDK ────────────────────────────────────────────────────────────────
@@ -77,9 +79,9 @@ cli-link:
 
 lint-swift:
 	@echo "→ Linting Swift (iOS)..."
-	/opt/homebrew/bin/swiftlint lint --strict apps/ios/Kelpie
+	$(SWIFTLINT) lint --strict apps/ios/Kelpie
 	@echo "→ Linting Swift (macOS)..."
-	/opt/homebrew/bin/swiftlint lint --strict apps/macos/Kelpie
+	$(SWIFTLINT) lint --strict apps/macos/Kelpie
 
 # ── iOS ────────────────────────────────────────────────────────────────────────
 

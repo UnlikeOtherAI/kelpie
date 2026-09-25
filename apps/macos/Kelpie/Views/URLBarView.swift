@@ -1,10 +1,7 @@
 import SwiftUI
 
-/// URL bar with navigation buttons, URL field, renderer toggle, and device size selector.
-/// Stacks selectors on a second row when window is narrow (phone portrait).
+/// Reference-style navigation row. Developer tools live in the trailing popup.
 struct URLBarView: View {
-    private static let toolbarButtonSize = CGSize(width: 40, height: 34)
-
     @ObservedObject var browserState: BrowserState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
@@ -14,6 +11,8 @@ struct URLBarView: View {
     let onBack: () -> Void
     let onForward: () -> Void
     let onReload: () -> Void
+    let onHome: () -> Void
+    let isStartPage: Bool
     let onAIToggle: () -> Void
     let onSnapshot3D: () -> Void
     let is3DActive: Bool
@@ -31,260 +30,133 @@ struct URLBarView: View {
     let onNetworkInspector: () -> Void
     let onSettings: () -> Void
 
-    @State private var urlText: String = ""
-    @State private var isNarrow = false
+    @ObservedObject var bookmarkStore = BookmarkStore.shared
+    @State var showTools = false
+    @State private var urlText = ""
     @FocusState private var isAddressFieldFocused: Bool
 
+    var pageURL: URL? {
+        guard !isStartPage, let url = URL(string: browserState.currentURL),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        return url
+    }
+
+    private var isSecurePage: Bool { pageURL?.scheme?.lowercased() == "https" }
+    private var isBookmarked: Bool { bookmarkStore.bookmarks.contains { $0.url == pageURL?.absoluteString } }
+
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             HStack(spacing: 8) {
                 AppKitToolbarButton(
-                    systemName: "chevron.left",
+                    systemName: "arrow.left",
                     accessibilityID: "browser.nav.back",
                     accessibilityLabel: "Back",
                     isEnabled: browserState.canGoBack,
                     action: onBack
                 )
-
                 AppKitToolbarButton(
-                    systemName: "chevron.right",
+                    systemName: "arrow.right",
                     accessibilityID: "browser.nav.forward",
                     accessibilityLabel: "Forward",
                     isEnabled: browserState.canGoForward,
                     action: onForward
                 )
-
                 AppKitToolbarButton(
                     systemName: "arrow.clockwise",
                     accessibilityID: "browser.nav.reload",
                     accessibilityLabel: "Reload",
                     action: onReload
                 )
-
-                addressField
-
-                if aiState.isAvailable {
-                    AIStatusPill(
-                        aiState: aiState,
-                        isOpen: isAIPanelOpen,
-                        action: onAIToggle
-                    )
-                    .fixedSize(horizontal: true, vertical: false)
+                AppKitToolbarButton(
+                    systemName: "house",
+                    accessibilityID: "browser.nav.home",
+                    accessibilityLabel: "Home",
+                    action: onHome
+                )
+                addressField.layoutPriority(1)
+                AppKitToolbarButton(
+                    systemName: "clock",
+                    accessibilityID: "browser.action.history",
+                    accessibilityLabel: "History",
+                    action: onHistory
+                )
+                AppKitToolbarButton(
+                    systemName: "ellipsis.vertical",
+                    accessibilityID: "browser.action.more",
+                    accessibilityLabel: "More browser controls",
+                    isSelected: showTools
+                ) {
+                    showTools.toggle()
                 }
-
-                if rendererState.activeEngine != .chromium {
-                    AppKitToolbarButton(
-                        systemName: "cube.transparent",
-                        accessibilityID: "browser.nav.snapshot3d",
-                        accessibilityLabel: "3D Inspector",
-                        isSelected: is3DActive,
-                        action: onSnapshot3D
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.85)))
-                }
-
-                actionButtons
-
-                if !isNarrow {
-                    selectorsRow
-                }
+                .popover(isPresented: $showTools, arrowEdge: .bottom) { toolsPopup }
             }
-            .animation(.easeOut(duration: 0.3), value: rendererState.activeEngine)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            FavouritesBarView(onNavigate: onNavigate, onAddBookmark: addBookmark, canAddBookmark: pageURL != nil && !isBookmarked)
+        }
+        .background(BrowserGlassBackground())
+        .overlay(alignment: .bottom) { BrowserChromeStyle.separator.frame(height: 1) }
+        .onAppear { syncAddress() }
+        .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
+        .onChange(of: isStartPage) { _, _ in syncAddress() }
+    }
 
-            if isNarrow {
+    private func syncAddress() { urlText = isStartPage ? "" : browserState.currentURL }
+
+    private func addBookmark() {
+        guard let pageURL, !isBookmarked else { return }
+        bookmarkStore.add(title: browserState.pageTitle.isEmpty ? pageURL.absoluteString : browserState.pageTitle,
+                          url: pageURL.absoluteString)
+    }
+
+    private var toolsPopup: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Browser controls").font(.headline)
+                popupAction("Bookmarks", icon: "bookmark", id: "bookmarks", action: onBookmarks)
+                popupAction("Safari authentication", icon: "safari", id: "safari-auth", enabled: pageURL != nil, action: onSafariAuth)
+                popupAction("Network inspector", icon: "antenna.radiowaves.left.and.right", id: "network", action: onNetworkInspector)
+                popupAction("Settings", icon: "gearshape", id: "settings", action: onSettings)
+                if aiState.isAvailable {
+                    popupAction(isAIPanelOpen ? "Hide AI assistant" : "AI assistant", icon: "sparkles", id: "ai", action: onAIToggle)
+                }
+                if rendererState.activeEngine != .chromium {
+                    popupAction(is3DActive ? "Exit 3D inspector" : "3D inspector", icon: "cube.transparent", id: "snapshot3d", action: onSnapshot3D)
+                }
+                Divider()
+                Text("Viewport · \(viewportState.resolutionLabel)").font(.subheadline).foregroundStyle(.secondary)
                 selectorsRow
             }
+            .padding(18)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(GeometryReader { geo in
-            Color.clear.onAppear {
-                isNarrow = geo.size.width < 600
-            }
-            .onChange(of: geo.size.width) { _, w in
-                isNarrow = w < 600
-            }
+        .frame(width: 320, height: 420)
+    }
+
+    private func popupAction(_ title: String, icon: String, id: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).frame(width: 20)
+            Text(title)
+            Spacer()
+        }
+        .frame(height: 28)
+        .contentShape(Rectangle())
+        .overlay(AppKitInvisibleButton(
+                    accessibilityID: "browser.action.\(id)",
+                    accessibilityLabel: title,
+                    isEnabled: enabled) {
+            showTools = false
+            action(
+                )
         })
-        .onAppear {
-            urlText = browserState.currentURL
-        }
-        .onChange(of: browserState.currentURL) { _, newURL in
-            guard !isAddressFieldFocused else { return }
-            urlText = newURL
-        }
-    }
-
-    @ViewBuilder
-    private var actionButtons: some View {
-        AppKitToolbarButton(
-            systemName: "safari",
-            accessibilityID: "browser.action.safari-auth",
-            accessibilityLabel: "Safari Auth",
-            action: onSafariAuth
-        )
-
-        AppKitToolbarButton(
-            systemName: "bookmark.fill",
-            accessibilityID: "browser.action.bookmarks",
-            accessibilityLabel: "Bookmarks",
-            action: onBookmarks
-        )
-
-        AppKitToolbarButton(
-            systemName: "clock.arrow.circlepath",
-            accessibilityID: "browser.action.history",
-            accessibilityLabel: "History",
-            action: onHistory
-        )
-
-        AppKitToolbarButton(
-            systemName: "antenna.radiowaves.left.and.right",
-            accessibilityID: "browser.action.network",
-            accessibilityLabel: "Network Inspector",
-            action: onNetworkInspector
-        )
-
-        AppKitToolbarButton(
-            systemName: "gear",
-            accessibilityID: "browser.action.settings",
-            accessibilityLabel: "Settings",
-            action: onSettings
-        )
-    }
-
-    @ViewBuilder
-    private var selectorsRow: some View {
-        HStack(spacing: 6) {
-            if show3DControls {
-                inspectorControlsRow
-            }
-
-            deviceDropdown
-
-            if viewportState.supportsOrientationSelection {
-                orientationToggle
-            }
-
-            rendererSwitch
-                .disabled(rendererState.isSwitching)
-
-            if viewportState.mode != .full {
-                scaleControl
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var inspectorControlsRow: some View {
-        HStack(spacing: 6) {
-            AppKitSegmentedStrip(
-                items: [
-                    AppKitSegmentedStrip.Item(
-                        id: "rotate",
-                        systemImageName: "hand.draw",
-                        accessibilityID: "browser.snapshot3d.mode.rotate",
-                        accessibilityLabel: "Rotate mode",
-                        width: 40,
-                        iconSize: 13
-                    ),
-                    AppKitSegmentedStrip.Item(
-                        id: "scroll",
-                        systemImageName: "arrow.up.and.down",
-                        accessibilityID: "browser.snapshot3d.mode.scroll",
-                        accessibilityLabel: "Scroll mode",
-                        width: 40,
-                        iconSize: 13
-                    )
-                ],
-                selectedID: inspectorMode,
-                accessibilityID: "browser.snapshot3d.mode",
-                isEnabled: true,
-                onSelect: onSetInspectorMode
-            )
-            .frame(width: 90, height: 34)
-
-            AppKitToolbarButton(
-                systemName: "minus.magnifyingglass",
-                accessibilityID: "browser.snapshot3d.zoom-out",
-                accessibilityLabel: "Zoom out 3D view",
-                action: onInspectorZoomOut
-            )
-
-            AppKitToolbarButton(
-                systemName: "plus.magnifyingglass",
-                accessibilityID: "browser.snapshot3d.zoom-in",
-                accessibilityLabel: "Zoom in 3D view",
-                action: onInspectorZoomIn
-            )
-
-            AppKitToolbarButton(
-                systemName: "arrow.counterclockwise",
-                accessibilityID: "browser.snapshot3d.reset",
-                accessibilityLabel: "Reset 3D view",
-                action: onInspectorReset
-            )
-
-            AppKitToolbarButton(
-                systemName: "xmark",
-                accessibilityID: "browser.snapshot3d.exit",
-                accessibilityLabel: "Exit 3D view",
-                action: onInspectorExit
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var scaleControl: some View {
-        let scaleSupported = rendererState.activeEngine != .chromium
-        HStack(spacing: 0) {
-            Text("−")
-                .font(.system(size: 17, weight: .medium))
-                .frame(width: 30, height: 34)
-                .opacity(scaleSupported && viewportState.canScaleDown ? 1.0 : 0.55)
-                .overlay(
-                    AppKitInvisibleButton(
-                        accessibilityID: "browser.viewport.scale.down",
-                        accessibilityLabel: "Zoom out",
-                        isEnabled: scaleSupported && viewportState.canScaleDown
-                    ) { viewportState.scaleDown() }
-                )
-
-            Text(scaleSupported ? viewportState.scalePercentLabel : "100%")
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .frame(minWidth: 40)
-                .lineLimit(1)
-
-            Text("+")
-                .font(.system(size: 17, weight: .medium))
-                .frame(width: 30, height: 34)
-                .opacity(scaleSupported && viewportState.canScaleUp ? 1.0 : 0.55)
-                .overlay(
-                    AppKitInvisibleButton(
-                        accessibilityID: "browser.viewport.scale.up",
-                        accessibilityLabel: "Zoom in",
-                        isEnabled: scaleSupported && viewportState.canScaleUp
-                    ) { viewportState.scaleUp() }
-                )
-        }
-        .foregroundStyle(.primary)
-        .frame(height: 34)
-        .background(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-        )
-        .accessibilityIdentifier("browser.viewport.scale")
+        .opacity(enabled ? 1 : 0.4)
     }
 
     @ViewBuilder
     private var addressField: some View {
         HStack(spacing: 6) {
-            Image(systemName: "lock")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+            Image(systemName: isSecurePage ? "lock.fill" : "globe")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(isSecurePage ? Color.green : BrowserChromeStyle.muted)
 
             ZStack(alignment: .leading) {
                 if let suffix = inlineCompletionSuffix {
@@ -295,140 +167,38 @@ struct URLBarView: View {
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                     }
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .lineLimit(1)
                     .allowsHitTesting(false)
                 }
 
                 TextField("Search or enter website name", text: $urlText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .lineLimit(1)
                     .focused($isAddressFieldFocused)
+                    .accessibilityIdentifier("browser.address")
                     .onSubmit { navigate() }
             }
+            AppKitToolbarButton(
+                    systemName: isBookmarked ? "star.fill" : "star",
+                    accessibilityID: "browser.action.bookmark-current",
+                    accessibilityLabel: isBookmarked ? "Page bookmarked" : "Bookmark this page",
+                    isEnabled: pageURL != nil && !isBookmarked,
+                    action: addBookmark
+                )
+            PageShareButton(url: pageURL)
         }
         .padding(.horizontal, 12)
-        .frame(height: 34)
+        .frame(height: 28)
         .background(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(BrowserChromeStyle.address)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(BrowserChromeStyle.separator, lineWidth: 0.5)
         )
-        .accessibilityIdentifier("browser.address")
-    }
-
-    @ViewBuilder
-    private var rendererSwitch: some View {
-        AppKitSegmentedStrip(
-            items: [
-                AppKitSegmentedStrip.Item(
-                    id: RendererState.Engine.webkit.rawValue,
-                    imageName: "SafariLogo",
-                    accessibilityID: "browser.renderer.webkit",
-                    accessibilityLabel: "WebKit",
-                    width: 54,
-                    iconSize: 16
-                ),
-                AppKitSegmentedStrip.Item(
-                    id: RendererState.Engine.chromium.rawValue,
-                    imageName: "ChromeLogo",
-                    accessibilityID: "browser.renderer.chromium",
-                    accessibilityLabel: "Chromium",
-                    width: 54,
-                    iconSize: 16
-                )
-            ],
-            selectedID: rendererState.activeEngine.rawValue,
-            accessibilityID: "browser.renderer.switch",
-            isEnabled: !rendererState.isSwitching,
-            onSelect: { selectedID in
-                guard let engine = RendererState.Engine(rawValue: selectedID) else { return }
-                onSwitchRenderer(engine)
-            }
-        )
-        .frame(width: 118, height: 34)
-    }
-
-    @ViewBuilder
-    private var orientationToggle: some View {
-        AppKitSegmentedStrip(
-            items: [
-                AppKitSegmentedStrip.Item(
-                    id: ViewportOrientation.portrait.rawValue,
-                    systemImageName: "rectangle.portrait",
-                    accessibilityID: "browser.orientation.portrait",
-                    accessibilityLabel: "Portrait",
-                    width: 40,
-                    iconSize: 12
-                ),
-                AppKitSegmentedStrip.Item(
-                    id: ViewportOrientation.landscape.rawValue,
-                    systemImageName: "rectangle",
-                    accessibilityID: "browser.orientation.landscape",
-                    accessibilityLabel: "Landscape",
-                    width: 40,
-                    iconSize: 12
-                )
-            ],
-            selectedID: viewportState.reportedOrientation.rawValue,
-            accessibilityID: "browser.orientation.switch",
-            isEnabled: viewportState.supportsOrientationSelection,
-            onSelect: { id in
-                guard let orientation = ViewportOrientation(rawValue: id) else { return }
-                viewportState.selectOrientation(orientation)
-            }
-        )
-        .frame(width: 90, height: 34)
-    }
-
-    @ViewBuilder
-    private var deviceDropdown: some View {
-        Menu {
-            Button("Full") { viewportState.selectFullViewport() }
-            Divider()
-            ForEach(viewportState.availablePhonePresets) { preset in
-                Button(preset.menuLabel) { _ = viewportState.selectPreset(preset.id) }
-            }
-            if !viewportState.availableTabletPresets.isEmpty {
-                Divider()
-                ForEach(viewportState.availableTabletPresets) { preset in
-                    Button(preset.menuLabel) { _ = viewportState.selectPreset(preset.id) }
-                }
-            }
-            if !viewportState.availableLaptopPresets.isEmpty {
-                Divider()
-                ForEach(viewportState.availableLaptopPresets) { preset in
-                    Button(preset.menuLabel) { _ = viewportState.selectPreset(preset.id) }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Text(viewportState.selectedPresetMenuLabel)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .foregroundStyle(.primary)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-        )
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityIdentifier("browser.preset.switch")
     }
 
     private func navigate() {
@@ -436,6 +206,7 @@ struct URLBarView: View {
         if !startsWithScheme(url) {
             url = "https://\(url)"
         }
+        isAddressFieldFocused = false
         onNavigate(url)
     }
 
