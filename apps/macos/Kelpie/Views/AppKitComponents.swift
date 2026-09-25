@@ -26,6 +26,8 @@ struct AppKitToolbarButton: NSViewRepresentable {
 
     func updateNSView(_ nsView: ToolbarButtonView, context: Context) {
         context.coordinator.action = action
+        nsView.setAccessibilityLabel(accessibilityLabel)
+        nsView.toolTip = accessibilityLabel
         nsView.chromeTintColor = tintColor
         nsView.isEnabled = isEnabled
         nsView.isButtonSelected = isSelected

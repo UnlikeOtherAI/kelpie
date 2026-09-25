@@ -26,63 +26,45 @@ enum BrowserChromeStyle {
     }
 }
 
-/// Illustrative favourites requested for the reference design. Never persisted as user bookmarks.
+/// Saved favourites use the same persistent records as bookmark management and the API.
 struct FavouritesBarView: View {
     @ObservedObject var appearance: BrowserChromeAppearance
+    let bookmarks: [BookmarkStore.Bookmark]
     let onNavigate: (String) -> Void
-    let onAddBookmark: () -> Void
-    let canAddBookmark: Bool
-
-    private struct Favourite: Identifiable {
-        let title: String
-        let icon: String
-        let color: Color
-        let url: String
-        var id: String { title }
-    }
-
-    private let favourites: [Favourite] = [
-        .init(title: "Personal", icon: "folder", color: BrowserChromeStyle.ink, url: "https://www.icloud.com"),
-        .init(title: "Work", icon: "folder", color: BrowserChromeStyle.ink, url: "https://github.com"),
-        .init(title: "Projects", icon: "square.grid.2x2.fill", color: .blue, url: "https://github.com"),
-        .init(title: "Inspiration", icon: "leaf.fill", color: .green, url: "https://www.pinterest.com"),
-        .init(title: "Travel", icon: "mappin", color: .red, url: "https://maps.google.com"),
-        .init(title: "Recipes", icon: "cup.and.saucer.fill", color: .orange, url: "https://www.bbcgoodfood.com"),
-        .init(title: "Reading", icon: "book.fill", color: .purple, url: "https://en.wikipedia.org")
-    ]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 24) {
-                ForEach(favourites) { favourite in
-                    label(favourite.title, icon: favourite.icon, color: favourite.icon == "folder" ? Color(nsColor: appearance.palette.foreground.color) : favourite.color)
-                        .overlay(AppKitInvisibleButton(
-                    accessibilityID: "browser.favourite.\(favourite.id)",
-                    accessibilityLabel: favourite.title
-                ) { onNavigate(favourite.url) })
-                }
-                label("Add bookmark…", icon: "plus", color: Color(nsColor: appearance.palette.foreground.color.withAlphaComponent(0.7)))
+                ForEach(bookmarks) { bookmark in
+                    HStack(spacing: 10) {
+                        Image(systemName: "bookmark").font(.system(size: 15))
+                        Text(bookmark.title.isEmpty ? bookmark.url : bookmark.title)
+                            .font(.system(size: 12)).lineLimit(1)
+                    }
+                    .foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
+                    .frame(maxWidth: 220)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(height: 28)
                     .overlay(AppKitInvisibleButton(
-                    accessibilityID: "browser.favourite.add",
-                    accessibilityLabel: "Add bookmark",
-                    isEnabled: canAddBookmark,
-                    action: onAddBookmark
-                ))
-                    .opacity(canAddBookmark ? 1 : 0.5)
+                        accessibilityID: "browser.favourite.\(bookmark.id.uuidString)",
+                        accessibilityLabel: bookmark.title.isEmpty ? bookmark.url : bookmark.title
+                    ) { onNavigate(bookmark.url) })
+                    .help(bookmark.url)
+                }
             }
             .padding(.horizontal, 20)
         }
-        .frame(height: 29)
+        .frame(height: BrowserChromeLayout.favouritesHeight)
     }
+}
 
-    private func label(_ title: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(color)
-            Text(title).font(.system(size: 12)).foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
-        }
-        .fixedSize()
-        .frame(height: 28)
-        .contentShape(Rectangle())
+/// Keep the native underlap and the visible rows in agreement when bookmarks change.
+enum BrowserChromeLayout {
+    static let navigationHeight: CGFloat = 44
+    static let favouritesHeight: CGFloat = 29
+
+    static func underlap(collapsed: Bool, hasBookmarks: Bool) -> CGFloat {
+        32 + (collapsed ? 0 : navigationHeight + (hasBookmarks ? favouritesHeight : 0))
     }
 }
 

@@ -7,6 +7,7 @@ final class BrowserChromeSampler {
     private weak var webView: WKWebView?
     private var loadingObservation: NSKeyValueObservation?
     private var pending: Task<Void, Never>?
+    private var settledSample: Task<Void, Never>?
     private var generation = 0
     private var sampling = false
     private var needsSample = false
@@ -18,6 +19,7 @@ final class BrowserChromeSampler {
         if webView == nil { onSample(nil) }
         if self.webView !== webView {
             generation += 1
+            settledSample?.cancel()
             pending?.cancel()
             pending = nil
             loadingObservation = nil
@@ -32,6 +34,17 @@ final class BrowserChromeSampler {
             generation += 1
             currentURL = webView?.url
             requestSample()
+        }
+    }
+
+    /// A final sample catches sticky-header CSS transitions after the last wheel event.
+    /// This is bounded to one trailing capture, never an idle timer.
+    func sampleAfterScroll() {
+        requestSample()
+        settledSample?.cancel()
+        settledSample = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: 350_000_000) } catch { return }
+            self?.requestSample()
         }
     }
 
@@ -92,5 +105,5 @@ final class BrowserChromeSampler {
 
     }
 
-    deinit { pending?.cancel() }
+    deinit { pending?.cancel(); settledSample?.cancel() }
 }

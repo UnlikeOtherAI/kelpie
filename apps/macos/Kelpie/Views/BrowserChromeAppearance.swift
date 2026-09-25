@@ -30,15 +30,19 @@ struct BrowserChromePalette: Equatable {
     var background: ChromeRGB
     var foreground: ChromeRGB
     var selectedTab: ChromeRGB
+    var inactiveTab: ChromeRGB
+    var selectedTabOpacity: Double
     var field: ChromeRGB
 
     static let neutral = Self(sample: .white)
 
-    init(sample: ChromeRGB) {
+    init(sample: ChromeRGB, collapsed: Bool = false) {
         background = sample
         let dark = sample.luminance < 0.35
         foreground = dark ? .white : .ink
-        selectedTab = sample.mixed(with: .white, progress: dark ? 0.13 : 0.8)
+        selectedTab = sample
+        selectedTabOpacity = collapsed ? 1 : 0
+        inactiveTab = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.13 : 0.06)
         field = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.10 : 0.05)
     }
 
@@ -47,6 +51,8 @@ struct BrowserChromePalette: Equatable {
         value.background = background.mixed(with: other.background, progress: progress)
         value.foreground = foreground.mixed(with: other.foreground, progress: progress)
         value.selectedTab = selectedTab.mixed(with: other.selectedTab, progress: progress)
+        value.selectedTabOpacity = selectedTabOpacity + (other.selectedTabOpacity - selectedTabOpacity) * min(1, max(0, progress))
+        value.inactiveTab = inactiveTab.mixed(with: other.inactiveTab, progress: progress)
         value.field = field.mixed(with: other.field, progress: progress)
         return value
     }
@@ -58,6 +64,8 @@ final class BrowserChromeAppearance: ObservableObject {
     @Published private(set) var palette = BrowserChromePalette.neutral
     private var target = BrowserChromePalette.neutral
     private var transition: Task<Void, Never>?
+    private var sample: ChromeRGB?
+    private var collapsed = false
 
     init() {
         let initial = BrowserChromePalette(sample: Self.defaultBackground)
@@ -71,8 +79,18 @@ final class BrowserChromeAppearance: ObservableObject {
     }
 
     func setSample(_ sample: ChromeRGB?) {
-        let next = BrowserChromePalette(sample: sample ?? Self.defaultBackground)
-        guard next.background.distance(to: target.background) > 0.035 else { return }
+        self.sample = sample
+        updateTarget()
+    }
+
+    func setCollapsed(_ collapsed: Bool) {
+        self.collapsed = collapsed
+        updateTarget()
+    }
+
+    private func updateTarget() {
+        let next = BrowserChromePalette(sample: sample ?? Self.defaultBackground, collapsed: collapsed)
+        guard next.background.distance(to: target.background) > 0.035 || next.selectedTabOpacity != target.selectedTabOpacity else { return }
         target = next
         transition?.cancel()
         let start = palette

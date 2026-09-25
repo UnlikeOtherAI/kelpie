@@ -27,6 +27,24 @@ final class BrowserChromeAppearanceTests: XCTestCase {
         }
     }
 
+    func testSelectedTabMatchesHeaderAndInactiveDarkTabsAreLighter() {
+        for sample in [ChromeRGB.white, ChromeRGB(red: 0, green: 0, blue: 0), ChromeRGB(red: 0.02, green: 0.03, blue: 0.12)] {
+            let palette = BrowserChromePalette(sample: sample)
+            XCTAssertEqual(palette.selectedTab, sample)
+            XCTAssertEqual(palette.selectedTabOpacity, 0)
+            XCTAssertEqual(BrowserChromePalette(sample: sample, collapsed: true).selectedTabOpacity, 1)
+            if sample.luminance < 0.35 {
+                XCTAssertGreaterThan(palette.inactiveTab.luminance, palette.selectedTab.luminance)
+            }
+        }
+        let light = BrowserChromePalette.neutral
+        let dark = BrowserChromePalette(sample: ChromeRGB(red: 0, green: 0, blue: 0), collapsed: true)
+        let halfway = light.mixed(with: dark, progress: 0.5)
+        XCTAssertEqual(halfway.selectedTab, halfway.background)
+        XCTAssertEqual(halfway.selectedTabOpacity, 0.5)
+        XCTAssertEqual(halfway.inactiveTab.red, (light.inactiveTab.red + dark.inactiveTab.red) / 2, accuracy: 0.001)
+    }
+
     func testBackgroundAndForegroundUseSameTransitionProgress() {
         let light = BrowserChromePalette.neutral
         let dark = BrowserChromePalette(sample: ChromeRGB(red: 0.02, green: 0.03, blue: 0.12))

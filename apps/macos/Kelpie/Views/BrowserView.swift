@@ -6,6 +6,7 @@ struct BrowserView: View {
     @ObservedObject var serverState: ServerState
     @ObservedObject var rendererState: RendererState
     @ObservedObject var viewportState: ViewportState
+    @ObservedObject var bookmarkStore = BookmarkStore.shared
     @ObservedObject var aiState = AIState.shared
     /// Each window owns its own tab list. The app-level `KelpieApp` does NOT
     /// inject a shared store — that was the source of the HTTP-routing bug
@@ -111,6 +112,7 @@ struct BrowserView: View {
                             }
                         },
                         onBookmarks: { showBookmarks = true },
+                        onAddBookmark: addCurrentBookmark,
                         onNetworkInspector: { showNetworkInspector = true },
                         onSettings: { showSettings = true }
                     )
@@ -229,7 +231,8 @@ struct BrowserView: View {
                 actions: BrowserCommandActions(
                     hardReload: { isChromeCollapsed = false; serverState.handlerContext.hardReloadPage() },
                     newTab: { handleNewTabCommand() },
-                    closeTab: { handleCloseTabCommand() }
+                    closeTab: { handleCloseTabCommand() },
+                    addBookmark: addCurrentBookmark
                 )
             )
             .frame(width: 0, height: 0)
@@ -237,6 +240,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(serverState: serverState, rendererState: rendererState, onNavigate: navigate)
         }
+        .onChange(of: isChromeCollapsed) { _, collapsed in chromeAppearance.setCollapsed(collapsed) }
         .pairingDialog(coordinator: serverState.pairingCoordinator)
         .sheet(isPresented: $showBookmarks) {
             BookmarksView(

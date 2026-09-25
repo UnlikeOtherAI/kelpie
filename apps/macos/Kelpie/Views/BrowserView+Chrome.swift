@@ -5,7 +5,7 @@ extension BrowserView {
         guard #available(macOS 26.0, *), rendererState.activeEngine == .webkit,
               viewportState.mode == .full, !serverState.isScriptRecording,
               tabStore.activeTab?.isStartPage != true else { return 0 }
-        return 32 + (isChromeCollapsed ? 0 : 73)
+        return BrowserChromeLayout.underlap(collapsed: isChromeCollapsed, hasBookmarks: !bookmarkStore.bookmarks.isEmpty)
     }
 
     var browserTabs: some View {
@@ -47,6 +47,15 @@ extension BrowserView {
         .frame(height: 32)
 
         .zIndex(2)
+    }
+
+    func addCurrentBookmark() {
+        isChromeCollapsed = false
+        bookmarkStore.addPage(
+            title: browserState.pageTitle,
+            url: browserState.currentURL,
+            isStartPage: tabStore.activeTab?.isStartPage == true
+        )
     }
 
     func showStartPage() {
