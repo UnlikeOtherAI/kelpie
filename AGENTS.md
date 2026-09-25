@@ -18,19 +18,6 @@
 - Feature specs: `docs/specs/`
 - Task breakdowns: `docs/to-do/`
 
-## Cross-Provider Reviews
-
-Get a second opinion from a different provider **before implementation** for: new features spanning 3+ files, architectural changes, design documents, changes to the HTTP/MCP protocol or mDNS discovery.
-
-### How to Conduct a Review
-
-1. Write the design/spec first — complete thinking before seeking review.
-2. Send to a different provider. Instruct the reviewer to be **adversarial**: look for technical debt, architectural regression, type safety gaps, and logic holes.
-3. The review is advisory. Assess each finding independently. Push back if the reviewer is wrong. Do not over-engineer.
-4. Append a "Cross-Provider Review" section to the design doc.
-
-**Skip review for:** typo fixes, doc-only updates, single-file changes under 50 lines.
-
 ## Platform Parity (CRITICAL)
 
 iOS and Android must be kept as absolute mirrors with full feature parity. Every feature, UI element, and behavior implemented on one platform must be implemented identically on the other in the same commit or PR.
