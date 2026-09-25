@@ -99,6 +99,7 @@ fun BottomBar(
                                 }, onDragEnd = { if (drag < -32 * density) onShowTabs() })
                             }
                         },
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (compact) {
                         Text(
@@ -120,7 +121,7 @@ fun BottomBar(
                                 editing = false
                                 onNavigate(it)
                             },
-                            Modifier.fillMaxWidth().height(44.dp),
+                            Modifier.widthIn(max = 620.dp).fillMaxWidth().height(44.dp),
                             shape = CircleShape,
                             textStyle = MaterialTheme.typography.bodySmall,
                             onEditingChanged = {
