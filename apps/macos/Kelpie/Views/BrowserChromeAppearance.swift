@@ -1,4 +1,8 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import SwiftUI
 
 struct ChromeRGB: Equatable {
@@ -9,7 +13,11 @@ struct ChromeRGB: Equatable {
     static let white = Self(red: 1, green: 1, blue: 1)
     static let ink = Self(red: 0.15, green: 0.20, blue: 0.30)
     static let tabGray = Self(red: 229 / 255, green: 234 / 255, blue: 243 / 255)
+    #if os(macOS)
     var color: NSColor { NSColor(srgbRed: red, green: green, blue: blue, alpha: 1) }
+    #else
+    var color: UIColor { UIColor(red: red, green: green, blue: blue, alpha: 1) }
+    #endif
     var luminance: Double {
         func linear(_ value: Double) -> Double { value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4) }
         return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
@@ -42,8 +50,13 @@ struct BrowserChromePalette: Equatable {
         let dark = sample.luminance < 0.35
         foreground = dark ? .white : .ink
         selectedTab = sample
+        #if os(macOS)
         selectedTabOpacity = 1
         inactiveTab = .tabGray
+        #else
+        selectedTabOpacity = collapsed ? 1 : 0
+        inactiveTab = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.13 : 0.06)
+        #endif
         field = sample.mixed(with: dark ? .white : .ink, progress: dark ? 0.10 : 0.05)
     }
 
@@ -75,8 +88,13 @@ final class BrowserChromeAppearance: ObservableObject {
     }
 
     private static var defaultBackground: ChromeRGB {
+        #if os(macOS)
         NSApp?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? ChromeRGB(red: 0.11, green: 0.12, blue: 0.14) : .white
+        #else
+        UITraitCollection.current.userInterfaceStyle == .dark
+            ? ChromeRGB(red: 0.11, green: 0.12, blue: 0.14) : .white
+        #endif
     }
 
     func setSample(_ sample: ChromeRGB?) {
@@ -94,6 +112,9 @@ final class BrowserChromeAppearance: ObservableObject {
         guard next.background.distance(to: target.background) > 0.035 || next.selectedTabOpacity != target.selectedTabOpacity else { return }
         target = next
         transition?.cancel()
+        #if os(iOS)
+        if UIAccessibility.isReduceMotionEnabled { palette = next; return }
+        #endif
         let start = palette
         transition = Task { [weak self] in
             for step in 1...12 {
