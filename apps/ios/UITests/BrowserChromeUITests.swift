@@ -39,7 +39,7 @@ final class BrowserChromeUITests: XCTestCase {
         app.buttons["Cancel"].tap()
 
         app.buttons["browser.more"].tap()
-        app.buttons["browser.tabs.add"].lastMatch.tap()
+        app.buttons.matching(identifier: "browser.tabs.add").allElementsBoundByIndex.last?.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         let start = field.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -140)))
