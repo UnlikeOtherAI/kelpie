@@ -87,8 +87,12 @@ The account menu opens hosted UOA sign-in in the external browser using PKCE.
 It shows identity/avatar, pending sign-in, sync errors, refresh and sign-out.
 Signed-in favorites preserve metadata and retry version conflicts; failed saves
 retain the visible list. Sign-out restores local favorites without uploading
-them. Tokens and account data remain in memory; only the public client ID and
-callback port are cached. Signing in is deliberately outside browser-control APIs.
+them. Identity and access tokens stay in memory; only the rotating UOA refresh
+token and its public client ID persist, DPAPI-encrypted for the current user in
+the profile's `uoa.session.v1`, so sign-in survives restarts. The account button
+and its tooltip show "Signing in…" while that session is restored at launch, and
+expiry or connection errors afterwards. Sign-out deletes and revokes it; quitting
+keeps it. Signing in is deliberately outside browser-control APIs.
 
 On Mac and Windows, only the selected tab carries the sampled page color.
 Inactive tabs and the full title strip stay opaque light gray in every theme;
@@ -111,6 +115,10 @@ Native select popups compose separately from the page buffer.
 
 The account menu provides hosted UOA PKCE sign-in in an external browser,
 identity/avatar, favorites refresh and sign-out. Local favorites remain separate.
+Sign-in survives restarts, including headless runs: only the rotating UOA refresh
+token and its client ID persist, AES-256-GCM sealed under the profile's 0700 `uoa/`
+directory with a separate 0600 key. The account tooltip shows "Signing in…" during
+the launch restore and any expiry or connection error; sign-out deletes and revokes it.
 The shared desktop runtime provides authenticated HTTP/MCP, tab leases, storage
 partitions, trusted input, DOM/evaluation, screenshots, dialogs and inspection.
 Full persistent tab sessions restore on restart; transient partitions do not.
