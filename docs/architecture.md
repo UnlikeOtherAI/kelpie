@@ -357,7 +357,8 @@ routes that are callable by its configured native shell callbacks.
 
 Windows and Linux Chromium shells share `DesktopApp`, tab leases, request routing,
 MCP and stores. `desktop-account` owns public-client PKCE, callback validation,
-in-memory account state and conflict-safe UOA favorites; its transports are WinHTTP
+in-memory account state, the encrypted refresh-session store (DPAPI on Windows,
+AES-256-GCM on Linux) and conflict-safe UOA favorites; its transports are WinHTTP
 and libcurl. Linux uses an owner-only locked profile and atomic readiness. GTK
 pumps CEF on its owner thread, routes native mouse/key/IME events, and paints only
 frames matching the selected tab generation. Popup buffers remain separate.
