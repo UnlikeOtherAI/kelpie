@@ -112,6 +112,8 @@ Each component owns its version in its own manifest — do not create a central 
 | macOS app | `apps/macos/Kelpie/Info.plist` → `CFBundleShortVersionString` |
 | iOS app   | `apps/ios/Project.swift` → `MARKETING_VERSION` build setting |
 | Android   | `apps/android/app/build.gradle.kts` → `versionName` |
+| Windows   | `apps/windows/CMakeLists.txt` → `project(kelpie_windows VERSION …)`, mirrored in `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp` |
+| Linux     | `apps/linux/CMakeLists.txt` → `KELPIE_LINUX_VERSION` |
 | CLI       | `packages/cli/package.json` → `version` |
 
 - Bump only the component(s) being released — other components stay at their current version.
@@ -127,7 +129,9 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `apps/windows/CMakeLists.txt` `KELPIE_WINDOWS_VERSION` (`0.1.4`).
+- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
+  (`0.1.7`); keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+  in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.
 - Verify direct `/mcp`, `kelpie --browser <alias> mcp`, native tabs/navigation/autocomplete, and
