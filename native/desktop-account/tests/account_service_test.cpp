@@ -35,7 +35,7 @@ void MergeAndLocalSeparation() {
   FakeServer server;
   server.list={{{"url","https://old.example/"},{"name","Legacy"},{"folder",{{"id",42}}}},"opaque"};
   AccountService account(local,server.Transport());
-  account.CompleteSignIn({"test-token",3600},0);
+  account.CompleteSignIn({"test-token",3600,{},{}},0);
   assert(account.State().signed_in);
   assert(json::parse(account.Bookmarks()).at(0).at("title")=="Legacy");
   server.conflict=true;
@@ -55,12 +55,12 @@ void MergeAndLocalSeparation() {
 void SessionFailureAndExpiry() {
   kelpie::BookmarkStore local; local.Add("Local","https://local.example/");
   FakeServer server; AccountService account(local,server.Transport());
-  account.CompleteSignIn({"test-token",3600},0);
+  account.CompleteSignIn({"test-token",3600,{},{}},0);
   server.deny=true;
   const auto response=account.BookmarkAction("add",{{"url","https://never-local.example/"}});
   assert(!response.at("success").get<bool>() && !account.State().signed_in && local.Count()==1);
   server.deny=false;
-  account.CompleteSignIn({"test-token",0},1);
+  account.CompleteSignIn({"test-token",0,{},{}},1);
   account.Poll();
   assert(!account.State().signed_in && !account.State().error.empty());
 }
@@ -75,7 +75,7 @@ void LateResponseCannotReplaceLocal() {
     }
     return server.Request(p,m,t,b,v);
   });
-  account.CompleteSignIn({"test-token",3600},0);
+  account.CompleteSignIn({"test-token",3600,{},{}},0);
   auto pending=std::async(std::launch::async,[&]{return account.BookmarkAction("add",{{"url","https://cloud.example/"}});});
   { std::unique_lock lock(mutex); cv.wait(lock,[&]{return blocked;}); }
   account.SignOut();
@@ -98,7 +98,7 @@ void CallbackAndPkce() {
       return AccountResponse{R"({"client_id":"public-test"})",{}};
     }
     assert(path=="/oauth/token" && parsed.at("code")=="valid-code" && parsed.at("redirect_uri")==redirect);
-    return AccountResponse{R"({"access_token":"test-token","token_type":"Bearer","expires_in":3600})",{}};
+    return AccountResponse{R"({"access_token":"test-token","token_type":"Bearer","expires_in":3600,"refresh_token":"test-refresh"})",{}};
   };
   auto open=[&](const std::string& url) {
     const auto start=url.find("&state=")+7;
@@ -110,7 +110,8 @@ void CallbackAndPkce() {
     auto good=client.Get("/oauth/callback?state="+state+"&code=valid-code"); assert(good && good->status==200);
     return true;
   };
-  assert(login.Run(request,profile,open).token=="test-token");
+  const auto token=login.Run(request,profile,open);
+  assert(token.token=="test-token" && token.refresh_token=="test-refresh" && token.client_id=="public-test");
   assert(!std::filesystem::exists(profile/"uoa-public-client.json"));
   std::filesystem::remove(profile);
 }

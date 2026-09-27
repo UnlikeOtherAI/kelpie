@@ -2,7 +2,6 @@
 #include <httplib.h>
 #include <condition_variable>
 #include <thread>
-#include <cmath>
 #include <algorithm>
 
 namespace kelpie::account {
@@ -77,15 +76,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
   p.server.stop();
   const auto response=request("/oauth/token","POST",{},json{{"grant_type","authorization_code"},{"code",p.code},
       {"client_id",client},{"redirect_uri",redirect},{"code_verifier",verifier}}.dump(),{});
-  const auto token=json::parse(response.body);
-  const auto value=token.at("access_token").get<std::string>();
-  const auto seconds=token.at("expires_in").get<double>();
-  auto type=token.value("token_type","");
-  for (auto& c:type) c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  const std::string scopes=" "+token.value("scope",std::string(kAccountScopes))+" ";
-  if (p.cancelled || value.empty() || type!="bearer" || !std::isfinite(seconds) || seconds<=0 || seconds>2592000 ||
-      scopes.find(" settings.read ")==std::string::npos || scopes.find(" settings.write ")==std::string::npos)
-    throw AccountFailure(403);
-  return {value,seconds};
+  if (p.cancelled) throw AccountFailure(403);
+  return ParseAccountToken(response.body,client);
 }
 }  // namespace kelpie::account

@@ -13,7 +13,8 @@ std::string ReadProfile(const std::filesystem::path& path) {
 }
 LinuxApp::Impl::Impl(AppConfig settings,int count,char** args)
     :config(std::move(settings)),argc(count),argv(args),device(config.profile_dir),
-     account(desktop.bookmark_store()) {
+     // Only the encrypted UOA refresh session is durable; identity stays in memory.
+     account(desktop.bookmark_store(),{},account::MakeAccountSessionStore(config.profile_dir)) {
   profile.Open(config.profile_dir,config.readiness_path);
   const std::filesystem::path root(config.profile_dir);
   desktop.bookmark_store().LoadJson(ReadProfile(root/"bookmarks.json"));
@@ -81,6 +82,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   if(!impl_->desktop.Start(runtime)) { ShowToast(impl_->desktop.last_error()); return false; }
   impl_->started=true;
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
+  impl_->account.RestoreSession();
   return true;
 }
 void LinuxApp::RequestShutdown() { impl_->closing=true; }

@@ -4,14 +4,16 @@
 #include <functional>
 #include <memory>
 #include "account_protocol.h"
+#include "account_token.h"
 
 namespace kelpie::account {
-struct AccountToken { std::string token; double seconds; };
 class AccountLogin {
  public:
   AccountLogin();
   ~AccountLogin();
   void Cancel();
+  // Returns the exchanged token with the registered client_id and, from a
+  // refresh-capable UOA server, its refresh token.
   AccountToken Run(const AccountRequest& request, const std::filesystem::path& profile,
                    const std::function<bool(const std::string&)>& open);
  private:
