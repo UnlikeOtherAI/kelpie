@@ -432,8 +432,9 @@ it closes when login finishes or is cancelled. Social providers may restrict
 embedded browsers; the system browser is preferred. Repeated clicks during login
 offer cancellation. Password and authenticator verification stay on UOA's hosted
 screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
-with Sign out and Refresh favourites actions. The sign-in survives restarts and
-access-token expiry; see [Staying signed in](#staying-signed-in).
+with Sign out and Refresh favourites actions. On macOS the sign-in survives restarts and
+access-token expiry (see [Staying signed in](#staying-signed-in)); on Windows and Linux,
+session expiry asks the user to sign in again.
 
 While signed in, favourites load and save directly in UOA's personal settings store
 (`browser` / `bookmarks`). Add, remove and clear wait for durable saves; conflicts fetch
@@ -499,13 +500,12 @@ State, exact callbacks and S256 PKCE still protect the authorization code return
 
 ### Staying signed in
 
-Every platform keeps the UOA sign-in across app restarts. UOA issues each registered
-native client a rotating refresh token, and Kelpie persists only that refresh token and
-the public client ID, encrypted: `SecretStore` (an AES-GCM file whose key lives in user
-defaults, never the Keychain) on macOS and iOS, Keystore-backed
-EncryptedSharedPreferences on Android, DPAPI on Windows and an owner-only AES-GCM file
-on Linux. Access tokens, identity, avatar and signed-in favourites are never written to
-disk; UOA remains the only identity store.
+macOS, iOS and Android keep the UOA sign-in across app restarts. UOA issues each
+registered native client a rotating refresh token, and Kelpie persists only that refresh
+token and the public client ID, encrypted: `SecretStore` (an AES-GCM file whose key lives
+in user defaults, never the Keychain) on macOS and iOS, and Keystore-backed
+EncryptedSharedPreferences on Android. Access tokens, identity, avatar and signed-in
+favourites are never written to disk; UOA remains the only identity store.
 
 At launch Kelpie exchanges the stored refresh token, persists the rotated replacement
 before using the new access token, and reloads the profile and favourites from UOA
