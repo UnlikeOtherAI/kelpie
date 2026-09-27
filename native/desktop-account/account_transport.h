@@ -9,10 +9,11 @@ namespace kelpie::account {
 struct AccountResponse { std::string body, version; };
 struct AccountFailure : std::runtime_error {
   int status;
-  explicit AccountFailure(int code) : std::runtime_error(code == 401
+  explicit AccountFailure(int code) : AccountFailure(code, code == 401
       ? "Your UOA session expired. Sign in again."
       : code == 403 ? "UOA did not grant access to favorites."
-      : "UOA could not complete this request. Please try again."), status(code) {}
+      : "UOA could not complete this request. Please try again.") {}
+  AccountFailure(int code, const std::string& message) : std::runtime_error(message), status(code) {}
 };
 using AccountRequest = std::function<AccountResponse(const std::string&, const std::string&,
     const std::string&, const std::string&, const std::string&)>;
