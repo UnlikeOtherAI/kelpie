@@ -135,7 +135,9 @@ bool WindowsApp::InitializeDesktopRuntime() {
   // Navigation callbacks may persist history immediately, so restore stores
   // before Chromium begins loading any page.
   LoadStores();
-  account_ = std::make_unique<account::AccountService>(desktop_app_->bookmark_store());
+  // Only the encrypted UOA refresh session is durable; identity stays in memory.
+  account_ = std::make_unique<account::AccountService>(desktop_app_->bookmark_store(), account::AccountRequest{},
+                                                       account::MakeAccountSessionStore(config_.profile_dir));
 
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
@@ -306,6 +308,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   }
   browser_view_->ShowFallback(false);
   SetTimer(shell_->hwnd(), 3, 300, nullptr);
+  account_->RestoreSession();
   startup_diagnostics_.Ready();
   return true;
 }
@@ -341,8 +344,7 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
     account_->Poll();
     const auto state = account_->State();
     if (!state.signing_in) ClosePrivateLoginWindow();
-    shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(state.signed_in ? state.email : "Login/register"),
-                          !state.error.empty(), state.busy);
+    shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);
   }
   std::vector<TabSnapshot> tabs;
   if (!desktop_app_->engine().GetTabs(&tabs, std::chrono::milliseconds(20)).ok) return;

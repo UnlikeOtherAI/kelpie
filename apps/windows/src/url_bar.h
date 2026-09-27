@@ -63,6 +63,7 @@ class UrlBar {
   void InvalidateSurface() const;
   void RefreshFont();
   void DrawAccount(const DRAWITEMSTRUCT& item) const;
+  void UpdateAccountTooltip() const;
 
   ui::ChromePalette palette_ = ui::ChromeColors(ui::DefaultChromeColor());
   mutable COLORREF brush_color_ = CLR_INVALID;
