@@ -12,6 +12,8 @@ struct TabWebViewContainer: UIViewRepresentable {
     @ObservedObject var browserState: BrowserState
     let handlerContext: HandlerContext?
     var bottomClearance: CGFloat = 0
+    /// CSS viewport insets with the bottom bar collapsed and expanded.
+    var bottomViewportInsets: ClosedRange<CGFloat> = 0...0
     let onScrollDirectionChange: (ScrollDirection) -> Void
     let onWebViewReady: (WKWebView) -> Void
 
@@ -40,8 +42,8 @@ struct TabWebViewContainer: UIViewRepresentable {
             webView.scrollView.contentInset.bottom = bottomClearance
             webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomClearance
             webView.setMinimumViewportInset(
-                UIEdgeInsets(top: 0, left: 0, bottom: bottomClearance == 0 ? 0 : 34, right: 0),
-                maximumViewportInset: UIEdgeInsets(top: 0, left: 0, bottom: bottomClearance == 0 ? 0 : 62, right: 0)
+                UIEdgeInsets(top: 0, left: 0, bottom: bottomViewportInsets.lowerBound, right: 0),
+                maximumViewportInset: UIEdgeInsets(top: 0, left: 0, bottom: bottomViewportInsets.upperBound, right: 0)
             )
         }
     }

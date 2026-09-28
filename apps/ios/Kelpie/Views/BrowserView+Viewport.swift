@@ -51,7 +51,10 @@ extension BrowserView {
             tabStore: tabStore,
             browserState: browserState,
             handlerContext: serverState.handlerContext,
-            bottomClearance: serverState.isScriptRecording ? 0 : (bottomBarCollapsed ? 34 : 62),
+            bottomClearance: serverState.isScriptRecording ? 0 : bottomBarClearance(collapsed: bottomBarCollapsed),
+            bottomViewportInsets: serverState.isScriptRecording
+                ? 0...0
+                : bottomBarClearance(collapsed: true)...bottomBarClearance(collapsed: false),
             onScrollDirectionChange: { direction in
                 guard !addressEditing, !showTabOverview, !isIn3DInspector else { return }
                 withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.2)) {

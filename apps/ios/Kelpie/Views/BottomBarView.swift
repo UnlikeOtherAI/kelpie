@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// Bottom chrome geometry shared by the bar and the web view's bottom clearance.
+enum BottomBarMetrics {
+    static let expandedHeight: CGFloat = 62
+    static let collapsedHeight: CGFloat = 34
+    /// The part of the home-indicator safe area kept clear beneath the bar.
+    static let homeIndicatorClearance: CGFloat = 11
+
+    /// How far the bar sinks into the home-indicator safe area.
+    static func sink(bottomSafeArea: CGFloat) -> CGFloat {
+        max(0, bottomSafeArea - homeIndicatorClearance)
+    }
+}
+
 /// One native bottom surface; tabs have their own top strip or overview.
 struct BottomBarView<MoreContent: View>: View {
     @ObservedObject var tabStore: TabStore
@@ -44,7 +57,7 @@ struct BottomBarView<MoreContent: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: isCollapsed && !isEditing ? 34 : 62)
+        .frame(height: isCollapsed && !isEditing ? BottomBarMetrics.collapsedHeight : BottomBarMetrics.expandedHeight)
         .background {
             UnevenChromeBackground()
                 .opacity(isCollapsed && !isEditing ? 0 : 1)

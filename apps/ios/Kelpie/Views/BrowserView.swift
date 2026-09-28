@@ -26,6 +26,7 @@ struct BrowserView: View {
     @State var bottomBarCollapsed = false
     @State var addressEditing = false
     @State var keyboardBottomInset: CGFloat = 0
+    @State var bottomSafeArea: CGFloat = 0
     @State var showTabOverview = false
     @StateObject var chromeAppearance = BrowserChromeAppearance()
     @State var chromeSampler = BrowserChromeSampler()
@@ -151,10 +152,18 @@ struct BrowserView: View {
             if !serverState.isScriptRecording && !showTabOverview {
                 bottomChrome
                     .padding(.bottom, keyboardBottomInset)
+                    .offset(y: keyboardBottomInset > 0 ? 0 : bottomBarSink)
                     .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
             }
         }
         .background { BrowserKeyboardInset { keyboardBottomInset = $0 } }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { bottomSafeArea = proxy.safeAreaInsets.bottom }
+                    .onChange(of: proxy.safeAreaInsets.bottom) { bottomSafeArea = $0 }
+            }
+        }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .accessibilityHidden(showTabOverview)
         .fullScreenCover(isPresented: $showTabOverview) {

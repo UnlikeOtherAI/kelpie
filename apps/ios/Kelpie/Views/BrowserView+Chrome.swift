@@ -23,6 +23,15 @@ extension BrowserView {
         )
     }
 
+    /// How far the bottom bar sits inside the home-indicator safe area.
+    var bottomBarSink: CGFloat { BottomBarMetrics.sink(bottomSafeArea: bottomSafeArea) }
+
+    /// Web content clearance above the bottom safe area for the bar in either state.
+    func bottomBarClearance(collapsed: Bool) -> CGFloat {
+        let height = collapsed ? BottomBarMetrics.collapsedHeight : BottomBarMetrics.expandedHeight
+        return max(0, height - bottomBarSink)
+    }
+
     @ViewBuilder
     var browserMoreMenu: some View {
         Button { showHistory = true } label: { Label("History", systemImage: "clock") }
