@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -40,13 +41,15 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kelpie.browser.R
 
-private val KelpieBlue = Color(0xFF78B0F4)
+// Kelpie blue deep enough for white text (about 4.9:1) on the primary action.
+private val KelpieActionBlue = Color(0xFF266ED6)
 
 private const val PREFS_NAME = "kelpie_prefs"
 private const val KEY_HIDE_WELCOME = "hide_welcome_card"
@@ -156,8 +159,16 @@ fun WelcomeCard(onDismiss: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // The whole row toggles, not only the switch; the switch mirrors the state.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = dontShowAgain,
+                                onValueChange = { dontShowAgain = it },
+                                role = Role.Switch,
+                            ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -167,10 +178,10 @@ fun WelcomeCard(onDismiss: () -> Unit) {
                     )
                     Switch(
                         checked = dontShowAgain,
-                        onCheckedChange = { dontShowAgain = it },
+                        onCheckedChange = null,
                         colors =
                             SwitchDefaults.colors(
-                                checkedTrackColor = KelpieBlue,
+                                checkedTrackColor = KelpieActionBlue,
                             ),
                     )
                 }
@@ -183,7 +194,7 @@ fun WelcomeCard(onDismiss: () -> Unit) {
                     shape = RoundedCornerShape(12.dp),
                     colors =
                         ButtonDefaults.buttonColors(
-                            containerColor = KelpieBlue,
+                            containerColor = KelpieActionBlue,
                             contentColor = Color.White,
                         ),
                 ) {
