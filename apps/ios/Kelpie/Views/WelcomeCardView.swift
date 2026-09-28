@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 
 private let kelpieBlue = Color(red: 120 / 255, green: 176 / 255, blue: 244 / 255)
+/// Kelpie blue deep enough for white text (about 4.9:1) on the primary action.
+private let kelpieActionBlue = Color(red: 38 / 255, green: 110 / 255, blue: 214 / 255)
 
 struct WelcomeCardView: View {
     let onDismiss: () -> Void
@@ -41,16 +43,14 @@ struct WelcomeCardView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                Toggle("Don't show this again", isOn: $dontShowAgain)
-                    .font(.subheadline)
-                    .tint(kelpieBlue)
+                dontShowAgainRow
 
                 Button(action: dismiss) {
                     Text("Get Started")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(kelpieBlue)
+                        .background(kelpieActionBlue)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
@@ -61,6 +61,27 @@ struct WelcomeCardView: View {
             .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
             .frame(maxWidth: UIDevice.current.userInterfaceIdiom == .pad ? modalCardMaxWidth : .infinity)
             .padding(.horizontal, 32)
+        }
+    }
+
+    /// The whole row toggles, not only the switch; the switch mirrors the state.
+    private var dontShowAgainRow: some View {
+        Button { dontShowAgain.toggle() } label: {
+            HStack {
+                Text("Don't show this again")
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 12)
+                Toggle("", isOn: $dontShowAgain)
+                    .labelsHidden()
+                    .tint(kelpieActionBlue)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityRepresentation {
+            Toggle("Don't show this again", isOn: $dontShowAgain)
         }
     }
 

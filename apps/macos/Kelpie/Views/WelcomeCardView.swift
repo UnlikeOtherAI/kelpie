@@ -134,10 +134,11 @@ private struct AppKitPrimaryButton: NSViewRepresentable {
         button.isBordered = false
         button.wantsLayer = true
         button.layer?.cornerRadius = 12
+        // A deeper Kelpie blue keeps the white title legible (about 4.9:1).
         button.layer?.backgroundColor = NSColor(
-            red: 120 / 255,
-            green: 176 / 255,
-            blue: 244 / 255,
+            red: 38 / 255,
+            green: 110 / 255,
+            blue: 214 / 255,
             alpha: 1
         ).cgColor
         button.contentTintColor = .white

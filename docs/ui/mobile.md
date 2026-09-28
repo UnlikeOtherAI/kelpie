@@ -153,6 +153,7 @@ On iPads and Android tablets:
 On iPad specifically:
 
 - The first-launch welcome card should cap its width to a modal-like width instead of expanding across the whole tablet.
+- The whole "Don't show this again" row toggles the preference, not only the switch. `Get Started` uses a deeper Kelpie blue (`#266ED6`) so its white title stays legible; the same colour marks the switch's on state on iOS, Android and macOS.
 - The settings help section can reopen the welcome card even when automatic launch presentation was previously disabled.
 - The app menu also exposes `Show Welcome Screen`, `Open Kelpie Website`, `Open GitHub Repository`, and `Open UnlikeOtherAI` directly under `Settings`.
 - The `View` menu lists `Full Width` plus every staged phone, tablet, and laptop viewport preset that currently fits the tablet geometry.
