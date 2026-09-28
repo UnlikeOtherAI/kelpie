@@ -432,16 +432,17 @@ it closes when login finishes or is cancelled. Social providers may restrict
 embedded browsers; the system browser is preferred. Repeated clicks during login
 offer cancellation. Password and authenticator verification stay on UOA's hosted
 screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
-with Sign out and Refresh favourites actions. Session expiry asks the user to sign in
-again; the public profile does not issue refresh tokens.
+with Sign out and Refresh favourites actions. On macOS the sign-in survives restarts and
+access-token expiry (see [Staying signed in](#staying-signed-in)); on Windows and Linux,
+session expiry asks the user to sign in again.
 
 While signed in, favourites load and save directly in UOA's personal settings store
 (`browser` / `bookmarks`). Add, remove and clear wait for durable saves; conflicts fetch
 the current server list and reapply the intended change. Sync failures appear in the
 account popup and are returned by bookmark API mutations. Refresh favourites reloads
 changes from another device. Signed-out favourites remain local and are restored on
-sign-out; they are never silently uploaded. Tokens, identity, avatar and signed-in
-favourites remain in memory and are cleared on sign-out, account change or expiry.
+sign-out; they are never silently uploaded. Access tokens, identity, avatar and signed-in
+favourites remain in memory and are cleared on sign-out or account change.
 
 ## iPhone and iPad browser chrome
 
@@ -473,8 +474,8 @@ and S256 PKCE. Android opens the default browser; when unavailable it uses a
 separate login Activity/process and WebView profile with no automation bridge and
 WebView inspection disabled. Android userdebug/eng system images can override
 that inspection setting; verify isolation on a production system image.
-iOS uses ASWebAuthenticationSession. Cancellation, expiry and
-process loss return to a signed-out state; no tokens or profiles are persisted.
+iOS uses ASWebAuthenticationSession. Cancellation returns to a signed-out state;
+a completed sign-in persists as described in [Staying signed in](#staying-signed-in).
 Apple and Android register a fresh public client for each login so revoked cached
 registrations cannot strand the app. Signing keys and branded configuration stay
 on the authentication server; no shared secret ships in the applications.
@@ -496,3 +497,24 @@ allowed Google/password methods from the administrator's Apps record. No shared
 secret or client-controlled authentication configuration is embedded. Every login
 registers a fresh client so policy changes take effect without clearing local state.
 State, exact callbacks and S256 PKCE still protect the authorization code return.
+
+### Staying signed in
+
+macOS, iOS and Android keep the UOA sign-in across app restarts. UOA issues each
+registered native client a rotating refresh token, and Kelpie persists only that refresh
+token and the public client ID, encrypted: `SecretStore` (an AES-GCM file whose key lives
+in user defaults, never the Keychain) on macOS and iOS, and Keystore-backed
+EncryptedSharedPreferences on Android. Access tokens, identity, avatar and signed-in
+favourites are never written to disk; UOA remains the only identity store.
+
+At launch Kelpie exchanges the stored refresh token, persists the rotated replacement
+before using the new access token, and reloads the profile and favourites from UOA
+while the account control shows sign-in in progress. An access token within a minute of
+expiry is renewed before its next use, and once more when UOA refuses one early, so an
+idle session is no longer signed out every access-token lifetime. When UOA rejects the refresh token
+(expired, revoked, reused or the account's credentials changed), Kelpie forgets it,
+signs out and asks for a new sign-in. When UOA is unreachable the stored session is
+kept, an error explains that it could not be restored, and the next Login/register or
+launch tries it again before opening the browser. Sign out forgets the session
+immediately and asks UOA to revoke it. A UOA server that issues no refresh token keeps
+the older memory-only session, which still ends at access-token expiry.

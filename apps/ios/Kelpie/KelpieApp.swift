@@ -39,6 +39,7 @@ struct KelpieApp: App {
         _browserState = StateObject(wrappedValue: bs)
         _serverState = StateObject(wrappedValue: ss)
         _tabStore = StateObject(wrappedValue: ts)
+        Task { @MainActor in UOAAccount.shared.restoreSession() }
     }
 
     var body: some Scene {

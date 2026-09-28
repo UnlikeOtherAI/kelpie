@@ -29,6 +29,7 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
         .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
         .glob("../macos/Kelpie/Account/UOAAccount.swift"),
+        .glob("../macos/Kelpie/Account/UOASession.swift"),
         .glob("../macos/Kelpie/Account/UOAPresentation.swift"),
         .glob("../macos/Kelpie/Account/UOAAuthorization.swift"),
         .glob("../macos/Kelpie/Account/UOATransport.swift"),
@@ -83,6 +84,7 @@ let kelpieTests = Target.target(
     sources: [
         .glob("Tests/**/*.swift"),
         .glob("../macos/Tests/UOAAccountTests.swift"),
+        .glob("../macos/Tests/UOASessionTests.swift"),
     ],
     dependencies: [
         .target(name: "Kelpie"),
