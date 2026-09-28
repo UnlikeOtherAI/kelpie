@@ -143,7 +143,9 @@ try {
   Copy-Item -LiteralPath (Join-Path $build "locales") -Destination (Join-Path $stage "locales") -Recurse
   Copy-Item -LiteralPath (Join-Path $cef "LICENSE.txt") -Destination (Join-Path $stage "CEF-LICENSE.txt")
 
-  if (Get-ChildItem -LiteralPath $stage -Recurse -Include "*.lib", "*.pdb" -File) { throw "Package contains development files." }
+  # Windows PowerShell 5.1 ignores -Include alongside -LiteralPath and would match every file.
+  $developmentFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in ".lib", ".pdb" }
+  if ($developmentFiles) { throw "Package contains development files." }
   $asset = Join-Path $output ("kelpie-windows-x64-" + $Version + ".zip")
   New-Item -ItemType Directory -Force -Path $output | Out-Null
   Remove-Item -Force -LiteralPath $asset -ErrorAction SilentlyContinue

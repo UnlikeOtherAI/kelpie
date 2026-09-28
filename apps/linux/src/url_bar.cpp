@@ -103,9 +103,7 @@ void UrlBar::Sync() {
     if(!image)image=gtk_image_new_from_icon_name("avatar-default-symbolic",GTK_ICON_SIZE_LARGE_TOOLBAR);
     gtk_button_set_image(GTK_BUTTON(account_button_),image);
   }
-  auto label=account.signed_in?account.email:std::string("Login/register");
-  if(account.busy)label+=" — syncing"; if(!account.error.empty())label+=" — "+account.error;
-  gtk_widget_set_tooltip_text(account_button_,label.c_str());
+  gtk_widget_set_tooltip_text(account_button_,account::AccountLabel(account).c_str());
 #endif
 }
 }  // namespace kelpie::linuxapp

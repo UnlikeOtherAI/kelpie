@@ -432,9 +432,8 @@ it closes when login finishes or is cancelled. Social providers may restrict
 embedded browsers; the system browser is preferred. Repeated clicks during login
 offer cancellation. Password and authenticator verification stay on UOA's hosted
 screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
-with Sign out and Refresh favourites actions. On macOS the sign-in survives restarts and
-access-token expiry (see [Staying signed in](#staying-signed-in)); on Windows and Linux,
-session expiry asks the user to sign in again.
+with Sign out and Refresh favourites actions. The sign-in survives restarts and
+access-token expiry; see [Staying signed in](#staying-signed-in).
 
 While signed in, favourites load and save directly in UOA's personal settings store
 (`browser` / `bookmarks`). Add, remove and clear wait for durable saves; conflicts fetch
@@ -500,12 +499,21 @@ State, exact callbacks and S256 PKCE still protect the authorization code return
 
 ### Staying signed in
 
-macOS, iOS and Android keep the UOA sign-in across app restarts. UOA issues each
-registered native client a rotating refresh token, and Kelpie persists only that refresh
-token and the public client ID, encrypted: `SecretStore` (an AES-GCM file whose key lives
-in user defaults, never the Keychain) on macOS and iOS, and Keystore-backed
-EncryptedSharedPreferences on Android. Access tokens, identity, avatar and signed-in
-favourites are never written to disk; UOA remains the only identity store.
+Every platform keeps the UOA sign-in across app restarts. UOA issues each registered
+native client a rotating refresh token, and Kelpie persists only that refresh token and
+the public client ID (`uoa.session.v1`), encrypted:
+
+- macOS and iOS: `SecretStore`, an AES-GCM file whose key lives in user defaults (never
+  the Keychain).
+- Android: Keystore-backed EncryptedSharedPreferences.
+- Windows: DPAPI for the current user, in the profile directory
+  (`%APPDATA%\Kelpie\uoa.session.v1` by default).
+- Linux: AES-256-GCM with a random key in a separate file, both 0600 inside the
+  profile's 0700 `uoa/` directory (`~/.config/kelpie/uoa/` by default). This works
+  headless, without a desktop keyring.
+
+Access tokens, identity, avatar and signed-in favourites are never written to disk;
+UOA remains the only identity store.
 
 At launch Kelpie exchanges the stored refresh token, persists the rotated replacement
 before using the new access token, and reloads the profile and favourites from UOA
@@ -516,5 +524,5 @@ idle session is no longer signed out every access-token lifetime. When UOA rejec
 signs out and asks for a new sign-in. When UOA is unreachable the stored session is
 kept, an error explains that it could not be restored, and the next Login/register or
 launch tries it again before opening the browser. Sign out forgets the session
-immediately and asks UOA to revoke it. A UOA server that issues no refresh token keeps
+immediately and asks UOA to revoke it in the background; quitting Kelpie keeps it. A UOA server that issues no refresh token keeps
 the older memory-only session, which still ends at access-token expiry.

@@ -3,8 +3,9 @@
 
 namespace kelpie::account {
 using json=nlohmann::json;
-AccountService::AccountService(BookmarkStore& local,AccountRequest request) : local_(local),request_(std::move(request)) {
-}
+AccountService::AccountService(BookmarkStore& local,AccountRequest request,std::shared_ptr<AccountSessionStore> store)
+    : local_(local),request_(std::move(request)),
+      store_(store?std::move(store):std::make_shared<MemoryAccountSessionStore>()) {}
 AccountRequest AccountService::RequestLocked() const {
   if (request_) return request_;
   auto transport=transport_;
@@ -12,6 +13,7 @@ AccountRequest AccountService::RequestLocked() const {
     return transport->Request(p,m,t,b,v);
   };
 }
+AccountRequest AccountService::Request() const { std::lock_guard lock(mutex_); return RequestLocked(); }
 AccountService::~AccountService() { Shutdown(); if (task_.valid()) task_.wait(); }
 AccountState AccountService::State() const { std::lock_guard lock(mutex_); return state_; }
 std::string AccountService::Bookmarks() const {
@@ -21,21 +23,6 @@ std::string AccountService::Bookmarks() const {
 void AccountService::CheckGeneration(std::uint64_t generation) const {
   std::lock_guard lock(mutex_);
   if (generation!=generation_) throw AccountFailure(401);
-}
-void AccountService::SignOut() {
-  std::shared_ptr<AccountLogin> login;
-  std::shared_ptr<AccountTransport> transport;
-  { std::lock_guard lock(mutex_); ++generation_; token_.clear(); state_={};
-    bookmarks_=json::array(); login=std::move(login_); transport=transport_;
-    pending_browser_url_.clear(); open_browser_={}; }
-  if (login) login->Cancel();
-  transport->Cancel();
-}
-void AccountService::Shutdown() { SignOut(); }
-bool AccountService::Drain() {
-  if (!task_.valid()) return true;
-  if (task_.wait_for(std::chrono::seconds(0))!=std::future_status::ready) return false;
-  task_.get(); return true;
 }
 void AccountService::Poll() {
   std::string url;
@@ -57,16 +44,31 @@ void AccountService::Poll() {
     }
   }
   if (task_.valid() && task_.wait_for(std::chrono::seconds(0))==std::future_status::ready) task_.get();
+  // A refresh token outlives the access token; without one (older UOA) expiry ends the session.
   bool expired;
-  { std::lock_guard lock(mutex_); expired=state_.signed_in && std::chrono::steady_clock::now()>=expiry_; }
-  if (expired) { SignOut(); std::lock_guard lock(mutex_); state_.error="Your UOA session expired. Sign in again."; }
+  { std::lock_guard lock(mutex_); expired=state_.signed_in && refresh_token_.empty() && std::chrono::steady_clock::now()>=expiry_; }
+  if (expired) { Reset(); std::lock_guard lock(mutex_); state_.error=AccountFailure(401).what(); }
 }
 void AccountService::Fail(std::uint64_t generation,const std::string& message,int status) {
+  if (status==401) { ExpireSession(generation,message); return; }
   std::lock_guard lock(mutex_);
   if (generation!=generation_) return;
   pending_browser_url_.clear(); open_browser_={};
-  if (status==401) { ++generation_; token_.clear(); bookmarks_=json::array(); state_={}; }
+  // A sign-in that did not finish keeps no credentials in memory; storage is untouched.
+  if (!state_.signed_in) { token_.clear(); refresh_token_.clear(); client_id_.clear(); }
   state_.error=message; state_.busy=false; state_.signing_in=false;
+}
+// A rejected session: signs out and deletes the stored session unless a newer attempt owns it.
+void AccountService::ExpireSession(std::uint64_t generation,const std::string& message) {
+  std::lock_guard storeLock(store_mutex_);
+  {
+    std::lock_guard lock(mutex_);
+    if (generation!=generation_) return;
+    ++generation_; token_.clear(); refresh_token_.clear(); client_id_.clear();
+    bookmarks_=json::array(); state_={}; state_.error=message;
+    pending_browser_url_.clear(); open_browser_={};
+  }
+  ClearStoredLocked();
 }
 bool AccountService::StartTask(std::function<void(std::uint64_t)> task,bool login) {
   Poll();
@@ -82,44 +84,26 @@ bool AccountService::StartTask(std::function<void(std::uint64_t)> task,bool logi
   });
   return true;
 }
-bool AccountService::StartSignIn(const std::filesystem::path& profile,const std::function<bool(const std::string&)>& open) {
-  Poll();
-  if (State().signed_in || task_.valid()) return false;
-  { std::lock_guard lock(mutex_); transport_=std::make_shared<AccountTransport>(); open_browser_=open; }
-  return StartTask([this,profile](std::uint64_t generation) {
-    auto login=std::make_shared<AccountLogin>();
-    { std::lock_guard lock(mutex_); if (generation!=generation_) return; login_=login; }
-    AccountRequest request;
-    { std::lock_guard lock(mutex_); request=RequestLocked(); }
-    const auto token=login->Run(request,profile,[this,generation](const std::string& url) {
-      std::lock_guard lock(mutex_);
-      if (generation!=generation_ || !state_.signing_in) return false;
-      pending_browser_url_=url;
-      return true;
-    });
-    CheckGeneration(generation);
-    CompleteSignIn(token,generation);
-  },true);
-}
 void AccountService::CompleteSignIn(const AccountToken& token,std::uint64_t generation) {
-  AccountRequest request;
-  { std::lock_guard lock(mutex_); if (generation!=generation_) return; request=RequestLocked(); }
-  const auto identity=json::parse(request("/oauth/me","GET",token.token,{},{}).body);
+  // Persists the (rotated) refresh token before the access token is used.
+  if (!AdoptToken(token,generation)) return;
+  const auto identity=json::parse(Authorized(generation,"/oauth/me","GET").body);
   CheckGeneration(generation);
   const auto name=identity.value("name",json()).is_string()?identity["name"].get<std::string>():std::string();
   const auto email=identity.at("email").get<std::string>();
   if (identity.at("sub").get<std::string>().empty() || email.empty()) throw AccountFailure(0);
-  const auto favorites=json::parse(request(kAccountBookmarks,"GET",token.token,{},{}).body);
+  const auto favorites=json::parse(Authorized(generation,kAccountBookmarks,"GET").body);
   auto list=favorites.value("value",json());
   if (list.is_null()) list=json::array();
   VisibleAccountBookmarks(list); // Validate before switching away from local favorites.
   CheckGeneration(generation);
-  std::string avatar;
-  try { avatar=request("/oauth/me/avatar","GET",token.token,{},{}).body; } catch (...) {}
+  std::string avatar, current;
+  AccountRequest request;
+  { std::lock_guard lock(mutex_); current=token_; request=RequestLocked(); }
+  try { avatar=request("/oauth/me/avatar","GET",current,{},{}).body; } catch (...) {}
   std::lock_guard lock(mutex_);
   if (generation!=generation_) return;
-  token_=token.token; bookmarks_=std::move(list);
-  expiry_=std::chrono::steady_clock::now()+std::chrono::milliseconds(static_cast<long long>(token.seconds*1000));
+  bookmarks_=std::move(list);
   state_={true,false,false,name,email,std::move(avatar),{}};
 }
 bool AccountService::StartBookmarkAction(std::string action,json params) {
@@ -130,8 +114,6 @@ bool AccountService::StartBookmarkAction(std::string action,json params) {
 }
 json AccountService::BookmarkAction(const std::string& action,const json& params,std::optional<std::uint64_t> expected) {
   std::uint64_t generation;
-  std::string token;
-  AccountRequest request;
   {
     std::lock_guard lock(mutex_);
     generation=generation_;
@@ -143,7 +125,6 @@ json AccountService::BookmarkAction(const std::string& action,const json& params
       return action=="clear" ? SuccessResponse({{"cleared",true}}) :
           SuccessResponse({{"bookmarks",json::parse(local_.ToJson())}});
     }
-    token=token_; request=RequestLocked();
     if (action=="list") return SuccessResponse({{"bookmarks",VisibleAccountBookmarks(bookmarks_)}});
   }
   try {
@@ -153,7 +134,7 @@ json AccountService::BookmarkAction(const std::string& action,const json& params
     for (int attempt=0;attempt<3;++attempt) {
       CheckGeneration(generation);
       if (std::chrono::steady_clock::now()>deadline) throw AccountFailure(0);
-      const auto response=request(kAccountBookmarks,"GET",token,{},{});
+      const auto response=Authorized(generation,kAccountBookmarks,"GET");
       CheckGeneration(generation);
       auto existing=json::parse(response.body).value("value",json());
       if (existing.is_null()) existing=json::array();
@@ -162,7 +143,7 @@ json AccountService::BookmarkAction(const std::string& action,const json& params
         if (response.version.empty()) throw AccountFailure(428);
         const auto updated=MutateAccountBookmarks(existing,action,params);
         try {
-          const auto saved=request(kAccountBookmarks,"PUT",token,json{{"value",updated}}.dump(),response.version);
+          const auto saved=Authorized(generation,kAccountBookmarks,"PUT",json{{"value",updated}}.dump(),response.version);
           existing=json::parse(saved.body).at("value");
           VisibleAccountBookmarks(existing);
         } catch (const AccountFailure& failure) {
