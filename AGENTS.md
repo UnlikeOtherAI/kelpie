@@ -117,6 +117,7 @@ Each component owns its version in its own manifest — do not create a central 
 | Linux     | `apps/linux/CMakeLists.txt` → `KELPIE_LINUX_VERSION` |
 | CLI       | `packages/cli/package.json` → `version` |
 
+- Published npm packages declare the canonical repository URL and package directory in their manifests; the release workflow verifies GitHub provenance during publication.
 - Bump only the component(s) being released — other components stay at their current version.
 - GitHub releases use a date tag (`release/YYYY-MM-DD`). The tag description must list every component version included in that release.
 - Every pushed fix, no matter how small, requires a full release/publish cycle. Do not push a fix without releasing it.
