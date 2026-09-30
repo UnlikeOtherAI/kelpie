@@ -277,7 +277,7 @@ Kelpie enforces explicit, on-device pairing before any `/v1/*` automation method
 
 - First contact: the CLI issues `POST /v1/pair` with a self-reported client id + name. The device shows a modal asking the user to allow the client — three responses: `Yes once` (in-memory), `Always allow` (persistent), `No` (suppresses re-prompts from that source for 10 minutes).
 - Token lifecycle: 32-byte CSPRNG bearer returned exactly once on the originating client's status poll. Only SHA-256 hashes are persisted on disk; comparison is constant-time. Theft of the device store does not yield usable tokens.
-- CLI side: persistent-scope tokens are stored at `~/.kelpie/tokens.json` (mode 0600), keyed by `<deviceId>:<host>:<port>` so mDNS spoofing at a new socket address forces a re-pair. Session-scope tokens live in process memory only.
+- CLI side: persistent-scope tokens are stored at `~/.kelpie/tokens.json` (mode 0600), keyed by `<deviceId>:<host>:<port>` so mDNS spoofing at a new socket address forces a re-pair. Direct-address and discovered-ID aliases reuse a token only at the identical socket, with ambiguous token values refused and distinct native IDs kept separate. The persistent store is reread on each access so running MCP processes observe external approvals and revocation; after a rejection the client removes only aliases carrying that rejected token and retries any fresh saved token before requesting approval. Session-scope tokens live in process memory only and use the same alias rules.
 - TLS is still future work — bearer tokens travel plaintext on the LAN. Use Kelpie only on trusted networks until TLS lands.
 
 Operator-facing knobs:

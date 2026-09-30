@@ -54,9 +54,10 @@ async function tokenFor(device: DiscoveredDevice): Promise<string | undefined> {
  * Drop tokens for `<deviceId,host,port>` from both caches. Used when the
  * server rejects them — keep the next call free of known-bad credentials.
  */
-async function clearTokensFor(device: DiscoveredDevice): Promise<void> {
-  getSessionCache().remove(device.id, device.ip, device.port);
-  await getTokenStore().remove(device.id, device.ip, device.port);
+async function clearTokensFor(device: DiscoveredDevice, rejected: string | undefined): Promise<void> {
+  if (!rejected) return;
+  getSessionCache().remove(device.id, device.ip, device.port, rejected);
+  await getTokenStore().remove(device.id, device.ip, device.port, rejected);
 }
 
 interface RawFetchResult<T> {
@@ -124,9 +125,6 @@ async function rawFetch<T>(
  * Returns `true` if a fresh token was obtained.
  */
 async function attemptAutoPair(device: DiscoveredDevice): Promise<boolean> {
-  // Drop the stale token (if any) before pairing.
-  await clearTokensFor(device);
-
   const store = getTokenStore();
   const clientId = await store.clientId();
   const clientName = defaultClientName();
@@ -170,6 +168,14 @@ export async function sendCommand<T = unknown>(
 
   if (first.status !== 401 || device.localReadinessFile) return first;
   if (options.autoPair === false) return first;
+
+  await clearTokensFor(device, token);
+  const refreshed = await tokenFor(device);
+  if (refreshed && refreshed !== token) {
+    const retry = await rawFetch<T>(url, body, refreshed, timeout);
+    if (retry.status !== 401) return retry;
+    await clearTokensFor(device, refreshed);
+  }
 
   const paired = await attemptAutoPair(device);
   if (!paired) return first;

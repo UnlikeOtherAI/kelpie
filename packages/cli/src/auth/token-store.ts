@@ -38,6 +38,26 @@ export function fingerprintFor(deviceId: string, host: string, port: number): st
   return `${deviceId}:${host}:${port}`;
 }
 
+/** A direct address and its discovered ID name the same pinned socket. */
+function resolveToken(tokens: Record<string, string>, deviceId: string,
+  host: string, port: number): string | undefined {
+  const exact = tokens[fingerprintFor(deviceId, host, port)];
+  if (exact) return exact;
+  const directId = `direct:${host}:${port}`;
+  if (deviceId !== directId) return tokens[fingerprintFor(directId, host, port)];
+  const suffix = `:${host}:${port}`;
+  const values = new Set(Object.entries(tokens)
+    .filter(([key]) => key.endsWith(suffix)).map(([, value]) => value));
+  return values.size === 1 ? values.values().next().value : undefined;
+}
+
+function removeTokenAliases(tokens: Record<string, string>, host: string,
+  port: number, rejected: string | undefined): Record<string, string> {
+  const suffix = `:${host}:${port}`;
+  return Object.fromEntries(Object.entries(tokens)
+    .filter(([key, value]) => !(key.endsWith(suffix) && value === rejected)));
+}
+
 export function defaultStoreDir(): string {
   return join(homedir(), ".kelpie");
 }
@@ -165,10 +185,11 @@ export class TokenStore {
   }
 
   async clientId(): Promise<string> {
-    const data = await this.load();
+    let data = await this.load();
     // Persist a freshly-generated clientId so subsequent CLI invocations
     // present the same identity to paired devices.
     if (!this.persistedClientId) {
+      data = await this.load();
       await this.flush(data);
       this.persistedClientId = true;
     }
@@ -177,7 +198,7 @@ export class TokenStore {
 
   async get(deviceId: string, host: string, port: number): Promise<string | undefined> {
     const data = await this.load();
-    return data.tokens[fingerprintFor(deviceId, host, port)];
+    return resolveToken(data.tokens, deviceId, host, port);
   }
 
   async set(deviceId: string, host: string, port: number, token: string): Promise<void> {
@@ -186,15 +207,11 @@ export class TokenStore {
     await this.flush(data);
   }
 
-  async remove(deviceId: string, host: string, port: number): Promise<void> {
+  async remove(deviceId: string, host: string, port: number, rejected?: string): Promise<void> {
     const data = await this.load();
-    const key = fingerprintFor(deviceId, host, port);
-    if (!(key in data.tokens)) return;
-    const next: Record<string, string> = {};
-    for (const [k, v] of Object.entries(data.tokens)) {
-      if (k !== key) next[k] = v;
-    }
-    data.tokens = next;
+    const token = rejected ?? resolveToken(data.tokens, deviceId, host, port);
+    if (!token) return;
+    data.tokens = removeTokenAliases(data.tokens, host, port, token);
     await this.flush(data);
   }
 
@@ -209,13 +226,16 @@ export class TokenStore {
   }
 
   private async load(): Promise<TokenStoreFile> {
-    if (this.cache) return this.cache;
     await ensureDir(this.dir);
     const fileExistedOnDisk = existsSync(this.file);
-    this.cache = await readStoreFile(this.file);
+    // MCP processes must observe approvals and revocations from other CLIs.
+    // Keep a generated identity stable only while no file exists yet.
+    if (fileExistedOnDisk || !this.cache || this.persistedClientId) {
+      this.cache = await readStoreFile(this.file);
+    }
     // If we read a real file, the clientId in it is already persisted; no
     // need for clientId() to re-flush.
-    if (fileExistedOnDisk) this.persistedClientId = true;
+    this.persistedClientId = fileExistedOnDisk;
     return this.cache;
   }
 
@@ -234,15 +254,18 @@ export class SessionTokenCache {
   private readonly tokens = new Map<string, string>();
 
   get(deviceId: string, host: string, port: number): string | undefined {
-    return this.tokens.get(fingerprintFor(deviceId, host, port));
+    return resolveToken(Object.fromEntries(this.tokens), deviceId, host, port);
   }
 
   set(deviceId: string, host: string, port: number, token: string): void {
     this.tokens.set(fingerprintFor(deviceId, host, port), token);
   }
 
-  remove(deviceId: string, host: string, port: number): void {
-    this.tokens.delete(fingerprintFor(deviceId, host, port));
+  remove(deviceId: string, host: string, port: number, rejected?: string): void {
+    const token = rejected ?? this.get(deviceId, host, port);
+    const next = removeTokenAliases(Object.fromEntries(this.tokens), host, port, token);
+    this.tokens.clear();
+    for (const [key, value] of Object.entries(next)) this.tokens.set(key, value);
   }
 }
 
