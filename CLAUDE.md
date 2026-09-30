@@ -6,6 +6,8 @@
 
 Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
 
+npm package metadata and provenance follow AGENTS.md → Versioning.
+
 ## Claude-Specific Notes
 
 - Keep instructions modular and prefer progressive disclosure.
