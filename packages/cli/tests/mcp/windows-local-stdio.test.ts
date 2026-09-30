@@ -73,7 +73,7 @@ describe("Windows local alias MCP stdio", () => {
     let childErrors = "";
     transport.stderr?.on("data", (chunk: Buffer) => { childErrors += chunk.toString(); });
     try { await client.connect(transport); }
-    catch (error) { throw new Error(`${String(error)}\n${childErrors}`); }
+    catch (error) { throw new Error(`${String(error)}\n${childErrors}`, { cause: error }); }
     const tools = await client.listTools();
     expect(capabilityAuthorized).toBe(true);
     expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["kelpie_navigate", "kelpie_screenshot", "kelpie_get_capabilities"]));
