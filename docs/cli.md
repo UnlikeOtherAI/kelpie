@@ -124,7 +124,7 @@ its own `address` and `port`: each one picks its own, so neither may be assumed.
         "name": "Ondrej's Mac mini",
         "model": "Kelpie macos",
         "platform": "macos",
-        "version": "0.1.13",
+        "version": "0.1.14",
         "address": "127.0.0.1",
         "port": 8420,
         "display": { "width": 0, "height": 0 },

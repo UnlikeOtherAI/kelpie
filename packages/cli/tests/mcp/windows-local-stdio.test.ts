@@ -64,13 +64,16 @@ describe("Windows local alias MCP stdio", () => {
     const port = await listen(server);
     const root = await mkdtemp(join(tmpdir(), "kelpie-mcp-alias-")); roots.push(root);
     const profile = join(root, "profile"); await mkdir(profile);
-    await writeFile(join(profile, "readiness.json"), JSON.stringify({ version: 1, launchId: "launch-1", deviceId: "device-1", port, token, controlMode: "loopback", mcp: { http: true, stdio: false, endpoint: "/mcp" } }));
+    await writeFile(join(profile, "readiness.json"), JSON.stringify({ version: 1, launchId: "launch-1", deviceId: "device-1", port, token, controlMode: "loopback", mcp: { http: true, stdio: false, endpoint: "/mcp" } }), { mode: 0o600 });
     await writeFile(join(root, "browsers.json"), JSON.stringify({ aliases: { win: { platform: "windows", profileDir: profile } }, running: { win: { port, lastLaunchedAt: new Date().toISOString(), launchId: "launch-1", readinessFile: join(profile, "readiness.json"), deviceId: "device-1" } } }));
 
     const transport = new StdioClientTransport({ command: process.execPath, args: ["--import", "tsx", resolve("src/index.ts"), "--browser", "win", "mcp"], cwd: process.cwd(), env: { ...process.env, KELPIE_HOME: root }, stderr: "pipe" });
     transports.push(transport);
     const client = new Client({ name: "nessie-local-test", version: "test" });
-    await client.connect(transport);
+    let childErrors = "";
+    transport.stderr?.on("data", (chunk: Buffer) => { childErrors += chunk.toString(); });
+    try { await client.connect(transport); }
+    catch (error) { throw new Error(`${String(error)}\n${childErrors}`, { cause: error }); }
     const tools = await client.listTools();
     expect(capabilityAuthorized).toBe(true);
     expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["kelpie_navigate", "kelpie_screenshot", "kelpie_get_capabilities"]));

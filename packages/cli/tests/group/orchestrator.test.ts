@@ -104,10 +104,10 @@ describe("executeSmartQuery", () => {
   });
 
   it("partitions into found/notFound", async () => {
-    let callIndex = 0;
-    globalThis.fetch = vi.fn(async () => {
-      callIndex++;
-      if (callIndex === 3) {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      // Token refresh performs disk IO, so concurrent requests need not
+      // reach fetch in input order. Bind the response to its actual device.
+      if (new URL(url as string).hostname === devices[2]?.ip) {
         return new Response(JSON.stringify({ found: false }), {
           status: 200,
           headers: { "Content-Type": "application/json" },

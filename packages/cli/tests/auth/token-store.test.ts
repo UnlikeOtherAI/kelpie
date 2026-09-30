@@ -87,6 +87,28 @@ describe("TokenStore", () => {
     expect(await fresh.get("d1", "h", 1)).toBe("tok-1");
   });
 
+  it("observes external approvals, revocation and removal without restarting MCP", async () => {
+    await store.clientId();
+    const other = new TokenStore(dir);
+    await other.set("d1", "h", 1, "approved");
+    expect(await store.get("d1", "h", 1)).toBe("approved");
+    await other.remove("d1", "h", 1);
+    expect(await store.get("d1", "h", 1)).toBeUndefined();
+    await other.set("d1", "h", 1, "approved-again");
+    expect(await store.get("d1", "h", 1)).toBe("approved-again");
+    unlinkSync(join(dir, "tokens.json"));
+    expect(await store.get("d1", "h", 1)).toBeUndefined();
+  });
+
+  it("preserves another CLI's tokens when a previously loaded store writes", async () => {
+    await store.clientId();
+    await new TokenStore(dir).set("d1", "h", 1, "first");
+    await store.set("d2", "h", 2, "second");
+    const fresh = new TokenStore(dir);
+    expect(await fresh.get("d1", "h", 1)).toBe("first");
+    expect(await fresh.get("d2", "h", 2)).toBe("second");
+  });
+
   it("generates a stable clientId per directory", async () => {
     const id1 = await store.clientId();
     const id2 = await store.clientId();
