@@ -2,6 +2,7 @@ import { browserTools, cliTools } from "../mcp/tools.js";
 import { commandMetadata, type CommandHelp, type HelpField } from "./command-metadata.js";
 import type { BrowserToolDef, CliToolDef } from "../mcp/tools.js";
 import { errorDescriptions } from "./error-descriptions.js";
+import { cliToEndpointCommandAliases, endpointToCliCommandAliases } from "./command-aliases.js";
 
 interface ShapeInfo {
   type: string;
@@ -132,87 +133,6 @@ const authenticationGuidance: CommandHelpOutput = {
   params: [],
   related: ["set-cookie", "get-cookies", "delete-cookies", "set-storage", "safari-auth"],
   response: defaultResponse,
-};
-
-const endpointToCliCommandAliases: Record<string, string> = {
-  "get-current-url": "url",
-  "get-dom": "dom",
-  "query-selector": "query",
-  "get-element-text": "text",
-  "get-accessibility-tree": "a11y",
-  "screenshot-annotated": "annotate",
-  "click-annotation": "click-index",
-  "fill-annotation": "fill-index",
-  "get-visible-elements": "visible",
-  "get-page-text": "page-text",
-  "get-form-state": "form-state",
-  "get-console-messages": "console",
-  "get-js-errors": "errors",
-  "get-network-log": "network",
-  "get-resource-timeline": "timeline",
-  "get-websockets": "websockets",
-  "get-websocket-messages": "ws-messages",
-  "wait-for-element": "wait",
-  "wait-for-navigation": "wait-nav",
-  "get-device-info": "info",
-  "get-viewport": "viewport",
-  "get-shadow-roots": "shadow-roots",
-  "query-shadow-dom": "shadow-query",
-  "set-home": "home set",
-  "get-home": "home get",
-  "get-debug-overlay": "debug-overlay get",
-  "set-debug-overlay": "debug-overlay set",
-  "get-dialog": "dialog check",
-  "handle-dialog": "dialog accept",
-  "set-dialog-auto-handler": "dialog auto",
-  "get-tabs": "tabs",
-  "new-tab": "tab new",
-  "get-partitions": "partitions",
-  "delete-partition": "partition delete",
-  "switch-tab": "tab switch",
-  "close-tab": "tab close",
-  "get-iframes": "iframes",
-  "switch-to-iframe": "iframe enter",
-  "switch-to-main": "iframe exit",
-  "get-iframe-context": "iframe context",
-  "get-cookies": "cookies",
-  "set-cookie": "cookies set",
-  "delete-cookies": "cookies delete",
-  "get-storage": "storage",
-  "set-storage": "storage set",
-  "clear-storage": "storage clear",
-  "get-clipboard": "clipboard",
-  "set-clipboard": "clipboard set",
-  "set-geolocation": "geo set",
-  "clear-geolocation": "geo clear",
-  "show-keyboard": "keyboard show",
-  "hide-keyboard": "keyboard hide",
-  "get-keyboard-state": "keyboard state",
-  "resize-viewport": "keyboard resize",
-  "reset-viewport": "keyboard resize-reset",
-  "is-element-obscured": "keyboard obscured",
-  "set-orientation": "orientation set",
-  "get-orientation": "orientation get",
-  "set-fullscreen": "fullscreen set",
-  "get-fullscreen": "fullscreen get",
-  "set-renderer": "renderer set",
-  "get-renderer": "renderer get",
-  "get-viewport-presets": "viewport-preset list",
-  "set-viewport-preset": "viewport-preset set",
-  "show-commentary": "commentary show",
-  "hide-commentary": "commentary hide",
-  highlight: "highlight show",
-  "hide-highlight": "highlight hide",
-  "play-script": "script run",
-  "abort-script": "script abort",
-  "get-script-status": "script status",
-};
-
-const cliToEndpointCommandAliases: Record<string, string> = {
-  ...Object.fromEntries(
-    Object.entries(endpointToCliCommandAliases).map(([endpoint, cli]) => [cli, endpoint]),
-  ),
-  "dialog dismiss": "handle-dialog",
 };
 
 interface ZodDef {
@@ -438,7 +358,9 @@ function describeErrors(codes?: string[]): ErrorInfo[] | undefined {
 
 function toolToHelp(tool: BrowserToolDef | CliToolDef, displayCommand?: string): CommandHelpOutput {
   const command = mcpToCommand(tool.name);
+  // A CLI phrase sharing a tool (`ai endpoint edit` → ai-endpoint-save) keeps its own metadata.
   const meta =
+    (displayCommand === undefined ? undefined : commandMetadata[displayCommand]) ??
     commandMetadata[command] ??
     commandMetadata[endpointToCliCommandAliases[command] ?? ""];
 

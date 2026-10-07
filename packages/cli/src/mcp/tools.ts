@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidPartition } from "@unlikeotherai/kelpie-shared";
+import { aiAskTool, aiEndpointTools, aiLoadTool } from "./ai-endpoint-tools.js";
 
 const platforms = ["ios", "android", "macos", "linux", "windows"] as const;
 type ToolPlatform = (typeof platforms)[number];
@@ -84,6 +85,8 @@ export interface BrowserToolDef {
   description: string;
   method: string;
   platforms?: readonly ToolPlatform[];
+  /** Device request timeout; defaults to 10 s. Long-running AI calls set their own. */
+  timeoutMs?: number;
   schema: Record<string, z.ZodType>;
   bodyFromArgs: (args: Record<string, unknown>) => Record<string, unknown>;
 }
@@ -313,12 +316,13 @@ export const browserTools: BrowserToolDef[] = [
 
   // AI / Local Inference
   { name: "kelpie_ai_status", description: "Get the local inference engine status — whether a model is loaded, which model, its capabilities, and memory usage", method: "ai-status", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_ai_load", description: "Load a model on a device for local inference. Pass a model ID or an ollama: prefixed ID. Only one model at a time — auto-unloads the current model.", method: "ai-load", schema: { device, model: z.string().describe("Model ID (e.g. 'gemma-4-e2b-q4') or Ollama model (e.g. 'ollama:llava:7b')") }, bodyFromArgs: passthrough },
+  aiLoadTool,
   { name: "kelpie_ai_unload", description: "Unload the current model from a device, freeing memory", method: "ai-unload", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_ai_ask", description: "Ask the locally-loaded model a question about the current page. Use 'context' to auto-gather page data or provide 'text' directly. Runs entirely on-device.", method: "ai-infer", schema: { device, prompt: z.string().optional().describe("Question or instruction"), audio: z.string().optional().describe("Base64 WAV audio (16kHz mono, max 30s)"), context: z.enum(["page_text", "screenshot", "dom", "accessibility"]).optional().describe("Auto-gather page context"), text: z.string().optional().describe("Raw text input"), maxTokens: z.number().optional().describe("Max tokens (default 512)"), temperature: z.number().optional().describe("Temperature (default 0.7)") }, bodyFromArgs: passthrough },
+  aiAskTool,
   { name: "kelpie_ai_record", description: "Control audio recording on the device for voice input to the AI model", method: "ai-record", schema: { device, action: z.enum(["start", "stop", "status"]).optional().describe("Recording action (default: start)") }, bodyFromArgs: passthrough },
   { name: "kelpie_ai_catalog", description: "List the approved on-device model catalog with download URLs and per-model metadata (size, RAM requirements, capabilities). Requires a HuggingFace token configured on the device.", method: "ai-catalog", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_ai_fitness", description: "Evaluate whether a catalog model fits a device's resources. Returns a fitness level (recommended, possible, not_recommended, no_storage) and an explanatory message. Pass the available RAM and free disk in GB to score against.", method: "ai-fitness", schema: { device, model: z.string().describe("Model ID from the catalog (e.g. 'gemma-4-e2b-q4')"), ramGB: z.number().optional().describe("Total device RAM in GB to score against"), diskGB: z.number().optional().describe("Free disk space in GB to score against") }, bodyFromArgs: passthrough },
+  ...aiEndpointTools,
 ];
 
 // --- CLI tool definitions (25 tools) ---
