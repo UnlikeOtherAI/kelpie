@@ -1,8 +1,17 @@
 import AVFoundation
 import Foundation
 
+/// AI inference + audio-recording HTTP request handler.
+///
+/// The OpenAI-compatible backend (endpoint management, `backend: "openai"`
+/// load/status/infer and tab pinning) lives in `AIHandler+OpenAI.swift`.
 struct AIHandler {
     let context: HandlerContext
+    /// Kelpie's own router; the OpenAI-compatible agent dispatches tools through it.
+    var router: Router?
+
+    let openAIService = OpenAIEndpointService.shared
+    var openAI: OpenAIInference { OpenAIInference(service: openAIService) }
 
     private let platformEngine = PlatformAIEngine()
     private static let ollamaPrefix = "ollama:"
@@ -28,6 +37,7 @@ struct AIHandler {
         router.register("ai-record") { body in await record(body) }
         router.register("ai-catalog") { _ in await catalog() }
         router.register("ai-fitness") { body in await fitness(body) }
+        OpenAIEndpointHandler(service: openAIService, host: Self.openAIHost).register(on: router)
     }
 
     private static let authRequiredResponse = errorResponse(
@@ -65,7 +75,11 @@ struct AIHandler {
     }
 
     private func status() async -> [String: Any] {
-        await MainActor.run {
+        if await MainActor.run(body: { AIState.shared.backend }) == "openai",
+           let openAIStatus = await openAI.status() {
+            return openAIStatus
+        }
+        return await MainActor.run {
             let state = AIState.shared
             var response = successResponse([
                 "loaded": state.isLoaded,
@@ -86,6 +100,10 @@ struct AIHandler {
         let start = CFAbsoluteTimeGetCurrent()
         let model = (body["model"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        if (body["backend"] as? String) == "openai" {
+            return await loadOpenAI(body)
+        }
+
         if let model, model.hasPrefix(Self.ollamaPrefix) {
             let ollamaModel = String(model.dropFirst(Self.ollamaPrefix.count))
             guard !ollamaModel.isEmpty else {
@@ -99,6 +117,7 @@ struct AIHandler {
 
             do {
                 try await validateOllamaModel(model: ollamaModel, endpoint: endpoint)
+                await openAIService.clearActive()
                 await MainActor.run {
                     AIState.shared.activateOllama(model: ollamaModel, endpoint: endpoint)
                 }
@@ -129,6 +148,7 @@ struct AIHandler {
             )
         }
 
+        await openAIService.clearActive()
         let payload = await MainActor.run { () -> [String: Any] in
             let state = AIState.shared
             state.activatePlatform()
@@ -143,7 +163,8 @@ struct AIHandler {
     }
 
     private func unload() async -> [String: Any] {
-        await MainActor.run {
+        await openAIService.clearActive()
+        return await MainActor.run {
             AIState.shared.activatePlatform()
             return successResponse()
         }
@@ -156,6 +177,8 @@ struct AIHandler {
         }
 
         switch stateSnapshot.backend {
+        case "openai":
+            return await inferWithOpenAI(body)
         case "ollama":
             guard let model = stateSnapshot.model, !model.isEmpty else {
                 return errorResponse(code: "NO_MODEL_LOADED", message: "Load a model first with ai-load")

@@ -37,7 +37,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Kelpie uses the local network to receive browser automation commands from the CLI.</string>
+	<string>Kelpie uses the local network to receive browser automation commands from the CLI and to reach AI inference servers you add in Settings.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_kelpie._tcp</string>

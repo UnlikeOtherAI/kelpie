@@ -64,9 +64,18 @@ final class AIState: ObservableObject {
         }
     }
 
+    /// Capabilities of the selected OpenAI-compatible endpoint model, mirrored
+    /// from `OpenAIEndpointService` (the authority for that selection).
+    @Published private(set) var openAICapabilities: [String] = []
+
+    /// Bumped on every explicit backend change so an in-flight endpoint
+    /// sync cannot overwrite a newer choice with a stale read.
+    private var selectionGeneration = 0
+    private var cancellables = Set<AnyCancellable>()
+
     var isLoaded: Bool {
         switch backend {
-        case "ollama":
+        case "ollama", "openai":
             return activeModel != nil
         case "platform":
             return isAvailable
@@ -79,6 +88,8 @@ final class AIState: ObservableObject {
         switch backend {
         case "ollama":
             return activeModel == nil ? [] : ["text"]
+        case "openai":
+            return activeModel == nil ? [] : openAICapabilities
         case "platform":
             return isAvailable ? ["text"] : []
         default:
@@ -94,9 +105,13 @@ final class AIState: ObservableObject {
         let storedModel = defaults.string(forKey: DefaultsKey.activeModel)
         let storedBackend = defaults.string(forKey: DefaultsKey.backend) ?? "platform"
 
+        let openAISelection = Self.persistedOpenAISelection()
         if storedBackend == "ollama", let storedModel, !storedModel.isEmpty {
             backend = "ollama"
             activeModel = storedModel
+        } else if storedBackend == "openai", let openAISelection {
+            backend = "openai"
+            activeModel = openAISelection.model
         } else {
             backend = "platform"
             activeModel = nil
@@ -107,17 +122,67 @@ final class AIState: ObservableObject {
         if defaults.string(forKey: DefaultsKey.ollamaEndpoint) == nil {
             defaults.set(Self.defaultOllamaEndpoint, forKey: DefaultsKey.ollamaEndpoint)
         }
+
+        if backend != "openai", openAISelection != nil {
+            // Another backend was chosen last; an endpoint selection left
+            // behind must not keep polling or answer `ai-status`.
+            Task { await OpenAIEndpointService.shared.clearActive() }
+        }
+        NotificationCenter.default.publisher(for: .openAIEndpointsDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.syncOpenAISelection() }
+            .store(in: &cancellables)
+        syncOpenAISelection()
     }
 
     func activatePlatform() {
+        selectionGeneration += 1
         backend = "platform"
         activeModel = nil
+        openAICapabilities = []
     }
 
     func activateOllama(model: String, endpoint: String) {
+        selectionGeneration += 1
         backend = "ollama"
         activeModel = model
         ollamaEndpoint = endpoint
+        openAICapabilities = []
+    }
+
+    /// Called after `OpenAIEndpointService.select` succeeded.
+    func activateOpenAI(model: String, capabilities: [String]) {
+        selectionGeneration += 1
+        backend = "openai"
+        activeModel = model
+        openAICapabilities = capabilities
+    }
+
+    /// Mirrors the endpoint service while openai is the backend: model and
+    /// capability changes are copied, and a cleared selection (endpoint
+    /// removed, address changed, unloaded over the API) shows platform again.
+    /// That is display state only — inference never falls back on its own.
+    func syncOpenAISelection() {
+        guard backend == "openai" else { return }
+        let generation = selectionGeneration
+        Task { @MainActor [weak self] in
+            let active = await OpenAIEndpointService.shared.activeEndpoint()
+            guard let self, generation == self.selectionGeneration, self.backend == "openai" else { return }
+            if let active {
+                self.activeModel = active.model
+                self.openAICapabilities = active.config.capabilities.legacyList
+            } else {
+                self.activatePlatform()
+            }
+        }
+    }
+
+    /// The persisted endpoint selection, if it still names a saved endpoint.
+    private static func persistedOpenAISelection() -> OpenAIActiveSelection? {
+        let persistence = OpenAIEndpointPersistence(defaults: .standard)
+        guard let active = persistence.loadActive(),
+              persistence.loadEndpoints().contains(where: { $0.id == active.endpointId }) else { return nil }
+        return active
     }
 
     /// Migrates any plaintext HF token previously stored in `UserDefaults`
