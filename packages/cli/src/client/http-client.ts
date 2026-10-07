@@ -42,26 +42,6 @@ function urlFor(device: DiscoveredDevice, method: string): string {
   return `http://${host}:${device.port}${API_VERSION_PREFIX}${kebabMethod}`;
 }
 
-/**
- * A multi-homed device advertises several addresses for one id. Route to the
- * advertised address its approval is pinned to, so "Always allow" is reused
- * instead of re-prompting whenever mDNS answers on another interface. Tokens
- * are still only sent to the exact socket they were issued for.
- */
-export async function routeToPinnedAddress(device: DiscoveredDevice): Promise<void> {
-  const hosts = device.addresses;
-  if (!hosts || hosts.length < 2) return;
-  const pinned = getSessionCache().pinnedHost(device.id, hosts, device.port) ??
-    await getTokenStore().pinnedHost(device.id, hosts, device.port);
-  if (pinned) device.ip = pinned;
-}
-
-/** Route to the pinned address first, then return the token sendCommand would send. */
-export async function routedTokenFor(device: DiscoveredDevice): Promise<string | undefined> {
-  if (!device.localControlToken) await routeToPinnedAddress(device);
-  return tokenFor(device);
-}
-
 /** Pull whichever token (session or persistent) we have for this device. */
 async function tokenFor(device: DiscoveredDevice): Promise<string | undefined> {
   if (device.localControlToken) return device.localControlToken;
@@ -168,6 +148,47 @@ async function attemptAutoPair(device: DiscoveredDevice): Promise<boolean> {
   return true;
 }
 
+/** Discovered address first, then every other socket this device id approved. */
+async function approvedHosts(device: DiscoveredDevice): Promise<string[]> {
+  const pinned = [
+    ...getSessionCache().pinnedHosts(device.id, device.port),
+    ...await getTokenStore().pinnedHosts(device.id, device.port),
+  ];
+  return [...new Set([device.ip, ...pinned])];
+}
+
+/**
+ * A device reachable on several interfaces (Ethernet + Wi-Fi, a DHCP move)
+ * is discovered at whichever address mDNS answers first, and "Always allow"
+ * tokens are pinned to the exact socket that approved them. Before prompting
+ * again, try every approval this device id still holds — each token only at
+ * its own pinned socket, so mDNS spoofing still cannot redirect a token —
+ * and drop the ones the device rejects. On success the device is re-routed
+ * to the working socket.
+ */
+async function retryWithStoredApprovals<T>(
+  device: DiscoveredDevice,
+  method: string,
+  body: Record<string, unknown> | undefined,
+  timeout: number,
+): Promise<RawFetchResult<T> | undefined> {
+  const tried = new Set<string>();
+  for (const host of await approvedHosts(device)) {
+    const candidate = { ...device, ip: host };
+    for (let token = await tokenFor(candidate); token && !tried.has(token); token = await tokenFor(candidate)) {
+      tried.add(token);
+      const retry = await rawFetch<T>(urlFor(candidate, method), body, token, timeout);
+      if (retry.status !== 401) {
+        if (retry.status === 0 || retry.status === 408) break;
+        device.ip = host;
+        return retry;
+      }
+      await clearTokensFor(candidate, token);
+    }
+  }
+  return undefined;
+}
+
 export async function sendCommand<T = unknown>(
   device: DiscoveredDevice,
   method: string,
@@ -182,26 +203,15 @@ export async function sendCommand<T = unknown>(
     }
     device.localControlToken = readiness.token;
   }
-  const token = await routedTokenFor(device);
-  const url = urlFor(device, method);
-  const first = await rawFetch<T>(url, body, token, timeout);
+  const token = await tokenFor(device);
+  const first = await rawFetch<T>(urlFor(device, method), body, token, timeout);
 
   if (first.status !== 401 || device.localReadinessFile) return first;
   if (options.autoPair === false) return first;
 
-  // Drop the rejected token and try any other approval still on file — one
-  // pinned to another advertised address, or one a concurrent CLI just stored.
-  const tried = new Set([token]);
-  let rejected = token;
-  for (;;) {
-    await clearTokensFor(device, rejected);
-    const next = await routedTokenFor(device);
-    if (!next || tried.has(next)) break;
-    tried.add(next);
-    const retry = await rawFetch<T>(urlFor(device, method), body, next, timeout);
-    if (retry.status !== 401) return retry;
-    rejected = next;
-  }
+  await clearTokensFor(device, token);
+  const reused = await retryWithStoredApprovals<T>(device, method, body, timeout);
+  if (reused) return reused;
 
   const paired = await attemptAutoPair(device);
   if (!paired) return first;

@@ -1,7 +1,6 @@
 package com.kelpie.browser.network
 
 import android.content.Context
-import android.util.Base64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -9,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 import java.util.UUID
 import kotlin.experimental.xor
 
@@ -111,7 +111,7 @@ class PairingStore(
 
         fun newClientId(): String = UUID.randomUUID().toString()
 
-        private fun base64UrlEncode(bytes: ByteArray): String = Base64.encodeToString(bytes, Base64.NO_PADDING or Base64.NO_WRAP or Base64.URL_SAFE)
+        private fun base64UrlEncode(bytes: ByteArray): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
     private val lock = Any()

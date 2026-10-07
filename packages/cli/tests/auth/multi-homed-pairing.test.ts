@@ -1,103 +1,91 @@
-import { it, expect, vi } from "vitest";
+import { it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TokenStore, setTokenStoreForTesting } from "../../src/auth/token-store.js";
 import { sendCommand } from "../../src/client/http-client.js";
-import { orderAddresses } from "../../src/discovery/scanner.js";
 import type { DiscoveredDevice } from "../../src/types.js";
 
-// A Mac on Ethernet + Wi-Fi in one subnet answers mDNS on both interfaces.
-function multiHomed(ip: string): DiscoveredDevice {
+// A Mac on Ethernet (.229) and Wi-Fi (.77) in one subnet: mDNS answers with
+// either address, while each "Always allow" token is pinned to one socket.
+function discoveredAt(ip: string): DiscoveredDevice {
   return {
-    id: "native", name: "Mac", ip, addresses: ["192.168.1.229", "192.168.1.77"], port: 8420,
+    id: "native", name: "Mac", ip, port: 8420,
     platform: "macos", model: "Mac", width: 0, height: 0, version: "test", lastSeen: Date.now(),
   };
 }
 
+let dir: string;
+let store: TokenStore;
+let calls: string[];
+const originalFetch = globalThis.fetch;
+
+/** Device accepts only `valid`; pairing requests are denied so a prompt is observable. */
+function mockDevice(valid: string): void {
+  globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const authorization = (init?.headers as Record<string, string> | undefined)?.Authorization ?? "";
+    calls.push(`${String(url)} ${authorization}`.trim());
+    if (String(url).endsWith("/v1/pair")) {
+      return new Response(JSON.stringify({ error: { code: "DENIED", message: "denied" } }), { status: 403 });
+    }
+    const ok = authorization === `Bearer ${valid}`;
+    return new Response(JSON.stringify({ success: ok }), { status: ok ? 200 : 401 });
+  }) as typeof fetch;
+}
+
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
+  store = new TokenStore(dir);
+  setTokenStoreForTesting(store);
+  calls = [];
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+});
+
+afterEach(async () => {
+  globalThis.fetch = originalFetch;
+  setTokenStoreForTesting(null);
+  vi.restoreAllMocks();
+  await rm(dir, { recursive: true, force: true });
+});
+
 it("reuses an Always approval when mDNS resolves the device on another interface", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
-  const originalFetch = globalThis.fetch;
-  try {
-    const store = new TokenStore(dir);
-    await store.set("native", "192.168.1.229", 8420, "always");
-    setTokenStoreForTesting(store);
-    const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const authorization = (init?.headers as Record<string, string>).Authorization ?? "";
-      calls.push(`${String(url)} ${authorization}`);
-      const ok = authorization === "Bearer always";
-      return new Response(JSON.stringify({ success: ok }), { status: ok ? 200 : 401 });
-    }) as typeof fetch;
+  await store.set("native", "192.168.1.229", 8420, "always");
+  mockDevice("always");
 
-    // Discovery picked the other interface; no pair request may be sent.
-    expect((await sendCommand(multiHomed("192.168.1.77"), "getTabs")).ok).toBe(true);
-    expect(calls).toEqual(["http://192.168.1.229:8420/v1/get-tabs Bearer always"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-    setTokenStoreForTesting(null);
-    await rm(dir, { recursive: true, force: true });
-  }
+  const device = discoveredAt("192.168.1.77");
+  expect((await sendCommand(device, "getTabs")).ok).toBe(true);
+  expect(calls).toEqual([
+    "http://192.168.1.77:8420/v1/get-tabs",
+    "http://192.168.1.229:8420/v1/get-tabs Bearer always",
+  ]);
+  // The device is re-routed, so later calls go straight to the approved socket.
+  calls.length = 0;
+  expect((await sendCommand(device, "getTabs")).ok).toBe(true);
+  expect(calls).toEqual(["http://192.168.1.229:8420/v1/get-tabs Bearer always"]);
 });
 
-it("falls back to the approval on the other interface when the first was replaced", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
-  const originalFetch = globalThis.fetch;
-  try {
-    const store = new TokenStore(dir);
-    // Re-approving at .77 replaced the device's record, revoking the .229 token.
-    await store.set("native", "192.168.1.229", 8420, "revoked");
-    await store.set("native", "192.168.1.77", 8420, "current");
-    setTokenStoreForTesting(store);
-    const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const authorization = (init?.headers as Record<string, string>).Authorization ?? "";
-      calls.push(`${String(url)} ${authorization}`);
-      const ok = authorization === "Bearer current";
-      return new Response(JSON.stringify({ success: ok }), { status: ok ? 200 : 401 });
-    }) as typeof fetch;
+it("skips an approval the device replaced and keeps the current one", async () => {
+  // Re-approving at .77 replaced the device's record, revoking the .229 token.
+  await store.set("native", "192.168.1.229", 8420, "revoked");
+  await store.set("native", "192.168.1.77", 8420, "current");
+  mockDevice("current");
 
-    expect((await sendCommand(multiHomed("192.168.1.229"), "getTabs")).ok).toBe(true);
-    expect(calls).toEqual([
-      "http://192.168.1.229:8420/v1/get-tabs Bearer revoked",
-      "http://192.168.1.77:8420/v1/get-tabs Bearer current",
-    ]);
-    // The next run goes straight to the surviving approval.
-    calls.length = 0;
-    expect((await sendCommand(multiHomed("192.168.1.229"), "getTabs")).ok).toBe(true);
-    expect(calls).toEqual(["http://192.168.1.77:8420/v1/get-tabs Bearer current"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-    setTokenStoreForTesting(null);
-    await rm(dir, { recursive: true, force: true });
-  }
+  expect((await sendCommand(discoveredAt("192.168.1.229"), "getTabs")).ok).toBe(true);
+  expect(calls).toEqual([
+    "http://192.168.1.229:8420/v1/get-tabs Bearer revoked",
+    "http://192.168.1.77:8420/v1/get-tabs Bearer current",
+  ]);
+  expect(await store.get("native", "192.168.1.229", 8420)).toBeUndefined();
+  expect(await store.get("native", "192.168.1.77", 8420)).toBe("current");
 });
 
-it("never sends a pinned token to an address that was not advertised", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
-  const originalFetch = globalThis.fetch;
-  try {
-    const store = new TokenStore(dir);
-    await store.set("native", "192.168.1.50", 8420, "always");
-    setTokenStoreForTesting(store);
-    const authorizations: string[] = [];
-    globalThis.fetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      authorizations.push((init?.headers as Record<string, string>).Authorization ?? "");
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
-    }) as typeof fetch;
+it("never sends another device's token or a token to a socket that did not approve it", async () => {
+  await store.set("other-device", "192.168.1.229", 8420, "foreign");
+  mockDevice("foreign");
 
-    await sendCommand(multiHomed("192.168.1.77"), "getTabs");
-    expect(authorizations).toEqual([""]);
-  } finally {
-    globalThis.fetch = originalFetch;
-    setTokenStoreForTesting(null);
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-it("orders advertised addresses deterministically", () => {
-  const expected = ["192.168.1.229", "192.168.1.77", "2001:db8::1", "fe80::1"];
-  expect(orderAddresses(["fe80::1", "192.168.1.77", "2001:db8::1", "192.168.1.229", "192.168.1.77"]))
-    .toEqual(expected);
-  expect(orderAddresses(["192.168.1.77", "fe80::1", "192.168.1.229", "2001:db8::1"])).toEqual(expected);
+  expect((await sendCommand(discoveredAt("192.168.1.77"), "getTabs")).ok).toBe(false);
+  expect(calls).toEqual([
+    "http://192.168.1.77:8420/v1/get-tabs",
+    "http://192.168.1.77:8420/v1/pair",
+  ]);
 });

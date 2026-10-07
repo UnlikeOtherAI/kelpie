@@ -51,6 +51,14 @@ function resolveToken(tokens: Record<string, string>, deviceId: string,
   return values.size === 1 ? values.values().next().value : undefined;
 }
 
+function pinnedHostsIn(tokens: Record<string, string>, deviceId: string, port: number): string[] {
+  const prefix = `${deviceId}:`, suffix = `:${port}`;
+  return Object.keys(tokens)
+    .filter((key) => key.startsWith(prefix) && key.endsWith(suffix))
+    .map((key) => key.slice(prefix.length, -suffix.length))
+    .filter((host) => host.length > 0);
+}
+
 function removeTokenAliases(tokens: Record<string, string>, host: string,
   port: number, rejected: string | undefined): Record<string, string> {
   const suffix = `:${host}:${port}`;
@@ -201,10 +209,9 @@ export class TokenStore {
     return resolveToken(data.tokens, deviceId, host, port);
   }
 
-  /** First advertised host whose socket already holds this device's token. */
-  async pinnedHost(deviceId: string, hosts: string[], port: number): Promise<string | undefined> {
-    const data = await this.load();
-    return hosts.find((host) => resolveToken(data.tokens, deviceId, host, port));
+  /** Hosts at which this device id already holds an approval on `port`. */
+  async pinnedHosts(deviceId: string, port: number): Promise<string[]> {
+    return pinnedHostsIn((await this.load()).tokens, deviceId, port);
   }
 
   async set(deviceId: string, host: string, port: number, token: string): Promise<void> {
@@ -263,8 +270,8 @@ export class SessionTokenCache {
     return resolveToken(Object.fromEntries(this.tokens), deviceId, host, port);
   }
 
-  pinnedHost(deviceId: string, hosts: string[], port: number): string | undefined {
-    return hosts.find((host) => this.get(deviceId, host, port));
+  pinnedHosts(deviceId: string, port: number): string[] {
+    return pinnedHostsIn(Object.fromEntries(this.tokens), deviceId, port);
   }
 
   set(deviceId: string, host: string, port: number, token: string): void {

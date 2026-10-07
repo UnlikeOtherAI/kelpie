@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Command } from "commander";
 import { scanForDevices } from "../discovery/scanner.js";
 import { probeLocalDevices } from "../discovery/local-probe.js";
-import { routedTokenFor } from "../client/http-client.js";
+import { getSessionCache, getTokenStore } from "../auth/token-store.js";
 import { listWireCatalog } from "../mcp/catalog.js";
 import {
   buildDescribeDocument,
@@ -31,7 +31,11 @@ import type { DiscoveredDevice } from "../types.js";
 
 /** Pairing truth, looked up exactly as sendCommand would for this device. */
 async function defaultIsPaired(device: DiscoveredDevice): Promise<boolean> {
-  return (await routedTokenFor(device)) !== undefined;
+  if (getSessionCache().get(device.id, device.ip, device.port)) return true;
+  if ((await getTokenStore().get(device.id, device.ip, device.port)) !== undefined) return true;
+  // An approval pinned to another of this device's sockets is reused too.
+  return getSessionCache().pinnedHosts(device.id, device.port).length > 0 ||
+    (await getTokenStore().pinnedHosts(device.id, device.port)).length > 0;
 }
 
 function answeringBinaryPath(): string {

@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { routeToPinnedAddress, sendCommand } from "../client/http-client.js";
+import { sendCommand } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
 import { scanForDevices } from "../discovery/scanner.js";
 import { filterDevices } from "../group/filter.js";
@@ -358,7 +358,6 @@ async function handlePair(
   if (!device) {
     return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
   }
-  await routeToPinnedAddress(device);
   const store = getTokenStore();
   const clientId = await store.clientId();
   const clientName = typeof params.clientName === "string" ? params.clientName : defaultClientName();
