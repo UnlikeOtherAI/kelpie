@@ -95,31 +95,28 @@ final class PairingStore: @unchecked Sendable {
 
     private func load() {
         guard let storeURL, FileManager.default.fileExists(atPath: storeURL.path) else { return }
-        guard let data = try? Data(contentsOf: storeURL) else { return }
-        guard let envelope = try? JSONDecoder().decode(StoredEnvelope.self, from: data) else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        persistent = envelope.pairings
+        do {
+            let envelope = try JSONDecoder().decode(StoredEnvelope.self, from: Data(contentsOf: storeURL))
+            lock.lock()
+            defer { lock.unlock() }
+            persistent = envelope.pairings
+        } catch {
+            print("[PairingStore] Failed to load persistent pairings: \(error)")
+        }
     }
 
     private func persistLocked() {
         guard let storeURL else { return }
         let envelope = StoredEnvelope(version: 1, pairings: persistent)
-        guard let data = try? JSONEncoder().encode(envelope) else { return }
-        // Atomic write: temp + fsync + rename.
-        let tmpURL = storeURL.appendingPathExtension("tmp")
         do {
-            try data.write(to: tmpURL, options: [.atomic])
-            // Apply file protection so the file is unreadable while the device is locked.
-            try? FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.complete, .posixPermissions: 0o600],
-                ofItemAtPath: tmpURL.path
+            // `.atomic` writes a temp file and renames it over the target.
+            // Readable after first unlock so a launch while locked never
+            // misses — and then overwrites — existing "Always allow" records.
+            try JSONEncoder().encode(envelope).write(
+                to: storeURL,
+                options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
             )
-            if FileManager.default.fileExists(atPath: storeURL.path) {
-                _ = try? FileManager.default.replaceItemAt(storeURL, withItemAt: tmpURL)
-            } else {
-                try FileManager.default.moveItem(at: tmpURL, to: storeURL)
-            }
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: storeURL.path)
         } catch {
             print("[PairingStore] Failed to persist: \(error)")
         }

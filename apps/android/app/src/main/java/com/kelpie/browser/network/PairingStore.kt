@@ -5,6 +5,8 @@ import android.util.Base64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
@@ -137,7 +139,7 @@ class PairingStore(
                 val text = file.readText()
                 val envelope = json.decodeFromString(StoredEnvelope.serializer(), text)
                 persistent = envelope.pairings.toMutableList()
-            }
+            }.onFailure { android.util.Log.w("PairingStore", "load failed: ${it.message}") }
         }
     }
 
@@ -153,11 +155,9 @@ class PairingStore(
             tmp.setReadable(true, true)
             tmp.setWritable(false, false)
             tmp.setWritable(true, true)
-            if (!tmp.renameTo(file)) {
-                // renameTo can fail on some filesystems if target exists; delete + retry.
-                file.delete()
-                tmp.renameTo(file)
-            }
+            // Atomic replace: never delete the existing approvals before the
+            // new file is in place.
+            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } catch (t: Throwable) {
             android.util.Log.w("PairingStore", "persist failed: ${t.message}")
         }

@@ -312,8 +312,9 @@ class HTTPServer(
             headers[key] = values.toMutableList()
             if (key == "transfer-encoding") hasTransferEncoding = true
         }
-        // Best-effort source address: Ktor exposes the local peer via request.origin.
-        val sourceAddress = call.request.origin.remoteHost
+        // Literal peer IP. `remoteHost` reverse-resolves, so the pair POST and
+        // its status poll could see different strings and lose the token.
+        val sourceAddress = call.request.origin.remoteAddress
         return ParsedRequest(
             method = call.request.httpMethod.value,
             path = decodedPath,
