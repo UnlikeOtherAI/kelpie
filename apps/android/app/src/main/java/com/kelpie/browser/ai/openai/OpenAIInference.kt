@@ -114,6 +114,10 @@ class OpenAIInference(
             run(request, dispatcher, contextProvider)
         } catch (e: OpenAIException) {
             errorResponse(e.code, e.message, e.diagnostics)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorResponse(OpenAIErrorCode.ENDPOINT_ERROR, e.message ?: e.javaClass.simpleName)
         }
 
     private suspend fun run(

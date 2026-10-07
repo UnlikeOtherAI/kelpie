@@ -32,6 +32,7 @@ import com.kelpie.browser.ai.openai.HealthState
 import com.kelpie.browser.ai.openai.OpenAIEndpoint
 import com.kelpie.browser.ai.openai.OpenAIException
 import com.kelpie.browser.ai.openai.OpenAIRuntime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -212,6 +213,10 @@ private fun CoroutineScope.runAction(
                 withContext(Dispatchers.IO) { block() }
             } catch (e: OpenAIException) {
                 "$label failed: ${e.message}"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                "$label failed: ${e.message ?: e.javaClass.simpleName}"
             }
         onBusy(null)
         onMessage(text)

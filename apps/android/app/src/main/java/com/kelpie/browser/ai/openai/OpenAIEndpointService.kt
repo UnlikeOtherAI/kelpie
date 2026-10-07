@@ -125,6 +125,9 @@ class OpenAIEndpointService(
                 } else {
                     ProbeOutcome.Failed(e.code, e.message, e.httpStatus, clock() - started)
                 }
+            } catch (e: Exception) {
+                // Never let an unexpected failure escape into the health-polling coroutine.
+                ProbeOutcome.Failed(OpenAIErrorCode.ENDPOINT_ERROR, e.message ?: e.javaClass.simpleName, null, clock() - started)
             }
         recordProbe(endpoint.id, outcome, selectedModel)
         return outcome
