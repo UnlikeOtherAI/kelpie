@@ -18,6 +18,8 @@ final class UOASessionTests: XCTestCase {
         var tokenReplies: [Result<String, Error>] = []
         var meStatuses: [Int] = []
         var tokenDelay: Duration = .zero
+        /// When set, `/oauth/register` issues this client id; otherwise registration is unavailable.
+        var registeredClientID: String?
         private(set) var calls: [Call] = []
 
         func calls(to path: String) -> [Call] { calls.filter { $0.path == path } }
@@ -35,6 +37,8 @@ final class UOASessionTests: XCTestCase {
                 return reply(#"{"sub":"user-1","email":"person@example.com","name":"Person"}"#)
             case "/oauth/me/settings/browser/bookmarks": return reply(#"{"value":[]}"#)
             case "/oauth/revoke": return reply("{}")
+            case "/oauth/register" where registeredClientID != nil:
+                return reply(#"{"client_id":"\#(registeredClientID ?? "")"}"#)
             default: throw UOATransport.Failure(status: 503)
             }
         }
@@ -51,9 +55,31 @@ final class UOASessionTests: XCTestCase {
         return .success(#"{"access_token":"\#(access)","token_type":"Bearer","expires_in":\#(expiresIn)\#(refreshField)}"#)
     }
 
-    private func makeAccount(_ server: FakeUOA, storage: MemoryStorage) throws -> UOAAccount {
+    /// Stands in for the login window: records what it was asked to open and lets the test end it.
+    @MainActor
+    private final class FakeLogin: UOALoginSurface {
+        private(set) var url: URL?
+        private(set) var closed = false
+        private var finish: ((UOALoginResult) -> Void)?
+
+        func present(_ url: URL, finish: @escaping (UOALoginResult) -> Void) -> UOALoginSurface? {
+            self.url = url
+            self.finish = finish
+            return self
+        }
+
+        func end(_ result: UOALoginResult) { finish?(result) }
+        func close() { closed = true }
+
+        var state: String? {
+            url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems }?.first { $0.name == "state" }?.value
+        }
+    }
+
+    private func makeAccount(_ server: FakeUOA, storage: MemoryStorage, login: FakeLogin? = nil) throws -> UOAAccount {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
-        return UOAAccount(transport: server.request, storage: storage, bookmarks: BookmarkStore(defaults: defaults))
+        let presenter: UOALoginPresenter? = login.map { fake in { fake.present($0, finish: $1) } }
+        return UOAAccount(transport: server.request, storage: storage, bookmarks: BookmarkStore(defaults: defaults), presentLogin: presenter)
     }
 
     private func waitUntil(_ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) async {
@@ -181,5 +207,73 @@ final class UOASessionTests: XCTestCase {
         XCTAssertNil(storage.session)
         XCTAssertNil(account.profile)
         XCTAssertFalse(account.signingIn)
+    }
+
+    func testInteractiveLoginExchangesTheInterceptedCallbackForASession() async throws {
+        let server = FakeUOA()
+        server.registeredClientID = "client-9"
+        server.tokenReplies = [grant("access-1", refresh: "refresh-9")]
+        let storage = MemoryStorage()
+        let login = FakeLogin()
+        let account = try makeAccount(server, storage: storage, login: login)
+        account.signIn()
+        await waitUntil { login.url != nil }
+        XCTAssertEqual(login.url?.host, URL(string: UOATransport.origin)?.host)
+        let state = try XCTUnwrap(login.state)
+        login.end(.callback(try XCTUnwrap(URL(string: UOAAuthorization.callback + "?code=code-1&state=" + state))))
+        await waitUntil { account.profile != nil }
+        let exchange = try XCTUnwrap(server.calls(to: "/oauth/token").first)
+        XCTAssertEqual(exchange.body["grant_type"] as? String, "authorization_code")
+        XCTAssertEqual(exchange.body["code"] as? String, "code-1")
+        XCTAssertEqual(exchange.body["client_id"] as? String, "client-9")
+        XCTAssertEqual(exchange.body["redirect_uri"] as? String, UOAAuthorization.callback)
+        XCTAssertNotNil(exchange.body["code_verifier"] as? String)
+        XCTAssertEqual(storage.session, UOAStoredSession(clientID: "client-9", refreshToken: "refresh-9"))
+        XCTAssertFalse(account.signingIn)
+    }
+
+    func testCallbackWithAForeignStateIsRejected() async throws {
+        let server = FakeUOA()
+        server.registeredClientID = "client-9"
+        let login = FakeLogin()
+        let account = try makeAccount(server, storage: MemoryStorage(), login: login)
+        account.signIn()
+        await waitUntil { login.url != nil }
+        login.end(.callback(try XCTUnwrap(URL(string: UOAAuthorization.callback + "?code=code-1&state=forged"))))
+        await waitUntil { !account.signingIn }
+        XCTAssertNil(account.profile)
+        XCTAssertNotNil(account.error)
+        XCTAssertTrue(server.calls(to: "/oauth/token").isEmpty)
+    }
+
+    func testCancellingTheLoginLeavesTheAccountSignedOutWithoutAnError() async throws {
+        let server = FakeUOA()
+        server.registeredClientID = "client-9"
+        let login = FakeLogin()
+        let account = try makeAccount(server, storage: MemoryStorage(), login: login)
+        account.signIn()
+        await waitUntil { login.url != nil }
+        login.end(.cancelled)
+        XCTAssertFalse(account.signingIn)
+        XCTAssertNil(account.profile)
+        XCTAssertNil(account.error)
+        XCTAssertTrue(server.calls(to: "/oauth/token").isEmpty)
+    }
+
+    func testSignOutClosesAnOpenLoginAndIgnoresItsLateCallback() async throws {
+        let server = FakeUOA()
+        server.registeredClientID = "client-9"
+        let login = FakeLogin()
+        let account = try makeAccount(server, storage: MemoryStorage(), login: login)
+        account.signIn()
+        await waitUntil { login.url != nil }
+        let state = try XCTUnwrap(login.state)
+        account.cancelSignIn()
+        XCTAssertTrue(login.closed)
+        login.end(.callback(try XCTUnwrap(URL(string: UOAAuthorization.callback + "?code=code-1&state=" + state))))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertNil(account.profile)
+        XCTAssertFalse(account.signingIn)
+        XCTAssertTrue(server.calls(to: "/oauth/token").isEmpty)
     }
 }

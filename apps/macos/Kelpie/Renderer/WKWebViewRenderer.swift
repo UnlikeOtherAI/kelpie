@@ -77,6 +77,9 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     /// it via `HandlerContext.dialogState(windowId:tabId:)`.
     let dialogState = DialogState()
 
+    /// Safari's user agent, so Google OAuth and similar services accept the page. Shared with the UOA login view.
+    nonisolated static let safariUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+
     var onStateChange: (() -> Void)?
     var onScriptMessage: ((_ name: String, _ body: [String: Any]) -> Void)?
 
@@ -108,7 +111,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
-        webView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        webView.customUserAgent = Self.safariUserAgent
 
         setupObservations()
     }

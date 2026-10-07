@@ -31,6 +31,7 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/Account/UOAAccount.swift"),
         .glob("../macos/Kelpie/Account/UOASession.swift"),
         .glob("../macos/Kelpie/Account/UOAPresentation.swift"),
+        .glob("../macos/Kelpie/Account/UOALoginWebView.swift"),
         .glob("../macos/Kelpie/Account/UOAAuthorization.swift"),
         .glob("../macos/Kelpie/Account/UOATransport.swift"),
         .glob("../macos/Kelpie/Account/AccountBookmarks.swift"),
