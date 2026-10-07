@@ -419,13 +419,12 @@ On macOS, Windows and Linux, the selected tab carries the sampled page colour co
 
 On macOS, Windows and Linux, pressing the circular account control between History
 and More while signed out starts **Login/register** immediately, with no intermediary
-menu. It opens authentication.unlikeotherai.com in the default browser (the system
-authentication session on Mac), using a public OAuth client and S256 PKCE. Windows
-and Linux fall back to a separate, ephemeral Kelpie login window if the default
-HTTPS handler is absent, fails, or is Kelpie itself. This window loads the hosted
-page and is excluded from automation, tab lists, history and session persistence;
-it closes when login finishes or is cancelled. Social providers may restrict
-embedded browsers; the system browser is preferred. Repeated clicks during login
+menu. It opens authentication.unlikeotherai.com in a Kelpie login window, using a
+public OAuth client and S256 PKCE; see [Shared sign-in profile](#shared-sign-in-profile).
+Windows and Linux fall back to the default browser only when the login window cannot
+open (headless mode or a build without Chromium). The window shows the page's real
+origin, is excluded from automation, tab lists, history and session persistence,
+and closes when login finishes or is cancelled. Repeated clicks during login
 offer cancellation. Password and authenticator verification stay on UOA's hosted
 screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
 with Sign out and Refresh favourites actions. The sign-in survives restarts and
@@ -465,11 +464,10 @@ during collapse. Script recording hides all browser chrome.
 
 Android and iOS expose Login/register directly from the bottom toolbar's account
 button. Authentication is hosted by UOA and uses public OAuth with random state
-and S256 PKCE. Android opens the default browser; when unavailable it uses a
-separate login Activity/process and WebView profile with no automation bridge and
-WebView inspection disabled. Android userdebug/eng system images can override
-that inspection setting; verify isolation on a production system image.
-iOS uses ASWebAuthenticationSession. Cancellation returns to a signed-out state;
+and S256 PKCE. Both open the hosted page in a Kelpie login screen with no
+automation bridge; see [Shared sign-in profile](#shared-sign-in-profile). Android
+falls back to the default browser only when no WebView is available.
+Cancellation returns to a signed-out state;
 a completed sign-in persists as described in [Staying signed in](#staying-signed-in).
 Apple and Android register a fresh public client for each login so revoked cached
 registrations cannot strand the app. Signing keys and branded configuration stay
@@ -483,6 +481,19 @@ screen and the account menu. Other clients' opaque fields are preserved. Apple
 and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
 Paired browser automation operates on the currently displayed favourites store,
 including the account store while signed in.
+
+### Shared sign-in profile
+
+On every platform the UOA login screen uses the same cookie and website-data store as
+the browser's default (unpartitioned) tabs, with the tabs' user agent. Signing in to
+UOA with Google therefore also signs every default tab in to Google, so a site's
+"Sign in with Google" offers the existing account instead of asking again; an existing
+Google session in the tabs likewise makes the UOA login a single choice. Partitioned
+tabs stay isolated. On macOS with the Chromium engine active, cookies are copied
+between the engine and the login screen around the sign-in. Signing out of UOA does
+not sign the tabs out of Google; use the provider's own sign-out or clear cookies.
+These cookies sit in the same store that paired automation can read with the cookie
+API, as if the user had signed in to Google in a tab.
 
 ### Registered app sign-in
 
