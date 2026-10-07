@@ -176,7 +176,7 @@ The user picks one of three responses on the device prompt:
 | Always allow | Yes | `~/.kelpie/tokens.json` (mode 0600) |
 | No | n/a | suppresses re-prompts from the source for 10 min |
 
-Persistent tokens are keyed by `<deviceId>:<host>:<port>` (the *device fingerprint*). If the same `deviceId` appears at a new socket address, the CLI refuses the stored token and forces a re-pair, defending against mDNS spoofing. A device that mDNS advertises on several interfaces (for example a Mac on both Ethernet and Wi-Fi) is routed to whichever advertised address already holds its approval, so one "Always allow" covers every discovery run; the token is still only sent to the exact socket it was issued for.
+Persistent tokens are keyed by `<deviceId>:<host>:<port>` (the *device fingerprint*). If the same `deviceId` appears at a new socket address, the CLI refuses the stored token and forces a re-pair, defending against mDNS spoofing. A device reachable on several interfaces (for example a Mac on both Ethernet and Wi-Fi) may be discovered at either address; before prompting again the CLI retries every approval that device id already holds, each only at the socket that issued it, and switches to the one the device accepts. Rejected tokens are dropped.
 
 ### `kelpie browser`
 Manage local macOS Kelpie app aliases stored in `~/.kelpie/browsers.json`.
