@@ -3,7 +3,8 @@ import Foundation
 import Security
 
 struct UOAAuthorization {
-    static let callback = "com.unlikeotherai.kelpie://oauth/callback"
+    static let callbackScheme = "com.unlikeotherai.kelpie"
+    static let callback = callbackScheme + "://oauth/callback"
     static let scopes = "openid profile settings.read settings.write"
     let state: String
     let verifier: String
@@ -39,7 +40,7 @@ struct UOAAuthorization {
 
     func code(from url: URL) throws -> String {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme == "com.unlikeotherai.kelpie", components.host == "oauth",
+              components.scheme == Self.callbackScheme, components.host == "oauth",
               components.path == "/callback", components.user == nil, components.password == nil,
               components.port == nil, components.fragment == nil else { throw UOATransport.Failure(status: 401) }
         let items = components.queryItems ?? []

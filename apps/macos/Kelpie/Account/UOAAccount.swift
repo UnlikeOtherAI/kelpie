@@ -1,11 +1,10 @@
 import Foundation
 import Combine
-import AuthenticationServices
 
 /// UOA is the identity authority. Profile, avatar and access tokens live only in memory; the only
 /// persisted material is UOA's rotating refresh token and the client id it is bound to.
 @MainActor
-final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
+final class UOAAccount: ObservableObject {
     static let shared = UOAAccount()
     typealias Transport = (_ path: String, _ method: String, _ token: String?, _ body: Data?, _ version: String?) async throws -> UOATransport.Response
 
@@ -25,7 +24,8 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     private let transport: Transport
     private let storage: UOASessionStorage
     private let bookmarks: BookmarkStore
-    private var session: ASWebAuthenticationSession?
+    private let presentLogin: UOALoginPresenter
+    private var loginSurface: UOALoginSurface?
     private var expiryTask: Task<Void, Never>?
     private var refreshTask: Task<String, Error>?
     private var generation = UUID()
@@ -33,12 +33,17 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     private var accessToken: String?
     private var expiresAt = Date.distantPast
 
-    init(transport: Transport? = nil, storage: UOASessionStorage = UOASecretSessionStorage(), bookmarks: BookmarkStore? = nil) {
+    init(
+        transport: Transport? = nil,
+        storage: UOASessionStorage = UOASecretSessionStorage(),
+        bookmarks: BookmarkStore? = nil,
+        presentLogin: UOALoginPresenter? = nil
+    ) {
         let client = UOATransport()
         self.transport = transport ?? { try await client.request($0, method: $1, token: $2, body: $3, version: $4) }
         self.storage = storage
         self.bookmarks = bookmarks ?? .shared
-        super.init()
+        self.presentLogin = presentLogin ?? { UOAPresentation.presentLogin($0, finish: $1) }
     }
 
     /// Restores the persisted session at launch. Never opens the browser.
@@ -214,8 +219,8 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
     /// Returns to the signed-out state. Storage survives only a restore that failed in transit.
     private func reset(clearStorage: Bool) {
         generation = UUID()
-        session?.cancel()
-        session = nil
+        loginSurface?.close()
+        loginSurface = nil
         expiryTask?.cancel()
         expiryTask = nil
         refreshTask?.cancel()
@@ -247,28 +252,36 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
             let authorization = try UOAAuthorization()
             let url = try authorization.url(clientID: clientID)
             guard generation == attempt else { return }
-            let authSession = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.unlikeotherai.kelpie") { [weak self] callback, failure in
-                Task { @MainActor in
-                    guard let self, self.generation == attempt else { return }
-                    self.session = nil
-                    if let callback {
-                        await self.complete(callback, authorization: authorization, clientID: clientID, attempt: attempt)
-                    } else {
-                        self.signingIn = false
-                        if (failure as? ASWebAuthenticationSessionError)?.code != .canceledLogin {
-                            self.error = "Sign-in could not be opened. Please try again."
-                        }
-                    }
-                }
+            var ended = false
+            let surface = presentLogin(url) { [weak self] result in
+                ended = true
+                guard let self, self.generation == attempt else { return }
+                self.loginSurface = nil
+                self.finishLogin(result, authorization: authorization, clientID: clientID, attempt: attempt)
             }
-            authSession.presentationContextProvider = self
-            authSession.prefersEphemeralWebBrowserSession = false
-            session = authSession
-            if !authSession.start() { throw UOATransport.Failure(status: 0) }
+            guard !ended else { return }
+            guard let surface else {
+                finishLogin(.failed, authorization: authorization, clientID: clientID, attempt: attempt)
+                return
+            }
+            loginSurface = surface
         } catch {
             guard generation == attempt else { return }
             signingIn = false
             self.error = error.localizedDescription
+        }
+    }
+
+    /// The login surface has closed itself; cancelling leaves the account signed out without an error.
+    private func finishLogin(_ result: UOALoginResult, authorization: UOAAuthorization, clientID: String, attempt: UUID) {
+        switch result {
+        case .callback(let callback):
+            Task { await complete(callback, authorization: authorization, clientID: clientID, attempt: attempt) }
+        case .cancelled:
+            signingIn = false
+        case .failed:
+            signingIn = false
+            error = "Sign-in could not be opened. Please try again."
         }
     }
 
@@ -299,9 +312,5 @@ final class UOAAccount: NSObject, ObservableObject, ASWebAuthenticationPresentat
             signOut()
             self.error = error.localizedDescription
         }
-    }
-
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated { UOAPresentation.anchor }
     }
 }

@@ -13,6 +13,40 @@ final class UOAAccountTests: XCTestCase {
         XCTAssertThrowsError(try authorization.code(from: XCTUnwrap(URL(string: "https://oauth/callback?state=state&code=one"))))
     }
 
+    func testLoginViewInterceptsTheCallbackAndOnlyLoadsHTTPS() throws {
+        let callback = try XCTUnwrap(URL(string: UOAAuthorization.callback + "?state=state&code=one"))
+        XCTAssertEqual(UOALoginNavigation.decide(callback), .callback(callback))
+        let otherCallback = try XCTUnwrap(URL(string: "com.unlikeotherai.kelpie://elsewhere"))
+        XCTAssertEqual(UOALoginNavigation.decide(otherCallback), .callback(otherCallback), "Exact callback validation stays in UOAAuthorization")
+        for allowed in ["https://authentication.unlikeotherai.com/oauth/authorize", "https://accounts.google.com/o/oauth2/v2/auth", "about:blank"] {
+            XCTAssertEqual(UOALoginNavigation.decide(URL(string: allowed)), .allow, allowed)
+        }
+        for denied in ["http://authentication.unlikeotherai.com", "javascript:alert(1)", "data:text/html,hi", "file:///etc/hosts", "mailto:a@b.c", "intent://x"] {
+            XCTAssertEqual(UOALoginNavigation.decide(URL(string: denied)), .deny, denied)
+        }
+        XCTAssertEqual(UOALoginNavigation.decide(nil), .deny)
+    }
+
+    func testLoginTitleShowsTheRealOrigin() {
+        XCTAssertEqual(UOALoginNavigation.title(for: URL(string: "https://Accounts.Google.com/signin?x=1")), "Login/register — https://accounts.google.com")
+        XCTAssertEqual(UOALoginNavigation.origin(of: URL(string: "https://auth.example:8443/a")), "https://auth.example:8443")
+        XCTAssertEqual(UOALoginNavigation.origin(of: URL(string: "https://auth.example:443/a")), "https://auth.example")
+        XCTAssertEqual(UOALoginNavigation.title(for: URL(string: "about:blank")), "Login/register")
+    }
+
+    #if os(macOS)
+    func testOnlyCookiesTheLoginCreatedOrChangedAreHandedToChromium() throws {
+        func cookie(_ name: String, _ value: String, domain: String = ".google.com") throws -> HTTPCookie {
+            try XCTUnwrap(HTTPCookie(properties: [.name: name, .value: value, .domain: domain, .path: "/"]))
+        }
+        let before = [try cookie("SID", "old"), try cookie("NID", "same"), try cookie("site", "kept", domain: "example.com")]
+        let after = [try cookie("SID", "new"), try cookie("NID", "same"), try cookie("site", "kept", domain: "example.com"), try cookie("HSID", "added")]
+        let changed = UOALoginCookies.changes(from: before, to: after)
+        XCTAssertEqual(changed.map(\.name).sorted(), ["HSID", "SID"])
+        XCTAssertEqual(changed.first { $0.name == "SID" }?.value, "new")
+    }
+    #endif
+
     func testConflictRetriesIntentAgainstLatestListWithoutPersistingAccountData() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
         let store = BookmarkStore(defaults: defaults)
