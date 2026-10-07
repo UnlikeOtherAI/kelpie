@@ -4,6 +4,8 @@ export interface DiscoveredDevice {
   id: string;
   name: string;
   ip: string;
+  /** Every address mDNS advertised for this device id, in preference order. */
+  addresses?: string[];
   port: number;
   platform: Platform;
   runtimeMode?: RuntimeMode;

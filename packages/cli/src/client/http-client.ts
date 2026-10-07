@@ -42,6 +42,26 @@ function urlFor(device: DiscoveredDevice, method: string): string {
   return `http://${host}:${device.port}${API_VERSION_PREFIX}${kebabMethod}`;
 }
 
+/**
+ * A multi-homed device advertises several addresses for one id. Route to the
+ * advertised address its approval is pinned to, so "Always allow" is reused
+ * instead of re-prompting whenever mDNS answers on another interface. Tokens
+ * are still only sent to the exact socket they were issued for.
+ */
+export async function routeToPinnedAddress(device: DiscoveredDevice): Promise<void> {
+  const hosts = device.addresses;
+  if (!hosts || hosts.length < 2) return;
+  const pinned = getSessionCache().pinnedHost(device.id, hosts, device.port) ??
+    await getTokenStore().pinnedHost(device.id, hosts, device.port);
+  if (pinned) device.ip = pinned;
+}
+
+/** Route to the pinned address first, then return the token sendCommand would send. */
+export async function routedTokenFor(device: DiscoveredDevice): Promise<string | undefined> {
+  if (!device.localControlToken) await routeToPinnedAddress(device);
+  return tokenFor(device);
+}
+
 /** Pull whichever token (session or persistent) we have for this device. */
 async function tokenFor(device: DiscoveredDevice): Promise<string | undefined> {
   if (device.localControlToken) return device.localControlToken;
@@ -162,8 +182,8 @@ export async function sendCommand<T = unknown>(
     }
     device.localControlToken = readiness.token;
   }
+  const token = await routedTokenFor(device);
   const url = urlFor(device, method);
-  const token = await tokenFor(device);
   const first = await rawFetch<T>(url, body, token, timeout);
 
   if (first.status !== 401 || device.localReadinessFile) return first;

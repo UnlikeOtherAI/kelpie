@@ -201,6 +201,12 @@ export class TokenStore {
     return resolveToken(data.tokens, deviceId, host, port);
   }
 
+  /** First advertised host whose socket already holds this device's token. */
+  async pinnedHost(deviceId: string, hosts: string[], port: number): Promise<string | undefined> {
+    const data = await this.load();
+    return hosts.find((host) => resolveToken(data.tokens, deviceId, host, port));
+  }
+
   async set(deviceId: string, host: string, port: number, token: string): Promise<void> {
     const data = await this.load();
     data.tokens[fingerprintFor(deviceId, host, port)] = token;
@@ -255,6 +261,10 @@ export class SessionTokenCache {
 
   get(deviceId: string, host: string, port: number): string | undefined {
     return resolveToken(Object.fromEntries(this.tokens), deviceId, host, port);
+  }
+
+  pinnedHost(deviceId: string, hosts: string[], port: number): string | undefined {
+    return hosts.find((host) => this.get(deviceId, host, port));
   }
 
   set(deviceId: string, host: string, port: number, token: string): void {

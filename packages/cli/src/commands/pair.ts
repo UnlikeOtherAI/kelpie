@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { print } from "../output/formatter.js";
 import { requireDevice } from "./helpers.js";
 import { pair } from "../auth/pairing.js";
+import { routeToPinnedAddress } from "../client/http-client.js";
 import {
   defaultClientName,
   getSessionCache,
@@ -37,6 +38,7 @@ export function registerPair(program: Command): void {
       const globals = program.opts<GlobalOptions>();
       const device = await requireDevice(program);
       if (!device) return;
+      await routeToPinnedAddress(device);
 
       const store = getTokenStore();
       const clientId = await store.clientId();

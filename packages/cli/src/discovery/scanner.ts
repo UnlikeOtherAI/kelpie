@@ -47,17 +47,22 @@ export async function scanForDevices(
 ): Promise<DiscoveredDevice[]> {
   const bonjour = createBonjour();
   const devices: DiscoveredDevice[] = [];
-  const seen = new Set<string>();
 
   return new Promise((resolve) => {
     const browser = bonjour.find({ type: MDNS_SERVICE_TYPE.replace("_", "").replace("._tcp", "") });
 
     browser.on("up", (service) => {
       const device = parseService(service);
-      if (device && !seen.has(device.id)) {
-        seen.add(device.id);
-        devices.push(device);
+      if (!device) return;
+      // A multi-homed device answers once per interface. Keep one entry but
+      // remember every address so pinned pairings stay reachable.
+      const existing = devices.find((d) => d.id === device.id);
+      if (existing) {
+        existing.addresses = orderAddresses([...(existing.addresses ?? []), ...(device.addresses ?? [])]);
+        existing.ip = existing.addresses[0] ?? existing.ip;
+        return;
       }
+      devices.push(device);
     });
 
     setTimeout(() => {
@@ -77,27 +82,34 @@ function createBonjour(): BonjourClient {
   return new Bonjour();
 }
 
-/** Prefer IPv4, then global IPv6, then link-local IPv6 as last resort. */
-function pickAddress(addresses: string[], fallback?: string): string | undefined {
-  const all = fallback ? [...addresses, fallback] : addresses;
-  const ipv4 = all.find((a) => !a.includes(":"));
-  if (ipv4) return ipv4;
-  const globalV6 = all.find((a) => a.includes(":") && !a.startsWith("fe80"));
-  if (globalV6) return globalV6;
-  return all[0];
+function addressRank(address: string): number {
+  if (!address.includes(":")) return 0;
+  return address.toLowerCase().startsWith("fe80") ? 2 : 1;
+}
+
+/**
+ * Prefer IPv4, then global IPv6, then link-local IPv6 as last resort. Ties
+ * sort lexically so the same address set always yields the same first pick.
+ */
+export function orderAddresses(addresses: string[]): string[] {
+  return [...new Set(addresses.filter(Boolean))].sort((a, b) =>
+    addressRank(a) - addressRank(b) || a.localeCompare(b));
 }
 
 function parseService(service: BonjourServiceRecord): DiscoveredDevice | null {
   const txt = service.txt;
   if (!txt?.id) return null;
 
-  const ip = pickAddress(service.addresses ?? [], service.referer?.address);
+  const fallback = service.referer?.address;
+  const addresses = orderAddresses(fallback ? [...(service.addresses ?? []), fallback] : service.addresses ?? []);
+  const ip = addresses[0];
   if (!ip) return null;
 
   return {
     id: txt.id,
     name: txt.name ?? service.name,
     ip,
+    addresses,
     port: Number(txt.port) || service.port,
     platform: parsePlatform(txt.platform),
     runtimeMode: parseRuntimeMode(txt.runtime_mode),
