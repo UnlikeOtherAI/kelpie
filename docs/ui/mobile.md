@@ -122,6 +122,17 @@ Slides in from the right edge when the settings icon is tapped. Covers approxima
 - Port number (editable, requires restart)
 - Device name (editable)
 
+**OpenAI-compatible endpoints** (iOS)
+- Explanation, above the list, that `localhost`, `127.0.0.1` and `[::1]` mean the iPhone or iPad running Kelpie — not the person's computer — and that a server on a computer must be entered by its LAN or `.local` address and listen on the network
+- One row per saved endpoint: name, normalised base URL, selected model, an `In use` marker for the active endpoint, and a health badge (`ready` green; `busy`, `loading`, `no model`, `model missing` orange; `unreachable`, `auth failed` red; `unknown` grey — results older than 90 s read as `unknown`)
+- `Add Endpoint` and tapping a row open the endpoint sheet:
+  - **Endpoint**: Name, Base URL (the loopback explanation repeats under the field when the URL is a loopback address), optional API key `SecureField` that shows `Saved` when a key is stored, and `Clear Key` to remove it on the next save
+  - **Model**: Model ID text field plus a menu of the models discovered from the server (IDs shown exactly as listed)
+  - **Capabilities**: context window (tokens), Vision and Tool calling as `Unknown` / `Yes` / `No` overrides; the footer shows the values in effect and their source (`server`, `user`, `test`)
+  - **Actions** (saved endpoints only): health badge, `Refresh Models`, `Test` (discovery, a short generation and a tool-calling probe), `Use` (selects the endpoint and model as the active AI backend after a live check), `Remove` (with confirmation; also deletes the stored key and stops using the endpoint if it was active); the last result is shown under the actions
+- `Save` stores the configuration only and never connects; only Refresh Models, Test and Use contact the server
+- Accessibility identifiers use the `settings.ai.openai.*` prefix (`add`, `row.<name>`, `name`, `baseURL`, `apiKey`, `clearKey`, `model`, `modelPicker`, `contextWindow`, `vision`, `toolCalling`, `save`, `close`, `refreshModels`, `test`, `use`, `remove`, `status`, `health`, `loopbackNote`, `urlLoopbackNote`)
+
 **Help**
 - Show Welcome Screen
 - Open Kelpie Website
