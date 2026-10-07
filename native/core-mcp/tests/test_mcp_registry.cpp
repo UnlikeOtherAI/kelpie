@@ -78,8 +78,8 @@ void TestRegistryFiltering() {
   assert(!ContainsTool(android_tools, "kelpie_press_key"));
   assert(!ContainsTool(macos_tools, "kelpie_press_key"));
 
-  assert(ContainsTool(ios_tools, "kelpie_safari_auth"));
-  assert(!ContainsTool(android_tools, "kelpie_safari_auth"));
+  assert(!ContainsTool(ios_tools, "kelpie_safari_auth"));
+  assert(!ContainsTool(macos_tools, "kelpie_safari_auth"));
   assert(ContainsTool(macos_tools, "kelpie_set_orientation"));
   assert(!ContainsTool(macos_tools, "kelpie_show_keyboard"));
   assert(!ContainsTool(windows_tools, "kelpie_set_orientation"));
@@ -87,9 +87,7 @@ void TestRegistryFiltering() {
 
 void TestAvailabilityChecks() {
   const kelpie::McpRegistry registry;
-  assert(registry.is_tool_available("kelpie_safari_auth", kelpie::Platform::kIos, "webkit"));
-  assert(!registry.is_tool_available("kelpie_safari_auth", kelpie::Platform::kIos, "chromium"));
-  assert(!registry.is_tool_available("kelpie_safari_auth", kelpie::Platform::kAndroid, "webkit"));
+  assert(!registry.is_tool_available("kelpie_safari_auth", kelpie::Platform::kIos, "webkit"));
   assert(registry.is_tool_available("kelpie_set_renderer", kelpie::Platform::kWindows, "gecko"));
   assert(registry.is_tool_available("kelpie_set_orientation", kelpie::Platform::kMacos, "webkit"));
   assert(registry.is_tool_available("kelpie_show_keyboard", kelpie::Platform::kAndroid, "chromium"));
@@ -102,14 +100,12 @@ void TestCapabilitiesClassification() {
   const auto ios_webkit = registry.get_capabilities(kelpie::Platform::kIos, "webkit");
   assert(ContainsString(ios_webkit.supported, "navigate"));
   assert(ContainsString(ios_webkit.partial, "show-keyboard"));
-  assert(ContainsString(ios_webkit.partial, "safari-auth"));
   assert(ContainsString(ios_webkit.partial, "set-renderer"));
-  assert(!ContainsString(ios_webkit.unsupported, "safari-auth"));
+  assert(!ContainsString(ios_webkit.unsupported, "show-keyboard"));
 
   const auto macos_chromium = registry.get_capabilities(kelpie::Platform::kMacos, "chromium");
   assert(ContainsString(macos_chromium.supported, "navigate"));
   assert(ContainsString(macos_chromium.partial, "set-renderer"));
-  assert(ContainsString(macos_chromium.unsupported, "safari-auth"));
   assert(ContainsString(macos_chromium.unsupported, "show-keyboard"));
 }
 
@@ -124,10 +120,10 @@ void TestCApi() {
   assert(ios_tools.size() == kelpie::McpRegistry().tools_for_platform(kelpie::Platform::kIos).size());
   assert(ios_tools[0].contains("availability"));
 
-  assert(kelpie_mcp_registry_is_available(registry, "kelpie_safari_auth", KELPIE_PLATFORM_IOS,
+  assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_IOS,
                                             "webkit") == 1);
-  assert(kelpie_mcp_registry_is_available(registry, "kelpie_safari_auth", KELPIE_PLATFORM_IOS,
-                                            "chromium") == 0);
+  assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_MACOS,
+                                            "webkit") == 0);
 
   char* capabilities_json =
       kelpie_mcp_registry_get_capabilities(registry, KELPIE_PLATFORM_ANDROID, "chromium");
@@ -141,7 +137,7 @@ void TestCApi() {
   assert(std::find(capabilities["partial"].begin(), capabilities["partial"].end(), "show-keyboard") !=
          capabilities["partial"].end());
   assert(std::find(capabilities["unsupported"].begin(), capabilities["unsupported"].end(),
-                   "safari-auth") != capabilities["unsupported"].end());
+                   "safari-auth") == capabilities["unsupported"].end());
 
   kelpie_mcp_registry_destroy(registry);
 }

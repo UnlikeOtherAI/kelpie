@@ -32,12 +32,6 @@ describe("MCP tool platform metadata matches shared unsupported catalog", () => 
     });
   }
 
-  it("safari_auth lists ios, android, macos (Android implements it via Chrome Custom Tabs)", () => {
-    const safariAuth = browserTools.find((t) => t.name === "kelpie_safari_auth");
-    expect(safariAuth?.platforms).toBeDefined();
-    expect([...(safariAuth!.platforms ?? [])].sort()).toEqual(["android", "ios", "macos"]);
-  });
-
   it("geolocation and request-interception tools declare an empty platforms array (unsupported everywhere)", () => {
     const names = [
       "kelpie_set_geolocation",

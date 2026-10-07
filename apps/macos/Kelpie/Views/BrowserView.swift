@@ -104,13 +104,6 @@ struct BrowserView: View {
                                 await serverState.switchRenderer(to: engine)
                             }
                         },
-                        onSafariAuth: {
-                            if let url = serverState.handlerContext.currentURL {
-                                let helper = SafariAuthHelper()
-                                helper.handlerContext = serverState.handlerContext
-                                helper.authenticate(url: url)
-                            }
-                        },
                         onBookmarks: { showBookmarks = true },
                         onAddBookmark: addCurrentBookmark,
                         onNetworkInspector: { showNetworkInspector = true },

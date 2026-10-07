@@ -40,7 +40,6 @@ import { registerBrowser } from "./browser.js";
 import { registerAI } from "./ai.js";
 import { registerScript } from "./script.js";
 import { registerRenderer } from "./renderer.js";
-import { registerSafariAuth } from "./safari-auth.js";
 import { registerFullscreen } from "./fullscreen.js";
 import { registerToast } from "./toast.js";
 import { registerOrientation } from "./orientation.js";
@@ -71,7 +70,6 @@ export function registerAllCommands(program: Command): void {
   registerDeviceInfo(program);
   registerDebug(program);
   registerToast(program);
-  registerSafariAuth(program);
   registerEval(program);
 
   // DevTools

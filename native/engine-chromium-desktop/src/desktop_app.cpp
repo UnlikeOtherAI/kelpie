@@ -93,7 +93,6 @@ std::vector<std::string> UnsupportedMethods() {
       "get-intercepted-requests", "clear-request-interception",
       "show-keyboard",      "hide-keyboard",      "get-keyboard-state",
       "is-element-obscured","set-orientation",    "get-orientation",
-      "safari-auth",
   };
 }
 

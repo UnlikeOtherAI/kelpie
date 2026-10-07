@@ -15,7 +15,6 @@ internal fun BrowserMoreMenu(
     tabCount: Int,
     onShare: () -> Unit,
     onWelcome: () -> Unit,
-    onChromeAuth: () -> Unit,
     onSettings: () -> Unit,
     onBookmarks: () -> Unit,
     onHistory: () -> Unit,
@@ -43,7 +42,6 @@ internal fun BrowserMoreMenu(
     item("Share page", onShare)
     HorizontalDivider()
     item("History", onHistory)
-    item("Sign in with Chrome", onChromeAuth)
     item("AI", onAI)
     item("Network inspector", onNetworkInspector)
     if (show3DInspector) item("3D inspector", onSnapshot3D)

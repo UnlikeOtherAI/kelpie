@@ -35,7 +35,6 @@ extension BrowserView {
     @ViewBuilder
     var browserMoreMenu: some View {
         Button { showHistory = true } label: { Label("History", systemImage: "clock") }
-        Button(action: authenticateInSafari) { Label("Sign in with Safari", systemImage: "safari") }
         Button { showAI = true } label: { Label("AI", systemImage: "sparkles") }
         Button { showNetworkInspector = true } label: { Label("Network inspector", systemImage: "network") }
         if FeatureFlags.is3DInspectorEnabled {

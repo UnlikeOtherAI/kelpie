@@ -128,9 +128,9 @@ const authenticationGuidance: CommandHelpOutput = {
     "Do NOT try to set a session cookie with `eval`/`document.cookie`: JavaScript cannot create httpOnly cookies, and reading `document.cookie` returns an empty string for them, so it looks like the cookie is missing even when it is set. " +
     "Use `kelpie cookies` (kelpie_get_cookies) to read cookies including httpOnly ones, and `kelpie cookies delete --all` to reset auth state. " +
     "For non-httpOnly token schemes, `kelpie storage set <key> <value>` (kelpie_set_storage) writes localStorage/sessionStorage. " +
-    "Alternatively, complete an interactive login in the browser once (e.g. `kelpie safari-auth <url>` on macOS/iOS).",
+    "Alternatively, sign in once interactively in a browser tab; the session persists in the same store.",
   params: [],
-  related: ["set-cookie", "get-cookies", "delete-cookies", "set-storage", "safari-auth"],
+  related: ["set-cookie", "get-cookies", "delete-cookies", "set-storage"],
   response: defaultResponse,
 };
 

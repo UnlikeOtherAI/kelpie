@@ -130,9 +130,6 @@ final class ServerState: ObservableObject {
         router.handlerContext = ctx
         router.scriptPlaybackState = scriptPlaybackState
 
-        let safariAuth = SafariAuthHelper()
-        safariAuth.handlerContext = ctx
-        registerSafariAuthHandler(context: ctx, safariAuth: safariAuth)
         registerToastHandler()
         registerReportIssueHandler()
 
@@ -181,23 +178,6 @@ final class ServerState: ObservableObject {
                 await self?.switchRenderer(to: engine)
             }
         ).register(on: router)
-    }
-
-    @MainActor
-    private func registerSafariAuthHandler(context: HandlerContext, safariAuth: SafariAuthHelper) {
-        router.register("safari-auth") { body in
-            await MainActor.run {
-                guard let renderer = context.renderer else {
-                    return errorResponse(code: "NO_WEBVIEW", message: "No WebView")
-                }
-                let urlString = body["url"] as? String
-                guard let url = urlString.flatMap({ URL(string: $0) }) ?? renderer.currentURL else {
-                    return errorResponse(code: "NO_URL", message: "No URL to authenticate")
-                }
-                safariAuth.authenticate(url: url)
-                return successResponse(["started": true, "url": url.absoluteString])
-            }
-        }
     }
 
     @MainActor

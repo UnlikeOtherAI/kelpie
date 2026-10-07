@@ -30,7 +30,6 @@ struct BrowserView: View {
     @State var showTabOverview = false
     @StateObject var chromeAppearance = BrowserChromeAppearance()
     @State var chromeSampler = BrowserChromeSampler()
-    let safariAuth = SafariAuthHelper()
     let debugTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     // FAB side shared with TV controls (1 = right, -1 = left)
@@ -304,20 +303,4 @@ struct BrowserView: View {
     func reload() {
         browserState.webView?.reload()
     }
-
-    func authenticateInSafari() {
-        guard let webView = browserState.webView, let url = webView.url else { return }
-        Task { @MainActor in
-            do {
-                try await safariAuth.authenticate(url: url, webView: webView)
-            } catch SafariAuthError.session(let underlying) {
-                await serverState.handlerContext.showToast("Safari sign-in failed: \(underlying.localizedDescription)")
-            } catch SafariAuthError.webViewUnavailable {
-                await serverState.handlerContext.showToast("Safari sign-in cancelled: tab closed")
-            } catch {
-                await serverState.handlerContext.showToast("Safari sign-in failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
 }
