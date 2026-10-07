@@ -6,13 +6,18 @@ import android.os.Bundle
 import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
-import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.kelpie.browser.browser.BROWSER_USER_AGENT
 
-/** Hosted login in a dedicated process/profile, never in the browser tab registry. */
+/**
+ * Hosted UOA login in the main process and the default WebView profile, so the Google (and UOA)
+ * cookies and storage it creates are shared with every browser tab by design. It is not a tab:
+ * it is never registered with the tab store, history, session persistence or automation, and it
+ * exposes no JavaScript bridge.
+ */
 class AccountLoginActivity : Activity() {
     private var webView: WebView? = null
     private var registered = false
@@ -31,7 +36,6 @@ class AccountLoginActivity : Activity() {
         const val CANCEL = "com.kelpie.browser.CANCEL_ACCOUNT_LOGIN"
     }
 
-    @android.annotation.SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED, Intent().putExtra("nonce", nonce))
@@ -39,58 +43,72 @@ class AccountLoginActivity : Activity() {
             .registerReceiver(this, cancelled, android.content.IntentFilter(CANCEL), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
         registered = true
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        val url = intent.getStringExtra("url") ?: return finish()
-        val initial = android.net.Uri.parse(url)
-        if (initial.scheme != "https" || initial.host != "authentication.unlikeotherai.com" || initial.path != "/oauth/authorize") return finish()
-        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val url = intent.getStringExtra("url")?.takeIf(AccountLoginPolicy::isAuthorizeUrl) ?: return finish()
+        val view =
+            runCatching { WebView(this) }.getOrElse {
+                setResult(AccountLoginPolicy.RESULT_WEBVIEW_UNAVAILABLE, Intent().putExtra("nonce", nonce))
+                return finish()
+            }
+        webView = view
         val location =
             TextView(this).apply {
                 setPadding(20, 16, 20, 16)
-                text = "authentication.unlikeotherai.com"
+                text = AccountLoginPolicy.LOGIN_HOST
             }
+        configure(view)
+        view.webViewClient = LoginClient(location)
+        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         layout.addView(location)
-        val view = WebView(this)
-        // Production Android honours this; userdebug WebView builds force inspection on.
-        WebView.setWebContentsDebuggingEnabled(false)
-        webView = view
-        view.settings.javaScriptEnabled = true
-        view.settings.domStorageEnabled = true
-        view.settings.allowFileAccess = false
-        view.settings.allowContentAccess = false
-        view.settings.saveFormData = false
-        view.settings.setSupportMultipleWindows(false)
-        view.webViewClient =
-            object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(
-                    view: WebView,
-                    request: WebResourceRequest,
-                ): Boolean {
-                    val next = request.url
-                    if (next.scheme == "com.unlikeotherai.kelpie" && next.host == "oauth" && next.path == "/callback") {
-                        setResult(RESULT_OK, Intent().setData(next).putExtra("nonce", nonce))
-                        finish()
-                        return true
-                    }
-                    return next.scheme != "https"
-                }
-
-                override fun onPageStarted(
-                    view: WebView,
-                    url: String,
-                    favicon: android.graphics.Bitmap?,
-                ) {
-                    val current = android.net.Uri.parse(url)
-                    location.text = "${current.scheme}://${current.host.orEmpty()}"
-                }
-            }
         layout.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(layout)
-        CookieManager.getInstance().removeAllCookies {
-            if (!isFinishing) {
-                view.clearCache(true)
-                WebStorage.getInstance().deleteAllData()
-                view.loadUrl(url)
+        view.loadUrl(url)
+    }
+
+    /** Mirrors the tab WebView settings that sign-in pages depend on; no bridges are installed. */
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    private fun configure(view: WebView) {
+        view.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            userAgentString = BROWSER_USER_AGENT
+            allowFileAccess = false
+            allowContentAccess = false
+            // Popups (Google account choosers) hand off in this same view.
+            setSupportMultipleWindows(false)
+        }
+    }
+
+    private fun completeWith(callback: android.net.Uri) {
+        // Persist the freshly created Google/UOA session for the tabs before leaving.
+        CookieManager.getInstance().flush()
+        setResult(RESULT_OK, Intent().setData(callback).putExtra("nonce", nonce))
+        finish()
+    }
+
+    private inner class LoginClient(
+        private val location: TextView,
+    ) : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest,
+        ): Boolean {
+            val next = request.url
+            if (AccountLoginPolicy.isCallback(next.scheme, next.host, next.path)) {
+                completeWith(next)
+                return true
             }
+            return !AccountLoginPolicy.allowsNavigation(next.scheme)
+        }
+
+        override fun onPageStarted(
+            view: WebView,
+            url: String,
+            favicon: android.graphics.Bitmap?,
+        ) {
+            val current = android.net.Uri.parse(url)
+            location.text = "${current.scheme}://${current.host.orEmpty()}"
         }
     }
 
@@ -98,13 +116,9 @@ class AccountLoginActivity : Activity() {
         if (registered) unregisterReceiver(cancelled)
         webView?.apply {
             stopLoading()
-            clearHistory()
-            clearCache(true)
             destroy()
         }
         webView = null
-        CookieManager.getInstance().removeAllCookies(null)
-        WebStorage.getInstance().deleteAllData()
         super.onDestroy()
     }
 }

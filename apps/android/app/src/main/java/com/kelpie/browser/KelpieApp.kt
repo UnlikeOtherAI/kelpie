@@ -15,11 +15,6 @@ class KelpieApp : Application() {
     override fun onCreate() {
         super.onCreate()
         app = this
-        if (getProcessName().endsWith(":auth")) {
-            WebView.setDataDirectorySuffix("account-login")
-            WebView.setWebContentsDebuggingEnabled(false)
-            return
-        }
         // Enable Chrome DevTools Protocol for WebView
         WebView.setWebContentsDebuggingEnabled(true)
         NetworkTrafficStore.init(this)
