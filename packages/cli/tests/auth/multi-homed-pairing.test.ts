@@ -10,7 +10,7 @@ import type { DiscoveredDevice } from "../../src/types.js";
 // A Mac on Ethernet + Wi-Fi in one subnet answers mDNS on both interfaces.
 function multiHomed(ip: string): DiscoveredDevice {
   return {
-    id: "native", name: "Mac", ip, addresses: ["192.168.1.77", "192.168.1.229"], port: 8420,
+    id: "native", name: "Mac", ip, addresses: ["192.168.1.229", "192.168.1.77"], port: 8420,
     platform: "macos", model: "Mac", width: 0, height: 0, version: "test", lastSeen: Date.now(),
   };
 }
