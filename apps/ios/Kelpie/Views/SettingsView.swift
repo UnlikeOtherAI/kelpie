@@ -9,6 +9,8 @@ struct SettingsView: View {
     @ObservedObject private var aiState = AIState.shared
     @State private var showTokenField = false
     @State private var tokenInput = ""
+    @StateObject private var openAIEndpoints = OpenAIEndpointsModel()
+    @State private var openAIEditor: OpenAIEndpointsSection.EditorTarget?
     let onShowWelcome: () -> Void
     var onNavigate: ((String) -> Void)?
 
@@ -92,6 +94,8 @@ struct SettingsView: View {
                     }
                 }
 
+                OpenAIEndpointsSection(model: openAIEndpoints, editorTarget: $openAIEditor)
+
                 Section("Debug") {
                     Toggle("Debug Overlay", isOn: $debugOverlay)
                 }
@@ -131,6 +135,9 @@ struct SettingsView: View {
                     row("Build", "Release")
                     #endif
                 }
+            }
+            .sheet(item: $openAIEditor) { target in
+                OpenAIEndpointEditor(model: openAIEndpoints, initialEndpointId: target.endpointId)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -200,6 +207,8 @@ struct AIStatusView: View {
         switch state.backend {
         case "ollama":
             return "Ollama"
+        case "openai":
+            return "OpenAI-compatible endpoint"
         case "platform":
             return "Platform"
         default:
