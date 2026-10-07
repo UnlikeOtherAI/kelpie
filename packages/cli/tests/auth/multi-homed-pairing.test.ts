@@ -40,6 +40,39 @@ it("reuses an Always approval when mDNS resolves the device on another interface
   }
 });
 
+it("falls back to the approval on the other interface when the first was replaced", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
+  const originalFetch = globalThis.fetch;
+  try {
+    const store = new TokenStore(dir);
+    // Re-approving at .77 replaced the device's record, revoking the .229 token.
+    await store.set("native", "192.168.1.229", 8420, "revoked");
+    await store.set("native", "192.168.1.77", 8420, "current");
+    setTokenStoreForTesting(store);
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const authorization = (init?.headers as Record<string, string>).Authorization ?? "";
+      calls.push(`${String(url)} ${authorization}`);
+      const ok = authorization === "Bearer current";
+      return new Response(JSON.stringify({ success: ok }), { status: ok ? 200 : 401 });
+    }) as typeof fetch;
+
+    expect((await sendCommand(multiHomed("192.168.1.229"), "getTabs")).ok).toBe(true);
+    expect(calls).toEqual([
+      "http://192.168.1.229:8420/v1/get-tabs Bearer revoked",
+      "http://192.168.1.77:8420/v1/get-tabs Bearer current",
+    ]);
+    // The next run goes straight to the surviving approval.
+    calls.length = 0;
+    expect((await sendCommand(multiHomed("192.168.1.229"), "getTabs")).ok).toBe(true);
+    expect(calls).toEqual(["http://192.168.1.77:8420/v1/get-tabs Bearer current"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setTokenStoreForTesting(null);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 it("never sends a pinned token to an address that was not advertised", async () => {
   const dir = await mkdtemp(join(tmpdir(), "kelpie-multihome-test-"));
   const originalFetch = globalThis.fetch;

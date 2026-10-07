@@ -189,19 +189,25 @@ export async function sendCommand<T = unknown>(
   if (first.status !== 401 || device.localReadinessFile) return first;
   if (options.autoPair === false) return first;
 
-  await clearTokensFor(device, token);
-  const refreshed = await tokenFor(device);
-  if (refreshed && refreshed !== token) {
-    const retry = await rawFetch<T>(url, body, refreshed, timeout);
+  // Drop the rejected token and try any other approval still on file — one
+  // pinned to another advertised address, or one a concurrent CLI just stored.
+  const tried = new Set([token]);
+  let rejected = token;
+  for (;;) {
+    await clearTokensFor(device, rejected);
+    const next = await routedTokenFor(device);
+    if (!next || tried.has(next)) break;
+    tried.add(next);
+    const retry = await rawFetch<T>(urlFor(device, method), body, next, timeout);
     if (retry.status !== 401) return retry;
-    await clearTokensFor(device, refreshed);
+    rejected = next;
   }
 
   const paired = await attemptAutoPair(device);
   if (!paired) return first;
 
   const retryToken = await tokenFor(device);
-  return rawFetch<T>(url, body, retryToken, timeout);
+  return rawFetch<T>(urlFor(device, method), body, retryToken, timeout);
 }
 
 /**
