@@ -1,4 +1,5 @@
 import type { Platform } from "@unlikeotherai/kelpie-shared";
+import { aiEndpointMetadata } from "./ai-endpoint-metadata.js";
 
 export interface HelpField {
   name: string;
@@ -366,6 +367,8 @@ export const commandMetadata: Record<string, CommandHelp> = {
   // --- AI / Local Inference ---
   "ai catalog": { purpose: "List the approved on-device model catalog", when: "Inspecting which models a device can download and their RAM/disk/capability requirements", explanation: "Queries the device for the approved model catalog with download URLs and per-model metadata (size, min/recommended RAM, capabilities, quantization). Requires a HuggingFace token configured on the device.", errors: ["AUTH_REQUIRED", "AI_UNAVAILABLE", "PLATFORM_NOT_SUPPORTED"], related: ["ai fitness", "ai list", "ai pull"], platforms: ["ios", "android", "macos"], response: successOnlyResponse },
   "ai fitness": { purpose: "Score a model against a device's resources", when: "Deciding whether a catalog model will run well before downloading or loading it", explanation: "Evaluates a catalog model against the supplied RAM and free disk (in GB) and returns a fitness level (recommended, possible, not_recommended, no_storage) with an explanatory message.", errors: ["MISSING_PARAM", "AUTH_REQUIRED", "AI_UNAVAILABLE", "PLATFORM_NOT_SUPPORTED"], related: ["ai catalog", "ai load"], platforms: ["ios", "android", "macos"], response: successOnlyResponse },
+
+  ...aiEndpointMetadata,
 
   // --- Group ---
   "group navigate": { purpose: "Navigate all devices to a URL", when: "Testing the same page across multiple devices simultaneously", explanation: "Sends navigate to all matched devices in parallel. Returns per-device results.", related: ["group screenshot", "group click"] },

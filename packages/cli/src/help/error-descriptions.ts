@@ -41,4 +41,23 @@ export const errorDescriptions: Record<string, string> = {
     "set-renderer cannot switch to Chromium while partitioned tabs are open, because " +
     "partitioned storage has no CEF equivalent to migrate into. Close those tabs or call " +
     "delete-partition first.",
+  INVALID_ENDPOINT_URL: "The endpoint URL is not http(s)://host[:port][/base]: it is empty, uses another scheme, has user info, a query string, a fragment, or a port outside 1-65535.",
+  API_KEY_ON_COMMAND_LINE: "API keys are refused as command-line values; pass --api-key-env <VAR> or pipe the key with --api-key-stdin.",
+  ENDPOINT_NOT_FOUND: "No saved endpoint matches the given id or name.",
+  ENDPOINT_UNREACHABLE: "The device running Kelpie could not connect to the endpoint. localhost means that device; a phone needs the server's LAN address and the server must listen on the network.",
+  ENDPOINT_AUTH_FAILED: "The endpoint answered 401/403: the API key is missing, wrong or not accepted.",
+  ENDPOINT_LOADING: "The endpoint is reachable but the server or model is still loading (503). Retry once loading finishes.",
+  ENDPOINT_REDIRECT_REFUSED: "The endpoint redirected to another origin; Kelpie refuses so credentials never leave the saved origin.",
+  ENDPOINT_MALFORMED_RESPONSE: "The endpoint returned non-JSON or an unexpected shape; it may not be OpenAI-compatible at this base URL.",
+  ENDPOINT_STREAM_TRUNCATED: "The streamed response ended without [DONE] or a finish_reason.",
+  ENDPOINT_TIMEOUT: "The endpoint did not answer within the probe, first-byte, idle or overall timeout.",
+  ENDPOINT_ERROR: "The endpoint returned an error; the message is the server's text, shortened and with the API key redacted.",
+  MODEL_DISCOVERY_UNSUPPORTED: "The server has no usable /models listing (404/405/501); type the model ID instead.",
+  MODEL_NOT_AVAILABLE: "The selected model is not available on the endpoint.",
+  NO_MODEL_SELECTED: "The endpoint has no model selected; pass --model or choose one with ai endpoint use.",
+  TOOLS_UNVERIFIED: "Tool calling is unknown for this endpoint; run `kelpie ai endpoint test <name> --tools` or declare --tool-calling yes.",
+  TOOLS_NOT_SUPPORTED: "The endpoint is known not to support tool calling, so the agent cannot run; use plain inference (--no-agent) or a context mode.",
+  VISION_NOT_SUPPORTED: "The active model is text-only; screenshots and images are never sent to it.",
+  AGENT_STEP_LIMIT: "The agent reached maxSteps (default 12, maximum 25) without a final answer.",
+  INFERENCE_CANCELLED: "The request was cancelled, for example by ai cancel.",
 };
