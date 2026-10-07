@@ -94,10 +94,15 @@ final class RecordingDispatcher: OpenAIToolDispatching, @unchecked Sendable {
     }
 
     func dispatch(method: String, body: [String: Any]) async -> [String: Any] {
-        lock.lock()
-        _calls.append((method, body))
-        lock.unlock()
+        record(method: method, body: body)
         return reply(method, body)
+    }
+
+    /// Synchronous so the lock is never held across a suspension point.
+    private func record(method: String, body: [String: Any]) {
+        lock.lock()
+        defer { lock.unlock() }
+        _calls.append((method, body))
     }
 }
 

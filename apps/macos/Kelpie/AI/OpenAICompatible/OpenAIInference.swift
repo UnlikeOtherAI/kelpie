@@ -122,8 +122,9 @@ struct OpenAIInference {
             let client = try await service.client(for: config)
             var payload: [String: Any]
             if request.agent {
-                var loop = OpenAIAgentLoop(client: client, model: model, dispatcher: dispatcher)
-                loop.onStep = onStep
+                var configuredLoop = OpenAIAgentLoop(client: client, model: model, dispatcher: dispatcher)
+                configuredLoop.onStep = onStep
+                let loop = configuredLoop
                 let agentRequest = OpenAIAgentLoop.Request(
                     prompt: request.prompt,
                     history: request.history,
