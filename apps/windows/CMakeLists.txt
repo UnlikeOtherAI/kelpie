@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(kelpie_windows VERSION 0.1.7 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.1.8 LANGUAGES CXX RC)
 
 include(CTest)
 
