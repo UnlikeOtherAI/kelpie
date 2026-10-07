@@ -1,7 +1,6 @@
-#include "kelpie/private_login_window.h"
+#include "kelpie/account_login_window.h"
 #include "include/cef_client.h"
 #include "include/cef_parser.h"
-#include "include/cef_request_context_handler.h"
 #include "include/cef_version.h"
 #include "include/views/cef_browser_view.h"
 #include "include/views/cef_browser_view_delegate.h"
@@ -51,7 +50,8 @@ class LoginWindow final : public CefClient,
                      const CefString& url, const CefString&, WindowOpenDisposition, bool,
                      const CefPopupFeatures&, CefWindowInfo&, CefRefPtr<CefClient>&,
                      CefBrowserSettings&, CefRefPtr<CefDictionaryValue>&, bool*) override {
-    // Keep provider handoffs inside the same private surface and context.
+    // Keep provider handoffs (e.g. Google) inside this window, which shares
+    // the default profile with tabs, instead of spawning an unowned popup.
     browser->GetMainFrame()->LoadURL(url);
     return true;
   }
@@ -72,14 +72,18 @@ class LoginWindow final : public CefClient,
     FinishClose();
   }
 #if CEF_VERSION_MAJOR >= 130
+  // Tabs are renderer-only Alloy browsers (ConfigureAlloyChildWindow on
+  // Windows; Linux's CEF120 predates runtime styles and is Alloy-only), so the
+  // login surface uses the same style: no Chrome UI, same browser behaviour.
   cef_runtime_style_t GetWindowRuntimeStyle() override { return CEF_RUNTIME_STYLE_ALLOY; }
   cef_runtime_style_t GetBrowserRuntimeStyle() override { return CEF_RUNTIME_STYLE_ALLOY; }
 #endif
   bool Open(const std::string& url) {
-    CefRequestContextSettings context_settings; // Empty cache path: memory-only cookies.
-    auto context=CefRequestContext::CreateContext(context_settings,nullptr);
+    // Same browser settings and the same nullptr (global) request context that
+    // DesktopEngine passes for an unpartitioned tab, so the login lands in the
+    // shared default profile. The user agent is the process-wide CefSettings one.
     CefBrowserSettings settings;
-    view_=CefBrowserView::CreateBrowserView(this,url,settings,nullptr,context,this);
+    view_=CefBrowserView::CreateBrowserView(this,url,settings,nullptr,nullptr,this);
     if (!view_) return false;
     return CefWindow::CreateTopLevelWindow(this)!=nullptr;
   }
@@ -102,14 +106,14 @@ class LoginWindow final : public CefClient,
   IMPLEMENT_REFCOUNTING(LoginWindow);
 };
 }
-bool OpenPrivateLoginWindow(const std::string& url,std::function<void()> cancelled) {
+bool OpenAccountLoginWindow(const std::string& url,std::function<void()> cancelled) {
   if (current) return false;
   current=new LoginWindow(std::move(cancelled));
   if (current->Open(url)) return true;
   current=nullptr;
   return false;
 }
-bool ClosePrivateLoginWindow() {
+bool CloseAccountLoginWindow() {
   if (current) current->Close();
   return !current;
 }

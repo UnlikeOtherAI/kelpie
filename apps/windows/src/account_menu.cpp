@@ -1,7 +1,8 @@
 #include "windows_app.h"
 #include "windows_utf.h"
 #include "../resources/resource.h"
-#include "kelpie/private_login_window.h"
+#include "account_login_surface.h"
+#include "kelpie/account_login_window.h"
 #include <shellapi.h>
 #include <shlwapi.h>
 
@@ -26,7 +27,10 @@ void WindowsApp::OnAccountRequested() {
   const auto state=account_->State();
   if (!state.signed_in && !state.signing_in) {
     if (!account_->StartSignIn(config_.profile_dir,[this](const std::string& url) {
-      return OpenAccountBrowser(url) || OpenPrivateLoginWindow(url,[this] { if (account_) account_->SignOut(); });
+      const auto window=[this](const std::string& login) {
+        return OpenAccountLoginWindow(login,[this] { if (account_) account_->SignOut(); });
+      };
+      return account::OpenLoginSurface(url,/*app_window_allowed=*/true,window,OpenAccountBrowser)!=account::LoginSurface::kNone;
     })) MessageBeep(MB_OK);
     return;
   }

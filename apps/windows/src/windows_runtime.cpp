@@ -3,7 +3,7 @@
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "windows_utf.h"
-#include "kelpie/private_login_window.h"
+#include "kelpie/account_login_window.h"
 
 #include <algorithm>
 #include <memory>
@@ -318,7 +318,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
-    if (!ClosePrivateLoginWindow()) return false;
+    if (!CloseAccountLoginWindow()) return false;
     if (!page_color_sampler_.Drain()) return false;
     if (!desktop_app_->Stop()) return false;
     account_.reset();
@@ -343,7 +343,7 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
     const auto state = account_->State();
-    if (!state.signing_in) ClosePrivateLoginWindow();
+    if (!state.signing_in) CloseAccountLoginWindow();
     shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);
   }
   std::vector<TabSnapshot> tabs;
