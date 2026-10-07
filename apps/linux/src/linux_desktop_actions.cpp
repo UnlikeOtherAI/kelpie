@@ -1,7 +1,8 @@
 #include "linux_desktop_internal.h"
 #include "account_protocol.h"
 #include "kelpie/response_helpers.h"
-#include "kelpie/private_login_window.h"
+#include "account_login_surface.h"
+#include "kelpie/account_login_window.h"
 #include <algorithm>
 #include <utility>
 #if KELPIE_LINUX_HAS_GTK
@@ -99,7 +100,11 @@ std::string LinuxApp::HistoryJson() const { return impl_->desktop.history_store(
 account::AccountState LinuxApp::AccountState() const { return impl_->account.State(); }
 void LinuxApp::AccountSignIn() {
   if (!impl_->account.StartSignIn(impl_->config.profile_dir,[this](const std::string& url) {
-    return OpenExternal(url) || OpenPrivateLoginWindow(url,[this] { AccountSignOut(); });
+    // Headless runs have no desktop to host the shared-profile login window.
+    const auto window=[this](const std::string& login) {
+      return OpenAccountLoginWindow(login,[this] { AccountSignOut(); });
+    };
+    return account::OpenLoginSurface(url,!impl_->config.headless,window,OpenExternal)!=account::LoginSurface::kNone;
   })) ShowToast("Please wait for the current account request.");
 }
 void LinuxApp::AccountSignOut() { impl_->account.SignOut(); }
