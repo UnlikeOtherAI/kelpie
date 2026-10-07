@@ -72,9 +72,9 @@ Examples: `http://127.0.0.1:18880/v1/` → `http://127.0.0.1:18880/v1`;
 - Redirects: same-origin (scheme+host+port) redirects are followed; any
   cross-origin redirect is refused → `ENDPOINT_REDIRECT_REFUSED`. Credentials
   are therefore never forwarded to another origin.
-- Timeouts: probe/models 8 s; chat time-to-first-byte 180 s (large prompt
-  processing); idle gap between SSE events 90 s (`: keep-alive` comments count);
-  overall request 900 s. All cancellable.
+- Timeouts: probe/models 8 s; chat time-to-first-byte and idle gap between
+  stream packets 180 s (`: keep-alive` comments count, covers large prompt
+  processing); overall request 900 s. All cancellable.
 - Server error bodies are reduced to a ≤300-char message with the API key
   redacted.
 
@@ -158,11 +158,11 @@ or the active tab) and injected into every call; model-supplied `tabId`,
 | Tool | Router method | Offered |
 |---|---|---|
 | `get_current_url` | `get-current-url` | always |
-| `get_page_text {mode?}` | `get-page-text` | always |
+| `get_page_text {selector?}` | `get-page-text` | always |
 | `get_visible_elements {interactableOnly?}` | `get-visible-elements` | always |
-| `find_element {text?, role?, selector?}` | `find-element` | always |
+| `find_element {text, role?}` | `find-element` | always |
 | `get_form_state {selector?}` | `get-form-state` | always |
-| `get_accessibility_tree {maxDepth?}` | `get-accessibility-tree` | always |
+| `get_accessibility_tree {maxDepth?, interactableOnly?}` | `get-accessibility-tree` | always |
 | `wait_for_element {selector, timeout?}` | `wait-for-element` | always |
 | `click {selector}` | `click` | `allowActions: true` |
 | `fill {selector, value}` | `fill` | `allowActions: true` |
