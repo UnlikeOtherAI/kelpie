@@ -1093,7 +1093,9 @@ Command surface: `kelpie mcp` and `kelpie mcp --http`.
 
 Detailed AI command documentation lives in [docs/cli/advanced.md](cli/advanced.md#ai-commands).
 
-Command surface: `kelpie ai`, `kelpie ai list`, `kelpie ai pull <model>`, `kelpie ai rm <model>`, `kelpie ai status`, `kelpie ai load <model>`, `kelpie ai unload`, `kelpie ai ask <prompt>`, `kelpie ai catalog`, and `kelpie ai fitness <model>`.
+Command surface: `kelpie ai`, `kelpie ai list`, `kelpie ai pull <model>`, `kelpie ai rm <model>`, `kelpie ai status`, `kelpie ai load <model>`, `kelpie ai unload`, `kelpie ai ask <prompt>`, `kelpie ai cancel`, `kelpie ai catalog`, and `kelpie ai fitness <model>`.
+
+OpenAI-compatible endpoints (llama-server, LM Studio, vLLM, Ollama `/v1`, …) are documented in [docs/cli/ai-endpoints.md](cli/ai-endpoints.md): `kelpie ai endpoint`, `kelpie ai endpoint list`, `kelpie ai endpoint add`, `kelpie ai endpoint edit <endpoint>`, `kelpie ai endpoint remove <endpoint>`, `kelpie ai endpoint models <endpoint>`, `kelpie ai endpoint test <endpoint>`, `kelpie ai endpoint health [endpoint]`, and `kelpie ai endpoint use <endpoint>`. `localhost` in an endpoint URL means the device running Kelpie, API keys are read only from `--api-key-env <VAR>` or `--api-key-stdin`, and a failing endpoint never falls back to another backend. `kelpie ai ask` gains `--agent`, `--no-agent`, `--allow-actions` and `--max-steps <n>`; `kelpie ai cancel` stops in-flight AI work.
 
 `kelpie ai catalog` lists the approved on-device model catalog from a device (requires a HuggingFace token configured on the device). `kelpie ai fitness <model>` scores a catalog model against a device's resources; pass `--ram <gb>` and `--disk <gb>` to evaluate against specific RAM/disk figures. Both are supported on iOS, Android, and macOS.
 

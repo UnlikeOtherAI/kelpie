@@ -25,8 +25,12 @@ const docsPath = join(here, "..", "..", "..", "..", "docs", "cli.md");
 /** Pattern: `name.command("phrase ...` — captures the variable name and the literal command head. */
 const COMMAND_CALL = /(\w+)\s*\.command\(\s*["']([a-z][^"'<\s]*)/g;
 
-/** Pattern: `const NAME = program.command("phrase")` — captures the variable that aliases a top-level group. */
-const GROUP_DECL = /(?:const|let|var)\s+(\w+)\s*=\s*program\s*\.command\(\s*["']([a-z][^"'<\s]*)/g;
+/**
+ * Pattern: `const NAME = parent.command("phrase")` — captures the variable,
+ * its receiver and the command head. The receiver is `program` for a
+ * top-level group, or a group variable for a nested one (`ai endpoint`).
+ */
+const GROUP_DECL = /(?:const|let|var)\s+(\w+)\s*=\s*(\w+)\s*\.command\(\s*["']([a-z][^"'<\s]*)/g;
 
 interface CommandPhrase {
   phrase: string;
@@ -43,29 +47,46 @@ function loadSourceFiles(): { name: string; content: string }[] {
     }));
 }
 
-function extractCommandPhrases(source: string, fileName: string): CommandPhrase[] {
-  // First pass: collect group variables in this file and their command heads.
+/** Heads of every `program.command(...)` group, across all command files. */
+function topLevelGroupHeads(sources: { content: string }[]): Set<string> {
+  const heads = new Set<string>();
+  for (const { content } of sources) {
+    for (const match of content.matchAll(GROUP_DECL)) {
+      if (match[2] === "program") heads.add(match[3]);
+    }
+  }
+  return heads;
+}
+
+/**
+ * A receiver's full phrase: a group variable declared in this file, or a
+ * parameter named after a top-level group (`registerAIEndpoint(program, ai)`
+ * receives the `ai` group from another file).
+ */
+function receiverHead(receiver: string, groupVarToHead: Map<string, string>, topLevel: Set<string>): string | undefined {
+  return groupVarToHead.get(receiver) ?? (topLevel.has(receiver) ? receiver : undefined);
+}
+
+function extractCommandPhrases(source: string, fileName: string, topLevel: Set<string>): CommandPhrase[] {
+  // First pass: collect group variables in this file and their full phrases.
   const groupVarToHead = new Map<string, string>();
   for (const match of source.matchAll(GROUP_DECL)) {
-    groupVarToHead.set(match[1], match[2]);
+    const [, variable, receiver, head] = match;
+    const parent = receiver === "program" ? undefined : receiverHead(receiver, groupVarToHead, topLevel);
+    groupVarToHead.set(variable, parent ? `${parent} ${head}` : head);
   }
 
   // Second pass: every .command("...") becomes a phrase. If the receiver is a
-  // known group var, prefix with its head. Otherwise it is a top-level command.
+  // known group, prefix with its phrase. Otherwise it is a top-level command.
+  // commander treats `program.command("geo")` as both the group definition
+  // and a usable command (e.g. `kelpie geo --help`), so the group line itself
+  // stays a phrase that must be documented.
   const phrases: CommandPhrase[] = [];
   for (const match of source.matchAll(COMMAND_CALL)) {
     const receiver = match[1];
     const head = match[2];
-    const groupHead = groupVarToHead.get(receiver);
-    // Skip the group-declaration line itself when we re-encounter it here:
-    // commander treats `program.command("geo")` as both the group definition
-    // and a usable command (e.g. `kelpie geo --help`). We still want it
-    // documented somewhere, so keep it as a phrase.
-    if (groupHead && receiver !== "program") {
-      phrases.push({ phrase: `${groupHead} ${head}`, sourceFile: fileName });
-    } else {
-      phrases.push({ phrase: head, sourceFile: fileName });
-    }
+    const groupHead = receiver === "program" ? undefined : receiverHead(receiver, groupVarToHead, topLevel);
+    phrases.push({ phrase: groupHead ? `${groupHead} ${head}` : head, sourceFile: fileName });
   }
   return phrases;
 }
@@ -80,7 +101,8 @@ function docMentions(doc: string, phrase: string): boolean {
 describe("docs/cli.md is in sync with CLI command surface", () => {
   const doc = readFileSync(docsPath, "utf8");
   const sourceFiles = loadSourceFiles();
-  const allPhrases = sourceFiles.flatMap((f) => extractCommandPhrases(f.content, f.name));
+  const topLevel = topLevelGroupHeads(sourceFiles);
+  const allPhrases = sourceFiles.flatMap((f) => extractCommandPhrases(f.content, f.name, topLevel));
 
   it("sanity: extracted at least 40 command phrases", () => {
     expect(allPhrases.length).toBeGreaterThanOrEqual(40);

@@ -63,7 +63,7 @@ kelpie ai status --device mac
 ```
 
 ### `kelpie ai load <model>`
-Load a model on a device. Supports native model IDs and `ollama:` prefixed IDs.
+Load a model on a device. Supports native model IDs and `ollama:` prefixed IDs. To select a saved OpenAI-compatible endpoint use [`kelpie ai endpoint use`](ai-endpoints.md#kelpie-ai-endpoint-use-endpoint).
 
 ```bash
 kelpie ai load gemma-4-e2b-q4 --device mac
@@ -78,17 +78,30 @@ kelpie ai unload --device mac
 ```
 
 ### `kelpie ai ask <prompt>`
-Run inference on the device's loaded model.
+Run inference on the device's active backend. With an OpenAI-compatible endpoint and no `--context`, the device runs Kelpie's browser agent: the model reads the pinned tab through semantic text, DOM and accessibility tools and answers with the steps it took. See [AI endpoints](ai-endpoints.md#agent-runs).
 
 | Flag | Description |
 |---|---|
 | `-c, --context <mode>` | Context mode: `page_text`, `screenshot`, `dom`, `accessibility` |
 | `--max-tokens <n>` | Maximum tokens to generate (default: 512) |
 | `--temperature <t>` | Sampling temperature (default: 0.7) |
+| `--agent` / `--no-agent` | Force the agent tool loop on or off (default: on for OpenAI-compatible endpoints when no context is given) |
+| `--allow-actions` | Let the agent click, fill, select and check in the pinned tab (read-only otherwise) |
+| `--max-steps <n>` | Maximum agent tool steps, 1–25 (device default 12) |
+
+Without `--timeout`, `ai ask` waits up to 30 minutes for an answer. If you stop waiting, run `kelpie ai cancel` so the device stops too.
 
 ```bash
 kelpie ai ask "summarise this page" --device mac -c page_text
 kelpie ai ask "describe what you see" --device mac -c screenshot
+kelpie ai ask "accept the cookie banner" --device mac --allow-actions --max-steps 6
+```
+
+### `kelpie ai cancel`
+Cancel every in-flight AI request and agent run on a device. Returns `{cancelled: n}`; the cancelled calls fail with `INFERENCE_CANCELLED`.
+
+```bash
+kelpie ai cancel --device mac
 ```
 
 ### `kelpie ai catalog`
