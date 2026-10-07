@@ -172,8 +172,5 @@ class TabStore(
         private const val PREFS_NAME = "kelpie_prefs"
         private const val KEY_HIDE_WELCOME = "hide_welcome_card"
         private const val JS_BRIDGE_NAME = "KelpieBridge"
-        private const val BROWSER_USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Version/131.0.0.0 Mobile Safari/537.36"
     }
 }

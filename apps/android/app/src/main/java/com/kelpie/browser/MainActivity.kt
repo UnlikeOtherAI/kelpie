@@ -56,13 +56,14 @@ class MainActivity : ComponentActivity() {
             androidx.activity.result.contract.ActivityResultContracts
                 .StartActivityForResult(),
         ) { result ->
-            com.kelpie.browser.account.UOAAccount.finishFallback(
-                if (result.resultCode == RESULT_OK) result.data?.dataString else null,
+            com.kelpie.browser.account.UOAAccount.finishLogin(
+                result.resultCode,
+                result.data?.dataString,
                 result.data?.getStringExtra("nonce"),
             )
         }
 
-    fun openAccountFallback(
+    fun openAccountLogin(
         url: String,
         nonce: String,
     ) {

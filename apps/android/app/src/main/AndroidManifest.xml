@@ -46,7 +46,7 @@
                 <data android:scheme="com.unlikeotherai.kelpie" android:host="oauth" android:path="/callback" />
             </intent-filter>
         </activity>
-        <activity android:name=".account.AccountLoginActivity" android:exported="false" android:process=":auth" android:excludeFromRecents="true" android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".account.AccountLoginActivity" android:exported="false" android:excludeFromRecents="true" android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <service
             android:name=".network.KelpieNetworkService"
