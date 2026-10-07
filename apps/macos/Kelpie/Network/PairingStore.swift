@@ -103,36 +103,24 @@ final class PairingStore: @unchecked Sendable {
 
     private func load() {
         guard let storeURL, FileManager.default.fileExists(atPath: storeURL.path) else { return }
-        guard let data = try? Data(contentsOf: storeURL) else { return }
-        guard let envelope = try? JSONDecoder().decode(StoredEnvelope.self, from: data) else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        persistent = envelope.pairings
+        do {
+            let envelope = try JSONDecoder().decode(StoredEnvelope.self, from: Data(contentsOf: storeURL))
+            lock.lock()
+            defer { lock.unlock() }
+            persistent = envelope.pairings
+        } catch {
+            print("[PairingStore] Failed to load persistent pairings: \(error)")
+        }
     }
 
     private func persistLocked() {
         guard let storeURL else { return }
         let envelope = StoredEnvelope(version: 1, pairings: persistent)
-        guard let data = try? JSONEncoder().encode(envelope) else { return }
-        // Atomic write: temp + rename. The `.atomic` option writes to a temp
-        // file first, fsyncs, and renames over the target — sufficient to
-        // avoid torn writes if the process is killed mid-write.
-        let tmpURL = storeURL.appendingPathExtension("tmp")
         do {
-            try data.write(to: tmpURL, options: [.atomic])
-            try? FileManager.default.setAttributes(
-                [.posixPermissions: 0o600],
-                ofItemAtPath: tmpURL.path
-            )
-            if FileManager.default.fileExists(atPath: storeURL.path) {
-                _ = try? FileManager.default.replaceItemAt(storeURL, withItemAt: tmpURL)
-            } else {
-                try FileManager.default.moveItem(at: tmpURL, to: storeURL)
-            }
-            try? FileManager.default.setAttributes(
-                [.posixPermissions: 0o600],
-                ofItemAtPath: storeURL.path
-            )
+            // `.atomic` writes a temp file and renames it over the target, so a
+            // killed process never leaves a torn file behind.
+            try JSONEncoder().encode(envelope).write(to: storeURL, options: [.atomic])
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: storeURL.path)
         } catch {
             print("[PairingStore] Failed to persist: \(error)")
         }
