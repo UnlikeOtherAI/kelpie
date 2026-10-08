@@ -1,7 +1,9 @@
 package com.kelpie.browser.network
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -13,6 +15,15 @@ import org.junit.rules.TemporaryFolder
 class PairingPersistenceTest {
     @get:Rule
     val folder = TemporaryFolder()
+
+    @Test
+    fun hashComparisonRetainsEveryDifference() {
+        // XOR-accumulating these byte differences cancels them to zero.
+        assertFalse(PairingStore.constantTimeEqualsHex("0011", "1100"))
+        assertFalse(PairingStore.constantTimeEqualsHex("a".repeat(64), "b".repeat(64)))
+        assertFalse(PairingStore.constantTimeEqualsHex("00", "0000"))
+        assertTrue(PairingStore.constantTimeEqualsHex("ab01".repeat(16), "ab01".repeat(16)))
+    }
 
     private fun approveAlways(
         store: PairingStore,

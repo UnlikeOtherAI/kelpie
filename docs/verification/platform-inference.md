@@ -67,6 +67,10 @@ runtime used or verified here.
 - CLI: lint/build passed, with 608 tests passing and 64 skipped. CLI code and npm
   versions are unchanged by this inference release.
 
+Android CI also exposed an existing token-comparison defect: XOR accumulation
+could cancel differing bytes and accept unequal hashes. Android now OR-accumulates
+all byte differences, matching iOS, with deterministic counterexample tests.
+
 Timing measurements are individual smoke tests, not performance benchmarks.
 Cancellation, invalid parameters, missing model files, endpoint failure without
 fallback, encrypted Windows persistence and secret redaction have focused tests.
