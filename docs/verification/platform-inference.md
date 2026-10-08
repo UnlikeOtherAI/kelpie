@@ -1,76 +1,86 @@
 # Inference platform coverage
 
-Source audit of the OpenAI-compatible endpoint implementation merged in PR #163,
-and the existing native/platform backends, on 2026-10-08.
+Verified on 2026-10-08 for Windows 0.1.10, Android 0.1.12 and iOS 0.1.13.
+The shared address-history correction also ships in macOS 0.1.28 and Linux 0.1.8.
 
 | Capability | Windows | iOS | Android |
 | --- | --- | --- | --- |
-| OpenAI-compatible endpoint settings, models, test and selection | Missing | Implemented | Implemented |
-| Text inference and browser agent using a selected endpoint | Missing | Implemented | Implemented |
-| Inference on another LAN computer | Missing | OpenAI-compatible or Ollama endpoint | OpenAI-compatible or Ollama endpoint |
-| Built-in on-device inference | Missing | Foundation Models, only when available | Not wired: AI Edge dependency is disabled and implementation is a reflection placeholder |
-| Automatic fallback based on device power | Missing | Not implemented | Not implemented |
+| Imported GGUF on-device text inference | Embedded CPU runtime | Embedded CPU runtime | Embedded CPU runtime |
+| OpenAI-compatible endpoint settings, models, test and selection | Implemented | Implemented | Implemented |
+| Text and selected page-context inference through a LAN endpoint | Implemented | Implemented | Implemented |
+| Remote browser agent | Not implemented | Existing implementation | Existing implementation |
+| Automatic fallback based on device power | Not implemented | Not implemented | Not implemented |
 
-"Implemented" describes source coverage, not a successful physical-device test.
-PR #163 passed Android build/lint, iOS simulator build, Swift project/lint and
-repository lint checks before merging. Its reported real-server agent test ran
-on macOS; it did not establish real-server inference on either mobile platform.
+The portable runtime uses llama.cpp with at most four CPU threads. It does not
+require Google AICore, Apple Intelligence or a GPU. GGUF models are imported by
+the user; no weights are bundled. Model size, supported chat template, context
+size and available memory determine whether a model can run. A successful small
+model test does not establish support for larger models or acceptable quality
+for arbitrary prompts. See [the local API contract](../api/local-gguf.md).
 
-## Running inference locally or on the LAN
+## Choosing local or remote inference
 
-On mobile, Settings / Local AI exposes OpenAI-compatible endpoints. Save the
-server's base URL, select a model, test it and explicitly use it. On a phone,
-`localhost` is that phone. To use a more powerful LAN computer, enter that
-computer's reachable hostname/IP and inference port, for example
-`http://minis.local:11434/v1` for an already configured Ollama server. The server
-must already listen on that network address. Kelpie does not configure servers
-or firewall rules.
+Windows Settings / Local AI offers a GGUF file picker, model load/unload, endpoint
+settings and a prompt box. Mobile Settings / Local AI offers matching import,
+load/unload and endpoint controls. Select an imported model to run on this device,
+or save, test and explicitly select a LAN endpoint to use a stronger machine.
+On mobile, localhost means the mobile device, not the Windows computer.
 
-Selecting a LAN endpoint is the supported alternative when platform inference
-is unavailable. Failure never silently changes endpoint/model or sends data to a
-cloud service. See [the endpoint contract](../api/ai-endpoints.md).
+For an Ollama server listening on Minis, the tested base URL is
+`http://192.168.1.215:11434/v1`. Kelpie does not configure server listening addresses
+or firewall rules. Remote inference sends the supplied prompt and any explicitly
+requested page context to the selected server. Selecting a remote endpoint
+unloads the portable local model. Local weights are not automatically loaded
+after application restart. Failure never silently selects another model, server
+or cloud service. See [the endpoint contract](../api/ai-endpoints.md).
 
-The Windows shell currently registers no `ai-*` handlers and exposes no endpoint
-settings. Merely linking `core-ai`, which supplies catalog/storage/Ollama helpers,
-does not provide this feature. Windows needs a desktop endpoint service, secure
-credential storage integration, HTTP/MCP registration, a tab-pinned agent bridge,
-and native settings wired to the same endpoint contract before claiming parity.
+Windows supports non-streaming text/page-context inference; it rejects browser
+agent requests and media inputs. The portable runtime has the same text-only
+scope on all three platforms. Existing mobile platform and remote-agent backends
+remain separate choices. Android's older Google reflection adapter is not the
+runtime used or verified here.
 
-Android's `PlatformAIEngine` checks for an absent AI Edge class and cannot execute
-on-device inference in the released build. It needs a supported SDK integration,
-real availability checks and inference tests on supported physical hardware.
-RAM/disk fitness scores and a model catalog alone do not implement a runtime.
+## Verification evidence
 
-## Verification of the address-search release
+- Windows: sandboxed CEF Release build and 45 native tests passed. The acceptance
+  suite passed HTTP, direct MCP, CLI-alias access, native navigation and readiness
+  cleanup. A real SmolLM2-135M-Instruct Q8 GGUF generated a 13-token greeting in
+  154 ms. The selected LAN `gemma4:e4b` model answered `2 + 2` with `4` in 34.7 s.
+  Settings and the local file picker rendered. Full keyboard interaction with
+  the owned file-picker window was not established by the UI automation tool.
+- Android: full Gradle build, lint and unit tests passed on Ubuntu. A physical
+  DOOGEE T30S (Android 14, arm64, approximately 6 GB RAM) imported the same GGUF
+  through the system file picker and ran it successfully. A 13-token greeting
+  took 10.9 s in the debug build with Wi-Fi disabled. Wi-Fi was restored and the
+  tablet received `4` from the Minis LAN model in 24.1 s. The development-signed
+  release APK installs as an update without deleting user data.
+- iOS: Swift lint, simulator build and the unit/UI test suite passed on the Mac.
+  The native bridge generated text from the real GGUF fixture in the iPhone 17
+  Pro simulator. Physical iPhone/iPad execution and real-server iOS inference
+  were not verified. The simulator does not establish physical-device speed.
+- macOS: Swift lint and Apple Silicon Release build passed. Xcode 27 still emits
+  existing concurrency/CEF/build metadata warnings; a warning-free Apple build
+  is not established.
+- CLI: lint/build passed, with 608 tests passing and 64 skipped. CLI code and npm
+  versions are unchanged by this inference release.
 
-- Windows: sandboxed CEF release build, 43 native tests and the HTTP/direct-MCP/
-  CLI-alias acceptance suite passed. Real keyboard input after page focus opened
-  Google results for `GitHub`.
-- iOS: Swift lint, simulator build, 116 unit tests and the keyboard-driven
-  `AddressSearchUITests` regression passed on the Mac. The Google page rendered.
-- Android: full Gradle build, lint and unit tests passed on Ubuntu. Installed
-  emulator app input `GitHub` opened Google. A paired HTTP test saved and selected
-  an OpenAI-compatible endpoint on Minis, loaded `gemma4:e4b`, and received `4`
-  from `ai-infer` for `2 + 2` in 26.5 seconds. The temporary endpoint was removed.
-- macOS: Swift lint and the Apple Silicon Release build passed; the running
-  release candidate reported version 0.1.27. Xcode 27 emitted warnings in existing
-  concurrency/CEF/build metadata code. Apple test builds also emitted dependency
-  warnings; warning-free Apple builds are not established.
-- Linux: Release build and 26 native tests passed on Ubuntu.
-- CLI: lint/build passed, with 608 tests passing and 64 skipped. A child-process
-  startup timeout under concurrent C++ compilation passed when rerun.
+Timing measurements are individual smoke tests, not performance benchmarks.
+Cancellation, invalid parameters, missing model files, endpoint failure without
+fallback, encrypted Windows persistence and secret redaction have focused tests.
+The Windows encrypted endpoint store uses per-user DPAPI; credentials are not
+returned in endpoint-list responses.
 
-Physical mobile devices, real-server iOS inference, and automatic fallback were
-not verified. Windows inference remains unimplemented. The shared resolver has
-27 cases covering search, Unicode, explicit URLs, hostnames, IP addresses and
-the C buffer bridge.
+## Address-bar search and existing history
 
-## Address-bar search
+All five native shells use the shared address resolver and history store. Words
+and phrases such as `GitHub` search Google. Domains, localhost, IPv4, bracketed
+IPv6 and explicit schemes remain addresses; empty input does nothing.
 
-All five native shells use `core-protocol`'s address-input resolver. Previously,
-each shell prepended HTTPS to any text without a scheme, turning `GitHub` into
-`https://GitHub`. Words and phrases now go to Google with a UTF-8 percent-encoded
-query. Domains, localhost, IPv4, bracketed IPv6 and explicit schemes remain
-addresses; empty input does nothing. Existing history completions still navigate
-to the displayed completed URL. HTTP/MCP `navigate` continues to accept URLs
-directly, without applying address-bar search policy.
+Existing malformed entries such as `https://github/` previously overrode search
+before the resolver ran. Shared history completion now ignores these entries
+for bare search input, without deleting history. Explicitly typed URLs can still
+complete intranet hosts, and valid domain history still autocompletes normally.
+Regression tests cover malformed history, explicit schemes, localhost, IPs and
+valid domains. On the physical T30S, typing `GitHub` in the release build opened
+Google results while the old malformed history entry was still present.
+HTTP/MCP `navigate` continues to accept URLs directly.
