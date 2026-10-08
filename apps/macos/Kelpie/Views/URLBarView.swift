@@ -213,10 +213,7 @@ struct URLBarView: View {
     }
 
     private func navigate() {
-        var url = resolvedNavigationText()
-        if !startsWithScheme(url) {
-            url = "https://\(url)"
-        }
+        guard let url = AddressInput.resolve(resolvedNavigationText()) else { return }
         isAddressFieldFocused = false
         onNavigate(url)
     }

@@ -1,6 +1,7 @@
 #include "linux_desktop_internal.h"
 #include "account_protocol.h"
 #include "kelpie/response_helpers.h"
+#include "kelpie/address_input.h"
 #include "account_login_surface.h"
 #include "kelpie/account_login_window.h"
 #include <algorithm>
@@ -70,8 +71,8 @@ void LinuxApp::CycleTab(int direction) {
   }
 }
 bool LinuxApp::Navigate(const std::string& url) {
-  std::string resolved=url;
-  if(resolved.find(':')==std::string::npos) resolved="https://"+resolved;
+  const auto resolved=kelpie::ResolveAddressInput(url);
+  if(resolved.empty()) return false;
   auto result=impl_->desktop.engine().Navigate(Active(*this),resolved,nullptr,std::chrono::seconds(3));
   if(!result.ok) ShowToast(result.message); return result.ok;
 }

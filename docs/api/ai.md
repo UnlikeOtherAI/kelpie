@@ -4,10 +4,10 @@ AI methods expose the active local inference backend on each device. The HTTP sh
 
 - macOS: native GGUF via `llama.cpp` or remote Ollama
 - iOS: platform AI (Apple Intelligence) by default when supported, with remote Ollama as an override
-- Android: platform AI (Gemini Nano) by default when supported, with remote Ollama as an override
+- Android: remote Ollama or OpenAI-compatible endpoints; the Gemini Nano SDK integration is not yet implemented
 - macOS, iOS and Android: user-configured OpenAI-compatible endpoints (`backend: "openai"`) — Strata, llama.cpp, LM Studio, vLLM, Ollama `/v1` and others. Their management methods (`ai-endpoints`, `ai-endpoint-save`, `ai-endpoint-remove`, `ai-endpoint-models`, `ai-endpoint-test`, `ai-endpoint-health`, `ai-cancel`) and the `openai` fields of `ai-load`, `ai-status` and `ai-infer` are documented in [ai-endpoints.md](ai-endpoints.md).
 
-Mobile platform AI is text-only. Vision and audio inference require a backend that supports those inputs.
+Windows and Linux do not yet register AI handlers. iOS platform AI is text-only. Vision and audio inference require a backend that supports those inputs.
 
 ## Methods
 

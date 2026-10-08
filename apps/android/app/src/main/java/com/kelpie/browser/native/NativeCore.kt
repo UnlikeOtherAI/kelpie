@@ -13,6 +13,8 @@ object NativeCore {
 
     private external fun bookmarkStoreCreateNative(): Long
 
+    external fun resolveAddressInput(input: String): String?
+
     external fun bookmarkStoreDestroyNative(handle: Long)
 
     external fun bookmarkStoreAdd(

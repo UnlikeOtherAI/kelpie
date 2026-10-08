@@ -1,6 +1,7 @@
 #include "windows_app.h"
 
 #include "windows_utf.h"
+#include "kelpie/address_input.h"
 
 #include <commctrl.h>
 
@@ -32,13 +33,6 @@ std::optional<TabLease> ActiveLease(DesktopApp* app) {
     if (tab.active) return TabLease{tab.id, tab.generation};
   }
   return std::nullopt;
-}
-
-bool HasScheme(const std::string& value) {
-  const auto colon = value.find(':');
-  return colon != std::string::npos && colon > 0 &&
-      std::all_of(value.begin(), value.begin() + static_cast<std::ptrdiff_t>(colon),
-                  [](unsigned char c) { return std::isalnum(c) || c == '+' || c == '-' || c == '.'; });
 }
 
 // A fresh partition id for an isolated tab. A UUID rather than a counter: the
@@ -131,10 +125,8 @@ int WindowsApp::Run(int show_command) {
 
 void WindowsApp::OnNavigateRequested(const std::string& url) {
   if (!desktop_app_) return;
-  const auto first = url.find_first_not_of(" \t\r\n");
-  const auto last = url.find_last_not_of(" \t\r\n");
-  const std::string trimmed = first == std::string::npos ? std::string() : url.substr(first, last - first + 1);
-  const std::string resolved = HasScheme(trimmed) ? trimmed : "https://" + trimmed;
+  const std::string resolved = kelpie::ResolveAddressInput(url);
+  if (resolved.empty()) return;
   const auto lease = ActiveLease(desktop_app_.get());
   const auto result = lease ? desktop_app_->engine().Navigate(*lease, resolved, nullptr, std::chrono::seconds(5))
                             : BrowserControlResult::Failure("TAB_NOT_FOUND", "No active tab exists");

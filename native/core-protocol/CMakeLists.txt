@@ -1,4 +1,5 @@
 add_library(kelpie_core_protocol STATIC
+  src/address_input.cpp
   src/error_codes.cpp
   src/partition.cpp
   src/platform.cpp
