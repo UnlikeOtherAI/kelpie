@@ -20,8 +20,8 @@ android {
         applicationId = "com.kelpie.browser"
         minSdk = 28
         targetSdk = 34
-        versionCode = 8
-        versionName = "0.1.8"
+        versionCode = 9
+        versionName = "0.1.9"
 
         externalNativeBuild {
             cmake {
