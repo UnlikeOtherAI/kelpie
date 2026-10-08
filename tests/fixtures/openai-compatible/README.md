@@ -6,7 +6,7 @@ Kelpie's OpenAI-compatible endpoint client (macOS, iOS, Android, CLI tests) can
 be verified against the awkward parts of the wire protocol without a GPU or a
 real llama-server / LM Studio / vLLM.
 
-Contract: [docs/plans/2026-10-07-openai-compatible-endpoints.md](../../../docs/plans/2026-10-07-openai-compatible-endpoints.md).
+Contract: [docs/api/ai-endpoints.md](../../../docs/api/ai-endpoints.md).
 
 Dependency-free; Node 18 or newer.
 

@@ -1,6 +1,8 @@
-# OpenAI-Compatible Inference Endpoints
+# Kelpie — OpenAI-Compatible Inference Endpoints
 
-Status: active. Contract shared by macOS, iOS, Android, the CLI and MCP.
+Reference and contract shared by macOS, iOS, Android, the CLI and MCP. CLI
+usage: [cli/ai-endpoints.md](../cli/ai-endpoints.md). Other AI methods:
+[ai.md](ai.md).
 
 ## Goal
 
@@ -229,6 +231,12 @@ request itself fails. Errors after steps were taken still include `steps`.
 | `ai-infer` | adds `agent?`, `allowActions?`, `maxSteps?` | adds `reasoning?`, `finishReason`, `steps[] {tool, args, ok, ms, preview}`, `tasks[] {task, done}`, `completed`, `stopReason`, `endpointId`, `model` |
 | `ai-cancel` | — | `{cancelled: n}` |
 
+Platform tab errors from `ai-infer` with the agent: macOS keeps the existing
+`TAB_REQUIRED` / `TAB_NOT_FOUND` rules (several tabs open → pass `tabId`); iOS
+returns `NO_WEBVIEW`, `TAB_NOT_FOUND` or `TAB_NOT_ACTIVE` (switch to the tab
+first); iOS and Android stop a run with a `TAB_CHANGED` tool error if the
+person switches tabs mid-run, so no action lands in the wrong tab.
+
 Error codes: `INVALID_ENDPOINT_URL`, `ENDPOINT_NOT_FOUND`, `ENDPOINT_UNREACHABLE`,
 `ENDPOINT_AUTH_FAILED`, `ENDPOINT_LOADING`, `ENDPOINT_REDIRECT_REFUSED`,
 `ENDPOINT_MALFORMED_RESPONSE`, `ENDPOINT_STREAM_TRUNCATED`, `ENDPOINT_TIMEOUT`,
@@ -260,3 +268,21 @@ It is a protocol fixture, not an inference server. Configurable port and base
 path; states `ready | loading | auth | busy | malformed | empty | nodiscovery`
 switchable at runtime via `POST /__fixture/state`; streams with tiny random
 chunk boundaries, reasoning deltas, fragmented tool calls and usage frames.
+
+## Troubleshooting
+
+| Symptom | Meaning | What to do |
+|---|---|---|
+| `unreachable` | Kelpie's device could not open a connection | Check the server is running and listening on an address the **Kelpie device** can reach. On a phone, `127.0.0.1` is the phone: use the computer's LAN or `.local` address and bind the server to the network (for example `--host 0.0.0.0`) yourself — Kelpie never changes listeners, firewalls or tunnels. |
+| `auth_failed` | 401/403 | Set or clear the API key; local servers usually need none. |
+| `loading` | Server or model is still loading (503, or `status: loading/unloaded`) | Wait; health re-checks every 30 s and immediately after wake or a network change. |
+| `model_missing` | Reachable, but the selected model is not listed — or the server has no `GET /models` | Pick a listed model, or run Test so a generation proves the typed model ID works. |
+| `busy` | Kelpie has a request in flight, or the server answered 429 | Still online; wait or `ai-cancel`. |
+| `unknown` + `stale` | Last check older than 90 s | Refresh; a cached success is never shown as live. |
+| `TOOLS_UNVERIFIED` | Nobody has shown this model can call tools | Run `ai-endpoint-test` with `tools: true`, or declare tool calling. |
+| `VISION_NOT_SUPPORTED` | Screenshot context on a model not known to accept images | Use text, DOM or accessibility context, or declare vision if the model really supports it. |
+| `completed: false` | The step budget ran out | Read the final report, raise `maxSteps` (≤ 40), or split the task. |
+
+Model IDs are shown exactly as the server returns them. Speculative decoding
+and MTP are server-side features — a Q4 target with Q2 draft experts is not an
+"all-Q4" model, and Kelpie neither labels nor configures it.

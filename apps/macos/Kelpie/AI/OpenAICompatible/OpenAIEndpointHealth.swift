@@ -1,7 +1,7 @@
 import Foundation
 
 /// Live readiness of one endpoint + selected model. See the health table in
-/// docs/plans/2026-10-07-openai-compatible-endpoints.md.
+/// docs/api/ai-endpoints.md.
 struct OpenAIEndpointHealth: Equatable, Sendable {
     enum State: String, Sendable {
         case unknown

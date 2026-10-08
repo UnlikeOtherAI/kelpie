@@ -8,7 +8,7 @@
 // UTF-8; keep-alive comments; a role-only first delta; fragmented tool-call
 // arguments; reasoning deltas; a usage frame with empty choices; [DONE]).
 //
-// Contract: docs/plans/2026-10-07-openai-compatible-endpoints.md.
+// Contract: docs/api/ai-endpoints.md.
 // Usage and the control API: README.md next to this file.
 
 import { createServer } from "node:http";

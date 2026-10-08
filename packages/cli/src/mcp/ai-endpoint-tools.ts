@@ -6,7 +6,7 @@ import type { BrowserToolDef } from "./tools.js";
 /**
  * MCP tools for user-configured OpenAI-compatible endpoints, plus the AI
  * load/ask tools whose schemas grew for them. Contract:
- * docs/plans/2026-10-07-openai-compatible-endpoints.md.
+ * docs/api/ai-endpoints.md.
  */
 
 /** Thrown by `bodyFromArgs` for bad input; the server turns it into an error result. */

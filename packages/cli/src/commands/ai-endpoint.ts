@@ -17,7 +17,7 @@ import {
 
 /**
  * `kelpie ai endpoint …` — user-configured OpenAI-compatible endpoints.
- * Contract: docs/plans/2026-10-07-openai-compatible-endpoints.md.
+ * Contract: docs/api/ai-endpoints.md.
  *
  * The device is authoritative for validation, health and capabilities; the
  * CLI validates flags early, resolves endpoint names to ids, and redacts every

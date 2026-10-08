@@ -2,7 +2,7 @@ package com.kelpie.browser.ai.openai
 
 /**
  * A normalised OpenAI-compatible base URL (`scheme://host[:port]/path`, no trailing slash).
- * See "URL handling" in docs/plans/2026-10-07-openai-compatible-endpoints.md.
+ * See "URL handling" in docs/api/ai-endpoints.md.
  */
 data class OpenAIEndpointURL(
     val scheme: String,

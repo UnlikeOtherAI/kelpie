@@ -1,6 +1,6 @@
 package com.kelpie.browser.ai.openai
 
-/** Error codes shared with macOS, iOS and the CLI (see docs/plans/2026-10-07-openai-compatible-endpoints.md). */
+/** Error codes shared with macOS, iOS and the CLI (see docs/api/ai-endpoints.md). */
 object OpenAIErrorCode {
     const val INVALID_ENDPOINT_URL = "INVALID_ENDPOINT_URL"
     const val ENDPOINT_NOT_FOUND = "ENDPOINT_NOT_FOUND"

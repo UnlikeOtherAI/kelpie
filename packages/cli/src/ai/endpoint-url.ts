@@ -1,6 +1,6 @@
 /**
  * Client-side mirror of `OpenAIEndpointURL.normalize` from
- * docs/plans/2026-10-07-openai-compatible-endpoints.md ("URL handling").
+ * docs/api/ai-endpoints.md ("URL handling").
  *
  * The device stays authoritative: it re-normalises whatever the CLI sends.
  * This copy exists so a typo fails fast on the CLI or MCP host instead of

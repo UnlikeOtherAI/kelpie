@@ -10,7 +10,7 @@ Kelpie's built-in browser agent.
 Supported on macOS, iOS and Android. The device does the talking: every probe,
 model listing and generation is made **from the device running Kelpie**, not
 from the computer running the CLI. Contract:
-[docs/plans/2026-10-07-openai-compatible-endpoints.md](../plans/2026-10-07-openai-compatible-endpoints.md).
+[docs/api/ai-endpoints.md](../api/ai-endpoints.md).
 
 Ground rules:
 

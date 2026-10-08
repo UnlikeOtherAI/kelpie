@@ -4,7 +4,7 @@ import Foundation
 /// (for example `http://127.0.0.1:18880/v1` or `https://host/openai/v1`).
 ///
 /// Shared by macOS and iOS. Rules are defined in
-/// docs/plans/2026-10-07-openai-compatible-endpoints.md → "URL handling".
+/// docs/api/ai-endpoints.md → "URL handling".
 struct OpenAIEndpointURL: Equatable, Sendable {
     let scheme: String
     let host: String
