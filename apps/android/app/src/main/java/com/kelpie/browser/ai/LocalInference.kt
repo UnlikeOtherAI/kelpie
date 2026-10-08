@@ -3,33 +3,40 @@ package com.kelpie.browser.ai
 import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
-import com.kelpie.browser.nativecore.NativeCore
+import com.kelpie.browser.ai.openai.OpenAIException
 import com.kelpie.browser.ai.openai.OpenAIRuntime
 import com.kelpie.browser.ai.openai.RouterAgentToolBridge
-import com.kelpie.browser.ai.openai.OpenAIException
+import com.kelpie.browser.nativecore.NativeCore
 import com.kelpie.browser.network.errorResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
 import java.io.DataInputStream
+import java.io.File
 import java.util.UUID
 
 /** Embedded CPU inference; importing a model never contacts a server. */
 object LocalInference {
-    suspend fun execute(operation: String, body: Map<String, Any?> = emptyMap()): Map<String, Any?> =
+    suspend fun execute(
+        operation: String,
+        body: Map<String, Any?> = emptyMap(),
+    ): Map<String, Any?> =
         withContext(Dispatchers.IO) {
             AIHttpJson.parseJsonObject(NativeCore.localInference(operation, JSONObject(body).toString()))
         }
 
     fun cancel() = NativeCore.cancelLocalInference()
 
-    suspend fun infer(input: Map<String, Any?>, bridge: RouterAgentToolBridge?): Map<String, Any?> {
+    suspend fun infer(
+        input: Map<String, Any?>,
+        bridge: RouterAgentToolBridge?,
+    ): Map<String, Any?> {
         val body = input.toMutableMap()
         val mode = body["context"] as? String
         if (mode != null) {
-            val method = mapOf("page_text" to "get-page-text", "dom" to "get-dom", "accessibility" to "get-accessibility-tree")[mode]
-                ?: return errorResponse("INVALID_PARAM", "context must be page_text, dom or accessibility")
+            val method =
+                mapOf("page_text" to "get-page-text", "dom" to "get-dom", "accessibility" to "get-accessibility-tree")[mode]
+                    ?: return errorResponse("INVALID_PARAM", "context must be page_text, dom or accessibility")
             if (bridge == null) return errorResponse("AI_UNAVAILABLE", "Browser router is unavailable")
             try {
                 val dispatcher = bridge.pinnedDispatcher(body["tabId"] as? String)
@@ -43,7 +50,10 @@ object LocalInference {
         return execute("infer", body)
     }
 
-    suspend fun load(context: Context, body: Map<String, Any?>): Map<String, Any?> {
+    suspend fun load(
+        context: Context,
+        body: Map<String, Any?>,
+    ): Map<String, Any?> {
         val path = body["model"] as? String ?: return errorResponse("MISSING_PARAM", "model is required")
         val info = ActivityManager.MemoryInfo()
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(info)
@@ -61,7 +71,10 @@ object LocalInference {
         return result
     }
 
-    suspend fun importModel(context: Context, uri: Uri): String =
+    suspend fun importModel(
+        context: Context,
+        uri: Uri,
+    ): String =
         withContext(Dispatchers.IO) {
             val directory = File(context.filesDir, "local-models").apply { mkdirs() }
             val file = File(directory, "${UUID.randomUUID()}.gguf")

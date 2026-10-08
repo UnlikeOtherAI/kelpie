@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Reads and switches Kelpie's active AI backend (AIState on Android, a fake in tests). */
 interface BackendSelector {
     suspend fun prepareOpenAI() {}
+
     fun currentBackend(): String
 
     fun selectOpenAI()

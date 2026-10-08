@@ -12,8 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.kelpie.browser.ai.LocalInference
 import com.kelpie.browser.ai.AIState
+import com.kelpie.browser.ai.LocalInference
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -26,6 +26,7 @@ internal fun LocalModelSection() {
     var busy by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Import a small instruction GGUF for offline text inference. Use a LAN endpoint below for larger models.") }
+
     fun load(selected: String) {
         busy = true
         loading = true
@@ -46,23 +47,24 @@ internal fun LocalModelSection() {
             }
         }
     }
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            busy = true
-            message = "Importing model…"
-            scope.launch {
-                try {
-                    val selected = LocalInference.importModel(context, uri)
-                    path = selected
-                    prefs.edit().putString("path", selected).apply()
-                    load(selected)
-                } catch (error: Exception) {
-                    message = error.message ?: "Could not import model"
-                    busy = false
+    val importer =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                busy = true
+                message = "Importing model…"
+                scope.launch {
+                    try {
+                        val selected = LocalInference.importModel(context, uri)
+                        path = selected
+                        prefs.edit().putString("path", selected).apply()
+                        load(selected)
+                    } catch (error: Exception) {
+                        message = error.message ?: "Could not import model"
+                        busy = false
+                    }
                 }
             }
         }
-    }
     Column {
         Text("On-device model")
         Text(message)

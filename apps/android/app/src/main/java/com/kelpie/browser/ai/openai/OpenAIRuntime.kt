@@ -91,7 +91,10 @@ object OpenAIRuntime {
 
 /** Maps backend selection onto the existing [AIState] globals. */
 object AIStateBackendSelector : BackendSelector {
-    override suspend fun prepareOpenAI() { LocalInference.execute("unload") }
+    override suspend fun prepareOpenAI() {
+        LocalInference.execute("unload")
+    }
+
     override fun currentBackend(): String = AIState.backend
 
     override fun selectOpenAI() {
