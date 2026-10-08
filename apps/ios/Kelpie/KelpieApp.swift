@@ -110,6 +110,7 @@ struct KelpieApp: App {
         serverState.startHTTPServer()
         serverState.ensureMDNSAdvertising()
         ExternalDisplayManager.shared.startMonitoring()
+        OpenAIEndpointMonitor.shared.start()
         if environment["KELPIE_DEBUG_ATTACH_LOCAL_TV"] == "1",
            !ExternalDisplayManager.shared.isConnected {
             ExternalDisplayManager.shared.attachDebugLocalTV()
