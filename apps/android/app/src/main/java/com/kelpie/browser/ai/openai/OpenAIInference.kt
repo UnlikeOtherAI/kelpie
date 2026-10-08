@@ -273,7 +273,8 @@ class OpenAIInference(
             "stopReason" to outcome.stopReason,
             "rounds" to outcome.rounds,
             "finishReason" to outcome.finishReason,
-            "tokensUsed" to outcome.promptTokens + outcome.completionTokens,
+            // Servers that send no usage frames leave this unknown (null) rather than 0 or an estimate.
+            "tokensUsed" to (outcome.promptTokens + outcome.completionTokens).takeIf { it > 0 },
         )
 
     private fun plainResult(result: ChatResult): MutableMap<String, Any?> {
@@ -283,7 +284,7 @@ class OpenAIInference(
             "response" to answer,
             "reasoning" to result.reasoning.ifEmpty { null },
             "finishReason" to result.finishReason,
-            "tokensUsed" to (total ?: (answer.length / 4).coerceAtLeast(1)),
+            "tokensUsed" to total,
         )
     }
 
