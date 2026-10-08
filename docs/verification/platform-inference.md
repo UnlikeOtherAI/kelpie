@@ -51,7 +51,8 @@ runtime used or verified here.
 - Android: full Gradle build, lint and unit tests passed on Ubuntu. A physical
   DOOGEE T30S (Android 14, arm64, approximately 6 GB RAM) imported the same GGUF
   through the system file picker and ran it successfully. A 13-token greeting
-  took 10.9 s in the debug build with Wi-Fi disabled. Wi-Fi was restored and the
+  took 10.9 s in the debug build with Wi-Fi disabled and 0.7 s in the optimized
+  release build. Wi-Fi was restored and the
   tablet received `4` from the Minis LAN model in 24.1 s. The development-signed
   release APK installs as an update without deleting user data.
 - iOS: Swift lint, simulator build and the unit/UI test suite passed on the Mac.
@@ -61,6 +62,8 @@ runtime used or verified here.
 - macOS: Swift lint and Apple Silicon Release build passed. Xcode 27 still emits
   existing concurrency/CEF/build metadata warnings; a warning-free Apple build
   is not established.
+- macOS native tests: all 12 tests for enabled backends passed.
+- Linux: Release build and all 26 native tests passed on Ubuntu.
 - CLI: lint/build passed, with 608 tests passing and 64 skipped. CLI code and npm
   versions are unchanged by this inference release.
 
