@@ -55,6 +55,7 @@ object LocalInference {
         body: Map<String, Any?>,
     ): Map<String, Any?> {
         val path = body["model"] as? String ?: return errorResponse("MISSING_PARAM", "model is required")
+        if (!File(path).isFile) return errorResponse("MODEL_NOT_FOUND", "Select an existing GGUF model file")
         val info = ActivityManager.MemoryInfo()
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(info)
         // Leave room for the WebView and OS as well as the GGUF evaluation buffers.

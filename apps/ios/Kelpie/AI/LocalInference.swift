@@ -32,8 +32,16 @@ final class LocalInference: @unchecked Sendable {
         guard let path = body["model"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "model is required")
         }
-        let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? NSNumber)?.uint64Value ?? 0
-        if size * 3 / 2 + 256 * 1024 * 1024 > os_proc_available_memory() {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? NSNumber)?.uint64Value else {
+            return errorResponse(code: "MODEL_NOT_FOUND", message: "Select an existing GGUF model file")
+        }
+        #if targetEnvironment(simulator)
+        // The simulator has no iOS process memory budget; os_proc_available_memory returns zero.
+        let availableMemory = ProcessInfo.processInfo.physicalMemory / 2
+        #else
+        let availableMemory = UInt64(os_proc_available_memory())
+        #endif
+        if size * 3 / 2 + 256 * 1024 * 1024 > availableMemory {
             return errorResponse(code: "MODEL_MEMORY_LIMIT", message: "Use a smaller GGUF model or a LAN inference endpoint")
         }
         let result = await execute("load", body: body)

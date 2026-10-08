@@ -34,8 +34,14 @@ internal fun AIStatusSheet(onDismiss: () -> Unit) {
     val revisionFlow = remember { if (OpenAIRuntime.isInitialized) OpenAIRuntime.service.revision else MutableStateFlow(0L) }
     val revision by revisionFlow.collectAsState()
     val openAIEndpoint = if (revision >= 0 && AIState.backend == AIState.OPENAI_BACKEND) OpenAIRuntime.service.activeEndpoint() else null
-    val ready = if (openAIEndpoint != null) OpenAIRuntime.service.healthPublic(openAIEndpoint.id)["state"] == "ready"
-        else if (AIState.backend == AIState.PLATFORM_BACKEND) AIState.isAvailable else AIState.activeModel != null
+    val ready =
+        if (openAIEndpoint != null) {
+            OpenAIRuntime.service.healthPublic(openAIEndpoint.id)["state"] == "ready"
+        } else if (AIState.backend == AIState.PLATFORM_BACKEND) {
+            AIState.isAvailable
+        } else {
+            AIState.activeModel != null
+        }
 
     Column(
         modifier =
