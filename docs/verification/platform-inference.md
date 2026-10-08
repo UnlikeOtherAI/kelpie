@@ -41,6 +41,30 @@ on-device inference in the released build. It needs a supported SDK integration,
 real availability checks and inference tests on supported physical hardware.
 RAM/disk fitness scores and a model catalog alone do not implement a runtime.
 
+## Verification of the address-search release
+
+- Windows: sandboxed CEF release build, 43 native tests and the HTTP/direct-MCP/
+  CLI-alias acceptance suite passed. Real keyboard input after page focus opened
+  Google results for `GitHub`.
+- iOS: Swift lint, simulator build, 116 unit tests and the keyboard-driven
+  `AddressSearchUITests` regression passed on the Mac. The Google page rendered.
+- Android: full Gradle build, lint and unit tests passed on Ubuntu. Installed
+  emulator app input `GitHub` opened Google. A paired HTTP test saved and selected
+  an OpenAI-compatible endpoint on Minis, loaded `gemma4:e4b`, and received `4`
+  from `ai-infer` for `2 + 2` in 26.5 seconds. The temporary endpoint was removed.
+- macOS: Swift lint and the Apple Silicon Release build passed; the running
+  release candidate reported version 0.1.27. Xcode 27 emitted warnings in existing
+  concurrency/CEF/build metadata code. Apple test builds also emitted dependency
+  warnings; warning-free Apple builds are not established.
+- Linux: Release build and 26 native tests passed on Ubuntu.
+- CLI: lint/build passed, with 608 tests passing and 64 skipped. A child-process
+  startup timeout under concurrent C++ compilation passed when rerun.
+
+Physical mobile devices, real-server iOS inference, and automatic fallback were
+not verified. Windows inference remains unimplemented. The shared resolver has
+27 cases covering search, Unicode, explicit URLs, hostnames, IP addresses and
+the C buffer bridge.
+
 ## Address-bar search
 
 All five native shells use `core-protocol`'s address-input resolver. Previously,

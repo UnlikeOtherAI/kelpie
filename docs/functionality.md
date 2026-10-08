@@ -238,7 +238,7 @@ AI inference on macOS, iOS and Android; Windows and Linux do not yet expose AI h
 
 **macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`kelpie ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
 
-**iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) is the default backend on supported hardware. Text-only until the iOS 26 SDK is linked. Users can switch to a remote Ollama model for vision-capable inference.
+**iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) provides text inference when available on iOS 26 or later with supported hardware and Apple Intelligence enabled. Users can select an OpenAI-compatible or Ollama endpoint on a LAN computer when on-device inference is unavailable.
 
 **Android — remote inference:** The on-device Gemini Nano path is a placeholder: the AI Edge SDK dependency is disabled. Use a configured Ollama or OpenAI-compatible endpoint on another LAN computer. Model capabilities determine whether vision is supported.
 
