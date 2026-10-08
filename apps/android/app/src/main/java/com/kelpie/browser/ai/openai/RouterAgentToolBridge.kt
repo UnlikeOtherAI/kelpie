@@ -45,7 +45,7 @@ class RouterAgentToolBridge(
     }
 
     private companion object {
-        const val MAX_CONTEXT_CHARS = 32_000
+        const val MAX_CONTEXT_CHARS = 24_000
     }
 }
 
