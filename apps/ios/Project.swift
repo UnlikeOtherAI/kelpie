@@ -10,6 +10,7 @@ let iOSLinkerFlags: SettingValue = .array([
     "-lkelpie_core_ai",
     "-lllama", "-lggml", "-lggml-base", "-lggml-cpu",
     "-framework AppIntents",
+    "-framework Accelerate",
     "-lc++",
 ])
 

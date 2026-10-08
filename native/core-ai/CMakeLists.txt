@@ -18,9 +18,11 @@ if(KELPIE_LOCAL_LLM)
   set(GGML_METAL OFF CACHE BOOL "" FORCE)
   set(GGML_BLAS OFF CACHE BOOL "" FORCE)
   set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+  if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+  endif()
   FetchContent_Declare(kelpie_llama
-    URL https://github.com/ggml-org/llama.cpp/archive/8345f333951c661d166b00e6f9362e553768f292.tar.gz
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    URL https://github.com/ggml-org/llama.cpp/archive/8345f333951c661d166b00e6f9362e553768f292.tar.gz)
   FetchContent_MakeAvailable(kelpie_llama)
 endif()
 
