@@ -204,6 +204,10 @@ final class AIState: ObservableObject {
         }
 
         let response = try await sendLocalRequest(method: "ai-infer", body: body)
+        if (response["success"] as? Bool) == false, response["steps"] != nil {
+            // The agent acted before failing; keep what it did visible.
+            throw AIChatFailure(message: responseErrorMessage(response), reply: AIChatReply(response: response))
+        }
         guard (response["success"] as? Bool) != false else {
             throw NSError(
                 domain: "AIState",

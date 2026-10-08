@@ -60,8 +60,8 @@ describe("AI endpoint MCP tool catalogue", () => {
   it("extends kelpie_ai_load and kelpie_ai_ask schemas", () => {
     expect(Object.keys(tool("kelpie_ai_load").schema)).toEqual(expect.arrayContaining(["model", "backend", "endpoint"]));
     expect(Object.keys(tool("kelpie_ai_ask").schema)).toEqual(expect.arrayContaining(["agent", "allowActions", "maxSteps"]));
-    expect(tool("kelpie_ai_ask").schema.maxSteps.safeParse(26).success).toBe(false);
-    expect(tool("kelpie_ai_ask").schema.maxSteps.safeParse(25).success).toBe(true);
+    expect(tool("kelpie_ai_ask").schema.maxSteps.safeParse(41).success).toBe(false);
+    expect(tool("kelpie_ai_ask").schema.maxSteps.safeParse(40).success).toBe(true);
   });
 });
 

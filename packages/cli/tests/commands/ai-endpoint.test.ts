@@ -236,8 +236,8 @@ describe("endpoint flag parsing", () => {
   });
 
   it("askBody validates max steps and refuses allow-actions without the agent", () => {
-    expect(() => askBody("p", { maxSteps: "26" })).toThrow(/1 to 25/);
-    expect(() => askBody("p", { maxSteps: "0" })).toThrow(/1 to 25/);
+    expect(() => askBody("p", { maxSteps: "41" })).toThrow(/1 to 40/);
+    expect(() => askBody("p", { maxSteps: "0" })).toThrow(/1 to 40/);
     expect(() => askBody("p", { agent: false, allowActions: true })).toThrow(/needs the agent/);
   });
 });

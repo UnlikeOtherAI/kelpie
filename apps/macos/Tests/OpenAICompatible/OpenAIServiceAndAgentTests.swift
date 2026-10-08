@@ -210,7 +210,7 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         let messages = try XCTUnwrap(sent["messages"] as? [[String: Any]])
         XCTAssertEqual(messages.filter { $0["role"] as? String == "tool" }.count, 2)
         XCTAssertFalse(OpenAIAgentLoop.json(messages).contains("I should look at the page."))
-        XCTAssertEqual((sent["tools"] as? [Any])?.count, OpenAIBrowserToolCatalog.tools(allowActions: true).count)
+        XCTAssertEqual((sent["tools"] as? [Any])?.count, OpenAIBrowserToolCatalog.tools(allowActions: true).count + 1, "browser tools plus update_task_list")
     }
 
     func testActionsAreNotOfferedOrExecutedWithoutPermission() async throws {
@@ -238,17 +238,55 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         XCTAssertFalse(toolNames.contains("fill"))
     }
 
-    func testAgentStepLimit() async throws {
-        let transport = agentTransport(steps: [OpenAIFixtures.toolCallStream(name: "get_page_text", arguments: "{}")])
-        let client = OpenAIEndpointClient(baseURL: try .normalize("http://h:1/v1"), apiKey: nil, transport: transport)
-        do {
-            _ = try await OpenAIAgentLoop(client: client, model: model, dispatcher: RecordingDispatcher()).run(.init(
-                prompt: "loop", history: [], tabId: nil, allowActions: false, maxSteps: 3, maxTokens: 64, temperature: nil
-            ))
-            XCTFail("expected step limit")
-        } catch {
-            XCTAssertEqual((error as? OpenAIEndpointError)?.code, "AGENT_STEP_LIMIT")
+    func testStepBudgetEndsWithFinalReportWithoutTools() async throws {
+        var calls = 0
+        let lock = NSLock()
+        let transport = FakeOpenAITransport { request in
+            lock.lock()
+            defer { lock.unlock() }
+            calls += 1
+            let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: Any] ?? [:]
+            if body["tools"] == nil {
+                return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.answerStream("I read the page twice but did not finish."))
+            }
+            return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.toolCallStream(name: "get_page_text", arguments: "{}"))
         }
+        let client = OpenAIEndpointClient(baseURL: try .normalize("http://h:1/v1"), apiKey: nil, transport: transport)
+        let outcome = try await OpenAIAgentLoop(client: client, model: model, dispatcher: RecordingDispatcher()).run(.init(
+            prompt: "loop", history: [], tabId: nil, allowActions: false, maxSteps: 3, maxTokens: 64, temperature: nil
+        ))
+        XCTAssertFalse(outcome.completed)
+        XCTAssertEqual(outcome.stopReason, "step_limit")
+        XCTAssertEqual(outcome.steps.count, 3)
+        XCTAssertEqual(outcome.answer, "I read the page twice but did not finish.")
+        let finalBody = try XCTUnwrap(transport.requests.last?.httpBody)
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: finalBody) as? [String: Any])
+        XCTAssertNil(sent["tools"], "the final report request offers no tools")
+        XCTAssertTrue(OpenAIAgentLoop.json(sent["messages"] as Any).contains("step budget"))
+    }
+
+    func testTaskListIsFreeAndOpenTasksEarnOneMoreTurn() async throws {
+        let plan = "{\"tasks\":[{\"task\":\"Read the page\",\"done\":false},{\"task\":\"Report the title\",\"done\":false}]}"
+        let finished = "{\"tasks\":[{\"task\":\"Read the page\",\"done\":true},{\"task\":\"Report the title\",\"done\":true}]}"
+        let transport = agentTransport(steps: [
+            OpenAIFixtures.toolCallStream(name: "update_task_list", arguments: plan, id: "t1"),
+            OpenAIFixtures.toolCallStream(name: "get_page_text", arguments: "{}", id: "c1"),
+            OpenAIFixtures.answerStream("Premature answer."),
+            OpenAIFixtures.toolCallStream(name: "update_task_list", arguments: finished, id: "t2"),
+            OpenAIFixtures.answerStream("The title is Riverside Book Club.")
+        ])
+        let dispatcher = RecordingDispatcher()
+        let client = OpenAIEndpointClient(baseURL: try .normalize("http://h:1/v1"), apiKey: nil, transport: transport)
+        let outcome = try await OpenAIAgentLoop(client: client, model: model, dispatcher: dispatcher).run(.init(
+            prompt: "What is the title?", history: [], tabId: nil, allowActions: false, maxSteps: 1, maxTokens: 64, temperature: nil
+        ))
+        XCTAssertTrue(outcome.completed)
+        XCTAssertEqual(outcome.answer, "The title is Riverside Book Club.")
+        XCTAssertEqual(outcome.steps.count, 1, "task-list updates do not use browser steps")
+        XCTAssertEqual(dispatcher.calls.map(\.method), ["get-page-text"])
+        XCTAssertEqual(outcome.tasks.map(\.done), [true, true])
+        let reminderBody = try XCTUnwrap(transport.requests[3].httpBody)
+        XCTAssertTrue(String(bytes: reminderBody, encoding: .utf8)?.contains("unfinished tasks") == true)
     }
 
     func testMalformedToolArgumentsAreFedBackNotDispatched() async throws {

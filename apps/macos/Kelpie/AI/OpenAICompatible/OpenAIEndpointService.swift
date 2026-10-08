@@ -230,6 +230,9 @@ private final class ResultBox<T>: @unchecked Sendable {
 
 private enum UnifiedError {
     static func map(_ error: Error, cancelled: Bool) -> Error {
+        if let failure = error as? OpenAIAgentLoop.Failure {
+            return cancelled ? OpenAIAgentLoop.Failure(error: .cancelled, steps: failure.steps, reasoning: failure.reasoning) : failure
+        }
         if cancelled || error is CancellationError { return OpenAIEndpointError.cancelled }
         if let urlError = error as? URLError, urlError.code == .cancelled { return OpenAIEndpointError.cancelled }
         return error

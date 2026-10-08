@@ -29,8 +29,16 @@ struct AIChatReply: Equatable {
     }
 
     init(response: [String: Any]) {
-        text = response["response"] as? String ?? ""
+        let answer = response["response"] as? String ?? ""
+        text = (response["completed"] as? Bool) == false ? "⚠︎ Step budget used up. \(answer)" : answer
         var lines: [String] = []
+        if let tasks = response["tasks"] as? [[String: Any]], !tasks.isEmpty {
+            lines.append("Tasks:")
+            for task in tasks {
+                lines.append("\((task["done"] as? Bool ?? false) ? "✓" : "○") \(task["task"] as? String ?? "")")
+            }
+            lines.append("")
+        }
         if let steps = response["steps"] as? [[String: Any]], !steps.isEmpty {
             for (index, step) in steps.enumerated() {
                 let mark = (step["ok"] as? Bool ?? false) ? "✓" : "✗"
@@ -50,4 +58,10 @@ struct AIChatReply: Equatable {
         }
         detail = lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
+}
+
+/// An agent run that failed after taking steps.
+struct AIChatFailure: Error {
+    let message: String
+    let reply: AIChatReply
 }

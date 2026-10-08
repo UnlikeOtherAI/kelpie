@@ -174,11 +174,11 @@ export function findEndpoint(endpoints: readonly EndpointSummary[], ref: string)
   return folded.length === 1 ? folded[0] : undefined;
 }
 
-/** `--max-steps`: a whole number from 1 to the contract maximum of 25. */
+/** `--max-steps`: a whole number from 1 to the contract maximum of 40. */
 export function parseMaxSteps(value: string): number {
   const steps = Number(value);
-  if (!/^\d+$/.test(value.trim()) || steps < 1 || steps > 25) {
-    throw new EndpointInputError("INVALID_PARAMS", "--max-steps must be a whole number from 1 to 25.");
+  if (!/^\d+$/.test(value.trim()) || steps < 1 || steps > 40) {
+    throw new EndpointInputError("INVALID_PARAMS", "--max-steps must be a whole number from 1 to 40.");
   }
   return steps;
 }

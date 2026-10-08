@@ -116,6 +116,8 @@ final class AIEndpointState: ObservableObject {
         let response = await dispatch("ai-endpoint-save", body)
         if response["success"] as? Bool == true {
             formError = nil
+            // Earlier test notes describe the previous configuration.
+            if let id = form.id { notes[id] = nil }
             return true
         }
         formError = Self.errorMessage(response)

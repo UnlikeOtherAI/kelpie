@@ -45,6 +45,8 @@ final class AIChatSession: ObservableObject {
                 allowActions: allowActions
             )
             messages.append(AIChatMessage(role: .assistant, text: reply.text, detail: reply.detail))
+        } catch let failure as AIChatFailure {
+            messages.append(AIChatMessage(role: .assistant, text: "⚠︎ \(failure.message)", detail: failure.reply.detail))
         } catch {
             errorMessage = error.localizedDescription
         }

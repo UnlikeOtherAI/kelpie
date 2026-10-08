@@ -133,7 +133,7 @@ export function registerAI(program: Command): void {
     .option("--agent", "Run the browser-agent tool loop (default for OpenAI-compatible endpoints when no context is given)")
     .option("--no-agent", "Plain inference only, no tool loop")
     .option("--allow-actions", "Let the agent click, fill, select and check in the pinned tab (read-only otherwise)")
-    .option("--max-steps <n>", "Maximum agent tool steps, 1-25 (device default 12)")
+    .option("--max-steps <n>", "Maximum browser tool steps, 1-40 (device default 20); when it runs out the model gives a final report")
     .action(async (prompt: string, opts: AskOptions) => {
       let body: Record<string, unknown>;
       try {

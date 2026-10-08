@@ -12,6 +12,8 @@ struct AIPanelActionButton: View {
     var body: some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(prominent ? Color.white : (isEnabled ? Color.primary : Color.secondary))
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
@@ -128,25 +130,31 @@ private struct AIEndpointCardView: View {
         )
     }
 
+    /// Two rows so the narrow panel never wraps a label: the connection
+    /// actions first, then configuration.
     private var actions: some View {
-        HStack(spacing: 6) {
-            AIPanelActionButton(
-                title: card.isActive ? "In use" : "Use",
-                accessibilityID: "browser.ai.openai.\(card.id).use",
-                prominent: true,
-                isEnabled: !isWorking && !card.isActive && card.model != nil
-            ) {
-                Task { await state.use(card.id, model: card.model) }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                AIPanelActionButton(
+                    title: card.isActive ? "In use" : "Use",
+                    accessibilityID: "browser.ai.openai.\(card.id).use",
+                    prominent: true,
+                    isEnabled: !isWorking && !card.isActive && card.model != nil
+                ) {
+                    Task { await state.use(card.id, model: card.model) }
+                }
+                AIPanelActionButton(title: isWorking ? "Working…" : "Test", accessibilityID: "browser.ai.openai.\(card.id).test", isEnabled: !isWorking) {
+                    Task { await state.test(card.id) }
+                }
+                AIPanelActionButton(title: "Refresh models", accessibilityID: "browser.ai.openai.\(card.id).models", isEnabled: !isWorking) {
+                    Task { await state.refreshModels(card.id) }
+                }
             }
-            AIPanelActionButton(title: isWorking ? "Working…" : "Test", accessibilityID: "browser.ai.openai.\(card.id).test", isEnabled: !isWorking) {
-                Task { await state.test(card.id) }
-            }
-            AIPanelActionButton(title: "Models", accessibilityID: "browser.ai.openai.\(card.id).models", isEnabled: !isWorking) {
-                Task { await state.refreshModels(card.id) }
-            }
-            AIPanelActionButton(title: "Edit", accessibilityID: "browser.ai.openai.\(card.id).edit", isEnabled: !isWorking, action: onEdit)
-            AIPanelActionButton(title: "Remove", accessibilityID: "browser.ai.openai.\(card.id).remove", isEnabled: !isWorking) {
-                Task { await state.remove(card.id) }
+            HStack(spacing: 6) {
+                AIPanelActionButton(title: "Edit", accessibilityID: "browser.ai.openai.\(card.id).edit", isEnabled: !isWorking, action: onEdit)
+                AIPanelActionButton(title: "Remove", accessibilityID: "browser.ai.openai.\(card.id).remove", isEnabled: !isWorking) {
+                    Task { await state.remove(card.id) }
+                }
             }
         }
     }
@@ -192,8 +200,8 @@ private struct AIEndpointFormView: View {
             }
             field("Model ID", text: $form.model, id: "model", placeholder: "Use Models to discover, or type an ID")
             if !discoveredModels.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(discoveredModels.prefix(4), id: \.self) { model in
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(discoveredModels.prefix(6), id: \.self) { model in
                         AIPanelActionButton(title: model, accessibilityID: "browser.ai.openai.form.model.\(model)") {
                             form.model = model
                         }
@@ -236,16 +244,17 @@ private struct AIEndpointFormView: View {
     }
 
     private func tristate(_ label: String, value: Binding<String>, id: String) -> some View {
-        HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
-            Spacer()
-            ForEach(["unknown", "yes", "no"], id: \.self) { option in
-                AIPanelActionButton(
-                    title: option.capitalized,
-                    accessibilityID: "browser.ai.openai.form.\(id).\(option)",
-                    prominent: value.wrappedValue == option
-                ) {
-                    value.wrappedValue = option
+            HStack(spacing: 4) {
+                ForEach(["unknown", "yes", "no"], id: \.self) { option in
+                    AIPanelActionButton(
+                        title: option.capitalized,
+                        accessibilityID: "browser.ai.openai.form.\(id).\(option)",
+                        prominent: value.wrappedValue == option
+                    ) {
+                        value.wrappedValue = option
+                    }
                 }
             }
         }

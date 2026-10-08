@@ -139,6 +139,9 @@ struct OpenAIInference {
                     "response": outcome.answer,
                     "reasoning": outcome.reasoning.isEmpty ? NSNull() : outcome.reasoning as Any,
                     "steps": outcome.steps.map(\.json),
+                    "tasks": outcome.tasks.map(\.json),
+                    "completed": outcome.completed,
+                    "stopReason": outcome.stopReason,
                     "rounds": outcome.rounds,
                     "finishReason": outcome.finishReason ?? NSNull(),
                     "tokensUsed": outcome.promptTokens + outcome.completionTokens
@@ -159,6 +162,13 @@ struct OpenAIInference {
             payload["model"] = model
             payload["inferenceTimeMs"] = Int((DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds) / 1_000_000)
             return successResponse(payload)
+        } catch let failure as OpenAIAgentLoop.Failure {
+            Task { try? await service.refreshHealth(config.id) }
+            var response = failure.error.response
+            response["backend"] = "openai"
+            response["steps"] = failure.steps.map(\.json)
+            if !failure.reasoning.isEmpty { response["reasoning"] = failure.reasoning }
+            return response
         } catch let error as OpenAIEndpointError {
             if case .cancelled = error {} else {
                 // A failure may mean the endpoint changed state; re-check now
