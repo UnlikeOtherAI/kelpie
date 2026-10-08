@@ -144,7 +144,10 @@ struct OpenAIInference {
                     "stopReason": outcome.stopReason,
                     "rounds": outcome.rounds,
                     "finishReason": outcome.finishReason ?? NSNull(),
-                    "tokensUsed": outcome.promptTokens + outcome.completionTokens
+                    // Servers that send no usage frames leave this unknown rather than 0.
+                    "tokensUsed": outcome.promptTokens + outcome.completionTokens > 0
+                        ? (outcome.promptTokens + outcome.completionTokens) as Any
+                        : NSNull()
                 ]
             } else {
                 let body = singleShotBody(request, model: model)
@@ -154,7 +157,7 @@ struct OpenAIInference {
                     "response": answer,
                     "reasoning": result.reasoning.isEmpty ? NSNull() : result.reasoning as Any,
                     "finishReason": result.finishReason ?? NSNull(),
-                    "tokensUsed": result.usage?.totalTokens ?? max(1, answer.count / 4)
+                    "tokensUsed": result.usage?.totalTokens.map { $0 as Any } ?? NSNull()
                 ]
             }
             payload["backend"] = "openai"

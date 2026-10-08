@@ -138,6 +138,27 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         XCTAssertEqual((screenshot?["error"] as? [String: Any])?["code"] as? String, "VISION_NOT_SUPPORTED")
     }
 
+    func testToolProbeOnlyCountsAWellFormedCall() async throws {
+        let transport = FakeOpenAITransport { request in
+            if request.url?.path.hasSuffix("/models") == true {
+                return .init(body: OpenAIFixtures.json(OpenAIFixtures.strataModels))
+            }
+            let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: Any] ?? [:]
+            if body["tools"] != nil {
+                // A call that names the tool but omits the required timezone.
+                return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.toolCallStream(name: "get_time", arguments: "{}"))
+            }
+            return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.answerStream("OK"))
+        }
+        let service = OpenAIFixtures.service(transport: transport)
+        let saved = try await service.save(draft())
+        let outcome = try await service.test(saved.id, model: nil, generate: true, tools: true)
+        XCTAssertEqual(outcome.generation?.ok, true)
+        XCTAssertEqual(outcome.toolCalling?.ok, false)
+        let config = try await service.resolve(saved.id)
+        XCTAssertEqual(config.capabilities.toolCalling, OpenAICapability(value: false, source: .test))
+    }
+
     func testCancelAllCancelsInFlightRun() async throws {
         let service = OpenAIFixtures.service(transport: modelsTransport())
         let saved = try await service.save(draft())

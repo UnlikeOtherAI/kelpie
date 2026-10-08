@@ -156,10 +156,13 @@ extension OpenAIEndpointService {
             guard let call = result.toolCalls.first else {
                 return (false, "The model answered without calling the tool.")
             }
-            guard call.name == "get_time", let args = call.parsedArguments else {
-                return (false, "The model produced an invalid tool call (\(call.name)).")
+            // Only a well-formed call with the required argument counts as evidence.
+            guard call.name == "get_time",
+                  let timezone = call.parsedArguments?["timezone"] as? String,
+                  !timezone.trimmingCharacters(in: .whitespaces).isEmpty else {
+                return (false, "The model's tool call was not a valid get_time call with a timezone (\(call.name): \(call.arguments.prefix(80))).")
             }
-            return (true, "Called get_time with \(args["timezone"] as? String ?? "?").")
+            return (true, "Called get_time with timezone \(timezone).")
         } catch {
             let mapped = (error as? OpenAIEndpointError) ?? .unreachable(error.localizedDescription)
             return (false, mapped.message)
