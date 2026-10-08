@@ -5,12 +5,15 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 namespace kelpie::linuxapp {
 namespace {
@@ -25,6 +28,8 @@ std::string HttpStatusText(int status) {
       return "No Content";
     case 400:
       return "Bad Request";
+    case 401:
+      return "Unauthorized";
     case 404:
       return "Not Found";
     case 405:
@@ -45,10 +50,7 @@ std::string TextResponse(int status, std::string_view body, std::string_view con
   stream << "HTTP/1.1 " << status << ' ' << HttpStatusText(status) << "\r\n"
          << "Content-Type: " << content_type << "\r\n"
          << "Content-Length: " << body.size() << "\r\n"
-         << "Connection: close\r\n"
-         << "Access-Control-Allow-Origin: *\r\n"
-         << "Access-Control-Allow-Headers: Content-Type\r\n"
-         << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\r\n"
+         << "Connection: close\r\n\r\n"
          << body;
   return stream.str();
 }
@@ -129,6 +131,48 @@ json ParseJsonBody(const std::string& request) {
   }
 }
 
+/** Every `Authorization` header value in the request head (case-insensitive name). */
+std::vector<std::string> AuthorizationValues(const std::string& request) {
+  std::vector<std::string> values;
+  const std::size_t header_end = request.find("\r\n\r\n");
+  std::istringstream lines(request.substr(0, header_end));
+  std::string line;
+  std::getline(lines, line);  // request line
+  while (std::getline(lines, line)) {
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    const std::size_t colon = line.find(':');
+    if (colon == std::string::npos) continue;
+    std::string name = line.substr(0, colon);
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (name != "authorization") continue;
+    const std::size_t start = line.find_first_not_of(' ', colon + 1);
+    values.push_back(start == std::string::npos ? std::string() : line.substr(start));
+  }
+  return values;
+}
+
+bool ConstantTimeEqual(std::string_view lhs, std::string_view rhs) {
+  if (lhs.size() != rhs.size()) return false;
+  unsigned char diff = 0;
+  for (std::size_t i = 0; i < lhs.size(); ++i) {
+    diff |= static_cast<unsigned char>(lhs[i] ^ rhs[i]);
+  }
+  return diff == 0;
+}
+
+/** True when the request carries exactly one `Bearer <token>` header. */
+bool HasControlToken(const std::string& request, const std::string& token) {
+  const std::vector<std::string> values = AuthorizationValues(request);
+  if (token.empty() || values.size() != 1) return false;
+  constexpr std::string_view scheme = "bearer ";
+  const std::string& value = values.front();
+  if (value.size() <= scheme.size()) return false;
+  for (std::size_t i = 0; i < scheme.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(value[i])) != scheme[i]) return false;
+  }
+  return ConstantTimeEqual(std::string_view(value).substr(scheme.size()), token);
+}
+
 }  // namespace
 
 HttpServer::HttpServer() = default;
@@ -137,10 +181,18 @@ HttpServer::~HttpServer() {
   Stop();
 }
 
-bool HttpServer::Start(int preferred_port, RequestHandler handler, std::string* error) {
+bool HttpServer::Start(int preferred_port, std::string control_token, RequestHandler handler,
+                       std::string* error) {
   if (running_) {
     return true;
   }
+  if (control_token.empty()) {
+    if (error != nullptr) {
+      *error = "A control token is required";
+    }
+    return false;
+  }
+  control_token_ = std::move(control_token);
   handler_ = std::move(handler);
   if (!Bind(preferred_port, error)) {
     return false;
@@ -189,7 +241,8 @@ bool HttpServer::Bind(int preferred_port, std::string* error) {
 
   sockaddr_in address{};
   address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  // Loopback only: the control API is never reachable from the network.
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
   for (int candidate = preferred_port; candidate < preferred_port + 50; ++candidate) {
     address.sin_port = htons(static_cast<std::uint16_t>(candidate));
@@ -228,9 +281,7 @@ void HttpServer::AcceptLoop() {
 
     int status = 200;
     std::string response;
-    if (method == "OPTIONS") {
-      response = TextResponse(204, "", "text/plain; charset=utf-8");
-    } else if (method == "GET" && path == "/health") {
+    if (method == "GET" && path == "/health") {
       response = JsonResponse(200, {{"status", "ok"}});
     } else if (method == "GET" && path == "/debug/coordinate-calibration") {
       const std::string page = ReadFile(CoordinateCalibrationPagePath());
@@ -246,6 +297,12 @@ void HttpServer::AcceptLoop() {
       } else {
         response = TextResponse(200, page, "text/html; charset=utf-8");
       }
+    } else if (method == "POST" && path.rfind("/v1/", 0) == 0 && !HasControlToken(request, control_token_)) {
+      status = 401;
+      response = JsonResponse(status, {
+          {"success", false},
+          {"error", {{"code", "UNAUTHORIZED"}, {"message", "Authentication required"}}},
+      });
     } else if (method == "POST" && path.rfind("/v1/", 0) == 0) {
       const json body = ParseJsonBody(request);
       const json payload = handler_ != nullptr ? handler_(path.substr(4), body, &status) : json::object();

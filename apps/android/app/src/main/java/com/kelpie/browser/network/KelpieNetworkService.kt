@@ -114,7 +114,10 @@ class KelpieNetworkService : Service() {
     private fun buildNotification(): Notification {
         val openAppIntent =
             Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                // SINGLE_TOP reuses the running MainActivity. Without it CLEAR_TOP
+                // finishes and recreates it, which tears down every tab and the
+                // HTTP server — losing pending pair prompts and issued tokens.
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         val pendingIntent =
             PendingIntent.getActivity(

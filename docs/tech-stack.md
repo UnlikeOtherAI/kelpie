@@ -7,7 +7,7 @@
 | **iOS App** | SwiftUI + WKWebView | Swift | Native WebKit browser, Bonjour for mDNS |
 | **Android App** | Jetpack Compose + WebView | Kotlin | Chrome DevTools Protocol for DOM access |
 | **macOS App** | SwiftUI + WKWebView + CEF | Swift | Dual Safari/WebKit and Chrome/Chromium renderers, macOS 14+ |
-| **Linux App** | C++17 + GTK3 + CEF + Avahi | C++ | Chromium-only desktop shell with optional headless mode |
+| **Linux App** | C++17 + GTK3 + CEF | C++ | Chromium-only desktop shell with optional headless mode |
 | **CLI** | Node.js | TypeScript | Published as `@unlikeotherai/kelpie` |
 | **MCP Servers** | MCP SDK | Per-platform | Browser-embedded + CLI standalone |
 

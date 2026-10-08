@@ -32,7 +32,10 @@ import type { DiscoveredDevice } from "../types.js";
 /** Pairing truth, looked up exactly as sendCommand would for this device. */
 async function defaultIsPaired(device: DiscoveredDevice): Promise<boolean> {
   if (getSessionCache().get(device.id, device.ip, device.port)) return true;
-  return (await getTokenStore().get(device.id, device.ip, device.port)) !== undefined;
+  if ((await getTokenStore().get(device.id, device.ip, device.port)) !== undefined) return true;
+  // An approval pinned to another of this device's sockets is reused too.
+  return getSessionCache().pinnedHosts(device.id, device.port).length > 0 ||
+    (await getTokenStore().pinnedHosts(device.id, device.port)).length > 0;
 }
 
 function answeringBinaryPath(): string {

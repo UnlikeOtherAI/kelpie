@@ -77,14 +77,6 @@ if(NOT KELPIE_LINUX_HEADLESS_ONLY)
   endif()
 endif()
 
-set(KELPIE_LINUX_HAS_AVAHI 0)
-if(PkgConfig_FOUND)
-  pkg_check_modules(AVAHI_CLIENT IMPORTED_TARGET avahi-client)
-  if(AVAHI_CLIENT_FOUND)
-    set(KELPIE_LINUX_HAS_AVAHI 1)
-  endif()
-endif()
-
 set(KELPIE_LINUX_HAS_FONTCONFIG 0)
 if(PkgConfig_FOUND)
   pkg_check_modules(FONTCONFIG IMPORTED_TARGET fontconfig)
@@ -121,10 +113,9 @@ target_include_directories(kelpie-linux
 target_compile_definitions(kelpie-linux
   PRIVATE
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
-    KELPIE_LINUX_HAS_AVAHI=${KELPIE_LINUX_HAS_AVAHI}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.1.5"
+    KELPIE_LINUX_VERSION="0.1.6"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -133,10 +124,6 @@ endif()
 
 if(KELPIE_LINUX_HAS_GTK)
   target_link_libraries(kelpie-linux PRIVATE PkgConfig::GTK3)
-endif()
-
-if(KELPIE_LINUX_HAS_AVAHI)
-  target_link_libraries(kelpie-linux PRIVATE PkgConfig::AVAHI_CLIENT)
 endif()
 
 if(KELPIE_LINUX_HAS_FONTCONFIG)
@@ -219,18 +206,28 @@ if(KELPIE_LINUX_HAS_CEF)
   endforeach()
 endif()
 
+# Both variants share the local-control contract: a profile lock and a
+# per-launch bearer token published in readiness.json.
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
+target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account)
+target_sources(kelpie-linux PRIVATE src/profile_session.cpp)
+if(BUILD_TESTING)
+  add_executable(linux_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
+  target_include_directories(linux_profile_session_test PRIVATE src)
+  target_compile_options(linux_profile_session_test PRIVATE -UNDEBUG)
+  target_link_libraries(linux_profile_session_test PRIVATE kelpie_desktop_account)
+  add_test(NAME linux_profile_session_test COMMAND linux_profile_session_test)
+endif()
+
 if(KELPIE_LINUX_HAS_CEF)
-  add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
-  target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account)
-  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp src/profile_session.cpp)
-  if(BUILD_TESTING)
-    add_executable(linux_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)
-    target_include_directories(linux_profile_session_test PRIVATE src)
-    target_compile_options(linux_profile_session_test PRIVATE -UNDEBUG)
-    target_link_libraries(linux_profile_session_test PRIVATE kelpie_desktop_account)
-    add_test(NAME linux_profile_session_test COMMAND linux_profile_session_test)
-  endif()
+  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp)
 else()
-  target_include_directories(kelpie-linux PRIVATE "${KELPIE_NATIVE_ROOT}/desktop-account")
-  target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/mdns_avahi.cpp src/stub_renderer.cpp)
+  target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)
+  if(BUILD_TESTING)
+    add_executable(linux_http_server_test tests/http_server_test.cpp src/http_server.cpp)
+    target_include_directories(linux_http_server_test PRIVATE src)
+    target_compile_options(linux_http_server_test PRIVATE -UNDEBUG)
+    target_link_libraries(linux_http_server_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+    add_test(NAME linux_http_server_test COMMAND linux_http_server_test)
+  endif()
 endif()
