@@ -109,6 +109,7 @@ export const aiAskTool: BrowserToolDef = {
     temperature: z.number().optional().describe("Temperature (default 0.7)"),
     agent: z.boolean().optional().describe("Run the browser-agent tool loop (OpenAI-compatible endpoints; default true when no context, text or messages are given)"),
     allowActions: z.boolean().optional().describe("Let the agent click, fill, select and check in the pinned tab only (default false: read-only)"),
+    tabId: z.string().optional().describe("Tab the agent is pinned to for the whole run (macOS: required when several tabs are open; use kelpie_get_tabs). The model cannot change it."),
     maxSteps: z.number().int().min(1).max(40).optional().describe("Maximum browser tool steps (default 20, maximum 40). Task-list updates are free. When the budget runs out the model gives a final report and the result has completed: false, stopReason: step_limit"),
   },
   bodyFromArgs: aiAskBody,
