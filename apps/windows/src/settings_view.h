@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <functional>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -27,7 +28,8 @@ class SettingsView {
   bool ShowModal(HINSTANCE instance,
                  HWND owner,
                  const SettingsValues& initial_values,
-                 SettingsValues& updated_values);
+                 SettingsValues& updated_values,
+                 std::function<void(HWND)> show_ai = {});
 };
 
 }  // namespace kelpie::windows

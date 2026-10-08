@@ -38,6 +38,10 @@ struct AIHandler {
         router.register("ai-catalog") { _ in await catalog() }
         router.register("ai-fitness") { body in await fitness(body) }
         OpenAIEndpointHandler(service: openAIService, host: Self.openAIHost).register(on: router)
+        router.register("ai-cancel") { _ in
+            LocalInference.shared.cancel()
+            return successResponse(["cancelled": await openAIService.cancelAll()])
+        }
     }
 
     private static let authRequiredResponse = errorResponse(
@@ -75,6 +79,9 @@ struct AIHandler {
     }
 
     private func status() async -> [String: Any] {
+        if await MainActor.run(body: { AIState.shared.backend }) == "native" {
+            return await LocalInference.shared.execute("status")
+        }
         if await MainActor.run(body: { AIState.shared.backend }) == "openai",
            let openAIStatus = await openAI.status() {
             return openAIStatus
@@ -97,6 +104,7 @@ struct AIHandler {
     }
 
     private func load(_ body: [String: Any]) async -> [String: Any] {
+        if body["backend"] as? String == "native" { return await LocalInference.shared.load(body) }
         let start = CFAbsoluteTimeGetCurrent()
         let model = (body["model"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -117,6 +125,7 @@ struct AIHandler {
 
             do {
                 try await validateOllamaModel(model: ollamaModel, endpoint: endpoint)
+                _ = await LocalInference.shared.execute("unload")
                 await openAIService.clearActive()
                 await MainActor.run {
                     AIState.shared.activateOllama(model: ollamaModel, endpoint: endpoint)
@@ -148,6 +157,7 @@ struct AIHandler {
             )
         }
 
+        _ = await LocalInference.shared.execute("unload")
         await openAIService.clearActive()
         let payload = await MainActor.run { () -> [String: Any] in
             let state = AIState.shared
@@ -163,6 +173,9 @@ struct AIHandler {
     }
 
     private func unload() async -> [String: Any] {
+        LocalInference.shared.cancel()
+        let local = await LocalInference.shared.execute("unload")
+        guard local["success"] as? Bool == true else { return local }
         await openAIService.clearActive()
         return await MainActor.run {
             AIState.shared.activatePlatform()
@@ -177,6 +190,8 @@ struct AIHandler {
         }
 
         switch stateSnapshot.backend {
+        case "native":
+            return await inferWithLocal(body)
         case "openai":
             return await inferWithOpenAI(body)
         case "ollama":

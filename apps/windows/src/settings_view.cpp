@@ -26,6 +26,7 @@ class SettingsDialogState {
   HWND profile_edit = nullptr;
   HWND url_edit = nullptr;
   HWND isolate_check = nullptr;
+  std::function<void(HWND)> show_ai;
 };
 
 std::wstring WindowText(HWND hwnd) {
@@ -85,6 +86,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
                    state->values.isolate_new_tabs ? BST_CHECKED : BST_UNCHECKED, 0);
       CreateWindowExW(0, L"BUTTON", L"Save", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       248, 168, 88, 28, hwnd, reinterpret_cast<HMENU>(IDOK), nullptr, nullptr);
+      CreateWindowExW(0, L"BUTTON", L"Local AI", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
+                      16, 168, 100, 28, hwnd, reinterpret_cast<HMENU>(3250), nullptr, nullptr);
       CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       344, 168, 88, 28, hwnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
       return 0;
@@ -115,6 +118,9 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
     }
     case WM_COMMAND:
       switch (LOWORD(wparam)) {
+        case 3250:
+          if (state->show_ai) state->show_ai(hwnd);
+          return 0;
         case IDC_SETTINGS_PROFILE_BROWSE: {
           BROWSEINFOW browse{};
           browse.hwndOwner = hwnd;
@@ -163,7 +169,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
 bool SettingsView::ShowModal(HINSTANCE instance,
                              HWND owner,
                              const SettingsValues& initial_values,
-                             SettingsValues& updated_values) {
+                             SettingsValues& updated_values,
+                             std::function<void(HWND)> show_ai) {
   const wchar_t kClassName[] = L"KelpieSettingsDialog";
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = &SettingsProc;
@@ -173,6 +180,7 @@ bool SettingsView::ShowModal(HINSTANCE instance,
   RegisterClassW(&window_class);
 
   SettingsDialogState state(initial_values, updated_values);
+  state.show_ai = std::move(show_ai);
   HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, kClassName, L"Settings",
                                 WS_POPUP | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT,
                                 456, 250, owner, nullptr, instance, &state);

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.kelpie.browser.ai.AIState
 import com.kelpie.browser.ai.openai.OpenAIRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
 
 @Composable
 internal fun AIStatusSheet(onDismiss: () -> Unit) {
@@ -33,6 +34,14 @@ internal fun AIStatusSheet(onDismiss: () -> Unit) {
     val revisionFlow = remember { if (OpenAIRuntime.isInitialized) OpenAIRuntime.service.revision else MutableStateFlow(0L) }
     val revision by revisionFlow.collectAsState()
     val openAIEndpoint = if (revision >= 0 && AIState.backend == AIState.OPENAI_BACKEND) OpenAIRuntime.service.activeEndpoint() else null
+    val ready =
+        if (openAIEndpoint != null) {
+            OpenAIRuntime.service.healthPublic(openAIEndpoint.id)["state"] == "ready"
+        } else if (AIState.backend == AIState.PLATFORM_BACKEND) {
+            AIState.isAvailable
+        } else {
+            AIState.activeModel != null
+        }
 
     Column(
         modifier =
@@ -44,14 +53,14 @@ internal fun AIStatusSheet(onDismiss: () -> Unit) {
         Text("Local AI", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.size(12.dp))
         AIInfoRow("Backend", backendLabel(AIState.backend))
-        AIInfoRow("Availability", if (AIState.isAvailable) "Available" else "Unavailable")
+        AIInfoRow("Availability", if (ready) "Available" else "Unavailable")
         val activeModel =
             openAIEndpoint?.let {
                 OpenAIRuntime.service.store
                     .active()
                     ?.model ?: it.model
             }
-                ?: AIState.activeModel
+                ?: AIState.activeModel?.let { if (AIState.backend == "native") File(it).name else it }
                 ?: if (AIState.isAvailable) "Platform AI" else "None"
         AIInfoRow("Active Model", activeModel)
         AIInfoRow(
@@ -65,14 +74,16 @@ internal fun AIStatusSheet(onDismiss: () -> Unit) {
         Spacer(Modifier.size(12.dp))
         Text(
             text =
-                if (AIState.isAvailable) {
+                if (ready) {
                     "AI is available from the browser shell and the HTTP API."
                 } else {
-                    "Platform AI is unavailable on this device right now. You can still use an OpenAI-compatible endpoint or an Ollama model."
+                    "Import a GGUF for on-device inference, or select a reachable LAN endpoint for a larger model."
                 },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.size(16.dp))
+        LocalModelSection()
         Spacer(Modifier.size(16.dp))
         OpenAIEndpointsSection()
         Spacer(Modifier.size(16.dp))
@@ -86,6 +97,7 @@ private fun backendLabel(backend: String): String =
     when (backend) {
         AIState.OLLAMA_BACKEND -> "Ollama"
         AIState.OPENAI_BACKEND -> "OpenAI-compatible"
+        "native" -> "On-device GGUF"
         else -> "Platform"
     }
 

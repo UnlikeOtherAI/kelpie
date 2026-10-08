@@ -31,6 +31,7 @@ add_subdirectory(${KELPIE_NATIVE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/kelpie-native)
 add_library(kelpie_jni SHARED
   kelpie_jni.cpp
   address_input_jni.cpp
+  local_inference_jni.cpp
 )
 
 target_link_libraries(kelpie_jni

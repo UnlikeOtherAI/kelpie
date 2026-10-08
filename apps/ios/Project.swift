@@ -8,7 +8,9 @@ let iOSLinkerFlags: SettingValue = .array([
     "-lkelpie_core_automation",
     "-lkelpie_core_mcp",
     "-lkelpie_core_ai",
+    "-lllama", "-lggml", "-lggml-base", "-lggml-cpu",
     "-framework AppIntents",
+    "-framework Accelerate",
     "-lc++",
 ])
 
@@ -41,6 +43,7 @@ let kelpieApp = Target.target(
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
+        .glob(pattern: "../../native/licenses/*.txt"),
     ],
     dependencies: [
         .package(product: "AppReveal"),
@@ -62,12 +65,15 @@ let kelpieApp = Target.target(
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-automation",
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-mcp",
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-ai",
+                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/src",
+                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src",
+                "$(KELPIE_NATIVE_BUILD_DIR)/_deps/kelpie_llama-build/ggml/src/ggml-cpu",
             ]),
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.12",
-            "CURRENT_PROJECT_VERSION": "12",
+            "MARKETING_VERSION": "0.1.13",
+            "CURRENT_PROJECT_VERSION": "13",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator

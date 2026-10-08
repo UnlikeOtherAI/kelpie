@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Reads and switches Kelpie's active AI backend (AIState on Android, a fake in tests). */
 interface BackendSelector {
+    suspend fun prepareOpenAI() {}
+
     fun currentBackend(): String
 
     fun selectOpenAI()
@@ -194,6 +196,7 @@ class OpenAIEndpointService(
             val code = if (state == HealthState.AUTH_FAILED) OpenAIErrorCode.ENDPOINT_AUTH_FAILED else OpenAIErrorCode.ENDPOINT_UNREACHABLE
             throw OpenAIException(code, healthOf(endpoint.id).message ?: "The endpoint is ${state.wire}")
         }
+        backend.prepareOpenAI()
         val current = store.get(endpoint.id) ?: endpoint
         if (current.model != selected) store.put(current.copy(model = selected))
         store.setActive(ActiveSelection(endpoint.id, selected))

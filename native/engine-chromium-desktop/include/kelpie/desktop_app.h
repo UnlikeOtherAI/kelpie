@@ -57,6 +57,8 @@ class DesktopApp {
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;
+    // Shell-specific services register before HTTP/MCP can dispatch requests.
+    std::function<void(DesktopRouter&)> register_handlers;
   };
 
   DesktopApp();

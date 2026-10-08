@@ -118,6 +118,16 @@ void TestCApiRoundTrip() {
 }
 
 void TestBestUrlCompletion() {
+  kelpie::HistoryStore legacy;
+  legacy.Record("https://github/", "Web page not available");
+  assert(legacy.BestUrlCompletion("GitHub").empty());
+  assert(legacy.BestUrlCompletion("https://git") == "https://github/");
+  legacy.Record("http://localhost:8420/page", "Local");
+  assert(legacy.BestUrlCompletion("local") == "http://localhost:8420/page");
+  legacy.Record("http://192.168.1.215/", "LAN");
+  assert(legacy.BestUrlCompletion("192.168") == "http://192.168.1.215/");
+  legacy.Record("https://github.com/", "GitHub");
+  assert(legacy.BestUrlCompletion("GitHub") == "https://github.com/");
   kelpie::HistoryStore store;
   store.Record("https://www.deepwater.example/path", "Deep Water");
   store.Record("https://second.example", "Second");

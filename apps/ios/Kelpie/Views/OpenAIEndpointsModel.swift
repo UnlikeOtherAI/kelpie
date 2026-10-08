@@ -103,6 +103,7 @@ final class OpenAIEndpointsModel: ObservableObject {
         await perform(id) { service in
             let health = try await service.select(id, model: nil)
             guard let active = await service.activeEndpoint() else { throw OpenAIEndpointError.endpointNotFound }
+            _ = await LocalInference.shared.execute("unload")
             await MainActor.run {
                 AIState.shared.activateOpenAI(model: active.model, capabilities: active.config.capabilities.legacyList)
             }

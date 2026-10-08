@@ -11,7 +11,7 @@ inference endpoints (Strata, llama.cpp `llama-server`, LM Studio, vLLM, Ollama's
 `/v1`, …). The selected endpoint + model becomes Kelpie's active AI backend
 (`backend: "openai"`) and drives both plain inference and Kelpie's built-in
 browser-agent tool loop. Existing `native`, `platform` and `ollama` backends are
-unchanged. Windows and Linux have no AI layer today and are out of scope.
+unchanged. Windows provides a text-only implementation with explicit probes and a native settings window; its differences are listed in [local-gguf.md](local-gguf.md). The streaming/agent sections below apply to Apple and Android clients. Linux has no AI layer.
 
 ## Principles
 

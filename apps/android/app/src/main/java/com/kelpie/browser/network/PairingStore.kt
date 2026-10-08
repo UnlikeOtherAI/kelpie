@@ -10,7 +10,6 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
-import kotlin.experimental.xor
 
 /**
  * State + storage for the pairing/auth system on Android.
@@ -96,9 +95,9 @@ class PairingStore(
             if (lhs.length != rhs.length) return false
             val a = lhs.toByteArray(Charsets.US_ASCII)
             val b = rhs.toByteArray(Charsets.US_ASCII)
-            var diff: Byte = 0
-            for (i in a.indices) diff = diff xor (a[i] xor b[i])
-            return diff == 0.toByte()
+            var diff = 0
+            for (i in a.indices) diff = diff or (a[i].toInt() xor b[i].toInt())
+            return diff == 0
         }
 
         fun generateToken(): String {

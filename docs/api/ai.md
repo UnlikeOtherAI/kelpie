@@ -4,10 +4,10 @@ AI methods expose the active local inference backend on each device. The HTTP sh
 
 - macOS: native GGUF via `llama.cpp` or remote Ollama
 - iOS: platform AI (Apple Intelligence) by default when supported, with remote Ollama as an override
-- Android: remote Ollama or OpenAI-compatible endpoints; the Gemini Nano SDK integration is not yet implemented
+- Windows, Android and iOS: embedded CPU GGUF text inference (`backend: native`); see [local GGUF and Windows remote inference](local-gguf.md). Android also supports remote Ollama/OpenAI endpoints.
 - macOS, iOS and Android: user-configured OpenAI-compatible endpoints (`backend: "openai"`) — Strata, llama.cpp, LM Studio, vLLM, Ollama `/v1` and others. Their management methods (`ai-endpoints`, `ai-endpoint-save`, `ai-endpoint-remove`, `ai-endpoint-models`, `ai-endpoint-test`, `ai-endpoint-health`, `ai-cancel`) and the `openai` fields of `ai-load`, `ai-status` and `ai-infer` are documented in [ai-endpoints.md](ai-endpoints.md).
 
-Windows and Linux do not yet register AI handlers. iOS platform AI is text-only. Vision and audio inference require a backend that supports those inputs.
+Linux does not yet register AI handlers. Windows supports inference and OpenAI-compatible endpoint methods; recording and catalog methods remain unavailable. iOS platform AI is text-only. Vision and audio inference require a backend that supports those inputs.
 
 ## Methods
 
@@ -45,7 +45,7 @@ Switches the active backend.
 
 - On iOS and Android, omitting `model` or passing `"platform"` switches back to platform AI.
 - Passing an `ollama:`-prefixed model switches the device to remote Ollama.
-- Plain GGUF model IDs and direct GGUF paths are not supported on mobile.
+- `backend: native` loads an imported GGUF path on Windows, iOS and Android. Catalog IDs are not file paths.
 
 Examples:
 
