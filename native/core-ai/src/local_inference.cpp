@@ -64,11 +64,16 @@ void LocalInference::Unload() {
   context_ = nullptr; model_ = nullptr; path_.clear();
 }
 json LocalInference::Execute(const std::string& operation, const json& body) {
-  std::unique_lock lock(mutex_, std::try_to_lock);
+  std::unique_lock lock(mutex_, std::defer_lock);
+  if (operation == "unload") { Cancel(); lock.lock(); }
+  else if (!lock.try_lock()) return Error("AI_BUSY", "A local model operation is already running");
   if (!lock.owns_lock()) return Error("AI_BUSY", "A local model operation is already running");
   try {
     if (operation == "load") return Load(body);
-    if (operation == "infer") return Infer(body);
+    if (operation == "infer") {
+      if (body.value("agent", false)) throw Failure("TOOLS_NOT_SUPPORTED", "Local GGUF inference accepts text and page context only");
+      return Infer(body);
+    }
     if (operation == "unload") Unload();
     else if (operation != "status") throw Failure("INVALID_PARAM", "Unknown local inference operation");
     return {{"success", true}, {"backend", "native"}, {"loaded", model_ != nullptr},

@@ -92,7 +92,10 @@ json InferenceService::Probe(json& endpoint, bool generate) {
     try {
       models = Models(endpoint);
       for (const auto& model : models) if (model["id"] == endpoint.value("model", "")) listed = true;
-    } catch (const InferenceError& error) { if (error.code != "MODEL_DISCOVERY_UNSUPPORTED" || !generate) throw; }
+    } catch (const InferenceError& error) {
+      if (error.code != "MODEL_DISCOVERY_UNSUPPORTED") throw;
+      health["discoveryUnsupported"] = true;
+    }
     const auto model = endpoint.value("model", "");
     if (!model.empty()) health["state"] = listed ? "ready" : "model_missing";
     json result = {{"models", models}};
@@ -164,6 +167,7 @@ json InferenceService::Dispatch(const std::string& method, const json& body) {
     if (body.contains("model")) endpoint["model"] = body.at("model").get<std::string>();
     if (endpoint.value("model", "").empty()) throw InferenceError("NO_MODEL_SELECTED", "Select a model ID first");
     auto health = Probe(endpoint, false);
+    if (health["health"].value("discoveryUnsupported", false)) health = Probe(endpoint, true);
     if (health["health"]["state"] != "ready") throw InferenceError("MODEL_NOT_AVAILABLE", "Select a listed model or test generation first");
     Endpoint(endpoint.at("id")) = endpoint;
     settings_["activeEndpointId"] = endpoint.at("id"); settings_["backend"] = "openai"; Persist();

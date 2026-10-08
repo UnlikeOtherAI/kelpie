@@ -1,6 +1,9 @@
 package com.kelpie.browser.ai
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.kelpie.browser.ai.openai.OpenAIRuntime
 import com.kelpie.browser.storage.SecretStore
 
@@ -18,8 +21,8 @@ object AIState {
 
     var isAvailable: Boolean = false
         private set
-    var backend: String = PLATFORM_BACKEND
-    var activeModel: String? = null
+    var backend: String by mutableStateOf(PLATFORM_BACKEND)
+    var activeModel: String? by mutableStateOf(null)
     var ollamaEndpoint: String? = null
 
     var huggingFaceToken: String

@@ -7,6 +7,7 @@ int main(int argc, char** argv) {
   using json = nlohmann::json;
   assert(engine.Execute("status", {})["loaded"] == false);
   assert(engine.Execute("infer", {{"prompt", "Hello"}})["error"]["code"] == "NO_MODEL_LOADED");
+  assert(engine.Execute("infer", {{"prompt", "Hello"}, {"agent", true}})["error"]["code"] == "TOOLS_NOT_SUPPORTED");
   assert(engine.Execute("load", {{"model", "missing.gguf"}})["error"]["code"] == "MODEL_NOT_FOUND");
   assert(engine.Execute("load", {{"model", 123}})["error"]["code"] == "INVALID_PARAM");
   engine.Cancel();

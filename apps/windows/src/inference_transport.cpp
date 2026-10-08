@@ -24,7 +24,9 @@ InferenceURL ParseInferenceURL(const std::string& input) {
   raw = raw.substr(begin, raw.find_last_not_of(" \t\r\n") - begin + 1);
   if (raw.find_first_of("?#\r\n\t \\") != std::string::npos)
     throw InferenceError("INVALID_ENDPOINT_URL", "Endpoint must not contain a query, fragment or whitespace");
-  auto wide = utf::Utf8ToWideDisplay(raw);
+  auto decoded = utf::Utf8ToWide(raw);
+  if (!decoded) throw InferenceError("INVALID_ENDPOINT_URL", "Endpoint must contain valid UTF-8");
+  auto wide = *decoded;
   URL_COMPONENTS parts{}; parts.dwStructSize = sizeof(parts);
   parts.dwHostNameLength = parts.dwUrlPathLength = parts.dwUserNameLength = parts.dwPasswordLength = static_cast<DWORD>(-1);
   if (!WinHttpCrackUrl(wide.c_str(), wide.size(), 0, &parts) || parts.dwHostNameLength == 0 ||

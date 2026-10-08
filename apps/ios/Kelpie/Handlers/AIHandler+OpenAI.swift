@@ -26,6 +26,7 @@ extension AIHandler {
             return response
         }
         let capabilities = response["capabilities"] as? [String] ?? ["text"]
+        _ = await LocalInference.shared.execute("unload")
         await MainActor.run {
             AIState.shared.activateOpenAI(model: model, capabilities: capabilities)
         }

@@ -125,6 +125,7 @@ struct AIHandler {
 
             do {
                 try await validateOllamaModel(model: ollamaModel, endpoint: endpoint)
+                _ = await LocalInference.shared.execute("unload")
                 await openAIService.clearActive()
                 await MainActor.run {
                     AIState.shared.activateOllama(model: ollamaModel, endpoint: endpoint)
@@ -156,6 +157,7 @@ struct AIHandler {
             )
         }
 
+        _ = await LocalInference.shared.execute("unload")
         await openAIService.clearActive()
         let payload = await MainActor.run { () -> [String: Any] in
             let state = AIState.shared
@@ -189,7 +191,7 @@ struct AIHandler {
 
         switch stateSnapshot.backend {
         case "native":
-            return await LocalInference.shared.execute("infer", body: body)
+            return await inferWithLocal(body)
         case "openai":
             return await inferWithOpenAI(body)
         case "ollama":

@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.kelpie.browser.ai.LocalInference
+import com.kelpie.browser.ai.AIState
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -23,9 +24,11 @@ internal fun LocalModelSection() {
     val prefs = remember { context.getSharedPreferences("local-model", 0) }
     var path by remember { mutableStateOf(prefs.getString("path", null)) }
     var busy by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Import a small instruction GGUF for offline text inference. Use a LAN endpoint below for larger models.") }
     fun load(selected: String) {
         busy = true
+        loading = true
         message = "Loading on this device…"
         scope.launch {
             try {
@@ -39,6 +42,7 @@ internal fun LocalModelSection() {
                 }
             } finally {
                 busy = false
+                loading = false
             }
         }
     }
@@ -66,6 +70,18 @@ internal fun LocalModelSection() {
         path?.takeIf { File(it).isFile }?.let { selected ->
             TextButton(enabled = !busy, onClick = { load(selected) }) { Text("Use imported model") }
         }
-        if (busy) TextButton(onClick = { LocalInference.cancel() }) { Text("Cancel") }
+        if (AIState.backend == "native") {
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                scope.launch {
+                    LocalInference.execute("unload")
+                    AIState.backend = AIState.PLATFORM_BACKEND
+                    AIState.activeModel = null
+                    message = "On-device model unloaded"
+                    busy = false
+                }
+            }) { Text("Unload on-device model") }
+        }
+        if (loading) TextButton(onClick = { LocalInference.cancel() }) { Text("Cancel") }
     }
 }

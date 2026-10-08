@@ -18,10 +18,14 @@ int main() {
   std::filesystem::create_directories(directory);
   int calls = 0;
   bool fail = false;
+  bool discovery = true;
   auto request = [&](const std::string& base, const std::string& op, const std::string& key, const json* body) -> json {
     ++calls; assert(base == "http://localhost:11434/v1"); assert(key == "test-secret");
     if (fail) throw InferenceError("ENDPOINT_UNREACHABLE", "Offline");
-    if (op == "models") return {{"data", json::array({{{"id", "tiny"}}})}};
+    if (op == "models") {
+      if (!discovery) throw InferenceError("MODEL_DISCOVERY_UNSUPPORTED", "No model list");
+      return {{"data", json::array({{{"id", "tiny"}}})}};
+    }
     assert(body && body->at("model") == "tiny" && body->at("stream") == false);
     return {{"choices", json::array({{{"message", {{"content", "4"}}}, {"finish_reason", "stop"}}})}};
   };
@@ -35,6 +39,9 @@ int main() {
     assert(loaded["loaded"] == true);
     auto answer = service.Execute("ai-infer", {{"prompt", "2 + 2?"}, {"agent", false}});
     assert(answer["response"] == "4");
+    discovery = false;
+    assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
+    discovery = true;
     fail = true;
     assert(service.Execute("ai-infer", {{"prompt", "again"}})["error"]["code"] == "ENDPOINT_UNREACHABLE");
     assert(service.Execute("ai-status")["backend"] == "openai");

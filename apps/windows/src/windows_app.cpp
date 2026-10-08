@@ -298,6 +298,7 @@ bool WindowsApp::TryCompleteClose() {
 }
 
 void WindowsApp::OnWindowCloseRequested() {
+  if (inference_) inference_->Cancel();
   if (account_) account_->Shutdown();
   close_lifecycle_.Request();
   if (desktop_app_ != nullptr) desktop_app_->BeginShutdown();

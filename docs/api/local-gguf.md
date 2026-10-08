@@ -7,7 +7,8 @@ with a llama.cpp-supported chat template; vision/audio projectors and arbitrary
 model formats are not supported. Model weights are user data, never bundled.
 
 Settings / Local AI offers **Import GGUF model** and **Use imported model** on
-both mobile platforms. Windows offers **Choose GGUF** and **Load on device**.
+both mobile platforms, with **Unload on-device model** to free memory. Windows
+offers **Choose GGUF** and **Load on device**.
 Import copies the mobile file into app-private storage; the last imported file
 can be reused after restart. Loading is explicit after restart, so opening the
 browser does not immediately allocate a model. Start with a small model on a
@@ -30,8 +31,11 @@ copy a model from Files/Documents. `contextSize` is bounded to 256–8192 tokens
 is bounded to 1–4096; input plus output must fit the context. Temperature is 0–2.
 Responses include `backend: native`, `response`, `tokensUsed`, `finishReason`
 and `inferenceTimeMs`. Every request starts a fresh context; caller-supplied
-messages provide conversation history. `ai-cancel` stops active evaluation;
-`ai-unload` releases model memory. Concurrent operations fail with `AI_BUSY`.
+messages provide conversation history. `context` can collect `page_text`, `dom`
+or `accessibility` from the selected browser tab. `agent: true` is rejected:
+the embedded runtime performs text generation, not browser tool execution.
+`ai-cancel` stops active evaluation; `ai-unload` cancels and waits for the active
+operation before releasing memory. Other concurrent operations fail with `AI_BUSY`.
 
 Errors include `MODEL_NOT_FOUND`, `MODEL_LOAD_FAILED`,
 `MODEL_TEMPLATE_UNSUPPORTED`, `MODEL_MEMORY_LIMIT`, `CONTEXT_TOO_LONG`,

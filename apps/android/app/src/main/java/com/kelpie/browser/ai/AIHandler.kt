@@ -18,9 +18,11 @@ class AIHandler(
     private val platformEngine by lazy { PlatformAIEngine(appContext) }
     private val recorder by lazy { AudioRecorder(appContext) }
     private var openAI: OpenAIEndpointsHandler? = null
+    private var localContext: RouterAgentToolBridge? = null
 
     fun register(router: Router) {
         OpenAIRuntime.initialize(appContext)
+        localContext = RouterAgentToolBridge(router, ctx)
         openAI =
             OpenAIEndpointsHandler(runtime = { OpenAIRuntime.parts() }, agentTools = RouterAgentToolBridge(router, ctx))
                 .also { it.register(router) }
@@ -106,6 +108,7 @@ class AIHandler(
                 )
             }
 
+            LocalInference.execute("unload")
             AIState.backend = AIState.PLATFORM_BACKEND
             AIState.activeModel = null
 
@@ -157,6 +160,7 @@ class AIHandler(
             )
         }
 
+        LocalInference.execute("unload")
         AIState.backend = AIState.OLLAMA_BACKEND
         AIState.activeModel = ollamaModel
         AIState.ollamaEndpoint = endpoint
@@ -193,7 +197,7 @@ class AIHandler(
                 AIState.OLLAMA_BACKEND to ::inferWithOllama,
                 AIState.PLATFORM_BACKEND to ::inferWithPlatform,
                 AIState.OPENAI_BACKEND to { body -> requireOpenAI().infer(body) },
-                "native" to { body -> LocalInference.execute("infer", body) },
+                "native" to { body -> LocalInference.infer(body, localContext) },
             ),
         )
     }
