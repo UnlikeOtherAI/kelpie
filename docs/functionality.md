@@ -233,7 +233,7 @@ On-device LLM inference across all platforms. Seven HTTP endpoints (`ai-status`,
 
 **iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) is the default backend on supported hardware. Text-only until the iOS 26 SDK is linked. Users can switch to a remote Ollama model for vision-capable inference.
 
-**Android — Gemini Nano + Ollama:** Platform AI (Google AI Edge SDK) is the default backend on Android 14+ hardware. Text-only until the SDK is integrated. Users can switch to a remote Ollama model for vision-capable inference.
+**Android — Gemini Nano + Ollama:** Platform AI (Google AI Edge SDK) is the default backend on Android 14+ hardware. Text-only until the SDK is integrated. Users can switch to a remote Ollama model for vision-capable inference. Android also supports user-configured OpenAI-compatible endpoints (`backend: "openai"`) managed from the AI sheet (see [Android AI sheet](ui/android-ai-sheet.md)); on Android, `localhost` means the phone itself.
 
 **Hugging Face Token:** Gated models (e.g. Gemma) require a HF access token. On macOS, a "Set HF Token" button appears in the AI panel's Models tab (NATIVE section header). When a download fails due to missing auth, the browser navigates to `huggingface.co/settings/tokens` and the error message guides the user to set their token. The token is stored in UserDefaults and sent as a `Bearer` header on all HF download and cloud inference requests.
 
