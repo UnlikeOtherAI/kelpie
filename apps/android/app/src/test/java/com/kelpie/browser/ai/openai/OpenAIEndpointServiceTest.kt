@@ -165,7 +165,7 @@ class OpenAIEndpointServiceTest {
                 if (body.contains("\"tools\"")) {
                     FakeResponse(
                         200,
-                        """{"choices":[{"message":{"tool_calls":[{"id":"t","function":{"name":"get_current_url","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""",
+                        """{"choices":[{"message":{"tool_calls":[{"id":"t","function":{"name":"get_time","arguments":"{\"timezone\":\"UTC\"}"}}]},"finish_reason":"tool_calls"}]}""",
                     )
                 } else {
                     FakeResponse(200, """{"choices":[{"message":{"content":"ready"},"finish_reason":"stop"}]}""")
@@ -196,6 +196,8 @@ class OpenAIEndpointServiceTest {
         assertEquals("Answer", result["response"])
         assertEquals("hm", result["reasoning"])
         assertEquals("stop", result["finishReason"])
+        assertTrue("no usage streamed means unknown tokens", result.containsKey("tokensUsed"))
+        assertNull(result["tokensUsed"])
         assertEquals(endpoint.id, result["endpointId"])
         assertEquals("qwen3-q4", result["model"])
         val sent = String(transport.requests.last().body!!)
@@ -261,5 +263,98 @@ class OpenAIEndpointServiceTest {
         assertEquals("openai", backend.backend)
         assertEquals(endpoint.id, store.active()?.endpointId)
         assertEquals(HealthState.UNREACHABLE, service.healthOf(endpoint.id).state)
+    }
+
+    private fun toolCallStream(name: String) =
+        Fixtures.sse(
+            """{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"$name","arguments":"{}"}}]}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+        )
+
+    private fun sseResponse(stream: String) = FakeResponse(200, contentType = "text/event-stream", body = stream.toByteArray())
+
+    @Test
+    fun agentInferenceReportsTasksCompletionAndStopReason() {
+        val endpoint = save(toolCalling = true)
+        runBlocking { service.activate(endpoint.id, null) }
+        var chats = 0
+        respond = { request ->
+            if (request.url.endsWith("/models")) {
+                FakeResponse(200, Fixtures.MODELS_JSON)
+            } else {
+                when (chats++) {
+                    0 -> sseResponse(toolCallStream("get_current_url"))
+                    else -> sseResponse(Fixtures.sse(Fixtures.contentFrame("Example"), """{"choices":[{"delta":{},"finish_reason":"stop"}]}"""))
+                }
+            }
+        }
+        val result = runBlocking { handler.infer(mapOf("prompt" to "Which page?", "maxSteps" to 5)) }
+        assertEquals(true, result["success"])
+        assertEquals("Example", result["response"])
+        assertEquals(true, result["completed"])
+        assertEquals("answered", result["stopReason"])
+        assertEquals(emptyList<Any>(), result["tasks"])
+        assertEquals(1, (result["steps"] as List<*>).size)
+        assertEquals("openai", result["backend"])
+        assertTrue(result.containsKey("tokensUsed"))
+        assertNull(result["tokensUsed"])
+        val sent = String(transport.requests.last().body!!)
+        assertTrue(sent.contains("update_task_list"))
+        assertTrue(sent.contains("\"max_tokens\":4096"))
+    }
+
+    @Test
+    fun agentErrorAfterStepsStillReportsSteps() {
+        val endpoint = save(toolCalling = true)
+        runBlocking { service.activate(endpoint.id, null) }
+        var chats = 0
+        respond = { request ->
+            when {
+                request.url.endsWith("/models") -> FakeResponse(200, Fixtures.MODELS_JSON)
+                chats++ == 0 -> sseResponse(toolCallStream("get_page_text"))
+                else -> FakeResponse(500, """{"error":{"message":"kaboom"}}""")
+            }
+        }
+        val result = runBlocking { handler.infer(mapOf("prompt" to "Read it")) }
+        assertEquals(false, result["success"])
+        assertEquals(OpenAIErrorCode.ENDPOINT_ERROR, (result["error"] as Map<*, *>)["code"])
+        assertEquals("get_page_text", ((result["steps"] as List<*>).single() as Map<*, *>)["tool"])
+    }
+
+    @Test
+    fun toolProbeAcceptsOnlyGetTimeWithTimezone() {
+        fun judge(
+            name: String,
+            arguments: String,
+        ) = EndpointTester.judgeToolProbe(ChatResult("", "", listOf(AssembledToolCall(0, "t", name, arguments)), "tool_calls", null)).first
+        assertTrue(judge("get_time", """{"timezone":"UTC"}"""))
+        assertFalse(judge("get_time", """{"timezone":"  "}"""))
+        assertFalse(judge("get_time", """{"timezone":5}"""))
+        assertFalse(judge("get_time", "{}"))
+        assertFalse(judge("get_time", """{"timezone":"""))
+        assertFalse(judge("get_current_url", """{"timezone":"UTC"}"""))
+        assertFalse(EndpointTester.judgeToolProbe(ChatResult("It is noon", "", emptyList(), "stop", null)).first)
+    }
+
+    @Test
+    fun failingToolProbeRecordsFalseFromTest() {
+        val endpoint = save()
+        respond = { request ->
+            when {
+                request.url.endsWith("/models") -> FakeResponse(200, Fixtures.MODELS_JSON)
+                else ->
+                    FakeResponse(
+                        200,
+                        """{"choices":[{"message":{"tool_calls":[{"id":"t","function":{"name":"get_time","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""",
+                    )
+            }
+        }
+        val result = runBlocking { EndpointTester(service).test(endpoint.id, null, generate = false, tools = true) }
+        assertEquals(false, (result["toolCalling"] as Map<*, *>)["ok"])
+        val probe = OpenAIJson.parseObjectOrNull(String(transport.requests.last().body!!))!!
+        assertTrue(OpenAIJson.encode(probe).contains("\"get_time\""))
+        val stored = store.get(endpoint.id)!!
+        assertEquals(false, stored.toolCalling.value)
+        assertEquals("test", stored.toolCalling.source)
     }
 }

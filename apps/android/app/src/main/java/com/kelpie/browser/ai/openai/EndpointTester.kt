@@ -72,24 +72,33 @@ class EndpointTester(
         )
     }
 
+    /**
+     * Bounded tool-calling check (mirrors Swift `runToolProbe`): only a `get_time` call whose
+     * parsed arguments carry a non-empty string `timezone` counts as evidence. Any other
+     * outcome, including a failed request, records `toolCalling: false` with source `test`.
+     */
     private suspend fun toolCalling(
         endpoint: OpenAIEndpoint,
         model: String,
     ): Map<String, Any?> {
-        val probeTool = AgentTools.all.first { it.name == PROBE_TOOL }
         val payload =
             request(
                 model,
-                "Call the $PROBE_TOOL tool now. Do not answer in text.",
-                extra = mapOf("tools" to JsonArray(listOf(probeTool.definition())), "tool_choice" to JsonPrimitive("auto")),
+                "Use the $PROBE_TOOL tool with timezone \"UTC\". Do not answer in text.",
+                extra =
+                    mapOf(
+                        "tools" to JsonArray(listOf(probeToolDefinition())),
+                        "max_tokens" to JsonPrimitive(TOOL_PROBE_MAX_TOKENS),
+                        "temperature" to JsonPrimitive(0),
+                    ),
             )
         val (ok, detail) =
             try {
                 val chat = service.client.chat(endpoint.url, service.store.apiKey(endpoint.id), payload, stream = false)
-                val called = chat.toolCalls.any { it.name == PROBE_TOOL }
-                called to if (called) "The model returned a $PROBE_TOOL tool call" else "The model answered without calling the tool"
+                judgeToolProbe(chat)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: OpenAIException) {
-                if (e.code != OpenAIErrorCode.TOOLS_NOT_SUPPORTED) throw e
                 false to e.message
             }
         val current = service.store.get(endpoint.id) ?: endpoint
@@ -125,9 +134,42 @@ class EndpointTester(
             "error" to mapOf("code" to code, "message" to message),
         )
 
-    private companion object {
-        const val PROBE_TOOL = "get_current_url"
-        const val GENERATION_MAX_TOKENS = 32
-        const val TEXT_PREVIEW_CHARS = 200
+    companion object {
+        const val PROBE_TOOL = "get_time"
+        private const val TOOL_PROBE_MAX_TOKENS = 512
+
+        /** Only a well-formed `get_time` call with a non-empty `timezone` counts as tool-calling evidence. */
+        fun judgeToolProbe(chat: ChatResult): Pair<Boolean, String> {
+            val call = chat.toolCalls.firstOrNull() ?: return false to "The model answered without calling the tool."
+            val timezone = OpenAIJson.string(call.parsedArguments()?.get("timezone"))?.trim()
+            if (call.name != PROBE_TOOL || timezone.isNullOrEmpty()) {
+                return false to
+                    "The model's tool call was not a valid $PROBE_TOOL call with a timezone (${call.name}: ${call.arguments.take(80)})."
+            }
+            return true to "Called $PROBE_TOOL with timezone $timezone."
+        }
+
+        fun probeToolDefinition(): JsonObject {
+            val parameters =
+                JsonObject(
+                    mapOf(
+                        "type" to JsonPrimitive("object"),
+                        "properties" to JsonObject(mapOf("timezone" to JsonObject(mapOf("type" to JsonPrimitive("string"))))),
+                        "required" to JsonArray(listOf(JsonPrimitive("timezone"))),
+                    ),
+                )
+            val function =
+                JsonObject(
+                    mapOf(
+                        "name" to JsonPrimitive(PROBE_TOOL),
+                        "description" to JsonPrimitive("Returns the current time in a timezone."),
+                        "parameters" to parameters,
+                    ),
+                )
+            return JsonObject(mapOf("type" to JsonPrimitive("function"), "function" to function))
+        }
+
+        private const val GENERATION_MAX_TOKENS = 32
+        private const val TEXT_PREVIEW_CHARS = 200
     }
 }
