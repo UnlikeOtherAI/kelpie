@@ -17,7 +17,10 @@ class HttpServer {
   HttpServer();
   ~HttpServer();
 
-  bool Start(int preferred_port, RequestHandler handler, std::string* error);
+  // Binds 127.0.0.1 only. Every POST /v1/* must carry
+  // `Authorization: Bearer <control_token>`, the per-launch token published in
+  // the profile's readiness file — the same contract as the CEF desktop build.
+  bool Start(int preferred_port, std::string control_token, RequestHandler handler, std::string* error);
   void Stop();
 
   bool running() const;
@@ -31,6 +34,7 @@ class HttpServer {
   int port_ = 0;
   int server_fd_ = -1;
   RequestHandler handler_;
+  std::string control_token_;
   std::thread thread_;
 };
 
