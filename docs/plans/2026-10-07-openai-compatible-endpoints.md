@@ -176,8 +176,22 @@ Never offered: navigation, script evaluation, cookies, storage, screenshots
 person toggling "Allow page actions" in the chat panel). Page content and model
 output cannot grant it. Tool results are JSON, truncated to 6 000 characters,
 and the system prompt states that page content is untrusted data whose
-instructions must be ignored. `maxSteps` default 12, maximum 25 →
-`AGENT_STEP_LIMIT`. Reasoning text is kept out of the message history.
+instructions must be ignored. Each browser-tool result carries
+`stepsRemaining`. Reasoning text is kept out of the message history.
+
+**Task list.** An always-offered `update_task_list {tasks: [{task, done}]}`
+tool lets the model record and update its plan; Kelpie handles it, it touches
+no page and does not use the step budget. If the model answers while its own
+list still has open tasks, Kelpie sends one reminder turn ("needs another
+turn"). The final list is returned as `tasks`.
+
+**Step budget and final feedback.** `maxSteps` counts browser tool calls:
+default 20, maximum 40. When the next round would exceed it, Kelpie sends one
+more request with no tools, asking for a final report (what was done, what was
+verified, what is unfinished), and returns it as a successful result with
+`completed: false` and `stopReason: "step_limit"` (otherwise `completed: true`,
+`stopReason: "answered"`). `AGENT_STEP_LIMIT` is returned only if that final
+request itself fails. Errors after steps were taken still include `steps`.
 
 ## Device HTTP API (all paired/bearer-authenticated)
 
@@ -212,7 +226,7 @@ instructions must be ignored. `maxSteps` default 12, maximum 25 →
 | `ai-endpoint-health` | `{id?, refresh?: false}` (default: active) | `{health}` |
 | `ai-load` | `{backend: "openai", endpoint: "<id or name>", model?}` | selects; fails on `unreachable` / `auth_failed` without changing the current backend |
 | `ai-status` | — | adds `backend: "openai"`, `endpoint {id,name,baseURL,loopback}`, `health` |
-| `ai-infer` | adds `agent?`, `allowActions?`, `maxSteps?` | adds `reasoning?`, `finishReason`, `steps[] {tool, args, ok, ms, preview}`, `endpointId`, `model` |
+| `ai-infer` | adds `agent?`, `allowActions?`, `maxSteps?` | adds `reasoning?`, `finishReason`, `steps[] {tool, args, ok, ms, preview}`, `tasks[] {task, done}`, `completed`, `stopReason`, `endpointId`, `model` |
 | `ai-cancel` | — | `{cancelled: n}` |
 
 Error codes: `INVALID_ENDPOINT_URL`, `ENDPOINT_NOT_FOUND`, `ENDPOINT_UNREACHABLE`,
