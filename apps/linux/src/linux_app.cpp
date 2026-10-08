@@ -224,9 +224,19 @@ int LinuxApp::Run() {
   }
 #endif
 
+  // Same local-control contract as the CEF build: a profile lock plus a
+  // per-launch token published in readiness.json, never mDNS or the LAN.
+  try {
+    impl_->profile.Open(impl_->config.profile_dir, impl_->config.readiness_path);
+  } catch (const std::exception& failure) {
+    std::cerr << failure.what() << '\n';
+    return 1;
+  }
+
   std::string error;
   if (!impl_->http_server.Start(
           impl_->config.port,
+          impl_->profile.token(),
           [this](std::string_view endpoint, const json& params, int* status) {
             return HandleApiRequest(endpoint, params, status);
           },
@@ -235,24 +245,19 @@ int LinuxApp::Run() {
     return 1;
   }
   impl_->bound_port = impl_->http_server.port();
-
-  const DeviceInfoSnapshot snapshot = impl_->device_info.Collect();
-  const bool mdns_started = impl_->mdns.Start(MdnsServiceConfig{
-      snapshot,
-      impl_->bound_port,
-      impl_->config.width,
-      impl_->config.height,
-      impl_->version,
-      RuntimeMode(),
-  });
-  impl_->mdns_status = mdns_started ? "active" : impl_->mdns.LastError();
+  try {
+    impl_->profile.Publish(impl_->device_info.Collect().id, impl_->bound_port, false);
+  } catch (const std::exception& failure) {
+    std::cerr << failure.what() << '\n';
+    impl_->http_server.Stop();
+    return 1;
+  }
   impl_->running = true;
 
   if (impl_->config.headless) {
     HeadlessShell shell(*this);
     const int result = shell.Run();
     impl_->running = false;
-    impl_->mdns.Stop();
     impl_->http_server.Stop();
     impl_->desktop_engine.Shutdown();
     impl_->PersistStores();
@@ -262,7 +267,6 @@ int LinuxApp::Run() {
   if (!GuiAvailable()) {
     std::cerr << "GTK3 support is not available in this build. Rebuild with GTK or use --headless.\n";
     impl_->running = false;
-    impl_->mdns.Stop();
     impl_->http_server.Stop();
     return 1;
   }
@@ -270,7 +274,6 @@ int LinuxApp::Run() {
   GUIShell shell(*this);
   const int result = shell.Run();
   impl_->running = false;
-  impl_->mdns.Stop();
   impl_->http_server.Stop();
   impl_->desktop_engine.Shutdown();
   impl_->PersistStores();
@@ -391,7 +394,7 @@ bool LinuxApp::GuiAvailable() const {
 }
 
 bool LinuxApp::MdnsActive() const {
-  return impl_->mdns.IsRunning();
+  return false;
 }
 
 bool LinuxApp::ScreenshotSupported() const {
@@ -399,7 +402,7 @@ bool LinuxApp::ScreenshotSupported() const {
 }
 
 std::string LinuxApp::MdnsStatusText() const {
-  return impl_->mdns_status;
+  return "Local agent control";
 }
 
 std::string LinuxApp::RuntimeMode() const {

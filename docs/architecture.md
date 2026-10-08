@@ -83,7 +83,7 @@ Each browser app has four internal layers:
 - iOS: `WKWebView` native methods — `evaluateJavaScript`, `takeSnapshot`, scroll via `scrollView`
 - Android: `WebView` + CDP — `DOM.getDocument`, `Page.captureScreenshot`, `Runtime.evaluate`
 - macOS: dual renderer stack — `WKWebView` for Safari/WebKit parity and CEF for Chromium/Chrome parity. Both conform to a shared renderer interface so the HTTP and MCP surface stays the same while the active engine changes.
-- Linux: CEF-backed Chromium shell when the SDK/runtime is present, with a stub-safe fallback that keeps the HTTP server, mDNS, and persisted state alive when CEF is unavailable.
+- Linux: CEF-backed Chromium shell when the SDK/runtime is present, with a stub-safe fallback that keeps the HTTP server and persisted state alive when CEF is unavailable. The fallback uses the same loopback-only, readiness-token control contract as the Chromium build and is not advertised over mDNS.
 
 **Command Handler** — Translates incoming HTTP requests into native browser calls. Android uses CDP for most operations (no scripts enter the page). iOS uses native `evaluateJavaScript` calls and, for features WebKit doesn't expose natively, ephemeral bridge scripts that are cleared on navigation (see [iOS bridge scripts](#ios--no-injection-dom-access)). macOS routes the same handlers through the active renderer and adds `set-renderer` / `get-renderer` so the UI and API can switch engines at runtime.
 
