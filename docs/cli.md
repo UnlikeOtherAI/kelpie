@@ -792,7 +792,7 @@ To drive an app that sits behind a login, put the browser into an authenticated 
 - **httpOnly session cookies are fully supported.** Set them with `kelpie cookies set <name> <value> --http-only` (MCP: `kelpie_set_cookie`). They are written to the native cookie store (`WKHTTPCookieStore` on iOS/macOS, `CookieManager` on Android), not via JavaScript, so the `--http-only`, `--secure`, `--same-site`, and `--expires` attributes all take effect.
 - **Do not use `eval` / `document.cookie` to set a session cookie.** JavaScript cannot create an httpOnly cookie, and reading `document.cookie` returns an empty string for httpOnly cookies — so it looks like the cookie is missing even when it is set. Use `kelpie cookies list` (which reads the native store, including httpOnly cookies) to verify instead.
 - **Non-httpOnly token schemes** that live in web storage can be primed with `kelpie storage set <key> <value>`.
-- **Interactive login** is also available: complete a sign-in once in the browser (e.g. `kelpie safari-auth <url>` on macOS/iOS), and the resulting session cookies persist.
+- **Interactive login** is also available: sign in once in a browser tab, and the resulting session cookies persist in the same store.
 
 ```bash
 # inject an httpOnly session cookie, then navigate authenticated
@@ -1071,7 +1071,6 @@ kelpie viewport --device "My iPhone"
 |---|---|---|
 | `kelpie toast <message>` | Show a toast overlay on the device | All |
 | `kelpie debug-screens` / `kelpie debug-overlay get` / `kelpie debug-overlay set <enabled>` | Inspect or toggle the screen debug overlay | iOS |
-| `kelpie safari-auth [url]` | Start a browser-backed authentication flow | Apple + Android |
 | `kelpie orientation get` / `kelpie orientation set <mode>` / `kelpie renderer get` / `kelpie renderer set <engine>` | Read or change orientation / renderer state | Orientation: iOS, Android, macOS. Renderer: macOS |
 | `kelpie fullscreen get` / `kelpie fullscreen set <enabled>` | Read or toggle desktop fullscreen for the browser window | macOS, Linux |
 

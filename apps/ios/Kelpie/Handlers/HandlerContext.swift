@@ -83,7 +83,6 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     var annotationSessionId: String?
     var annotationPageURL: String?
     var annotationElementCount: Int?
-    let safariAuth = SafariAuthHelper()
     let dialogState = DialogState()
     let keyboardObserver = KeyboardObserver()
 

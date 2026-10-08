@@ -3,12 +3,12 @@ import { Command } from "commander";
 import { registerAllCommands } from "../../src/commands/index.js";
 
 describe("platform utility command registration", () => {
-  it("registers toast, safari-auth, and debug overlay commands", () => {
+  it("registers toast and debug overlay commands", () => {
     const program = new Command();
     registerAllCommands(program);
 
     expect(program.commands.find((command) => command.name() === "toast")).toBeDefined();
-    expect(program.commands.find((command) => command.name() === "safari-auth")).toBeDefined();
+    expect(program.commands.find((command) => command.name() === "safari-auth")).toBeUndefined();
 
     const debugOverlay = program.commands.find((command) => command.name() === "debug-overlay");
     expect(debugOverlay).toBeDefined();

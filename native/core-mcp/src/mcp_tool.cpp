@@ -9,8 +9,6 @@ using P = Platform;
 
 const std::vector<P> kAllPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux, P::kWindows};
 const StringList kAllEngines = {"webkit", "chromium", "gecko"};
-const StringList kWebkitOnly = {"webkit"};
-const std::vector<P> kApplePlatforms = {P::kIos, P::kMacos};
 const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
@@ -200,8 +198,6 @@ std::vector<McpTool> CreateDefaultMcpTools() {
            CapabilityAvailability(kOrientationPlatforms, kAllEngines, {"orientation-control"})),
       Tool("kelpie_get_orientation", "get-orientation", "Get the current device orientation and lock state",
            CapabilityAvailability(kOrientationPlatforms, kAllEngines, {"orientation-control"})),
-      Tool("kelpie_safari_auth", "safari-auth", "Open the current page (or a specific URL) in a Safari-backed authentication session. This lets the user authenticate using Safari's saved passwords and cookies, then syncs the session back into the browser. Use this when a login page requires credentials the user has saved in Safari, or when OAuth providers block in-app browsers. The user will see a Safari sheet and must complete authentication manually — the tool returns once they finish or cancel.",
-           UiAvailability(kApplePlatforms, kWebkitOnly, {"safari-auth-session"})),
       Tool("kelpie_set_renderer", "set-renderer", "Switch the browser rendering engine when renderer switching is supported on the current platform. Available engines are platform-dependent and iOS alternative engines remain region-gated.",
            CapabilityAvailability(kRendererPlatforms, kAllEngines, {"renderer-switching"})),
       Tool("kelpie_get_renderer", "get-renderer", "Get the current rendering engine and the engines available on the current platform. iOS alternative engines remain region-gated.",

@@ -48,9 +48,6 @@ class HandlerContext {
     /** Most recent WebView navigation error (cleared on each new navigation). */
     @Volatile
     var lastNavigationError: String? = null
-    val chromeAuth =
-        com.kelpie.browser.browser
-            .ChromeAuthHelper()
     private val consoleMessagesLock = Any()
 
     private val _activePanel = MutableStateFlow<String?>(null)

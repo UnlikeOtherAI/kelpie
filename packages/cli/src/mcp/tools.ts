@@ -21,9 +21,6 @@ const partitionId = z
   .string()
   .refine(isValidPartition, "Must be 1-128 chars from [A-Za-z0-9._-], contain a letter or digit, and not be \".\", \"..\", \"default\" or start with \"ephemeral-\"");
 const orientationPlatforms = ["ios", "android", "macos"] as const;
-// safari-auth: iOS (SFAuthenticationSession), macOS (ASWebAuthenticationSession),
-// Android (Chrome Custom Tabs via ChromeAuthHelper).
-const safariAuthPlatforms = ["ios", "android", "macos"] as const;
 // Geolocation and request-interception have no working native implementation today —
 // every platform's handler returns PLATFORM_NOT_SUPPORTED.
 const unavailablePlatforms = [] as const;
@@ -299,9 +296,6 @@ export const browserTools: BrowserToolDef[] = [
   // Orientation
   { name: "kelpie_set_orientation", description: "Force the device into portrait, landscape, or auto orientation. Useful for testing responsive layouts and orientation-dependent features.", method: "setOrientation", platforms: orientationPlatforms, schema: { device, orientation: z.enum(["portrait", "landscape", "auto"]).describe("Target orientation. 'auto' unlocks rotation.") }, bodyFromArgs: passthrough },
   { name: "kelpie_get_orientation", description: "Get the current device orientation and lock state", method: "getOrientation", platforms: orientationPlatforms, schema: { device }, bodyFromArgs: passthrough },
-
-  // Safari Auth (iOS, macOS, Android via Chrome Custom Tabs)
-  { name: "kelpie_safari_auth", description: "Open the current page (or a specific URL) in a system-backed authentication session — Safari on iOS/macOS, Chrome Custom Tabs on Android. This lets the user authenticate using credentials saved in their system browser, then syncs the session back into the in-app WebView. Use this when a login page requires credentials the user has saved system-side, or when OAuth providers block embedded WebViews. The user will see a system auth sheet and must complete authentication manually — the tool returns once they finish or cancel.", method: "safariAuth", platforms: safariAuthPlatforms, schema: { device, url: url.optional().describe("URL to authenticate. Defaults to the current page URL."), message }, bodyFromArgs: passthrough },
 
   // Fullscreen (macOS only)
   { name: "kelpie_set_fullscreen", description: "Enable or disable fullscreen mode for the desktop browser window", method: "setFullscreen", platforms: fullscreenPlatforms, schema: { device, enabled: z.boolean().describe("Enable or disable fullscreen") }, bodyFromArgs: passthrough },

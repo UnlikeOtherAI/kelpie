@@ -3,7 +3,7 @@
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "windows_utf.h"
-#include "kelpie/private_login_window.h"
+#include "kelpie/account_login_window.h"
 
 #include <algorithm>
 #include <memory>
@@ -144,7 +144,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.7";
+  runtime.app_version = "0.1.8";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;
@@ -318,7 +318,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
-    if (!ClosePrivateLoginWindow()) return false;
+    if (!CloseAccountLoginWindow()) return false;
     if (!page_color_sampler_.Drain()) return false;
     if (!desktop_app_->Stop()) return false;
     account_.reset();
@@ -343,7 +343,7 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
     const auto state = account_->State();
-    if (!state.signing_in) ClosePrivateLoginWindow();
+    if (!state.signing_in) CloseAccountLoginWindow();
     shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);
   }
   std::vector<TabSnapshot> tabs;

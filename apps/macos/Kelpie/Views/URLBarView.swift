@@ -25,7 +25,6 @@ struct URLBarView: View {
     let onInspectorZoomOut: () -> Void
     let onInspectorReset: () -> Void
     let onSwitchRenderer: (RendererState.Engine) -> Void
-    let onSafariAuth: () -> Void
     let onBookmarks: () -> Void
     let onAddBookmark: () -> Void
     let onNetworkInspector: () -> Void
@@ -125,7 +124,6 @@ struct URLBarView: View {
                 Text("Browser controls").font(.headline)
                 popupAction("Add bookmark", icon: "star", id: "add-bookmark", enabled: pageURL != nil && !isBookmarked, action: onAddBookmark)
                 popupAction("Bookmarks", icon: "bookmark", id: "bookmarks", action: onBookmarks)
-                popupAction("Safari authentication", icon: "safari", id: "safari-auth", enabled: pageURL != nil, action: onSafariAuth)
                 popupAction("Network inspector", icon: "antenna.radiowaves.left.and.right", id: "network", action: onNetworkInspector)
                 popupAction("Settings", icon: "gearshape", id: "settings", action: onSettings)
                 if aiState.isAvailable {

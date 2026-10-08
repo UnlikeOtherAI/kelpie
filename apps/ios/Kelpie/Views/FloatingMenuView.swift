@@ -24,7 +24,6 @@ private struct NativeBlur: UIViewRepresentable {
 /// tap targets work correctly (offset-based layout breaks hit testing in SwiftUI).
 struct FloatingMenuView: View {
     let onReload: () -> Void
-    let onSafariAuth: () -> Void
     let onSettings: () -> Void
     let onBookmarks: () -> Void
     let onHistory: () -> Void
@@ -160,7 +159,6 @@ struct FloatingMenuView: View {
     private var menuItems: [MenuItem] {
         var items: [MenuItem] = [
             .init(icon: "arrow.clockwise", elementId: "browser.menu.reload", tint: .white, closesMenu: true, action: onReload),
-            .init(icon: "safari", elementId: "browser.menu.safari-auth", tint: .white, closesMenu: true, action: onSafariAuth),
             .init(icon: "bookmark.fill", elementId: "browser.menu.bookmarks", tint: .white, closesMenu: true, action: onBookmarks),
             .init(icon: "clock.arrow.circlepath", elementId: "browser.menu.history", tint: .white, closesMenu: true, action: onHistory),
             .init(icon: "antenna.radiowaves.left.and.right", elementId: "browser.menu.network-inspector", tint: .white, closesMenu: true, action: onNetworkInspector),

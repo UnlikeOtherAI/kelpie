@@ -48,10 +48,6 @@ On Windows, the desktop shell under `apps/windows/` now combines an undecorated 
 
 The Windows shell places curved tabs in the title bar, a new-tab plus at the top left, and window controls at the top right. The navigation row has unboxed controls and an IME-capable rounded address field. Home opens the saved home URL; the address-field star adds the current page to favorites. The favorites row disappears when empty and offers an overflow menu when crowded. Rendered page-edge colors animate into the chrome, with a one-pixel separator at 10% contrasting opacity. Native accessibility, high contrast, DPI scaling, tab shortcuts and inline history completion remain available. See [Windows shell notes](ui/README.md#windows-shell-notes) for sampling limits and viewport behavior.
 
-### Safari / Chrome Authentication
-
-One-tap login using the device's saved passwords. On iOS, opens an ASWebAuthenticationSession (Safari's login sheet) that shares Safari's saved passwords and cookies. On Android, uses Chrome Custom Tabs. After login, cookies are synced back into the browser automatically.
-
 ### Persistent Home Page
 
 Every platform keeps a persisted home page URL. Fresh launches load that URL instead of a hard-coded blank tab, and automation can change it remotely with `set-home` / `get-home` or the matching CLI commands `kelpie home set` / `kelpie home get`.
@@ -317,7 +313,7 @@ On Android, keyboard visibility and height now come from live `WindowInsets` tra
 
 On iPad and Android tablets, the browser shell also has a More-menu phone viewport picker that stages the live browser view inside a centered device-class viewport instead of stretching edge to edge. The staged viewport honors the current tablet orientation: portrait uses a portrait frame, landscape uses a landscape frame, and the preset list only shows the shared phone, tablet, and laptop sizes that fit the current device geometry. When staged mode is active, a persistent black close button with a white border sits outside the browser frame at the upper-left, and a centered black summary pill sits above the viewport with clear spacing and shows the simulated inches band and pixel range.
 
-On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native window retains the current page title for system menus; the tabs show it visually, and the three-dot popup shows the live viewport resolution. The shell persists the user-resized shell window size and on-screen position across launches — the saved position is restored only when it still lands on a connected screen, otherwise the window is re-centered — and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets, sorted by screen size: `Flip Fold (Cover)`, `Compact / Base`, `Standard / Pro`, `Book Fold (Cover)`, `Large / Plus`, `Flip Fold (Internal)`, `Ultra / Pro Max`, `Book Fold (Internal)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Kelpie clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`. macOS keeps back, forward, reload, Home, bookmark, native page sharing and history in the navigation row. The right-hand three-dot popup contains bookmark management, Safari authentication, network inspector, settings, AI, 3D inspection, renderer selection, viewport presets, orientation and scale. All chrome controls use AppKit-backed hit targets. Tabs stay pinned while downward page scrolling hides the address and favourites rows; the first upward scroll reveals them, as do navigation, Home, reload and tab selection. The compact bars use native translucent blur. On macOS 26+ in full-size WebKit mode, page content renders beneath that blur while native insets keep fixed/sticky headers and the visible automation viewport correctly positioned. Other engines, older macOS and staged viewports retain their reserved content area. Chrome samples a narrow visible WebKit page strip during navigation and throttled scrolling, then transitions background, selected tabs, text and toolbar icons together over 200 ms. Sampling stays in memory, ignores bright foreground details when choosing the background, and stops when idle. A bottom status bar shows hovered link destinations, including same-origin frames and open shadow roots, and clears on exit, scrolling or navigation; cross-origin frame links cannot be inspected through the native tracker’s one-shot DOM query. The favourites row contains real saved bookmarks and is hidden while the store is empty. Cmd+D, Add bookmark in the application or three-dot menu, and the address star save the current window’s page, avoiding duplicates and start pages, and reveal the row. Favourites open their saved URLs; removing the last bookmark removes the row and its 29-point WebKit underlap. The divider moves with the bottom of the visible rows and uses adaptive foreground colour at 10% opacity. History opens in an anchored 320-by-420-point popover matching the additional-controls menu, retaining entry navigation and Clear history with AppKit-backed hit targets. Bookmarks, network and settings open native macOS sheets backed by the same stores and inspector data as iOS, with full-row hit targets.
+On macOS, the browser window and the browser viewport are separate concepts. `Full` mode fills the live stage, shared device presets create a centered simulated viewport inside that shell, and raw `resize-viewport` calls enter a `Custom` viewport mode instead of resizing the native window. The shell can grow larger, but never smaller than the configured minimum. The native window retains the current page title for system menus; the tabs show it visually, and the three-dot popup shows the live viewport resolution. The shell persists the user-resized shell window size and on-screen position across launches — the saved position is restored only when it still lands on a connected screen, otherwise the window is re-centered — and shows the same first-launch welcome card used on iOS. The macOS preset picker now uses the same shared categories as tablets, sorted by screen size: `Flip Fold (Cover)`, `Compact / Base`, `Standard / Pro`, `Book Fold (Cover)`, `Large / Plus`, `Flip Fold (Internal)`, `Ultra / Pro Max`, `Book Fold (Internal)`, and `Tri-Fold (Internal)`. If the window becomes too small for the active preset, Kelpie clears that preset and returns to `Full` mode instead of keeping a stale hidden selection. The same menu exposes links to the Kelpie website, the GitHub repository, and `unlikeotherai.com`. macOS keeps back, forward, reload, Home, bookmark, native page sharing and history in the navigation row. The right-hand three-dot popup contains bookmark management, network inspector, settings, AI, 3D inspection, renderer selection, viewport presets, orientation and scale. All chrome controls use AppKit-backed hit targets. Tabs stay pinned while downward page scrolling hides the address and favourites rows; the first upward scroll reveals them, as do navigation, Home, reload and tab selection. The compact bars use native translucent blur. On macOS 26+ in full-size WebKit mode, page content renders beneath that blur while native insets keep fixed/sticky headers and the visible automation viewport correctly positioned. Other engines, older macOS and staged viewports retain their reserved content area. Chrome samples a narrow visible WebKit page strip during navigation and throttled scrolling, then transitions background, selected tabs, text and toolbar icons together over 200 ms. Sampling stays in memory, ignores bright foreground details when choosing the background, and stops when idle. A bottom status bar shows hovered link destinations, including same-origin frames and open shadow roots, and clears on exit, scrolling or navigation; cross-origin frame links cannot be inspected through the native tracker’s one-shot DOM query. The favourites row contains real saved bookmarks and is hidden while the store is empty. Cmd+D, Add bookmark in the application or three-dot menu, and the address star save the current window’s page, avoiding duplicates and start pages, and reveal the row. Favourites open their saved URLs; removing the last bookmark removes the row and its 29-point WebKit underlap. The divider moves with the bottom of the visible rows and uses adaptive foreground colour at 10% opacity. History opens in an anchored 320-by-420-point popover matching the additional-controls menu, retaining entry navigation and Clear history with AppKit-backed hit targets. Bookmarks, network and settings open native macOS sheets backed by the same stores and inspector data as iOS, with full-row hit targets.
 
 The browser HTTP API and MCP now expose named viewport presets directly via `get-viewport-presets` / `set-viewport-preset` and `kelpie_get_viewport_presets` / `kelpie_set_viewport_preset`, so an LLM can inspect the current preset catalog and activate one of the shared device classes remotely. Linux does not support named viewport presets yet.
 
@@ -423,13 +419,12 @@ On macOS, Windows and Linux, the selected tab carries the sampled page colour co
 
 On macOS, Windows and Linux, pressing the circular account control between History
 and More while signed out starts **Login/register** immediately, with no intermediary
-menu. It opens authentication.unlikeotherai.com in the default browser (the system
-authentication session on Mac), using a public OAuth client and S256 PKCE. Windows
-and Linux fall back to a separate, ephemeral Kelpie login window if the default
-HTTPS handler is absent, fails, or is Kelpie itself. This window loads the hosted
-page and is excluded from automation, tab lists, history and session persistence;
-it closes when login finishes or is cancelled. Social providers may restrict
-embedded browsers; the system browser is preferred. Repeated clicks during login
+menu. It opens authentication.unlikeotherai.com in a Kelpie login window, using a
+public OAuth client and S256 PKCE; see [Shared sign-in profile](#shared-sign-in-profile).
+Windows and Linux fall back to the default browser only when the login window cannot
+open (headless mode or a build without Chromium). The window shows the page's real
+origin, is excluded from automation, tab lists, history and session persistence,
+and closes when login finishes or is cancelled. Repeated clicks during login
 offer cancellation. Password and authenticator verification stay on UOA's hosted
 screen. Once signed in, the popup displays the authoritative UOA name/email and avatar,
 with Sign out and Refresh favourites actions. The sign-in survives restarts and
@@ -454,7 +449,7 @@ bar, or selecting Tabs in More. Tap a preview to switch; swipe a card sideways
 or use its close button to close it. Closing the last tab creates a start tab.
 
 The native bottom toolbar provides Back, Forward, address/reload, Share and More;
-iPad also shows Bookmarks directly. More holds Bookmarks, History, Safari sign-in,
+iPad also shows Bookmarks directly. More holds Bookmarks, History,
 AI, network and 3D inspectors, viewport presets and Settings. Narrow phones put
 Share in More. Scrolling down shrinks the toolbar to a small domain capsule;
 scrolling upward or tapping it expands it. The same address capsule shrinks and
@@ -469,11 +464,10 @@ during collapse. Script recording hides all browser chrome.
 
 Android and iOS expose Login/register directly from the bottom toolbar's account
 button. Authentication is hosted by UOA and uses public OAuth with random state
-and S256 PKCE. Android opens the default browser; when unavailable it uses a
-separate login Activity/process and WebView profile with no automation bridge and
-WebView inspection disabled. Android userdebug/eng system images can override
-that inspection setting; verify isolation on a production system image.
-iOS uses ASWebAuthenticationSession. Cancellation returns to a signed-out state;
+and S256 PKCE. Both open the hosted page in a Kelpie login screen with no
+automation bridge; see [Shared sign-in profile](#shared-sign-in-profile). Android
+falls back to the default browser only when no WebView is available.
+Cancellation returns to a signed-out state;
 a completed sign-in persists as described in [Staying signed in](#staying-signed-in).
 Apple and Android register a fresh public client for each login so revoked cached
 registrations cannot strand the app. Signing keys and branded configuration stay
@@ -487,6 +481,19 @@ screen and the account menu. Other clients' opaque fields are preserved. Apple
 and Android write UTC ISO-8601 dates and accept the older Apple numeric format.
 Paired browser automation operates on the currently displayed favourites store,
 including the account store while signed in.
+
+### Shared sign-in profile
+
+On every platform the UOA login screen uses the same cookie and website-data store as
+the browser's default (unpartitioned) tabs, with the tabs' user agent. Signing in to
+UOA with Google therefore also signs every default tab in to Google, so a site's
+"Sign in with Google" offers the existing account instead of asking again; an existing
+Google session in the tabs likewise makes the UOA login a single choice. Partitioned
+tabs stay isolated. On macOS with the Chromium engine active, cookies are copied
+between the engine and the login screen around the sign-in. Signing out of UOA does
+not sign the tabs out of Google; use the provider's own sign-out or clear cookies.
+These cookies sit in the same store that paired automation can read with the cookie
+API, as if the user had signed in to Google in a tab.
 
 ### Registered app sign-in
 

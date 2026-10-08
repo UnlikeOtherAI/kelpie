@@ -165,13 +165,6 @@ describe("command API method mapping", () => {
     expect(capturedUrl()).toContain("/v1/debug-screens");
   });
 
-  it("safariAuth converts to safari-auth", async () => {
-    mockFetch({ success: true, started: true });
-    await sendCommand(device, "safariAuth", { url: "https://example.com/login" });
-    expect(capturedUrl()).toContain("/v1/safari-auth");
-    expect(capturedBody()).toEqual({ url: "https://example.com/login" });
-  });
-
   it("watchMutations sends options", async () => {
     mockFetch({ success: true, watchId: "mut_001" });
     await sendCommand(device, "watchMutations", { selector: "main", attributes: true, childList: true, subtree: true });

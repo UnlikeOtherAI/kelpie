@@ -58,7 +58,7 @@ object UOAAccount {
     private var host = WeakReference<MainActivity>(null)
     private var appContext: Context? = null
     private var pendingUrl: String? = null
-    private var fallbackOpen = false
+    private var loginOpen = false
 
     fun attach(activity: MainActivity) {
         host = WeakReference(activity)
@@ -74,31 +74,44 @@ object UOAAccount {
         if (host.get() === activity) host.clear()
     }
 
+    /** The in-app login shares the tabs' WebView profile, so the Google session reaches every tab. */
     private fun openPendingLogin() {
         val url = pendingUrl ?: return
-        val activity = host.get()?.takeUnless { it.isFinishing || it.isDestroyed } ?: return
+        val activity = liveHost() ?: return
         pendingUrl = null
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-        val handler = activity.packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
-        if (handler != null && handler.activityInfo.packageName != activity.packageName) {
-            try {
-                activity.startActivity(intent)
-                return
-            } catch (_: android.content.ActivityNotFoundException) {
-            }
-        }
-        fallbackOpen = true
-        activity.openAccountFallback(url, generation.toString())
+        loginOpen = true
+        activity.openAccountLogin(url, generation.toString())
     }
 
-    fun finishFallback(
+    fun finishLogin(
+        resultCode: Int,
         callback: String?,
         nonce: String?,
     ) {
         if (nonce != generation.toString()) return
-        fallbackOpen = false
-        if (callback == null) signOut() else receiveCallback(callback)
+        loginOpen = false
+        when (val outcome = AccountLoginPolicy.outcome(resultCode, callback)) {
+            is AccountLoginPolicy.Outcome.Callback -> receiveCallback(outcome.url)
+            AccountLoginPolicy.Outcome.WebViewUnavailable -> openInBrowser()
+            AccountLoginPolicy.Outcome.Cancelled -> signOut()
+        }
     }
+
+    /** Last resort when no WebView can be created; the callback returns via [AccountCallbackActivity]. */
+    private fun openInBrowser() {
+        val pending = attempt ?: return
+        val intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(pending.authorization.url(pending.clientId)))
+                .addCategory(Intent.CATEGORY_BROWSABLE)
+        val activity = liveHost() ?: return fail("Could not open login. Please try again.")
+        try {
+            activity.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            fail("Could not open login. Please try again.")
+        }
+    }
+
+    private fun liveHost(): MainActivity? = host.get()?.takeUnless { it.isFinishing || it.isDestroyed }
 
     /** Restores the persisted session at launch without opening a login page. */
     private fun restoreSession() {
@@ -252,8 +265,8 @@ object UOAAccount {
 
     /** Returns to the signed-out state. Storage survives only a restore that failed in transit. */
     private fun reset(clearStorage: Boolean): UOAStoredSession? {
-        if (fallbackOpen) appContext?.sendBroadcast(Intent(AccountLoginActivity.CANCEL).setPackage(appContext?.packageName).putExtra("nonce", generation.toString()))
-        fallbackOpen = false
+        if (loginOpen) appContext?.sendBroadcast(Intent(AccountLoginActivity.CANCEL).setPackage(appContext?.packageName).putExtra("nonce", generation.toString()))
+        loginOpen = false
         pendingUrl = null
         generation = UUID.randomUUID()
         attempt = null

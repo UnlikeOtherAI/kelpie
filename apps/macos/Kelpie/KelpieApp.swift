@@ -272,6 +272,7 @@ struct KelpieApp: App {
         // onAppear call below is a redundant, idempotent safety net.
         Task { @MainActor in
             Self.startServices(serverState: server, rendererState: renderer)
+            UOALoginCookies.context = server.handlerContext
             UOAAccount.shared.restoreSession()
         }
     }

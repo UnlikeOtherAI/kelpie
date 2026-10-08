@@ -56,13 +56,14 @@ class MainActivity : ComponentActivity() {
             androidx.activity.result.contract.ActivityResultContracts
                 .StartActivityForResult(),
         ) { result ->
-            com.kelpie.browser.account.UOAAccount.finishFallback(
-                if (result.resultCode == RESULT_OK) result.data?.dataString else null,
+            com.kelpie.browser.account.UOAAccount.finishLogin(
+                result.resultCode,
+                result.data?.dataString,
                 result.data?.getStringExtra("nonce"),
             )
         }
 
-    fun openAccountFallback(
+    fun openAccountLogin(
         url: String,
         nonce: String,
     ) {
@@ -190,19 +191,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        router.register("safari-auth") { body ->
-            val wv = handlerContext.webView
-            if (wv == null) {
-                mapOf("success" to false, "error" to mapOf("code" to "NO_WEBVIEW", "message" to "No WebView"))
-            } else {
-                val url = (body["url"] as? String) ?: wv.url ?: ""
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    handlerContext.chromeAuth.authenticate(url, wv, this@MainActivity)
-                }
-                mapOf("success" to true, "started" to true, "url" to url)
-            }
-        }
-
         router.registerFallbacks()
     }
 
@@ -231,11 +219,6 @@ class MainActivity : ComponentActivity() {
         networkStage = stage
         NetworkServiceState.stage(stage)
         KelpieNetworkService.start(applicationContext)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        handlerContext.chromeAuth.onResume(handlerContext.webView)
     }
 
     override fun onTrimMemory(level: Int) {

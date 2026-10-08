@@ -252,11 +252,6 @@ fun BrowserScreen(
                                 forceShowWelcome = true
                                 showWelcome = true
                             },
-                            onChromeAuth = {
-                                webView?.let { wv ->
-                                    handlerContext.chromeAuth.authenticate(wv.url ?: "", wv, activity)
-                                }
-                            },
                             onSettings = { showSettings = true },
                             onBookmarks = { showBookmarks = true },
                             onHistory = { showHistory = true },
