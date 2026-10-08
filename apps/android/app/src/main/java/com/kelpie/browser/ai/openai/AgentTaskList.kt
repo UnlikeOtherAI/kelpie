@@ -45,7 +45,9 @@ class AgentTaskList {
         if (open.isEmpty()) return null
         val list = open.mapIndexed { index, item -> "${index + 1}. ${item.task}" }.joinToString("\n")
         return "Kelpie: your task list still has unfinished tasks:\n$list\n" +
-            "If they still need doing, continue with the tools. If they cannot be done, give your final answer and explain why."
+            "If they still need doing, continue with the tools. If they are already done, mark them done and repeat your " +
+            "complete final answer, because only your last message is shown to the person. If they cannot be done, " +
+            "give your complete final answer and explain why."
     }
 
     companion object {

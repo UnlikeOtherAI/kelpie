@@ -23,7 +23,8 @@ struct OpenAIInference {
                 guard let role = entry["role"] as? String, let content = entry["content"] as? String else { return nil }
                 return ["role": role, "content": content]
             }
-            let hasExplicitInput = body["context"] != nil || body["text"] != nil
+            // Contract: agent by default only when no context, text or messages are given.
+            let hasExplicitInput = body["context"] != nil || body["text"] != nil || body["messages"] != nil
             return Self(
                 prompt: (body["prompt"] as? String) ?? "",
                 history: history,
