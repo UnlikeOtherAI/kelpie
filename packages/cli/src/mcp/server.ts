@@ -12,6 +12,8 @@ import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
+import { ToolInputError } from "./ai-endpoint-tools.js";
+import { redactSecrets } from "../ai/endpoint-secrets.js";
 import type { DiscoveredDevice } from "../types.js";
 import { BrowserToolUnsupportedPlatforms, type BrowserMcpTool, type Platform } from "@unlikeotherai/kelpie-shared";
 import { getApprovedModels, findModel } from "../ai/models.js";
@@ -110,8 +112,15 @@ function registerBrowserTool(
     if (!device) {
       return errorToolResult({ success: false, error: { code: "DEVICE_NOT_FOUND", message: `No device matching "${deviceId}"` } });
     }
-    const body = tool.bodyFromArgs(args as Record<string, unknown>);
-    const result = await sendCommand(device, tool.method, body);
+    let body: Record<string, unknown>;
+    try {
+      body = tool.bodyFromArgs(args as Record<string, unknown>);
+    } catch (error) {
+      if (!(error instanceof ToolInputError)) throw error;
+      return errorToolResult({ success: false, error: { code: error.code, message: error.message } });
+    }
+    const sent = await sendCommand(device, tool.method, body, tool.timeoutMs);
+    const result = handlesEndpointSecrets(tool.method) ? { ...sent, data: redactSecrets(sent.data, secretsIn(body)) } : sent;
     if (tool.method === "reportIssue" && result.ok && (result.data as { success?: boolean }).success === true) {
       const remote = result.data as {
         reportId?: string;
@@ -147,6 +156,16 @@ function textToolResult(data: unknown): CallToolResult {
     content: [{ type: "text", text: JSON.stringify(data) }],
     ...(isMcpFailure(data) ? { isError: true } : {}),
   };
+}
+
+/** Endpoint management and selection results may echo server errors; inference answers are left untouched. */
+function handlesEndpointSecrets(method: string): boolean {
+  return method.startsWith("ai-endpoint") || method === "ai-load";
+}
+
+/** An API key read from `apiKeyEnv` travels in the request body; never let it come back out. */
+function secretsIn(body: Record<string, unknown>): string[] {
+  return typeof body.apiKey === "string" ? [body.apiKey] : [];
 }
 
 function errorToolResult(data: unknown): { content: { type: "text"; text: string }[]; isError: true } {

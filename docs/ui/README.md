@@ -5,6 +5,7 @@
 | Document | When to Read |
 |---|---|
 | [mobile.md](mobile.md) | Building or modifying the browser app UI on iOS or Android |
+| [android-ai-sheet.md](android-ai-sheet.md) | Changing the Android AI sheet or its OpenAI-compatible endpoint settings |
 
 ---
 

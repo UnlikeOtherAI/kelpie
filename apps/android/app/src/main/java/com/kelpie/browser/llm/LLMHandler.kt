@@ -130,7 +130,7 @@ class LLMHandler(
 
     private suspend fun findElement(body: Map<String, Any?>): Map<String, Any?> {
         val text = body["text"] as? String ?: return errorResponse("MISSING_PARAM", "text is required")
-        return findByText(text, "true")
+        return findByText(text, roleFilter(body["role"] as? String))
     }
 
     private suspend fun findButton(body: Map<String, Any?>): Map<String, Any?> {
@@ -143,21 +143,39 @@ class LLMHandler(
         return findByText(text, "el.tagName==='A'||el.getAttribute('role')==='link'")
     }
 
+    /**
+     * `find-element`'s optional ARIA role filter: explicit `role` attributes
+     * win, otherwise the element's implicit role is used.
+     */
+    private fun roleFilter(role: String?): String {
+        val q = role?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return "true"
+        return "(function(q){var a=(el.getAttribute('role')||'').toLowerCase();if(a)return a===q;" +
+            "var t=el.tagName,y=(el.type||'').toLowerCase();" +
+            "if(q==='button')return t==='BUTTON'||(t==='INPUT'&&['button','submit','reset'].includes(y));" +
+            "if(q==='link')return t==='A'&&el.hasAttribute('href');" +
+            "if(q==='textbox')return t==='TEXTAREA'||(t==='INPUT'&&!['button','submit','reset','checkbox','radio','hidden'].includes(y));" +
+            "if(q==='checkbox')return t==='INPUT'&&y==='checkbox';if(q==='heading')return /^H[1-6]$/.test(t);return false;})" +
+            "('" + JSEscape.string(q) + "')"
+    }
+
     private suspend fun findByText(
         text: String,
         filter: String,
     ): Map<String, Any?> {
         val safe = JSEscape.string(text.lowercase())
         val js =
-            "(function(){" + elementSelectorBuilderScript() + "var all=document.querySelectorAll('*');" +
+            "(function(){" + elementSelectorBuilderScript() + "var all=document.querySelectorAll('*'),best=null,bt='';" +
                 "for(var el of all){if(!($filter))continue;" +
                 "var t=(el.textContent||'').trim();" +
-                "if(t.toLowerCase().includes('$safe')){" +
+                "if(!t.toLowerCase().includes('$safe'))continue;" +
                 "var r=el.getBoundingClientRect();" +
-                "if(r.width>0&&r.height>0)return{found:true,element:{" +
-                "tag:el.tagName.toLowerCase(),text:t.substring(0,100)," +
-                "selector:kelpieBuildSelector(el)," +
-                "rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()"
+                "if(r.width<=0||r.height<=0)continue;" +
+                "if(!best||t.length<=bt.length){best=el;bt=t;}}" +
+                "if(!best)return{found:false};var b=best.getBoundingClientRect();" +
+                "return{found:true,element:{" +
+                "tag:best.tagName.toLowerCase(),text:bt.substring(0,100)," +
+                "selector:kelpieBuildSelector(best)," +
+                "rect:{x:b.x,y:b.y,width:b.width,height:b.height}}};})()"
         return try {
             ctx.evaluateJSReturningJSON(js)
         } catch (e: Exception) {

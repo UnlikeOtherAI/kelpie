@@ -237,3 +237,26 @@ describe("partition error descriptions", () => {
     expect(unsupported?.description).toContain("chromium-engine");
   });
 });
+
+describe("AI endpoint help", () => {
+  it("answers CLI phrases with their own metadata", () => {
+    const edit = JSON.parse(generateLlmHelp("ai endpoint edit"));
+    expect(edit.command).toBe("ai endpoint edit");
+    expect(edit.purpose).toBe("Change a saved endpoint");
+    expect(edit.params.some((p: { name: string }) => p.name === "apiKeyEnv")).toBe(true);
+    const add = JSON.parse(generateLlmHelp("ai endpoint add"));
+    expect(add.explanation).toContain("device running Kelpie");
+    expect(add.errors).toContainEqual(expect.objectContaining({ code: "INVALID_ENDPOINT_URL" }));
+  });
+
+  it("documents the agent flags and TOOLS_UNVERIFIED on ai ask", () => {
+    const ask = JSON.parse(generateLlmHelp("ai ask"));
+    expect(ask.params.map((p: { name: string }) => p.name)).toEqual(expect.arrayContaining(["agent", "allowActions", "maxSteps"]));
+    expect(ask.errors).toContainEqual(expect.objectContaining({ code: "TOOLS_UNVERIFIED", description: expect.stringContaining("--tools") }));
+  });
+
+  it("resolves MCP names for the new tools", () => {
+    expect(JSON.parse(generateLlmHelp("kelpie_ai_cancel")).command).toBe("ai-cancel");
+    expect(JSON.parse(generateLlmHelp("ai endpoint use")).purpose).toBe("Make an endpoint the active AI backend");
+  });
+});

@@ -113,15 +113,31 @@ export async function requireDevice(program: Command): Promise<DiscoveredDevice 
   return null;
 }
 
+export interface DeviceCommandOptions {
+  /** Timeout used when `--timeout` was not typed; long-running AI calls need more than the global default. */
+  defaultTimeoutMs?: number;
+}
+
+/** The typed `--timeout`, else `fallback`, else the global default. */
+export function commandTimeout(program: Command, fallback?: number): number {
+  const globals = getGlobals(program);
+  if (program.getOptionValueSource("timeout") === "cli" || fallback === undefined) {
+    return globals.timeout;
+  }
+  return fallback;
+}
+
 export async function deviceCommand(
   program: Command,
   method: string,
   body?: Record<string, unknown>,
+  options: DeviceCommandOptions = {},
 ): Promise<void> {
   const globals = getGlobals(program);
   const device = await requireDevice(program);
   if (!device) return;
-  const result = await sendCommand(device, method, withGlobalTabId(globals, body), globals.timeout);
+  const timeout = commandTimeout(program, options.defaultTimeoutMs);
+  const result = await sendCommand(device, method, withGlobalTabId(globals, body), timeout);
   print(result.data, globals.format);
   if (!result.ok) process.exitCode = 1;
 }

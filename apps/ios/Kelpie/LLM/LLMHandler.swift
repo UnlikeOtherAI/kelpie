@@ -83,7 +83,7 @@ struct LLMHandler {
         guard let text = body["text"] as? String else {
             return errorResponse(code: "MISSING_PARAM", message: "text is required")
         }
-        return await findByText(text, filter: "true")
+        return await findByText(text, filter: Self.roleFilter(body["role"] as? String))
     }
 
     @MainActor
@@ -116,10 +116,21 @@ struct LLMHandler {
         }
     }
 
+    /// `find-element`'s optional ARIA role filter: explicit `role` attributes
+    /// win, otherwise the element's implicit role is used.
+    static func roleFilter(_ role: String?) -> String {
+        guard let role = role?.trimmingCharacters(in: .whitespaces).lowercased(), !role.isEmpty else { return "true" }
+        return "(function(q){var a=(el.getAttribute('role')||'').toLowerCase();if(a)return a===q;var t=el.tagName,y=(el.type||'').toLowerCase();" +
+            "if(q==='button')return t==='BUTTON'||(t==='INPUT'&&['button','submit','reset'].includes(y));" +
+            "if(q==='link')return t==='A'&&el.hasAttribute('href');" +
+            "if(q==='textbox')return t==='TEXTAREA'||(t==='INPUT'&&!['button','submit','reset','checkbox','radio','hidden'].includes(y));" +
+            "if(q==='checkbox')return t==='INPUT'&&y==='checkbox';if(q==='heading')return /^H[1-6]$/.test(t);return false;})('\(JSEscape.string(role))')"
+    }
+
     @MainActor
     private func findByText(_ text: String, filter: String) async -> [String: Any] {
         let js = """
-        (function(){\(elementSelectorBuilderScript())var all=document.querySelectorAll('*');for(var el of all){if(!(\(filter)))continue;var t=(el.textContent||'').trim();if(t.toLowerCase().includes('\(JSEscape.string(text.lowercased()))')){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0)return{found:true,element:{tag:el.tagName.toLowerCase(),text:t.substring(0,100),selector:kelpieBuildSelector(el),rect:{x:r.x,y:r.y,width:r.width,height:r.height}}};}}return{found:false};})()
+        (function(){\(elementSelectorBuilderScript())var all=document.querySelectorAll('*'),best=null,bt='';for(var el of all){if(!(\(filter)))continue;var t=(el.textContent||'').trim();if(!t.toLowerCase().includes('\(JSEscape.string(text.lowercased()))'))continue;var r=el.getBoundingClientRect();if(r.width<=0||r.height<=0)continue;if(!best||t.length<=bt.length){best=el;bt=t;}}if(!best)return{found:false};var b=best.getBoundingClientRect();return{found:true,element:{tag:best.tagName.toLowerCase(),text:bt.substring(0,100),selector:kelpieBuildSelector(best),rect:{x:b.x,y:b.y,width:b.width,height:b.height}}};})()
         """
         do {
             return try await context.evaluateJSReturningJSON(js)

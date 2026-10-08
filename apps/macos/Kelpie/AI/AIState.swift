@@ -5,6 +5,7 @@ import SwiftUI
 enum AIBackend: String, Equatable {
     case native
     case ollama
+    case openai
 }
 
 struct AIActiveModel: Equatable {
@@ -91,7 +92,9 @@ final class AIState: ObservableObject {
     /// Legacy plaintext UserDefaults key — migrated on first launch then removed.
     private static let legacyHuggingFaceTokenKey = "huggingFaceToken"
 
-    private var serverPort: UInt16?
+    /// Kelpie's own router. The panel is the person at the app, so its
+    /// requests are dispatched in-process rather than over paired HTTP.
+    private var router: Router?
     private var refreshTask: Task<Void, Never>?
     private var downloadTasks: [String: Task<Void, Never>] = [:]
     private var downloadStates: [String: AINativeModelCard.DownloadState] = [:]
@@ -134,9 +137,10 @@ final class AIState: ObservableObject {
         return store.get(SecretKey.huggingFaceToken) ?? ""
     }
 
-    func configure(localServerPort: UInt16) {
-        guard serverPort != localServerPort else { return }
-        serverPort = localServerPort
+    func configure(router: Router) {
+        guard self.router !== router else { return }
+        self.router = router
+        AIEndpointState.shared.configure(router: router)
         Task {
             await refresh()
         }
@@ -179,14 +183,20 @@ final class AIState: ObservableObject {
         await sendControlRequest(method: "ai-unload", body: [:])
     }
 
-    func ask(prompt: String, history: [AIChatMessage]) async throws -> String {
+    func ask(prompt: String, history: [AIChatMessage], tabId: String?, allowActions: Bool) async throws -> AIChatReply {
         guard let activeModel else {
             throw NSError(domain: "AIState", code: 1, userInfo: [NSLocalizedDescriptionKey: "Load a model first."])
         }
 
         var body: [String: Any] = ["prompt": prompt]
 
-        if activeModel.backend == .ollama {
+        if activeModel.backend == .openai {
+            // The selected endpoint drives Kelpie's browser agent in this tab.
+            body["messages"] = history.suffix(10).map { $0.apiPayload }
+            body["agent"] = true
+            body["allowActions"] = allowActions
+            if let tabId { body["tabId"] = tabId }
+        } else if activeModel.backend == .ollama {
             let priorMessages = history.suffix(10).map { $0.apiPayload }
             body["messages"] = priorMessages
         } else {
@@ -194,6 +204,10 @@ final class AIState: ObservableObject {
         }
 
         let response = try await sendLocalRequest(method: "ai-infer", body: body)
+        if (response["success"] as? Bool) == false, response["steps"] != nil {
+            // The agent acted before failing; keep what it did visible.
+            throw AIChatFailure(message: responseErrorMessage(response), reply: AIChatReply(response: response))
+        }
         guard (response["success"] as? Bool) != false else {
             throw NSError(
                 domain: "AIState",
@@ -201,7 +215,12 @@ final class AIState: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: responseErrorMessage(response)]
             )
         }
-        return response["response"] as? String ?? ""
+        return AIChatReply(response: response)
+    }
+
+    /// Cancels in-flight inference on the OpenAI-compatible backend.
+    func cancelInference() async {
+        _ = try? await sendLocalRequest(method: "ai-cancel", body: [:])
     }
 
     func downloadNativeModel(id: String) {
@@ -291,7 +310,7 @@ final class AIState: ObservableObject {
     }
 
     private func refreshActiveStatus() async {
-        guard serverPort != nil else { return }
+        guard router != nil else { return }
         do {
             let response = try await sendLocalRequest(method: "ai-status", body: [:])
             guard (response["success"] as? Bool) != false else {
@@ -380,21 +399,10 @@ final class AIState: ObservableObject {
     }
 
     private func sendLocalRequest(method: String, body: [String: Any]) async throws -> [String: Any] {
-        guard let serverPort else {
+        guard let router else {
             throw NSError(domain: "AIState", code: 3, userInfo: [NSLocalizedDescriptionKey: "Local AI server is not ready yet."])
         }
-        // swiftlint:disable:next force_unwrapping
-        let url = URL(string: "http://127.0.0.1:\(serverPort)/v1/\(method)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
-            throw NSError(domain: "AIState", code: 4, userInfo: [NSLocalizedDescriptionKey: "Local AI request failed."])
-        }
-        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        return await router.handle(method: method, body: body).json
     }
 
     private func responseErrorMessage(_ response: [String: Any]) -> String {
@@ -445,20 +453,5 @@ final class AIState: ObservableObject {
             return ["text", "vision"]
         }
         return ["text"]
-    }
-}
-
-struct AIChatMessage: Identifiable, Equatable {
-    enum Role: String {
-        case user
-        case assistant
-    }
-
-    let id = UUID()
-    let role: Role
-    let text: String
-
-    var apiPayload: [String: String] {
-        ["role": role.rawValue, "content": text]
     }
 }

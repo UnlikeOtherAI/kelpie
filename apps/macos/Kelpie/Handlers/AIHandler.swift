@@ -52,6 +52,8 @@ actor AIBackendStore {
 /// - `AIHandler+Ollama.swift` holds the Ollama transport layer.
 struct AIHandler {
     let context: HandlerContext
+    /// Kelpie's own router; the OpenAI-compatible agent dispatches tools through it.
+    var router: Router?
 
     let engine = InferenceEngine.shared
     let backendStore = AIBackendStore.shared
@@ -69,6 +71,8 @@ struct AIHandler {
     }
 
     let defaultOllamaEndpoint = "http://localhost:11434"
+    let openAIService = OpenAIEndpointService.shared
+    var openAI: OpenAIInference { OpenAIInference(service: openAIService) }
 
     func register(on router: Router) {
         router.register("ai-status") { _ in await status() }
@@ -78,7 +82,13 @@ struct AIHandler {
         router.register("ai-record") { body in await record(body) }
         router.register("ai-catalog") { _ in await catalog() }
         router.register("ai-fitness") { body in await fitness(body) }
+        OpenAIEndpointHandler(service: openAIService, host: Self.openAIHost).register(on: router)
     }
+
+    static let openAIHost = OpenAIEndpointHandler.Host(
+        platform: "macos",
+        loopbackMeans: "localhost, 127.0.0.1 and [::1] mean this Mac — the computer running Kelpie and sending the inference requests."
+    )
 
     private static let authRequiredResponse = errorResponse(
         code: "AUTH_REQUIRED",
@@ -144,11 +154,25 @@ struct AIHandler {
             ])
         }
 
+        if let openAIStatus = await openAI.status() {
+            return openAIStatus
+        }
+
         return successResponse(["loaded": false])
     }
 
     private func load(_ body: [String: Any]) async -> [String: Any] {
         let start = DispatchTime.now()
+
+        if (body["backend"] as? String) == "openai" {
+            let response = await openAI.load(body)
+            if response["success"] as? Bool == true {
+                // The endpoint is now the only active backend; nothing falls back to these.
+                await engine.unload()
+                await backendStore.clear()
+            }
+            return response
+        }
 
         if let model = body["model"] as? String, model.hasPrefix("ollama:") {
             let endpoint = (body["ollamaEndpoint"] as? String) ?? defaultOllamaEndpoint
@@ -162,6 +186,7 @@ struct AIHandler {
             }
 
             await engine.unload()
+            await openAIService.clearActive()
             let capabilities = ollamaCapabilities(for: ollamaModel)
             await backendStore.setOllama(model: ollamaModel, endpoint: endpoint, capabilities: capabilities)
             await MainActor.run {
@@ -195,6 +220,7 @@ struct AIHandler {
 
                 try await engine.load(path: path, name: name, capabilities: capabilities)
                 await backendStore.setNative(model: name, capabilities: capabilities)
+                await openAIService.clearActive()
                 return successResponse([
                     "model": name,
                     "backend": "native",
@@ -211,6 +237,7 @@ struct AIHandler {
     private func unload() async -> [String: Any] {
         await engine.unload()
         await backendStore.clear()
+        await openAIService.clearActive()
         return successResponse()
     }
 

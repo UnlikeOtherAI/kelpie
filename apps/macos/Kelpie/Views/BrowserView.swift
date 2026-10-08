@@ -163,6 +163,7 @@ struct BrowserView: View {
                             aiState: aiState,
                             session: aiChatSession,
                             selectedTab: $aiPanelTab,
+                            activeTabId: tabStore.activeTab?.id.uuidString,
                             onClose: { isAIPanelOpen = false }
                         )
                         .frame(width: aiPanelWidth)
@@ -277,7 +278,7 @@ struct BrowserView: View {
                 NSApplication.shared.keyWindow?.makeFirstResponder(nil)
             }
             Task { @MainActor in
-                aiState.configure(localServerPort: UInt16(serverState.deviceInfo.port))
+                aiState.configure(router: serverState.router)
                 aiState.onAuthFailureNavigate = { [weak serverState] url in
                     serverState?.handlerContext.load(url: url)
                 }

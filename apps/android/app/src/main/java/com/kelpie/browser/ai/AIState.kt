@@ -1,11 +1,13 @@
 package com.kelpie.browser.ai
 
 import android.content.Context
+import com.kelpie.browser.ai.openai.OpenAIRuntime
 import com.kelpie.browser.storage.SecretStore
 
 object AIState {
     const val PLATFORM_BACKEND = "platform"
     const val OLLAMA_BACKEND = "ollama"
+    const val OPENAI_BACKEND = "openai"
     const val PLATFORM_MODEL_ID = "platform"
     const val DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434"
 
@@ -38,6 +40,8 @@ object AIState {
         isAvailable = PlatformAIEngine.isAvailable(context)
         backend = PLATFORM_BACKEND
         activeModel = null
+        // Restores a persisted OpenAI-compatible endpoint selection, if any.
+        OpenAIRuntime.initialize(context)
     }
 
     /**

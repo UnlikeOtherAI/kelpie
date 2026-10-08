@@ -13,6 +13,9 @@ extension AIHandler {
     func infer(_ body: [String: Any]) async -> [String: Any] {
         let backendState = await backendStore.snapshot()
         let nativeLoaded = await MainActor.run { engine.isLoaded }
+        if !nativeLoaded, backendState.backend != "ollama", await openAIService.activeEndpoint() != nil {
+            return await inferWithOpenAI(body)
+        }
         guard nativeLoaded || backendState.backend == "ollama" else {
             return errorResponse(code: "NO_MODEL_LOADED", message: "Load a model first with ai-load")
         }
@@ -165,7 +168,7 @@ extension AIHandler {
     }
 
     @MainActor
-    private func preloadedContext(mode: String?, tabId: String?) async -> String? {
+    func preloadedContext(mode: String?, tabId: String?) async -> String? {
         switch mode {
         case nil:
             return nil
@@ -228,7 +231,7 @@ extension AIHandler {
     }
 
     @MainActor
-    private func screenshotData(tabId: String?) async throws -> Data {
+    func screenshotData(tabId: String?) async throws -> Data {
         let image = try await context.takeSnapshot(tabId: tabId)
         guard let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),

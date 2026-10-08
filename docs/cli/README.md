@@ -4,3 +4,4 @@ The primary CLI reference remains [../cli.md](../cli.md). Long-form sections liv
 
 - [Group commands](group.md)
 - [Advanced commands](advanced.md)
+- [AI endpoints (OpenAI-compatible)](ai-endpoints.md)
