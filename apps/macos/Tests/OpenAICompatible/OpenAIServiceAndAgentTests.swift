@@ -310,6 +310,14 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         XCTAssertTrue(String(bytes: reminderBody, encoding: .utf8)?.contains("unfinished tasks") == true)
     }
 
+    func testReminderAsksForTheCompleteAnswerAgain() {
+        var tasks = OpenAIAgentTaskList()
+        _ = tasks.apply(OpenAIToolCall(id: "t", name: "update_task_list", arguments: "{\"tasks\":[{\"task\":\"Read\",\"done\":false}]}"))
+        let reminder = tasks.unfinishedReminder() ?? ""
+        XCTAssertTrue(reminder.contains("1. Read"))
+        XCTAssertTrue(reminder.contains("repeat your complete final answer"))
+    }
+
     func testMalformedToolArgumentsAreFedBackNotDispatched() async throws {
         let transport = agentTransport(steps: [
             OpenAIFixtures.toolCallStream(name: "fill", arguments: "{\"selector\":"),

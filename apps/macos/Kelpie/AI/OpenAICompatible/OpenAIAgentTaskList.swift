@@ -76,7 +76,9 @@ struct OpenAIAgentTaskList: Sendable {
         return """
         Kelpie: your task list still has unfinished tasks:
         \(list)
-        If they still need doing, continue with the tools. If they cannot be done, give your final answer and explain why.
+        If they still need doing, continue with the tools. If they are already done, mark them done and repeat your \
+        complete final answer, because only your last message is shown to the person. If they cannot be done, \
+        give your complete final answer and explain why.
         """
     }
 }

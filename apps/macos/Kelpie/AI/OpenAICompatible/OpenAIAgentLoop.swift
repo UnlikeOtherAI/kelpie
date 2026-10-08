@@ -112,11 +112,11 @@ struct OpenAIAgentLoop: Sendable {
 
             guard !result.toolCalls.isEmpty else {
                 let answer = try Self.answerText(result)
-                if !reminded, let reminder = tasks.unfinishedReminder() {
+                if !reminded, let text = tasks.unfinishedReminder() {
                     // The model's own plan says it is not done: one more turn.
                     reminded = true
                     messages.append(["role": "assistant", "content": answer])
-                    messages.append(["role": "user", "content": reminder])
+                    messages.append(["role": "user", "content": text])
                     continue
                 }
                 return outcome(answer: answer, result: result, log: log, tasks: tasks, rounds: round, completed: true)
