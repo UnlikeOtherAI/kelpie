@@ -262,4 +262,58 @@ class OpenAIEndpointServiceTest {
         assertEquals(endpoint.id, store.active()?.endpointId)
         assertEquals(HealthState.UNREACHABLE, service.healthOf(endpoint.id).state)
     }
+
+    private fun toolCallStream(name: String) =
+        Fixtures.sse(
+            """{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"$name","arguments":"{}"}}]}}]}""",
+            """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+        )
+
+    private fun sseResponse(stream: String) = FakeResponse(200, contentType = "text/event-stream", body = stream.toByteArray())
+
+    @Test
+    fun agentInferenceReportsTasksCompletionAndStopReason() {
+        val endpoint = save(toolCalling = true)
+        runBlocking { service.activate(endpoint.id, null) }
+        var chats = 0
+        respond = { request ->
+            if (request.url.endsWith("/models")) {
+                FakeResponse(200, Fixtures.MODELS_JSON)
+            } else {
+                when (chats++) {
+                    0 -> sseResponse(toolCallStream("get_current_url"))
+                    else -> sseResponse(Fixtures.sse(Fixtures.contentFrame("Example"), """{"choices":[{"delta":{},"finish_reason":"stop"}]}"""))
+                }
+            }
+        }
+        val result = runBlocking { handler.infer(mapOf("prompt" to "Which page?", "maxSteps" to 5)) }
+        assertEquals(true, result["success"])
+        assertEquals("Example", result["response"])
+        assertEquals(true, result["completed"])
+        assertEquals("answered", result["stopReason"])
+        assertEquals(emptyList<Any>(), result["tasks"])
+        assertEquals(1, (result["steps"] as List<*>).size)
+        assertEquals("openai", result["backend"])
+        val sent = String(transport.requests.last().body!!)
+        assertTrue(sent.contains("update_task_list"))
+        assertTrue(sent.contains("\"max_tokens\":4096"))
+    }
+
+    @Test
+    fun agentErrorAfterStepsStillReportsSteps() {
+        val endpoint = save(toolCalling = true)
+        runBlocking { service.activate(endpoint.id, null) }
+        var chats = 0
+        respond = { request ->
+            when {
+                request.url.endsWith("/models") -> FakeResponse(200, Fixtures.MODELS_JSON)
+                chats++ == 0 -> sseResponse(toolCallStream("get_page_text"))
+                else -> FakeResponse(500, """{"error":{"message":"kaboom"}}""")
+            }
+        }
+        val result = runBlocking { handler.infer(mapOf("prompt" to "Read it")) }
+        assertEquals(false, result["success"])
+        assertEquals(OpenAIErrorCode.ENDPOINT_ERROR, (result["error"] as Map<*, *>)["code"])
+        assertEquals("get_page_text", ((result["steps"] as List<*>).single() as Map<*, *>)["tool"])
+    }
 }
