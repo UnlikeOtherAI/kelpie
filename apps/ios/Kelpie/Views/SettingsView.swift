@@ -167,13 +167,19 @@ struct SettingsView: View {
 struct AIStatusView: View {
     @ObservedObject private var state = AIState.shared
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var openAIEndpoints = OpenAIEndpointsModel()
+    @State private var openAIEditor: OpenAIEndpointsSection.EditorTarget?
+
+    private var ready: Bool {
+        state.backend == "openai" ? openAIEndpoints.rows.contains { $0.isActive && $0.health == .ready } : state.isLoaded
+    }
 
     var body: some View {
         NavigationView {
             List {
                 Section("Status") {
                     row("Backend", backendLabel)
-                    row("Availability", state.isAvailable ? "Available" : "Unavailable")
+                    row("Availability", ready ? "Available" : "Unavailable")
                     row("Loaded", state.isLoaded ? "Yes" : "No")
                 }
 
@@ -188,11 +194,16 @@ struct AIStatusView: View {
                     }
                 }
 
-                if !state.isAvailable {
-                    Text("Platform AI is not currently available on this device. You can still load an Ollama model over the API.")
+                if !ready {
+                    Text("Import a GGUF for on-device inference, or select a reachable LAN endpoint for a larger model.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
+                LocalModelSection()
+                OpenAIEndpointsSection(model: openAIEndpoints, editorTarget: $openAIEditor)
+            }
+            .sheet(item: $openAIEditor) { target in
+                OpenAIEndpointEditor(model: openAIEndpoints, initialEndpointId: target.endpointId)
             }
             .navigationTitle("Local AI")
             .navigationBarTitleDisplayMode(.inline)
@@ -212,12 +223,15 @@ struct AIStatusView: View {
             return "OpenAI-compatible endpoint"
         case "platform":
             return "Platform"
+        case "native":
+            return "On-device GGUF"
         default:
             return state.backend
         }
     }
 
     private var activeModelLabel: String {
+        if state.backend == "native", let model = state.activeModel { return URL(fileURLWithPath: model).lastPathComponent }
         if state.backend == "platform" {
             return state.isAvailable ? "Platform AI" : "None"
         }
