@@ -27,8 +27,9 @@ void InferenceService::Register(DesktopRouter& router) {
 void InferenceService::Cancel() { cancelled_ = true; local_.Cancel(); transport_.Cancel(); }
 json InferenceService::Execute(const std::string& method, const json& body) {
   if (method == "ai-cancel") { cancelled_ = true; local_.Cancel(); return Success({{"cancelled", transport_.Cancel()}}); }
-  std::unique_lock lock(mutex_, std::try_to_lock);
-  if (!lock.owns_lock()) return Failure("AI_BUSY", "Inference is busy; cancel it or wait for completion");
+  std::unique_lock lock(mutex_, std::defer_lock);
+  if (method == "ai-unload") { Cancel(); lock.lock(); }
+  else if (!lock.try_lock()) return Failure("AI_BUSY", "Inference is busy; cancel it or wait for completion");
   try { cancelled_ = false; return Dispatch(method, body); }
   catch (const InferenceError& error) { return Failure(error.code, error.what()); }
   catch (const json::exception&) { return Failure("INVALID_PARAM", "Invalid inference parameters or model response"); }

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <future>
 
 using namespace kelpie::windows;
 using json = nlohmann::json;
@@ -19,6 +20,9 @@ int main() {
   int calls = 0;
   bool fail = false;
   bool discovery = true;
+  std::promise<void> entered, release;
+  auto released = release.get_future().share();
+  bool blocking = false;
   auto request = [&](const std::string& base, const std::string& op, const std::string& key, const json* body) -> json {
     ++calls; assert(base == "http://localhost:11434/v1"); assert(key == "test-secret");
     if (fail) throw InferenceError("ENDPOINT_UNREACHABLE", "Offline");
@@ -27,6 +31,7 @@ int main() {
       return {{"data", json::array({{{"id", "tiny"}}})}};
     }
     assert(body && body->at("model") == "tiny" && body->at("stream") == false);
+    if (blocking) { entered.set_value(); released.wait(); }
     return {{"choices", json::array({{{"message", {{"content", "4"}}}, {"finish_reason", "stop"}}})}};
   };
   {
@@ -42,6 +47,16 @@ int main() {
     discovery = false;
     assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
     discovery = true;
+    blocking = true;
+    auto inference = std::async(std::launch::async, [&] { return service.Execute("ai-infer", {{"prompt", "wait"}}); });
+    entered.get_future().wait();
+    auto unload = std::async(std::launch::async, [&] { return service.Execute("ai-unload"); });
+    assert(unload.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout);
+    release.set_value();
+    inference.get();
+    assert(unload.get()["loaded"] == false);
+    blocking = false;
+    assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
     fail = true;
     assert(service.Execute("ai-infer", {{"prompt", "again"}})["error"]["code"] == "ENDPOINT_UNREACHABLE");
     assert(service.Execute("ai-status")["backend"] == "openai");
