@@ -9,7 +9,7 @@
 #include "device_info_linux.h"
 #include "http_server.h"
 #include "linux_app.h"
-#include "mdns_avahi.h"
+#include "profile_session.h"
 #include "kelpie/bookmark_store.h"
 #include "kelpie/desktop_engine.h"
 #include "kelpie/console_store.h"
@@ -36,8 +36,8 @@ struct LinuxApp::Impl {
   kelpie::NetworkTrafficStore network;
   kelpie::McpRegistry registry;
   DeviceInfoLinux device_info;
+  ProfileSession profile;
   HttpServer http_server;
-  MdnsAvahi mdns;
   bool running = false;
   bool shutdown_requested = false;
   int bound_port = 0;
@@ -45,7 +45,6 @@ struct LinuxApp::Impl {
   mutable std::mutex toast_mutex;
   std::chrono::steady_clock::time_point started_at = std::chrono::steady_clock::now();
   std::string version = KELPIE_LINUX_VERSION;
-  std::string mdns_status = "inactive";
   bool browser_initialized = false;
   bool browser_hosted = false;
   std::atomic<bool> desired_fullscreen{false};

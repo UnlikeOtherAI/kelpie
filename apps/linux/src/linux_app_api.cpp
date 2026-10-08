@@ -59,7 +59,7 @@ LinuxApp::json LinuxApp::DeviceInfo() const {
                                            impl_->config.height,
                                            MdnsActive(),
                                            impl_->http_server.running(),
-                                           impl_->mdns.ServiceName(),
+                                           std::string(),
                                            impl_->version,
                                            uptime.count());
   payload["success"] = true;
