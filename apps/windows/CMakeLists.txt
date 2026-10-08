@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(kelpie_windows VERSION 0.1.9 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.1.10 LANGUAGES CXX RC)
 
 include(CTest)
 
@@ -93,6 +93,8 @@ set(WINDOWS_THEME_HEADERS
 
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
 
+include(inference.cmake)
+
 set(WINDOWS_APP_SOURCES
   ${WINDOWS_THEME_SOURCES}
   src/main.cpp
@@ -119,6 +121,7 @@ set(WINDOWS_APP_SOURCES
   src/favicon_cache.cpp
   src/letter_avatar.cpp
   src/settings_view.cpp
+  ${WINDOWS_INFERENCE_SOURCES}
   src/bookmarks_view.cpp
   src/history_view.cpp
   src/network_inspector.cpp
@@ -209,6 +212,8 @@ target_link_libraries(kelpie
     kelpie_core_state
     kelpie_core_automation
     kelpie_core_mcp
+    kelpie_core_ai
+    winhttp
     nlohmann_json::nlohmann_json
     user32
     gdi32
@@ -283,6 +288,7 @@ if(HAS_CEF)
 endif()
 
 if(BUILD_TESTING)
+  add_windows_inference_tests()
   add_executable(page_color_sampler_test tests/page_color_sampler_test.cpp src/page_color_sampler.cpp ${WINDOWS_THEME_SOURCES})
   target_include_directories(page_color_sampler_test PRIVATE src "${KELPIE_NATIVE_ROOT}/engine-chromium-desktop/include")
   target_link_libraries(page_color_sampler_test PRIVATE nlohmann_json::nlohmann_json user32 gdi32 gdiplus uxtheme dwmapi crypt32 ole32)
@@ -480,17 +486,5 @@ if(BUILD_TESTING)
   endif()
   add_test(NAME kelpie_windows_theme_test COMMAND kelpie_windows_theme_test)
 
-  if(HAS_CEF)
-    # Only the packaged executable can prove the invariant this guards: closing
-    # a tab must not retire the loopback control surface. close-tab reports
-    # success either way, so the assertion has to be a later request that the
-    # running app actually answers.
-    add_executable(close_tab_control_surface_test tests/close_tab_control_surface_test.cpp)
-    target_compile_definitions(close_tab_control_surface_test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-    target_link_libraries(close_tab_control_surface_test PRIVATE
-      httplib::httplib nlohmann_json::nlohmann_json ws2_32 user32)
-    add_test(NAME close_tab_control_surface_test
-      COMMAND close_tab_control_surface_test "$<TARGET_FILE_DIR:kelpie>")
-    set_tests_properties(close_tab_control_surface_test PROPERTIES TIMEOUT 300)
-  endif()
+  include(tests/close_tab.cmake)
 endif()

@@ -343,6 +343,7 @@ bool DesktopApp::Start(const Config& config) {
   }
 
   impl_->RegisterHandlers();
+  if (config.register_handlers) config.register_handlers(impl_->router);
 
   impl_->http_server.SetRouter(&impl_->router);
   impl_->mcp_server.SetRegistry(&impl_->mcp_registry);

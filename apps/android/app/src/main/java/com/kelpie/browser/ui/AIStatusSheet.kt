@@ -74,6 +74,8 @@ internal fun AIStatusSheet(onDismiss: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.size(16.dp))
+        LocalModelSection()
+        Spacer(Modifier.size(16.dp))
         OpenAIEndpointsSection()
         Spacer(Modifier.size(16.dp))
         TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
@@ -86,6 +88,7 @@ private fun backendLabel(backend: String): String =
     when (backend) {
         AIState.OLLAMA_BACKEND -> "Ollama"
         AIState.OPENAI_BACKEND -> "OpenAI-compatible"
+        "native" -> "On-device GGUF"
         else -> "Platform"
     }
 

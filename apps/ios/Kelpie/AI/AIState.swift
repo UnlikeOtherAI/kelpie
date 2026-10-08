@@ -75,7 +75,7 @@ final class AIState: ObservableObject {
 
     var isLoaded: Bool {
         switch backend {
-        case "ollama", "openai":
+        case "ollama", "openai", "native":
             return activeModel != nil
         case "platform":
             return isAvailable
@@ -86,7 +86,7 @@ final class AIState: ObservableObject {
 
     var capabilities: [String] {
         switch backend {
-        case "ollama":
+        case "ollama", "native":
             return activeModel == nil ? [] : ["text"]
         case "openai":
             return activeModel == nil ? [] : openAICapabilities
@@ -139,6 +139,13 @@ final class AIState: ObservableObject {
         selectionGeneration += 1
         backend = "platform"
         activeModel = nil
+        openAICapabilities = []
+    }
+
+    func activateNative(model: String) {
+        selectionGeneration += 1
+        backend = "native"
+        activeModel = model
         openAICapabilities = []
     }
 

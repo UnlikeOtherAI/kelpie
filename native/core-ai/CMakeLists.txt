@@ -1,5 +1,29 @@
 include(FetchContent)
 
+set(KELPIE_LOCAL_LLM_DEFAULT OFF)
+if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(KELPIE_LOCAL_LLM_DEFAULT ON)
+endif()
+option(KELPIE_LOCAL_LLM "Embed the portable CPU GGUF runtime" ${KELPIE_LOCAL_LLM_DEFAULT})
+if(KELPIE_LOCAL_LLM)
+  enable_language(C)
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+  set(GGML_NATIVE OFF CACHE BOOL "Portable release binaries" FORCE)
+  set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+  set(GGML_METAL OFF CACHE BOOL "" FORCE)
+  set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+  set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(kelpie_llama
+    URL https://github.com/ggml-org/llama.cpp/archive/8345f333951c661d166b00e6f9362e553768f292.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  FetchContent_MakeAvailable(kelpie_llama)
+endif()
+
 set(KELPIE_AI_USE_HTTPLIB_DEFAULT ON)
 if(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(KELPIE_AI_USE_HTTPLIB_DEFAULT OFF)
@@ -34,6 +58,10 @@ if(KELPIE_AI_USE_HTTPLIB)
 endif()
 
 add_library(kelpie_core_ai STATIC ${CORE_AI_SOURCES})
+if(KELPIE_LOCAL_LLM)
+  target_sources(kelpie_core_ai PRIVATE src/local_inference.cpp)
+  target_link_libraries(kelpie_core_ai PUBLIC llama)
+endif()
 
 target_include_directories(kelpie_core_ai
   PUBLIC

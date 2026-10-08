@@ -94,6 +94,7 @@ struct SettingsView: View {
                     }
                 }
 
+                LocalModelSection()
                 OpenAIEndpointsSection(model: openAIEndpoints, editorTarget: $openAIEditor)
 
                 Section("Debug") {

@@ -1,4 +1,5 @@
 #include "windows_app.h"
+#include "inference_view.h"
 
 #include "windows_utf.h"
 #include "kelpie/address_input.h"
@@ -158,7 +159,8 @@ void WindowsApp::OnReloadRequested() {
 
 void WindowsApp::OnOpenSettingsRequested() {
   SettingsValues updated = CurrentSettings();
-  if (settings_view_->ShowModal(instance_, shell_->hwnd(), CurrentSettings(), updated)) {
+  if (settings_view_->ShowModal(instance_, shell_->hwnd(), CurrentSettings(), updated,
+      [this](HWND owner) { if (inference_) ShowInferenceSettings(instance_, owner, *inference_); })) {
     ApplySettings(updated);
   }
 }

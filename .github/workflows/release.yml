@@ -409,7 +409,7 @@ jobs:
       - uses: actions/download-artifact@v8.0.1
         with:
           pattern: 'linux-release-*'
-          merge-multiple: true
+          merge-multiple: false
           path: dist/release
 
       - uses: actions/download-artifact@v8.0.1
@@ -422,6 +422,13 @@ jobs:
           name: cli-release
           path: dist/release/cli
 
+      - name: Give checksum assets unique component names
+        run: |
+          find dist/release -name checksums.txt -print0 | while IFS= read -r -d '' file; do
+            directory="$(dirname "$file")"
+            mv "$file" "$directory/checksums-$(basename "$directory").txt"
+          done
+
       - uses: softprops/action-gh-release@v3.0.0
         with:
           tag_name: ${{ github.event.release.tag_name }}
@@ -433,7 +440,7 @@ jobs:
             dist/release/**/*.apk
             dist/release/**/*.aab
             dist/release/**/*.tgz
-            dist/release/**/checksums.txt
+            dist/release/**/checksums-*.txt
 
   attach-windows-to-release:
     name: Attach Windows assets to GitHub release

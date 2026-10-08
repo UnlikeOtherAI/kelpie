@@ -141,10 +141,12 @@ bool WindowsApp::InitializeDesktopRuntime() {
 
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
+  inference_ = std::make_unique<InferenceService>(config_.profile_dir);
+  runtime.register_handlers = [this](DesktopRouter& router) { inference_->Register(router); };
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.9";
+  runtime.app_version = "0.1.10";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;

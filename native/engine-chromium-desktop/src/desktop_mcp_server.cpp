@@ -1,4 +1,5 @@
 #include "kelpie/desktop_mcp_server.h"
+#include "inference_schema.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -44,6 +45,7 @@ nlohmann::json ReplyOrNothing(bool notification, nlohmann::json response) {
 }
 
 nlohmann::json InputSchema(std::string_view endpoint) {
+  if (endpoint.substr(0, 3) == "ai-") return InferenceInputSchema(endpoint);
   nlohmann::json properties = nlohmann::json::object();
   nlohmann::json required = nlohmann::json::array();
   const auto string = [&properties](const char* name, bool required_field = false) {

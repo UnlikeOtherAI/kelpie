@@ -24,13 +24,17 @@ class AIHandler(
         openAI =
             OpenAIEndpointsHandler(runtime = { OpenAIRuntime.parts() }, agentTools = RouterAgentToolBridge(router, ctx))
                 .also { it.register(router) }
-        router.register("ai-status") { aiStatus() }
+        router.register("ai-status") { if (AIState.backend == "native") LocalInference.execute("status") else aiStatus() }
         router.register("ai-load") { aiLoad(it) }
         router.register("ai-unload") { aiUnload() }
         router.register("ai-infer") { aiInfer(it) }
         router.register("ai-record") { aiRecord(it) }
         router.register("ai-catalog") { aiCatalog() }
         router.register("ai-fitness") { aiFitness(it) }
+        router.register("ai-cancel") {
+            LocalInference.cancel()
+            successResponse(mapOf("cancelled" to OpenAIRuntime.parts().inference.cancelAll()))
+        }
     }
 
     private fun aiCatalog(): Map<String, Any?> {
@@ -89,6 +93,7 @@ class AIHandler(
     }
 
     private suspend fun aiLoad(body: Map<String, Any?>): Map<String, Any?> {
+        if (body["backend"] == "native") return LocalInference.load(appContext, body)
         if (body["backend"] == AIState.OPENAI_BACKEND) return requireOpenAI().load(body)
         val requestedModel = (body["model"] as? String)?.trim().orEmpty()
         val start = SystemClock.elapsedRealtime()
@@ -165,7 +170,10 @@ class AIHandler(
         )
     }
 
-    private fun aiUnload(): Map<String, Any?> {
+    private suspend fun aiUnload(): Map<String, Any?> {
+        LocalInference.cancel()
+        val local = LocalInference.execute("unload")
+        if (local["success"] != true) return local
         requireOpenAI().unload()
         AIState.backend = AIState.PLATFORM_BACKEND
         AIState.activeModel = null
@@ -185,6 +193,7 @@ class AIHandler(
                 AIState.OLLAMA_BACKEND to ::inferWithOllama,
                 AIState.PLATFORM_BACKEND to ::inferWithPlatform,
                 AIState.OPENAI_BACKEND to { body -> requireOpenAI().infer(body) },
+                "native" to { body -> LocalInference.execute("infer", body) },
             ),
         )
     }

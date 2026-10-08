@@ -15,6 +15,10 @@ object NativeCore {
 
     external fun resolveAddressInput(input: String): String?
 
+    external fun localInference(operation: String, body: String): String
+
+    external fun cancelLocalInference()
+
     external fun bookmarkStoreDestroyNative(handle: Long)
 
     external fun bookmarkStoreAdd(
