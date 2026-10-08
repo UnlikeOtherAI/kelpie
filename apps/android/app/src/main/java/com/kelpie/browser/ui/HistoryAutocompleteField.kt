@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.kelpie.browser.browser.HistoryStore
+import com.kelpie.browser.nativecore.NativeCore
 
 @Composable
 fun HistoryAutocompleteField(
@@ -110,7 +111,7 @@ private fun resolvedNavigationUrl(
     if (!fullCompletion.isNullOrBlank()) {
         return fullCompletion
     }
-    return if (startsWithScheme(trimmed)) trimmed else "https://$trimmed"
+    return NativeCore.resolveAddressInput(trimmed)
 }
 
 private fun inlineCompletionSuffix(

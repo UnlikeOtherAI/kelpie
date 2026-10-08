@@ -6,3 +6,4 @@ function(add_protocol_test name)
 endfunction()
 
 add_protocol_test(test_partition test_partition.cpp)
+add_protocol_test(test_address_input test_address_input.cpp)

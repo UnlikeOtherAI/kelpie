@@ -210,9 +210,7 @@ struct BottomBarView<MoreContent: View>: View {
     }
 
     private func navigate() {
-        var value = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return }
-        if !value.contains("://") { value = "https://\(value)" }
+        guard let value = AddressInput.resolve(urlText) else { return }
         addressFocused = false
         onNavigate(value)
     }
