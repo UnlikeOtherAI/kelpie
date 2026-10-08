@@ -228,6 +228,9 @@ phrase opens a Google search. Search queries preserve Unicode and punctuation.
 Domains, IP addresses, localhost and explicit URLs remain direct navigations;
 blank input does nothing. Accepted history completions still open the displayed
 URL. This shared rule applies to the address bar, not HTTP/MCP navigation commands.
+Old single-label history entries such as `https://github/` are excluded from
+implicit completion, so they cannot turn `GitHub` back into a broken URL.
+An explicitly typed URL can still access an intranet hostname.
 
 ## Local AI
 

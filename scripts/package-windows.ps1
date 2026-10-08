@@ -139,6 +139,7 @@ try {
   $customBootstrapHash = (Get-FileHash -LiteralPath $customBootstrap -Algorithm SHA256).Hash
   if ($customBootstrapHash -eq $originalBootstrapHash) { throw "Package bootstrap branding did not change the verified copy." }
   Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination (Join-Path $stage "LICENSE.txt")
+  Copy-Item -LiteralPath (Join-Path $repoRoot "native/licenses/llama.cpp-LICENSE.txt") -Destination $stage
   foreach ($file in $runtimeFiles + $resourceFiles) { Copy-Item -LiteralPath (Join-Path $build $file) -Destination $stage }
   Copy-Item -LiteralPath (Join-Path $build "locales") -Destination (Join-Path $stage "locales") -Recurse
   Copy-Item -LiteralPath (Join-Path $cef "LICENSE.txt") -Destination (Join-Path $stage "CEF-LICENSE.txt")

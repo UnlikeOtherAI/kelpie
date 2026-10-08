@@ -61,6 +61,7 @@ android {
     sourceSets {
         getByName("main") {
             assets.srcDir("../../../assets")
+            assets.srcDir("../../../native/licenses")
         }
     }
 

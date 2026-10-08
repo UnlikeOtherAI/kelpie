@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "kelpie/internal_scheme.h"
+#include "kelpie/address_input.h"
 #include "store_support.h"
 
 namespace kelpie {
@@ -126,6 +127,11 @@ std::string HistoryStore::BestUrlCompletion(const std::string& query) const {
 
   std::lock_guard<std::mutex> lock(mutex_);
   for (auto it = entries_.rbegin(); it != entries_.rend(); ++it) {
+    // Earlier shells recorded words as https://word/. Do not let those entries
+    // turn a search back into a single-label hostname. Explicit URLs still work.
+    const auto host_input = StripScheme(it->url);
+    if (normalized_query.find("://") == std::string::npos && host_input != it->url &&
+        ResolveAddressInput(host_input) != "https://" + host_input) continue;
     for (const std::string& candidate : CompletionCandidates(it->url)) {
       const std::string normalized_candidate = NormalizeCompletionQuery(candidate);
       if (normalized_candidate.rfind(normalized_query, 0) == 0) {
