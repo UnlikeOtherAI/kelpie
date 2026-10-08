@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import com.kelpie.browser.ai.AIState
-import com.kelpie.browser.nativecore.NativeCore
+import com.kelpie.browser.ai.LocalInference
 import com.kelpie.browser.storage.SecretStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,10 +91,10 @@ object OpenAIRuntime {
 
 /** Maps backend selection onto the existing [AIState] globals. */
 object AIStateBackendSelector : BackendSelector {
+    override suspend fun prepareOpenAI() { LocalInference.execute("unload") }
     override fun currentBackend(): String = AIState.backend
 
     override fun selectOpenAI() {
-        NativeCore.localInference("unload", "{}")
         AIState.backend = AIState.OPENAI_BACKEND
         AIState.activeModel = null
     }
