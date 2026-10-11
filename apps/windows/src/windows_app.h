@@ -133,7 +133,6 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<DesktopApp> desktop_app_;
   PageColorSampler page_color_sampler_;
   std::unique_ptr<account::AccountService> account_;
-  std::unique_ptr<connect::Executor> connect_executor_;
   std::unique_ptr<connect::Client> connection_;
   bool connect_model_ready_=false,connect_model_installed_=false;
   std::unique_ptr<InferenceService> inference_;
