@@ -40,6 +40,8 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/Browser/BookmarkStore.swift"),
         .glob("../macos/Kelpie/Browser/AddressInput.swift"),
         .glob("../macos/Kelpie/AI/OpenAICompatible/**/*.swift"),
+        .glob("../macos/Kelpie/Network/BrowserControlGateway.swift"),
+        .glob("../macos/Kelpie/Network/Router+BrowserControl.swift"),
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
@@ -72,8 +74,8 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.13",
-            "CURRENT_PROJECT_VERSION": "13",
+            "MARKETING_VERSION": "0.1.14",
+            "CURRENT_PROJECT_VERSION": "14",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
@@ -95,6 +97,8 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/UOAAccountTests.swift"),
         .glob("../macos/Tests/UOASessionTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
+        .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
+        .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
         .target(name: "Kelpie"),

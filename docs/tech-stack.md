@@ -95,10 +95,9 @@ Both paths are available. CDP is preferred for DOM operations because:
 | Concern | Choice | Why |
 |---|---|---|
 | **UI Framework** | SwiftUI | Matches Apple platform architecture and keeps macOS UI native |
-| **Browser Engines** | `WKWebView` + CEF + Gecko | Runtime switching between Safari/WebKit, Chrome/Chromium, and Firefox/Gecko |
+| **Browser Engines** | `WKWebView` + CEF | Runtime switching between Safari/WebKit and Chrome/Chromium |
 | **Renderer Abstraction** | Shared Swift protocol over all engines | Keeps one handler surface for navigation, JS, screenshots, and cookies |
 | **CEF Integration** | Objective-C++ bridge over the CEF C API | Exposes Chromium safely to Swift code |
-| **Gecko Integration** | Bundled Firefox runtime via CDP subprocess | Firefox binary bundled in `Frameworks/KelpieGeckoHelper.app`; run `make gecko-runtime` once to download |
 | **HTTP Server / mDNS** | Network.framework | Reuses Apple-native local networking primitives on macOS |
 | **Min Target** | macOS 14+ | Required for the native app baseline and SwiftUI app lifecycle |
 

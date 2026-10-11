@@ -7,11 +7,34 @@ struct DOMHandler {
     let context: HandlerContext
 
     func register(on router: Router) {
+        router.register("get-links") { body in await getLinks(body) }
         router.register("get-dom") { body in await getDOM(body) }
         router.register("query-selector") { body in await querySelector(body) }
         router.register("query-selector-all") { body in await querySelectorAll(body) }
         router.register("get-element-text") { body in await getElementText(body) }
         router.register("get-attributes") { body in await getAttributes(body) }
+    }
+
+    @MainActor
+    private func getLinks(_ body: [String: Any]) async -> [String: Any] {
+        do {
+            let result = try await context.evaluateJSReturningJSON(
+                """
+                (() => {
+                    const links = Array.from(document.querySelectorAll('a[href]'));
+                    return {count: links.length, links: links.slice(0, 200).map(link => ({
+                        href: link.href, text: (link.textContent || '').trim().substring(0, 200)
+                    }))};
+                })()
+                """,
+                windowId: HandlerContext.windowId(from: body),
+                tabId: HandlerContext.tabId(from: body)
+            )
+            return successResponse(result)
+        } catch {
+            if let tabError = tabErrorResponse(from: error) { return tabError }
+            return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+        }
     }
 
     @MainActor

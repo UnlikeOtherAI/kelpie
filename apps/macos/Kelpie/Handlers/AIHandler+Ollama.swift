@@ -16,11 +16,11 @@ extension AIHandler {
         image: Data?
     ) async throws -> InferenceEngine.InferenceResult {
         let startedAt = DispatchTime.now()
-        let harness = InferenceHarness(context: context)
+        let harness = InferenceHarness(context: context, router: router)
         let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
 
         // Pre-fetch page text — fast JS call, works with every model
-        let pageText = await harness.executeTool("get_text", args: [:])
+        let pageText = await harness.pageSnapshot()
         let summary = await PageSummary.gather(from: context)
         let systemContent = """
         You are a browser assistant built into Kelpie. Answer questions about the current web page.

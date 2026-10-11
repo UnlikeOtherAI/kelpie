@@ -31,7 +31,10 @@ extension AIHandler {
         if let explicitText {
             contextText = explicitText
         } else {
-            contextText = await preloadedContext(mode: contextMode, tabId: tabId)
+            if contextMode != nil {
+                let gateway = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
+                contextText = OpenAIAgentLoop.json(await gateway.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "", "params": [:]]))
+            } else { contextText = nil }
         }
         var image: Data?
         if contextMode == "screenshot" {
@@ -53,13 +56,21 @@ extension AIHandler {
     /// keep the existing "tab required" rule so the caller must choose.
     @MainActor
     func pinTab(requested: String?) -> TabPin {
-        if context.activeEngineIsChromium { return .pinned(nil) }
+        if context.activeEngineIsChromium {
+            guard requested == nil || requested == "chromium" else { return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Unknown Chromium tab")) }
+            return .pinned("chromium")
+        }
         do {
             _ = try context.resolveRenderer(windowId: nil, tabId: requested)
         } catch {
             return .rejected(tabErrorResponse(from: error) ?? errorResponse(code: "NO_WEBVIEW", message: "No browser tab is available."))
         }
-        if let requested { return .pinned(requested) }
+        if let requested {
+            guard requested == context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString else {
+                return .rejected(errorResponse(code: "TAB_NOT_ACTIVE", message: "The agent runs in the visible tab"))
+            }
+            return .pinned(requested)
+        }
         return .pinned(context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString)
     }
 }

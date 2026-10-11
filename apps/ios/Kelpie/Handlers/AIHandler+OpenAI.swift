@@ -52,7 +52,10 @@ extension AIHandler {
         if let explicitText = body["text"] as? String {
             contextText = explicitText
         } else {
-            contextText = await preloadedContext(mode: contextMode, router: router)
+            if contextMode != nil {
+                let gateway = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
+                contextText = OpenAIAgentLoop.json(await gateway.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "", "params": [:]]))
+            } else { contextText = nil }
         }
         var image: Data?
         if contextMode == "screenshot" {
@@ -82,7 +85,10 @@ extension AIHandler {
         guard context.webView != nil else {
             return .rejected(errorResponse(code: "NO_WEBVIEW", message: "No browser tab is available."))
         }
-        guard let tabStore = context.tabStore else { return .pinned(requested) }
+        guard let tabStore = context.tabStore else {
+            guard requested == nil || requested == "external" else { return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Unknown external tab")) }
+            return .pinned("external")
+        }
         guard let requested else { return .pinned(tabStore.activeBrowserTabID?.uuidString) }
         guard let id = UUID(uuidString: requested), tabStore.tabs.contains(where: { $0.id == id }) else {
             return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Tab \(requested) not found"))
@@ -135,6 +141,10 @@ struct VisibleTabToolDispatcher: OpenAIToolDispatching {
     let base: OpenAIToolDispatching
     let pinnedTabId: String?
     let visibleTabId: @Sendable () async -> String?
+
+    func browserSession(tabId: String?, allowActions: Bool) async -> BrowserControlGateway {
+        await base.browserSession(tabId: pinnedTabId ?? tabId, allowActions: allowActions)
+    }
 
     func dispatch(method: String, body: [String: Any]) async -> [String: Any] {
         if let pinnedTabId, await visibleTabId() != pinnedTabId {
