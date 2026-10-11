@@ -9,7 +9,7 @@ export function nativeBrowserTransport(device: DiscoveredDevice, timeout = 30_00
     return { version: 1, ok: false, error: {
       code: result.status === 401 || result.status === 403 ? "ACCESS_DENIED" : result.status === 404 ? "UNSUPPORTED" : "COMMAND_FAILED",
       message: "Native browser gateway unavailable or request failed. Pair explicitly if required.",
-      mayHaveCompleted: browserControlMutates(request.method) && ![400, 401, 403, 404].includes(result.status),
+      mayHaveCompleted: (browserControlMutates(request.method) || request.tabId !== undefined) && ![400, 401, 403, 404].includes(result.status),
     } };
   });
 }

@@ -13,8 +13,8 @@ export function createNativeBrowserTransport(send: (request: BrowserControlReque
     if (!request.success) return failure("INVALID_ARGUMENTS", false);
     try {
       const answer = response.safeParse(await send(request.data));
-      return answer.success ? answer.data : failure("COMMAND_FAILED", browserControlMutates(request.data.method));
-    } catch { return failure("COMMAND_FAILED", browserControlMutates(request.data.method)); }
+      return answer.success ? answer.data : failure("COMMAND_FAILED", (browserControlMutates(request.data.method) || request.data.tabId !== undefined));
+    } catch { return failure("COMMAND_FAILED", (browserControlMutates(request.data.method) || request.data.tabId !== undefined)); }
   };
   return { call(input) { const next = tail.then(() => execute(input)); tail = next.catch(() => undefined); return next; } };
 }

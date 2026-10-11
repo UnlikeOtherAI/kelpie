@@ -14,7 +14,7 @@ export function registerCanonicalBrowserControl(program: Command): void {
       const device = await requireDevice(program);
       if (!device) return;
       const globals = getGlobals(program);
-      const result = await nativeBrowserTransport(device, Number(globals.timeout)).call(request.data);
+      const result = await nativeBrowserTransport(device, globals.timeout).call(request.data);
       print(result, globals.format);
       if (!result.ok) process.exitCode = 1;
     });

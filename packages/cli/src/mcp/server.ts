@@ -121,7 +121,7 @@ function registerBrowserTool(
     }
     let body: Record<string, unknown>;
     try {
-      body = tool.bodyFromArgs(args as Record<string, unknown>);
+      body = tool.bodyFromArgs(args);
     } catch (error) {
       if (!(error instanceof ToolInputError)) throw error;
       return errorToolResult({ success: false, error: { code: error.code, message: error.message } });
@@ -282,7 +282,7 @@ function isJsonObject(value: unknown): value is JsonObject {
 
 function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: DiscoveredDevice): ExtensionEntry {
   const handler = async (args: Record<string, unknown>): Promise<CallToolResult> => {
-    const params = args as Record<string, unknown>;
+    const params = args;
 
     if (tool.kind === "discovery") {
       return handleDiscovery(tool.method, params, pinned);

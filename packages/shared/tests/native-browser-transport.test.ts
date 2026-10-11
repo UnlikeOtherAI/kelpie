@@ -14,6 +14,10 @@ describe("canonical native wire transport", () => {
     send.mockResolvedValueOnce({ version: 1, ok: false, error: { code: "STALE_REFERENCE", message: "Observe again", mayHaveCompleted: false } });
     expect(await transport.call({ version: 1, method: "tab.click", tabId: "a", params: { ref: "e1" } })).toMatchObject({ error: { code: "STALE_REFERENCE", mayHaveCompleted: false } });
   });
+  it("preserves uncertainty for lost tab-targeted reads that may select a renderer", async () => {
+    const transport = createNativeBrowserTransport(async () => { throw new Error("Lost reply after selected-tab switch"); });
+    expect(await transport.call({ version: 1, method: "tab.snapshot", tabId: "b" })).toMatchObject({ error: { mayHaveCompleted: true } });
+  });
   it("serializes the complete native transaction", async () => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => { release = resolve; });
