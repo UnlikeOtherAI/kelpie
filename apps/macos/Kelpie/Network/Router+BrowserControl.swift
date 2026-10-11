@@ -63,6 +63,63 @@ extension Router {
         #endif
     }
 
+    /// One captured, owned renderer supplies model grounding without changing the visible tab.
+    @MainActor
+    func pageObservation(tabId: String?) async -> [String: Any] {
+        guard let context = handlerContext else { return errorResponse(code: "NO_WEBVIEW", message: "No browser renderer") }
+        let target: String
+        #if os(iOS)
+        target = tabId ?? selectedBrowserTabId ?? "external"
+        let view: WKWebView?
+        if let store = context.tabStore {
+            view = store.tabs.first { $0.id.uuidString == target }?.webView
+        } else { view = target == "external" ? context.webView : nil }
+        guard let view else { return errorResponse(code: "TAB_NOT_FOUND", message: "The context tab is unavailable") }
+        let owned: @MainActor () -> Bool = {
+            if let store = context.tabStore { return store.tabs.contains { $0.id.uuidString == target && $0.webView === view } }
+            return context.webView === view
+        }
+        #else
+        let external = tabId == nil && !context.activeEngineIsChromium && selectedBrowserTabId == nil && context.tabStore(windowId: nil, tabId: nil) == nil
+        target = tabId ?? (context.activeEngineIsChromium ? "chromium" : selectedBrowserTabId ?? "external")
+        if context.activeEngineIsChromium && target != "chromium" {
+            return errorResponse(code: "TAB_NOT_FOUND", message: "Inactive Chromium observation is unavailable")
+        }
+        guard let renderer = try? context.resolveRenderer(tabId: external ? nil : target) else {
+            return errorResponse(code: "TAB_NOT_FOUND", message: "The context tab is unavailable")
+        }
+        let profile = browserProfile
+        let owned: @MainActor () -> Bool = { [weak self] in
+            guard let self, self.browserProfile == profile else { return false }
+            if external && (self.selectedBrowserTabId != nil || context.tabStore(windowId: nil, tabId: nil) != nil) { return false }
+            guard let current = try? context.resolveRenderer(tabId: external ? nil : target) else { return false }
+            return current === renderer
+        }
+        #endif
+        let gateway = BrowserControlGateway(
+            methods: ["get-current-url"], extensions: [], targeting: "direct", allowActions: false, lease: browserLease,
+            dispatch: { method, params, mutates in
+                guard method == "browser-control-evaluate", !mutates, owned(), let expression = params["expression"] as? String else {
+                    return errorResponse(code: "TAB_CHANGED", message: "The context renderer changed")
+                }
+                do {
+                    #if os(iOS)
+                    let result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    #else
+                    let result = try await renderer.evaluateBrowserControlJS(expression)
+                    #endif
+                    guard owned() else { return errorResponse(code: "TAB_CHANGED", message: "The context renderer changed") }
+                    return successResponse(["result": result ?? NSNull()])
+                } catch { return errorResponse(code: "WEBVIEW_ERROR", message: "Fixed page observation failed") }
+            },
+            authorize: { request, mutates in
+                !mutates && request["method"] as? String == "tab.snapshot" && request["tabId"] as? String == target && owned()
+            }
+        )
+        return await gateway.request(["version": 1, "method": "tab.snapshot", "tabId": target,
+                                      "params": ["maxChars": 12000, "maxElements": 200]])
+    }
+
     @MainActor
     func browserControl(_ body: [String: Any]) async -> [String: Any] {
         await directGateway().request(body)

@@ -51,7 +51,9 @@ class LLMHandler(
                 "if(!r)return{tree:{role:'none'},nodeCount:0};" +
                 "return{tree:walk(r,0),nodeCount:r.querySelectorAll('*').length};})()"
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
+            successResponse(PageTextSnapshot.readObject(ctx, body, js))
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }
@@ -84,23 +86,14 @@ class LLMHandler(
         }
     }
 
-    private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> {
-        val selector = body["selector"] as? String ?: "body"
-        val safe = JSEscape.string(selector)
-        val js =
-            "(function(){var el=document.querySelector('$safe');" +
-                "if(!el)return{title:'',content:'',wordCount:0};" +
-                "var t=el.innerText||el.textContent||'';" +
-                "return{title:document.title,content:t.trim()," +
-                "wordCount:t.trim().split(/\\s+/).length," +
-                "language:document.documentElement.lang||null," +
-                "excerpt:t.trim().substring(0,200)};})()"
-        return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
-        } catch (e: Exception) {
-            errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
+    private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> =
+        try {
+            successResponse(PageTextSnapshot.read(ctx, body))
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
+        } catch (error: Exception) {
+            errorResponse("EVAL_ERROR", error.message ?: "Could not read page context")
         }
-    }
 
     private suspend fun getFormState(): Map<String, Any?> {
         val js =

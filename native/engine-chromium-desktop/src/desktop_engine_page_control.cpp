@@ -12,6 +12,21 @@ namespace kelpie {
 
 using namespace engine_control;
 
+BrowserControlResult DesktopEngine::GetChatSession(std::optional<TabLease> lease,
+    std::shared_ptr<TabChatSession>* session, Timeout timeout) {
+  if (!session) return BrowserControlResult::Failure("INTERNAL", "session is required");
+  const auto impl = impl_;
+  auto captured = std::make_shared<std::shared_ptr<TabChatSession>>();
+  const auto result = impl->RunOnUi([impl, lease, captured] {
+    auto* tab = lease ? impl->FindTab(*lease) : impl->ActiveTab();
+    if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "No live tab is selected");
+    *captured = tab->chat_session;
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
+  }, timeout);
+  if (result.ok) *session = *captured;
+  return result;
+}
+
 BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script, Json* value, Timeout timeout) {
   const auto impl = impl_;
   if (value == nullptr) return BrowserControlResult::Failure("INTERNAL", "result is required");

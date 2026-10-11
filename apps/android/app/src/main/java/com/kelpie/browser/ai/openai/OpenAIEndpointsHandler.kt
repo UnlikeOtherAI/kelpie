@@ -38,7 +38,7 @@ class OpenAIEndpointsHandler(
         val request = InferRequest.fromBody(body)
         val dispatcher =
             try {
-                agentTools.pinnedDispatcher(request.tabId, request.allowActions)
+                if (request.agentMode) agentTools.pinnedDispatcher(request.tabId, request.allowActions) else agentTools.contextDispatcher(request.tabId)
             } catch (e: OpenAIException) {
                 return errorResponse(e.code, e.message, e.diagnostics)
             }
@@ -109,6 +109,8 @@ interface AgentToolBridge {
         tabId: String?,
         allowActions: Boolean = false,
     ): ToolDispatcher
+
+    suspend fun contextDispatcher(tabId: String?): ToolDispatcher = pinnedDispatcher(tabId, false)
 
     /** Returns page context for `context` (`page_text`, `dom`, `accessibility`) as text. */
     suspend fun pageContext(

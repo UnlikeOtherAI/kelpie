@@ -153,6 +153,8 @@ BrowserControlResult DesktopEngine::DeletePartition(const std::string&, Partitio
 
 BrowserControlResult DesktopEngine::ActivateTab(TabLease, Timeout) { return UnsupportedControl(); }
 
+BrowserControlResult DesktopEngine::GetChatSession(std::optional<TabLease>, std::shared_ptr<TabChatSession>*, Timeout) { return UnsupportedControl(); }
+
 BrowserControlResult DesktopEngine::CloseTab(TabLease, Timeout) { return UnsupportedControl(); }
 
 BrowserControlResult DesktopEngine::Navigate(std::optional<TabLease>, std::string, TabSnapshot*, Timeout) {
