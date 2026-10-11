@@ -108,7 +108,7 @@ struct KelpieApp: App {
 
     private func startServices() {
         serverState.startHTTPServer()
-        NessieConnection.shared.start(router: serverState.router, context: serverState.handlerContext)
+        NessieConnection.shared.start(context: serverState.handlerContext)
         serverState.ensureMDNSAdvertising()
         ExternalDisplayManager.shared.startMonitoring()
         OpenAIEndpointMonitor.shared.start()

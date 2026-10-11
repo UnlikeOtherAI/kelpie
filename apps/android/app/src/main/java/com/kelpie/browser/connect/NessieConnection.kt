@@ -5,7 +5,6 @@ import com.kelpie.browser.account.UOAAccount
 import com.kelpie.browser.account.UOATransport
 import com.kelpie.browser.ai.AIHttpJson
 import com.kelpie.browser.handlers.HandlerContext
-import com.kelpie.browser.network.Router
 import com.kelpie.browser.storage.SecretStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -68,7 +67,6 @@ object NessieConnection {
 
     fun start(
         context: Context,
-        router: Router,
         handlers: HandlerContext,
     ) {
         appContext = context.applicationContext
@@ -178,6 +176,9 @@ object NessieConnection {
         lifetime = scope.launch { connectLoop(current) }
     }
 
+    fun authorizes(command: Map<String, Any?>): Boolean =
+        canMutate && state.value.running && ConnectAuthorization.from(command)?.matches(currentCommand) == true
+
     private suspend fun connectLoop(current: UUID) {
         var backoff = 2000L
         while (scope.isActive && epoch == current && owner != null) {
@@ -278,7 +279,7 @@ object NessieConnection {
 
         override fun onFailure(
             webSocket: WebSocket,
-            error: Throwable,
+            t: Throwable,
             response: Response?,
         ) {
             opened.completeExceptionally(IllegalStateException("Gateway unavailable"))
