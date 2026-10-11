@@ -61,6 +61,12 @@ async function core(method, tabId, params = {}) {
   assert.equal(response.status, 200);
   return response.body;
 }
+function assertCoreSuccess(response, operation) {
+  const error = response.error;
+  assert.equal(response.ok, true, `${operation}: ${JSON.stringify({
+    code: error?.code, mayHaveCompleted: error?.mayHaveCompleted
+  })}`);
+}
 async function native(method, params = {}) {
   const response = await wire(`/v1/${method}`, params);
   assert.equal(response.status, 200, `${method} HTTP refusal`);
@@ -76,17 +82,17 @@ async function snapshot(tabId, predicate = () => true) {
   throw new Error('Candidate fixture snapshot did not settle');
 }
 async function verifyRenderer(label, tabId) {
-  assert.equal((await core('tab.goto', tabId, { url: fixtureURL })).ok, true);
+  assertCoreSuccess(await core('tab.goto', tabId, { url: fixtureURL }), `${label} tab.goto`);
   const observed = await snapshot(tabId, value => value.elements.some(el => el.name === 'Activate'));
   for (const secret of ['editable-secret', 'textarea-secret', 'password-secret']) assert(!JSON.stringify(observed).includes(secret));
   const button = observed.elements.find(el => el.name === 'Activate');
   assert(button?.ref);
-  assert.equal((await core('tab.click', tabId, { ref: button.ref })).ok, true);
+  assertCoreSuccess(await core('tab.click', tabId, { ref: button.ref }), `${label} tab.click`);
   await snapshot(tabId, value => value.text.includes('Activated'));
   const fresh = await snapshot(tabId);
   const entry = fresh.elements.find(el => el.name === 'Entry');
   assert(entry?.ref);
-  assert.equal((await core('tab.type', tabId, { ref: entry.ref, text: 'tail' })).ok, true);
+  assertCoreSuccess(await core('tab.type', tabId, { ref: entry.ref, text: 'tail' }), `${label} tab.type`);
   const form = await native('get-form-state', { tabId, selector: 'form' });
   assert(JSON.stringify(form).includes('seed-tail'), 'Common type must append');
   const beforeReplacement = await snapshot(tabId);
