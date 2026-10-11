@@ -164,6 +164,16 @@ an existing debug APK through the real Android SDK tool, and rejected unsigned
 APK/AAB fixtures before staging. No key was generated and no real signed release
 build was claimed. The validation log and script are retained with native evidence.
 
+iOS CI uses CMake's Xcode generator, which places static archives in each target's
+`Debug-iphonesimulator` directory. Its output-flattening step must include
+`core-connect` alongside the other native libraries so `Project.swift` finds
+`libkelpie_core_connect.a` at its declared search path. The CI native build has no
+archive cache and builds all targets; the missing copy caused the PR169 link failure.
+The focused Mac check built this arm64 simulator archive in a fresh Xcode-generator
+directory, ran the corrected workflow's actual flattening script, and linked a
+native probe through that declared library path. Other native targets and the full
+app were not rebuilt for this packaging-only check. Logs are in durable native evidence.
+
 Verification roots to preserve before cleanup:
 
 - Mac: `/Volumes/External/Projects/kelpie/.worktrees/kelpie-connect-native-verify`.
