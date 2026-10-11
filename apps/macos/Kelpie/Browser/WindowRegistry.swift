@@ -72,7 +72,8 @@ final class WindowRegistry {
 
     /// Remove a window from the registry. Called when the window closes.
     func unregister(id: String) {
-        entries.removeValue(forKey: id)
+        let entry = entries.removeValue(forKey: id)
+        entry?.tabStore.tabs.forEach { $0.chatSession.close() }
         registrationOrder.removeAll { $0 == id }
     }
 

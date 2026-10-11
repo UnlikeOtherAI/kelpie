@@ -59,12 +59,9 @@ struct LLMHandler {
     private func getPageText(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
         let selector = body["selector"] as? String ?? "body"
-        let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim(),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
-            return successResponse(result)
+            let page = try await AIPageContext.gather(from: context, tabId: tabId, selector: selector, maxTextLength: nil)
+            return successResponse(page.pageTextPayload)
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)

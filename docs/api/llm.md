@@ -431,6 +431,19 @@ Response:
   "excerpt": "This is the main article text..."
 }
 ```
+macOS, iOS and Android preserve their existing page-text fields and add `url` and
+`accessibleLabels`. On macOS, selector-scoped reads use the same strict snapshot
+as local chat and OpenAI-compatible context; `textTruncated` and `labelsTruncated`
+report bounded evidence. The API's body text remains uncapped. Read failures are
+returned explicitly, including before OpenAI-compatible inference. Mobile context
+behavior is described in [mobile AI context](mobile-ai-context.md).
+
+Desktop Chromium additionally returns `text`, `length`, `mode`, `url`, `title`
+and `accessibleLabels`. Labels include visible image alt text, ARIA names and SVG
+titles from the same document snapshot, including logos with no body text. These
+fields also apply when a `selector` scopes extraction. A blank page returns empty
+text and labels; a failed tab read returns an error rather than empty evidence.
+
 ## Form State
 
 ### `getFormState`
