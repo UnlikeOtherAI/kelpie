@@ -106,6 +106,19 @@ void ExtensionReachability() {
   nullable.BeginMcp({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"}, {"params", {{"name", "mutable"}, {"arguments", {{"tabId", nullptr}}}}}});
   assert(nullable.Advance({{"success", true}})["response"]["result"]["isError"] == false);
 }
+void ReadOnlySnapshotLifetime() {
+  for (int turn = 0; turn < 3; ++turn) {
+    kelpie::BrowserGateway gateway({{"nativeMethods", {"click", "type"}}, {"fixedReader", true},
+      {"allowActions", false}, {"requireAuthorization", false}});
+    const auto step = gateway.Begin(Request("tab.snapshot"));
+    const std::string expression = step["params"]["expression"];
+    assert(expression.find(kelpie::browser_assets::reader) != std::string::npos);
+    assert(expression.find(kelpie::browser_assets::remember) == std::string::npos);
+    assert(expression.find(".snapshot") != std::string::npos);
+    gateway.Cancel();
+    assert(gateway.Begin(Request("tab.click", {{"ref", "e1"}}))["response"]["error"]["code"] == "UNSUPPORTED");
+  }
+}
 void SelectedAndMapping() {
   const json config = {{"nativeMethods", {"get-tabs", "switch-tab", "scroll", "screenshot", "get-current-url", "navigate"}}, {"targeting", "selected"}, {"allowActions", false}, {"requireAuthorization", false}};
   kelpie::BrowserGateway read_only(config);
@@ -176,4 +189,4 @@ void Notifications() {
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
 }
-int main() { Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+int main() { ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

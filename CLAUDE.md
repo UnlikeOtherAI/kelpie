@@ -49,8 +49,7 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 
 ## Windows release ownership
 
-The Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
-(currently `0.1.8`), mirrored in `resources/kelpie.rc`, `device_info_windows.h` and `windows_runtime.cpp`. Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
+The Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`, mirrored in `resources/kelpie.rc`, `device_info_windows.h` and `windows_runtime.cpp`. Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
 loopback readiness-token control and the CLI stdio alias bridge before publication.
 
 Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).

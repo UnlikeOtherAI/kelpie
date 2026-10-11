@@ -87,7 +87,11 @@ struct BrowserGateway::Impl {
       params.erase("tabId");
       params["prefix"] = session + "s" + std::to_string(++generation) + "e";
       params["includeShadow"] = false;
-      const std::string expression = "(" + std::string(browser_assets::remember) + ")((" + browser_assets::reader + ")(" + params.dump() + ")," + json(key).dump() + ")";
+      const std::string collected = "(" + std::string(browser_assets::reader) + ")(" + params.dump() + ")";
+      // One-shot read-only observers never retain renderer targets/listeners.
+      const std::string expression = config.value("allowActions", true)
+        ? "(" + std::string(browser_assets::remember) + ")(" + collected + "," + json(key).dump() + ")"
+        : "(" + collected + ").snapshot";
       Dispatch("browser-control-evaluate", {{"tabId", tab}, {"expression", expression}}, "observe"); return;
     }
     if (method == "tab.click" || method == "tab.type") {

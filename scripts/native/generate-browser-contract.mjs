@@ -58,6 +58,9 @@ const output = process.argv[2];
 if (!output) throw new Error('Expected generated header path');
 const inputs = [
   {version:1,method:"tabs.list"},
+  {version:1,method:"tab.snapshot",tabId:"stub"},
+  {version:1,method:"tabs.new"},
+  {version:1,method:"tab.screenshot",tabId:"a"},
   {version:1,method:"page.scroll",tabId:"a",params:{deltaY:5}},
   {version:1,method:"tab.type",tabId:"a",params:{ref:"e1",text:"😀".repeat(100)}},
   {version:1,method:"tab.goto",params:{url:"x".repeat(8193)}},
