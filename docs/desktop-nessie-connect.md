@@ -35,7 +35,9 @@ operations use the named tab's current document version, activate that tab visib
 and retain its lease through native owner-thread execution. Person-driven tab selection
 pauses active work; bound owner-thread calls also require the target to remain active. Document versions change
 on main-frame load, including same-URL reload, and are independent of tab lifetime.
-Queued effects also carry cancellation and deadline guards. Inputs mirror the native
+Queued effects also carry cancellation and immutable full job deadline guards.
+Individual browser calls remain bounded to ten seconds; local inference retains the
+original job deadline and cannot extend it when returning to the browser. Inputs mirror the native
 wire contract: selector clicks, atomic field fill, bounded scroll deltas, compact page
 snapshot and optional viewport PNG. PNGs beyond the terminal-output budget fail with
 `SCREENSHOT_TOO_LARGE`; full-page capture is unsupported here. HTTP(S) navigation rejects
