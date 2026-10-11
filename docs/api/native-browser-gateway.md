@@ -116,3 +116,12 @@ remain HTTP 200 envelopes so clients preserve `mayHaveCompleted`. Authenticated
 GET returns 405; unsupported explicit `MCP-Protocol-Version` headers return 400.
 The native transport rejects browser-supplied Origin headers, including `null`,
 after existing bearer admission.
+
+The durable Apple candidate journey is `scripts/native/apple-browser-control-journey.mjs`.
+Launch the exact development candidate on a dedicated port (Mac `--port 18520`),
+then run `node scripts/native/apple-browser-control-journey.mjs http://127.0.0.1:18520 macos`
+or use the simulator's port and `ios`. Approve its visible one-session pairing
+request. The fixture uses a standard MCP SDK client and exercises private-world
+spoof resistance, editable-value omission, atomic observed actions, append, stale
+DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairing
+tokens stay in process memory and are revoked; fixture tabs close afterward.
