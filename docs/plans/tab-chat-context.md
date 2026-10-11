@@ -39,3 +39,5 @@ Windows uses the same ownership rule through `DesktopEngine::Tab` with a mutex-p
 - Windows: CEF CI build/native tests passed and the candidate package passed live HTTP/MCP, accessible logo and tab-isolation checks on Maxis. No real Windows model server was running. The final integrated PR rebuilds the shared shutdown fix.
 - Linux: CEF/GTK build, all 27 native tests and the full live release harness passed, including page evidence, partition/session restoration and both clean shutdowns.
 - CLI: lint/build/tests passed on Maxis; 608 tests passed and 64 device-dependent tests were skipped. Existing Xcode warnings remain.
+
+Final backend audit extended the shared macOS snapshot to the OpenAI-compatible page-text tool and preload path. Existing page-text response fields and uncapped API content are preserved; accessible names and truncation flags are additive. Preload errors stop inference, and explicit caller text still bypasses extraction. Four focused regressions cover scoped labels, long text, malformed snapshots and OpenAI failure/explicit-text behavior.
