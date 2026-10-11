@@ -6,6 +6,54 @@ import { BrowserControlRequestSchema, browserControlInputSchema, BROWSER_CONTROL
 import { BROWSER_CONTROL_DESCRIPTION, BROWSER_CONTROL_DOCUMENTATION } from '../../packages/shared/dist/browser-control/proxy.js';
 import { collectBrowserSnapshot } from '../../packages/shared/dist/browser-control/snapshot.js';
 import { rememberNativeSnapshot, resolveNativeReference, actOnNativeReference } from '../../packages/shared/dist/browser-control/native-reference.js';
+import { sharedBrowserTools } from '../../packages/shared/dist/extension-tools.js';
+import { sharedAiLoadTool, sharedAiAskTool, sharedAiEndpointTools } from '../../packages/shared/dist/extension-ai-tools.js';
+const extensionTools = [...sharedBrowserTools, sharedAiLoadTool, sharedAiAskTool, ...sharedAiEndpointTools];
+const endpointOf = tool => tool.method.startsWith('ai-') ? tool.method : tool.name.slice(7).replaceAll('_', '-');
+const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
+  const { device, ...fields } = tool.schema;
+  // Native requests own routing; device selection is only a CLI argument. Preserve
+  // the same fields forwarded by bodyFromArgs, including screenshot resolution defaults.
+  const shape = { windowId: z.string().optional(), generation: z.number().int().nonnegative().optional(), ...fields };
+  if (tool.name === 'kelpie_screenshot' || tool.name === 'kelpie_screenshot_annotated') shape.resolution = shape.resolution.default('viewport');
+  if (tool.method === 'ai-endpoint-save') {
+    delete shape.apiKeyEnv; // A CLI-host environment variable cannot be resolved on a device.
+  }
+  if (tool.method === 'ai-load') shape.contextSize = z.number().int().min(256).max(8192).optional();
+  if (tool.method === 'ai-infer') shape.messages = z.array(z.record(z.string(), z.unknown())).optional();
+  const schema = z.toJSONSchema(z.strictObject(shape), { unrepresentable: 'any' });
+  return [endpointOf(tool), schema];
+}));
+// Fail the native build if an authoritative schema requires validation we do not implement.
+const supported = new Set(['$schema', '$defs', '$ref', 'type', 'properties', 'required', 'additionalProperties',
+  'description', 'enum', 'const', 'anyOf', 'oneOf', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum',
+  'minLength', 'maxLength', 'pattern', 'items', 'minItems', 'maxItems', 'default']);
+function auditSchema(schema) {
+  if (typeof schema === 'boolean') return;
+  for (const [key, value] of Object.entries(schema)) {
+    if (!supported.has(key)) throw new Error(`Unsupported native schema keyword: ${key}`);
+    if (key === 'properties' || key === '$defs') Object.values(value).forEach(auditSchema);
+    else if (key === 'anyOf' || key === 'oneOf') value.forEach(auditSchema);
+    else if (['items', 'additionalProperties'].includes(key)) auditSchema(value);
+  }
+}
+Object.values(extensionSchemas).forEach(auditSchema);
+const sample = schema => {
+  if (schema.const !== undefined) return schema.const;
+  if (schema.enum) return schema.enum[0];
+  if (schema.anyOf) return sample(schema.anyOf[0]);
+  if (schema.type === 'object') return Object.fromEntries((schema.required ?? []).map(key => [key, sample(schema.properties[key])]));
+  if (schema.type === 'array') return [];
+  if (schema.type === 'number' || schema.type === 'integer') return schema.minimum ?? 1;
+  if (schema.type === 'boolean') return true;
+  if (schema.type === 'null') return null;
+  return 'sample1';
+};
+const extensionCases = extensionTools.map(tool => {
+  const schema = extensionSchemas[endpointOf(tool)];
+  const body = tool.bodyFromArgs({device:'fixture', ...sample(schema)});
+  return {endpoint:endpointOf(tool), body};
+});
 const output = process.argv[2];
 if (!output) throw new Error('Expected generated header path');
 const inputs = [
@@ -25,6 +73,8 @@ const inputs = [
 const cases = inputs.map(input => { const result = BrowserControlRequestSchema.safeParse(input); return {input,accepted:result.success,...(result.success ? {output:result.data} : {})}; });
 const assets = {
   cases: JSON.stringify(cases),
+  extension_schemas: JSON.stringify(extensionSchemas),
+  extension_cases: JSON.stringify(extensionCases),
   request_schema: JSON.stringify(z.toJSONSchema(BrowserControlRequestSchema, { reused: 'ref' })),
   input_schema: JSON.stringify(browserControlInputSchema({ compact: true })),
   methods: JSON.stringify(BROWSER_CONTROL_METHODS),

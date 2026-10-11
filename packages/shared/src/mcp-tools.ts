@@ -57,6 +57,7 @@ export const BrowserMcpTools = [
   "kelpie_find_element",
   "kelpie_find_button",
   "kelpie_find_link",
+  "kelpie_get_links",
   "kelpie_find_input",
   "kelpie_evaluate",
   "kelpie_toast",

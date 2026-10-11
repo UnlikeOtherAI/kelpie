@@ -191,7 +191,11 @@ json BrowserGateway::Advance(json result) {
       else if (method == "tabs.list") value = result.at("tabs");
       else if (method == "tabs.new") value = result.contains("tab") ? result["tab"] : json{{"id", result.at("tabId")}};
       else if (method == "tab.url" || method == "tab.title") value = result.value(method == "tab.url" ? "url" : "title", std::string());
-      else if (method == "tab.screenshot") value = {{"type", "image"}, {"mimeType", "image/png"}, {"data", result.at("image")}};
+      else if (method == "tab.screenshot") {
+        const std::string format = result.value("format", std::string("png"));
+        if (format != "png" && format != "jpeg" && format != "webp") { fail(); return Next(); }
+        value = {{"type", "image"}, {"mimeType", "image/" + format}, {"data", result.at("image")}};
+      }
       impl_->Finish(Success(value));
     }
   } catch (...) { fail(); }

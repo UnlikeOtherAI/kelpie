@@ -140,6 +140,10 @@ void SelectedAndMapping() {
   step = direct.Begin(Request("tab.screenshot", {{"fullPage", false}}));
   assert(step["method"] == "screenshot");
   assert(!step["params"].contains("fullPage"));
+  step = direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "webp"}});
+  assert(step["response"]["value"]["mimeType"] == "image/webp");
+  direct.Begin(Request("tab.screenshot"));
+  assert(direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "invalid"}})["response"]["error"]["code"] == "COMMAND_FAILED");
 }
 void CAbi() {
   const auto gateway = kelpie_browser_gateway_create("{\"nativeMethods\":[]}");

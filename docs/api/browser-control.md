@@ -77,3 +77,20 @@ conformance separately after installing Chromium and building the package:
 `pnpm --filter @unlikeotherai/kelpie-shared test:browser`. This suite exercises
 Playwright and a mocked native HTTP-shaped transport backed by real browser pages;
 it does not establish physical native-device parity.
+
+Rich extension schemas come from `packages/shared/src/extension-tools.ts` and
+`extension-ai-tools.ts`, shared with the CLI. Native generation projects the
+forwarded body: device selection stays on the CLI host, native window/generation
+routing remains optional, and screenshots retain the CLI's viewport default.
+Native endpoint configuration does not accept `apiKeyEnv`; that field is resolved
+by the CLI host before its authenticated HTTP request. Existing device endpoint
+configuration retains its separate protected key path. Device handlers still
+validate semantic constraints such as partition identities and endpoint URLs.
+Generation refuses unsupported JSON Schema keywords; native tests cover every
+registered extension and forwarded argument shape. `get-links` is a read-only
+macOS WebKit/Chromium extension returning up to 200 href/text pairs.
+
+The Linux fallback advertises only its actual metadata/legacy capabilities. Its
+MCP HTTP route uses the desktop local-client, bearer, content/accept and protocol
+version guards. Unsupported SSE GET returns 405; accepted notifications return
+202 with an empty body. It does not advertise live browser observations.

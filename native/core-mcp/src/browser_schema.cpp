@@ -1,6 +1,7 @@
 #include "browser_schema.h"
 #include <cmath>
 #include <string>
+#include <regex>
 namespace kelpie {
 namespace {
 using json = nlohmann::json;
@@ -47,11 +48,14 @@ bool Validate(const json& root, const json& schema, json* value, int depth) {
     if (!std::isfinite(number) || (type == "integer" && std::floor(number) != number)) return false;
     if (schema.contains("minimum") && number < schema["minimum"].get<double>()) return false;
     if (schema.contains("maximum") && number > schema["maximum"].get<double>()) return false;
+    if (schema.contains("exclusiveMinimum") && number <= schema["exclusiveMinimum"].get<double>()) return false;
+    if (schema.contains("exclusiveMaximum") && number >= schema["exclusiveMaximum"].get<double>()) return false;
   }
   if (value->is_string()) {
     const auto size = Utf16Length(value->get<std::string>());
     if (schema.contains("minLength") && size < schema["minLength"].get<std::size_t>()) return false;
     if (schema.contains("maxLength") && size > schema["maxLength"].get<std::size_t>()) return false;
+    if (schema.contains("pattern") && !std::regex_search(value->get<std::string>(), std::regex(schema["pattern"].get<std::string>()))) return false;
   }
   if (value->is_array()) {
     if (schema.contains("minItems") && value->size() < schema["minItems"].get<std::size_t>()) return false;
@@ -63,7 +67,10 @@ bool Validate(const json& root, const json& schema, json* value, int depth) {
     for (auto it = value->begin(); it != value->end(); ++it) {
       if (properties.contains(it.key())) {
         if (!Validate(root, properties[it.key()], &it.value(), depth + 1)) return false;
-      } else if (schema.contains("additionalProperties") && schema["additionalProperties"] == false) return false;
+      } else if (schema.contains("additionalProperties")) {
+        const auto& extra = schema["additionalProperties"];
+        if (extra == false || (extra.is_object() && !Validate(root, extra, &it.value(), depth + 1))) return false;
+      }
     }
     for (auto it = properties.begin(); it != properties.end(); ++it) {
       const json* defaults = &it.value();

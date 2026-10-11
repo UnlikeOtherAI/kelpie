@@ -128,6 +128,8 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_wait_for_navigation", "wait-for-navigation", "Wait for a navigation to complete"),
       Tool("kelpie_find_element", "find-element", "Find an element by text content or role and return a stable selector for follow-up click, fill, or highlight."),
       Tool("kelpie_find_button", "find-button", "Find a button by its text and return a stable selector for follow-up click or highlight."),
+      Tool("kelpie_get_links", "get-links", "Read up to 200 page links with href and visible text",
+           ToolAvailability{{P::kMacos}, {"webkit", "chromium"}, false, true, {}}),
       Tool("kelpie_find_link", "find-link", "Find a link by its text and return a stable selector for follow-up click or highlight."),
       Tool("kelpie_find_input", "find-input", "Find an input field by label, placeholder, or name and return a stable selector for follow-up fill, click, or highlight."),
       Tool("kelpie_evaluate", "evaluate", "Evaluate JavaScript in the page context"),
