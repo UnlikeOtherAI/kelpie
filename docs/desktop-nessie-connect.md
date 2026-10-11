@@ -17,7 +17,9 @@ Accepted/terminal events are persisted before sending, and a restart replays ret
 terminal results; potentially effective interrupted work becomes `UNKNOWN_EFFECTS`.
 
 Hello advertises `browser.control` and implemented `page.extract` on Windows.
-Device labels use the native computer hostname, bounded to 120 characters.
+Device labels use the native computer hostname, bounded to 120 UTF-8 bytes without
+splitting code points. Extraction summary, excerpt and source byte bounds use the
+same boundary rule so multilingual page content remains valid JSON.
 
 Only a short-lived UOA connection ticket reaches the fixed gateway. Tickets remain in
 memory, are renewed before expiry, and a reconnect obtains a fresh ticket.401 gets the
