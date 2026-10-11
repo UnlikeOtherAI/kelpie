@@ -126,11 +126,23 @@ stopped.
 
 The ZIP contains only the CEF runtime, locales, licenses, unchanged CEF bootstrap
 kelpie.exe, and Kelpie's kelpie.dll. Packaging rejects missing RunWinMain, non-x64 DLLs,
-or absent/mismatched 0.1.3 DLL resource versions. It writes uniquely named SHA-256 and
+or absent/mismatched manifest DLL resource versions. It writes uniquely named SHA-256 and
 provenance sidecars. Signing happens after deterministic resource stamping when a
 certificate is supplied; no certificate is assumed here. Use the approved Windows
 release acceptance command documented above; CI packaging does not bypass a locally
 rejected browser launch.
+
+The shared native HTTP/MCP journey can also run against a built desktop executable:
+`node tests/native/run-control-acceptance.mjs <absolute-executable>` (add `--fallback`
+for the Linux build without CEF). It owns its temporary profile, listener and fixture,
+uses the standard MCP SDK handshake, measures the default and discovered rich catalog,
+and verifies snapshots, captured-node actions, stale refs and timeout/recovery.
+Windows additionally checks nested common AI context reads and cancellation using a
+local provider fixture. This proves routing and context boundaries, not provider quality.
+Run the full Windows release journey with a CLI-only tarball installed in an empty
+consumer as `--cli`; it exercises the normal `browser-control` command, advertised
+Nessie HTTP/stdio tools, sandboxing and profile restoration without installing shared
+as a separate runtime dependency.
 
 ## Native iOS browser chrome
 
