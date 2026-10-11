@@ -83,6 +83,7 @@ class BrowserGatewayBinding(
                     }
                 },
                 beforeMutation = { sessions.filter { it !== gateway }.forEach { it.invalidateLocked() } },
+                retirement = ctx.browserRetirement,
                 dispatch = { method, params -> execute(method, params, pinned) },
             )
         sessions.add(gateway)
@@ -93,7 +94,7 @@ class BrowserGatewayBinding(
         method: String,
         action: suspend () -> T,
     ): T =
-        lock.withLock {
+        withBrowserGatewayLease(lock, ctx.browserRetirement) {
             // Methods outside the admitted read catalogue can mutate; invalidate conservatively before dispatch.
             if (method !in READ_METHODS) sessions.forEach { it.invalidateLocked() }
             action()
@@ -138,7 +139,7 @@ class BrowserGatewayBinding(
         tabId: String,
         method: String,
     ): Map<String, Any?> =
-        lock.withLock {
+        withBrowserGatewayLease(lock, ctx.browserRetirement) {
             execute(method, mapOf("tabId" to tabId), tabId)
         }
 

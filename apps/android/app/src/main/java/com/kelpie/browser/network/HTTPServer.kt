@@ -115,6 +115,15 @@ class HTTPServer(
                             is AuthDecision.Authenticated -> handleAuthenticatedPost(call, "mcp")
                         }
                     }
+                    get("/mcp") {
+                        when (val decision = middleware.evaluate(parsedRequest(call))) {
+                            is AuthDecision.Reject -> respondReject(call, decision)
+                            else -> {
+                                call.response.header("Allow", "POST")
+                                call.respondText("", status = HttpStatusCode.MethodNotAllowed)
+                            }
+                        }
+                    }
                     // --- Health (unauth) ---
                     get("/health") {
                         call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
@@ -305,6 +314,10 @@ class HTTPServer(
             return
         }
         val (status, result) = router.handle(method, body)
+        if (method == "mcp" && status == 200 && result.isEmpty()) {
+            call.respondText("", status = HttpStatusCode.Accepted)
+            return
+        }
         call.respondText(
             text = mapToJsonString(result),
             contentType = ContentType.Application.Json,

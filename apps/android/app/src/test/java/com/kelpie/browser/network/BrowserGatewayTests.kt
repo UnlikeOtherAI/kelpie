@@ -74,6 +74,12 @@ class BrowserGatewayTests {
             val token = store.approve(pending.requestId, persist = false)!!.first
             assertTrue(auth.evaluate(request.copy(headers = mapOf("authorization" to listOf("Bearer $token")))) is AuthDecision.Authenticated)
             assertEquals(400, (auth.evaluate(request.copy(headers = mapOf("authorization" to listOf("Bearer $token", "Bearer $token")))) as AuthDecision.Reject).status)
+            if (path == "/mcp") {
+                val authorized = request.copy(headers = mapOf("authorization" to listOf("Bearer $token")))
+                assertEquals(403, (auth.evaluate(authorized.copy(headers = authorized.headers + ("origin" to listOf("null")))) as AuthDecision.Reject).status)
+                assertEquals(400, (auth.evaluate(authorized.copy(headers = authorized.headers + ("mcp-protocol-version" to listOf("unsupported")))) as AuthDecision.Reject).status)
+                assertTrue(auth.evaluate(authorized.copy(headers = authorized.headers + ("mcp-protocol-version" to listOf("2025-06-18")))) is AuthDecision.Authenticated)
+            }
         }
     }
 
@@ -203,4 +209,62 @@ class BrowserGatewayTests {
             assertEquals(2, dispatches)
             session.close()
         }
+
+    @Test fun timedOutRendererLeaseWaitsForCallbackThenAllowsExplicitReconciliation() = runBlocking {
+        val lock = Mutex()
+        val retirement = BrowserGatewayRetirement()
+        val target = Any()
+        lateinit var ticket: Any
+        var dispatches = 0
+        val session = BrowserGatewaySession(emptyMap(), lock, { _, _ -> true }, { _, _ ->
+            if (++dispatches == 1) {
+                ticket = retirement.start(target) {}
+                awaitCancellation()
+            }
+            mapOf("success" to true)
+        }, Abi(), 20, retirement = retirement)
+        assertEquals(false, session.call(emptyMap())!!["ok"])
+        val next = async { session.call(emptyMap()) }
+        kotlinx.coroutines.delay(25)
+        assertEquals(1, dispatches)
+        assertFalse(next.isCompleted)
+        retirement.complete(ticket)
+        assertEquals(true, next.await()!!["ok"])
+        assertEquals(2, dispatches)
+        session.close()
+    }
+
+    @Test fun confirmedRendererTeardownRetiresLostCallbackWithoutPermanentLatch() = runBlocking {
+        val retirement = BrowserGatewayRetirement()
+        val target = Any()
+        var cancelled = false
+        retirement.start(target) { cancelled = true }
+        val pending = retirement.waitForPending()!!
+        retirement.retireTarget(target)
+        assertTrue(cancelled)
+        pending.await()
+        assertEquals(null, retirement.waitForPending())
+    }
+
+    @Test fun cancelledLegacyRendererWorkKeepsSharedLeaseUntilCallback() = runBlocking {
+        val lock = Mutex()
+        val retirement = BrowserGatewayRetirement()
+        val target = Any()
+        lateinit var ticket: Any
+        val started = CompletableDeferred<Unit>()
+        val first = launch {
+            withBrowserGatewayLease(lock, retirement) {
+                ticket = retirement.start(target) {}
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        started.await()
+        first.cancelAndJoin()
+        val next = async { withBrowserGatewayLease(lock, retirement) { "reconciled" } }
+        kotlinx.coroutines.delay(25)
+        assertFalse(next.isCompleted)
+        retirement.complete(ticket)
+        assertEquals("reconciled", next.await())
+    }
 }

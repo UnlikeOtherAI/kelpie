@@ -20,14 +20,14 @@ class BrowserGatewaySession(
     private val dispatchTimeoutMs: Long = 30_000,
     private val beforeBegin: () -> Unit = {},
     private val beforeMutation: () -> Unit = {},
+    private val retirement: BrowserGatewayRetirement? = null,
 ) {
     private var handle = abi.create(OpenAIJson.encode(OpenAIJson.fromAny(config))).also { check(it != 0L) }
 
     suspend fun call(
         request: Map<String, Any?>,
         mcp: Boolean = false,
-    ): Map<String, Any?>? =
-        lock.withLock {
+    ): Map<String, Any?>? = withBrowserGatewayLease(lock, retirement) {
             check(handle != 0L) { "The browser gateway has closed" }
             beforeBegin()
             var step = decode(abi.begin(handle, OpenAIJson.encode(OpenAIJson.fromAny(request)), mcp))
@@ -51,7 +51,7 @@ class BrowserGatewaySession(
                 if (error is CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) throw error
                 cancelled
             }
-        }
+    }
 
     /** Called under the same router lock before legacy mutations touch the renderer. */
     fun invalidateLocked(tabId: String? = null) {

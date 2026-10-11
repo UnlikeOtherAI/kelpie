@@ -10,6 +10,9 @@ Protocol failures return HTTP 200 with their canonical/MCP error envelope so
 clients retain uncertain outcomes; authentication, body and recording admission
 failures retain their transport error status. Page dispatch rechecks the requested
 active tab on the main thread and keeps that admitted WebView across suspension.
+MCP notifications receive an empty HTTP 202 response. Authenticated GET returns
+405, unsupported protocol-version headers return 400, and browser Origin headers
+are refused under the existing native-client boundary.
 
 The direct MCP catalog has four tools: `kelpie_browser_control`, `kelpie_extensions`,
 `kelpie_extension_tools`, and `kelpie_extension`. Extension availability follows
@@ -33,7 +36,10 @@ frame navigation queues per-tab invalidation before the next transaction. Script
 playback owns its nested handler sequence; abort/status and inference cancellation
 remain reachable during playback. Recording gates still refuse browser operations.
 Renderer dispatch is bounded at 30 seconds. Cancellation resets native state and
-preserves its uncertain outcome, without an automatic repeat. Per-run handles close
+preserves its uncertain outcome, without an automatic repeat. An uncertain action
+stops the current agent run. The shared mutex remains held until the original
+renderer callback completes or that WebView is destroyed; a later explicit
+observation can then reconcile without restarting the app. Per-run handles close
 after inference; Activity teardown closes remaining handles after the listener.
 
 The fixed reader uses `WebView.evaluateJavascript` in the page realm; this binding
@@ -52,3 +58,13 @@ never committed. JVM tests cover authentication, scope, serialization, refusal,
 timeout/cancellation and ownership. Native CTest covers canonical validation and
 ref lifetime. Emulator verification exercises JNI and the real HTTP/MCP renderer
 path separately; an emulator pass does not establish physical-device acceptance.
+
+For the real journey, install this revision's APK on an isolated emulator and set
+`ANDROID_SERIAL` to its explicit serial. Forward host 18420 to device 8420, then
+run `python3 scripts/testing/android-browser-gateway.py --adb "$ANDROID_HOME/platform-tools/adb"`.
+The fixture server binds host 18421, and the harness taps the existing **Yes, once**
+pairing approval UI. It verifies JNI observation/actions, ref expiry/replacement,
+extension discovery, renderer timeout retirement, and the actual OpenAI agent
+catalog/admission/uncertainty stop using a local mock endpoint. It also runs the
+standard MCP SDK initialize/list/call journey from the CLI's installed dependency.
+Bearer contents stay in memory and stdin; no persistent pairing is created.

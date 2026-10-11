@@ -9,6 +9,7 @@ import com.kelpie.browser.browser.DialogState
 import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.nativecore.AiManager
+import com.kelpie.browser.network.BrowserGatewayRetirement
 import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,7 @@ class HandlerContext {
 
     var tabStore: TabStore? = null
     var browserDocumentChanged: ((String) -> Unit)? = null
+    val browserRetirement = BrowserGatewayRetirement()
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
     var annotationSessionId: String? = null
@@ -118,14 +120,19 @@ class HandlerContext {
                 cont.resumeWithException(IllegalStateException("No WebView"))
                 return@suspendCancellableCoroutine
             }
+            val ticket = browserRetirement.start(wv) { cont.cancel() }
             mainHandler.post {
                 if (cont.isActive) {
                     try {
-                        wv.evaluateJavascript(script) { result -> if (cont.isActive) cont.resume(result ?: "null") }
+                        wv.evaluateJavascript(script) { result ->
+                            browserRetirement.complete(ticket)
+                            if (cont.isActive) cont.resume(result ?: "null")
+                        }
                     } catch (error: Exception) {
+                        browserRetirement.complete(ticket)
                         if (cont.isActive) cont.resumeWithException(error)
                     }
-                }
+                } else browserRetirement.complete(ticket)
             }
         }
 
