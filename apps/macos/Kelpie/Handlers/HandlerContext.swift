@@ -12,6 +12,7 @@ final class HandlerContext {
     /// hidden about:blank `WKWebViewRenderer`. Kept in sync by ServerState
     /// wherever the active renderer changes.
     var activeEngineIsChromium = false
+    var browserControlEngineName: String?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
@@ -45,6 +46,7 @@ final class HandlerContext {
     /// tab windows reject empty `tabId` so LLMs are forced to be explicit
     /// about which tab they target.
     func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        if let browserControlEngineName, browserControlEngineName != renderer?.engineName { throw HandlerError.rendererHidden }
         // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
         // WebKit, so resolving through the tab store here would return a hidden
         // WKWebViewRenderer that never navigated (stuck on about:blank): navigate

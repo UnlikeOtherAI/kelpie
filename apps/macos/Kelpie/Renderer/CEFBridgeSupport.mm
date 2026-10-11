@@ -1030,7 +1030,7 @@ static void OnDevToolsCookieAgentDetached(cef_dev_tools_message_observer_t *self
     CompleteAllPendingDevToolsCookieCommands(observer, NO, nil);
 }
 
-static void SendDevToolsCookieCommand(cef_browser_host_t *host,
+void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
                                       NSString *method,
                                       NSDictionary *params,
                                       void (^completion)(BOOL success, NSDictionary *result)) {
@@ -1220,7 +1220,7 @@ void CEFBridgeSetCookieViaCDP(cef_browser_host_t *host,
         params[@"expires"] = @(expires.timeIntervalSince1970);
     }
 
-    SendDevToolsCookieCommand(host, @"Network.setCookie", params, ^(BOOL success, NSDictionary *result) {
+    CEFBridgeSendDevToolsCommand(host, @"Network.setCookie", params, ^(BOOL success, NSDictionary *result) {
         const BOOL cookieSet = success && [result[@"success"] respondsToSelector:@selector(boolValue)]
             ? [result[@"success"] boolValue]
             : NO;
@@ -1232,7 +1232,7 @@ void CEFBridgeSetCookieViaCDP(cef_browser_host_t *host,
 
 void CEFBridgeGetCookiesViaCDP(cef_browser_host_t *host,
                                void (^completion)(BOOL success, NSArray<NSDictionary *> *cookies)) {
-    SendDevToolsCookieCommand(host, @"Network.getCookies", nil, ^(BOOL success, NSDictionary *result) {
+    CEFBridgeSendDevToolsCommand(host, @"Network.getCookies", nil, ^(BOOL success, NSDictionary *result) {
         NSArray<NSDictionary *> *cookies = @[];
         id value = result[@"cookies"];
         if ([value isKindOfClass:[NSArray class]]) {
@@ -1260,7 +1260,7 @@ void CEFBridgeDeleteCookieViaCDP(cef_browser_host_t *host,
         @"domain": domain ?: @"",
         @"path": path.length > 0 ? path : @"/",
     };
-    SendDevToolsCookieCommand(host, @"Network.deleteCookies", params, ^(BOOL success, NSDictionary *) {
+    CEFBridgeSendDevToolsCommand(host, @"Network.deleteCookies", params, ^(BOOL success, NSDictionary *) {
         if (completion != nil) {
             completion(success);
         }

@@ -157,6 +157,14 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         }
     }
 
+    func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
+        try await withWebKitTimeout("Browser control") { completion in
+            webView.evaluateJavaScript(script, in: nil, in: .world(name: "KelpieBrowserControl")) { result in
+                completion(result.map { Optional($0) })
+            }
+        }
+    }
+
     func allCookies() async -> [HTTPCookie] {
         await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
     }
@@ -280,6 +288,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         // Each new provisional navigation starts clean — clear any error captured
         // by a superseded load so a cancelled-then-successful sequence is not fatal.
+        NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
         self.lastNavigationError = nil
         self.documentNavigationStart = Date()
         self.capturedDocumentResponseURL = nil

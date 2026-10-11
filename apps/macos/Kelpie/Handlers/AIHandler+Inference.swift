@@ -111,7 +111,7 @@ extension AIHandler {
         do {
             let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
             let preloaded = explicitText ?? fallbackContext
-            let harness = InferenceHarness(context: context)
+            let harness = InferenceHarness(context: context, router: router)
             let result = try await harness.run(prompt: prompt, audio: audio, preloadedContext: preloaded)
 
             var response = successResponse([

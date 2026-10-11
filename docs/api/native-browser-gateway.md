@@ -63,3 +63,43 @@ Android ABI configurations. CMake regenerates when authoritative sources or lock
 change. CI/native release jobs must install those tools before configuring CMake.
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.
+
+## Apple bindings
+
+macOS 0.1.29/build23 and iOS 0.1.14/build14 expose canonical requests at
+`POST /v1/browser-control` and the compact four-tool catalog at `POST /mcp`.
+Both routes pass the existing pairing bearer/header gates. Canonical refusal and
+unknown outcomes retain HTTP200 with the versioned envelope; malformed JSON and
+authentication failures retain HTTP4xx. The generated fixed evaluator has no
+public HTTP route.
+
+The shared Swift coordinator is compiled into both apps. WebKit uses the named
+`KelpieBrowserControl` content world. macOS Chromium uses the same existing
+bounded native CDP transport for main-frame discovery, an isolated world without
+universal access, and fixed evaluation. Page scripts cannot replace this world's
+reference registry. Canonical clicks activate the observed DOM object and type
+appends with input/change events; rich extensions retain native input semantics.
+Navigation, renderer changes and legacy/rich mutations invalidate references.
+Chromium exposes one `chromium` handle and omits unsupported tab lifecycle methods.
+WebKit preserves explicit native tab/window ownership. iOS dispatch rechecks the
+selected WebView identity after asynchronous inspection; it never acts on a tab
+whose selected renderer changed. External-display WebKit exposes its own `external`
+handle through that display's separately authenticated server.
+
+OpenAI-compatible inference and the Mac local GGUF harness use a fresh policy-bound
+compact catalog per run. Only previously admitted product extensions appear;
+`allowActions:false` removes common and extension mutations. Both Apple agents
+stay in the visible pinned tab and refuse model-selected tab/window changes or
+later UI tab changes. iOS local GGUF inference remains a single-shot lane and uses
+the bounded common snapshot for optional page context. Ambiguous mutations stop the
+AI turn instead of feeding an error into another action attempt. A renderer mutation
+timeout quarantines the shared lease until browser restart; late callbacks cannot
+advance the cancelled coordinator.
+
+Mac candidate signing uses Xcode's real selected identity for staged CEF bundles
+and preserves helper entitlements; no script introduces ad-hoc signatures. Local
+Apple Development signing demonstrates a development candidate only. The current
+repository's release workflow does not establish Developer ID notarization, and
+iOS simulator artifacts do not establish physical-device signing or an IPA release.
+Binding regressions live in `BrowserControlGatewayTests` (compiled on both Apple
+targets), alongside the model-loop fixtures and shared native CTest coverage.

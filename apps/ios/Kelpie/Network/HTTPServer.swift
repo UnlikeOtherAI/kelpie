@@ -317,7 +317,9 @@ final class HTTPServer: @unchecked Sendable {
                 )
             }
         default:
-            if parsed.method == "POST", parsed.path.hasPrefix("/v1/") {
+            if parsed.method == "POST", parsed.path == "/mcp" {
+                await handleMCP(parsed: parsed, connection: connection)
+            } else if parsed.method == "POST", parsed.path.hasPrefix("/v1/") {
                 await handlePOSTv1(parsed: parsed, connection: connection)
             } else {
                 await send(
@@ -326,6 +328,17 @@ final class HTTPServer: @unchecked Sendable {
                 )
             }
         }
+    }
+
+    private func handleMCP(parsed: ParsedHTTPRequest, connection: NWConnection) async {
+        guard let body = parseJSON(String(data: parsed.body, encoding: .utf8) ?? "") else {
+            await send(connection: connection, response: PairingHTTPResponse.error(
+                status: 400, code: "INVALID_JSON", message: "Invalid JSON-RPC body"
+            ))
+            return
+        }
+        let result = await router.browserMCP(body)
+        await send(connection: connection, response: PairingHTTPResponse.json(status: 200, json: result))
     }
 
     private func handlePOSTv1(parsed: ParsedHTTPRequest, connection: NWConnection) async {

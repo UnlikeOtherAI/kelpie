@@ -50,6 +50,12 @@ void CEFBridgeSetCookie(cef_cookie_manager_t *manager,
                         void (^ _Nullable completion)(BOOL success));
 void CEFBridgeDeleteAllCookies(cef_cookie_manager_t *manager, void (^ _Nullable completion)(NSInteger deleted));
 void CEFBridgeFlushCookieStore(cef_cookie_manager_t *manager, void (^ _Nullable completion)(void));
+/// Shared bounded CDP command transport; each result callback completes once.
+void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
+                                NSString *method,
+                                NSDictionary * _Nullable params,
+                                void (^completion)(BOOL success, NSDictionary * _Nullable result));
+
 void CEFBridgeSetCookieViaCDP(cef_browser_host_t *host,
                               NSString *name,
                               NSString *value,
