@@ -206,7 +206,8 @@ fun BrowserScreen(
                 )
             }
 
-            com.kelpie.browser.connect.ConnectControls(compact = true)
+            com.kelpie.browser.connect
+                .ConnectControls(compact = true)
             BrowserViewport(
                 tabStore,
                 browserState,

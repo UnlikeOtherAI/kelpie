@@ -29,7 +29,10 @@ class SecretStore private constructor(
     }
 
     /** Remote actions require their encrypted recovery journal committed before dispatch. */
-    fun setDurably(name: String, value: String) {
+    fun setDurably(
+        name: String,
+        value: String,
+    ) {
         check(prefs.edit().putString(name, value).commit()) { "Could not persist action recovery journal" }
     }
 

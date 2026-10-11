@@ -22,11 +22,18 @@ object NativeCore {
 
     external fun cancelLocalInference()
 
-    external fun connectCreate(state: String, owner: String): Long
+    external fun connectCreate(
+        state: String,
+        owner: String,
+    ): Long
 
     external fun connectDestroy(handle: Long)
 
-    external fun connectExecute(handle: Long, operation: String, json: String): String?
+    external fun connectExecute(
+        handle: Long,
+        operation: String,
+        json: String,
+    ): String?
 
     external fun bookmarkStoreDestroyNative(handle: Long)
 
