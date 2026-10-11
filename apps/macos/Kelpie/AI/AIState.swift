@@ -188,20 +188,13 @@ final class AIState: ObservableObject {
             throw NSError(domain: "AIState", code: 1, userInfo: [NSLocalizedDescriptionKey: "Load a model first."])
         }
 
-        var body: [String: Any] = ["prompt": prompt]
-
-        if activeModel.backend == .openai {
-            // The selected endpoint drives Kelpie's browser agent in this tab.
-            body["messages"] = history.suffix(10).map { $0.apiPayload }
-            body["agent"] = true
-            body["allowActions"] = allowActions
-            if let tabId { body["tabId"] = tabId }
-        } else if activeModel.backend == .ollama {
-            let priorMessages = history.suffix(10).map { $0.apiPayload }
-            body["messages"] = priorMessages
-        } else {
-            body["context"] = "page_text"
-        }
+        let body = Self.chatRequest(
+            prompt: prompt,
+            history: history,
+            tabId: tabId,
+            backend: activeModel.backend,
+            allowActions: allowActions
+        )
 
         let response = try await sendLocalRequest(method: "ai-infer", body: body)
         if (response["success"] as? Bool) == false, response["steps"] != nil {
@@ -219,6 +212,20 @@ final class AIState: ObservableObject {
     }
 
     /// Cancels in-flight inference on the OpenAI-compatible backend.
+    static func chatRequest(
+        prompt: String, history: [AIChatMessage], tabId: String?, backend: AIBackend, allowActions: Bool
+    ) -> [String: Any] {
+        var body: [String: Any] = ["prompt": prompt, "messages": history.map { $0.apiPayload }]
+        if let tabId { body["tabId"] = tabId }
+        if backend == .openai {
+            body["agent"] = true
+            body["allowActions"] = allowActions
+        } else {
+            body["context"] = "page_text"
+        }
+        return body
+    }
+
     func cancelInference() async {
         _ = try? await sendLocalRequest(method: "ai-cancel", body: [:])
     }

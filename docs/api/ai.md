@@ -74,6 +74,7 @@ Runs inference against the active backend.
 - Platform AI on mobile currently accepts text only.
 - Remote Ollama on mobile proxies the request to the configured `/api/generate` or `/api/chat` endpoint.
 - If Ollama is configured but unavailable, the request fails explicitly instead of silently falling back.
+- On macOS, `messages` supplies prior conversation turns (the current `prompt` is appended once). Local Ollama and native chat capture the current page from `tabId`, including accessible image/logo labels. Supply `tabId` in multi-tab windows; ambiguous or closed tabs fail explicitly. Extraction failures return `PAGE_CONTEXT_UNAVAILABLE`. The browser panel supplies its full per-tab history; each model's context limit still applies.
 
 Examples:
 

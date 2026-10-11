@@ -27,7 +27,9 @@ extension AIHandler {
         let explicitText = body["text"] as? String
         let contextMode = body["context"] as? String
         let audio = decodeBase64Field(body["audio"])
-        let messages = body["messages"] as? [[String: Any]]
+        if let messages = body["messages"] as? [[String: Any]] {
+            return await inferLocalChat(body, history: messages, backend: backendState)
+        }
 
         if backendState.backend == "ollama" {
             guard let model = backendState.model else {
@@ -42,26 +44,15 @@ extension AIHandler {
 
             do {
                 let image = contextMode == "screenshot" ? try await screenshotData(tabId: tabId) : nil
-                let result: InferenceEngine.InferenceResult
-                if let messages {
-                    result = try await inferWithOllamaAgentLoop(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        historyMessages: messages,
-                        image: image
-                    )
-                } else {
-                    let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-                    result = try await inferWithOllama(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        messages: nil,
-                        contextText: explicitText ?? fallbackContext,
-                        image: image
-                    )
-                }
+                let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
+                let result = try await inferWithOllama(
+                    endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
+                    model: model,
+                    prompt: prompt,
+                    messages: nil,
+                    contextText: explicitText ?? fallbackContext,
+                    image: image
+                )
                 return successResponse([
                     "response": result.text,
                     "tokensUsed": result.tokensUsed,

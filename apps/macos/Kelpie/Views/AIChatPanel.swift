@@ -5,62 +5,10 @@ enum AIPanelTab: String, CaseIterable {
     case models = "Models"
 }
 
-@MainActor
-final class AIChatSession: ObservableObject {
-    @Published var messages: [AIChatMessage] = []
-    @Published var input = ""
-    @Published var isSending = false
-    @Published var errorMessage: String?
-    /// Lets the OpenAI-compatible agent click and type in the current tab.
-    /// Off by default; only the person can turn it on.
-    @Published var allowActions = false
-
-    func reset() {
-        messages = []
-        input = ""
-        isSending = false
-        errorMessage = nil
-        allowActions = false
-    }
-
-    func stop(using aiState: AIState) {
-        Task { await aiState.cancelInference() }
-    }
-
-    func send(using aiState: AIState, tabId: String?) async {
-        let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
-
-        let userMessage = AIChatMessage(role: .user, text: prompt)
-        messages.append(userMessage)
-        input = ""
-        errorMessage = nil
-        isSending = true
-
-        do {
-            let reply = try await aiState.ask(
-                prompt: prompt,
-                history: messages.dropLast().map { $0 },
-                tabId: tabId,
-                allowActions: allowActions
-            )
-            messages.append(AIChatMessage(role: .assistant, text: reply.text, detail: reply.detail))
-        } catch let failure as AIChatFailure {
-            messages.append(AIChatMessage(role: .assistant, text: "⚠︎ \(failure.message)", detail: failure.reply.detail))
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isSending = false
-    }
-}
-
 struct AIChatPanel: View {
     @ObservedObject var aiState: AIState
     @ObservedObject var session: AIChatSession
     @Binding var selectedTab: AIPanelTab
-    /// The tab the agent operates on (pinned per request).
-    let activeTabId: String?
     @ObservedObject var endpointState = AIEndpointState.shared
     let onClose: () -> Void
     @State private var showHFTokenPopover = false
@@ -182,7 +130,7 @@ struct AIChatPanel: View {
                     .accessibilityIdentifier("browser.ai.chat.input")
                     .onSubmit {
                         Task {
-                            await session.send(using: aiState, tabId: activeTabId)
+                            await session.send(using: aiState)
                         }
                     }
 
@@ -197,7 +145,7 @@ struct AIChatPanel: View {
                             accessibilityLabel: "Send",
                             isEnabled: canSend
                         ) {
-                            Task { await session.send(using: aiState, tabId: activeTabId) }
+                            Task { await session.send(using: aiState) }
                         }
                     )
 
