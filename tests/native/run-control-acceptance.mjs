@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createServer } from "node:net";
 import { startFixtureServer } from "../windows/lib/fixture.mjs";
 import { control, rawRequest, bearerHeaders } from "../windows/lib/http.mjs";
 import { runCanonicalAcceptance } from "../windows/lib/canonical-browser.mjs";
@@ -13,8 +14,12 @@ const fallback = process.argv.includes("--fallback");
 const profile = await mkdtemp(join(tmpdir(), "kelpie-native-contract-"));
 const readinessPath = join(profile, "readiness.json");
 const fixture = await startFixtureServer();
+const reservation = createServer();
+await new Promise(resolve => reservation.listen(0, "127.0.0.1", resolve));
+const port = reservation.address().port;
+await new Promise(resolve => reservation.close(resolve));
 const browser = startBrowser(executable, ["--profile-dir", profile, "--readiness-file", readinessPath,
-  "--port", "0", "--url", fixture.baseUrl, ...(process.platform === "linux" ? ["--headless"] : [])]);
+  "--port", String(port), "--url", fixture.baseUrl, ...(process.platform === "linux" ? ["--headless"] : [])]);
 let readiness;
 try {
   readiness = await waitForReadiness(readinessPath, 45000);
