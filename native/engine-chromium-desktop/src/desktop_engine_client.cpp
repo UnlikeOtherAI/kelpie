@@ -174,6 +174,13 @@ void DesktopCefClient::OnLoadEnd(CefRefPtr<CefBrowser> browser,
   owner_->UpdateActiveState();
 }
 
+void DesktopCefClient::OnLoadStart(CefRefPtr<CefBrowser> browser,CefRefPtr<CefFrame> frame,
+                                  TransitionType) {
+  if(frame && frame->IsMain()) {
+    if(auto* tab=owner_->FindTab(browser))tab->document_version=NextDocumentVersion();
+  }
+}
+
 void DesktopCefClient::OnLoadError(CefRefPtr<CefBrowser> browser,
                                    CefRefPtr<CefFrame> frame,
                                    CefLoadHandler::ErrorCode error_code,

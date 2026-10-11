@@ -3,6 +3,8 @@
 #include "device_info_linux.h"
 #include "profile_session.h"
 #include "account_service.h"
+#include "connect_client.h"
+#include "connect_executor.h"
 #include "kelpie/desktop_app.h"
 #include "kelpie/desktop_http_server.h"
 #include "kelpie/desktop_router.h"
@@ -17,6 +19,8 @@ struct LinuxApp::Impl final : DeviceInfoProvider {
   DeviceInfoLinux device;
   mutable DesktopApp desktop;
   account::AccountService account;
+  std::unique_ptr<connect::Executor> connect_executor;
+  std::unique_ptr<connect::Client> connection;
   std::atomic<bool> running{true}, closing{false}, fullscreen{false}, desired_fullscreen{false};
   std::atomic<int> requested_width{0},requested_height{0};
   std::atomic<bool> started{false};

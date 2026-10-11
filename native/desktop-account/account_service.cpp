@@ -64,7 +64,7 @@ void AccountService::ExpireSession(std::uint64_t generation,const std::string& m
   {
     std::lock_guard lock(mutex_);
     if (generation!=generation_) return;
-    ++generation_; token_.clear(); refresh_token_.clear(); client_id_.clear();
+    ++generation_; subject_.clear(); token_.clear(); refresh_token_.clear(); client_id_.clear();
     bookmarks_=json::array(); state_={}; state_.error=message;
     pending_browser_url_.clear(); open_browser_={};
   }
@@ -105,6 +105,7 @@ void AccountService::CompleteSignIn(const AccountToken& token,std::uint64_t gene
   if (generation!=generation_) return;
   bookmarks_=std::move(list);
   state_={true,false,false,name,email,std::move(avatar),{}};
+  subject_=identity.at("sub").get<std::string>();
 }
 bool AccountService::StartBookmarkAction(std::string action,json params) {
   return StartTask([this,action=std::move(action),params=std::move(params)](std::uint64_t generation) {

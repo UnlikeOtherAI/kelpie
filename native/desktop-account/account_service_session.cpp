@@ -17,7 +17,7 @@ AccountSession AccountService::Reset() {
   AccountSession session;
   {
     std::lock_guard lock(mutex_);
-    ++generation_; token_.clear(); state_={}; bookmarks_=json::array(); expiry_={};
+    ++generation_; subject_.clear(); token_.clear(); state_={}; bookmarks_=json::array(); expiry_={};
     session={std::exchange(client_id_,{}),std::exchange(refresh_token_,{})};
     login=std::move(login_); transport=transport_;
     pending_browser_url_.clear(); open_browser_={};
