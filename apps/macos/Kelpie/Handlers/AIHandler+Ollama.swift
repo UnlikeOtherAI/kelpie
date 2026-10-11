@@ -13,26 +13,12 @@ extension AIHandler {
         model: String,
         prompt: String,
         historyMessages: [[String: Any]],
-        image: Data?
+        image: Data?,
+        page: AIPageContext
     ) async throws -> InferenceEngine.InferenceResult {
         let startedAt = DispatchTime.now()
-        let harness = InferenceHarness(context: context)
         let url = try ollamaURL(endpoint: endpoint, path: "/api/chat")
-
-        // Pre-fetch page text — fast JS call, works with every model
-        let pageText = await harness.executeTool("get_text", args: [:])
-        let summary = await PageSummary.gather(from: context)
-        let systemContent = """
-        You are a browser assistant built into Kelpie. Answer questions about the current web page.
-        Be concise. Only state facts present in the page content below. Never guess or make up content.
-
-        Page: "\(summary.title)"
-        URL: \(summary.url)
-
-        Page content:
-        \(pageText)
-        """
-        let systemMessage: [String: Any] = ["role": "system", "content": systemContent]
+        let systemMessage: [String: Any] = ["role": "system", "content": try page.systemPrompt()]
         var messages: [[String: Any]] = [systemMessage] + historyMessages
         var userMessage: [String: Any] = ["role": "user", "content": prompt]
         if let image {

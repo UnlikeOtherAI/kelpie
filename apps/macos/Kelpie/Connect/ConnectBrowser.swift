@@ -209,6 +209,7 @@ final class ConnectBrowser {
         guard let store = context.tabStore, let tab = store.tabs.first(where: { $0.id == uuid }) else { throw Failure("Tab not found") }
         NessieConnection.shared.changeTabRemotely { store.selectBrowserTab(id: uuid) }
         isolated.webView = tab.webView
+        isolated.tabStore = store
         #else
         if let cef = context.renderer as? CEFRenderer, cef.connectionTabID == tabID {
             isolated.renderer = cef

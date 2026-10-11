@@ -124,7 +124,10 @@ bool DesktopCefClient::DoClose(CefRefPtr<CefBrowser> browser) {
 
 void DesktopCefClient::OnBeforeClose(CefRefPtr<CefBrowser> browser) {
   for (auto& tab : owner_->tabs) {
-    if (tab.browser && tab.browser->IsSame(browser) && tab.devtools) tab.devtools->CancelAll();
+    if (tab.browser && tab.browser->IsSame(browser)) {
+      tab.chat_session->Close();
+      if (tab.devtools) tab.devtools->CancelAll();
+    }
   }
   owner_->tabs.erase(std::remove_if(owner_->tabs.begin(), owner_->tabs.end(),
       [&browser](const DesktopEngine::Impl::Tab& tab) { return tab.browser->IsSame(browser); }),

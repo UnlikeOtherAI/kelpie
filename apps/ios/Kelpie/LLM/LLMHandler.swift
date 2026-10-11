@@ -30,8 +30,10 @@ struct LLMHandler {
         (function(){function walk(el,depth){if(depth>"\(maxDepth)")return null;var role=el.getAttribute('role')||el.tagName.toLowerCase();var name=el.getAttribute('aria-label')||el.textContent?.trim().substring(0,50)||'';var node={role:role,name:name};if(el.getAttribute('aria-checked'))node.checked=el.getAttribute('aria-checked')==='true';if(el.disabled)node.disabled=true;if(document.activeElement===el)node.focused=true;var children=[];for(var c of el.children){var cn=walk(c,depth+1);if(cn)children.push(cn);}if(children.length)node.children=children;return node;}var root=document.querySelector('\(JSEscape.string(root))');if(!root)return{tree:{role:'none'},nodeCount:0};var tree=walk(root,0);var count=root.querySelectorAll('*').length;return{tree:tree,nodeCount:count};})()
         """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
+            let result = try await PageTextSnapshot.object(context: context, body: body, script: js)
             return successResponse(result)
+        } catch let error as AIHandlerError {
+            return error.response
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
@@ -41,7 +43,7 @@ struct LLMHandler {
     private func getVisibleElements(_ body: [String: Any]) async -> [String: Any] {
         let interactableOnly = body["interactableOnly"] as? Bool ?? false
         let js = """
-        (function(){\(elementSelectorBuilderScript())var els=document.querySelectorAll('*');var visible=[];for(var el of els){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left<window.innerWidth&&r.right>0){var tag=el.tagName.toLowerCase();if(\(interactableOnly)&&!['a','button','input','select','textarea'].includes(tag)&&!el.onclick&&el.getAttribute('role')!=='button')continue;visible.push({tag:tag,selector:kelpieBuildSelector(el),text:(el.textContent||'').trim().substring(0,100),rect:{x:r.x,y:r.y,width:r.width,height:r.height},role:el.getAttribute('role')||undefined,interactable:['a','button','input','select','textarea'].includes(tag)});if(visible.length>=200)break;}}return{viewport:{width:window.innerWidth,height:window.innerHeight,scrollX:window.scrollX,scrollY:window.scrollY},elements:visible,count:visible.length};})()
+        (function(){var els=document.querySelectorAll('*');var visible=[];for(var el of els){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left<window.innerWidth&&r.right>0){var tag=el.tagName.toLowerCase();if(\(interactableOnly)&&!['a','button','input','select','textarea'].includes(tag)&&!el.onclick&&el.getAttribute('role')!=='button')continue;visible.push({tag:tag,text:(el.textContent||'').trim().substring(0,100),rect:{x:r.x,y:r.y,width:r.width,height:r.height},role:el.getAttribute('role')||undefined,interactable:['a','button','input','select','textarea'].includes(tag)});if(visible.length>=200)break;}}return{viewport:{width:window.innerWidth,height:window.innerHeight,scrollX:window.scrollX,scrollY:window.scrollY},elements:visible,count:visible.length};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js)
@@ -53,14 +55,10 @@ struct LLMHandler {
 
     @MainActor
     private func getPageText(_ body: [String: Any]) async -> [String: Any] {
-        let selector = body["selector"] as? String ?? "body"
-        let maxLength = max(1, min(100000, body["maxLength"] as? Int ?? 100000))
-        let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim().substring(0,\(maxLength)),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            return successResponse(result)
+            return successResponse(try await PageTextSnapshot.read(context: context, body: body))
+        } catch let error as AIHandlerError {
+            return error.response
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }

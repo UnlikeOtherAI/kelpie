@@ -274,10 +274,21 @@ bool DesktopEngine::Impl::Shutdown() {
     return true;
   }
   shutting_down = true;
-  for (auto& tab : tabs) {
+  struct ClosingTab {
+    CefRefPtr<CefBrowser> browser;
+    CefRefPtr<DesktopDevToolsSession> devtools;
+    std::shared_ptr<TabChatSession> chat_session;
+  };
+  std::vector<ClosingTab> closing;
+  for (const auto& tab : tabs) closing.push_back({tab.browser, tab.devtools, tab.chat_session});
+  // CloseBrowser may synchronously run OnBeforeClose and erase/move tabs.
+  // No reference or iterator into that mutable owner list can survive it.
+  for (const auto& tab : closing) {
     if (tab.devtools) tab.devtools->CancelAll();
+    tab.chat_session->Close();
     if (tab.browser && tab.browser->GetHost()) tab.browser->GetHost()->CloseBrowser(true);
   }
+  closing.clear(); // Release CEF references before pumping close callbacks and CefShutdown.
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
   while (!tabs.empty() && std::chrono::steady_clock::now() < deadline) {
     CefDoMessageLoopWork();

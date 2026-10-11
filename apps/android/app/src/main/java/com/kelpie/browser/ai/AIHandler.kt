@@ -197,12 +197,21 @@ class AIHandler(
                 AIState.OLLAMA_BACKEND to ::inferWithOllama,
                 AIState.PLATFORM_BACKEND to ::inferWithPlatform,
                 AIState.OPENAI_BACKEND to { body -> requireOpenAI().infer(body) },
-                "native" to { body -> LocalInference.infer(body, localContext) },
+                "native" to { body -> LocalInference.execute("infer", body) },
             ),
         )
     }
 
-    private suspend fun aiInfer(body: Map<String, Any?>): Map<String, Any?> = inferDispatch.infer(currentBackend(), body)
+    private suspend fun aiInfer(body: Map<String, Any?>): Map<String, Any?> {
+        val backend = currentBackend()
+        return try {
+            AIConversation.messages(body)
+            val prepared = if (backend == AIState.OPENAI_BACKEND) body else AIPageContext.prepare(body, localContext)
+            inferDispatch.infer(backend, prepared)
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
+        }
+    }
 
     private fun requireOpenAI(): OpenAIEndpointsHandler = openAI ?: error("AIHandler.register must run before AI requests")
 
@@ -301,14 +310,14 @@ class AIHandler(
         }
 
         val prompt =
-            buildPrompt(body)
-                ?: return errorResponse("MISSING_PARAM", "prompt is required")
-        val messages = parseMessages(body["messages"])
+            buildPrompt(body - "messages").orEmpty()
+        val messages = AIConversation.messages(body)
+        if (prompt.isEmpty() && messages.isEmpty()) return errorResponse("MISSING_PARAM", "prompt or messages is required")
         val images = extractImages(body)
         val start = SystemClock.elapsedRealtime()
 
         return try {
-            val isChat = messages.isNotEmpty()
+            val isChat = body.containsKey("messages")
             val response =
                 if (isChat) {
                     AIHttpJson.postJson(
@@ -370,15 +379,7 @@ class AIHandler(
         return listOf("llava", "vision", "moondream", "minicpm-v").any { lowercase.contains(it) }
     }
 
-    private fun buildPrompt(body: Map<String, Any?>): String? {
-        val prompt = (body["prompt"] as? String)?.trim().orEmpty()
-        val text = (body["text"] as? String)?.trim().orEmpty()
-
-        if (prompt.isEmpty() && text.isEmpty()) return null
-        if (prompt.isEmpty()) return text
-        if (text.isEmpty()) return prompt
-        return "$prompt\n\n$text"
-    }
+    private fun buildPrompt(body: Map<String, Any?>): String? = AIConversation.prompt(body).takeIf { it.isNotEmpty() }
 
     private fun extractImages(body: Map<String, Any?>): List<String> {
         val explicitImages =
@@ -392,16 +393,6 @@ class AIHandler(
 
         val singleImage = (body["image"] as? String)?.takeIf { it.isNotBlank() }
         return if (singleImage != null) listOf(singleImage) else emptyList()
-    }
-
-    private fun parseMessages(value: Any?): List<Map<String, String>> {
-        val rawMessages = value as? List<*> ?: return emptyList()
-        return rawMessages.mapNotNull { item ->
-            val map = item as? Map<*, *> ?: return@mapNotNull null
-            val role = map["role"] as? String ?: return@mapNotNull null
-            val content = map["content"] as? String ?: return@mapNotNull null
-            mapOf("role" to role, "content" to content)
-        }
     }
 
     private fun buildGenerateRequest(
@@ -430,7 +421,7 @@ class AIHandler(
         body: Map<String, Any?>,
     ): Map<String, Any?> {
         val requestMessages = messages.toMutableList()
-        requestMessages.add(mapOf("role" to "user", "content" to prompt))
+        if (prompt.isNotEmpty()) requestMessages.add(mapOf("role" to "user", "content" to prompt))
 
         val request =
             linkedMapOf<String, Any?>(

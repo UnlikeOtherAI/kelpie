@@ -137,6 +137,12 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         }
     }
 
+    private func inputError(audio: Data?, image: Data?) -> InferenceError? {
+        if image != nil && !loadedCapabilities.contains("vision") { return .visionNotSupported }
+        if audio != nil && !loadedCapabilities.contains("audio") { return .audioNotSupported }
+        return nil
+    }
+
     func infer(
         prompt: String,
         audio: Data? = nil,
@@ -155,12 +161,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                     continuation.resume(throwing: InferenceError.noModelLoaded)
                     return
                 }
-                if image != nil && !self.loadedCapabilities.contains("vision") {
-                    continuation.resume(throwing: InferenceError.visionNotSupported)
-                    return
-                }
-                if audio != nil && !self.loadedCapabilities.contains("audio") {
-                    continuation.resume(throwing: InferenceError.audioNotSupported)
+                if let error = self.inputError(audio: audio, image: image) {
+                    continuation.resume(throwing: error)
                     return
                 }
 
@@ -175,6 +177,12 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 let tokenCount = llama_tokenize(vocab, prompt, Int32(utf8Count), tokens, Int32(maxTokenCount), true, false)
                 guard tokenCount > 0 else {
                     continuation.resume(throwing: InferenceError.inferenceFailed("Tokenization failed"))
+                    return
+                }
+
+                guard Int(tokenCount) + max(1, maxTokens) <= Int(llama_n_ctx(ctx)) else {
+                    let message = "Conversation and page exceed the model's context window. Use a model with a larger context window."
+                    continuation.resume(throwing: InferenceError.inferenceFailed(message))
                     return
                 }
 
