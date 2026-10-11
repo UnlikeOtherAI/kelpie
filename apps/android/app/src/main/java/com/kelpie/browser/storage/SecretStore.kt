@@ -28,6 +28,11 @@ class SecretStore private constructor(
         prefs.edit().remove(name).apply()
     }
 
+    /** Remote actions require their encrypted recovery journal committed before dispatch. */
+    fun setDurably(name: String, value: String) {
+        check(prefs.edit().putString(name, value).commit()) { "Could not persist action recovery journal" }
+    }
+
     companion object {
         private const val FILE_NAME = "kelpie_secrets"
 

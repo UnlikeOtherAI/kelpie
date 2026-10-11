@@ -5,7 +5,7 @@ import Security
 struct UOAAuthorization {
     static let callbackScheme = "com.unlikeotherai.kelpie"
     static let callback = callbackScheme + "://oauth/callback"
-    static let scopes = "openid profile settings.read settings.write"
+    static let scopes = "openid profile settings.read settings.write kelpie.connect"
     let state: String
     let verifier: String
 
