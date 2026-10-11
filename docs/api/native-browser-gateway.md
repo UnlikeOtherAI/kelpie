@@ -55,7 +55,7 @@ Default MCP tools are `kelpie_browser_control`, `kelpie_extensions` (names), `ke
 through the advertised generic extension tool, so embedded AI providers can
 reach every admitted feature without requiring dynamic function registration.
 
-CMake explicitly runs `pnpm install --frozen-lockfile`, builds the shared package,
+CMake explicitly runs `pnpm install --frozen-lockfile`, cleans and builds the shared package,
 and generates the schema, documentation, fixed reader and Zod parity fixtures in
 the build directory. Native builds require Node 20+ and pnpm; generated assets
 are never committed. A portable source lock serializes dependency/build generation across concurrent
