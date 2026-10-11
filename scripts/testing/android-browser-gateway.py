@@ -77,10 +77,10 @@ class FixtureHandler(BaseHTTPRequestHandler):
             assert not body.get('tools'), 'Plain inference offered browser action tools'
             FixtureHandler.plain_payload = body
             FixtureHandler.plain_requests += 1
-            assert len(body['messages']) == 33, 'Full history plus system/current context must be retained'
+            assert len(body['messages']) == 32, 'Thirty prior turns plus system/current question must be retained'
             assert body['messages'][1]['content'] == 'remember-0'
-            assert body['messages'][31]['content'] == 'Which logo is on the background page?'
             current = body['messages'][-1]['content']
+            assert 'Which logo is on the background page?' in current
             assert 'Untrusted current page evidence' in current and 'Gateway logo' in current
             assert 'Gateway SVG title' in current and 'Public gateway evidence' in current
             assert 'seed' not in current, 'Form value leaked into common model grounding'
@@ -185,7 +185,7 @@ def main():
             assert value['ok'], 'Gateway fixture evaluation failed'
             return value['value']
         status, result = request('/v1/' + method, params or {})
-        assert status == 200 and result.get('success'), 'Native fixture operation failed: ' + method
+        assert status == 200 and result.get('success'), 'Native fixture operation failed: ' + method + ': ' + json.dumps({'status': status, 'error': result.get('error')})
         return result
 
     def core(method, tab=None, params=None, succeeds=True):
@@ -305,17 +305,16 @@ def main():
     core('tabs.select', other)
     FixtureHandler.model_mode, FixtureHandler.plain_payload = 'plain', None
     history = [{'role': 'user' if i % 2 == 0 else 'assistant', 'content': 'remember-' + str(i)} for i in range(30)]
-    history.append({'role': 'user', 'content': 'Which logo is on the background page?'})
-    native('ai-infer', {'messages': history, 'context': 'page_text', 'agent': False, 'tabId': tab})
+    native('ai-infer', {'prompt': 'Which logo is on the background page?', 'messages': history, 'context': 'page_text', 'agent': False, 'tabId': tab})
     assert FixtureHandler.plain_payload is not None
     listing = core('tabs.list')
     assert next(item['id'] for item in listing if item['active']) == other, 'Context read switched the visible tab'
     before_calls = FixtureHandler.plain_requests
-    status, closed = request('/v1/ai-infer', {'messages': history, 'context': 'page_text', 'agent': False, 'tabId': 'closed-owned-tab'})
+    status, closed = request('/v1/ai-infer', {'prompt': 'Read closed tab', 'messages': history, 'context': 'page_text', 'agent': False, 'tabId': 'closed-owned-tab'})
     assert status == 400 and closed['error']['code'] == 'TAB_NOT_FOUND'
     assert FixtureHandler.plain_requests == before_calls
     core('tabs.select', tab)
-    print('PASS common bounded background grounding/SVG/value omission/full 31-turn history/no selection', flush=True)
+    print('PASS common bounded background grounding/SVG/value omission/full 30-turn history/current question/no selection', flush=True)
     for mode in ('read', 'write', 'timeout'):
         core('tab.goto', tab, {'url': fixture_url})
         FixtureHandler.model_mode, FixtureHandler.model_stage = mode, 0
