@@ -7,6 +7,7 @@ import {
   getTokenStore,
 } from "../auth/token-store.js";
 import { pair } from "../auth/pairing.js";
+import { pairAccount } from "../auth/account-pairing.js";
 import { readLocalReadiness } from "../browser/store.js";
 
 export interface HttpResponse<T = unknown> {
@@ -17,11 +18,10 @@ export interface HttpResponse<T = unknown> {
 
 interface SendOptions {
   /**
-   * If false, a `401 UNAUTHORIZED` response is returned to the caller as-is
-   * instead of triggering the implicit-pair retry. Used by the `pair`
-   * command and unit tests.
+   * False disables implicit pairing; "account" allows only existing account
+   * authorization without starting a manual approval prompt.
    */
-  autoPair?: boolean;
+  autoPair?: boolean | "account";
 }
 
 function toKebabCase(method: string): string {
@@ -119,22 +119,22 @@ async function rawFetch<T>(
 
 /**
  * On a 401, kick off the device pair flow once and retry the original call.
- * The user must approve on-device; we surface a one-line prompt so they
- * know to look at the screen.
+ * Same-account authorization is automatic; manual requests surface a prompt.
  *
  * Returns `true` if a fresh token was obtained.
  */
-async function attemptAutoPair(device: DiscoveredDevice): Promise<boolean> {
+async function attemptAutoPair(device: DiscoveredDevice, accountOnly: boolean): Promise<boolean> {
   const store = getTokenStore();
   const clientId = await store.clientId();
   const clientName = defaultClientName();
 
-  process.stderr.write(
-    `Device "${device.name}" (${device.ip}:${device.port}) requires pairing. ` +
-      `Approve on device when prompted...\n`,
-  );
-
-  const result = await pair({ host: device.ip, port: device.port, clientId, clientName });
+  const context = { host: device.ip, port: device.port, clientId, clientName,
+    onApprovalRequired: () => process.stderr.write(
+      `Device "${device.name}" (${device.ip}:${device.port}) requires pairing. Approve on device when prompted...\n`,
+    ),
+  };
+  const result = accountOnly ? await pairAccount(context) : await pair(context);
+  if (!result) return false;
   if (result.status !== "approved") {
     process.stderr.write(`Pairing not completed: ${result.status}\n`);
     return false;
@@ -213,7 +213,7 @@ export async function sendCommand<T = unknown>(
   const reused = await retryWithStoredApprovals<T>(device, method, body, timeout);
   if (reused) return reused;
 
-  const paired = await attemptAutoPair(device);
+  const paired = await attemptAutoPair(device, options.autoPair === "account");
   if (!paired) return first;
 
   const retryToken = await tokenFor(device);

@@ -25,9 +25,11 @@ same UOA account, without pairing or team setup. Their account menu shows connec
 status and Pause/Stop controls; see [desktop Nessie connection](desktop-nessie-connect.md).
 This connection uses a dedicated, scoped UOA ticket and does not expose local listeners.
 
-Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires a bearer token issued by the on-device user.
+Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires an authorized bearer token.
 
-**Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, the CLI posts a pairing request to the device. The device shows a modal with the requester's self-reported client name and offers three responses:
+**Same-account access.** A client already authorized to the same UOA account as the signed-in Apple or Android browser connects without the Allow dialog, including through the standalone LAN CLI/MCP interface. UOA compares the current account subjects using a short-lived proof bound to the device's random challenge and the client id. General UOA credentials go only to UOA over TLS. The resulting LAN token stays in memory, expires within two minutes, and requires a fresh UOA decision on every API/MCP request. Sign-out, account change, expiry and revocation invalidate access. Local revocation also suppresses new requests from that source for ten minutes. Windows/Linux's local readiness-token path already avoids pairing prompts and remains scoped to the local user. See the [account pairing contract](api/account-pairing.md), including the required UOA endpoints and client session provider.
+
+**Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, it first uses its existing account authorization when available. A caller without account authorization posts a manual pairing request. The device shows a modal with the requester's self-reported client name and offers three responses:
 
 - **No** — the device denies the request. The CLI surfaces `PAIR_DENIED` and stores nothing.
 - **Yes, once** — the device issues a session-scope token. The CLI keeps it in process memory and drops it at exit. The user must re-approve on the next CLI invocation.

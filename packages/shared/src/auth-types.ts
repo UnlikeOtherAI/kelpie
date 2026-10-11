@@ -10,6 +10,10 @@ export interface PairRequest {
   clientId: string;
   /** Human-readable client name, such as `username@hostname`. Truncated to 64 chars. */
   clientName: string;
+  /** Request a hidden challenge and present a narrow UOA proof instead of manual approval. */
+  account?: true;
+  requestId?: string;
+  accountTicket?: string;
 }
 
 /** Initial response from `POST /v1/pair`. */

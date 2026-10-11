@@ -29,6 +29,8 @@ final class UOAAccount: ObservableObject {
     private var expiryTask: Task<Void, Never>?
     private var refreshTask: Task<String, Error>?
     private var generation = UUID()
+    /// Opaque session fence; signing out and signing in again always changes it.
+    var pairingSession: String? { profile == nil ? nil : generation.uuidString }
     private var credential: UOAStoredSession?
     private var accessToken: String?
     private var expiresAt = Date.distantPast

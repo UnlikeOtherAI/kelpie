@@ -41,7 +41,7 @@ struct AuthMiddleware {
 
     let store: PairingStore
 
-    func evaluate(_ req: ParsedHTTPRequest) -> AuthDecision {
+    func evaluate(_ req: ParsedHTTPRequest, verifiedAccountClientId: String? = nil) -> AuthDecision {
         if let headerReject = rejectAmbiguousHeaders(req) {
             return headerReject
         }
@@ -54,7 +54,7 @@ struct AuthMiddleware {
         guard let bearer = extractBearer(req.headers) else {
             return .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Authentication required")
         }
-        guard let clientId = store.validateBearer(bearer) else {
+        guard let clientId = store.validateBearer(bearer) ?? verifiedAccountClientId else {
             return .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Invalid bearer token")
         }
         return .authenticated(clientId: clientId)

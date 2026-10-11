@@ -214,7 +214,7 @@ All browser-CLI communication uses REST over HTTP/JSON.
 - Content-Type: `application/json`
 - Auth: bearer token via `Authorization: Bearer <token>` for every `/v1/*`
   endpoint except `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and
-  `/health`; tokens are issued only after on-device pairing approval.
+  `/health`; tokens require live same-account UOA verification or on-device pairing approval.
 - Port: `8420` (default, configurable in settings)
 
 ### mDNS Service
@@ -265,19 +265,22 @@ Both browser and CLI MCP servers use **Streamable HTTP** (SSE) transport:
 
 ## Security Model
 
-Kelpie operates exclusively on the local network. No cloud services, no remote access.
+The local HTTP/MCP interface runs on the LAN. Signed-in account access uses UOA
+over TLS; the separate outbound Nessie connection uses authenticated WSS.
 
 | Boundary | Control |
 |---|---|
-| Network isolation | Devices must be on the same local network |
+| Local network isolation | LAN HTTP/MCP clients must be on the same local network |
 | No internet exposure | HTTP servers bind to local/private IPs only |
 | No persistent scripts | No browser extensions or content scripts. Some iOS features use ephemeral bridge scripts (cleared on navigation) |
-| No data collection | No telemetry, no analytics, no phone-home |
+| Account authority | UOA owns identity and revocation; account credentials go only to UOA |
 | Port access | Default 8420, configurable per device |
 
 ### Shared Network Risk
 
-Kelpie enforces explicit, on-device pairing before any `/v1/*` automation method or `/mcp` connection is allowed. Unauthenticated traffic is denied by default; only the three discovery/pair endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`) and `/health` are reachable without a bearer token.
+Kelpie requires verified account authority or explicit on-device pairing before any `/v1/*` automation method or `/mcp` connection is allowed. Unauthenticated traffic is denied by default; only the three discovery/pair endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`) and `/health` are reachable without a bearer token.
+
+- Same-account access: the existing pairing store holds a hidden, source-bound challenge and memory-only account grant. UOA verifies the requester's proof against the receiving browser's current authenticated account on issuance and every automation request. Opaque native account generations fence sign-out and re-login, even to the same subject. Account grants cannot enter the manual bearer path or persistent pairing file. See [account pairing](api/account-pairing.md).
 
 - First contact: the CLI issues `POST /v1/pair` with a self-reported client id + name. The device shows a modal asking the user to allow the client — three responses: `Yes once` (in-memory), `Always allow` (persistent), `No` (suppresses re-prompts from that source for 10 minutes).
 - Token lifecycle: 32-byte CSPRNG bearer returned exactly once on the originating client's status poll. Only SHA-256 hashes are persisted on disk; comparison is constant-time. Theft of the device store does not yield usable tokens.

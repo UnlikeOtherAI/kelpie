@@ -87,7 +87,7 @@ class HTTPServer(
         private set
 
     fun start() {
-        val middleware = AuthMiddleware(pairingStore)
+        val middleware = AccountPairingAuthorization(pairingStore)
         val pairEndpoints =
             PairEndpoints(pairingStore) { onPendingPairChanged() }
 
@@ -157,7 +157,12 @@ class HTTPServer(
                                 is AuthDecision.Reject -> respondReject(call, decision)
                                 AuthDecision.Unauthenticated -> {
                                     val bodyText = call.receiveText()
-                                    val result = pairEndpoints.handlePairPost(bodyText, parsed.sourceAddress)
+                                    val result =
+                                        if (AccountPairingAuthorization.handles(bodyText)) {
+                                            middleware.handlePost(bodyText, parsed.sourceAddress)
+                                        } else {
+                                            pairEndpoints.handlePairPost(bodyText, parsed.sourceAddress)
+                                        }
                                     respondPairing(call, result.status, result.json, noStore = true)
                                 }
                                 is AuthDecision.Authenticated -> {
@@ -167,7 +172,12 @@ class HTTPServer(
                                     // there is no special-casing — fall through to the
                                     // unauth path.
                                     val bodyText = call.receiveText()
-                                    val result = pairEndpoints.handlePairPost(bodyText, parsed.sourceAddress)
+                                    val result =
+                                        if (AccountPairingAuthorization.handles(bodyText)) {
+                                            middleware.handlePost(bodyText, parsed.sourceAddress)
+                                        } else {
+                                            pairEndpoints.handlePairPost(bodyText, parsed.sourceAddress)
+                                        }
                                     respondPairing(call, result.status, result.json, noStore = true)
                                 }
                             }
@@ -235,7 +245,7 @@ class HTTPServer(
 
     private suspend fun handlePublicDeviceInfo(
         call: ApplicationCall,
-        middleware: AuthMiddleware,
+        middleware: AccountPairingAuthorization,
         pairEndpoints: PairEndpoints,
     ) {
         val parsed = parsedRequest(call)

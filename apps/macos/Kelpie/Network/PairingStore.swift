@@ -32,6 +32,7 @@ final class PairingStore: @unchecked Sendable {
         let sourceAddress: String
         let createdAt: Double
         let expiresAt: Double
+        let accountSession: String?
     }
 
     /// In-memory session approval ("Yes once" — cleared on app restart).
@@ -40,6 +41,16 @@ final class PairingStore: @unchecked Sendable {
         let clientName: String
         let tokenHashSha256: String
         let approvedAt: Double
+        let accountGrant: AccountGrant?
+    }
+
+    /// A UOA-verified, challenge-bound grant. Never persisted or accepted by the manual bearer path.
+    struct AccountGrant: Equatable {
+        let session: String
+        let ticket: String
+        let challenge: String
+        let expiresAt: Double
+        let sourceAddress: String
     }
 
     static let pendingTTLSeconds: Double = 300       // 5 min
@@ -193,7 +204,7 @@ final class PairingStore: @unchecked Sendable {
     /// Returns a fresh pending entry, or `denied` if this source address is in
     /// the current 10-minute denial window. Same source + same clientId is
     /// idempotent (replaces the prior pending entry).
-    func startPairing(clientId: String, clientName: String, sourceAddress: String) -> PairStartResult {
+    func startPairing(clientId: String, clientName: String, sourceAddress: String, accountSession: String? = nil) -> PairStartResult {
         lock.lock()
         defer { lock.unlock() }
 
@@ -215,7 +226,8 @@ final class PairingStore: @unchecked Sendable {
             clientName: Self.sanitizeClientName(clientName),
             sourceAddress: sourceAddress,
             createdAt: nowMs(),
-            expiresAt: nowMs() + Self.pendingTTLSeconds * 1_000
+            expiresAt: nowMs() + (accountSession == nil ? Self.pendingTTLSeconds : 120) * 1_000,
+            accountSession: accountSession
         )
         pending[req.requestId] = req
         pendingBySource[sourceAddress] = req.requestId
@@ -227,7 +239,7 @@ final class PairingStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         gcLocked(now: nowMs())
-        return pending.values.sorted { $0.createdAt < $1.createdAt }
+        return pending.values.filter { $0.accountSession == nil }.sorted { $0.createdAt < $1.createdAt }
     }
 
     func pendingRequest(requestId: String) -> PendingRequest? {
@@ -242,11 +254,16 @@ final class PairingStore: @unchecked Sendable {
     /// `PendingIssuance` keyed by `requestId`. The next status poll from the
     /// originating source consumes the issuance exactly once.
     @discardableResult
-    func approve(requestId: String, persist: Bool) -> (token: String, scope: String)? {
+    func approve(requestId: String, persist: Bool, accountGrant: AccountGrant? = nil) -> (token: String, scope: String)? {
         lock.lock()
         defer { lock.unlock() }
         gcLocked(now: nowMs())
-        guard let entry = pending.removeValue(forKey: requestId) else { return nil }
+        guard let entry = pending[requestId], entry.accountSession == accountGrant?.session else { return nil }
+        if let accountGrant {
+            guard !persist, accountGrant.expiresAt > nowMs(), accountGrant.challenge == requestId,
+                  accountGrant.sourceAddress == entry.sourceAddress else { return nil }
+        }
+        pending.removeValue(forKey: requestId)
         pendingBySource.removeValue(forKey: entry.sourceAddress)
 
         let token = Self.generateToken()
@@ -273,7 +290,8 @@ final class PairingStore: @unchecked Sendable {
                     clientId: entry.clientId,
                     clientName: entry.clientName,
                     tokenHashSha256: hash,
-                    approvedAt: now
+                    approvedAt: now,
+                    accountGrant: accountGrant
                 )
             )
             scope = "session"
@@ -333,11 +351,18 @@ final class PairingStore: @unchecked Sendable {
             return persistent[idx].clientId
         }
         if let match = sessions.first(where: {
-            Self.constantTimeEqual($0.tokenHashSha256, hash)
+            $0.accountGrant == nil && Self.constantTimeEqual($0.tokenHashSha256, hash)
         }) {
             return match.clientId
         }
         return nil
+    }
+
+    func accountApproval(_ token: String) -> SessionApproval? {
+        let hash = Self.hashToken(token)
+        lock.lock(); defer { lock.unlock() }
+        gcLocked(now: nowMs())
+        return sessions.first { $0.accountGrant != nil && Self.constantTimeEqual($0.tokenHashSha256, hash) }
     }
 
     // MARK: - Revocation
@@ -349,6 +374,9 @@ final class PairingStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         let before = persistent.count + sessions.count
+        for session in sessions where session.clientId == clientId {
+            if let grant = session.accountGrant { deniedSources[grant.sourceAddress] = nowMs() + Self.denyTTLSeconds * 1_000 }
+        }
         persistent.removeAll { $0.clientId == clientId }
         sessions.removeAll { $0.clientId == clientId }
         if persistent.count + sessions.count != before {
@@ -367,6 +395,7 @@ final class PairingStore: @unchecked Sendable {
 
     func listSessions() -> [SessionApproval] {
         lock.lock(); defer { lock.unlock() }
+        gcLocked(now: nowMs())
         return sessions
     }
 
@@ -391,6 +420,7 @@ final class PairingStore: @unchecked Sendable {
         // Drop expired denial entries + stale issuances.
         deniedSources = deniedSources.filter { $0.value > now }
         pendingIssuances = pendingIssuances.filter { $0.value.expiresAt > now }
+        sessions.removeAll { $0.accountGrant.map { $0.expiresAt <= now } ?? false }
     }
 
     private func nowMs() -> Double {
