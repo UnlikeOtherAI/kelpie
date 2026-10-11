@@ -10,7 +10,7 @@ namespace kelpie {
 namespace {
 
 int StatusForResponse(const nlohmann::json& response) {
-  if (response.value("success", false)) {
+  if (response.contains("ok") || response.value("success", false)) {
     return 200;
   }
   const nlohmann::json error = response.value("error", nlohmann::json::object());
@@ -25,6 +25,8 @@ int StatusForResponse(const nlohmann::json& response) {
 }
 
 }  // namespace
+
+void DesktopRouter::BeforeDispatch(std::function<void(std::string_view, const json&)> observer) { observer_ = std::move(observer); }
 
 void DesktopRouter::Register(std::string method, Handler handler, bool callable) {
   handlers_[std::move(method)] = Route{std::move(handler), callable};
@@ -47,6 +49,7 @@ DesktopRouter::Result DesktopRouter::Dispatch(std::string_view method, const jso
   }
 
   try {
+    if (observer_) observer_(method, params);
     const json body = it->second.handler(params);
     return {StatusForResponse(body), body};
   } catch (const std::invalid_argument& exception) {

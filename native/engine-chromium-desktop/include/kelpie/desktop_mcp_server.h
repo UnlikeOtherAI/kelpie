@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iosfwd>
+#include <functional>
+#include <string_view>
 #include <memory>
 #include <string>
 
@@ -31,6 +33,10 @@ class DesktopMcpServer {
 
   void SetRouter(const DesktopRouter* router);
   void SetRegistry(const McpRegistry* registry);
+  using FixedReader = std::function<json(const json&)>;
+  void SetFixedReader(FixedReader reader);
+  void InvalidateReferences(std::string_view method, const json& params) const;
+  json HandleBrowserRequest(const json& request, const Config& config) const;
 
   bool Run(const Config& config);
   // Returns null for a valid JSON-RPC notification.  Stdio callers must not
