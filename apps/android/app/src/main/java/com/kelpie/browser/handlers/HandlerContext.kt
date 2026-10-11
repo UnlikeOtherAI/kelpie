@@ -100,7 +100,10 @@ class HandlerContext {
 
     suspend fun evaluateJS(script: String): String = evaluateGuardedJS(script, remoteDocumentGuard)
 
-    private suspend fun evaluateGuardedJS(script: String, guard: (() -> Boolean)?): String =
+    private suspend fun evaluateGuardedJS(
+        script: String,
+        guard: (() -> Boolean)?,
+    ): String =
         suspendCoroutine { cont ->
             val wv = webView
             if (wv == null) {
@@ -130,10 +133,11 @@ class HandlerContext {
             check(remoteNavigationWaitGuard?.invoke() == true) { "Navigation document changed or job stopped" }
             kotlinx.coroutines.delay(25)
         }
-        val raw = evaluateGuardedJS(
-            "JSON.stringify({url:location.href,title:document.title,readyState:document.readyState})",
-            remoteNavigationReadGuard ?: remoteDocumentGuard,
-        )
+        val raw =
+            evaluateGuardedJS(
+                "JSON.stringify({url:location.href,title:document.title,readyState:document.readyState})",
+                remoteNavigationReadGuard ?: remoteDocumentGuard,
+            )
         return parseObject(raw)
     }
 

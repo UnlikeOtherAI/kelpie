@@ -62,7 +62,8 @@ fun TabWebViewContent(
             wv.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
-                        com.kelpie.browser.connect.NessieConnection.personInteracted()
+                        com.kelpie.browser.connect.NessieConnection
+                            .personInteracted()
                         start = event.y
                         translation = 0f
                         dragging = true

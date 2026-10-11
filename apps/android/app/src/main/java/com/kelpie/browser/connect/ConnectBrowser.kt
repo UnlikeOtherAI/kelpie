@@ -112,12 +112,14 @@ class ConnectBrowser(
         val body = validatedInput(operation, input)
         val history = tab.webView.copyBackForwardList()
         val offset = if (operation == "back") -1 else 1
-        val destination = when (operation) {
-            "navigate" -> body["url"] as String
-            "reload" -> tab.webView.url
-            else -> history.getItemAtIndex(history.currentIndex + offset)?.url
-        }
+        val destination =
+            when (operation) {
+                "navigate" -> body["url"] as String
+                "reload" -> tab.webView.url
+                else -> history.getItemAtIndex(history.currentIndex + offset)?.url
+            }
         val lease = ConnectNavigationLease(expected, destination)
+
         fun authorized() = NessieConnection.authorizes(command) && context.tabStore?.activeTab?.id == tab.id
         isolated.remoteNavigationStart = { lease.arm(tab.documentVersion, authorized()) }
         isolated.remoteNavigationReadGuard = { lease.allowsRead(tab.documentVersion, tab.isLoading, authorized()) }
