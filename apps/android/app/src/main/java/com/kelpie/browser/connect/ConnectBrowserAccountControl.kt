@@ -256,7 +256,10 @@ class ConnectBrowserAccountControl(
         return isAccountURL(url)
     }
 
-    private fun isAccountDestination(params: Map<*, *>?): Boolean = isAccountURL(params?.get("url") as? String ?: return false)
+    private fun isAccountDestination(params: Map<*, *>?): Boolean {
+        val url = params?.get("url") as? String ?: return false
+        return isAccountURL(url)
+    }
 
     private fun isAccountURL(url: String): Boolean =
         runCatching { java.net.URI(url).host.equals("authentication.unlikeotherai.com", ignoreCase = true) }.getOrDefault(false)
