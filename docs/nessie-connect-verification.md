@@ -17,6 +17,13 @@ installation, account store, or running user's process was replaced or stopped.
 | umac / merged Android source | `b657376` plus test formatting | `ktlintCheck`, 122 JVM tests, debug app and instrumentation APK builds | Passed, zero failures |
 | umac / Android emulator x86_64 | `39b841b` (equivalent formatted verification source) | Real `ConnectBrowser` → router → navigation handler → WebView callbacks | Passed, four instrumentation tests |
 | dictator / iPhoneOS arm64 | `a723aad` | Native Release archives and development-device app compile/link | Passed; final signing blocked |
+| Minis / MSVC 19.51 | `f052d65` | Durable early-cancellation receipts, retention/clock rollback/capacity, Unicode terminal errors | Passed, CTest |
+| dictator / macOS arm64 | `f052d65` | Native owned GGUF request cancellation and journal tests | Passed, two CTest executables |
+| dictator / macOS arm64 | `45a0314` | Strict SwiftLint, 275 files | Passed, zero violations |
+| dictator / macOS arm64 | `f052d65` | Debug build including CEF, seven authorization and four page-context tests | Passed, 11 tests |
+| dictator / iOS 27 arm64 simulator | `f052d65` | Rebuilt native owned-request C API, eight authorization and five page-context tests | Passed, 13 tests |
+| umac / Android | `0e607b1` plus formatter-only `45a0314` | Strict ktlint, 122 JVM tests, arm64/x86_64 debug and instrumentation APK builds | Passed, zero failures |
+| umac / Android emulator x86_64 | `0e607b1` plus formatter-only `45a0314` | Actual WebView navigation, page guards, isolated inference cancellation, observed selectors | Passed, six tests |
 
 The navigation instrumentation proves a new document pin is returned after an owned
 navigation, cancellation and person tab selection refuse completion, an unrelated
@@ -25,6 +32,18 @@ before and after JavaScript evaluation. It uses an explicit local response latch
 not a timing delay, and an injected authority predicate; it does not prove production
 UOA or WebSocket authentication. The production predicate remains the existing
 immutable job/account/deadline/connection authority.
+
+The additional DOM tests return distinct observed selectors for duplicate buttons
+and an empty input, and resolve every selector back to exactly one element. Owned
+cancellation tests cancel a separate extraction request before dispatch and verify
+another request remains available. They do not use a loaded GGUF fixture and therefore
+do not establish live token-generation cancellation or model quality.
+
+The journal tests cover unknown cancel before command delivery, duplicate and
+post-completion cancel receipts, no cancellation of another active attempt, exact
+terminal acknowledgements, compact tombstones, capacity recovery without dropping
+unacknowledged results, and restart after forward-clock retirement followed by a
+backward clock jump. Expired attempts cannot execute after their tombstone is retired.
 
 The Android APK compiled both arm64-v8a and x86_64 JNI libraries. The isolated debug
 profile uses port 18420; ordinary builds retain 8420. The initial isolated launch
@@ -37,9 +56,10 @@ than an instrumentation test. The cause of the first startup timeout was not pro
 The Apple checks used arm64 simulator archives. An unrestricted generic simulator
 build attempted x86_64 and could not link the available arm64 native archives;
 the verified command explicitly selects `ARCHS=arm64 ONLY_ACTIVE_ARCH=YES`.
-Unchanged core-AI/LLM archives were reused read-only after verifying their source
-matched; the changed core-connect and supporting portable libraries were rebuilt
-in the verification worktree. This is compile/link evidence, not local-model inference evidence.
+Earlier unchanged core-AI/LLM archives were reused read-only after verifying their source
+matched. The final owned-request gate rebuilt the changed core-AI runtime and its
+LLM dependency for the arm64 simulator, and rebuilt core-connect in the verification
+worktree. This is compile/link evidence, not loaded-model inference evidence.
 
 Focused commands:
 
@@ -74,9 +94,12 @@ GGUF extraction were not exercised here. Background extraction is intentionally
 not advertised: all three adapters require a visible foreground browser, and the
 installed embedded model advertises text capability with delegated browsing false.
 
-The dedicated verification trees retain build logs and the iOS result bundle; local
-`native/.build-connect/ios-settings.png` and `android-settings-now.png` retain the
-reviewed screenshots. Preserve needed artifacts before removing those worktrees.
+Logs, XCTest result bundles, JVM reports, and reviewed Settings screenshots are preserved
+outside disposable worktrees in `C:/Users/ondre/.codex/artifacts/kelpie-connect-20261011/native`.
+Host equivalents are `/Users/dictator/.codex/artifacts/kelpie-connect-20261011/native`
+and `/home/umac/.codex/artifacts/kelpie-connect-20261011/native`. The Apple and Android
+archives include their exact source revision. The app containers and credentials were
+not copied. Built packages still need the coordinated signed release process.
 
 Read-only device inventory on dictator found a paired, available iPhone 16 Pro Max
 and iPad Air 13-inch (M3); both already contain `com.unlikeotherai.kelpie` 0.1.5 build 5.
