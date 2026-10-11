@@ -38,6 +38,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
     model_catalog_chars = None
     fixture_query = ''
     plain_payload = None
+    plain_requests = 0
     tab = None
 
     def log_message(self, *_):
@@ -75,8 +76,10 @@ class FixtureHandler(BaseHTTPRequestHandler):
         if self.model_mode == 'plain':
             assert not body.get('tools'), 'Plain inference offered browser action tools'
             FixtureHandler.plain_payload = body
-            assert len(body['messages']) == 31, 'History was truncated or an extra user turn was added'
-            assert body['messages'][0]['content'] == 'remember-0'
+            FixtureHandler.plain_requests += 1
+            assert len(body['messages']) == 33, 'Full history plus system/current context must be retained'
+            assert body['messages'][1]['content'] == 'remember-0'
+            assert body['messages'][31]['content'] == 'Which logo is on the background page?'
             current = body['messages'][-1]['content']
             assert 'Untrusted current page evidence' in current and 'Gateway logo' in current
             assert 'Gateway SVG title' in current and 'Public gateway evidence' in current
@@ -307,10 +310,10 @@ def main():
     assert FixtureHandler.plain_payload is not None
     listing = core('tabs.list')
     assert next(item['id'] for item in listing if item['active']) == other, 'Context read switched the visible tab'
-    before_calls = len(FixtureHandler.calls)
+    before_calls = FixtureHandler.plain_requests
     status, closed = request('/v1/ai-infer', {'messages': history, 'context': 'page_text', 'agent': False, 'tabId': 'closed-owned-tab'})
     assert status == 400 and closed['error']['code'] == 'TAB_NOT_FOUND'
-    assert len(FixtureHandler.calls) == before_calls
+    assert FixtureHandler.plain_requests == before_calls
     core('tabs.select', tab)
     print('PASS common bounded background grounding/SVG/value omission/full 31-turn history/no selection', flush=True)
     for mode in ('read', 'write', 'timeout'):
