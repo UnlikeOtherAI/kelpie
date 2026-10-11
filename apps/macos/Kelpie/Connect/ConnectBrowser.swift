@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class ConnectBrowser {
     struct Failure: Error { let message: String; init(_ message: String) { self.message = message } }
-    private let context: HandlerContext
+    let context: HandlerContext
     private var extractionRequest: InferenceRequest?
     private var extractionBusy: Bool { extractionRequest != nil }
     private var cachedModelReady = false
@@ -23,7 +23,7 @@ final class ConnectBrowser {
     init(context: HandlerContext) { self.context = context }
 
     // Enabled when the shared gateway is bound to a job-owned dispatch context.
-    var supportsControlV1: Bool { false }
+    var supportsControlV1: Bool { true }
 
     var isReady: Bool {
         #if os(iOS)
@@ -51,11 +51,13 @@ final class ConnectBrowser {
         extractionRequest?.cancel()
     }
 
+    // This is the durable operation router; each operation's handlers stay split below.
+    // swiftlint:disable:next cyclomatic_complexity
     func execute(_ command: [String: Any]) async throws -> [String: Any] {
         guard isReady, let operation = command["operation"] as? String,
               let input = command["input"] as? [String: Any] else { throw Failure("Browser is not ready") }
         try Task.checkCancellation()
-        if operation == "control" { return await control(command, input: input) }
+        if operation == "control" { return await executeControl(command, input: input) }
         if operation == "tabs" { return ["tabs": tabs()] }
         if operation == "open" {
             let owner = context.browserRouter
@@ -131,106 +133,6 @@ final class ConnectBrowser {
         return ["tabId": tabID, "tabVersion": try version(tabID), "result": safeResult]
     }
 
-    private func control(_ command: [String: Any], input: [String: Any]) async -> [String: Any] {
-        guard let request = input["request"] as? [String: Any],
-              let method = request["method"] as? String,
-              let owner = context.browserRouter else {
-            return ["response": controlFailure("INVALID_ARGUMENTS")]
-        }
-        let unbound = ["capabilities", "documentation", "tabs.list", "tabs.new"].contains(method)
-        guard accountControlMethods.contains(method) else { return ["response": controlFailure("UNSUPPORTED")] }
-        if ["tabs.new", "tab.goto"].contains(method), isAccountDestination(request["params"] as? [String: Any]) {
-            return ["response": controlFailure("ACCOUNT_SURFACE_FORBIDDEN")]
-        }
-        let tabID = command["tabId"] as? String
-        let expected = command["tabVersion"] as? String
-        if unbound {
-            guard tabID == nil, expected == nil else { return ["response": controlFailure("TAB_PIN_MISMATCH")] }
-        } else {
-            guard let tabID, let expected, request["tabId"] as? String == tabID else {
-                return ["response": controlFailure("TAB_PIN_MISMATCH")]
-            }
-            guard (try? version(tabID)) == expected else { return ["response": controlFailure("STALE_DOCUMENT")] }
-            if isAccountSurface(tabID) { return ["response": controlFailure("ACCOUNT_SURFACE_FORBIDDEN")] }
-            if method != "tabs.select", !isActive(tabID) { return ["response": controlFailure("TAB_NOT_ACTIVE")] }
-        }
-        let authorized: BrowserControlGateway.Authorize = { [weak self] _, _ in
-            guard let self, !Task.isCancelled, NessieConnection.shared.authorizes(command) else { return false }
-            if let tabID, let expected {
-                guard (try? self.version(tabID)) == expected, !self.isAccountSurface(tabID),
-                      method == "tabs.select" || self.isActive(tabID) else { return false }
-            }
-            return true
-        }
-        var response: [String: Any]
-        if method == "tabs.select" || method == "tabs.new" {
-            response = await NessieConnection.shared.changeTabRemotely {
-                await owner.browserControl(request, authorizeAccountStep: authorized)
-            }
-            if response["ok"] as? Bool == true {
-                let value = response["value"] as? [String: Any]
-                let claimed = method == "tabs.select" ? tabID : value?["id"] as? String
-                if let claimed { NessieConnection.shared.claimTab(claimed) }
-            }
-        } else {
-            response = await owner.browserControl(request, authorizeAccountStep: authorized)
-        }
-        if method == "capabilities", response["ok"] as? Bool == true,
-           var value = response["value"] as? [String: Any] {
-            value["extensions"] = [String]()
-            value["methods"] = (value["methods"] as? [String] ?? []).filter { accountControlMethods.contains($0) }
-            response["value"] = value
-        }
-        var result: [String: Any] = ["response": response]
-        if method == "tabs.list", response["ok"] as? Bool == true {
-            let listed = Set((response["value"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String })
-            result["tabs"] = tabs().filter { listed.contains($0["tabId"] as? String ?? "") }.compactMap { tab -> [String: String]? in
-                guard let tabID = tab["tabId"] as? String, let tabVersion = tab["tabVersion"] as? String else { return nil }
-                return ["tabId": tabID, "tabVersion": tabVersion]
-            }
-        } else if response["ok"] as? Bool == true, method == "tabs.new",
-                  let value = response["value"] as? [String: Any],
-                  let id = (value["id"] ?? value["tabId"]) as? String,
-                  let current = tabs().first(where: { $0["tabId"] as? String == id }) {
-            result["tab"] = ["tabId": id, "tabVersion": current["tabVersion"]]
-        } else if let tabID, let current = tabs().first(where: { $0["tabId"] as? String == tabID }),
-                  let currentVersion = current["tabVersion"] as? String,
-                  response["ok"] as? Bool == true || currentVersion == expected {
-            result["tab"] = ["tabId": tabID, "tabVersion": currentVersion]
-        }
-        return result
-    }
-
-    private func controlFailure(_ code: String) -> [String: Any] {
-        ["version": 1, "ok": false, "error": [
-            "code": code, "message": "Browser request refused; observe the page before continuing.",
-            "mayHaveCompleted": false
-        ]]
-    }
-
-    private func isAccountSurface(_ tabID: String) -> Bool {
-        guard let url = tabs().first(where: { $0["tabId"] as? String == tabID })?["url"] as? String else { return false }
-        return isAccountURL(url)
-    }
-
-    private var accountControlMethods: Set<String> {
-        ["capabilities", "documentation", "tabs.list", "tabs.new", "tabs.select", "tabs.close",
-         "tab.snapshot", "tab.screenshot", "tab.goto", "tab.click", "tab.type", "page.press", "page.scroll"]
-    }
-
-    private func isActive(_ tabID: String) -> Bool {
-        tabs().first(where: { $0["tabId"] as? String == tabID })?["active"] as? Bool == true
-    }
-
-    private func isAccountDestination(_ params: [String: Any]?) -> Bool {
-        guard let url = params?["url"] as? String else { return false }
-        return isAccountURL(url)
-    }
-
-    private func isAccountURL(_ url: String) -> Bool {
-        URLComponents(string: url)?.host?.lowercased() == "authentication.unlikeotherai.com"
-    }
-
     private func navigate(
         _ operation: String,
         input: [String: Any],
@@ -303,7 +205,7 @@ final class ConnectBrowser {
         return raw
     }
 
-    private func tabs() -> [[String: Any]] {
+    func tabs() -> [[String: Any]] {
         #if os(iOS)
         return context.tabStore?.tabs.map { tab in
             ["tabId": tab.id.uuidString, "tabVersion": ConnectDocument.version(tab.webView),
@@ -326,7 +228,7 @@ final class ConnectBrowser {
         #endif
     }
 
-    private func version(_ tabID: String) throws -> String {
+    func version(_ tabID: String) throws -> String {
         guard let uuid = UUID(uuidString: tabID) else { throw Failure("Tab not found") }
         #if os(iOS)
         guard let tab = context.tabStore?.tabs.first(where: { $0.id == uuid }), !tab.webView.isLoading else {

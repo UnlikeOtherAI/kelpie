@@ -127,7 +127,10 @@ final class HandlerContext {
     /// Convenience: evaluate JS on a specific tab.
     func evaluateJS(_ script: String, windowId: String? = nil, tabId: String?) async throws -> Any? {
         let target = try resolveRenderer(windowId: windowId, tabId: tabId)
-        return try await target.evaluateJS(script)
+        guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        let result = try await target.evaluateJS(script)
+        guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        return result
     }
 
     func evaluateJSReturningString(_ script: String, windowId: String? = nil, tabId: String?) async throws -> String {
@@ -157,7 +160,10 @@ final class HandlerContext {
 
     func takeSnapshot(tabId: String?) async throws -> NSImage {
         let target = try resolveRenderer(tabId: tabId)
-        return try await target.takeSnapshot()
+        guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        let result = try await target.takeSnapshot()
+        guard remoteDocumentGuard?() != false else { throw CancellationError() }
+        return result
     }
 
     func showTouchIndicator(x: Double, y: Double, color: String = defaultOverlayRGB, tabId: String?) async {
