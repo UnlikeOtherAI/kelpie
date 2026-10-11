@@ -40,6 +40,7 @@ struct BrowserView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
+                ConnectControls(compact: true)
                 if !serverState.isScriptRecording {
                     Group {
                         if isWindowFullscreen {

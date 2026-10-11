@@ -16,7 +16,10 @@ final class RendererState: ObservableObject {
     }
 
     @Published var activeEngine: Engine {
-        didSet { UserDefaults.standard.set(activeEngine.rawValue, forKey: "com.kelpie.renderer-engine") }
+        didSet {
+            if activeEngine != oldValue { NessieConnection.shared.personChangedTab() }
+            UserDefaults.standard.set(activeEngine.rawValue, forKey: "com.kelpie.renderer-engine")
+        }
     }
     @Published var isSwitching: Bool = false
 

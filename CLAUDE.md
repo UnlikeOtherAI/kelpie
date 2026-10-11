@@ -21,6 +21,7 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 ## Debugging Protocol
 
 Persistent pairing and exact-socket token reuse follow [Pairing & Authentication](docs/functionality.md#pairing--authentication).
+Native outbound Nessie connectivity follows [the connection contract](docs/nessie-connect.md).
 
 - **Always check logs first** before diving into source code. Check device HTTP server logs, mDNS advertisement logs, and CLI output before analyzing code.
 - **Never manually fix state** — if the mDNS discovery, HTTP server, or MCP server is stuck, fix the code so it self-heals.

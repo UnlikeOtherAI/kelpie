@@ -10,6 +10,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
     @MainActor @Published private(set) var capabilities: [String] = []
 
     private let queue = DispatchQueue(label: "com.kelpie.inference", qos: .userInitiated)
+    private let cancellationLock = NSLock()
+    private var cancellationGeneration = UUID()
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
     private var vocab: OpaquePointer?
@@ -30,11 +32,24 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         case inferenceFailed(String)
         case visionNotSupported
         case audioNotSupported
+        case cancelled
     }
 
     private static var backendInitialized = false
 
     private init() {}
+
+    func cancel() {
+        cancellationLock.lock()
+        cancellationGeneration = UUID()
+        cancellationLock.unlock()
+    }
+
+    private func currentCancellation() -> UUID {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return cancellationGeneration
+    }
 
     func load(path: String, name: String, capabilities: [String]) async throws {
         // Auto-unload previous model if any
@@ -129,8 +144,13 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         maxTokens: Int = 512,
         temperature: Float = 0.7
     ) async throws -> InferenceResult {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
+        let generation = currentCancellation()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
             queue.async {
+                guard self.currentCancellation() == generation else {
+                    continuation.resume(throwing: InferenceError.cancelled)
+                    return
+                }
                 guard self.model != nil, let ctx = self.ctx, let vocab = self.vocab else {
                     continuation.resume(throwing: InferenceError.noModelLoaded)
                     return
@@ -196,6 +216,10 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 var curPos = tokenCount
 
                 for _ in 0..<maxTokens {
+                    guard self.currentCancellation() == generation else {
+                        continuation.resume(throwing: InferenceError.cancelled)
+                        return
+                    }
                     let newTokenId = llama_sampler_sample(sampler, ctx, batch.n_tokens - 1)
 
                     if llama_vocab_is_eog(vocab, newTokenId) {

@@ -8,7 +8,7 @@ typedef struct KelpieConnect* KelpieConnectRef;
 KelpieConnectRef kelpie_connect_create(const char* saved_state, const char* account_reference);
 void kelpie_connect_destroy(KelpieConnectRef client);
 /* receive: gateway frame; complete: {jobId,attemptId,state,output?,error?};
- * replay: {generation}; reset: {}. Returns {decision,state}; null on failure.
+ * replay: {generation}. Returns {decision,state}; null on failure.
  * receive reserves commands durably in state before returning kind=command.
  * On restore pending commands become UNKNOWN_EFFECTS terminal failures. */
 char* kelpie_connect_execute(KelpieConnectRef client, const char* operation, const char* json);

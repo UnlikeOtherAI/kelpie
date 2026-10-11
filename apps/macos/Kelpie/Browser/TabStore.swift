@@ -152,6 +152,7 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addTab(spec: TabSpec = TabSpec()) -> Tab {
+        NessieConnection.shared.personChangedTab()
         let tab = Tab(spec: spec)
         bind(tab)
         tabs.append(tab)
@@ -161,6 +162,7 @@ final class TabStore: ObservableObject {
     }
 
     func closeTab(id: UUID) {
+        if id == activeTabID { NessieConnection.shared.personChangedTab() }
         guard let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
 
         if tabs.count == 1 {
@@ -183,6 +185,7 @@ final class TabStore: ObservableObject {
     }
 
     func selectTab(id: UUID) {
+        if id != activeTabID { NessieConnection.shared.personChangedTab() }
         guard tabs.contains(where: { $0.id == id }) else { return }
         activeTabID = id
         persistSession()

@@ -3,6 +3,8 @@ import AppKit
 /// Shared context providing access to the active renderer for all handlers.
 @MainActor
 final class HandlerContext {
+    /// A remote job's isolated context can only resolve its pinned document.
+    var remoteDocumentGuard: (() -> Bool)?
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     var renderer: (any RendererEngine)?
@@ -45,6 +47,8 @@ final class HandlerContext {
     /// tab windows reject empty `tabId` so LLMs are forced to be explicit
     /// about which tab they target.
     func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        try Task.checkCancellation()
+        if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
         // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
         // WebKit, so resolving through the tab store here would return a hidden
         // WKWebViewRenderer that never navigated (stuck on about:blank): navigate

@@ -51,6 +51,9 @@ fun SettingsScreen(
     ) {
         Text("Kelpie", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
+        SectionHeader("Nessie")
+        com.kelpie.browser.connect.ConnectControls()
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
         SectionHeader("Device")
         InfoRow("Name", deviceInfo.name)
