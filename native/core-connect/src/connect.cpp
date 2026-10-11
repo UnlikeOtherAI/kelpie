@@ -42,7 +42,7 @@ bool Terminal(const std::string& state) {
 }
 Json Event(const Json& command, const std::string& state) {
   return {{"type", "event"}, {"jobId", command.at("jobId")},
-      {"attemptId", command.at("attemptId")}, {"seq", command.at("seq")}, {"state", state}};
+      {"attemptId", command.at("attemptId")}, {"seq", state == "accepted" ? 1 : 2}, {"state", state}};
 }
 }
 

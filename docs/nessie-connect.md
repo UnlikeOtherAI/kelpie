@@ -38,6 +38,8 @@ execution are outside this operation allowlist.
 `event` carries job/attempt/seq and `state` (`accepted`, `progress`, `completed`,
 `failed`, `cancelled`), optional object `output` and bounded `error`.
 `ack` acknowledges that exact job/attempt/seq. `cancel` cancels the attempt.
+Event sequences are independent of command sequences: accepted is event 1 and the
+terminal result is event 2. A late acknowledgement of event 1 cannot discard event 2.
 Frames are at most 1 MiB and terminal output at most 768 KiB.
 
 ## Shared native ledger
