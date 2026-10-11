@@ -146,6 +146,27 @@ int main() {
   const auto busy_rpc = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 123}, {"method", "tools/call"},
       {"params", {{"name", "kelpie_browser_control"}, {"arguments", {{"request", {{"version", 1}, {"method", "tabs.list"}}}}}}}}, config);
   assert(busy_rpc["id"] == 123 && busy_rpc["error"]["code"] == -32000);
+  {
+    const auto observation = server.GuardDispatch("get-dialog", nlohmann::json::object());
+    assert(observation);
+  }
+  {
+    const auto handling = server.GuardDispatch("handle-dialog", {{"action", "accept"}});
+    assert(handling);
+  }
+  for (const auto* name : {"kelpie_get_dialog", "kelpie_handle_dialog"}) {
+    const auto arguments = std::string(name) == "kelpie_handle_dialog"
+      ? nlohmann::json{{"action", "accept"}} : nlohmann::json::object();
+    const auto recovery = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 125}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", name}, {"arguments", arguments}}}}}}, config);
+    assert(recovery["result"]["isError"] == false);
+    // Recovery alone does not clear ownership; only the actual late callback can.
+    assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tabs.list"}}, config)["error"]["code"] == "BUSY");
+  }
+  bool refused = false;
+  try { server.GuardDispatch("click", {{"selector", "button"}}); }
+  catch (const std::runtime_error&) { refused = true; }
+  assert(refused);
   pending = false; // The late renderer callback retired execution ownership.
   assert(server.HandleBrowserRequest({{"version", 1}, {"method", "documentation"}}, config)["ok"] == true);
   bool nested = false;

@@ -173,3 +173,5 @@ The tab chat integration keeps caller history in full and captures one owned ren
 
 Read-only, one-shot page observers execute the fixed reader without remembering DOM targets or installing reference invalidation listeners. Their snapshot references cannot authorize actions; persistent action-enabled gateways remain the sole owner of actionable native references.
 The macOS native single-shot harness also obtains its initial public URL/title metadata from its admitted common gateway. It has no separate page-summary JavaScript collector or silent empty-summary fallback.
+
+Desktop renderer retirement keeps native dialog observation and accept/dismiss controls reachable while a dialog-blocked renderer command remains outstanding. These recovery handlers use the existing native dialog state/callback; other browser actions and common observations stay busy until the renderer reply retires.
