@@ -1,7 +1,5 @@
 package com.kelpie.browser.ui
 
-import com.kelpie.browser.connect.NessieConnection
-
 import android.app.Activity
 import android.content.Context
 import android.webkit.WebView
@@ -43,6 +41,7 @@ import com.kelpie.browser.browser.BrowserState
 import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.SessionStore
 import com.kelpie.browser.browser.TabStore
+import com.kelpie.browser.connect.NessieConnection
 import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.ScriptPlaybackState

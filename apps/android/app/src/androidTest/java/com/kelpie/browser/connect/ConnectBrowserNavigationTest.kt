@@ -24,44 +24,50 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 class ConnectBrowserNavigationTest {
     @Test
-    fun navigationReturnsItsNewDocumentPin() = runBlocking {
-        fixture { browser, context, server, _ ->
-            server.enqueue(page("Owned destination"))
-            val tab = context.tabStore!!.activeTab!!
-            val previous = tab.documentVersion
-            val result = browser.execute(command(context, server.url("/destination").toString()))
-            assertEquals(tab.id, result["tabId"])
-            assertEquals(tab.documentVersion, result["tabVersion"])
-            assertNotEquals(previous, result["tabVersion"])
-            assertEquals("Owned destination", (result["result"] as Map<*, *>)["title"])
-        }
-    }
-
-    @Test
-    fun cancellationAndUserTabChangeRefuseCompletion() = runBlocking {
-        for (switchTab in listOf(false, true)) {
-            fixture { browser, context, server, authority ->
-                server.enqueue(page("Delayed").setBodyDelay(600, TimeUnit.MILLISECONDS))
-                val execution = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()).async {
-                    runCatching { browser.execute(command(context, server.url("/delayed").toString())) }
-                }
-                withContext(Dispatchers.IO) { check(server.takeRequest(5, TimeUnit.SECONDS) != null) }
-                if (switchTab) context.tabStore!!.addTab() else authority.allowed = false
-                assertTrue(execution.await().isFailure)
+    fun navigationReturnsItsNewDocumentPin() =
+        runBlocking {
+            fixture { browser, context, server, _ ->
+                server.enqueue(page("Owned destination"))
+                val tab = context.tabStore!!.activeTab!!
+                val previous = tab.documentVersion
+                val result = browser.execute(command(context, server.url("/destination").toString()))
+                assertEquals(tab.id, result["tabId"])
+                assertEquals(tab.documentVersion, result["tabVersion"])
+                assertNotEquals(previous, result["tabVersion"])
+                assertEquals("Owned destination", (result["result"] as Map<*, *>)["title"])
             }
         }
-    }
 
     @Test
-    fun unrelatedRedirectCannotBorrowCompletionPin() = runBlocking {
-        fixture { browser, context, server, _ ->
-            server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", server.url("/other")))
-            server.enqueue(page("Redirected"))
-            assertTrue(runCatching { browser.execute(command(context, server.url("/requested").toString())) }.isFailure)
+    fun cancellationAndUserTabChangeRefuseCompletion() =
+        runBlocking {
+            for (switchTab in listOf(false, true)) {
+                fixture { browser, context, server, authority ->
+                    server.enqueue(page("Delayed").setBodyDelay(600, TimeUnit.MILLISECONDS))
+                    val execution =
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()).async {
+                            runCatching { browser.execute(command(context, server.url("/delayed").toString())) }
+                        }
+                    withContext(Dispatchers.IO) { check(server.takeRequest(5, TimeUnit.SECONDS) != null) }
+                    if (switchTab) context.tabStore!!.addTab() else authority.allowed = false
+                    assertTrue(execution.await().isFailure)
+                }
+            }
         }
-    }
 
-    private class Authority { var allowed = true }
+    @Test
+    fun unrelatedRedirectCannotBorrowCompletionPin() =
+        runBlocking {
+            fixture { browser, context, server, _ ->
+                server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", server.url("/other")))
+                server.enqueue(page("Redirected"))
+                assertTrue(runCatching { browser.execute(command(context, server.url("/requested").toString())) }.isFailure)
+            }
+        }
+
+    private class Authority {
+        var allowed = true
+    }
 
     private suspend fun fixture(block: suspend (ConnectBrowser, HandlerContext, MockWebServer, Authority) -> Unit) {
         val server = MockWebServer()
@@ -76,21 +82,35 @@ class ConnectBrowserNavigationTest {
                 // Own verification profile only; establish a settled initial document through its real clients.
                 val tab = store.addTab()
                 tab.webView.loadDataWithBaseURL(server.url("/initial").toString(), "<title>Initial</title>", "text/html", "utf-8", null)
-                withTimeout(5000) { do { delay(50) } while (tab.isLoading || tab.pageTitle != "Initial") }
+                withTimeout(5000) {
+                    do {
+                        delay(50)
+                    } while (tab.isLoading || tab.pageTitle != "Initial")
+                }
                 val authority = Authority()
                 val expires = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
                 val browser = ConnectBrowser(context, app.cacheDir) { authority.allowed && System.nanoTime() < expires }
-                try { withTimeout(10000) { block(browser, context, server, authority) } } finally { store.destroyAllTabs() }
+                try {
+                    withTimeout(10000) { block(browser, context, server, authority) }
+                } finally {
+                    store.destroyAllTabs()
+                }
             }
         } finally {
             server.shutdown()
         }
     }
 
-    private fun command(context: HandlerContext, url: String): Map<String, Any?> = mapOf(
-        "operation" to "navigate", "tabId" to context.tabStore!!.activeTab!!.id,
-        "tabVersion" to context.tabStore!!.activeTab!!.documentVersion, "input" to mapOf("url" to url),
-    )
+    private fun command(
+        context: HandlerContext,
+        url: String,
+    ): Map<String, Any?> =
+        mapOf(
+            "operation" to "navigate",
+            "tabId" to context.tabStore!!.activeTab!!.id,
+            "tabVersion" to context.tabStore!!.activeTab!!.documentVersion,
+            "input" to mapOf("url" to url),
+        )
 
     private fun page(title: String) = MockResponse().setHeader("Content-Type", "text/html").setBody("<title>$title</title><p>Local fixture</p>")
 }
