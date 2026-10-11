@@ -35,6 +35,7 @@ class DesktopMcpServer {
   void SetRegistry(const McpRegistry* registry);
   using FixedReader = std::function<json(const json&)>;
   void SetFixedReader(FixedReader reader);
+  std::shared_ptr<void> GuardDispatch(std::string_view method, const json& params) const;
   void InvalidateReferences(std::string_view method, const json& params) const;
   json HandleBrowserRequest(const json& request, const Config& config) const;
 

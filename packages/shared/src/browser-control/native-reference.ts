@@ -31,10 +31,11 @@ export function actOnNativeReference(ref: string, key: string, method: "tab.clic
   if (!state || !el?.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: false };
   if (!(el instanceof HTMLElement) || !(el.getRootNode() instanceof Document)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   if (method === "tab.type" && !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !el.isContentEditable) return { error: "UNSUPPORTED", mayHaveCompleted: false };
-  if (el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
+  if (method === "tab.type" && el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && (el.disabled || el.readOnly)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   // Focus may synchronously invoke page handlers, so verify again immediately before the mutation.
   el.focus();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- focus handlers can detach the node synchronously.
   if (!el.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: true };
   if (method === "tab.type" && ((el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type)) ||
     ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && (el.disabled || el.readOnly)) ||
@@ -42,7 +43,8 @@ export function actOnNativeReference(ref: string, key: string, method: "tab.clic
   if (method === "tab.click") el.click();
   else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     const prototype = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-    Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(el, el.value + text);
+    const value = Object.getOwnPropertyDescriptor(prototype, "value")!;
+    value.set!.call(el, String(value.get!.call(el)) + text);
     el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   } else {
     el.append(document.createTextNode(text));

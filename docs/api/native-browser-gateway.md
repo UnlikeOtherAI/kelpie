@@ -3,12 +3,12 @@
 `native/core-mcp` owns the canonical validator, capability projection, reference
 ownership, sequential operation state, and MCP translation. One persistent
 `KelpieBrowserGatewayRef` serves both `/v1/browser-control` and `/mcp` for a browser.
-The final CLI integration forwards canonical requests to that same gateway. Authentication stays
+The CLI forwards canonical requests to that same gateway. Authentication stays
 at the existing transport boundary; the gateway never pairs or attaches endpoints.
 
 Include `kelpie/browser_gateway_c_api.h`. Create with JSON containing
 `nativeMethods` (callable HTTP kebab-case endpoints), `targeting` (`direct` or
-`selected`), `fixedReader`, `allowActions`, and `requireAuthorization`. The latter
+`selected`), `browserAvailable` (default true), `fixedReader`, `allowActions`, and `requireAuthorization`. The latter
 two default true. Pass existing extension descriptors as
 `{name,method,description,inputSchema,mutates}`. Include only admitted functions;
 read-only AI sessions must disable actions and further restrict visible tabs.
@@ -38,12 +38,12 @@ outside the canonical gateway; pass null to invalidate all tabs. Rich extension
 mutations dispatched inside the gateway also invalidate their target refs.
 
 The special internal `browser-control-evaluate` dispatch executes a generated
-fixed reader/resolver, never model-authored JavaScript. Bind it to a private
+fixed reader or atomic captured-node action, never model-authored JavaScript. Bind it to a private
 renderer realm where available. The generated scripts retain ephemeral DOM object
 identity under a per-gateway random key; the native coordinator privately owns
 admitted refs per tab and snapshot. In a page realm this is a correctness guard,
 not isolation from hostile page scripts; bindings must report their realm honestly.
-Navigation/replaced nodes, another tab's ref and old snapshots refuse. Type appends.
+Navigation/replaced nodes, another tab's ref and old snapshots refuse. `tab.click` performs synthetic DOM activation on the captured object; `tab.type` appends through native value setters and an input event on text inputs/textarea, or text-node append in contenteditable. Number/file/date/checkbox inputs refuse typing before focus. After focus, eligibility and connection are checked again because page handlers can mutate them; refusal then reports uncertainty. Rich native input extensions retain their event guarantees.
 Native screenshots currently support viewport PNG; other request options refuse.
 Explicit native timeouts support 1–30,000ms; zero or larger limits refuse.
 Selected-tab readers inspect active identity first and never switch in read-only
@@ -63,3 +63,5 @@ Android ABI configurations. CMake regenerates when authoritative sources or lock
 change. CI/native release jobs must install those tools before configuring CMake.
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.
+
+The Linux no-CEF fallback also serves authenticated canonical HTTP and compact MCP through this coordinator. Its core advertises only documentation/capabilities; existing metadata, navigation stub, bookmarks/history and diagnostics remain discoverable extensions. It does not advertise DOM observations or browser input.

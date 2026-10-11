@@ -357,7 +357,7 @@ bool DesktopApp::Start(const Config& config) {
     return impl_->mcp_server.HandleBrowserRequest(request, gateway_config);
   });
   impl_->router.BeforeDispatch([this](std::string_view method, const nlohmann::json& params) {
-    impl_->mcp_server.InvalidateReferences(method, params);
+    return impl_->mcp_server.GuardDispatch(method, params);
   });
   impl_->http_server.SetMcpServer(&impl_->mcp_server);
   DesktopHttpServer::Config server_config;

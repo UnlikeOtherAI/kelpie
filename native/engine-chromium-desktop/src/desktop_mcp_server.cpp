@@ -54,6 +54,11 @@ DesktopMcpServer::~DesktopMcpServer() = default;
 void DesktopMcpServer::SetRouter(const DesktopRouter* router) { impl_->router = router; impl_->gateway.reset(); }
 void DesktopMcpServer::SetRegistry(const McpRegistry* registry) { impl_->registry = registry; impl_->gateway.reset(); }
 void DesktopMcpServer::SetFixedReader(FixedReader reader) { impl_->reader = std::move(reader); impl_->gateway.reset(); }
+std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, const json& params) const {
+  auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
+  InvalidateReferences(method, params);
+  return lock;
+}
 void DesktopMcpServer::InvalidateReferences(std::string_view method, const json& params) const {
   std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
   if (!impl_->gateway || impl_->internal_dispatch || method == "browser-control" || !NativeExtensionMutates(method)) return;

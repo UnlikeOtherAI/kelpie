@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -23,7 +24,7 @@ class DesktopRouter {
   // A registered route may return an explicit platform error for HTTP clients.
   // It is not automatically an MCP capability: callers must opt in to discovery.
   void Register(std::string method, Handler handler, bool callable = true);
-  void BeforeDispatch(std::function<void(std::string_view, const json&)> observer);
+  void BeforeDispatch(std::function<std::shared_ptr<void>(std::string_view, const json&)> observer);
   bool Has(std::string_view method) const;
   bool IsCallable(std::string_view method) const;
   Result Dispatch(std::string_view method, const json& params) const;
@@ -36,7 +37,7 @@ class DesktopRouter {
   };
 
   std::unordered_map<std::string, Route> handlers_;
-  std::function<void(std::string_view, const json&)> observer_;
+  std::function<std::shared_ptr<void>(std::string_view, const json&)> observer_;
 };
 
 }  // namespace kelpie

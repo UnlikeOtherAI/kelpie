@@ -207,7 +207,8 @@ function isNativeScreenshotResult(method: string, data: unknown): data is Screen
 function portableScreenshotResult(result: ScreenshotResult): CallToolResult {
   const format = normalizeImageFormat(result.format);
   const mimeType = `image/${format}`;
-  const metadata: JsonObject = { ...result, mimeType };
+  const { image: _image, ...details } = result;
+  const metadata: JsonObject = { ...details, mimeType };
   return {
     content: [
       { type: "text", text: JSON.stringify(metadata) },
