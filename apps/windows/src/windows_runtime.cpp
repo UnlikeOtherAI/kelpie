@@ -3,6 +3,7 @@
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "kelpie/desktop_mcp_server.h"
+#include "kelpie/screenshot_fit.h"
 #include "windows_utf.h"
 #include "kelpie/account_login_window.h"
 
@@ -320,6 +321,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
           return desktop_app_->mcp_server().GuardDispatch(method,target);
         },[this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
           DesktopMcpServer::Config config; config.platform=Platform::kWindows; config.engine="chromium";
+          config.screenshot_base64_limit=kAccountScreenshotBase64Limit;
           return desktop_app_->mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
         });
         return executor.Execute(command,guard);

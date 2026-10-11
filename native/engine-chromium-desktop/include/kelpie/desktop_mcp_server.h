@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <iosfwd>
 #include <functional>
 #include <string_view>
@@ -27,6 +28,10 @@ class DesktopMcpServer {
     std::string server_version = "0.0.1";
     std::istream* input = nullptr;
     std::ostream* output = nullptr;
+    // Base64 budget for an authorized account `tab.screenshot`. Zero keeps the
+    // capture unchanged; a limit retakes an oversized capture as JPEG and fails
+    // SCREENSHOT_TOO_LARGE when no quality fits (see kelpie/screenshot_fit.h).
+    std::size_t screenshot_base64_limit = 0;
   };
 
   DesktopMcpServer();

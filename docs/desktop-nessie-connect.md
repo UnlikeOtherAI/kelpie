@@ -58,8 +58,15 @@ original job deadline and cannot extend it when returning to the browser. Legacy
 retain their selector/evidence contract, bounded scroll deltas, compact page snapshot and
 optional viewport PNG. Canonical `tab.type` appends through the common reference action.
 Canonical screenshots retain the typed image envelope and are projected by Nessie's
-job-owned file service. Legacy PNGs beyond the terminal-output budget fail with
-`SCREENSHOT_TOO_LARGE`; full-page capture is unsupported here. HTTP(S) navigation rejects
+job-owned file service. Account screenshots, canonical and legacy, keep the base64
+image within 640 KiB so the result fits the terminal-output budget: an oversized
+viewport PNG is retaken as JPEG at quality 80, then 60, then 40, and the first that
+fits is returned as `image/jpeg`. Each retake goes through the same job lease and
+authorization fences as the first capture. If none fits, the job fails with the
+read-only `SCREENSHOT_TOO_LARGE`. Local HTTP/MCP `tab.screenshot` is unchanged.
+The shared ladder is `kelpie/screenshot_fit.h`; canonical requests apply it in
+`DesktopMcpServer` when the account callback sets `screenshot_base64_limit`.
+Full-page capture is unsupported here. HTTP(S) navigation rejects
 embedded credentials and UOA account surfaces. Current private account-login windows
 are outside the normal tab set.
 
