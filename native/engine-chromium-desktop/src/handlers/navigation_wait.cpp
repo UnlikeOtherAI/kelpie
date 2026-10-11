@@ -7,6 +7,11 @@
 namespace kelpie {
 namespace {
 
+bool HasSuffix(const std::string& value, const std::string& suffix) {
+  return value.size() >= suffix.size() &&
+         value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 std::string NormalizeUrl(std::string url) {
   const auto scheme_end = url.find("://");
   if (scheme_end == std::string::npos) return url;
@@ -21,8 +26,8 @@ std::string NormalizeUrl(std::string url) {
                  [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   auto authority = url.substr(authority_begin, end - authority_begin);
   const auto scheme = url.substr(0, scheme_end);
-  if ((scheme == "https" && authority.ends_with(":443")) ||
-      (scheme == "http" && authority.ends_with(":80"))) {
+  if ((scheme == "https" && HasSuffix(authority, ":443")) ||
+      (scheme == "http" && HasSuffix(authority, ":80"))) {
     authority.erase(authority.rfind(':'));
   }
   auto suffix = authority_end == std::string::npos ? std::string() : url.substr(authority_end);
