@@ -14,7 +14,7 @@ export type BrowserTextMatcher = z.infer<typeof matcher>;
 const timeoutMs = z.number().int().min(0).max(120_000).optional();
 const tabId = z.string().min(1).max(256);
 const locator = { locator: BrowserLocatorSchema, timeoutMs };
-const selection = z.union([z.string(), z.object({ value: z.string().optional(), label: z.string().optional(), index: z.number().int().nonnegative().optional() }).strict()]);
+const selection = z.union([text, z.object({ value: text.optional(), label: text.optional(), index: z.number().int().nonnegative().optional() }).strict()]);
 const request = <M extends string, S extends z.ZodType>(method: M, params: S) => z.object({
   version: z.literal(1), method: z.literal(method), tabId: tabId.optional(), params,
 }).strict();
@@ -22,7 +22,7 @@ const empty = z.object({}).strict().default({});
 export const BrowserControlRequestSchema = z.discriminatedUnion("method", [
   request("capabilities", empty), request("documentation", empty), request("tabs.list", empty),
   request("tabs.new", z.object({ url: z.string().max(8192).optional() }).strict().default({})),
-  request("tabs.close", empty),
+  request("tabs.close", empty), request("tabs.select", empty),
   request("tab.goto", z.object({ url: z.string().min(1).max(8192), timeoutMs }).strict()),
   request("tab.back", z.object({ timeoutMs }).strict().default({})),
   request("tab.forward", z.object({ timeoutMs }).strict().default({})),
@@ -45,7 +45,7 @@ export const BrowserControlRequestSchema = z.discriminatedUnion("method", [
   request("locator.isEnabled", z.object(locator).strict()),
   request("locator.waitFor", z.object({ ...locator, state: z.enum(["attached", "detached", "visible", "hidden"]).optional() }).strict()),
   request("page.press", z.object({ key: z.string().min(1).max(100) }).strict()),
-  request("page.scroll", z.object({ deltaX: z.number().finite().min(-100_000).max(100_000).default(0), deltaY: z.number().finite().min(-100_000).max(100_000) }).strict()),
+  request("page.scroll", z.object({ deltaX: z.number().min(-100_000).max(100_000).default(0), deltaY: z.number().min(-100_000).max(100_000) }).strict()),
 ]);
 export type BrowserControlRequest = z.infer<typeof BrowserControlRequestSchema>;
 export type BrowserControlMethod = BrowserControlRequest["method"];
@@ -69,4 +69,11 @@ const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "t
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();
-export const browserControlInputSchema = (): Record<string, unknown> => z.toJSONSchema(BrowserControlEnvelopeSchema);
+export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[] } = {}): Record<string, unknown> {
+  if (!options.methods) return z.toJSONSchema(BrowserControlEnvelopeSchema, { reused: "ref" });
+  const allowed = new Set(options.methods);
+  const variants = BrowserControlRequestSchema.options.filter((option) => allowed.has(option.shape.method.value));
+  if (!variants.length) throw new Error("At least one browser method must be included in the input schema.");
+  const scoped = z.union(variants);
+  return z.toJSONSchema(z.object({ request: scoped }).strict(), { reused: "ref" });
+}

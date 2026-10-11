@@ -1,9 +1,9 @@
 import { BrowserControlError } from "./protocol.js";
-import type { BrowserControlMethod, BrowserControlRequest, BrowserControlTransport, BrowserImage, BrowserLocator, BrowserSnapshot, BrowserTabInfo, BrowserTextMatcher } from "./protocol.js";
+import type { BrowserControlMethod, BrowserControlRequest, BrowserControlTransport, BrowserCapabilities, BrowserImage, BrowserLocator, BrowserSnapshot, BrowserTabInfo, BrowserTextMatcher } from "./protocol.js";
 
 type Match = string | RegExp;
 const match = (value: Match): BrowserTextMatcher => typeof value === "string" ? value : { source: value.source, flags: value.flags };
-type Wait = { timeoutMs?: number };
+interface Wait { timeoutMs?: number }
 type Select = string | { value?: string; label?: string; index?: number };
 export class BrowserLocatorClient {
   constructor(private readonly tab: BrowserTabClient, private readonly query: BrowserLocator) {}
@@ -20,15 +20,16 @@ export class BrowserLocatorClient {
   last(): BrowserLocatorClient { return this.nth(-1); }
   filter(options: { hasText?: Match; visible?: boolean }): BrowserLocatorClient { return this.chain({ kind: "filter", ...options, hasText: options.hasText === undefined ? undefined : match(options.hasText) }); }
   private call<T>(method: BrowserControlMethod, params: Record<string, unknown> = {}): Promise<T> { return this.tab.call(method, { locator: this.query, ...params }); }
-  click(options: Wait & { button?: "left" | "right" | "middle"; modifiers?: Array<"Alt" | "Control" | "ControlOrMeta" | "Meta" | "Shift"> } = {}): Promise<void> { return this.call("locator.click", options); }
+  click(options: Wait & { button?: "left" | "right" | "middle"; modifiers?: ("Alt" | "Control" | "ControlOrMeta" | "Meta" | "Shift")[] } = {}): Promise<void> { return this.call("locator.click", options); }
   dblclick(options: Wait = {}): Promise<void> { return this.call("locator.dblclick", options); }
   fill(value: string, options: Wait = {}): Promise<void> { return this.call("locator.fill", { value, ...options }); }
   type(text: string, options: Wait = {}): Promise<void> { return this.call("locator.type", { text, ...options }); }
+  pressSequentially(text: string, options: Wait = {}): Promise<void> { return this.type(text, options); }
   press(key: string, options: Wait = {}): Promise<void> { return this.call("locator.press", { key, ...options }); }
   check(options: Wait = {}): Promise<void> { return this.call("locator.check", options); }
   uncheck(options: Wait = {}): Promise<void> { return this.call("locator.uncheck", options); }
   setChecked(checked: boolean, options: Wait = {}): Promise<void> { return checked ? this.check(options) : this.uncheck(options); }
-  selectOption(value: Select | Select[], options: Wait = {}): Promise<void> { return this.call("locator.selectOption", { value, ...options }); }
+  selectOption(value: Select | Select[], options: Wait = {}): Promise<string[]> { return this.call("locator.selectOption", { value, ...options }); }
   innerText(options: Wait = {}): Promise<string> { return this.call("locator.innerText", options); }
   textContent(options: Wait = {}): Promise<string | null> { return this.call("locator.textContent", options); }
   getAttribute(name: string, options: Wait = {}): Promise<string | null> { return this.call("locator.getAttribute", { name, ...options }); }
@@ -39,16 +40,8 @@ export class BrowserLocatorClient {
 }
 export class BrowserTabClient {
   readonly playwright;
-  readonly dom_cua;
   constructor(readonly id: string, private readonly transport: BrowserControlTransport) {
     const root = new BrowserLocatorClient(this, []);
-    this.dom_cua = {
-      get_visible_dom: () => this.snapshot(),
-      click: ({ node_id }: { node_id: string }) => this.call<void>("tab.click", { ref: node_id }),
-      type: ({ node_id, text }: { node_id: string; text: string }) => this.call<void>("tab.type", { ref: node_id, text }),
-      keypress: ({ key }: { key: string }) => this.pressKey(key),
-      scroll: ({ deltaY, deltaX = 0 }: { deltaY: number; deltaX?: number }) => this.scroll(deltaY, deltaX),
-    };
     this.playwright = {
       domSnapshot: async (): Promise<string> => (await this.snapshot()).text,
       getByRole: root.getByRole.bind(root), getByLabel: root.getByLabel.bind(root), getByText: root.getByText.bind(root),
@@ -70,7 +63,13 @@ export class BrowserTabClient {
   title(): Promise<string> { return this.call("tab.title"); }
   snapshot(options: { maxElements?: number; maxChars?: number } = {}): Promise<BrowserSnapshot> { return this.call("tab.snapshot", options); }
   async getAXState(): Promise<string> { return (await this.snapshot()).text; }
-  screenshot(options: { fullPage?: boolean; format?: "png" | "jpeg"; quality?: number } = {}): Promise<BrowserImage> { return this.call("tab.screenshot", options); }
+  async screenshot(options: { fullPage?: boolean; format?: "png" | "jpeg"; quality?: number } = {}): Promise<Uint8Array> {
+    const image = await this.call<BrowserImage>("tab.screenshot", options);
+    return Uint8Array.from(atob(image.data), (character) => character.charCodeAt(0));
+  }
+  getScreenshot(): Promise<Uint8Array> { return this.screenshot(); }
+  click(ref: string | number): Promise<void> { return this.call("tab.click", { ref: String(ref) }); }
+  typeText(ref: string | number, text: string): Promise<void> { return this.call("tab.type", { ref: String(ref), text }); }
   pressKey(key: string): Promise<void> { return this.call("page.press", { key }); }
   scroll(deltaY: number, deltaX = 0): Promise<void> { return this.call("page.scroll", { deltaX, deltaY }); }
 }
@@ -83,13 +82,14 @@ export function createBrowserClient(transport: BrowserControlTransport) {
   return {
     tabs: {
       list: (): Promise<BrowserTabInfo[]> => call({ version: 1, method: "tabs.list", params: {} }),
-      get: (id: string): BrowserTabClient => new BrowserTabClient(id, transport),
+      select: (id: string): Promise<void> => call({ version: 1, method: "tabs.select", tabId: id, params: {} }),
+      get: (id: string): Promise<BrowserTabClient> => Promise.resolve(new BrowserTabClient(id, transport)),
       new: async (options: { url?: string } = {}): Promise<BrowserTabClient> => {
         const tab = await call<BrowserTabInfo>({ version: 1, method: "tabs.new", params: options });
         return new BrowserTabClient(tab.id, transport);
       },
     },
     documentation: (): Promise<string> => call({ version: 1, method: "documentation", params: {} }),
-    capabilities: () => call({ version: 1, method: "capabilities", params: {} }),
+    capabilities: (): Promise<BrowserCapabilities> => call({ version: 1, method: "capabilities", params: {} }),
   };
 }

@@ -24,7 +24,9 @@ export function browserSnapshot(
 ): BrowserSnapshot {
   const maxChars = limits.maxChars ?? 16_000;
   const elements: BrowserElement[] = [];
-  let text = `url: ${input.url}\ntitle: ${input.title}`.slice(0, maxChars);
+  const url = input.url.slice(0, Math.min(4096, Math.floor(maxChars / 2)));
+  const title = input.title.replace(/\s+/g, " ").trim().slice(0, Math.min(1024, Math.floor(maxChars / 4)));
+  let text = `url: ${url}\ntitle: ${title}`;
   for (const el of input.elements.slice(0, limits.maxElements ?? 200)) {
     const element = { ref: el.ref, role: el.role.slice(0, 80), name: el.name.replace(/\s+/g, " ").trim().slice(0, 256) };
     const line = `\n[${element.ref}] ${element.role} ${JSON.stringify(element.name)}`;
@@ -32,5 +34,5 @@ export function browserSnapshot(
     text += line;
     elements.push(element);
   }
-  return { url: input.url, title: input.title, text, elements, truncated: input.truncated === true || elements.length < input.elements.length };
+  return { url, title, text, elements, truncated: input.truncated === true || elements.length < input.elements.length || url !== input.url || title !== input.title };
 }

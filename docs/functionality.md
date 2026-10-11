@@ -549,3 +549,7 @@ kept, an error explains that it could not be restored, and the next Login/regist
 launch tries it again before opening the browser. Sign out forgets the session
 immediately and asks UOA to revoke it in the background; quitting Kelpie keeps it. A UOA server that issues no refresh token keeps
 the older memory-only session, which still ends at access-token expiry.
+
+## Shared browser control
+
+CLI MCP exposes `kelpie_browser_control`, the versioned browser core used by runtime consumers. Its owning surface is machine-facing MCP, reached through the existing `kelpie mcp` or pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native locators and keypresses are refused. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).

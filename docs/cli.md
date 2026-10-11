@@ -1147,3 +1147,7 @@ kelpie browser stop linux
 The profile is owner-only (0700), readiness is 0600, and each launch holds an
 exclusive profile lock. The CLI reads the bearer capability locally and rejects
 `mcp --http` for this alias. Persistent partitions live under `cef-cache` on Linux.
+
+## Versioned browser core
+
+`kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It uses existing approved sockets and never triggers pairing automatically. Native extension tools retain their existing catalogue. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.

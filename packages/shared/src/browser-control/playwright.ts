@@ -22,7 +22,8 @@ export function resolvePlaywrightLocator(page: Page, query: BrowserLocator): Loc
       case "frame": scope = scope.frameLocator(selector(step.value)); break;
       case "nth": {
         if (!("nth" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "nth requires an element locator.");
-        scope = step.index === -1 ? scope.last() : scope.nth(step.index); break;
+        const elementScope = scope as Locator;
+        scope = step.index === -1 ? elementScope.last() : elementScope.nth(step.index); break;
       }
       case "filter": {
         if (!("filter" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
@@ -40,6 +41,7 @@ export interface PlaywrightBrowserBinding {
   getPage(tabId: string): Promise<Page>;
   newTab?(url?: string): Promise<BrowserTabInfo>;
   closeTab?(tabId: string): Promise<void>;
+  selectTab?(tabId: string): Promise<void>;
 }
 
 /** Browserbase, local Chromium and test browsers use the same page implementation. Allocation stays outside it. */
@@ -50,8 +52,9 @@ export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding
   const clear = async (id: string): Promise<void> => {
     const old = references.get(id);
     references.delete(id);
-    await Promise.all(Array.from(old?.values() ?? []).map((handle) => handle.dispose()));
+    await Promise.allSettled(Array.from(old?.values() ?? []).map((handle) => handle.dispose()));
   };
+  if (!binding.selectTab) capabilities.methods = capabilities.methods.filter((method) => method !== "tabs.select");
   if (!binding.newTab) capabilities.methods = capabilities.methods.filter((method) => method !== "tabs.new");
   if (!binding.closeTab) capabilities.methods = capabilities.methods.filter((method) => method !== "tabs.close");
   return {
@@ -61,20 +64,24 @@ export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding
       if (request.method === "tabs.new" && binding.newTab) return binding.newTab(request.params.url);
       // The resolver must revalidate the session's ownership for every call.
       if (!request.tabId) throw new BrowserControlError("TAB_REQUIRED", "Choose a browser tab.");
-      if (request.method === "tabs.close" && binding.closeTab) return binding.closeTab(request.tabId);
+      if (request.method === "tabs.select" && binding.selectTab) return binding.selectTab(request.tabId);
+      if (request.method === "tabs.close" && binding.closeTab) {
+        await clear(request.tabId);
+        return binding.closeTab(request.tabId);
+      }
       const page = await binding.getPage(request.tabId);
       if (request.method === "tab.snapshot") {
         await clear(request.tabId);
         const collected = await page.evaluateHandle(collectBrowserSnapshot, { ...request.params, prefix: `s${String(++generation)}e` });
         try {
           const snap = await collected.getProperty("snapshot");
-          const value = await snap.jsonValue();
+          const value: unknown = await snap.jsonValue();
           await snap.dispose();
           const targets = await collected.getProperty("targets");
           const properties = await targets.getProperties();
           const refs = new Map<string, ElementHandle>();
           for (const [ref, handle] of properties) {
-            const element = handle.asElement();
+            const element = handle.asElement() as ElementHandle<Element> | null;
             if (element) refs.set(ref, element);
             else await handle.dispose();
           }
@@ -88,7 +95,11 @@ export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding
         if (!handle || !await handle.evaluate((el) => el.isConnected)) throw new BrowserControlError("STALE_REFERENCE", "Observe this tab again before acting.");
         try {
           if (request.method === "tab.click") await handle.click({ timeout: 10_000 });
-          else { await handle.focus(); await page.keyboard.insertText(request.params.text); }
+          else {
+            const editable = await handle.evaluate((el) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable));
+            if (!editable) throw new BrowserControlError("INVALID_TARGET", "Choose an editable element from a new snapshot.");
+            await handle.fill(await handle.evaluate((el) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.value : el.textContent ?? "") + request.params.text, { timeout: 10_000 });
+          }
           return null;
         } finally { await clear(request.tabId); }
       }
