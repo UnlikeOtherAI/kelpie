@@ -7,8 +7,9 @@ Device labels and compact model evidence obey wire UTF-16 length limits while pr
 Extraction cancellation owns a separate request authority flag in the native model
 runtime, including before worker dispatch. Pause/Stop never invokes a global model
 cancel for that remote extraction, so it cannot cancel a person's separate AI chat.
-Snapshots include observed unique selectors from the existing DOM selector builder,
-bounded to 2000 characters; elements without a bounded selector are omitted.
+Legacy snapshots and extraction include observed unique selectors from the existing
+DOM selector builder, bounded to 2000 characters; elements without a bounded selector
+are omitted. Canonical browser control uses the shared gateway's opaque references.
 
 The durable ledger acknowledges cancellation even before command delivery by retaining
 a cancelled attempt tombstone and sequence-2 receipt. A later command for that attempt
@@ -136,7 +137,8 @@ version, job authorization and deadline; handler reads and effects recheck that
 fence, and navigation uses the native issued-navigation lease. A common browser
 operation cannot overlap remote renderer work. Extraction releases that browser
 admission before local model inference, and rechecks its immutable document authority
-after inference. The selector/evidence wire remains version 1.
+after inference. Legacy selector/evidence results remain decodable for persisted jobs;
+new browser jobs use the shared browser-control v1 contract above.
 macOS supports both WebKit tabs and the visible Chromium/CEF surface. CEF exposes its
 one current surface as one tab; `open` navigates that surface. Each main-frame start
 rotates a native document identity, including reloads to the same URL. The legacy
@@ -146,7 +148,7 @@ rotates a native document identity, including reloads to the same URL. The legac
 or an unrelated focused control. Only canonical methods in the account allowlist are
 advertised. No caller-supplied JavaScript is accepted.
 
-`tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
+For legacy jobs, `tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
 `{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
 the character count without echoing its contents. `snapshot` returns
 `{tabId,tabVersion,page}` using the shared value-free fixed snapshot reader. Explicit
