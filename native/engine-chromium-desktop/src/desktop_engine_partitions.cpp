@@ -76,7 +76,6 @@ BrowserControlResult DesktopEngine::DeletePartition(const std::string& id,
     for (Impl::Tab& tab : impl->tabs) {
       if (tab.closing || !tab.partition || *tab.partition != id) continue;
       tab.closing = true;
-      if (tab.devtools) tab.devtools->CancelAll();
       closing.push_back(tab.browser);
     }
     outcome->tabs_closed = closing.size();

@@ -60,7 +60,7 @@ and generates the schema, documentation, fixed reader and Zod parity fixtures in
 the build directory. Native builds require Node 20+ and pnpm; generated assets
 are never committed. A portable source lock serializes dependency/build generation across concurrent
 Android ABI configurations. CMake regenerates when authoritative sources or lockfiles
-change. CI/native release jobs must install those tools before configuring CMake.
+change. Generated UTF-8 byte arrays avoid compiler string-literal limits while preserving identical assets. CI/native release jobs must install those tools before configuring CMake.
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.
 
@@ -151,3 +151,9 @@ or an agent's pinned visible tab changes during dispatch; dispatched mutations
 retain uncertainty. Isolated real-WebKit fixtures exercise this boundary on macOS
 and the iOS simulator, including captured-node activation, append, replacement
 refusal and single-image screenshot output.
+Run `node tests/native/run-control-acceptance.mjs <absolute-native-executable>`
+on the target host for the real MCP SDK handshake and canonical browser journey,
+including uncertain renderer timeout, BUSY refusal, late completion and recovery.
+On Windows the SDK journey also checks nested common inference page context and
+cancellation through an owned local mock endpoint. Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
+DOM refusal. Each run owns its temporary profile, token and exact process.

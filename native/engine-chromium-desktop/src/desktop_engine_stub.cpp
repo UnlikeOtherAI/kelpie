@@ -37,6 +37,8 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
+bool DesktopEngine::HasPendingBrowserControl() const { return false; }
+
 bool DesktopEngine::Shutdown() { return true; }
 
 FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }

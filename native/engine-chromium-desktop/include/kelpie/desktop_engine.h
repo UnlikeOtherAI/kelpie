@@ -96,6 +96,7 @@ class DesktopEngine final : public DesktopBrowserControl {
 
   bool Initialize(const Config& config);
   bool Shutdown();
+  bool HasPendingBrowserControl() const;
   void DoMessageLoopWork();
   const std::string& last_error() const;
   bool IsActiveNativeBrowserAttached(void* parent_window, Timeout timeout);
