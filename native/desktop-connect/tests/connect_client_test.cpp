@@ -83,6 +83,30 @@ int main() {
     client.Shutdown();assert(Wait([&] { return client.Drain(); }));
   }
   std::filesystem::remove_all(interrupted_profile);
+  const auto cancelling_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
+  auto cancellation=std::make_shared<Wire>();std::atomic<bool> started=false,done=false;
+  std::atomic<int> cancellations=0;
+  {
+    Client client(account,cancelling_profile,"windows",kDevice,[&](const Json&,std::shared_ptr<const std::atomic<bool>> guard) {
+      started=true;assert(Wait([&] { return guard->load(); }));done=true;
+      return Json{{"state","cancelled"},{"error","Own attempt stopped"}};
+    },[&](const auto& guard) { assert(guard->load());++cancellations; },[cancellation] { return std::make_unique<Socket>(cancellation); });
+    client.Update(false);assert(Wait([&] { return started.load(); }));
+    const auto cancel_frame=[&](const char* job,const char* attempt) {
+      std::lock_guard lock(cancellation->mutex);
+      cancellation->incoming.push_back(Json{{"type","cancel"},{"generation",kGeneration},{"jobId",job},
+          {"attemptId",attempt},{"seq",2}}.dump());
+    };
+    constexpr auto other="10000000-0000-4000-8000-000000000009";
+    cancel_frame(other,other);
+    assert(Wait([&] { std::lock_guard lock(cancellation->mutex);for(const auto& frame:cancellation->sent)
+      if(frame["type"]=="event" && frame["jobId"]==other && frame["state"]=="cancelled")return true;return false; }));
+    assert(!done && cancellations==0); // Receipt for queued work cannot stop the active job.
+    cancel_frame(kJob,kAttempt);assert(Wait([&] { return done.load(); }));
+    assert(cancellations>=1);
+    client.Shutdown();assert(Wait([&] { return client.Drain(); }));
+  }
+  std::filesystem::remove_all(cancelling_profile);
   auto second=std::make_shared<Wire>();
   {
     Client client(account,profile,"windows",kDevice,execute,{},[second] { return std::make_unique<Socket>(second); });

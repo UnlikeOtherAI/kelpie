@@ -90,6 +90,40 @@ int main() {
     assert(unload.get()["loaded"] == false);
     blocking = false;
     assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
+    auto owner = std::make_shared<std::atomic<bool>>(false);
+    auto stale = std::make_shared<std::atomic<bool>>(false);
+    assert(!service.CancelOwned(owner)); // An idle connection does not own page chat.
+    const int before_native = calls;
+    assert(service.ExecuteOwned("ai-infer", {{"prompt", "native only"}}, owner, true)["error"]["code"] == "NO_MODEL_LOADED");
+    assert(calls == before_native); // A changed backend cannot redirect extraction to the cloud.
+    assert(service.ExecuteOwned("ai-cancel", json::object(), owner)["error"]["code"] == "INVALID_PARAM");
+    const auto start_blocked = [&](InferenceService::Owner token) {
+      entered = std::promise<void>(); release = std::promise<void>(); released = release.get_future().share();
+      blocking = true;
+      auto work = std::async(std::launch::async, [&,token] {
+        return service.ExecuteOwned("ai-infer", {{"prompt", "wait"}}, token);
+      });
+      entered.get_future().wait();
+      return work;
+    };
+    auto person_chat = start_blocked({});
+    assert(!service.CancelOwned(owner));
+    assert(service.ExecuteOwned("ai-infer", {{"prompt", "busy"}}, owner)["error"]["code"] == "AI_BUSY");
+    assert(!service.CancelOwned(owner)); // A rejected request never steals ownership.
+    release.set_value(); assert(person_chat.get()["response"] == "4");
+    auto owned = start_blocked(owner);
+    assert(!service.CancelOwned(stale));
+    assert(service.CancelOwned(owner));
+    release.set_value(); assert(owned.get()["error"]["code"] == "INFERENCE_CANCELLED");
+    assert(!service.CancelOwned(owner)); // Completion retires its cancellation identity.
+    auto later_chat = start_blocked({});
+    assert(!service.CancelOwned(owner));
+    release.set_value(); assert(later_chat.get()["response"] == "4");
+    blocking = false;
+    owner->store(true);
+    const int before_cancelled = calls;
+    assert(service.ExecuteOwned("ai-infer", {{"prompt", "stopped"}}, owner)["error"]["code"] == "INFERENCE_CANCELLED");
+    assert(calls == before_cancelled);
     fail = true;
     assert(service.Execute("ai-infer", {{"prompt", "again"}})["error"]["code"] == "ENDPOINT_UNREACHABLE");
     assert(service.Execute("ai-status")["backend"] == "openai");

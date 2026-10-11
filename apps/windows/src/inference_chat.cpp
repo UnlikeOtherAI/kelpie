@@ -64,7 +64,7 @@ json InferenceService::Infer(const json& input) {
   }
   if (settings_.value("backend", "none") == "native") {
     // Token limits can stop between UTF-8 bytes; match the mobile C bridge.
-    return json::parse(local_.Execute("infer", body).dump(-1, ' ', false, json::error_handler_t::replace));
+    return json::parse(local_.Execute("infer", body, request_authority_).dump(-1, ' ', false, json::error_handler_t::replace));
   }
   if (settings_.value("backend", "none") != "openai")
     throw InferenceError("NO_MODEL_LOADED", "Load a local model or select an inference endpoint");

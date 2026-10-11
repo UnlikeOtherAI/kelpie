@@ -22,7 +22,7 @@ std::string DeviceLabel(const std::string& platform) {
 namespace kelpie::connect {
 using Json=nlohmann::json;
 Client::Client(account::AccountService& account,const std::filesystem::path& profile,
-    std::string platform,std::string installation,Execute execute,std::function<void()> cancel,Factory factory)
+    std::string platform,std::string installation,Execute execute,Cancel cancel,Factory factory)
     :account_(account),journal_(account::MakeEncryptedBlobStore(profile,"nessie.journal.v1",32*1024*1024)),
      settings_(account::MakeEncryptedBlobStore(profile,"nessie.controls.v1",4096)),platform_(std::move(platform)),
      installation_(std::move(installation)),execute_(std::move(execute)),cancel_(std::move(cancel)),factory_(std::move(factory)) {
@@ -48,7 +48,7 @@ void Client::Pause(bool value) {
     catch(...) { enabled_=false;cancel=true;status_="Nessie: storage unavailable"; }
     if(cancel)cancelled_.load()->store(true);
   }
-  if(cancel && cancel_)cancel_();changed_.notify_all();
+  if(cancel && cancel_)cancel_(cancelled_.load());changed_.notify_all();
 }
 void Client::Enable(bool value) {
   bool cancel=!value;
@@ -57,11 +57,11 @@ void Client::Enable(bool value) {
     catch(...) { enabled_=false;cancel=true;status_="Nessie: storage unavailable"; }
     if(cancel)cancelled_.load()->store(true);
   }
-  if(cancel && cancel_)cancel_();changed_.notify_all();
+  if(cancel && cancel_)cancel_(cancelled_.load());changed_.notify_all();
 }
 void Client::UserTabChanged() { bool working; { std::lock_guard lock(mutex_);working=working_; } if(working)Pause(true); }
-void Client::SignOut() { { std::lock_guard lock(mutex_); owner_.clear(); discard_=true; cancelled_.load()->store(true); } if(cancel_)cancel_(); changed_.notify_all(); }
-void Client::Shutdown() { shutdown_=true; cancelled_.load()->store(true); if(cancel_)cancel_(); changed_.notify_all(); }
+void Client::SignOut() { { std::lock_guard lock(mutex_); owner_.clear(); discard_=true; cancelled_.load()->store(true); } if(cancel_)cancel_(cancelled_.load()); changed_.notify_all(); }
+void Client::Shutdown() { shutdown_=true; cancelled_.load()->store(true); if(cancel_)cancel_(cancelled_.load()); changed_.notify_all(); }
 bool Client::Drain() { return !worker_.valid() || worker_.wait_for(std::chrono::seconds(0))==std::future_status::ready; }
 void Client::SetStatus(std::string value) { std::lock_guard lock(mutex_); status_=std::move(value); }
 std::string Client::Status() const { std::lock_guard lock(mutex_); return status_; }
@@ -142,7 +142,10 @@ void Client::Run() {
         const auto decision=persist("receive",frame); send(decision);
         const auto kind=decision.value("kind","");
         if(kind=="welcome") { generation=frame.at("generation"); failures=0; SetStatus(paused?"Nessie: paused":"Nessie: connected"); }
-        if(kind=="cancel") { cancelled_.load()->store(true); if(cancel_)cancel_(); }
+        if(kind=="cancel" && task.valid() && active.value("jobId",Json())==frame.at("jobId")
+            && active.value("attemptId",Json())==frame.at("attemptId")) {
+          cancelled_.load()->store(true); if(cancel_)cancel_(cancelled_.load());
+        }
         if(kind=="command") {
           const auto command=decision.at("command");
           bool allowed;
@@ -157,13 +160,13 @@ void Client::Run() {
         }
         if(!task.valid() && !generation.empty())SetStatus(paused?"Nessie: paused":"Nessie: connected");
       }
-      cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_();
+      cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_(cancelled_.load());
       socket->Close();
     }catch(const account::AccountFailure& failure) {
-      cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_();
+      cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_(cancelled_.load());
       SetStatus(failure.status==403?"Nessie: sign in again to allow connection":failure.status==401?"Nessie: signed out":"Nessie: waiting for UOA");
       if(failure.status==403) { std::unique_lock lock(mutex_); changed_.wait_for(lock,std::chrono::seconds(30)); }
-    }catch(...) { cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_();SetStatus("Nessie: reconnecting"); }
+    }catch(...) { cancelled_.load()->store(true); if(task.valid() && cancel_)cancel_(cancelled_.load());SetStatus("Nessie: reconnecting"); }
     if(!shutdown_) { std::unique_lock lock(mutex_); changed_.wait_for(lock,std::chrono::seconds(std::min(30u,1u<<std::min(failures++,5u)))); }
   }
   if(task.valid()) { cancelled_.load()->store(true); task.wait(); try { finish(); } catch(...) {} }

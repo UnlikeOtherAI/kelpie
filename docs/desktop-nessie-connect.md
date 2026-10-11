@@ -51,6 +51,13 @@ Extraction uses bounded untrusted page text and a question, with no browser tool
 Its result contains a summary and URL/excerpt/time evidence with the pinned tab and
 document version. Cancellation, deadline, active tab and document are checked again
 after inference. Socket loss cancels in-flight work before any reconnect dispatch.
+Windows inference binds the remote job's transient cancellation identity under a
+request ownership lock. Pausing, stopping or losing that connection cancels only
+its own inference; a person's independent tab chat remains untouched. Backend
+selection is checked inside the inference lock so extraction cannot race a switch
+to a cloud endpoint. Native decoding also polls a request-owned authority flag,
+including model startup. Cancellation receipts for other job/attempt identities
+are durably acknowledged without cancelling the active job.
 Linux advertises no extraction/model capability. Heartbeats publish model readiness changes without reconnecting. The platform's existing inference UI owns model
 installation/loading; the Nessie connection never downloads or loads one implicitly.
 

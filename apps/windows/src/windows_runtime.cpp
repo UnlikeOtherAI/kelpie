@@ -311,14 +311,13 @@ bool WindowsApp::InitializeDesktopRuntime() {
   browser_view_->ShowFallback(false);
   SetTimer(shell_->hwnd(), 3, 300, nullptr);
   account_->RestoreSession();
-  connect_executor_=std::make_unique<connect::Executor>(desktop_app_->engine(),[this](const json& body) {
-    const auto status=inference_->Execute("ai-status");
-    if(!status.value("loaded",false) || status.value("backend","")!="native")return json{{"success",false}};
-    return inference_->Execute("ai-infer",body);
-  });
   connection_=std::make_unique<connect::Client>(*account_,config_.profile_dir,"windows",runtime.device_id,
-      [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return connect_executor_->Execute(command,cancelled); },
-      [this] { if(inference_)inference_->Cancel(); });
+      [this](const json& command,std::shared_ptr<const std::atomic<bool>> guard) {
+        connect::Executor executor(desktop_app_->engine(),[this,guard](const json& body) {
+          return inference_->ExecuteOwned("ai-infer",body,guard,/*native_only=*/true);
+        });
+        return executor.Execute(command,guard);
+      },[this](const auto& guard) { if(inference_)inference_->CancelOwned(guard); });
   startup_diagnostics_.Ready();
   return true;
 }
@@ -327,7 +326,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // CEF must deliver every OnBeforeClose before CefShutdown. Keep the owner
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
-    if(connection_) { connection_->Shutdown(); if(!connection_->Drain())return false; connection_.reset(); connect_executor_.reset(); }
+    if(connection_) { connection_->Shutdown(); if(!connection_->Drain())return false; connection_.reset(); }
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
     if (!CloseAccountLoginWindow()) return false;
     if (!page_color_sampler_.Drain()) return false;
