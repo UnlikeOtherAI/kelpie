@@ -86,9 +86,9 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   impl_->account.RestoreSession();
   impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
       [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },
-      [this](const json& request,const connect::Executor::Authorization& authorize) {
+      [this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
         DesktopMcpServer::Config config; config.platform=Platform::kLinux; config.engine="chromium";
-        return impl_->desktop.mcp_server().HandleBrowserRequestAuthorized(request,config,authorize);
+        return impl_->desktop.mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
       });
   impl_->connection=std::make_unique<connect::Client>(impl_->account,impl_->config.profile_dir,"linux",runtime.device_id,
       [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return impl_->connect_executor->Execute(command,cancelled); },

@@ -21,7 +21,7 @@ nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool 
     return InvalidParams("format must be png");
   }
   TabLease lease;
-  auto result = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+  auto result = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
   if (!result.ok) return ControlError(result);
   BrowserScreenshot image;
   result = RequireBrowserControl(runtime_).Screenshot(lease, &image, ControlTimeout(params));

@@ -113,8 +113,19 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
       if(method!="tabs.select" && !tab->active)return false;
       return true;
     };
+    TabLease job_lease;
+    if (!unbound) {
+      const auto resolved = browser_.ResolveTab(tab_id, std::nullopt, &job_lease, timeout);
+      if (!resolved.ok || !resolved.tab || resolved.tab->document_version != expected ||
+          resolved.tab->is_loading || (method != "tabs.select" && !resolved.tab->active))
+        return {{"state", "completed"}, {"output", {{"response", ControlFailure("STALE_DOCUMENT")}}}};
+      job_lease.document_version = expected;
+      job_lease.cancelled = cancelled;
+      job_lease.deadline = deadline;
+      job_lease.require_active = method != "tabs.select";
+    }
     Json response;
-    try { response=control_(request,authorized); }
+    try { response=control_(request,job_lease,authorized); }
     catch(...) { response=ControlFailure("BROWSER_FAILED",true); }
     if(!response.is_object() || !response.contains("version") || response.value("version",0)!=1 || !response.contains("ok"))
       response=ControlFailure("BROWSER_FAILED",true);
