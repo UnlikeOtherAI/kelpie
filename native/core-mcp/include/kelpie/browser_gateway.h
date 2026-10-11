@@ -2,6 +2,9 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 namespace kelpie {
+// Internal generated reader expression; bindings execute it only in their fixed
+// private-world reader. The returned targets are transient DOM objects, not refs.
+std::string CollectBrowserSnapshotExpression(const nlohmann::json& options);
 // One coordinator per browser. Caller serializes begin through terminal completion,
 // including its policy callback. next/advance bridge synchronous C++ to async renderers.
 class BrowserGateway {

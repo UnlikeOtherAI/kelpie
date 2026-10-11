@@ -2,6 +2,7 @@
 
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
+#include "kelpie/desktop_mcp_server.h"
 #include "windows_utf.h"
 #include "kelpie/account_login_window.h"
 
@@ -315,6 +316,8 @@ bool WindowsApp::InitializeDesktopRuntime() {
       [this](const json& command,std::shared_ptr<const std::atomic<bool>> guard) {
         connect::Executor executor(desktop_app_->engine(),[this,guard](const json& body) {
           return inference_->ExecuteOwned("ai-infer",body,guard,/*native_only=*/true);
+        },[this](const std::string& method,const json& target) {
+          return desktop_app_->mcp_server().GuardDispatch(method,target);
         });
         return executor.Execute(command,guard);
       },[this](const auto& guard) { if(inference_)inference_->CancelOwned(guard); });

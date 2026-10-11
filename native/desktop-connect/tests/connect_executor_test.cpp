@@ -3,9 +3,11 @@
 #include "connect_text.h"
 #include "encrypted_blob_store.h"
 #include "account_protocol.h"
+#include "kelpie/desktop_mcp_server.h"
 #include <cassert>
 #include <fstream>
 #include <ctime>
+#include <future>
 using namespace kelpie;
 using namespace kelpie::connect;
 namespace {
@@ -36,6 +38,7 @@ class Browser final:public DesktopBrowserControl {
   BrowserControlResult Forward(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
   BrowserControlResult Reload(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
   BrowserControlResult Evaluate(TabLease lease,std::string,Json* out,Timeout timeout)override { assert(timeout<=std::chrono::seconds(10));const auto r=Check(lease);if(r.ok)*out={{"text","Page content"}};return r; }
+  BrowserControlResult EvaluateBrowserControl(TabLease lease,std::string script,Json* out,Timeout timeout)override { return Evaluate(lease,std::move(script),out,timeout); }
   BrowserControlResult Screenshot(TabLease lease,BrowserScreenshot* out,Timeout)override { const auto r=Check(lease);out->base64_data="AA==";return r; }
   BrowserControlResult DispatchTrustedInput(TabLease lease,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok){++effects;*out={{"success",true}};}return r; }
   BrowserControlResult DevTools(TabLease lease,std::string,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok)*out={{"nodes",Json::array()}};return r; }
@@ -92,6 +95,21 @@ int main() {
   Executor long_inference(browser,[&](const Json&) { inference_deadline=browser.used.deadline;return Json{{"success",true},{"response","Answer"}}; });
   assert(long_inference.Execute(long_job,guard)["state"]=="completed");
   assert(inference_deadline==browser.used.deadline && inference_deadline && *inference_deadline-std::chrono::steady_clock::now()>std::chrono::minutes(4));
+  DesktopMcpServer common;bool renderer_pending=true;
+  common.SetPendingCheck([&] { return renderer_pending; });
+  const auto admission=[&](const auto& method,const auto& target) { return common.GuardDispatch(method,target); };
+  Executor admitted(browser,{},admission);const auto previous_effects=browser.effects;
+  assert(admitted.Execute(Command("click",{{"selector","#go"}}),guard)["error"]=="BROWSER_BUSY");
+  assert(browser.effects==previous_effects);renderer_pending=false;
+  Executor independent_inference(browser,[&](const Json&) {
+    // An independent browser transaction can proceed while local decoding runs.
+    auto observer=std::async(std::launch::async,[&] { return common.GuardDispatch("get-tabs",Json::object()); });
+    assert(observer.wait_for(std::chrono::seconds(1))==std::future_status::ready);observer.get().reset();
+    return Json{{"success",true},{"response","Answer"}};
+  },admission);
+  assert(independent_inference.Execute(long_job,guard)["state"]=="completed");
+  Executor retired_during_inference(browser,[&](const Json&) { renderer_pending=true;return Json{{"success",true},{"response","stale"}}; },admission);
+  assert(retired_during_inference.Execute(long_job,guard)["error"]=="BROWSER_BUSY");renderer_pending=false;
   std::string split="\x81\x05hello";auto half=split.substr(0,4);assert(!DecodeFrame(half));half+=split.substr(4);assert(DecodeFrame(half)->payload=="hello");
   std::string masked="\x81\x80";bool rejected=false;try { DecodeFrame(masked); }catch(...) { rejected=true; }assert(rejected);
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();

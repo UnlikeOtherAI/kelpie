@@ -31,6 +31,13 @@ see the [wire contract](nessie-connect.md).
 
 Browser execution uses an explicit operation allowlist. It never forwards arbitrary
 router calls, scripts, cookies, account settings or local-control credentials. Bound
+requests share the existing DesktopMcpServer transaction, canonical reference
+invalidation and unresolved renderer-operation fence with HTTP/MCP. No second
+browser admission state is created. The transaction is released during model decoding
+and reacquired before validating the original document/deadline after inference.
+Snapshots reuse the common generated value-free reader in its native private world;
+transient observed nodes provide bounded CSS selectors for the existing Nessie wire.
+Editable values and raw accessibility trees are not forwarded.
 operations use the named tab's current document version, activate that tab visibly,
 and retain its lease through native owner-thread execution. Person-driven tab selection
 pauses active work; bound owner-thread calls also require the target to remain active. Document versions change

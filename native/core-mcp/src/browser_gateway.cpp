@@ -30,6 +30,9 @@ const std::map<std::string, std::string> kRoutes = {
   {"page.press", "press-key"}, {"page.scroll", "scroll"}, {"tab.click", "click"}, {"tab.type", "type"}
 };
 }
+std::string CollectBrowserSnapshotExpression(const nlohmann::json& options) {
+  return "(" + std::string(browser_assets::reader) + ")(" + options.dump() + ")";
+}
 struct BrowserGateway::Impl {
   json config, request, step = {{"kind", "complete"}, {"response", nullptr}};
   std::set<std::string> native, methods, mutations;
@@ -87,7 +90,7 @@ struct BrowserGateway::Impl {
       params.erase("tabId");
       params["prefix"] = session + "s" + std::to_string(++generation) + "e";
       params["includeShadow"] = false;
-      const std::string collected = "(" + std::string(browser_assets::reader) + ")(" + params.dump() + ")";
+      const std::string collected = CollectBrowserSnapshotExpression(params);
       // One-shot read-only observers never retain renderer targets/listeners.
       const std::string expression = config.value("allowActions", true)
         ? "(" + std::string(browser_assets::remember) + ")(" + collected + "," + json(key).dump() + ")"

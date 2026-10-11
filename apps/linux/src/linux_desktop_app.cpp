@@ -2,6 +2,7 @@
 #include "gui_shell.h"
 #include "headless_shell.h"
 #include "kelpie/response_helpers.h"
+#include "kelpie/desktop_mcp_server.h"
 #include "kelpie/account_login_window.h"
 #include <fstream>
 #include <iostream>
@@ -83,7 +84,8 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   impl_->started=true;
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
   impl_->account.RestoreSession();
-  impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine());
+  impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
+      [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); });
   impl_->connection=std::make_unique<connect::Client>(impl_->account,impl_->config.profile_dir,"linux",runtime.device_id,
       [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return impl_->connect_executor->Execute(command,cancelled); });
   return true;
