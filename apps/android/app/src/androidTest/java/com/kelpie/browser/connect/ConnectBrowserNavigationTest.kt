@@ -76,6 +76,8 @@ class ConnectBrowserNavigationTest {
             withContext(Dispatchers.Main) {
                 val app = InstrumentationRegistry.getInstrumentation().targetContext
                 check(app.packageName.endsWith(".nessieverify")) { "Requires the isolated verification profile" }
+                com.kelpie.browser.browser.HistoryStore.init(app)
+                com.kelpie.browser.browser.HomeStore.init(app)
                 val context = HandlerContext()
                 val store = TabStore(app, context, BrowserState())
                 context.tabStore = store
