@@ -74,7 +74,14 @@ int GUIShell::Run() {
     if(!c.app.IsRunning()) { if(c.app.FinishShutdown())gtk_main_quit(); return G_SOURCE_CONTINUE; }
     if(c.app.WantsFullscreen()!=c.app.IsFullscreen()) { if(c.app.WantsFullscreen())gtk_window_fullscreen(c.window); else gtk_window_unfullscreen(c.window); }
     auto [width,height]=c.app.TakeResizeRequest();
-    if(width>0&&height>0) { int w,h; gtk_window_get_size(c.window,&w,&h); auto view=c.app.ViewFrame(); gtk_window_resize(c.window,w+width-view.width,h+height-view.height); }
+    if(width>0&&height>0) {
+      int w,h;gtk_window_get_size(c.window,&w,&h);
+      // A painted CEF frame may be missing or stale; native layout owns geometry.
+      auto* view=c.browser.widget();
+      const int view_width=gtk_widget_get_allocated_width(view);
+      const int view_height=gtk_widget_get_allocated_height(view);
+      gtk_window_resize(c.window,w+width-view_width,h+height-view_height);
+    }
     c.browser.Sync(); c.chrome.Sync();
     if(++c.tick%15==0) { c.url.Sync(); const auto title=c.app.CurrentTitle(); gtk_window_set_title(c.window,(title.empty()?"Kelpie":title+" — Kelpie").c_str()); }
     auto message=c.app.ConsumeToast(); if(!message.empty())c.toast.Show(message);

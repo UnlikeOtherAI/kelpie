@@ -74,6 +74,10 @@ sandboxed CEF SDK; Linux requires its CEF runtime, curl/OpenSSL and GTK for menu
 Portable mocks do not verify production provisioning, real WSS revocation, installed
 model inference or the rendered platform menus. Those require native/integration checks.
 
+GTK viewport resize/reset uses the current allocated browser widget dimensions,
+independent of missing or stale CEF paint frames. Native Linux acceptance exercises
+resize immediately after readiness and again after browser actions.
+
 Verified on 2026-10-11 at source `3886012cfe0ca01560402d46557a0df3d27a3266`:
 
 - Minis built Windows 0.1.12 Release with MSVC 19.51, pinned sandboxed CEF 152
