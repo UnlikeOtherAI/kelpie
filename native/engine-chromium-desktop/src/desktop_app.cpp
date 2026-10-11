@@ -353,6 +353,7 @@ bool DesktopApp::Start(const Config& config) {
   impl_->mcp_server.SetFixedReader([this](const nlohmann::json& params) {
     return EvaluateBrowserFixed(impl_->engine, params);
   });
+  impl_->mcp_server.SetPendingCheck([this] { return impl_->engine.HasPendingBrowserControl(); });
   const DesktopMcpServer::Config gateway_config{config.platform, config.engine_name, config.app_name, config.app_version};
   impl_->router.Register("browser-control", [this, gateway_config](const nlohmann::json& request) {
     return impl_->mcp_server.HandleBrowserRequest(request, gateway_config);

@@ -36,6 +36,14 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   await new Promise(resolve => setTimeout(resolve, 1200));
   assert.equal((await call("tab.click", { ref: button.ref }, tab)).error.code, "STALE_REFERENCE");
   assert.equal((await call("tab.screenshot", { fullPage: true }, tab)).error.code, "UNSUPPORTED");
+  const delayed = await rawRequest({ port: readiness.port, path: "/v1/evaluate", headers: bearerHeaders(readiness.token),
+    body: JSON.stringify({ tabId: tab, timeout: 100, expression: 'new Promise(resolve=>setTimeout(()=>{window.__delayedCount=(window.__delayedCount||0)+1;resolve(window.__delayedCount);},1500))' }) });
+  assert.equal(delayed.json.success, false);
+  assert.equal(delayed.json.error.details.operationMayHaveCompleted, true);
+  assert.equal((await call("tab.snapshot", {}, tab)).error.code, "BUSY");
+  await new Promise(resolve => setTimeout(resolve, 1600));
+  assert.equal((await call("tab.snapshot", {}, tab)).ok, true);
+  assert.equal(await evaluate('window.__delayedCount'), 1);
   const final = await call("tab.snapshot", { maxChars: 256 }, tab);
   assert.ok(final.value.text.length <= 256);
   const image = await call("tab.screenshot", {}, tab);

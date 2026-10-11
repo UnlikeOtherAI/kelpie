@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -73,13 +74,13 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
     Result result_;
   };
 
-  DesktopDevToolsSession();
+  explicit DesktopDevToolsSession(std::shared_ptr<std::atomic<std::size_t>> unknown_operations = std::make_shared<std::atomic<std::size_t>>(0));
   void Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink);
   std::shared_ptr<Operation> Begin(CefRefPtr<CefBrowser> browser,
                                    const std::string& method,
                                    const Json& params);
   // `interrupted` is polled while the reply is outstanding; when it returns
-  // true the operation is abandoned with INTERRUPTED. It runs without any
+  // true the caller returns INTERRUPTED; ownership remains until the late result. It runs without any
   // session lock held, so it may hop to the CEF UI thread.
   Result Wait(const std::shared_ptr<Operation>& operation, std::chrono::milliseconds timeout,
               const std::function<bool()>& interrupted = {});
@@ -112,6 +113,7 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
 
   std::mutex mutex_;
   int next_message_id_ = 1;
+  std::shared_ptr<std::atomic<std::size_t>> unknown_operations_;
   CefRefPtr<CefBrowser> browser_;
   CefRefPtr<CefRegistration> registration_;
   std::unordered_map<int, std::shared_ptr<Operation>> pending_;
