@@ -101,7 +101,7 @@ final class BrowserControlGateway {
                 let method = step["method"] as? String ?? ""
                 let params = step["params"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
-                guard !Task.isCancelled, (authorizeAccountStep?(body, mutates) ?? true) else { return cancel() }
+                guard !Task.isCancelled, authorizeAccountStep?(body, mutates) ?? true else { return cancel() }
                 if ["ai-infer", "ai-record"].contains(method) {
                     // Product inference owns its existing model/run deadlines. Its
                     // nested browser calls each acquire the shared admission lease.

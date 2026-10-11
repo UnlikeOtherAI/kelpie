@@ -87,7 +87,8 @@ into selectors or expose arbitrary scripts, cookies, account endpoints or extens
 Screenshots retain the canonical typed image response and are projected through the
 job-owned file service before model presentation. Native execution requires the named
 tab to remain active except for an explicit `tabs.select`; account sign-in surfaces are
-forbidden as both current and destination pages.
+forbidden as both current and destination pages. macOS does not advertise `page.press`:
+its native trusted-key method is unavailable on Apple account connections.
 
 `event` carries job/attempt/seq and `state` (`accepted`, `progress`, `completed`,
 `failed`, `cancelled`), optional object `output` and bounded `error`.
@@ -128,16 +129,22 @@ remote work. Returning to the foreground does not override a person's pause.
 Apple and Android reuse their existing browser handlers through a job-owned context.
 Their isolated routers share the original browser gateway's admission and reference
 invalidation. Android also shares its renderer callback retirement tracker; Apple
-keeps the admission lease until the awaited handler completes. A common browser
+keeps the admission lease until the awaited handler completes, including after a
+cancelled or timed-out response while a native callback is still pending. Apple's
+control-v1 route binds each dispatch to one immutable renderer, active tab, document
+version, job authorization and deadline; handler reads and effects recheck that
+fence, and navigation uses the native issued-navigation lease. A common browser
 operation cannot overlap remote renderer work. Extraction releases that browser
 admission before local model inference, and rechecks its immutable document authority
 after inference. The selector/evidence wire remains version 1.
 macOS supports both WebKit tabs and the visible Chromium/CEF surface. CEF exposes its
 one current surface as one tab; `open` navigates that surface. Each main-frame start
-rotates a native document identity, including reloads to the same URL. Remote `type`
-sets the selected editable control through the existing atomic `fill` handler; it
-does not write to an unrelated focused control. Only validated selector/text, HTTP(S)
-URL, and bounded scroll inputs enter handlers. No caller-supplied JavaScript is accepted.
+rotates a native document identity, including reloads to the same URL. The legacy
+`type` operation sets the selected editable control through the existing atomic
+`fill` handler. Canonical `control` requests use opaque snapshot references, and
+`tab.type` appends through the shared fixed action; neither is converted to a selector
+or an unrelated focused control. Only canonical methods in the account allowlist are
+advertised. No caller-supplied JavaScript is accepted.
 
 `tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
 `{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
