@@ -225,6 +225,7 @@ let kelpieTests = Target.target(
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
+        .glob("Tests/**/*.mm"),
     ],
     dependencies: [
         .target(name: "Kelpie"),
@@ -232,6 +233,11 @@ let kelpieTests = Target.target(
     settings: .settings(
         base: [
             "SWIFT_VERSION": "5.0",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
+            "HEADER_SEARCH_PATHS": .array([
+                "$(PROJECT_DIR)/Kelpie/Renderer",
+                "$(PROJECT_DIR)/Frameworks/cef_include",
+            ]),
         ]
     )
 )

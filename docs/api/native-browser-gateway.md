@@ -157,3 +157,9 @@ including uncertain renderer timeout, BUSY refusal, late completion and recovery
 On Windows the SDK journey also checks nested common inference page context and
 cancellation through an owned local mock endpoint. Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
 DOM refusal. Each run owns its temporary profile, token and exact process.
+
+Common Apple WK/CDP operations retain the pending lease until their actual result
+or confirmed renderer close. Legacy inner timeout and CDP agent-detach callbacks
+do not retire a common gesture. A real WebKit cancellation fixture holds a 9.5s
+page handler past the former 8s inner deadline; CDP callback fixtures cover the
+former 5s deadline, detach, late result and confirmed close separately.

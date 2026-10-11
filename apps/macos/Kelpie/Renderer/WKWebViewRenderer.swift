@@ -158,11 +158,8 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
-        try await withWebKitTimeout("Browser control") { completion in
-            webView.evaluateJavaScript(script, in: nil, in: BrowserControlWebKit.world) { result in
-                completion(result.map { Optional($0) })
-            }
-        }
+        // The gateway bounds its response while retaining the real renderer lease.
+        try await BrowserControlWebKit.evaluate(script, in: webView)
     }
 
     func allCookies() async -> [HTTPCookie] {

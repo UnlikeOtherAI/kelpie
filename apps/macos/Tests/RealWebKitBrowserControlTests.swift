@@ -93,6 +93,29 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         let encoded = try XCTUnwrap(images.first?["data"] as? String)
         XCTAssertNotNil(Data(base64Encoded: encoded))
         XCTAssertFalse(content.filter { $0["type"] as? String == "text" }.contains { ($0["text"] as? String)?.contains(encoded) == true })
+
+        let delayed = try await snapshot(router, tabId: tabId)
+        let delayedElements = try XCTUnwrap(delayed["elements"] as? [[String: Any]])
+        let delayedRef = try XCTUnwrap(delayedElements.first { $0["name"] as? String == "Delayed" }?["ref"] as? String)
+        let action = Task { await router.browserControl(["version": 1, "method": "tab.click", "tabId": tabId, "params": ["ref": delayedRef]]) }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        action.cancel()
+        let uncertain = await action.value
+        XCTAssertEqual((uncertain["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, true)
+        // Exceed the former inner WK 8s deadline while the actual callback remains pending.
+        try await Task.sleep(nanoseconds: 8_300_000_000)
+        let premature = router.browserLease.begin()
+        if premature { router.browserLease.end() }
+        XCTAssertFalse(premature, "A cancelled response cannot retire a running renderer gesture")
+        for _ in 0..<100 {
+            if router.browserLease.begin() { router.browserLease.end(); break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let recovered = router.browserLease.begin()
+        if recovered { router.browserLease.end() }
+        XCTAssertTrue(recovered, "The actual late callback releases the lease without restarting")
+        let delayedActivations = try await webView.evaluateJavaScript("window.delayedActivations")
+        XCTAssertEqual(delayedActivations as? Int, 1)
     }
 
     #if os(macOS)
@@ -136,11 +159,17 @@ final class RealWebKitBrowserControlTests: XCTestCase {
     private static let fixture = """
     <!doctype html><title>Isolated browser fixture</title>
     <style>body{font:20px system-ui;padding:20px}button,input{font:20px system-ui;margin:10px}</style>
-    <button id="activate">Activate</button><label>Entry<input id="entry" value="seed-"></label>
+    <button id="activate">Activate</button><button id="delayed">Delayed</button><label>Entry<input id="entry" value="seed-"></label>
     <div contenteditable="true" aria-label="Editable">editable-secret</div>
     <textarea aria-label="Notes">textarea-secret</textarea><input type="password" value="password-secret" aria-label="Password">
     <script>
       window.activations = 0;
+      window.delayedActivations = 0;
+      document.getElementById('delayed').onclick = () => {
+        window.delayedActivations++;
+        const until = Date.now() + 9500;
+        while (Date.now() < until) {}
+      };
       document.getElementById('activate').onclick = () => window.activations++;
       window.WeakMap = class { set() { throw new Error('page-world spoof'); } get() { return null; } };
       Element.prototype.click = () => window.activations = -1;

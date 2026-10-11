@@ -1,6 +1,6 @@
 #import "CEFBridge_Internal.h"
 
-// Reuse the bounded native CDP transport. The isolated world is created in the
+// Retain native CDP work until its result or confirmed browser close. The isolated world is created in the
 // live main frame on every operation, so navigation cannot reuse a stale context.
 @implementation CEFBridge (BrowserControl)
 
@@ -18,15 +18,15 @@
         completion(value, error);
     };
     NSError *failure = [NSError errorWithDomain:@"KelpieBrowserControl" code:2 userInfo:nil];
-    CEFBridgeSendDevToolsCommand(host, @"Page.getFrameTree", nil, ^(BOOL success, NSDictionary *tree) {
+    CEFBridgeSendBrowserControlCommand(host, @"Page.getFrameTree", nil, ^(BOOL success, NSDictionary *tree) {
         NSString *frameID = tree[@"frameTree"][@"frame"][@"id"];
         if (!stillVisible() || !success || ![frameID isKindOfClass:NSString.class]) { finish(nil, failure); return; }
         NSDictionary *world = @{@"frameId": frameID, @"worldName": @"KelpieBrowserControl", @"grantUniveralAccess": @NO};
-        CEFBridgeSendDevToolsCommand(host, @"Page.createIsolatedWorld", world, ^(BOOL created, NSDictionary *context) {
+        CEFBridgeSendBrowserControlCommand(host, @"Page.createIsolatedWorld", world, ^(BOOL created, NSDictionary *context) {
             NSNumber *contextID = context[@"executionContextId"];
             if (!stillVisible() || !created || ![contextID isKindOfClass:NSNumber.class]) { finish(nil, failure); return; }
             NSDictionary *params = @{@"expression": expression, @"contextId": contextID, @"returnByValue": @YES};
-            CEFBridgeSendDevToolsCommand(host, @"Runtime.evaluate", params, ^(BOOL evaluated, NSDictionary *result) {
+            CEFBridgeSendBrowserControlCommand(host, @"Runtime.evaluate", params, ^(BOOL evaluated, NSDictionary *result) {
                 if (!evaluated || result[@"exceptionDetails"] != nil) { finish(nil, failure); return; }
                 finish(result[@"result"][@"value"], nil);
             });

@@ -216,6 +216,7 @@ struct DevToolsCookieObserver {
     cef_dev_tools_message_observer_t observer;
     RefCountedState ref;
     __strong NSMutableDictionary<NSNumber *, id> *pendingCompletions;
+    NSMutableSet<NSNumber *> *retirementCompletions;
     std::atomic<int> nextMessageID;
     cef_registration_t *registration;
     int browserID;
@@ -398,7 +399,8 @@ static void OnAfterCreated(cef_life_span_handler_t *self, cef_browser_t *browser
 
 static int DoClose(cef_life_span_handler_t *, cef_browser_t *) { return 0; }
 
-static void OnBeforeClose(cef_life_span_handler_t *self, cef_browser_t *) {
+static void OnBeforeClose(cef_life_span_handler_t *self, cef_browser_t *browser) {
+    CEFBridgeRetireBrowserControlCommands(browser);
     [StructFromBase<LifeSpanHandler>(&self->base, offsetof(LifeSpanHandler, handler))->owner cefBridgeWillCloseBrowser];
 }
 
@@ -824,6 +826,7 @@ static void CompletePendingDevToolsCookieCommand(DevToolsCookieObserver *observe
         completion = [stored copy];
     }
     [observer->pendingCompletions removeObjectForKey:key];
+    [observer->retirementCompletions removeObject:key];
 
     if (completion != nil) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -834,13 +837,15 @@ static void CompletePendingDevToolsCookieCommand(DevToolsCookieObserver *observe
 
 static void CompleteAllPendingDevToolsCookieCommands(DevToolsCookieObserver *observer,
                                                      BOOL success,
-                                                     NSDictionary *result) {
+                                                     NSDictionary *result,
+                                                     BOOL rendererRetired = YES) {
     if (observer == nullptr || observer->pendingCompletions.count == 0) {
         return;
     }
 
     NSArray<NSNumber *> *keys = observer->pendingCompletions.allKeys;
     for (NSNumber *key in keys) {
+        if (!rendererRetired && [observer->retirementCompletions containsObject:key]) { continue; }
         CompletePendingDevToolsCookieCommand(observer, key.intValue, success, result);
     }
 }
@@ -870,6 +875,7 @@ static DevToolsCookieObserver *CreateDevToolsCookieObserver(void) {
     DevToolsCookieObserver *observer = new DevToolsCookieObserver();
     observer->ref.count = 1;
     observer->pendingCompletions = [NSMutableDictionary dictionary];
+    observer->retirementCompletions = [NSMutableSet set];
     observer->nextMessageID = 1;
     observer->registration = nullptr;
     observer->browserID = 0;
@@ -1027,12 +1033,13 @@ static void OnDevToolsCookieAgentAttached(cef_dev_tools_message_observer_t *, ce
 
 static void OnDevToolsCookieAgentDetached(cef_dev_tools_message_observer_t *self, cef_browser_t *) {
     DevToolsCookieObserver *observer = StructFromBase<DevToolsCookieObserver>(&self->base, offsetof(DevToolsCookieObserver, observer));
-    CompleteAllPendingDevToolsCookieCommands(observer, NO, nil);
+    CompleteAllPendingDevToolsCookieCommands(observer, NO, nil, NO);
 }
 
-void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
+static void SendDevToolsCommand(cef_browser_host_t *host,
                                       NSString *method,
                                       NSDictionary *params,
+                                      BOOL requireRetirement,
                                       void (^completion)(BOOL success, NSDictionary *result)) {
     if (host == nullptr || method.length == 0 || host->send_dev_tools_message == nullptr) {
         if (completion != nil) {
@@ -1056,6 +1063,7 @@ void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
     const int messageID = observer->nextMessageID.fetch_add(1, std::memory_order_relaxed);
     if (completion != nil) {
         observer->pendingCompletions[@(messageID)] = [completion copy];
+        if (requireRetirement) { [observer->retirementCompletions addObject:@(messageID)]; }
     }
 
     NSDictionary *payload = @{
@@ -1077,13 +1085,24 @@ void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host,
         return;
     }
 
-    observer->observer.base.add_ref(&observer->observer.base);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        CompletePendingDevToolsCookieCommand(observer, messageID, NO, nil);
-        observer->observer.base.release(&observer->observer.base);
-    });
-
+    if (!requireRetirement) {
+        observer->observer.base.add_ref(&observer->observer.base);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            CompletePendingDevToolsCookieCommand(observer, messageID, NO, nil);
+            observer->observer.base.release(&observer->observer.base);
+        });
+    }
     observer->observer.base.release(&observer->observer.base);
+}
+
+void CEFBridgeSendDevToolsCommand(cef_browser_host_t *host, NSString *method, NSDictionary *params,
+                                void (^completion)(BOOL, NSDictionary *)) {
+    SendDevToolsCommand(host, method, params, NO, completion);
+}
+
+void CEFBridgeSendBrowserControlCommand(cef_browser_host_t *host, NSString *method, NSDictionary *params,
+                                      void (^completion)(BOOL, NSDictionary *)) {
+    SendDevToolsCommand(host, method, params, YES, completion);
 }
 
 void CEFBridgeVisitAllCookies(cef_cookie_manager_t *manager, void (^completion)(NSArray<NSDictionary *> *cookies)) {
@@ -1427,7 +1446,7 @@ void CEFBridgeInvalidateScreenshotCapture(cef_browser_t *browser) {
     observer->observer.base.release(&observer->observer.base);
 }
 
-void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser) {
+static void InvalidateCookieObserver(cef_browser_t *browser, BOOL rendererRetired) {
     if (browser == nullptr || browser->get_identifier == nullptr) {
         return;
     }
@@ -1442,6 +1461,10 @@ void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser) {
         std::lock_guard<std::mutex> lock(sDevToolsCookieObserversMutex);
         if (auto it = sDevToolsCookieObservers.find(browserID); it != sDevToolsCookieObservers.end()) {
             observer = it->second;
+            if (!rendererRetired && observer->retirementCompletions.count > 0) {
+                CompleteAllPendingDevToolsCookieCommands(observer, NO, nil, NO);
+                return;
+            }
             sDevToolsCookieObservers.erase(it);
         }
     }
@@ -1455,4 +1478,12 @@ void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser) {
         observer->registration = nullptr;
     }
     observer->observer.base.release(&observer->observer.base);
+}
+
+void CEFBridgeInvalidateCookieObserver(cef_browser_t *browser) {
+    InvalidateCookieObserver(browser, NO);
+}
+
+void CEFBridgeRetireBrowserControlCommands(cef_browser_t *browser) {
+    InvalidateCookieObserver(browser, YES);
 }
