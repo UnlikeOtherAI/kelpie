@@ -35,7 +35,11 @@ try {
     console.log("Fallback refuses DOM capabilities before dispatch");
   } else await runCanonicalAcceptance(readiness, fixture.baseUrl);
 } finally {
-  try { await stopBrowser(browser, { gracefulClose: readiness ? () => control(readiness, "close-browser") : undefined }); }
+  // The fallback truthfully has no close-browser command. Stop its owned
+  // listener through the normal process signal, preserving that capability limit.
+  try { await stopBrowser(browser, { gracefulClose: readiness
+    ? fallback ? async () => { browser.child.kill("SIGTERM"); } : () => control(readiness, "close-browser")
+    : undefined }); }
   finally {
     await fixture.close();
     await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
