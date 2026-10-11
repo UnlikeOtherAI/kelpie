@@ -43,8 +43,9 @@ export function actOnNativeReference(ref: string, key: string, method: "tab.clic
   if (method === "tab.click") el.click();
   else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     const prototype = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-    const value = Object.getOwnPropertyDescriptor(prototype, "value")!;
-    value.set!.call(el, String(value.get!.call(el)) + text);
+    const value = Object.getOwnPropertyDescriptor(prototype, "value");
+    if (!value?.get || !value.set) return { error: "UNSUPPORTED", mayHaveCompleted: true };
+    value.set.call(el, String(value.get.call(el)) + text);
     el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   } else {
     el.append(document.createTextNode(text));
