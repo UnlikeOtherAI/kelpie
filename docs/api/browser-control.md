@@ -107,3 +107,7 @@ Windows chrome appearance sampling uses a separate fixed internal CDP observatio
 Its late callback remains owned but does not fence public browser commands. This
 is unavailable through model inputs: public evaluation, screenshot and canonical
 snapshot requests keep the completion fence described above.
+
+Value-free snapshots include visible named SVG graphics as `img` elements, using
+ARIA names before a direct SVG `title`; unnamed and hidden graphics are omitted.
+This preserves accessible logo evidence for existing page-grounded conversations.
