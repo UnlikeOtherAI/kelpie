@@ -4,6 +4,24 @@ Native build/test evidence and remaining real-device checks are recorded in [ver
 
 Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
 
+Extraction cancellation owns a separate request authority flag in the native model
+runtime, including before worker dispatch. Pause/Stop never invokes a global model
+cancel for that remote extraction, so it cannot cancel a person's separate AI chat.
+Snapshots include observed unique selectors from the existing DOM selector builder,
+bounded to 2000 characters; elements without a bounded selector are omitted.
+
+The durable ledger acknowledges cancellation even before command delivery by retaining
+a cancelled attempt tombstone and sequence-2 receipt. A later command for that attempt
+cannot execute. Cancellation of a terminal attempt replays its retained event; an
+already acknowledged attempt sends a lightweight receipt without old output. Receipt
+decisions never cancel another active attempt. Exact terminal acknowledgements compact
+known jobs to identity, deadline and terminal state. Only acknowledged terminal jobs
+are retired after deadline plus 60 seconds; unknown cancellation receipts retain at
+least the server's 15-minute admission window plus 60 seconds. A persisted nondecreasing
+local time floor prevents a backward clock jump from re-admitting a retired deadline.
+The core rejects expired commands before dispatch and deadlines over 15 minutes ahead;
+active and unacknowledged results are never discarded to make capacity.
+
 Android navigation reserves one explicit destination at the native mutation point. Only fixed
 completion metadata reads may transfer to its first matching document start and resulting pin;
 cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
