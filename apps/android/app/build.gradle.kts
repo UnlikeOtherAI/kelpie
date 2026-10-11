@@ -20,6 +20,7 @@ android {
         applicationId = "com.kelpie.browser"
         minSdk = 28
         targetSdk = 34
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 12
         versionName = "0.1.12"
         buildConfigField("int", "LOCAL_HTTP_PORT", "8420")
@@ -126,4 +127,7 @@ dependencies {
 
     // Unit tests (plain JVM, no Android runtime)
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }

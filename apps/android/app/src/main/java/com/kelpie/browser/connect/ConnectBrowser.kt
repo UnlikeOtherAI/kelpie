@@ -17,6 +17,7 @@ import java.time.Instant
 class ConnectBrowser(
     private val context: HandlerContext,
     private val modelDirectory: java.io.File,
+    private val authority: (Map<String, Any?>) -> Boolean = NessieConnection::authorizes,
 ) {
     private var extractionBusy = false
     private var cachedModelReady = false
@@ -62,7 +63,7 @@ class ConnectBrowser(
                 scriptPlaybackState = context.scriptPlaybackState
                 remoteDocumentGuard = {
                     coroutine[kotlinx.coroutines.Job]?.isActive == true &&
-                        NessieConnection.authorizes(command) &&
+                        authority(command) &&
                         store.tabs.value.any { it === tab } &&
                         tab.documentVersion == expected &&
                         !tab.isLoading
@@ -120,7 +121,7 @@ class ConnectBrowser(
             }
         val lease = ConnectNavigationLease(expected, destination)
 
-        fun authorized() = NessieConnection.authorizes(command) && context.tabStore?.activeTab?.id == tab.id
+        fun authorized() = authority(command) && context.tabStore?.activeTab?.id == tab.id
         isolated.remoteNavigationStart = { lease.arm(tab.documentVersion, authorized()) }
         isolated.remoteNavigationReadGuard = { lease.allowsRead(tab.documentVersion, tab.isLoading, authorized()) }
         isolated.remoteNavigationWaitGuard = { lease.allowsWait(tab.documentVersion, authorized()) }
