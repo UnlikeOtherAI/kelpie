@@ -21,6 +21,8 @@ NS_ASSUME_NONNULL_BEGIN
     BOOL _canGoBack;
     BOOL _canGoForward;
     NSInteger _mainFrameHTTPStatusCode;
+    NSString *_documentVersion;
+    NSUInteger _documentNavigationCount;
     double _loadingProgress;
     NSInteger _nextEvalID;
     NSMutableDictionary<NSString *, id> *_pendingEvalBlocks;

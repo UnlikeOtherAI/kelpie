@@ -49,6 +49,7 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
 endif()
 
 add_subdirectory(core-protocol)
+add_subdirectory(core-connect)
 add_subdirectory(core-state)
 add_subdirectory(core-automation)
 add_subdirectory(core-mcp)

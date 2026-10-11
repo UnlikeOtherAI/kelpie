@@ -42,6 +42,7 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addBrowserTab(url: String? = nil) -> BrowserTab {
+        NessieConnection.shared.personChangedTab()
         captureActivePreview()
         let tab = createBrowserTab()
         bind(tab)
@@ -56,6 +57,7 @@ final class TabStore: ObservableObject {
     }
 
     func closeBrowserTab(id: UUID) {
+        if id == activeBrowserTabID { NessieConnection.shared.personChangedTab() }
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
 
         if tabs.count == 1 {
@@ -79,6 +81,7 @@ final class TabStore: ObservableObject {
     }
 
     func selectBrowserTab(id: UUID) {
+        if id != activeBrowserTabID { NessieConnection.shared.personChangedTab() }
         guard tabs.contains(where: { $0.id == id }) else { return }
         if id != activeBrowserTabID { captureActivePreview() }
         activeBrowserTabID = id

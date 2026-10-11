@@ -50,6 +50,11 @@ class LinuxApp {
   account::AccountState AccountState() const;
   void AccountSignIn();
   void AccountSignOut();
+  std::string NessieStatus() const;
+  bool NessiePaused() const;
+  bool NessieEnabled() const;
+  void NessiePause();
+  void NessieEnable();
   void AccountRefresh();
   std::pair<int,int> TakeResizeRequest();
   bool AttachBrowserHost(std::uintptr_t parent_window, int width, int height);

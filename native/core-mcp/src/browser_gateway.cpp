@@ -1,4 +1,5 @@
 #include "kelpie/browser_gateway.h"
+#include "kelpie/element_selector_script.h"
 #include "browser_schema.h"
 #include "browser_contract.h"
 #include <algorithm>
@@ -29,6 +30,16 @@ const std::map<std::string, std::string> kRoutes = {
   {"tab.url", "get-current-url"}, {"tab.title", "get-current-url"}, {"tab.screenshot", "screenshot"},
   {"page.press", "press-key"}, {"page.scroll", "scroll"}, {"tab.click", "click"}, {"tab.type", "type"}
 };
+}
+std::string CollectBrowserSnapshotExpression(const nlohmann::json& options) {
+  return "(" + std::string(browser_assets::reader) + ")(" + options.dump() + ")";
+}
+std::string CollectBrowserSelectorSnapshotExpression(const nlohmann::json& options) {
+  return "((read)=>{" + ElementSelectorBuilderScript() +
+      "read.snapshot.elements=read.snapshot.elements.flatMap(item=>{"
+      "const node=read.targets[item.ref],selector=kelpieBuildSelector(node);"
+      "return selector?[{selector,tag:node.tagName.toLowerCase(),role:item.role,label:item.name}]:[];});"
+      "return read.snapshot;})(" + CollectBrowserSnapshotExpression(options) + ")";
 }
 struct BrowserGateway::Impl {
   json config, request, step = {{"kind", "complete"}, {"response", nullptr}};
@@ -87,7 +98,7 @@ struct BrowserGateway::Impl {
       params.erase("tabId");
       params["prefix"] = session + "s" + std::to_string(++generation) + "e";
       params["includeShadow"] = false;
-      const std::string collected = "(" + std::string(browser_assets::reader) + ")(" + params.dump() + ")";
+      const std::string collected = CollectBrowserSnapshotExpression(params);
       // One-shot read-only observers never retain renderer targets/listeners.
       const std::string expression = config.value("allowActions", true)
         ? "(" + std::string(browser_assets::remember) + ")(" + collected + "," + json(key).dump() + ")"

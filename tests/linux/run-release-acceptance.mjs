@@ -39,6 +39,11 @@ async function close() {
 }
 try {
   await start(['--url',fixture.baseUrl])();
+  // Geometry must not depend on whether CEF has painted its first frame yet.
+  await control(readiness,'resize-viewport',{width:960,height:640});
+  const early=await control(readiness,'get-viewport',{});
+  assert.equal(early.width,960);assert.equal(early.height,640);
+  await control(readiness,'reset-viewport',{});
   assert.equal((await stat(profile)).mode&0o777,0o700);
   assert.equal((await stat(readinessFile)).mode&0o777,0o600);
   const contender=spawn(exe,['--profile-dir',profile,'--port','0'],{stdio:'ignore'});

@@ -20,6 +20,11 @@ Works identically with real devices, iOS Simulators, and Android Emulators — a
 
 ## Pairing & Authentication
 
+Signed-in Windows and Linux Chromium apps also connect outbound to Nessie under the
+same UOA account, without pairing or team setup. Their account menu shows connection
+status and Pause/Stop controls; see [desktop Nessie connection](desktop-nessie-connect.md).
+This connection uses a dedicated, scoped UOA ticket and does not expose local listeners.
+
 Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires a bearer token issued by the on-device user.
 
 **Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, the CLI posts a pairing request to the device. The device shows a modal with the requester's self-reported client name and offers three responses:
@@ -439,7 +444,8 @@ creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browse
 provides a token-free stdio bridge for local development agents and local Nessie executors.
 `kelpie browser stop <name>` requests orderly app shutdown and clears its alias state only after
 that launch removes readiness. Windows home, native toast, and fullscreen are callable through
-HTTP and MCP; remote browser control is not shipped.
+HTTP and MCP. Account-based remote browser control uses the separate authenticated
+[Nessie connection](#nessie-account-connection).
 
 On macOS, Windows and Linux, the selected tab carries the sampled page colour continuously into the navigation area below. Inactive tabs and the entire title strip stay static light gray, including on dark pages. Page colours animate while the gray strip remains unchanged. On macOS, a bounded trailing sample catches sticky-header colour transitions after the last scroll event.
 
@@ -562,6 +568,16 @@ launch tries it again before opening the browser. Sign out forgets the session
 immediately and asks UOA to revoke it in the background; quitting Kelpie keeps it. A UOA server that issues no refresh token keeps
 the older memory-only session, which still ends at access-token expiry.
 
+## Nessie account connection
+
+Signed-in Kelpie connects outbound to Nessie using a short-lived UOA ticket.
+Nessie can choose the person's ready device and drive its visible browser without
+LAN pairing or an executor. Settings and the active browser expose Pause/Resume/Stop;
+switching the controlled tab or backgrounding a mobile app cancels active remote work.
+Browser jobs pin the exact document and completion results survive reconnect.
+Loaded on-device text models can extract bounded page evidence asynchronously; installed
+and ready models are advertised separately. Embedded GGUF does not run delegated
+browser tool loops. See [the native connection contract](nessie-connect.md).
 ## Shared browser control
 
 Android exposes the common core directly at authenticated `/v1/browser-control`

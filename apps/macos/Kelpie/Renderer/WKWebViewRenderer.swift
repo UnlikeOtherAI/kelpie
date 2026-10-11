@@ -131,7 +131,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     func load(url: URL) {
         lastNavigationError = nil
-        webView.load(URLRequest(url: url))
+        ConnectDocument.issued(self, navigation: webView.load(URLRequest(url: url)))
     }
 
     /// Clears any captured navigation error. Used by `NavigationHandler` to start
@@ -140,9 +140,9 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         lastNavigationError = nil
     }
 
-    func goBack() { webView.goBack() }
-    func goForward() { webView.goForward() }
-    func reload() { webView.reload() }
+    func goBack() { ConnectDocument.issued(self, navigation: webView.goBack()) }
+    func goForward() { ConnectDocument.issued(self, navigation: webView.goForward()) }
+    func reload() { ConnectDocument.issued(self, navigation: webView.reload()) }
     func hardReload() { webView.reloadFromOrigin() }
 
     func evaluateJS(_ script: String) async throws -> Any? {
@@ -283,6 +283,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        ConnectDocument.navigated(self, navigation: navigation)
         // Each new provisional navigation starts clean — clear any error captured
         // by a superseded load so a cancelled-then-successful sequence is not fatal.
         NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)

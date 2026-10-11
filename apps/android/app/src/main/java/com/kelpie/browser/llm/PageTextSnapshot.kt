@@ -43,6 +43,7 @@ object PageTextSnapshot {
         script: String,
     ): Map<String, Any?> =
         withContext(Dispatchers.Main) {
+            check(context.remoteDocumentGuard?.invoke() != false) { "Tab document changed or job stopped" }
             val requested = body["tabId"] as? String
             val webView =
                 if (requested != null) {
@@ -56,6 +57,7 @@ object PageTextSnapshot {
                     (context.tabStore?.activeTab?.webView ?: context.webView) ?: throw OpenAIException("NO_WEBVIEW", "No browser tab is available")
                 }
             val raw = context.withBrowserTarget(webView) { context.evaluateJS("JSON.stringify(($script))") }
+            check(context.remoteDocumentGuard?.invoke() != false) { "Tab document changed or job stopped" }
             decodeObject(raw)
         }
 

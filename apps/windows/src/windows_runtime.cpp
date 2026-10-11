@@ -2,6 +2,7 @@
 
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
+#include "kelpie/desktop_mcp_server.h"
 #include "windows_utf.h"
 #include "kelpie/account_login_window.h"
 
@@ -146,7 +147,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.12";
+  runtime.app_version = "0.1.13";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;
@@ -311,6 +312,15 @@ bool WindowsApp::InitializeDesktopRuntime() {
   browser_view_->ShowFallback(false);
   SetTimer(shell_->hwnd(), 3, 300, nullptr);
   account_->RestoreSession();
+  connection_=std::make_unique<connect::Client>(*account_,config_.profile_dir,"windows",runtime.device_id,
+      [this](const json& command,std::shared_ptr<const std::atomic<bool>> guard) {
+        connect::Executor executor(desktop_app_->engine(),[this,guard](const json& body) {
+          return inference_->ExecuteOwned("ai-infer",body,guard,/*native_only=*/true);
+        },[this](const std::string& method,const json& target) {
+          return desktop_app_->mcp_server().GuardDispatch(method,target);
+        });
+        return executor.Execute(command,guard);
+      },[this](const auto& guard) { if(inference_)inference_->CancelOwned(guard); });
   startup_diagnostics_.Ready();
   return true;
 }
@@ -319,6 +329,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // CEF must deliver every OnBeforeClose before CefShutdown. Keep the owner
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
+    if(connection_) { connection_->Shutdown(); if(!connection_->Drain())return false; connection_.reset(); }
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
     if (!CloseAccountLoginWindow()) return false;
     if (!page_color_sampler_.Drain()) return false;
@@ -344,6 +355,11 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
+    if(connection_) {
+      const auto model=inference_->Execute("ai-status");
+      if(model.value("success",false)) { connect_model_ready_=model.value("loaded",false) && model.value("backend","")=="native";connect_model_installed_=model.value("modelInstalled",false); }
+      connection_->Update(connect_model_ready_,connect_model_installed_);
+    }
     const auto state = account_->State();
     if (!state.signing_in) CloseAccountLoginWindow();
     shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);

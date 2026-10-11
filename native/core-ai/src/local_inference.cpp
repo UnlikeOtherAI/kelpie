@@ -13,6 +13,13 @@
 namespace kelpie::ai {
 using json = nlohmann::json;
 namespace {
+struct AuthorityScope {
+  std::shared_ptr<const std::atomic<bool>>& slot;
+  AuthorityScope(std::shared_ptr<const std::atomic<bool>>& slot, std::shared_ptr<const std::atomic<bool>> authority) : slot(slot) {
+    std::atomic_store(&slot, std::move(authority));
+  }
+  ~AuthorityScope() { std::atomic_store(&slot, std::shared_ptr<const std::atomic<bool>>{}); }
+};
 struct Failure : std::runtime_error {
   std::string code;
   Failure(std::string code, std::string message) : std::runtime_error(message), code(std::move(code)) {}
@@ -58,16 +65,22 @@ std::string FormatPrompt(llama_model* model, const json& body) {
 
 LocalInference::~LocalInference() { Cancel(); std::lock_guard lock(mutex_); Unload(); }
 void LocalInference::Cancel() { cancelled_ = true; }
+bool LocalInference::IsCancelled() const {
+  const auto authority = std::atomic_load(&authority_);
+  return cancelled_.load() || (authority && !authority->load());
+}
 void LocalInference::Unload() {
   if (context_) llama_free(context_);
   if (model_) llama_model_free(model_);
   context_ = nullptr; model_ = nullptr; path_.clear();
 }
-json LocalInference::Execute(const std::string& operation, const json& body) {
+json LocalInference::Execute(const std::string& operation, const json& body, std::shared_ptr<const std::atomic<bool>> authority) {
+  if (authority && !authority->load()) return Error("INFERENCE_CANCELLED", "Inference was cancelled");
   std::unique_lock lock(mutex_, std::defer_lock);
   if (operation == "unload") { Cancel(); lock.lock(); }
   else if (!lock.try_lock()) return Error("AI_BUSY", "A local model operation is already running");
   if (!lock.owns_lock()) return Error("AI_BUSY", "A local model operation is already running");
+  AuthorityScope scope(authority_, std::move(authority));
   try {
     if (operation == "load") return Load(body);
     if (operation == "infer") {
@@ -94,15 +107,15 @@ json LocalInference::Load(const json& body) {
   cancelled_ = false;
   auto params = llama_model_default_params();
   params.n_gpu_layers = 0; // Portable CPU baseline on all supported devices.
-  params.progress_callback = [](float, void* state) { return !static_cast<LocalInference*>(state)->cancelled_.load(); };
+  params.progress_callback = [](float, void* state) { return !static_cast<LocalInference*>(state)->IsCancelled(); };
   params.progress_callback_user_data = this;
   std::unique_ptr<llama_model, decltype(&llama_model_free)> next(llama_model_load_from_file(path.c_str(), params), llama_model_free);
-  if (!next) throw Failure(cancelled_ ? "INFERENCE_CANCELLED" : "MODEL_LOAD_FAILED", "Could not load this GGUF model; try a smaller model or a LAN endpoint");
+  if (!next) throw Failure(IsCancelled() ? "INFERENCE_CANCELLED" : "MODEL_LOAD_FAILED", "Could not load this GGUF model; try a smaller model or a LAN endpoint");
   auto settings = llama_context_default_params();
   settings.n_ctx = context;
   settings.n_batch = 256;
   settings.n_threads = settings.n_threads_batch = std::max(1u, std::min(4u, std::thread::hardware_concurrency()));
-  settings.abort_callback = [](void* state) { return static_cast<LocalInference*>(state)->cancelled_.load(); };
+  settings.abort_callback = [](void* state) { return static_cast<LocalInference*>(state)->IsCancelled(); };
   settings.abort_callback_data = this;
   auto* next_context = llama_init_from_model(next.get(), settings);
   if (!next_context) throw Failure("MODEL_LOAD_FAILED", "Not enough memory for this context; use a smaller model or LAN endpoint");
@@ -139,11 +152,11 @@ json LocalInference::Infer(const json& body) {
     llama_sampler_chain_add(sampler.get(), llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
   }
   auto decode = [&](llama_token* data, int size) {
-    if (cancelled_) throw Failure("INFERENCE_CANCELLED", "Inference was cancelled");
+    if (IsCancelled()) throw Failure("INFERENCE_CANCELLED", "Inference was cancelled");
     if (std::chrono::steady_clock::now() - started > std::chrono::minutes(15))
       throw Failure("INFERENCE_TIMEOUT", "Local inference timed out");
     if (llama_decode(context_, llama_batch_get_one(data, size)) != 0)
-      throw Failure(cancelled_ ? "INFERENCE_CANCELLED" : "AI_INFERENCE_FAILED", "Local model evaluation stopped");
+      throw Failure(IsCancelled() ? "INFERENCE_CANCELLED" : "AI_INFERENCE_FAILED", "Local model evaluation stopped");
   };
   for (int offset = 0; offset < count; offset += 256) decode(tokens.data() + offset, std::min(256, count - offset));
   std::string output;
@@ -169,9 +182,17 @@ json LocalInference::Infer(const json& body) {
 extern "C" void* kelpie_local_create() { try { return new kelpie::ai::LocalInference(); } catch (...) { return nullptr; } }
 extern "C" void kelpie_local_destroy(void* engine) { delete static_cast<kelpie::ai::LocalInference*>(engine); }
 extern "C" void kelpie_local_cancel(void* engine) { if (engine) static_cast<kelpie::ai::LocalInference*>(engine)->Cancel(); }
+using RequestAuthority = std::shared_ptr<std::atomic<bool>>;
+extern "C" void* kelpie_local_request_create() { return new RequestAuthority(std::make_shared<std::atomic<bool>>(true)); }
+extern "C" void kelpie_local_request_cancel(void* request) { if (request) (*static_cast<RequestAuthority*>(request))->store(false); }
+extern "C" void kelpie_local_request_destroy(void* request) { delete static_cast<RequestAuthority*>(request); }
 extern "C" char* kelpie_local_execute(void* engine, const char* operation, const char* body) {
+  return kelpie_local_execute_owned(engine, operation, body, nullptr);
+}
+extern "C" char* kelpie_local_execute_owned(void* engine, const char* operation, const char* body, void* request) {
   try {
-    const auto result = engine ? static_cast<kelpie::ai::LocalInference*>(engine)->Execute(operation, nlohmann::json::parse(body))
+    const auto authority = request ? *static_cast<RequestAuthority*>(request) : RequestAuthority{};
+    const auto result = engine ? static_cast<kelpie::ai::LocalInference*>(engine)->Execute(operation, nlohmann::json::parse(body), authority)
         : nlohmann::json({{"success", false}, {"error", {{"code", "AI_UNAVAILABLE"}, {"message", "Local engine unavailable"}}}});
     // A token limit may split a UTF-8 character; JSON replaces only that incomplete suffix.
     const auto text = result.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);

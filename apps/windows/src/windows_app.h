@@ -33,6 +33,8 @@
 #include "window_placement.h"
 #include "page_color_sampler.h"
 #include "account_service.h"
+#include "connect_client.h"
+#include "connect_executor.h"
 #include "inference_service.h"
 
 namespace kelpie::windows {
@@ -131,6 +133,8 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<DesktopApp> desktop_app_;
   PageColorSampler page_color_sampler_;
   std::unique_ptr<account::AccountService> account_;
+  std::unique_ptr<connect::Client> connection_;
+  bool connect_model_ready_=false,connect_model_installed_=false;
   std::unique_ptr<InferenceService> inference_;
   ProfileSession profile_session_;
   StartupDiagnostics startup_diagnostics_;

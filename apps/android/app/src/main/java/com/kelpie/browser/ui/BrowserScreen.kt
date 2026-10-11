@@ -41,6 +41,7 @@ import com.kelpie.browser.browser.BrowserState
 import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.SessionStore
 import com.kelpie.browser.browser.TabStore
+import com.kelpie.browser.connect.NessieConnection
 import com.kelpie.browser.device.DeviceInfo
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.ScriptPlaybackState
@@ -206,6 +207,8 @@ fun BrowserScreen(
                 )
             }
 
+            com.kelpie.browser.connect
+                .ConnectControls(compact = true)
             BrowserViewport(
                 tabStore,
                 browserState,
@@ -230,13 +233,23 @@ fun BrowserScreen(
                     canGoForward = canGoForward,
                     isCollapsed = bottomBarCollapsed,
                     onNavigate = { url ->
+                        NessieConnection.personInteracted()
                         tabStore.activeTab?.isStartPage = false
                         webView?.loadUrl(url)
                     },
-                    onBack = { webView?.goBack() },
-                    onForward = { webView?.goForward() },
+                    onBack = {
+                        NessieConnection.personInteracted()
+                        webView?.goBack()
+                    },
+                    onForward = {
+                        NessieConnection.personInteracted()
+                        webView?.goForward()
+                    },
                     isLoading = isLoading,
-                    onReload = { if (isLoading) webView?.stopLoading() else webView?.reload() },
+                    onReload = {
+                        NessieConnection.personInteracted()
+                        if (isLoading) webView?.stopLoading() else webView?.reload()
+                    },
                     onBookmarks = { showBookmarks = true },
                     onShare = { sharePage(context, currentUrl) },
                     onShowTabs = ::showTabs,
@@ -418,7 +431,10 @@ fun BrowserScreen(
             BookmarksSheet(
                 currentTitle = pageTitle,
                 currentUrl = currentUrl,
-                onNavigate = { url -> webView?.loadUrl(url) },
+                onNavigate = { url ->
+                    NessieConnection.personInteracted()
+                    webView?.loadUrl(url)
+                },
                 onDismiss = { showBookmarks = false },
             )
         }
@@ -430,7 +446,10 @@ fun BrowserScreen(
             sheetState = rememberModalBottomSheetState(),
         ) {
             HistorySheet(
-                onNavigate = { url -> webView?.loadUrl(url) },
+                onNavigate = { url ->
+                    NessieConnection.personInteracted()
+                    webView?.loadUrl(url)
+                },
                 onDismiss = { showHistory = false },
             )
         }

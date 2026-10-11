@@ -139,6 +139,11 @@ int main() {
   server.NotifyDocumentChanged();
   const auto stale = server.HandleBrowserRequest({{"version", 1}, {"method", "tab.click"}, {"tabId", "a"}, {"params", {{"ref", observed}}}}, config);
   assert(stale["error"]["code"] == "STALE_REFERENCE");
+  assert(server.HandleBrowserRequest({{"version",1},{"method","tab.snapshot"},{"tabId","a"}},config)["ok"]==true);
+  { const auto remote=server.GuardDispatch("switch-tab",{{"tabId","a"}});assert(remote); }
+  // WSS/native selection shares admission and invalidates the public gateway's refs.
+  assert(server.HandleBrowserRequest({{"version",1},{"method","tab.click"},{"tabId","a"},
+      {"params",{{"ref",observed}}}},config)["error"]["code"]=="STALE_REFERENCE");
 
   bool pending = true;
   server.SetPendingCheck([&] { return pending; });

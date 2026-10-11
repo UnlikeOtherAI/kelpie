@@ -59,7 +59,7 @@ struct NavigationHandler {
             }
 
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
-            let snapshot = await NavigationPageSnapshot.read(from: renderer, fallbackURL: urlString)
+            let snapshot = try await navigationSnapshot(renderer, fallbackURL: urlString)
             let finalURL = snapshot.url
             // Honest failure (Chromium only): after a real load CEF reports the
             // live document URL, so a renderer still on about:blank / no URL here
@@ -102,7 +102,7 @@ struct NavigationHandler {
                 renderer.goBack()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            let snapshot = try await navigationSnapshot(renderer)
             return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
@@ -121,7 +121,7 @@ struct NavigationHandler {
                 renderer.goForward()
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
-            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            let snapshot = try await navigationSnapshot(renderer)
             return successResponse(["url": snapshot.url, "title": snapshot.title])
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
@@ -145,7 +145,7 @@ struct NavigationHandler {
                 if !renderer.isLoading { break }
             }
             let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
-            let snapshot = await NavigationPageSnapshot.read(from: renderer)
+            let snapshot = try await navigationSnapshot(renderer)
             return successResponse([
                 "url": snapshot.url,
                 "title": snapshot.title,
@@ -155,6 +155,14 @@ struct NavigationHandler {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "NO_WEBVIEW", message: error.localizedDescription)
         }
+    }
+
+    @MainActor
+    private func navigationSnapshot(_ renderer: any RendererEngine, fallbackURL: String? = nil) async throws -> NavigationPageSnapshot {
+        try await context.waitForNavigationRead()
+        let result = await NavigationPageSnapshot.read(from: renderer, fallbackURL: fallbackURL)
+        try await context.waitForNavigationRead()
+        return result
     }
 
     @MainActor

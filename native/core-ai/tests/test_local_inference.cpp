@@ -6,6 +6,18 @@ int main(int argc, char** argv) {
   kelpie::ai::LocalInference engine;
   using json = nlohmann::json;
   assert(engine.Execute("status", {})["loaded"] == false);
+  const auto extraction = std::make_shared<std::atomic<bool>>(true);
+  const auto person_chat = std::make_shared<std::atomic<bool>>(true);
+  extraction->store(false);
+  assert(engine.Execute("infer", {{"prompt", "Hello"}}, extraction)["error"]["code"] == "INFERENCE_CANCELLED");
+  assert(engine.Execute("status", {}, person_chat)["success"] == true);
+  assert(person_chat->load());
+  auto* owned = kelpie_local_request_create();
+  kelpie_local_request_cancel(owned);
+  char* stopped = kelpie_local_execute_owned(&engine, "infer", "{\"prompt\":\"Hello\"}", owned);
+  assert(json::parse(stopped)["error"]["code"] == "INFERENCE_CANCELLED");
+  std::free(stopped);
+  kelpie_local_request_destroy(owned);
   assert(engine.Execute("infer", {{"prompt", "Hello"}})["error"]["code"] == "NO_MODEL_LOADED");
   assert(engine.Execute("infer", {{"prompt", "Hello"}, {"agent", true}})["error"]["code"] == "TOOLS_NOT_SUPPORTED");
   assert(engine.Execute("load", {{"model", "missing.gguf"}})["error"]["code"] == "MODEL_NOT_FOUND");

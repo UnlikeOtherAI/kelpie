@@ -27,7 +27,8 @@ struct NavigationHandler {
         let iterations = max(timeout / 100, 1)
         let start = CFAbsoluteTimeGetCurrent()
         context.lastNavigationError = nil
-        webView.load(URLRequest(url: url))
+        guard mayNavigate() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
+        context.navigationIssued(webView.load(URLRequest(url: url)))
 
         // Wait for the load to finish. A captured error is only fatal once the page is no
         // longer loading — while `isLoading` is true a superseded/redirecting load may have
@@ -45,6 +46,7 @@ struct NavigationHandler {
         // alongside a finished, non-loading page (e.g. a real DNS/TLS failure) is a true error;
         // benign cancellations were already filtered out in the navigation delegate.
         if didFinish {
+            guard await mayReadNavigation() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
             if let error = context.lastNavigationError {
                 return errorResponse(code: "NAVIGATION_ERROR", message: error)
             }
@@ -67,16 +69,20 @@ struct NavigationHandler {
     @MainActor
     private func back() async -> [String: Any] {
         guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        webView.goBack()
+        guard mayNavigate() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
+        context.navigationIssued(webView.goBack())
         try? await Task.sleep(nanoseconds: 500_000_000)
+        guard await mayReadNavigation() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
         return successResponse(["url": webView.url?.absoluteString ?? "", "title": webView.title ?? ""])
     }
 
     @MainActor
     private func forward() async -> [String: Any] {
         guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
-        webView.goForward()
+        guard mayNavigate() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
+        context.navigationIssued(webView.goForward())
         try? await Task.sleep(nanoseconds: 500_000_000)
+        guard await mayReadNavigation() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
         return successResponse(["url": webView.url?.absoluteString ?? "", "title": webView.title ?? ""])
     }
 
@@ -84,13 +90,23 @@ struct NavigationHandler {
     private func reload() async -> [String: Any] {
         guard let webView = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "No WebView") }
         let start = CFAbsoluteTimeGetCurrent()
-        webView.reload()
+        guard mayNavigate() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
+        context.navigationIssued(webView.reload())
         for _ in 0..<100 {
             try? await Task.sleep(nanoseconds: 100_000_000)
             if !webView.isLoading { break }
         }
         let loadTime = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+        guard await mayReadNavigation() else { return errorResponse(code: "JOB_STOPPED", message: "Navigation authority ended") }
         return successResponse(["url": webView.url?.absoluteString ?? "", "title": webView.title ?? "", "loadTime": loadTime])
+    }
+
+    @MainActor
+    private func mayNavigate() -> Bool { !Task.isCancelled && context.remoteDocumentGuard?() != false }
+
+    @MainActor
+    private func mayReadNavigation() async -> Bool {
+        do { try await context.waitForNavigationRead(); return true } catch { return false }
     }
 
     @MainActor

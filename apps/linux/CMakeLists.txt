@@ -115,7 +115,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.1.11"
+    KELPIE_LINUX_VERSION="0.1.12"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -209,7 +209,8 @@ endif()
 # Both variants share the local-control contract: a profile lock and a
 # per-launch bearer token published in readiness.json.
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
-target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account)
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-connect" "${CMAKE_BINARY_DIR}/desktop-connect")
+target_link_libraries(kelpie-linux PRIVATE kelpie_desktop_account kelpie_desktop_connect)
 target_sources(kelpie-linux PRIVATE src/profile_session.cpp)
 if(BUILD_TESTING)
   add_executable(linux_profile_session_test tests/profile_session_test.cpp src/profile_session.cpp)

@@ -2,6 +2,10 @@
 
 @./AGENTS.md
 
+Android release signing requires all four configured secrets and verified APK/AAB signatures, with no unsigned fallback; follow [Android release signing](docs/api/native-browser-gateway-android.md#release-signing).
+
+Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
+
 ## What This Is
 
 Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
@@ -25,6 +29,7 @@ Three mechanisms silently kill button clicks — see the CRITICAL rule in AGENTS
 ## Debugging Protocol
 
 Persistent pairing and exact-socket token reuse follow [Pairing & Authentication](docs/functionality.md#pairing--authentication).
+Native outbound Nessie connectivity follows [the connection contract](docs/nessie-connect.md).
 
 - **Always check logs first** before diving into source code. Check device HTTP server logs, mDNS advertisement logs, and CLI output before analyzing code.
 - **Never manually fix state** — if the mDNS discovery, HTTP server, or MCP server is stuck, fix the code so it self-heals.

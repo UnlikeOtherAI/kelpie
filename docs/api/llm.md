@@ -408,6 +408,9 @@ Response:
   "count": 4
 }
 ```
+Native visible element entries also include a unique `selector`, usable for an
+explicit subsequent click or fill on the same pinned document.
+
 ## Page Text Extraction
 
 ### `getPageText`
@@ -417,7 +420,8 @@ Extract the main readable content from the page, stripping navigation, ads, foot
 POST /v1/get-page-text
 {
   "mode": "readable",         // "readable" (main content only) | "full" (all visible text) | "markdown" (structured markdown)
-  "selector": null             // optional, extract from specific element
+  "selector": null,            // optional, extract from specific element
+  "maxLength": 100000          // optional, native content bound 1–100000 characters
 }
 
 Response:

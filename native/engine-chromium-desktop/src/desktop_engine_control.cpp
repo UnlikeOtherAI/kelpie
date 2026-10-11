@@ -70,7 +70,9 @@ using namespace engine_control;
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
   for (auto& tab : tabs) {
     if (tab.id == lease.id) {
-      return !tab.closing && tab.generation == lease.generation ? &tab : nullptr;
+      return (!lease.require_active || (browser && tab.browser && browser->IsSame(tab.browser))) && (!lease.cancelled || !lease.cancelled->load()) &&
+          (!lease.deadline || std::chrono::steady_clock::now()<*lease.deadline) && !tab.closing && tab.generation == lease.generation &&
+          (!lease.document_version || *lease.document_version==tab.document_version) ? &tab : nullptr;
     }
   }
   return nullptr;
@@ -95,6 +97,7 @@ TabSnapshot DesktopEngine::Impl::Snapshot(const Tab& tab) const {
                        // Shared, not copied: see the field comment on TabSnapshot.
                        tab.favicon_png_base64};
   snapshot.name = tab.name;
+  snapshot.document_version = tab.document_version;
   snapshot.partition = tab.partition;
   // `persistent` describes the partition, so a tab in the default shared store
   // reports neither field rather than a misleading default.
@@ -160,6 +163,9 @@ BrowserControlResult DesktopEngine::Impl::RunOnUi(std::function<BrowserControlRe
 BrowserControlResult DesktopEngine::Impl::CreateTabOnUi(const NewTabRequest& request,
                                                         TabSnapshot* snapshot,
                                                         std::optional<std::string> restored_id) {
+  if ((request.cancelled && request.cancelled->load()) ||
+      (request.deadline && std::chrono::steady_clock::now()>=*request.deadline))
+    return BrowserControlResult::Failure("CANCELLED", "Request expired or stopped on this device");
   // A tab with no URL opens Kelpie's start page, the same as macOS. This is the
   // one place that decides it, so the `+` button, `new-tab` over HTTP/MCP, and
   // the replacement tab after the last close all agree.

@@ -24,16 +24,49 @@ void InferenceService::Register(DesktopRouter& router) {
       "ai-endpoint-save", "ai-endpoint-remove", "ai-endpoint-models", "ai-endpoint-test", "ai-endpoint-health"})
     router.Register(method, [this, method](const json& body) { return Execute(method, body); });
 }
-void InferenceService::Cancel() { cancelled_ = true; local_.Cancel(); transport_.Cancel(); }
+void InferenceService::CancelRequest() {
+  if (request_authority_) request_authority_->store(false);
+  cancelled_ = true; local_.Cancel(); transport_.Cancel();
+}
+void InferenceService::Cancel() { std::lock_guard lock(ownership_mutex_); CancelRequest(); }
+bool InferenceService::CancelOwned(const Owner& owner) {
+  std::lock_guard lock(ownership_mutex_);
+  if (!owner || request_owner_ != owner) return false;
+  CancelRequest();
+  return true;
+}
 json InferenceService::Execute(const std::string& method, const json& body) {
-  if (method == "ai-cancel") { cancelled_ = true; local_.Cancel(); return Success({{"cancelled", transport_.Cancel()}}); }
+  return ExecuteOwned(method, body, {});
+}
+json InferenceService::ExecuteOwned(const std::string& method, const json& body, Owner owner, bool native_only) {
+  if (owner && method != "ai-infer") return Failure("INVALID_PARAM", "Owned requests only infer text");
+  if (method == "ai-cancel") { Cancel(); return Success({{"cancelled", true}}); }
   std::unique_lock lock(mutex_, std::defer_lock);
   if (method == "ai-unload") { Cancel(); lock.lock(); }
   else if (!lock.try_lock()) return Failure("AI_BUSY", "Inference is busy; cancel it or wait for completion");
-  try { cancelled_ = false; return Dispatch(method, body); }
-  catch (const InferenceError& error) { return Failure(error.code, error.what()); }
-  catch (const json::exception&) { return Failure("INVALID_PARAM", "Invalid inference parameters or model response"); }
-  catch (const std::exception&) { return Failure("AI_INFERENCE_FAILED", "Inference operation failed"); }
+  {
+    std::lock_guard ownership(ownership_mutex_);
+    if (owner && owner->load()) return Failure("INFERENCE_CANCELLED", "Inference cancelled");
+    request_owner_ = owner;
+    request_authority_ = std::make_shared<std::atomic<bool>>(true);
+    cancelled_ = false;
+  }
+  json result;
+  try {
+    if (native_only && settings_.value("backend", "none") != "native") {
+      result = Failure("NO_MODEL_LOADED", "Load a local model on this device");
+    } else result = Dispatch(method, body);
+  }
+  catch (const InferenceError& error) { result = Failure(error.code, error.what()); }
+  catch (const json::exception&) { result = Failure("INVALID_PARAM", "Invalid inference parameters or model response"); }
+  catch (const std::exception&) { result = Failure("AI_INFERENCE_FAILED", "Inference operation failed"); }
+  {
+    std::lock_guard ownership(ownership_mutex_);
+    if (owner && (owner->load() || cancelled_.load())) result = Failure("INFERENCE_CANCELLED", "Inference cancelled");
+    request_owner_.reset();
+    request_authority_.reset();
+  }
+  return result;
 }
 void InferenceService::Persist() { WriteInferenceStore(store_, settings_); }
 json& InferenceService::Endpoint(const std::string& id) {
@@ -113,10 +146,12 @@ json InferenceService::Probe(json& endpoint, bool generate) {
 }
 json InferenceService::Status() {
   const auto backend = settings_.value("backend", "none");
-  if (backend == "native") return local_.Execute("status", json::object());
-  if (backend != "openai") return Success({{"backend", "none"}, {"loaded", false}, {"capabilities", json::array()}});
+  std::error_code error;
+  const bool installed=std::filesystem::is_regular_file(std::filesystem::u8path(settings_.value("localModel","")),error);
+  if (backend == "native") { auto status=local_.Execute("status", json::object());status["modelInstalled"]=installed;return status; }
+  if (backend != "openai") return Success({{"backend", "none"}, {"loaded", false}, {"modelInstalled",installed},{"capabilities", json::array()}});
   auto endpoint = Public(Endpoint(settings_.value("activeEndpointId", "")));
-  return Success({{"backend", "openai"}, {"model", endpoint.value("model", "")}, {"endpoint", endpoint},
+  return Success({{"modelInstalled",installed},{"backend", "openai"}, {"model", endpoint.value("model", "")}, {"endpoint", endpoint},
       {"health", endpoint["health"]}, {"loaded", endpoint["health"].value("state", "unknown") == "ready"},
       {"capabilities", json::array({"text"})}});
 }
@@ -159,7 +194,7 @@ json InferenceService::Dispatch(const std::string& method, const json& body) {
       MEMORYSTATUSEX memory{}; memory.dwLength = sizeof(memory); GlobalMemoryStatusEx(&memory);
       if (std::filesystem::exists(path) && std::filesystem::file_size(path) * 3 / 2 + 256ull * 1024 * 1024 > memory.ullAvailPhys)
         throw InferenceError("MODEL_MEMORY_LIMIT", "Use a smaller GGUF or a LAN inference endpoint");
-      auto result = local_.Execute("load", body);
+      auto result = local_.Execute("load", body, request_authority_);
       if (result.value("success", false)) { settings_["backend"] = "native"; settings_["localModel"] = body["model"]; Persist(); }
       return result;
     }

@@ -64,6 +64,17 @@ change. Generated UTF-8 byte arrays avoid compiler string-literal limits while p
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.
 
+The pure C++ `CollectBrowserSelectorSnapshotExpression(options)` projects the same
+value-free reader's transient observed nodes into Nessie's existing selector wire:
+`{url,title,text,truncated,elements:[{selector,tag,role,label}]}`. It creates no
+reference registry. The shared automation selector builder validates a single match
+against the exact observed node, including duplicate IDs and document roots;
+selectors beyond 2,000 characters are omitted. Run real headless DOM conformance
+separately with `node tests/native/browser-snapshot-selectors.mjs <path-to-browser_snapshot_fixture>`
+after building that native test target and installing Playwright Chromium.
+Set `KELPIE_TEST_ARTIFACT_DIR` to retain its synthetic DOM screenshot and safe
+observed snapshot outside the checkout.
+
 The Linux no-CEF fallback also serves authenticated canonical HTTP and compact MCP through this coordinator. Its core advertises only documentation/capabilities; existing metadata, navigation stub, bookmarks/history and diagnostics remain discoverable extensions. It does not advertise DOM observations or browser input.
 
 Windows one-shot inference page context now reads the bounded value-free common snapshot through the same native gateway. Its existing page_text/dom/accessibility labels select that shared representation; they do not inject raw DOM values. Windows still refuses agent execution and has no tool loop. Linux has no embedded inference tool loop to migrate. Native local GGUF also remains text/page-context only. Desktop navigation/title callbacks queue reference invalidation without taking the transaction mutex on the renderer thread; the next gateway step drains it.

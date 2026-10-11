@@ -33,11 +33,17 @@ private val json =
     }
 private val mainHandler = Handler(Looper.getMainLooper())
 
-class HandlerContext {
+class HandlerContext(
+    val browserRetirement: BrowserGatewayRetirement = BrowserGatewayRetirement(),
+) {
     companion object {
         const val DEFAULT_OVERLAY_RGB = "59,130,246"
     }
 
+    var remoteDocumentGuard: (() -> Boolean)? = null
+    var remoteNavigationStart: (() -> Boolean)? = null
+    var remoteNavigationReadGuard: (() -> Boolean)? = null
+    var remoteNavigationWaitGuard: (() -> Boolean)? = null
     private var visibleWebView: WebView? = null
     private val operationWebView = ThreadLocal<WebView>()
     var webView: WebView?
@@ -54,7 +60,7 @@ class HandlerContext {
 
     var tabStore: TabStore? = null
     var browserDocumentChanged: ((String) -> Unit)? = null
-    val browserRetirement = BrowserGatewayRetirement()
+    var browserGateway: com.kelpie.browser.network.BrowserGatewayBinding? = null
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
     var annotationSessionId: String? = null
@@ -113,7 +119,12 @@ class HandlerContext {
             cleared
         }
 
-    suspend fun evaluateJS(script: String): String =
+    suspend fun evaluateJS(script: String): String = evaluateGuardedJS(script, remoteDocumentGuard)
+
+    private suspend fun evaluateGuardedJS(
+        script: String,
+        guard: (() -> Boolean)?,
+    ): String =
         suspendCancellableCoroutine { cont ->
             val wv = webView
             if (wv == null) {
@@ -124,9 +135,16 @@ class HandlerContext {
             mainHandler.post {
                 if (cont.isActive) {
                     try {
+                        check(guard?.invoke() != false) { "Tab document changed or job stopped" }
                         wv.evaluateJavascript(script) { result ->
                             browserRetirement.complete(ticket)
-                            if (cont.isActive) cont.resume(result ?: "null")
+                            if (cont.isActive) {
+                                if (guard?.invoke() == false) {
+                                    cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
+                                } else {
+                                    cont.resume(result ?: "null")
+                                }
+                            }
                         }
                     } catch (error: Exception) {
                         browserRetirement.complete(ticket)
@@ -141,6 +159,24 @@ class HandlerContext {
     suspend fun evaluateJSReturningJSON(script: String): Map<String, Any?> {
         val wrapped = "JSON.stringify(($script))"
         val raw = evaluateJS(wrapped)
+        return parseObject(raw)
+    }
+
+    /** Fixed metadata only: callers cannot use the transferred pin for arbitrary script/mutations. */
+    suspend fun navigationSnapshot(): Map<String, Any?> {
+        while (remoteNavigationReadGuard?.invoke() == false) {
+            check(remoteNavigationWaitGuard?.invoke() == true) { "Navigation document changed or job stopped" }
+            kotlinx.coroutines.delay(25)
+        }
+        val raw =
+            evaluateGuardedJS(
+                "JSON.stringify({url:location.href,title:document.title,readyState:document.readyState})",
+                remoteNavigationReadGuard ?: remoteDocumentGuard,
+            )
+        return parseObject(raw)
+    }
+
+    private fun parseObject(raw: String): Map<String, Any?> {
         // WebView returns a JSON-encoded string (escaped), so we need to unescape
         val unescaped =
             if (raw.startsWith("\"") && raw.endsWith("\"")) {

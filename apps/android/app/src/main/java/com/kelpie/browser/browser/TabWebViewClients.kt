@@ -47,6 +47,12 @@ private fun tabWebViewClient(
             url: String,
             favicon: Bitmap?,
         ) {
+            val previousVersion = tab.documentVersion
+            tab.documentVersion =
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            tab.remoteNavigationLease?.started(previousVersion, tab.documentVersion, url)
             handlerContext.browserDocumentChanged?.invoke(tab.id)
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()

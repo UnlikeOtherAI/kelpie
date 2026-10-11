@@ -4,6 +4,7 @@ import ProjectDescription
 
 let iOSLinkerFlags: SettingValue = .array([
     "-lkelpie_core_state",
+    "-lkelpie_core_connect",
     "-lkelpie_core_protocol",
     "-lkelpie_core_automation",
     "-lkelpie_core_mcp",
@@ -31,6 +32,7 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/Views/BrowserChromeAppearance.swift"),
         .glob("../macos/Kelpie/Views/BrowserChromeSampler.swift"),
         .glob("../macos/Kelpie/Account/UOAAccount.swift"),
+        .glob("../macos/Kelpie/Connect/**/*.swift"),
         .glob("../macos/Kelpie/Account/UOASession.swift"),
         .glob("../macos/Kelpie/Account/UOAPresentation.swift"),
         .glob("../macos/Kelpie/Account/UOALoginWebView.swift"),
@@ -56,6 +58,7 @@ let kelpieApp = Target.target(
             "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
             "HEADER_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/../../native/core-state/include",
+                "$(PROJECT_DIR)/../../native/core-connect/include",
                 "$(PROJECT_DIR)/../../native/core-protocol/include",
                 "$(PROJECT_DIR)/../../native/core-automation/include",
                 "$(PROJECT_DIR)/../../native/core-mcp/include",
@@ -63,6 +66,7 @@ let kelpieApp = Target.target(
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-state",
+                "$(KELPIE_NATIVE_BUILD_DIR)/core-connect",
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-protocol",
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-automation",
                 "$(KELPIE_NATIVE_BUILD_DIR)/core-mcp",
@@ -74,8 +78,8 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.15",
-            "CURRENT_PROJECT_VERSION": "15",
+            "MARKETING_VERSION": "0.1.16",
+            "CURRENT_PROJECT_VERSION": "16",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
@@ -96,6 +100,7 @@ let kelpieTests = Target.target(
         .glob("Tests/**/*.swift"),
         .glob("../macos/Tests/UOAAccountTests.swift"),
         .glob("../macos/Tests/UOASessionTests.swift"),
+        .glob("../macos/Tests/ConnectAuthorizationTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
         .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),

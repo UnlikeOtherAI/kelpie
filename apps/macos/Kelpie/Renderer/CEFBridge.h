@@ -53,10 +53,6 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 /// Whether the browser can go forward.
 - (BOOL)canGoForward;
 
-/// HTTP status code of the most recently completed main-frame document load,
-/// or 0 if not yet known. Captured from CEF's OnLoadEnd callback.
-- (NSInteger)mainFrameHTTPStatusCode;
-
 /// Evaluate JavaScript and return the result via callback.
 /// The callback receives the result as a JSON string, or nil on error.
 /// Internal fixed browser control only; executes in a private Chromium world.
@@ -93,6 +89,14 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 /// Set callback for CEF dialog-state resets such as navigation cancellation.
 @property (nonatomic, copy, nullable) void (^onJavaScriptDialogReset)(void);
 
+@end
+
+@interface CEFBridge (Navigation)
+/// HTTP status code of the most recently completed main-frame document load.
+- (NSInteger)mainFrameHTTPStatusCode;
+/// Native main-frame load identity; changes even for same-URL reloads.
+- (NSString *)documentVersion;
+- (NSUInteger)documentNavigationCount;
 @end
 
 @interface CEFBridge (Lifecycle)

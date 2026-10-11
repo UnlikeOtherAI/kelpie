@@ -45,6 +45,7 @@ final class CEFRenderer: RendererEngine {
     }
 
     let engineName = "chromium"
+    let connectionTabID = UUID().uuidString
 
     private static var cefInitialized = false
     private static var messageLoopTimer: Timer?

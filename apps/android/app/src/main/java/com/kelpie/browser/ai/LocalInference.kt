@@ -18,9 +18,12 @@ object LocalInference {
     suspend fun execute(
         operation: String,
         body: Map<String, Any?> = emptyMap(),
+        request: InferenceRequest? = null,
     ): Map<String, Any?> =
         withContext(Dispatchers.IO) {
-            AIHttpJson.parseJsonObject(NativeCore.localInference(operation, JSONObject(body).toString()))
+            val input = JSONObject(body).toString()
+            val raw = if (request == null) NativeCore.localInference(operation, input) else NativeCore.localInferenceOwned(operation, input, request.handle)
+            AIHttpJson.parseJsonObject(raw)
         }
 
     fun cancel() = NativeCore.cancelLocalInference()

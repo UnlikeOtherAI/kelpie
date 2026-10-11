@@ -215,6 +215,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.3
+      - name: Require Android release signing configuration
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              printf '::error::Missing Android release signing configuration: %s\n' "$name"
+              exit 1
+            fi
+          done
       - uses: ./.github/actions/browser-contract
 
       - uses: actions/setup-java@v5.2.0
@@ -234,38 +248,38 @@ jobs:
           set -euo pipefail
           cd apps/android
 
-          SIGNING_ARGS=()
-          if [ -n "${ANDROID_KEYSTORE_BASE64}" ]; then
-            echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > signing-keystore.jks
-            SIGNING_ARGS+=(
-              "-Pandroid.injected.signing.store.file=$(pwd)/signing-keystore.jks"
-              "-Pandroid.injected.signing.store.password=${ANDROID_KEYSTORE_PASSWORD}"
-              "-Pandroid.injected.signing.key.alias=${ANDROID_KEY_ALIAS}"
-              "-Pandroid.injected.signing.key.password=${ANDROID_KEY_PASSWORD}"
-            )
-          fi
+          umask 077
+          signing_keystore="${RUNNER_TEMP}/kelpie-android-signing.jks"
+          trap 'rm -f "$signing_keystore"' EXIT
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "$signing_keystore"
+          SIGNING_ARGS=(
+            "-Pandroid.injected.signing.store.file=${signing_keystore}"
+            "-Pandroid.injected.signing.store.password=${ANDROID_KEYSTORE_PASSWORD}"
+            "-Pandroid.injected.signing.key.alias=${ANDROID_KEY_ALIAS}"
+            "-Pandroid.injected.signing.key.password=${ANDROID_KEY_PASSWORD}"
+          )
 
           ./gradlew assembleRelease bundleRelease "${SIGNING_ARGS[@]}"
+
+          apk="app/build/outputs/apk/release/app-release.apk"
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$apk"
+          test -s "$bundle"
+          apksigner="$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$apksigner"
+          "$apksigner" verify "$apk"
+          jarsigner -J-Duser.language=en -J-Duser.country=US -verify "$bundle" > "${RUNNER_TEMP}/kelpie-android-bundle-verification.txt"
+          if ! grep -Fxq 'jar verified.' "${RUNNER_TEMP}/kelpie-android-bundle-verification.txt"; then
+            printf '::error::Android App Bundle has no verified signing identity\n'
+            exit 1
+          fi
 
           release_label="$(printf '%s' "${GITHUB_REF_NAME}" | sed -E 's#[^0-9A-Za-z._-]+#-#g')"
           out_dir="../../dist/release/android"
           mkdir -p "${out_dir}"
 
-          find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -exec cp -a {} "${out_dir}/" \;
-          find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -exec cp -a {} "${out_dir}/" \;
-
-          for artifact in "${out_dir}"/*; do
-            [ -f "${artifact}" ] || continue
-            ext="${artifact##*.}"
-            case "$(basename "${artifact}")" in
-              *unsigned*)
-                mv "${artifact}" "${out_dir}/kelpie-android-${release_label}-release-unsigned.${ext}"
-                ;;
-              *)
-                mv "${artifact}" "${out_dir}/kelpie-android-${release_label}-release.${ext}"
-                ;;
-            esac
-          done
+          cp "$apk" "${out_dir}/kelpie-android-${release_label}-release.apk"
+          cp "$bundle" "${out_dir}/kelpie-android-${release_label}-release.aab"
 
           (
             cd "${out_dir}"

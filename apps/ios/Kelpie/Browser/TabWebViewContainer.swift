@@ -196,6 +196,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             _ webView: WKWebView,
             didStartProvisionalNavigation navigation: WKNavigation!
         ) {
+            ConnectDocument.navigated(webView, navigation: navigation)
             guard webView === currentWebView else { return }
             chromeScroll = BrowserChromeScroll()
             // Each new provisional navigation starts clean — clear any error captured

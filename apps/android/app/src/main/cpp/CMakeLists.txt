@@ -32,12 +32,14 @@ add_library(kelpie_jni SHARED
   kelpie_jni.cpp
   address_input_jni.cpp
   local_inference_jni.cpp
+  connect_jni.cpp
   browser_gateway_jni.cpp
 )
 
 target_link_libraries(kelpie_jni
   PRIVATE
     kelpie_core_state
+    kelpie_core_connect
     kelpie_core_protocol
     kelpie_core_ai
     kelpie_core_mcp

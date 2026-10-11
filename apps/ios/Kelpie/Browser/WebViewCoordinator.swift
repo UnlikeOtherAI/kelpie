@@ -110,6 +110,7 @@ struct WebViewContainer: UIViewRepresentable {
         // MARK: - WKNavigationDelegate
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            ConnectDocument.navigated(webView, navigation: navigation)
             NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             observe(webView)
             // Each new provisional navigation starts clean — clear any error captured

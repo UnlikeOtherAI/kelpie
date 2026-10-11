@@ -36,7 +36,7 @@ class NavigationHandler(
         val marker = "__kelpie_navigation_${UUID.randomUUID().toString().replace("-", "")}"
         val previousUrl = ctx.evaluateJSReturningJSON("(window['$marker'] = true, {url: location.href})")["url"] as? String
         val stateScript = "({url: location.href, title: document.title, readyState: document.readyState, sameDocument: window['$marker'] === true})"
-        mainHandler.post { wv.loadUrl(url) }
+        mainHandler.post { if (mayNavigate()) wv.loadUrl(url) }
         // Wait for page to start loading then finish
         delay(100)
         val timeout = (body["timeout"] as? Int) ?: 10000
@@ -45,8 +45,8 @@ class NavigationHandler(
             ctx.lastNavigationError?.let { err ->
                 return errorResponse("NAVIGATION_ERROR", err)
             }
-            val result = ctx.evaluateJSReturningJSON(stateScript)
-            if (NavigationCompletion.hasLoaded(result, url, previousUrl)) {
+            val result = navigationState(stateScript)
+            if (hasLoaded(result, url, previousUrl)) {
                 return successResponse(
                     mapOf(
                         "url" to (result["url"] ?: url),
@@ -59,9 +59,9 @@ class NavigationHandler(
         }
         // Timeout reached. If the requested page is actually fully loaded, allow
         // success; otherwise return the last captured navigation error.
-        val finalState = ctx.evaluateJSReturningJSON(stateScript)
+        val finalState = navigationState(stateScript)
         val finalUrl = finalState["url"] as? String
-        if (NavigationCompletion.hasLoaded(finalState, url, previousUrl)) {
+        if (hasLoaded(finalState, url, previousUrl)) {
             return successResponse(
                 mapOf(
                     "url" to finalUrl,
@@ -79,28 +79,28 @@ class NavigationHandler(
 
     private suspend fun back(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.goBack() }
+        mainHandler.post { if (mayNavigate()) wv.goBack() }
         delay(200)
-        val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val result = ctx.navigationSnapshot()
         return successResponse(result)
     }
 
     private suspend fun forward(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.goForward() }
+        mainHandler.post { if (mayNavigate()) wv.goForward() }
         delay(200)
-        val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val result = ctx.navigationSnapshot()
         return successResponse(result)
     }
 
     private suspend fun reload(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.reload() }
+        mainHandler.post { if (mayNavigate()) wv.reload() }
         delay(100)
         val timeout = 10000
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeout) {
-            val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+            val result = ctx.navigationSnapshot()
             if (result["readyState"] == "complete") {
                 return successResponse(
                     mapOf(
@@ -112,7 +112,7 @@ class NavigationHandler(
             }
             delay(100)
         }
-        val finalState = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val finalState = ctx.navigationSnapshot()
         return successResponse(
             mapOf(
                 "url" to (finalState["url"] ?: wv.url ?: ""),
@@ -121,6 +121,16 @@ class NavigationHandler(
             ),
         )
     }
+
+    private fun mayNavigate(): Boolean = ctx.remoteDocumentGuard?.invoke() != false && ctx.remoteNavigationStart?.invoke() != false
+
+    private suspend fun navigationState(script: String): Map<String, Any?> = if (ctx.remoteNavigationReadGuard != null) ctx.navigationSnapshot() else ctx.evaluateJSReturningJSON(script)
+
+    private fun hasLoaded(
+        state: Map<String, Any?>,
+        requested: String,
+        previous: String?,
+    ): Boolean = if (ctx.remoteNavigationReadGuard != null) state["readyState"] == "complete" else NavigationCompletion.hasLoaded(state, requested, previous)
 
     private suspend fun getCurrentUrl(): Map<String, Any?> {
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")

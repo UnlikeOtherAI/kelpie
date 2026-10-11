@@ -39,6 +39,10 @@ jstring Output(JNIEnv* env, char* owned) {
 }  // namespace
 
 extern "C" {
+JNIEXPORT jstring JNICALL Java_com_kelpie_browser_nativecore_BrowserGatewayNative_selectorSnapshotExpression(JNIEnv* env, jobject, jstring options) {
+  const auto input = Input(env, options);
+  return Output(env, kelpie_browser_selector_snapshot_expression(input.c_str()));
+}
 JNIEXPORT jlong JNICALL Java_com_kelpie_browser_nativecore_BrowserGatewayNative_create(JNIEnv* env, jobject, jstring config) {
   const auto input = Input(env, config);
   return static_cast<jlong>(reinterpret_cast<intptr_t>(kelpie_browser_gateway_create(input.c_str())));

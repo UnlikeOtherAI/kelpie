@@ -57,6 +57,7 @@ struct BrowserView: View {
     var browserContent: some View {
         ZStack {
             VStack(spacing: 0) {
+                ConnectControls(compact: true)
                 if isPad && !serverState.isScriptRecording {
                     TabletTabStrip(tabStore: tabStore, appearance: chromeAppearance)
                 }
@@ -287,20 +288,24 @@ struct BrowserView: View {
     }
 
     func navigate(_ urlString: String) {
+        NessieConnection.shared.personInteracted()
         tabStore.activeBrowserTab?.isStartPage = false
         guard let webView = browserState.webView, let url = URL(string: urlString) else { return }
         webView.load(URLRequest(url: url))
     }
 
     func goBack() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.goBack()
     }
 
     func goForward() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.goForward()
     }
 
     func reload() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.reload()
     }
 }

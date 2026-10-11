@@ -323,6 +323,8 @@ struct AIHandler {
                 code: "AUDIO_NOT_SUPPORTED",
                 message: "Model does not support audio. Transcribe via platform STT and resend as text."
             )
+        case .cancelled:
+            return errorResponse(code: "INFERENCE_CANCELLED", message: "Local inference was stopped")
         }
     }
 

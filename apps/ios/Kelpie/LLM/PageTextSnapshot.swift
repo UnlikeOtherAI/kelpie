@@ -36,6 +36,8 @@ enum PageTextSnapshot {
 
     @MainActor
     static func object(context: HandlerContext, body: [String: Any], script: String) async throws -> [String: Any] {
+        try Task.checkCancellation()
+        guard context.remoteDocumentGuard?() != false else { throw CancellationError() }
         let webView: WKWebView?
         if let requested = body["tabId"] as? String {
             guard let id = UUID(uuidString: requested),
@@ -52,6 +54,8 @@ enum PageTextSnapshot {
               let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIHandlerError(code: "EVAL_ERROR", message: "Page text returned an invalid snapshot")
         }
+        try Task.checkCancellation()
+        guard context.remoteDocumentGuard?() != false else { throw CancellationError() }
         return result
     }
 }

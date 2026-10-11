@@ -52,22 +52,35 @@ final class SecretStore {
         }
     }
 
+    /// A remote action may run only after its recovery journal is on disk.
+    func setDurably(_ name: String, value: String) throws {
+        try queue.sync {
+            let previous = cache[name]
+            cache[name] = value
+            do { try persistDurablyLocked() } catch {
+                cache[name] = previous
+                throw error
+            }
+        }
+    }
+
     // MARK: - Persistence
 
     private func persistLocked() {
         do {
-            let json = try JSONSerialization.data(withJSONObject: cache, options: [.sortedKeys])
-            let sealed = try AES.GCM.seal(json, using: key)
-            guard let combined = sealed.combined else {
-                NSLog("SecretStore: failed to combine sealed box")
-                return
-            }
-            try ensureDirectoryExists()
-            try combined.write(to: fileURL, options: [.atomic, .completeFileProtection])
-            applyFilePermissions()
+            try persistDurablyLocked()
         } catch {
             NSLog("SecretStore: persist failed: \(error.localizedDescription)")
         }
+    }
+
+    private func persistDurablyLocked() throws {
+        let json = try JSONSerialization.data(withJSONObject: cache, options: [.sortedKeys])
+        let sealed = try AES.GCM.seal(json, using: key)
+        guard let combined = sealed.combined else { throw CocoaError(.fileWriteUnknown) }
+        try ensureDirectoryExists()
+        try combined.write(to: fileURL, options: [.atomic, .completeFileProtection])
+        applyFilePermissions()
     }
 
     private func ensureDirectoryExists() throws {

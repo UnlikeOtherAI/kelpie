@@ -2,7 +2,10 @@
 
 ## What It Is
 
-Kelpie is an **LLM-first browser** for iOS and Android (phones and tablets) paired with a **Node.js CLI** that enables large language models to discover, control, and orchestrate multiple browser instances on a local network.
+Kelpie is an **LLM-first browser** for iOS/iPadOS, Android, macOS, Windows and Linux.
+Its **Node.js CLI** discovers and controls browser instances on a local network.
+Signing into the same UnlikeOtherAI account also connects a browser directly to
+Nessie across networks, without an executor or device pairing.
 
 Think Playwright-style automation, but running natively on real mobile devices — no emulators, no persistent content scripts, no desktop required. Android has near-full parity with desktop automation via CDP; iOS covers core workflows with some platform-specific gaps (see [Platform Support Matrix](api/README.md)).
 
@@ -17,9 +20,9 @@ LLMs that need to interact with web content on mobile devices today have no good
 
 ## The Solution
 
-Two components that work together:
+The native browser supports local CLI control and account-based Nessie control:
 
-### 1. Kelpie Browser (Native iOS + Android App)
+### 1. Kelpie Browser (Native Mobile and Desktop Apps)
 
 A minimal native browser built on each platform's WebView engine (WKWebView / Android WebView) that:
 
@@ -41,12 +44,31 @@ A Node.js CLI published on npm that:
 - Includes **built-in LLM help** — every command has structured descriptions explaining what it does, when to use it, and expected inputs/outputs
 - Exposes everything through its own **MCP server** for direct LLM integration
 
+### 3. Account-connected Nessie browsers
+
+Each signed-in browser opens an authenticated outbound WebSocket. The person sees
+their own devices in Nessie's Connected accounts and conversation browser picker
+in every selected team where they are entitled to work. Agents can select a ready
+browser automatically or keep the person's explicit choice. Team membership does
+not grant another person access to these personal browser sessions.
+
+A foreground iPhone on mobile data can therefore be driven from Nessie's iPad web
+wrapper. Mobile background suspension is reported as unavailable; desktop executors
+remain independent. Native Pause/Stop and document guards keep the person in control.
+
+Where a ready on-device text model is supported, Nessie can request compact,
+source-linked page facts. Durable completion events resume the waiting agent
+asynchronously. No cloud inference fallback or background mobile execution is
+implied. See [the connection contract](nessie-connect.md) and
+[native verification and remaining device checks](nessie-connect-verification.md).
+
 ## Key Features
 
 | Feature | Description |
 |---|---|
 | **No persistent content scripts** | Page interaction through native WebView APIs and CDP (Android). Some iOS features use lightweight bridge scripts for capabilities WKWebView doesn't expose natively (console capture, mutation observation). No browser extension model, no content script persistence across navigations. |
 | **mDNS discovery** | Browsers advertise `_kelpie._tcp` with device metadata (name, platform, resolution, version) — CLI auto-discovers them |
+| **Account discovery** | The same UOA account exposes the person's ready Kelpie browsers to Nessie across networks, with automatic or exact-device selection |
 | **Individual control** | Target any single device by name/IP for precise commands |
 | **Group commands** | Send the same command to all devices — fill forms, navigate, click simultaneously |
 | **Smart queries** | `findButton("Submit")` across all devices returns which ones found it — LLM makes the decision |

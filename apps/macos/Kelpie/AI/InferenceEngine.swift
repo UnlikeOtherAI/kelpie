@@ -10,6 +10,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
     @MainActor @Published private(set) var capabilities: [String] = []
 
     private let queue = DispatchQueue(label: "com.kelpie.inference", qos: .userInitiated)
+    private let cancellationLock = NSLock()
+    private var cancellationGeneration = UUID()
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
     private var vocab: OpaquePointer?
@@ -30,11 +32,24 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         case inferenceFailed(String)
         case visionNotSupported
         case audioNotSupported
+        case cancelled
     }
 
     private static var backendInitialized = false
 
     private init() {}
+
+    func cancel() {
+        cancellationLock.lock()
+        cancellationGeneration = UUID()
+        cancellationLock.unlock()
+    }
+
+    private func currentCancellation() -> UUID {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return cancellationGeneration
+    }
 
     func load(path: String, name: String, capabilities: [String]) async throws {
         // Auto-unload previous model if any
@@ -128,15 +143,37 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         return nil
     }
 
+    private func promptBatch(tokens: UnsafeMutablePointer<llama_token>, count: Int32) -> llama_batch {
+        let batch = llama_batch_init(count, 0, 1)
+        for index in 0..<Int(count) {
+            batch.token[index] = tokens[index]
+            batch.pos[index] = Int32(index)
+            batch.n_seq_id[index] = 1
+            // swiftlint:disable:next force_unwrapping
+            batch.seq_id[index]![0] = 0
+            batch.logits[index] = 0
+        }
+        var populated = batch
+        populated.n_tokens = count
+        populated.logits[Int(count) - 1] = 1
+        return populated
+    }
+
     func infer(
         prompt: String,
         audio: Data? = nil,
         image: Data? = nil,
         maxTokens: Int = 512,
-        temperature: Float = 0.7
+        temperature: Float = 0.7,
+        request: InferenceRequest? = nil
     ) async throws -> InferenceResult {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
+        let generation = currentCancellation()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
             queue.async {
+                guard self.currentCancellation() == generation, request?.isCancelled != true else {
+                    continuation.resume(throwing: InferenceError.cancelled)
+                    return
+                }
                 guard self.model != nil, let ctx = self.ctx, let vocab = self.vocab else {
                     continuation.resume(throwing: InferenceError.noModelLoaded)
                     return
@@ -170,19 +207,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 llama_memory_clear(llama_get_memory(ctx), false)
 
                 // Prepare batch for prompt
-                var batch = llama_batch_init(Int32(tokenCount), 0, 1)
+                var batch = self.promptBatch(tokens: tokens, count: tokenCount)
                 defer { llama_batch_free(batch) }
-
-                for i in 0..<Int(tokenCount) {
-                    batch.token[i] = tokens[i]
-                    batch.pos[i] = Int32(i)
-                    batch.n_seq_id[i] = 1
-                    // swiftlint:disable:next force_unwrapping
-                    batch.seq_id[i]![0] = 0
-                    batch.logits[i] = 0
-                }
-                batch.n_tokens = tokenCount
-                batch.logits[Int(tokenCount) - 1] = 1
 
                 guard llama_decode(ctx, batch) == 0 else {
                     continuation.resume(throwing: InferenceError.inferenceFailed("Initial decode failed"))
@@ -204,6 +230,10 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 var curPos = tokenCount
 
                 for _ in 0..<maxTokens {
+                    guard self.currentCancellation() == generation, request?.isCancelled != true else {
+                        continuation.resume(throwing: InferenceError.cancelled)
+                        return
+                    }
                     let newTokenId = llama_sampler_sample(sampler, ctx, batch.n_tokens - 1)
 
                     if llama_vocab_is_eog(vocab, newTokenId) {
@@ -231,24 +261,20 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                     }
                 }
 
-                let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
-                let elapsedMs = Int(elapsed / 1_000_000)
-
-                // Build output string
-                output.append(0) // null terminator
-                let resultText = String(cString: output)
-
-                continuation.resume(returning: InferenceResult(
-                    text: resultText,
-                    tokensUsed: Int(generatedCount),
-                    inferenceTimeMs: elapsedMs
-                ))
+                continuation.resume(returning: self.result(output, tokens: generatedCount, startedAt: startedAt))
             }
         }
     }
 
     var memoryUsageMB: Int {
         queue.sync { estimatedMemoryUsageMB }
+    }
+
+    private func result(_ output: [CChar], tokens: Int32, startedAt: DispatchTime) -> InferenceResult {
+        // The model emits token bytes; terminate once before converting the final text.
+        let text = String(cString: output + [0])
+        let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
+        return InferenceResult(text: text, tokensUsed: Int(tokens), inferenceTimeMs: Int(elapsed / 1_000_000))
     }
 
     private func tokenToPiece(vocab: OpaquePointer, token: llama_token) -> [CChar] {

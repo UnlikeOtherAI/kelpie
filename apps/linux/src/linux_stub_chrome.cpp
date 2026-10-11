@@ -15,6 +15,11 @@ bool LinuxApp::CommitText(const std::string&,bool) { return false; }
 account::AccountState LinuxApp::AccountState() const { return {}; }
 void LinuxApp::AccountSignIn() { ShowToast("Accounts require the Chromium build"); }
 void LinuxApp::AccountSignOut() {}
+std::string LinuxApp::NessieStatus() const { return "Nessie requires the Chromium build"; }
+bool LinuxApp::NessiePaused() const { return true; }
+bool LinuxApp::NessieEnabled() const { return false; }
+void LinuxApp::NessiePause() {}
+void LinuxApp::NessieEnable() {}
 void LinuxApp::AccountRefresh() {}
 std::pair<int,int> LinuxApp::TakeResizeRequest() { return {}; }
 }

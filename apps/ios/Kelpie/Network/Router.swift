@@ -5,6 +5,7 @@ typealias RouteHandler = @MainActor @Sendable ([String: Any]) async -> [String: 
 
 /// Maps POST /v1/{method} paths to handler functions.
 final class Router: @unchecked Sendable {
+    weak var browserReferenceOwner: Router?
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
     var scriptPlaybackState: ScriptPlaybackState?
@@ -30,6 +31,14 @@ final class Router: @unchecked Sendable {
         bypassRecordingGate: Bool = false,
         browserGatewayDispatch: Bool = false
     ) async -> (statusCode: Int, json: [String: Any]) {
+        if let owner = browserReferenceOwner, !browserGatewayDispatch {
+            guard owner.browserLease.begin() else {
+                return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
+            }
+            defer { owner.browserLease.end() }
+            owner.invalidateBrowserReferences(method: method, body: body)
+            return await handle(method: method, body: body, bypassRecordingGate: bypassRecordingGate, browserGatewayDispatch: true)
+        }
         if method == "browser-control" {
             return (200, await browserControl(body))
         }

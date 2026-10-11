@@ -73,9 +73,18 @@ private func scaledImage(
 /// Shared context providing access to the WebView for all handlers.
 @MainActor
 final class HandlerContext: NSObject, WKScriptMessageHandler {
+    weak var browserRouter: Router?
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     weak var webView: WKWebView?
+    /// A remote job's isolated context can only evaluate its pinned document.
+    var remoteDocumentGuard: (() -> Bool)?
+    var remoteNavigationReadGuard: (() -> Bool)?
+    var remoteNavigationWaitGuard: (() -> Bool)?
+
+    func navigationIssued(_ navigation: AnyObject?) {
+        if let webView { ConnectDocument.issued(webView, navigation: navigation) }
+    }
     var tabStore: TabStore?
     var browserControlTabId: String?
     var consoleMessages: [[String: Any]] = []
@@ -138,6 +147,8 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     }
 
     func evaluateJS(_ script: String) async throws -> Any? {
+        try Task.checkCancellation()
+        if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
         if let browserControlTabId, browserControlTabId != (tabStore?.activeBrowserTabID?.uuidString ?? (webView != nil ? "external" : nil)) {
             throw HandlerError.noWebView
         }
