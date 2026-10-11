@@ -7,10 +7,10 @@ final class ConnectControlsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabURLs", "()", "-homeURL", "about:blank"]
         app.launch()
-        let more = app.descendants(matching: .any)["browser.menu.fab"]
+        let more = app.buttons["browser.more"]
         XCTAssertTrue(more.waitForExistence(timeout: 15))
         more.tap()
-        let settings = app.buttons["browser.menu.settings"]
+        let settings = app.buttons["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
         XCTAssertTrue(app.staticTexts["Nessie"].waitForExistence(timeout: 5))
