@@ -379,9 +379,7 @@ class AIHandler(
         return listOf("llava", "vision", "moondream", "minicpm-v").any { lowercase.contains(it) }
     }
 
-    private fun buildPrompt(body: Map<String, Any?>): String? {
-        return AIConversation.prompt(body).takeIf { it.isNotEmpty() }
-    }
+    private fun buildPrompt(body: Map<String, Any?>): String? = AIConversation.prompt(body).takeIf { it.isNotEmpty() }
 
     private fun extractImages(body: Map<String, Any?>): List<String> {
         val explicitImages =

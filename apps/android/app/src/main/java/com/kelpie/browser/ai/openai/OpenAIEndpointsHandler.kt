@@ -42,7 +42,10 @@ class OpenAIEndpointsHandler(
             } catch (e: OpenAIException) {
                 return errorResponse(e.code, e.message, e.diagnostics)
             }
-        return runtime().inference.infer(request, dispatcher, { mode -> com.kelpie.browser.ai.AIPageContext.evidence(mode, dispatcher) })
+        return runtime().inference.infer(request, dispatcher, { mode ->
+            com.kelpie.browser.ai.AIPageContext
+                .evidence(mode, dispatcher)
+        })
     }
 
     /** ai-unload: forget the persisted selection so it is not restored at launch. */

@@ -38,8 +38,7 @@ object PageTextSnapshot {
     suspend fun read(
         context: HandlerContext,
         body: Map<String, Any?>,
-    ): Map<String, Any?> =
-        decodeSnapshot(readObject(context, body, script(body["selector"] as? String ?: "body")))
+    ): Map<String, Any?> = decodeSnapshot(readObject(context, body, script(body["selector"] as? String ?: "body")))
 
     suspend fun readObject(
         context: HandlerContext,
@@ -50,7 +49,11 @@ object PageTextSnapshot {
             val requested = body["tabId"] as? String
             val webView =
                 if (requested != null) {
-                    context.tabStore?.tabs?.value?.firstOrNull { it.id == requested }?.webView
+                    context.tabStore
+                        ?.tabs
+                        ?.value
+                        ?.firstOrNull { it.id == requested }
+                        ?.webView
                         ?: throw OpenAIException("TAB_NOT_FOUND", "Tab $requested not found")
                 } else {
                     (context.tabStore?.activeTab?.webView ?: context.webView) ?: throw OpenAIException("NO_WEBVIEW", "No browser tab is available")
@@ -62,9 +65,13 @@ object PageTextSnapshot {
     fun decode(raw: String): Map<String, Any?> = decodeSnapshot(decodeObject(raw))
 
     private fun decodeSnapshot(result: Map<String, Any?>): Map<String, Any?> {
-        if (result["title"] !is String || result["url"] !is String || result["content"] !is String ||
+        if (result["title"] !is String ||
+            result["url"] !is String ||
+            result["content"] !is String ||
             (result["accessibleLabels"] as? List<*>)?.all { it is String } != true
-        ) throw OpenAIException("EVAL_ERROR", "Page text returned an invalid snapshot")
+        ) {
+            throw OpenAIException("EVAL_ERROR", "Page text returned an invalid snapshot")
+        }
         return result
     }
 
@@ -82,7 +89,8 @@ object PageTextSnapshot {
     private suspend fun evaluate(
         webView: WebView,
         script: String,
-    ): String = suspendCancellableCoroutine { continuation ->
-        webView.evaluateJavascript(script) { raw -> if (continuation.isActive) continuation.resume(raw ?: "null") }
-    }
+    ): String =
+        suspendCancellableCoroutine { continuation ->
+            webView.evaluateJavascript(script) { raw -> if (continuation.isActive) continuation.resume(raw ?: "null") }
+        }
 }

@@ -86,15 +86,14 @@ class LLMHandler(
         }
     }
 
-    private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> {
-        return try {
+    private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> =
+        try {
             successResponse(PageTextSnapshot.read(ctx, body))
         } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
             errorResponse(error.code, error.message)
         } catch (error: Exception) {
             errorResponse("EVAL_ERROR", error.message ?: "Could not read page context")
         }
-    }
 
     private suspend fun getFormState(): Map<String, Any?> {
         val js =

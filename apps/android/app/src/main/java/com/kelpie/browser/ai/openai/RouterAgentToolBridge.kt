@@ -37,8 +37,8 @@ class RouterAgentToolBridge(
     }
 
     override suspend fun pageContext(mode: String): String? =
-        com.kelpie.browser.ai.AIPageContext.evidence(mode, pinnedDispatcher(null))
-
+        com.kelpie.browser.ai.AIPageContext
+            .evidence(mode, pinnedDispatcher(null))
 }
 
 /** Dispatches through the router with the pinned tab injected; refuses if the user switched tabs. */
