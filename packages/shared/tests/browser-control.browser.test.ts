@@ -35,7 +35,8 @@ const fixture = `<title>Control fixture</title><h1>Observe</h1>
 <label>Email<input id="email" value="INITIAL_SECRET"></label>
 <label>Password<input type="password" value="PASSWORD_SECRET"></label>
 <textarea placeholder="Notes">TEXTAREA_SECRET</textarea>
-<div contenteditable="true" role="textbox" aria-label="Draft">EDITABLE_SECRET<p>EDITABLE_DESCENDANT_SECRET</p><button>EDITABLE_BUTTON_SECRET</button></div>
+<div contenteditable="true" role="textbox" aria-label="Draft">EDITABLE_SECRET<span id="private-label">EDITABLE_LABEL_SECRET</span><p>EDITABLE_DESCENDANT_SECRET</p><button>EDITABLE_BUTTON_SECRET</button></div>
+<button aria-labelledby="private-label">Public action</button>
 <button id="save">Save</button><button>Save draft</button>
 <button>Duplicate</button><button>Duplicate</button>
 <label>Agree<input id="agree" type="checkbox"></label><select id="choice"><option value="a">Alpha</option><option value="b">Beta</option></select>
@@ -94,6 +95,11 @@ for (const adapter of ["playwright", "native-transport"] as const) {
       const short = await tab.snapshot({ maxElements: 2 });
       expect(short.elements).toHaveLength(2);
       expect(short.truncated).toBe(true);
+    });
+    it("omits inherited editor values used as external accessible labels", async () => {
+      const snapshot = await tab.snapshot();
+      expect(snapshot.elements?.some((element) => element.name === "Public action")).toBe(true);
+      expect(JSON.stringify(snapshot)).not.toContain("EDITABLE_LABEL_SECRET");
     });
     it("includes visible named SVGs with accessible-name precedence", async () => {
       const snapshot = await tab.snapshot();
