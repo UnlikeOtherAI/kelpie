@@ -66,7 +66,15 @@ bool Validate(const json& root, const json& schema, json* value, int depth) {
       } else if (schema.contains("additionalProperties") && schema["additionalProperties"] == false) return false;
     }
     for (auto it = properties.begin(); it != properties.end(); ++it) {
-      if (!value->contains(it.key()) && it.value().contains("default")) (*value)[it.key()] = it.value()["default"];
+      const json* defaults = &it.value();
+      int refs = 0;
+      while (defaults->contains("$ref") && ++refs <= 100) {
+        const std::string ref = (*defaults)["$ref"];
+        if (ref.rfind("#/", 0) != 0) return false;
+        defaults = &root.at(json::json_pointer(ref.substr(1)));
+      }
+      if (refs > 100) return false;
+      if (!value->contains(it.key()) && defaults->contains("default")) (*value)[it.key()] = (*defaults)["default"];
     }
     for (const auto& key : schema.value("required", json::array())) if (!value->contains(key.get<std::string>())) return false;
   }
