@@ -14,6 +14,7 @@ class BrowserTab(
     var isStartPage: Boolean = true,
 ) {
     var currentUrl: String by mutableStateOf("")
+    var documentVersion: String = UUID.randomUUID().toString()
     var pageTitle: String by mutableStateOf("")
     var isLoading: Boolean by mutableStateOf(false)
     var chromeColor: Int by mutableStateOf(-1)

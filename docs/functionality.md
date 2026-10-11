@@ -549,3 +549,14 @@ kept, an error explains that it could not be restored, and the next Login/regist
 launch tries it again before opening the browser. Sign out forgets the session
 immediately and asks UOA to revoke it in the background; quitting Kelpie keeps it. A UOA server that issues no refresh token keeps
 the older memory-only session, which still ends at access-token expiry.
+
+## Nessie account connection
+
+Signed-in Kelpie connects outbound to Nessie using a short-lived UOA ticket.
+Nessie can choose the person's ready device and drive its visible browser without
+LAN pairing or an executor. Settings and the active browser expose Pause/Resume/Stop;
+switching the controlled tab or backgrounding a mobile app cancels active remote work.
+Browser jobs pin the exact document and completion results survive reconnect.
+Loaded on-device text models can extract bounded page evidence asynchronously; installed
+and ready models are advertised separately. Embedded GGUF does not run delegated
+browser tool loops. See [the native connection contract](nessie-connect.md).

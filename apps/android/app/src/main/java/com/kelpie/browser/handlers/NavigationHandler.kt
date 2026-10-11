@@ -31,7 +31,7 @@ class NavigationHandler(
         }
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
         ctx.lastNavigationError = null
-        mainHandler.post { wv.loadUrl(url) }
+        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.loadUrl(url) }
         // Wait for page to start loading then finish
         delay(100)
         val timeout = (body["timeout"] as? Int) ?: 10000
@@ -85,7 +85,7 @@ class NavigationHandler(
 
     private suspend fun back(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.goBack() }
+        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.goBack() }
         delay(200)
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
         return successResponse(result)
@@ -93,7 +93,7 @@ class NavigationHandler(
 
     private suspend fun forward(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.goForward() }
+        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.goForward() }
         delay(200)
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
         return successResponse(result)
@@ -101,7 +101,7 @@ class NavigationHandler(
 
     private suspend fun reload(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { wv.reload() }
+        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.reload() }
         delay(100)
         val timeout = 10000
         val start = System.currentTimeMillis()

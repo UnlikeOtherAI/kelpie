@@ -76,6 +76,8 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     weak var webView: WKWebView?
+    /// A remote job's isolated context can only evaluate its pinned document.
+    var remoteDocumentGuard: (() -> Bool)?
     var tabStore: TabStore?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
@@ -137,6 +139,8 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     }
 
     func evaluateJS(_ script: String) async throws -> Any? {
+        try Task.checkCancellation()
+        if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
         guard let webView else { throw HandlerError.noWebView }
         return try await webView.evaluateJavaScript(script)
     }

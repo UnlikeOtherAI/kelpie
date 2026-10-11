@@ -206,6 +206,7 @@ struct InteractionHandler {
         let delay = body["delay"] as? Int ?? 50
         do {
             for char in text {
+            if Task.isCancelled { return errorResponse(code: "CANCELLED", message: "Typing was stopped") }
                 if context.scriptPlaybackState?.isAbortRequested() == true { break }
                 let escapedChar = JSEscape.string(String(char))
                 let charJS = """

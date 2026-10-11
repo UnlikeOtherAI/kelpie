@@ -278,6 +278,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        ConnectDocument.navigated(self)
         // Each new provisional navigation starts clean — clear any error captured
         // by a superseded load so a cancelled-then-successful sequence is not fatal.
         self.lastNavigationError = nil

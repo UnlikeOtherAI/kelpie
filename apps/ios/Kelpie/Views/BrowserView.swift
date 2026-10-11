@@ -57,6 +57,7 @@ struct BrowserView: View {
     var browserContent: some View {
         ZStack {
             VStack(spacing: 0) {
+                ConnectControls(compact: true)
                 if isPad && !serverState.isScriptRecording {
                     TabletTabStrip(tabStore: tabStore, appearance: chromeAppearance)
                 }

@@ -35,6 +35,7 @@ class HandlerContext {
     }
 
     var webView: WebView? = null
+    var remoteDocumentGuard: (() -> Boolean)? = null
     var tabStore: TabStore? = null
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
@@ -102,6 +103,10 @@ class HandlerContext {
                 return@suspendCoroutine
             }
             mainHandler.post {
+                if (remoteDocumentGuard?.invoke() == false) {
+                    cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
+                    return@post
+                }
                 wv.evaluateJavascript(script) { result ->
                     cont.resume(result ?: "null")
                 }

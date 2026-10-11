@@ -71,6 +71,7 @@ class TabStore(
     }
 
     fun addTab(url: String? = null): BrowserTab {
+        com.kelpie.browser.connect.NessieConnection.personChangedTab()
         captureActivePreview()
         val tab = createTab()
         _tabs.value = _tabs.value + tab
@@ -85,6 +86,7 @@ class TabStore(
     }
 
     fun closeTab(id: String) {
+        if (id == _activeTabId.value) com.kelpie.browser.connect.NessieConnection.personChangedTab()
         previewTabs.remove(id)
         val index = _tabs.value.indexOfFirst { it.id == id }
         if (index < 0) return
@@ -109,6 +111,7 @@ class TabStore(
     }
 
     fun selectTab(id: String) {
+        if (id != _activeTabId.value) com.kelpie.browser.connect.NessieConnection.personChangedTab()
         if (_tabs.value.any { it.id == id }) {
             if (id != _activeTabId.value) captureActivePreview()
             _activeTabId.value = id
