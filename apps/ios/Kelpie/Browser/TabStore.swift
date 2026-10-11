@@ -40,6 +40,13 @@ final class TabStore: ObservableObject {
         }
     }
 
+    /// Creates an isolated in-memory tab store for WebKit control tests.
+    init(isolatedTab: BrowserTab) {
+        handlerContext = nil
+        tabs = [isolatedTab]
+        activeBrowserTabID = isolatedTab.id
+    }
+
     @discardableResult
     func addBrowserTab(url: String? = nil) -> BrowserTab {
         NessieConnection.shared.personChangedTab()

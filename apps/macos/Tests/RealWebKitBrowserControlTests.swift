@@ -1,4 +1,7 @@
 import WebKit
+#if os(iOS)
+import Network
+#endif
 #if os(macOS)
 import AppKit
 #else
@@ -118,6 +121,143 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         XCTAssertEqual(delayedActivations as? Int, 1)
     }
 
+    #if os(iOS)
+    func testAccountJobOwnsCanonicalGotoAndFreshDocumentPin() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 640, height: 800), configuration: configuration)
+        let tab = BrowserTab(webView: webView, isStartPage: false, recordsHistory: false)
+        let store = TabStore(isolatedTab: tab)
+        let context = HandlerContext()
+        context.webView = webView
+        context.tabStore = store
+        let owner = Router()
+        owner.handlerContext = context
+        context.browserRouter = owner
+        InteractionHandler(context: context).register(on: owner)
+        NavigationHandler(context: context).register(on: owner)
+        ScreenshotHandler(context: context).register(on: owner)
+        ScrollHandler(context: context).register(on: owner)
+        ConnectSnapshot(context: context).register(on: owner)
+        let tabId = tab.id.uuidString
+        owner.register("get-tabs") { _ in
+            successResponse(["tabs": [["id": tabId, "active": true, "url": webView.url?.absoluteString ?? ""]]])
+        }
+
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 640, height: 800)
+        let container = UIView(frame: window.bounds)
+        let controller = UIViewController()
+        controller.view = container
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        let browserState = BrowserState()
+        let coordinator = TabWebViewContainer.Coordinator(
+            browserState: browserState, handlerContext: context,
+            onScrollDirectionChange: { _ in }, onWebViewReady: { _ in }
+        )
+        coordinator.install(webView: webView, in: container)
+        defer {
+            window.isHidden = true
+            tab.invalidate()
+        }
+
+        webView.loadHTMLString("<title>Initial account fixture</title><p>Ready</p>", baseURL: URL(string: "https://initial.fixture.test"))
+        for _ in 0..<100 where webView.isLoading {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(webView.isLoading)
+
+        let fixture = Self.fixture.replacingOccurrences(of: "9500", with: "1500")
+        let server = try LoopbackWebKitFixture(html: fixture)
+        let port = try await server.start()
+        var authorized = true
+        func job(version: String) throws -> ConnectBrowserControlJob {
+            let command = Self.command(tabID: tabId, version: version)
+            return try ConnectBrowserControlJob(
+                source: context, owner: owner, command: command, tabID: tabId,
+                expectedVersion: version, authorized: { authorized }
+            )
+        }
+        func request(_ method: String, params: [String: Any] = [:]) -> [String: Any] {
+            ["version": 1, "method": method, "tabId": tabId, "params": params]
+        }
+        func run(_ request: [String: Any], through job: ConnectBrowserControlJob) async -> [String: Any] {
+            await owner.browserControl(
+                request, authorizeAccountStep: { _, _ in authorized },
+                dispatchAccountStep: { method, params, mutates in
+                    await job.dispatch(method: method, params: params, mutates: mutates)
+                }
+            )
+        }
+
+        let initialVersion = ConnectDocument.version(webView)
+        let goto = await run(
+            request("tab.goto", params: ["url": "http://127.0.0.1:\(port)/account-fixture"]),
+            through: try job(version: initialVersion)
+        )
+        XCTAssertEqual(goto["ok"] as? Bool, true, "Canonical goto should finish through the issued WKNavigation lease: \(goto)")
+        XCTAssertTrue(server.receivedRequest)
+        let nextVersion = ConnectDocument.version(webView)
+        XCTAssertNotEqual(nextVersion, initialVersion)
+
+        let nextJob = try job(version: nextVersion)
+        let snapshot = await run(request("tab.snapshot"), through: nextJob)
+        XCTAssertEqual(snapshot["ok"] as? Bool, true)
+        let elements = try XCTUnwrap((snapshot["value"] as? [String: Any])?["elements"] as? [[String: Any]])
+        let entry = try XCTUnwrap(elements.first { $0["name"] as? String == "Entry" }?["ref"] as? String)
+        let typed = await run(request("tab.type", params: ["ref": entry, "text": "tail"]), through: nextJob)
+        XCTAssertEqual(typed["ok"] as? Bool, true)
+        let typedValue = try await webView.evaluateJavaScript("document.getElementById('entry').value") as? String
+        XCTAssertEqual(typedValue, "seed-tail")
+
+        let fresh = await run(request("tab.snapshot"), through: nextJob)
+        let freshElements = try XCTUnwrap((fresh["value"] as? [String: Any])?["elements"] as? [[String: Any]])
+        let button = try XCTUnwrap(freshElements.first { $0["name"] as? String == "Activate" }?["ref"] as? String)
+        var replacedBeforeDispatch = false
+        let refused = await owner.browserControl(
+            request("tab.click", params: ["ref": button]),
+            authorizeAccountStep: { _, _ in
+                if !replacedBeforeDispatch {
+                    replacedBeforeDispatch = true
+                    ConnectDocument.navigated(webView)
+                }
+                return true
+            },
+            dispatchAccountStep: { method, params, mutates in
+                await nextJob.dispatch(method: method, params: params, mutates: mutates)
+            }
+        )
+        XCTAssertEqual(refused["ok"] as? Bool, false)
+        let activationCount = try await webView.evaluateJavaScript("window.activations") as? Int
+        XCTAssertEqual(activationCount, 0)
+
+        let cancellationVersion = ConnectDocument.version(webView)
+        let cancellationJob = try job(version: cancellationVersion)
+        let delayedSnapshot = await run(request("tab.snapshot"), through: cancellationJob)
+        let delayedElements = try XCTUnwrap((delayedSnapshot["value"] as? [String: Any])?["elements"] as? [[String: Any]])
+        let delayedRef = try XCTUnwrap(delayedElements.first { $0["name"] as? String == "Delayed" }?["ref"] as? String)
+        let action = Task { await run(request("tab.click", params: ["ref": delayedRef]), through: cancellationJob) }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        action.cancel()
+        authorized = false
+        let cancelled = await action.value
+        XCTAssertEqual((cancelled["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, true)
+        XCTAssertFalse(owner.browserLease.begin(), "Cancellation must retain the lease while the WK callback is pending")
+        var retired = false
+        for _ in 0..<100 {
+            if owner.browserLease.begin() {
+                owner.browserLease.end()
+                retired = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(retired, "The actual WK callback must retire the cancelled job lease")
+    }
+    #endif
+
     #if os(macOS)
     func testAgentReadDiscardsOutputWhenPinnedWindowLosesSelection() async {
         let tab = Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
@@ -156,6 +296,18 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         return try XCTUnwrap(result["value"] as? [String: Any])
     }
 
+    #if os(iOS)
+    private static func command(tabID: String, version: String) -> [String: Any] {
+        [
+            "jobId": UUID().uuidString,
+            "attemptId": UUID().uuidString,
+            "deadline": ISO8601DateFormatter().string(from: Date().addingTimeInterval(60)),
+            "tabId": tabID,
+            "tabVersion": version
+        ]
+    }
+    #endif
+
     private static let fixture = """
     <!doctype html><title>Isolated browser fixture</title>
     <style>body{font:20px system-ui;padding:20px}button,input{font:20px system-ui;margin:10px}</style>
@@ -176,3 +328,56 @@ final class RealWebKitBrowserControlTests: XCTestCase {
     </script>
     """
 }
+
+#if os(iOS)
+private final class LoopbackWebKitFixture: @unchecked Sendable {
+    private let html: String
+    private let listener: NWListener
+    private let lock = NSLock()
+    private var received = false
+    private let queue = DispatchQueue(label: "kelpie.ios.account-control-fixture")
+
+    var receivedRequest: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return received
+    }
+
+    init(html: String) throws {
+        self.html = html
+        listener = try NWListener(using: .tcp, on: .any)
+    }
+
+    func start() async throws -> UInt16 {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    guard let port = self.listener.port?.rawValue else {
+                        continuation.resume(throwing: NSError(domain: "KelpieFixture", code: 1))
+                        return
+                    }
+                    continuation.resume(returning: port)
+                case .failed(let error): continuation.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.newConnectionHandler = { [weak self] connection in
+                guard let self else { return }
+                connection.start(queue: self.queue)
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { _, _, _, error in
+                    guard error == nil else { connection.cancel(); return }
+                    self.lock.lock()
+                    self.received = true
+                    self.lock.unlock()
+                    let body = Data(self.html.utf8)
+                    var response = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n".utf8)
+                    response.append(body)
+                    connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+                }
+            }
+            listener.start(queue: queue)
+        }
+    }
+}
+#endif

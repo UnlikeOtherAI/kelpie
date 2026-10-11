@@ -6,6 +6,7 @@ import WebKit
 final class BrowserTab: ObservableObject, Identifiable {
     let id = UUID()
     let webView: WKWebView
+    private let recordsHistory: Bool
 
     @Published var currentURL: String = ""
     @Published var pageTitle: String = ""
@@ -42,11 +43,13 @@ final class BrowserTab: ObservableObject, Identifiable {
     private var observations: [NSKeyValueObservation] = []
     private var lastHistoryURL: String = ""
     private var lastHistoryTitle: String = ""
-    private var lastObservedHistoryClearGeneration = HistoryStore.shared.clearGeneration
+    private var lastObservedHistoryClearGeneration: Int
 
-    init(webView: WKWebView, isStartPage: Bool = true) {
+    init(webView: WKWebView, isStartPage: Bool = true, recordsHistory: Bool = true) {
         self.webView = webView
         self.isStartPage = isStartPage
+        self.recordsHistory = recordsHistory
+        lastObservedHistoryClearGeneration = recordsHistory ? HistoryStore.shared.clearGeneration : 0
         setupObservations()
     }
 
@@ -83,6 +86,7 @@ final class BrowserTab: ObservableObject, Identifiable {
     }
 
     private func recordHistoryIfNeeded(url: String) {
+        guard recordsHistory else { return }
         syncHistoryTrackingIfNeeded()
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty, trimmedURL != lastHistoryURL else { return }
@@ -93,6 +97,7 @@ final class BrowserTab: ObservableObject, Identifiable {
     }
 
     private func updateHistoryTitleIfNeeded(title: String) {
+        guard recordsHistory else { return }
         syncHistoryTrackingIfNeeded()
         let trimmedURL = currentURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
