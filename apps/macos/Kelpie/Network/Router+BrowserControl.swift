@@ -56,7 +56,14 @@ extension Router {
 
     @MainActor
     func browserMCP(_ body: [String: Any]) async -> [String: Any] {
-        await directGateway().request(body, mcp: true)
+        let persistent = directGateway()
+        if let method = persistent.extensionMethod(body), ["ai-infer", "ai-record"].contains(method) {
+            // Long-running product inference/recording gets its own coordinator;
+            // the persistent browser handle remains available for explicit calls.
+            let gateway = makeBrowserGateway(allowActions: true, pinnedTabId: nil, agent: false)
+            return await gateway.request(body, mcp: true)
+        }
+        return await persistent.request(body, mcp: true)
     }
 
     @MainActor

@@ -155,6 +155,23 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertEqual(value?["nestedSucceeded"] as? Bool, true)
     }
 
+    func testPendingInferenceDoesNotOccupyPersistentDirectCoordinator() async {
+        let router = Router()
+        var pending: CheckedContinuation<[String: Any], Never>?
+        router.register("ai-infer") { _ in await withCheckedContinuation { pending = $0 } }
+        let inference = Task { await router.browserMCP([
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": ["name": "kelpie_extension", "arguments": [
+                "name": "kelpie_ai_ask", "arguments": ["prompt": "fixture"]
+            ]]
+        ]) }
+        while pending == nil { await Task.yield() }
+        let independent = await router.browserControl(["version": 1, "method": "documentation", "params": [:]])
+        XCTAssertEqual(independent["ok"] as? Bool, true)
+        pending?.resume(returning: successResponse(["response": "fixture"]))
+        let result = await inference.value
+        XCTAssertEqual((result["result"] as? [String: Any])?["isError"] as? Bool, false)
+    }
+
     func testLegacyExtensionRetargetIsRefusedBeforeDispatch() async {
         let dispatcher = RecordingDispatcher()
         let gateway = await dispatcher.browserSession(tabId: "visible", allowActions: true)

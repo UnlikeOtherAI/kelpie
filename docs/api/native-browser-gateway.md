@@ -129,7 +129,10 @@ DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairin
 tokens stay in process memory and new fixture grants are revoked; existing CLI
 grants are preserved, and fixture tabs close afterward.
 
-The rich inference extension delegates admission to its inner browser requests;
+Long-running rich inference/recording extensions use a dedicated coordinator,
+selected by the authoritative extension descriptor, so the persistent direct
+coordinator remains available for other explicit requests. Inference delegates
+admission to its inner browser requests;
 it does not hold the browser lease across model inference. Its existing model
 and run deadlines remain authoritative, avoiding both self-blocked tool loops
 and a detached outer timeout while an AI turn continues to act.

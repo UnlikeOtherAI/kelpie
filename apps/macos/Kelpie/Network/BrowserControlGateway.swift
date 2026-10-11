@@ -10,6 +10,7 @@ final class BrowserControlGateway {
     private let dispatch: Dispatch
     private let authorize: Authorize
     private let mutatingMethods: Set<String>
+    private let extensionMethods: [String: String]
     private var navigationObserver: NSObjectProtocol?
     private let lease: BrowserControlLease?
     private let timeoutNanoseconds: UInt64
@@ -28,6 +29,10 @@ final class BrowserControlGateway {
         self.lease = lease
         self.dispatch = dispatch
         self.authorize = authorize
+        extensionMethods = Dictionary(uniqueKeysWithValues: extensions.compactMap { descriptor in
+            guard let name = descriptor["name"] as? String, let method = descriptor["method"] as? String else { return nil }
+            return (name, method)
+        })
         mutatingMethods = Set(extensions.filter { $0["mutates"] as? Bool ?? true }.compactMap { $0["method"] as? String })
         let config: [String: Any] = [
             "nativeMethods": methods, "extensions": extensions, "targeting": targeting,
@@ -49,6 +54,16 @@ final class BrowserControlGateway {
     }
 
     func invalidates(method: String) -> Bool { mutatingMethods.contains(method) }
+
+    func extensionMethod(_ rpc: [String: Any]) -> String? {
+        guard rpc["method"] as? String == "tools/call", let params = rpc["params"] as? [String: Any],
+              let name = params["name"] as? String else { return nil }
+        if name == "kelpie_extension" {
+            guard let arguments = params["arguments"] as? [String: Any], let extensionName = arguments["name"] as? String else { return nil }
+            return extensionMethods[extensionName]
+        }
+        return extensionMethods[name]
+    }
 
     func request(_ body: [String: Any], mcp: Bool = false) async -> [String: Any] {
         guard lease?.begin() != false else {
@@ -81,7 +96,7 @@ final class BrowserControlGateway {
                 let method = step["method"] as? String ?? ""
                 let params = step["params"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
-                if method == "ai-infer" {
+                if ["ai-infer", "ai-record"].contains(method) {
                     // Product inference owns its existing model/run deadlines. Its
                     // nested browser calls each acquire the shared admission lease.
                     // Holding it across inference would block its own tool loop.
