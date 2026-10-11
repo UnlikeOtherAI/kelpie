@@ -8,7 +8,9 @@ import com.kelpie.browser.network.successResponse
 import org.json.JSONObject
 
 /** Fixed shared reader, registered only in the job-owned router. */
-class ConnectSnapshot(private val context: HandlerContext) {
+class ConnectSnapshot(
+    private val context: HandlerContext,
+) {
     fun register(router: Router) {
         router.register("connect-snapshot") { body ->
             try {
