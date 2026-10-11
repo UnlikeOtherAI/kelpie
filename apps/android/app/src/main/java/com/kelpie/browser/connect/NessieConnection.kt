@@ -35,7 +35,14 @@ import java.util.UUID
 object NessieConnection {
     const val RESOURCE = "https://api.nessie.works/api/kelpie/connect"
     const val GATEWAY = "wss://api.nessie.works/api/kelpie/connect"
-    data class State(val status: String = "Signed out", val paused: Boolean = false, val running: Boolean = false, val requiresSignIn: Boolean = false)
+
+    data class State(
+        val status: String = "Signed out",
+        val paused: Boolean = false,
+        val running: Boolean = false,
+        val requiresSignIn: Boolean = false,
+    )
+
     private val mutableState = MutableStateFlow(State())
     val state = mutableState.asStateFlow()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -59,15 +66,23 @@ object NessieConnection {
     private var controlledTab: String? = null
     private var remoteTabMutation = false
 
-    fun start(context: Context, router: Router, handlers: HandlerContext) {
+    fun start(
+        context: Context,
+        router: Router,
+        handlers: HandlerContext,
+    ) {
         appContext = context.applicationContext
         secrets = SecretStore.get(context)
         host = handlers
         browser = ConnectBrowser(handlers, java.io.File(context.filesDir, "local-models"))
         if (accountObserver == null) {
-            accountObserver = scope.launch {
-                UOAAccount.state.map { it.profile?.subject }.distinctUntilChanged().collect { accountChanged(it) }
-            }
+            accountObserver =
+                scope.launch {
+                    UOAAccount.state
+                        .map { it.profile?.subject }
+                        .distinctUntilChanged()
+                        .collect { accountChanged(it) }
+                }
         }
     }
 
@@ -96,7 +111,9 @@ object NessieConnection {
         publishLifecycle()
     }
 
-    fun claimTab(tabId: String) { controlledTab = tabId }
+    fun claimTab(tabId: String) {
+        controlledTab = tabId
+    }
 
     fun personChangedTab() {
         if (controlledTab == null || remoteTabMutation) return
@@ -107,7 +124,11 @@ object NessieConnection {
 
     fun <T> changeTabRemotely(action: () -> T): T {
         remoteTabMutation = true
-        return try { action() } finally { remoteTabMutation = false }
+        return try {
+            action()
+        } finally {
+            remoteTabMutation = false
+        }
     }
 
     fun renewConsent() {
@@ -116,7 +137,14 @@ object NessieConnection {
     }
 
     private val lifecycle: String get() = if (foreground && !state.value.paused && browser?.ready == true) "ready" else "paused"
-    val canMutate: Boolean get() = foreground && !state.value.paused && socket != null && generation != null && owner != null && UOAAccount.state.value.profile?.subject == owner
+    val canMutate: Boolean get() =
+        foreground &&
+            !state.value.paused &&
+            socket != null &&
+            generation != null &&
+            owner != null &&
+            UOAAccount.state.value.profile
+                ?.subject == owner
 
     private fun accountChanged(subject: String?) {
         if (owner == subject) return
@@ -132,13 +160,17 @@ object NessieConnection {
         mutableState.value = State()
         val store = secrets ?: return
         if (hadOwner) {
-            try { ConnectLedger.clear(store) } catch (_: Exception) {
+            try {
+                ConnectLedger.clear(store)
+            } catch (_: Exception) {
                 mutableState.value = State(status = "Recovery storage unavailable")
                 return
             }
         }
         if (subject == null) return
-        try { ledger = ConnectLedger(store, subject) } catch (_: Exception) {
+        try {
+            ledger = ConnectLedger(store, subject)
+        } catch (_: Exception) {
             mutableState.value = State(status = "Recovery storage unavailable")
             return
         }
@@ -159,17 +191,33 @@ object NessieConnection {
                 socket = connection
                 opened.await()
                 val ready = browser?.modelReady() ?: false
-                send(mapOf("type" to "hello", "protocol" to 1, "ticket" to ticket.value,
-                    "installationId" to installationId(), "label" to android.os.Build.MODEL.take(120),
-                    "platform" to "android", "capabilities" to listOf("browser.control", "page.extract"),
-                    "lifecycle" to lifecycle, "modelReady" to ready, "modelInstalled" to (browser?.modelInstalled ?: false),
-                    "modelCapabilities" to listOf("text"), "delegatedBrowsing" to false), connection)
+                send(
+                    mapOf(
+                        "type" to "hello",
+                        "protocol" to 1,
+                        "ticket" to ticket.value,
+                        "installationId" to installationId(),
+                        "label" to
+                            android.os.Build.MODEL
+                                .take(120),
+                        "platform" to "android",
+                        "capabilities" to listOf("browser.control", "page.extract"),
+                        "lifecycle" to lifecycle,
+                        "modelReady" to ready,
+                        "modelInstalled" to (browser?.modelInstalled ?: false),
+                        "modelCapabilities" to listOf("text"),
+                        "delegatedBrowsing" to false,
+                    ),
+                    connection,
+                )
                 renewal = scope.launch { renewTickets(connection, current, ticket.expires) }
                 for (raw in frames) {
                     if (epoch != current || socket !== connection) return
                     receive(AIHttpJson.parseJsonObject(raw), connection)
                 }
-            } catch (error: CancellationException) { throw error } catch (error: Exception) {
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 if (epoch != current) return
                 mutableState.value = state.value.copy(status = "Nessie connection unavailable")
                 if (error is UOATransport.Failure && error.status == 403) {
@@ -185,33 +233,64 @@ object NessieConnection {
         }
     }
 
-    private fun listener(frames: Channel<String>, opened: kotlinx.coroutines.CompletableDeferred<Unit>) =
-        object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) { opened.complete(Unit) }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                if (text.toByteArray().size > 1024 * 1024 || frames.trySend(text).isFailure) {
-                    frames.close(IllegalStateException("Invalid gateway frame"))
-                    webSocket.close(1008, "Frame limit exceeded")
-                }
-            }
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                if (bytes.size > 1024 * 1024) {
-                    frames.close(IllegalStateException("Invalid gateway frame"))
-                    webSocket.close(1008, "Frame limit exceeded")
-                } else onMessage(webSocket, bytes.utf8())
-            }
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                webSocket.close(code, null)
-                opened.completeExceptionally(IllegalStateException("Gateway closed"))
-                frames.close()
-            }
-            override fun onFailure(webSocket: WebSocket, error: Throwable, response: Response?) {
-                opened.completeExceptionally(IllegalStateException("Gateway unavailable"))
-                frames.close(IllegalStateException("Gateway unavailable"))
+    private fun listener(
+        frames: Channel<String>,
+        opened: kotlinx.coroutines.CompletableDeferred<Unit>,
+    ) = object : WebSocketListener() {
+        override fun onOpen(
+            webSocket: WebSocket,
+            response: Response,
+        ) {
+            opened.complete(Unit)
+        }
+
+        override fun onMessage(
+            webSocket: WebSocket,
+            text: String,
+        ) {
+            if (text.toByteArray().size > 1024 * 1024 || frames.trySend(text).isFailure) {
+                frames.close(IllegalStateException("Invalid gateway frame"))
+                webSocket.close(1008, "Frame limit exceeded")
             }
         }
 
-    private data class Ticket(val value: String, val expires: Long)
+        override fun onMessage(
+            webSocket: WebSocket,
+            bytes: ByteString,
+        ) {
+            if (bytes.size > 1024 * 1024) {
+                frames.close(IllegalStateException("Invalid gateway frame"))
+                webSocket.close(1008, "Frame limit exceeded")
+            } else {
+                onMessage(webSocket, bytes.utf8())
+            }
+        }
+
+        override fun onClosing(
+            webSocket: WebSocket,
+            code: Int,
+            reason: String,
+        ) {
+            webSocket.close(code, null)
+            opened.completeExceptionally(IllegalStateException("Gateway closed"))
+            frames.close()
+        }
+
+        override fun onFailure(
+            webSocket: WebSocket,
+            error: Throwable,
+            response: Response?,
+        ) {
+            opened.completeExceptionally(IllegalStateException("Gateway unavailable"))
+            frames.close(IllegalStateException("Gateway unavailable"))
+        }
+    }
+
+    private data class Ticket(
+        val value: String,
+        val expires: Long,
+    )
+
     private suspend fun issueTicket(): Ticket {
         val response = UOAAccount.request("/oauth/kelpie/connect", "POST", JSONObject(mapOf("resource" to RESOURCE)).toString())
         val json = JSONObject(String(response.data, Charsets.UTF_8))
@@ -222,7 +301,11 @@ object NessieConnection {
         return Ticket(ticket, expires)
     }
 
-    private suspend fun renewTickets(connection: WebSocket, current: UUID, expires: Long) {
+    private suspend fun renewTickets(
+        connection: WebSocket,
+        current: UUID,
+        expires: Long,
+    ) {
         var expiry = expires
         while (epoch == current && socket === connection) {
             delay((expiry / 2).coerceIn(1, 60) * 1000)
@@ -233,14 +316,19 @@ object NessieConnection {
                 if (socket !== connection) return
                 send(mapOf("type" to "auth", "generation" to gen, "ticket" to ticket.value), connection)
                 expiry = ticket.expires
-            } catch (error: CancellationException) { throw error } catch (_: Exception) {
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
                 connection.cancel()
                 return
             }
         }
     }
 
-    private suspend fun receive(frame: Map<String, Any?>, connection: WebSocket) {
+    private suspend fun receive(
+        frame: Map<String, Any?>,
+        connection: WebSocket,
+    ) {
         val journal = ledger ?: error("Recovery storage unavailable")
         val decision = journal.execute("receive", frame)
         if (decision["kind"] == "welcome") {
@@ -261,26 +349,36 @@ object NessieConnection {
                 mutableState.value = state.value.copy(running = true)
                 action = scope.launch { perform(command, connection) }
             }
-            "cancel" -> if (frame["jobId"] == currentCommand?.get("jobId") && frame["attemptId"] == currentCommand?.get("attemptId")) {
-                action?.cancel()
-                browser?.cancelInference()
-                currentCommand = null
-                mutableState.value = state.value.copy(running = false)
-            }
+            "cancel" ->
+                if (frame["jobId"] == currentCommand?.get("jobId") && frame["attemptId"] == currentCommand?.get("attemptId")) {
+                    action?.cancel()
+                    browser?.cancelInference()
+                    currentCommand = null
+                    mutableState.value = state.value.copy(running = false)
+                }
         }
     }
 
-    private suspend fun perform(command: Map<String, Any?>, connection: WebSocket) {
+    private suspend fun perform(
+        command: Map<String, Any?>,
+        connection: WebSocket,
+    ) {
         var expiry: Job? = null
         try {
             val remaining = Instant.parse(command["deadline"] as String).toEpochMilli() - System.currentTimeMillis()
             check(remaining in 1..86400000) { "Job deadline expired" }
-            expiry = scope.launch { delay(remaining); stopCurrent("Job deadline expired; reconcile page before continuing") }
+            expiry =
+                scope.launch {
+                    delay(remaining)
+                    stopCurrent("Job deadline expired; reconcile page before continuing")
+                }
             val target = browser ?: error("Browser unavailable")
             val output = target.execute(command)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             finish(command, "completed", output = output, connection = connection)
-        } catch (error: CancellationException) { throw error } catch (error: Exception) {
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
             runCatching { finish(command, "failed", error = error.message?.take(2000) ?: "Browser action failed", connection = connection) }
         } finally {
             expiry?.cancel()
@@ -291,7 +389,13 @@ object NessieConnection {
         }
     }
 
-    private fun finish(command: Map<String, Any?>, state: String, output: Map<String, Any?>? = null, error: String? = null, connection: WebSocket? = null) {
+    private fun finish(
+        command: Map<String, Any?>,
+        state: String,
+        output: Map<String, Any?>? = null,
+        error: String? = null,
+        connection: WebSocket? = null,
+    ) {
         val result = mutableMapOf("jobId" to command["jobId"], "attemptId" to command["attemptId"], "state" to state)
         if (output != null) result["output"] = output
         if (error != null) result["error"] = error
@@ -305,7 +409,9 @@ object NessieConnection {
         val command = currentCommand ?: return
         currentCommand = null
         mutableState.value = state.value.copy(running = false)
-        try { finish(command, "cancelled", error = reason, connection = socket) } catch (_: Exception) {
+        try {
+            finish(command, "cancelled", error = reason, connection = socket)
+        } catch (_: Exception) {
             mutableState.value = state.value.copy(status = "Recovery storage unavailable")
             close()
         }
@@ -313,12 +419,13 @@ object NessieConnection {
 
     private fun startHeartbeat(connection: WebSocket) {
         heartbeat?.cancel()
-        heartbeat = scope.launch {
-            while (socket === connection) {
-                publishHeartbeat(connection)
-                delay(10000)
+        heartbeat =
+            scope.launch {
+                while (socket === connection) {
+                    publishHeartbeat(connection)
+                    delay(10000)
+                }
             }
-        }
     }
 
     private fun publishLifecycle() {
@@ -330,17 +437,35 @@ object NessieConnection {
     private suspend fun publishHeartbeat(connection: WebSocket) {
         val gen = generation ?: return
         val ready = browser?.modelReady() ?: false
-        runCatching { send(mapOf("type" to "heartbeat", "generation" to gen, "lifecycle" to lifecycle, "modelReady" to ready,
-            "modelInstalled" to (browser?.modelInstalled ?: false), "modelCapabilities" to listOf("text"), "delegatedBrowsing" to false), connection) }
+        runCatching {
+            send(
+                mapOf(
+                    "type" to "heartbeat",
+                    "generation" to gen,
+                    "lifecycle" to lifecycle,
+                    "modelReady" to ready,
+                    "modelInstalled" to (browser?.modelInstalled ?: false),
+                    "modelCapabilities" to listOf("text"),
+                    "delegatedBrowsing" to false,
+                ),
+                connection,
+            )
+        }
     }
 
-    private fun sendFrames(decision: Map<String, Any?>, connection: WebSocket) {
+    private fun sendFrames(
+        decision: Map<String, Any?>,
+        connection: WebSocket,
+    ) {
         @Suppress("UNCHECKED_CAST")
         val frames = decision["frames"] as? List<Map<String, Any?>> ?: return
         frames.forEach { send(it, connection) }
     }
 
-    private fun send(frame: Map<String, Any?>, connection: WebSocket) {
+    private fun send(
+        frame: Map<String, Any?>,
+        connection: WebSocket,
+    ) {
         val raw = JSONObject(frame).toString()
         check(raw.toByteArray().size <= 1024 * 1024 && connection.send(raw)) { "Gateway send failed" }
     }
