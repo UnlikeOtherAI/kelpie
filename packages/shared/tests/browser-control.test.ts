@@ -1,6 +1,7 @@
+import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 import {
-  BrowserControlError, BrowserControlRequestSchema, browserControlInputSchema,
+  BrowserControlError, BrowserControlEnvelopeSchema, BrowserControlRequestSchema, BROWSER_CONTROL_DESCRIPTION, browserControlInputSchema,
   browserSnapshot, createBrowserBackend, createBrowserClient, createBrowserControlProxy,
   createKelpieBrowserBackend,
 } from "../src/browser-control/index.js";
@@ -54,6 +55,7 @@ describe("browser control boundary", () => {
     expect(JSON.stringify(scoped)).not.toContain("locator.fill");
     expect(JSON.stringify(scoped).length).toBeLessThan(24_000);
     expect(JSON.stringify(full).length).toBeLessThan(24_000);
+    console.info("Browser catalogue bytes", { expanded: JSON.stringify(z.toJSONSchema(BrowserControlEnvelopeSchema)).length, factored: JSON.stringify(full).length, restricted: JSON.stringify(scoped).length, description: BROWSER_CONTROL_DESCRIPTION.length });
   });
 
   it("bounds metadata and exposes only normalized fields in snapshots", () => {

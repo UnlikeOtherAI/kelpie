@@ -21,13 +21,12 @@ export function resolvePlaywrightLocator(page: Page, query: BrowserLocator): Loc
       case "css": scope = scope.locator(selector(step.value)); break;
       case "frame": scope = scope.frameLocator(selector(step.value)); break;
       case "nth": {
-        if (!("nth" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "nth requires an element locator.");
-        const elementScope = scope as Locator;
-        scope = step.index === -1 ? elementScope.last() : elementScope.nth(step.index); break;
+        if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "nth requires an element locator.");
+        scope = step.index === -1 ? scope.last() : scope.nth(step.index); break;
       }
       case "filter": {
-        if (!("filter" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
-        scope = (scope as Locator).filter({ hasText: step.hasText === undefined ? undefined : matcher(step.hasText), visible: step.visible }); break;
+        if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
+        scope = scope.filter({ hasText: step.hasText === undefined ? undefined : matcher(step.hasText), visible: step.visible }); break;
       }
     }
   }
