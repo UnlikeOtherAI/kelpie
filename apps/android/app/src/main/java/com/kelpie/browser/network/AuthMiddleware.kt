@@ -54,7 +54,7 @@ class AuthMiddleware(
         val ambiguous = rejectAmbiguousHeaders(req)
         if (ambiguous != null) return ambiguous
 
-        if (req.path in UNAUTH_ALLOWLIST) {
+        if (req.path in UNAUTH_ALLOWLIST && (req.path != "/v1/pair" || req.method.equals("POST", ignoreCase = true))) {
             if (req.path == "/v1/pair" && req.method.equals("POST", ignoreCase = true)) {
                 val csrf = csrfReject(req)
                 if (csrf != null) return csrf
@@ -68,6 +68,13 @@ class AuthMiddleware(
         val clientId =
             store.validateBearer(bearer)
                 ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Invalid bearer token")
+        if (req.path == "/mcp" || req.path == "/v1/mcp") {
+            if (req.headers.containsKey("origin")) return AuthDecision.Reject(403, "FORBIDDEN", "Browser Origin is not permitted on MCP")
+            val versions = req.headers["mcp-protocol-version"]
+            if (versions != null && (versions.size != 1 || versions.single() !in setOf("2025-03-26", "2025-06-18"))) {
+                return AuthDecision.Reject(400, "BAD_REQUEST", "Unsupported MCP protocol version")
+            }
+        }
         return AuthDecision.Authenticated(clientId)
     }
 

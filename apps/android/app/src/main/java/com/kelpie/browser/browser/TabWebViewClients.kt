@@ -47,6 +47,7 @@ private fun tabWebViewClient(
             url: String,
             favicon: Bitmap?,
         ) {
+            handlerContext.browserDocumentChanged?.invoke(tab.id)
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()
             }

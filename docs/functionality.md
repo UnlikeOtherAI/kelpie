@@ -554,6 +554,13 @@ the older memory-only session, which still ends at access-token expiry.
 
 ## Shared browser control
 
+Android exposes the common core directly at authenticated `/v1/browser-control`
+and `/mcp`. Its existing OpenAI-compatible agent uses the compact shared catalog
+with per-run tab and action permissions. Product extensions are discovered on
+demand; pairing and plain local inference retain their permissions. See
+[the Android binding](api/native-browser-gateway-android.md), including its WebView
+page-realm limitation and verification commands.
+
 Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-json>` and CLI MCP expose one versioned browser core used by runtime consumers. Native owns the persistent reference registry. The default MCP catalog advertises the core and three extension discovery/invocation tools; rich functions remain reachable through the generic extension caller. Its owning surface is machine-facing control, reached through HTTP, existing `kelpie mcp`, or a pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native methods are refused according to actual capabilities. The Linux no-CEF fallback supports the protocol with metadata-only core capabilities and legacy extensions. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).
 
 The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).
