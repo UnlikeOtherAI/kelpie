@@ -13,10 +13,13 @@ assert.equal(endpoint.hostname, '127.0.0.1');
 const platform = process.argv[3] ?? 'macos';
 let token;
 let replacement = 0;
+const pendingCommands = new Set();
 const fixture = http.createServer((req, res) => {
-  if (req.url === '/command') {
+  if (req.url?.startsWith('/command?')) {
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ replacement }));
+    const after = Number(new URL(req.url, 'http://127.0.0.1').searchParams.get('after'));
+    if (after !== replacement) res.end(JSON.stringify({ replacement }));
+    else { pendingCommands.add(res); res.on('close', () => pendingCommands.delete(res)); }
     return;
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -28,20 +31,17 @@ const fixture = http.createServer((req, res) => {
     <textarea aria-label="Notes">textarea-secret</textarea><input type="password" value="password-secret" aria-label="Password">
     <a href="https://example.test/fixture">Fixture link</a><p id="replacement">Original</p>
     <script>
-      let generation = 0;
+
       document.querySelector('#activate').onclick = () => document.querySelector('#status').textContent = 'Activated';
       // A hostile page realm must not replace the private reader's intrinsics.
       window.WeakMap = class { get() { return 'spoofed'; } set() { throw new Error('page registry spoof'); } };
       Element.prototype.click = () => { document.querySelector('#status').textContent = 'Page-world spoof'; };
-      setInterval(async () => {
-        const command = await (await fetch('/command')).json();
-        if (command.replacement !== generation) {
-          generation = command.replacement;
-          const old = document.querySelector('#activate');
-          old.replaceWith(old.cloneNode(true));
-          document.querySelector('#replacement').textContent = 'Replaced';
-        }
-      }, 100);
+      // One pending request per navigation; no traffic-observer polling storm.
+      fetch('/command?after=${replacement}').then(response => response.json()).then(() => {
+        const old = document.querySelector('#activate');
+        old.replaceWith(old.cloneNode(true));
+        document.querySelector('#replacement').textContent = 'Replaced';
+      });
     </script>`);
 });
 await new Promise(resolve => fixture.listen(18846, '127.0.0.1', resolve));
@@ -49,6 +49,7 @@ const fixtureURL = 'http://127.0.0.1:18846/';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function wire(path, body, method = 'POST', headers = {}) {
   const response = await fetch(new URL(path, endpoint), {
+    signal: AbortSignal.timeout(40_000),
     method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
     ...(method === 'POST' ? { body: JSON.stringify(body) } : {})
   });
@@ -59,6 +60,12 @@ async function core(method, tabId, params = {}) {
   const response = await wire('/v1/browser-control', { version: 1, method, ...(tabId ? { tabId } : {}), params });
   assert.equal(response.status, 200);
   return response.body;
+}
+function assertCoreSuccess(response, operation) {
+  const error = response.error;
+  assert.equal(response.ok, true, `${operation}: ${JSON.stringify({
+    code: error?.code, mayHaveCompleted: error?.mayHaveCompleted
+  })}`);
 }
 async function native(method, params = {}) {
   const response = await wire(`/v1/${method}`, params);
@@ -75,22 +82,24 @@ async function snapshot(tabId, predicate = () => true) {
   throw new Error('Candidate fixture snapshot did not settle');
 }
 async function verifyRenderer(label, tabId) {
-  assert.equal((await core('tab.goto', tabId, { url: fixtureURL })).ok, true);
+  assertCoreSuccess(await core('tab.goto', tabId, { url: fixtureURL }), `${label} tab.goto`);
   const observed = await snapshot(tabId, value => value.elements.some(el => el.name === 'Activate'));
   for (const secret of ['editable-secret', 'textarea-secret', 'password-secret']) assert(!JSON.stringify(observed).includes(secret));
   const button = observed.elements.find(el => el.name === 'Activate');
   assert(button?.ref);
-  assert.equal((await core('tab.click', tabId, { ref: button.ref })).ok, true);
+  assertCoreSuccess(await core('tab.click', tabId, { ref: button.ref }), `${label} tab.click`);
   await snapshot(tabId, value => value.text.includes('Activated'));
   const fresh = await snapshot(tabId);
   const entry = fresh.elements.find(el => el.name === 'Entry');
   assert(entry?.ref);
-  assert.equal((await core('tab.type', tabId, { ref: entry.ref, text: 'tail' })).ok, true);
+  assertCoreSuccess(await core('tab.type', tabId, { ref: entry.ref, text: 'tail' }), `${label} tab.type`);
   const form = await native('get-form-state', { tabId, selector: 'form' });
   assert(JSON.stringify(form).includes('seed-tail'), 'Common type must append');
   const beforeReplacement = await snapshot(tabId);
   const oldButton = beforeReplacement.elements.find(el => el.name === 'Activate');
   replacement++;
+  for (const response of pendingCommands) response.end(JSON.stringify({ replacement }));
+  pendingCommands.clear();
   for (let attempt = 0; attempt < 100; attempt++) {
     const text = await native('get-page-text', { tabId });
     if (JSON.stringify(text).includes('Replaced')) break;
@@ -168,5 +177,9 @@ try {
       assert.equal((await wire('/v1/browser-control', { version: 1, method: 'tabs.list', params: {} })).status, 401, 'Revoked bearer must be refused');
       console.log('Disposable one-session pairing revoked; old bearer refused');
     }
-  } finally { fixture.close(); }
+  } finally {
+    for (const response of pendingCommands) response.end();
+    fixture.closeAllConnections();
+    fixture.close();
+  }
 }
