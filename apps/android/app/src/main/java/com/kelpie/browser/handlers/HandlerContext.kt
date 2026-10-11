@@ -36,6 +36,7 @@ class HandlerContext {
 
     var webView: WebView? = null
     var tabStore: TabStore? = null
+    var browserDocumentChanged: ((String) -> Unit)? = null
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
     var annotationSessionId: String? = null

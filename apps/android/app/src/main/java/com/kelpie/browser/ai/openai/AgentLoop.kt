@@ -10,6 +10,11 @@ import kotlin.coroutines.coroutineContext
 
 /** Dispatches a sanitised tool call through Kelpie's router. The pinned tab is the dispatcher's concern. */
 fun interface ToolDispatcher {
+    val tools: JsonArray get() = JsonArray(emptyList())
+    val pinnedTabId: String? get() = null
+
+    suspend fun close() {}
+
     suspend fun dispatch(
         method: String,
         args: Map<String, Any?>,
@@ -95,7 +100,7 @@ class AgentLoop(
     private val actionSettleMs: Long = ACTION_SETTLE_MS,
 ) {
     private val stepLimit = maxSteps.coerceIn(1, MAX_STEPS)
-    private val tools = JsonArray(listOf(AgentTaskList.definition()) + AgentTools.definitions(allowActions))
+    private val tools = JsonArray(listOf(AgentTaskList.definition()) + dispatcher.tools)
     private val tasks = AgentTaskList()
     private var syntheticIds = 0
 
@@ -212,14 +217,13 @@ class AgentLoop(
     }
 
     private suspend fun toolPayload(call: AssembledToolCall): Pair<Boolean, Map<String, Any?>> {
-        val tool = AgentTools.all.firstOrNull { it.name == call.name } ?: return failure("Unknown tool \"${call.name}\".")
-        if (tool.requiresActions && !allowActions) return failure("Page actions are not enabled for this request.")
+        if (dispatcher.tools.none { OpenAIJson.string(((it as JsonObject)["function"] as JsonObject)["name"]) == call.name }) {
+            return failure("Unknown tool \"${call.name}\".")
+        }
         val rawArgs = call.parsedArguments() ?: return failure("The tool arguments were not valid JSON.")
-        val (args, missing) = AgentTools.sanitize(tool, rawArgs)
-        if (args == null) return failure("$missing is required")
-        val result = dispatcher.dispatch(tool.method, args)
-        val ok = result["success"] as? Boolean ?: (result["error"] == null)
-        if (tool.requiresActions && ok && actionSettleMs > 0) {
+        val result = dispatcher.dispatch(call.name, OpenAIJson.toMap(rawArgs))
+        val ok = result["ok"] as? Boolean ?: result["success"] as? Boolean ?: (result["error"] == null)
+        if (allowActions && ok && actionSettleMs > 0) {
             // Give the page a moment to react before the model observes it.
             delay(actionSettleMs)
         }
@@ -302,7 +306,9 @@ class AgentLoop(
                 "Start by calling update_task_list with the tasks you will do, keep it current, " +
                     "and mark a task done only after you have verified it.",
                 "Every tool result reports stepsRemaining; plan your work within that budget.",
-                "Use selectors returned by find_element or get_form_state. Do not guess facts that you have not observed.",
+                "Use kelpie_browser_control with request {version:1,method,tabId?,params}. Start with capabilities or documentation, then tab.snapshot. " +
+                    "Click/type only refs from the latest snapshot. Discover product tools with kelpie_extensions and kelpie_extension_tools; invoke with kelpie_extension.",
+                "If an error says mayHaveCompleted, observe before any further action; never repeat an uncertain action automatically.",
                 "When every task is done or cannot be done, reply with a short final answer grounded in what you observed, " +
                     "stating what you verified.",
             ).joinToString("\n")

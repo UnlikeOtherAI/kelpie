@@ -1,5 +1,7 @@
 package com.kelpie.browser
 
+import kotlinx.coroutines.launch
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -192,6 +194,7 @@ class MainActivity : ComponentActivity() {
         }
 
         router.registerFallbacks()
+        com.kelpie.browser.network.BrowserGatewayBinding(router, handlerContext).register()
     }
 
     private fun startServer(deviceInfo: DeviceInfo) {
@@ -239,6 +242,9 @@ class MainActivity : ComponentActivity() {
             NetworkServiceState.clearIf(it)
         }
         networkStage = null
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            router.browserGateway?.close()
+        }
         if (!isChangingConfigurations) KelpieNetworkService.stop(applicationContext)
         httpServer = null
         mdnsAdvertiser = null

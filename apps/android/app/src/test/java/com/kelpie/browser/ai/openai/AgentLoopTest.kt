@@ -14,14 +14,20 @@ class AgentLoopTest {
     private class RecordingDispatcher(
         val result: (String) -> Map<String, Any?> = { mapOf("success" to true, "url" to "https://example.com") },
     ) : ToolDispatcher {
+        var allowActions = false
+        // Legacy semantic fixtures exercise the loop independently of the production native catalog.
+        override val tools get() = AgentTools.definitions(allowActions)
         val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
 
         override suspend fun dispatch(
             method: String,
             args: Map<String, Any?>,
         ): Map<String, Any?> {
-            calls += method to args
-            return result(method)
+            val tool = AgentTools.all.first { it.name == method }
+            val (sanitized, missing) = AgentTools.sanitize(tool, OpenAIJson.fromAny(args) as JsonObject)
+            if (sanitized == null) return mapOf("success" to false, "error" to "$missing is required")
+            calls += tool.method to sanitized
+            return result(tool.method)
         }
     }
 
@@ -54,11 +60,36 @@ class AgentLoopTest {
         allowActions: Boolean = false,
         maxSteps: Int = AgentLoop.DEFAULT_MAX_STEPS,
         progress: AgentProgress = AgentProgress(),
-    ) = AgentLoop(chat, dispatcher, allowActions, maxSteps, progress, actionSettleMs = 0)
+    ): AgentLoop {
+        if (dispatcher is RecordingDispatcher) dispatcher.allowActions = allowActions
+        return AgentLoop(chat, dispatcher, allowActions, maxSteps, progress, actionSettleMs = 0)
+    }
 
     private fun toolNames(tools: JsonArray?): List<String?> = tools.orEmpty().map { OpenAIJson.string(((it as JsonObject)["function"] as JsonObject)["name"]) }
 
     private fun toolResult(message: JsonObject): JsonObject = OpenAIJson.parseObjectOrNull(OpenAIJson.string(message["content"])!!)!!
+
+    @Test
+    fun commonGatewayCatalogDispatchesNestedRequestAndKeepsUncertainFailure() {
+        val names = listOf("kelpie_browser_control", "kelpie_extensions", "kelpie_extension_tools", "kelpie_extension")
+        val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
+        val dispatcher = object : ToolDispatcher {
+            override val tools = JsonArray(names.map { name -> OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to name))) })
+            override suspend fun dispatch(method: String, args: Map<String, Any?>): Map<String, Any?> {
+                calls += method to args
+                return mapOf("version" to 1, "ok" to false, "error" to mapOf("code" to "CANCELLED", "mayHaveCompleted" to true))
+            }
+        }
+        val chat = ScriptedChat(toolTurn(AssembledToolCall(0, "c1", "kelpie_browser_control",
+            """{"request":{"version":1,"method":"tab.click","tabId":"one","params":{"ref":"observed"}}}""")), answer("Action outcome unknown"))
+        val outcome = runBlocking { loop(chat, dispatcher, allowActions = true).run("Click it") }
+        assertEquals(listOf(AgentTaskList.TOOL_NAME) + names, toolNames(chat.toolSets.first()))
+        assertEquals(1, calls.size)
+        assertEquals("one", (calls.single().second["request"] as Map<*, *>)["tabId"])
+        assertFalse(outcome.steps.single().ok)
+        assertTrue(outcome.steps.single().preview.contains("mayHaveCompleted"))
+        assertTrue(AgentLoop.systemPrompt(true).contains("never repeat an uncertain action"))
+    }
 
     @Test
     fun dispatchesToolsAndReturnsFinalAnswer() {
@@ -131,7 +162,7 @@ class AgentLoopTest {
             outcome.steps
                 .single()
                 .preview
-                .contains("Page actions are not enabled"),
+                .contains("Unknown tool"),
         )
     }
 

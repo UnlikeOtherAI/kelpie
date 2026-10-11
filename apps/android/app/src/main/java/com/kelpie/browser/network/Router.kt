@@ -10,6 +10,7 @@ class Router {
     var webView: WebView? = null
     var handlerContext: HandlerContext? = null
     var scriptPlaybackState: com.kelpie.browser.handlers.ScriptPlaybackState? = null
+    var browserGateway: BrowserGatewayBinding? = null
 
     /** Snapshot of currently-registered method names. */
     val registeredMethods: Set<String>
@@ -36,7 +37,12 @@ class Router {
         method: String,
         body: Map<String, Any?>,
         bypassRecordingGate: Boolean = false,
+        fromGateway: Boolean = false,
     ): Pair<Int, Map<String, Any?>> {
+        val gateway = browserGateway
+        if (gateway != null && !fromGateway && !bypassRecordingGate && method !in setOf("browser-control", "mcp", "ai-infer", "ai-record", "ai-cancel", "abort-script", "get-script-status")) {
+            return gateway.legacy(method) { handle(method, body, bypassRecordingGate, fromGateway = true) }
+        }
         val handler =
             routes[method]
                 ?: return 404 to

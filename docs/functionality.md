@@ -552,4 +552,11 @@ the older memory-only session, which still ends at access-token expiry.
 
 ## Shared browser control
 
+Android exposes the common core directly at authenticated `/v1/browser-control`
+and `/mcp`. Its existing OpenAI-compatible agent uses the compact shared catalog
+with per-run tab and action permissions. Product extensions are discovered on
+demand; pairing and plain local inference retain their permissions. See
+[the Android binding](api/native-browser-gateway-android.md), including its WebView
+page-realm limitation and verification commands.
+
 CLI MCP exposes `kelpie_browser_control`, the versioned browser core used by runtime consumers. Its owning surface is machine-facing MCP, reached through the existing `kelpie mcp` or pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native locators and keypresses are refused. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).
