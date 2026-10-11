@@ -245,7 +245,7 @@ AI inference on macOS, iOS, Android and Windows; Linux does not yet expose AI ha
 
 **Windows tab conversations:** The Local AI dialog keeps a separate in-memory transcript for its originating tab, includes page context by default, and sends all prior turns. Reopening the dialog or navigating preserves that transcript; closing the tab clears it and ignores late replies. Page text includes accessible image, ARIA and SVG names on both Windows and Linux.
 
-**iOS and Android API context:** Existing AI APIs accept complete caller-supplied conversation history on every backend. Explicit page context reads the requested tab and includes the page title, URL, text and accessible labels. Invalid tabs and extraction failures return errors. Mobile does not add a chat panel or a second conversation store; API clients own their conversation history. See [mobile AI context](api/mobile-ai-context.md).
+**iOS and Android API context:** Existing AI APIs accept complete caller-supplied conversation history on every backend. Page-text, DOM and accessibility context capture the requested tab without switching it. Page-text evidence includes the title, URL, text and accessible labels. Invalid tabs and extraction failures return errors. Mobile does not add a chat panel or a second conversation store; API clients own their conversation history. See [mobile AI context](api/mobile-ai-context.md).
 
 **iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) provides text inference when available on iOS 26 or later with supported hardware and Apple Intelligence enabled. Users can select an OpenAI-compatible or Ollama endpoint on a LAN computer when on-device inference is unavailable.
 

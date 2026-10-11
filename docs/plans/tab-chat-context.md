@@ -30,3 +30,12 @@ Rejected: adding a second session registry (Tab owns the session), blocking mode
 The user requested Sol agents across all platforms and confirmed that this repair covers existing AI paths only. macOS has the chat sidebar; Windows has an Ask/result surface. iOS and Android expose AI APIs without a chat panel, so their fixes preserve caller-supplied conversations and correct page targeting. Linux has no local AI chat service; shared page extraction is covered without introducing a new service or UI. Mobile implementations must remain equivalent.
 
 Windows uses the same ownership rule through `DesktopEngine::Tab` with a mutex-protected conversation and completion token. Google Gemma reviewed this supplement before implementation: accepted explicit extraction failures and synchronized close/completion tests; rejected cross-launch persistence because the requested lifetime ends on tab close. Separate Sol agents own macOS, mobile, and Windows/Linux changes, integrated into one delivery.
+
+## Acceptance evidence
+
+- macOS: Swift lint, 161 Xcode tests and arm64 Release build passed. A real Gemma/Ollama conversation read GitHub customer names and recalled a phrase after tab switching, navigation and panel reopening. The packaged Release build also passed page grounding and recall.
+- iOS: 11 focused tests exercised real WKWebViews, background tabs and stale view pointers. Swift lint and arm64 Simulator Release build passed; the installed app reported 0.1.14. Authenticated live API pairing was unavailable, so native router tests provide the page-read evidence.
+- Android: full Gradle build and bundleRelease, lint and 115 tests each in Debug and Release passed on Ubuntu. The signed release installed/launched in an API 35 emulator and reported 0.1.13. Physical mobile devices were unavailable.
+- Windows: CEF CI build/native tests passed and the candidate package passed live HTTP/MCP, accessible logo and tab-isolation checks on Maxis. No real Windows model server was running. The final integrated PR rebuilds the shared shutdown fix.
+- Linux: CEF/GTK build, all 27 native tests and the full live release harness passed, including page evidence, partition/session restoration and both clean shutdowns.
+- CLI: lint/build/tests passed on Maxis; 608 tests passed and 64 device-dependent tests were skipped. Existing Xcode warnings remain.
