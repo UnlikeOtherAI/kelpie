@@ -6,6 +6,7 @@ import XCTest
 final class BrowserControlGatewayTests: XCTestCase {
     func testAuthenticatedRoutesUseCanonicalEnvelopeAndCompactMCP() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = PairingStore(storeURL: directory.appendingPathComponent("pairings.json"))
         guard case .created(let pairing) = store.startPairing(clientId: "browser-test", clientName: "test", sourceAddress: "127.0.0.1") else {
@@ -60,6 +61,12 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertEqual(tools?.first?["name"] as? String, "kelpie_browser_control")
         let internalRoute = try await fetch(port: port, path: "/v1/browser-control-evaluate", body: ["expression": "alert(1)"], token: token)
         XCTAssertEqual(internalRoute.0, 404)
+        let unauthenticatedDelete = try await fetch(port: port, path: "/v1/pair", body: [:], token: nil, method: "DELETE")
+        XCTAssertEqual(unauthenticatedDelete.0, 401)
+        let revoked = try await fetch(port: port, path: "/v1/pair", body: [:], token: token, method: "DELETE")
+        XCTAssertEqual(revoked.0, 200)
+        let oldBearer = try await fetch(port: port, path: "/v1/browser-control", body: ["version": 1, "method": "tabs.list", "params": [:]], token: token)
+        XCTAssertEqual(oldBearer.0, 401, "Authenticated DELETE must revoke only its own pairing")
     }
 
     func testReadonlyCannotSwitchOrWriteAndSelectedReaderDoesNotRetarget() async {
