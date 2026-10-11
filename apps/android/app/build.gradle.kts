@@ -22,6 +22,7 @@ android {
         targetSdk = 34
         versionCode = 12
         versionName = "0.1.12"
+        buildConfigField("int", "LOCAL_HTTP_PORT", "8420")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
 
         externalNativeBuild {
@@ -35,6 +36,7 @@ android {
         debug {
             if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
                 applicationIdSuffix = ".nessieverify"
+                buildConfigField("int", "LOCAL_HTTP_PORT", "18420")
             }
         }
         release {

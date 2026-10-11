@@ -105,7 +105,7 @@ pauses its lifecycle. Device labels use the system device name when available an
 bounded operational metadata.
 
 For isolated Android verification, `./gradlew assembleDebug -PkelpieVerificationProfile=true`
-builds `com.kelpie.browser.nessieverify`, leaving an installed Kelpie app's data untouched.
+builds `com.kelpie.browser.nessieverify` with local HTTP port 18420, leaving an installed Kelpie app's data and listener untouched.
 This debug-only profile is for browser/UI checks; production OAuth verification uses the
 registered production app. Native UI tests use their own simulator/emulator and never
 terminate another person's Kelpie instance.
