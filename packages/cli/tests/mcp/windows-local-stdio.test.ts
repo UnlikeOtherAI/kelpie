@@ -80,6 +80,25 @@ describe("Windows local alias MCP stdio", () => {
     expect(tools.tools.map((tool) => tool.name)).not.toContain("kelpie_ai_ask");
     expect(tools.tools.map((tool) => tool.name)).not.toContain("kelpie_find_element");
 
+    expect(tools.tools.map((tool) => tool.name)).toContain("kelpie_browser_control");
+    const coreCapabilities = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "capabilities", params: {} } } });
+    const capabilityText = (coreCapabilities.content as { type: string; text?: string }[]).find((item) => item.type === "text")?.text;
+    const coreMethods = JSON.parse(capabilityText ?? "{}").value.methods as string[];
+    expect(coreMethods).toContain("tab.goto");
+    expect(coreMethods).not.toContain("locator.click");
+    expect(coreMethods).not.toContain("page.press");
+    const coreNavigation = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "tab.goto", tabId: "owned-tab", params: { url: "https://example.test/core" } } } });
+    expect(coreNavigation.isError).not.toBe(true);
+    const coreFailure = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "tab.goto", tabId: "owned-tab", params: { url: "https://fail.test" } } } });
+    expect(coreFailure.isError).toBe(true);
+    expect(JSON.stringify(coreFailure.content)).toContain("mayHaveCompleted");
+    const coreScreenshot = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "tab.screenshot", tabId: "owned-tab", params: {} } } });
+    const coreBlocks = coreScreenshot.content as { type: string; text?: string; data?: string }[];
+    expect(coreBlocks.filter((item) => item.type === "image")).toEqual([{ type: "image", data: "cG5n", mimeType: "image/png" }]);
+    expect(coreBlocks.filter((item) => item.type === "text").some((item) => item.text?.includes("cG5n"))).toBe(false);
+    const invalid = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "tab.click", tabId: "owned-tab", params: { ref: "e1", selector: "#guess" } } } });
+    expect(invalid.isError).toBe(true);
+
     const navigation = await client.callTool({ name: "kelpie_navigate", arguments: { url: "https://example.test" } });
     expect(navigation.isError).not.toBe(true);
     expect(navigationAuthorized).toBe(true);

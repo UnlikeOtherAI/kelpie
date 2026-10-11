@@ -29,7 +29,11 @@ function nativeBackend(pages: Map<string, Page>): BrowserControlBackend {
     if (method === "getCurrentUrl") return { success: true, url: page.url(), title: await page.title() };
     if (method === "navigate") await page.goto(String(params.url));
     if (method === "click") await page.locator(String(params.selector)).click();
-    if (method === "type") await page.locator(String(params.selector)).pressSequentially(String(params.text));
+    if (method === "type") {
+      const target = page.locator(String(params.selector));
+      await target.press("End");
+      await target.pressSequentially(String(params.text));
+    }
     if (method === "screenshot") return { success: true, image: (await page.screenshot()).toString("base64"), format: "png" };
     if (method === "scroll") await page.mouse.wheel(Number(params.deltaX), Number(params.deltaY));
     return { success: true };

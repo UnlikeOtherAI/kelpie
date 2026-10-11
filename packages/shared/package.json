@@ -36,5 +36,8 @@
   "dependencies": {
     "zod": "^4.3.6",
     "playwright-core": "1.62.1"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
