@@ -31,7 +31,6 @@ struct InferenceHarness {
 
     func run(prompt: String, audio: Data? = nil, preloadedContext: String? = nil) async throws -> Result {
         let startedAt = DispatchTime.now()
-        let summary = await PageSummary.gather(from: context)
         var totalTokens = 0
         var toolCallsMade = 0
         var rounds = 0
@@ -43,11 +42,18 @@ struct InferenceHarness {
         let tabId = await MainActor.run { context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString }
         let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true, admission: .localReadOnly(vision: vision))
         let definitions = await browser.toolDefinitions()
+        let observation = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "",
+                                                 "params": ["maxChars": 1200, "maxElements": 1]])
+        guard observation["ok"] as? Bool == true, let value = observation["value"] as? [String: Any] else {
+            throw InferenceEngine.InferenceError.inferenceFailed("Could not observe the pinned browser tab")
+        }
+        let summary = "Untrusted page metadata: " + stringify(["title": value["title"] ?? "", "url": value["url"] ?? ""])
+
 
         if let preloadedContext {
             let fullPrompt = buildDirectAnswerPrompt(
                 userPrompt: prompt,
-                pageSummary: summary.formatted(),
+                pageSummary: summary,
                 pageText: preloadedContext
             )
             let inference = try await engine.infer(prompt: fullPrompt, audio: audio, image: nil)
@@ -66,7 +72,7 @@ struct InferenceHarness {
         while rounds < maxRounds {
             let fullPrompt = buildPrompt(
                 userPrompt: prompt,
-                pageSummary: summary.formatted(),
+                pageSummary: summary,
                 preloadedContext: nil,
                 transcript: transcript,
                 toolDefinitions: stringify(definitions)
@@ -112,14 +118,6 @@ struct InferenceHarness {
             totalTimeMs: elapsedMs(since: startedAt),
             transcription: transcription
         )
-    }
-
-    func pageSnapshot() async -> String {
-        guard let router else { return "" }
-        let tabId = await MainActor.run { context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString }
-        let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
-        let result = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "", "params": [:]])
-        return truncate(stringify(result), maxTokens: toolTokenBudget)
     }
 
     private func truncate(_ text: String, maxTokens: Int) -> String {
