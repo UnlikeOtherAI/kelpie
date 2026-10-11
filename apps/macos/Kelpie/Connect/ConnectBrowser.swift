@@ -26,9 +26,9 @@ final class ConnectBrowser {
         return context.tabStore?.activeBrowserTab != nil
         #else
         if let cef = context.renderer as? CEFRenderer {
-            return cef.bridge != nil && cef.containerView.window != nil && !cef.containerView.isHidden
+            return cef.bridge != nil && cef.containerView.window?.isVisible == true && !cef.containerView.isHidden
         }
-        return WindowRegistry.shared.defaultEntry() != nil
+        return WindowRegistry.shared.defaultEntry()?.window?.isVisible == true
         #endif
     }
 

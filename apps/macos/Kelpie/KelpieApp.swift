@@ -253,6 +253,7 @@ private struct BrowserCommands: Commands {
 
 @main
 struct KelpieApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var browserState = BrowserState()
     @StateObject private var rendererState: RendererState
     @StateObject private var serverState: ServerState
@@ -286,6 +287,7 @@ struct KelpieApp: App {
                 viewportState: serverState.viewportState
             )
             .onAppear { Self.startServices(serverState: serverState, rendererState: rendererState) }
+            .onChange(of: scenePhase) { phase in NessieConnection.shared.setForeground(phase == .active) }
             .frame(
                 minWidth: ViewportState.minimumShellSize.width,
                 minHeight: ViewportState.minimumShellSize.height
