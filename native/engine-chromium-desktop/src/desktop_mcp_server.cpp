@@ -39,8 +39,9 @@ class DesktopMcpServer::Impl {
     gateway_config = {{"nativeMethods", methods}, {"fixedReader", static_cast<bool>(reader)}, {"requireAuthorization", false}, {"extensions", extensions}};
     gateway = std::make_unique<BrowserGateway>(gateway_config);
   }
-  json Run(json step) const {
+  json Run(json step, const DesktopMcpServer::StepAuthorization& authorize = {}) const {
     while (step.value("kind", std::string()) != "complete") {
+      if (authorize && !authorize()) return gateway->Cancel()["response"];
       if (step.value("kind", std::string()) == "authorize") { step = gateway->Advance({{"success", true}}); continue; }
       json result;
       try {
@@ -129,5 +130,14 @@ DesktopMcpServer::json DesktopMcpServer::HandleBrowserRequest(const json& reques
   if (impl_->pending && impl_->pending() && request.is_object() && request.value("method", std::string()) != "tabs.close")
     return {{"version", 1}, {"ok", false}, {"error", {{"code", "BUSY"}, {"message", "A prior renderer command is still pending"}, {"mayHaveCompleted", false}}}};
   return impl_->Run(impl_->gateway->Begin(request));
+}
+DesktopMcpServer::json DesktopMcpServer::HandleBrowserRequestAuthorized(
+    const json& request, const Config& config, const StepAuthorization& authorize) const {
+  std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
+  impl_->Ensure(config);
+  impl_->DrainDocuments();
+  if (impl_->pending && impl_->pending() && request.is_object() && request.value("method", std::string()) != "tabs.close")
+    return {{"version", 1}, {"ok", false}, {"error", {{"code", "BUSY"}, {"message", "A prior renderer command is still pending"}, {"mayHaveCompleted", false}}}};
+  return impl_->Run(impl_->gateway->Begin(request), authorize);
 }
 }

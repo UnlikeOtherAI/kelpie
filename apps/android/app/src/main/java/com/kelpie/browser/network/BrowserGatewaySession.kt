@@ -27,6 +27,8 @@ class BrowserGatewaySession(
     suspend fun call(
         request: Map<String, Any?>,
         mcp: Boolean = false,
+        authorizeAccountStep: suspend (Map<String, Any?>, Boolean) -> Boolean = { _, _ -> true },
+        dispatchAccountStep: (suspend (String, Map<String, Any?>) -> Map<String, Any?>)? = null,
     ): Map<String, Any?>? =
         withBrowserGatewayLease(lock, retirement) {
             check(handle != 0L) { "The browser gateway has closed" }
@@ -36,8 +38,11 @@ class BrowserGatewaySession(
                 while (step["kind"] != "complete") {
                     val result =
                         when (step["kind"]) {
-                            "authorize" -> mapOf("success" to authorize(objectValue(step["request"]), step["mutates"] == true))
-                            "dispatch" -> if (dispatchTimeoutMs == null) dispatchStep(step) else withTimeout(dispatchTimeoutMs) { dispatchStep(step) }
+                            "authorize" -> mapOf("success" to (authorize(objectValue(step["request"]), step["mutates"] == true) && authorizeAccountStep(request, step["mutates"] == true)))
+                            "dispatch" -> {
+                                if (!authorizeAccountStep(request, step["mutates"] == true)) error("Account command authority changed")
+                                if (dispatchTimeoutMs == null) dispatchStep(step, dispatchAccountStep) else withTimeout(dispatchTimeoutMs) { dispatchStep(step, dispatchAccountStep) }
+                            }
                             else -> error("Invalid native browser step")
                         }
                     step = decode(abi.advance(handle, OpenAIJson.encode(OpenAIJson.fromAny(result))))
@@ -50,9 +55,14 @@ class BrowserGatewaySession(
             }
         }
 
-    private suspend fun dispatchStep(step: Map<String, Any?>): Map<String, Any?> {
+    private suspend fun dispatchStep(
+        step: Map<String, Any?>,
+        dispatchOverride: (suspend (String, Map<String, Any?>) -> Map<String, Any?>)?,
+    ): Map<String, Any?> {
         if (step["mutates"] == true) beforeMutation()
-        return dispatch(step["method"] as String, objectValue(step["params"]))
+        val method = step["method"] as String
+        val params = objectValue(step["params"])
+        return dispatchOverride?.invoke(method, params) ?: dispatch(method, params)
     }
 
     /** Called under the same router lock before legacy mutations touch the renderer. */

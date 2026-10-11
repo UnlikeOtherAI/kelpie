@@ -22,10 +22,10 @@ std::string DeviceLabel(const std::string& platform) {
 namespace kelpie::connect {
 using Json=nlohmann::json;
 Client::Client(account::AccountService& account,const std::filesystem::path& profile,
-    std::string platform,std::string installation,Execute execute,Cancel cancel,Factory factory)
+    std::string platform,std::string installation,Execute execute,Cancel cancel,Factory factory,bool browser_control_v1)
     :account_(account),journal_(account::MakeEncryptedBlobStore(profile,"nessie.journal.v1",32*1024*1024)),
      settings_(account::MakeEncryptedBlobStore(profile,"nessie.controls.v1",4096)),platform_(std::move(platform)),
-     installation_(std::move(installation)),execute_(std::move(execute)),cancel_(std::move(cancel)),factory_(std::move(factory)) {
+     installation_(std::move(installation)),browser_control_v1_(browser_control_v1),execute_(std::move(execute)),cancel_(std::move(cancel)),factory_(std::move(factory)) {
   try { if(auto raw=settings_->Load()) {
     const auto value=Json::parse(*raw,nullptr,false);
     if(!value.is_object() || !value.at("enabled").is_boolean() || !value.at("paused").is_boolean())throw std::runtime_error("Invalid connection controls");
@@ -121,6 +121,7 @@ void Client::Run() {
       { std::lock_guard lock(mutex_); if(owner!=owner_ || !enabled_)continue; }
       auto socket=factory_(); socket->Open(); generation.clear();
       auto caps=Json::array({"browser.control"});
+      if(browser_control_v1_)caps.push_back("browser.control.v1");
       if(platform_=="windows")caps.push_back("page.extract");
       socket->Send(Json{{"type","hello"},{"protocol",1},{"ticket",ticket.at("connection_ticket")},
           {"installationId",installation_},{"label",DeviceLabel(platform_)},{"platform",platform_},

@@ -16,11 +16,16 @@ constexpr std::size_t kMaxFrame = 1024 * 1024;
 constexpr std::size_t kMaxOutput = 768 * 1024;
 constexpr std::size_t kMaxJournal = 32 * 1024 * 1024;
 const std::set<std::string> kOperations = {
-    "tabs", "open", "navigate", "snapshot", "click", "type", "scroll",
+    "tabs", "open", "control", "navigate", "snapshot", "click", "type", "scroll",
     "back", "forward", "reload", "extract"};
 std::string Text(const Json& value, const char* key) {
   if (!value.contains(key) || !value[key].is_string()) throw std::invalid_argument(key);
   return value[key].get<std::string>();
+}
+bool UnboundControlMethod(const Json& request) {
+  const auto method = Text(request, "method");
+  return method == "capabilities" || method == "documentation" ||
+      method == "tabs.list" || method == "tabs.new";
 }
 bool UUID(const std::string& value) {
   if (value.size() != 36) return false;
@@ -132,7 +137,21 @@ struct KelpieConnect {
     const auto deadline = Clock::Deadline(Text(frame, "deadline"));
     const auto now = journal.at("retirementTime").get<std::int64_t>();
     if (deadline > now + Clock::maxDeadline) throw std::invalid_argument("Deadline exceeds admission window");
-    if (operation != "tabs" && operation != "open") {
+    if (operation == "control") {
+      if (!frame["input"].contains("request") || !frame["input"]["request"].is_object() ||
+          frame["input"]["request"].value("version", 0) != 1 ||
+          !frame["input"]["request"].contains("params") || !frame["input"]["request"]["params"].is_object())
+        throw std::invalid_argument("Invalid browser-control request");
+      const auto& request = frame["input"]["request"];
+      if (UnboundControlMethod(request)) {
+        if (!frame.at("tabId").is_null() || !frame.at("tabVersion").is_null())
+          throw std::invalid_argument("Unbound control command contains a tab pin");
+      } else {
+        const auto request_tab = Text(request, "tabId");
+        if (request_tab.empty() || Text(frame, "tabId") != request_tab || Text(frame, "tabVersion").empty())
+          throw std::invalid_argument("A matching browser-control tab pin is required");
+      }
+    } else if (operation != "tabs" && operation != "open") {
       if (Text(frame, "tabId").empty() || Text(frame, "tabVersion").empty())
         throw std::invalid_argument("A pinned tab document is required");
     } else if (!frame.at("tabId").is_null() || !frame.at("tabVersion").is_null()) {

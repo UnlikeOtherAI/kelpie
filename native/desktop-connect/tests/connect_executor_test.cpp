@@ -118,6 +118,46 @@ int main() {
         return transaction;
       });
   assert(stopped_while_readmitting.Execute(long_job,guard)["state"]=="cancelled");guard->store(false);
+  const Json canonical_request={{"version",1},{"method","tab.click"},{"tabId","owned"},{"params",{{"ref","observed-7"}}}};
+  auto control_command=Json{{"operation","control"},{"input",{{"request",canonical_request}}},
+      {"deadline","2099-10-11T12:00:00.000Z"},{"tabId","owned"},{"tabVersion","document-1"}};
+  bool dispatched=false;int authority_checks=0;Json seen;
+  Executor control_executor(browser,{}, {},[&](const Json& request,const Authorization& authorize) {
+    seen=request;dispatched=true;authority_checks++;assert(authorize());
+    return Json{{"version",1},{"ok",true},{"value",{{"success",true}}}};
+  });
+  const auto control_result=control_executor.Execute(control_command,guard);
+  assert(control_result["state"]=="completed" && seen==canonical_request && authority_checks==1);
+  assert(control_result["output"]["response"]["value"]["success"]==true);
+  auto wrong_pin=control_command;wrong_pin["input"]["request"]["tabId"]="other";
+  dispatched=false;control_executor.Execute(wrong_pin,guard);assert(!dispatched);
+  browser.tab.active=false;dispatched=false;
+  control_executor.Execute(control_command,guard);assert(!dispatched);browser.tab.active=true;
+  auto screenshot=control_command;screenshot["input"]["request"]={{"version",1},{"method","tab.screenshot"},{"tabId","owned"},{"params",Json::object()}};
+  Executor image_executor(browser,{}, {},[](const Json&,const Authorization&) {
+    return Json{{"version",1},{"ok",true},{"value",{{"type","image"},{"mimeType","image/png"},{"data","opaque-image"}}}};
+  });
+  assert(image_executor.Execute(screenshot,guard)["output"]["response"]["value"]["type"]=="image");
+  auto capabilities=control_command;capabilities["tabId"]=nullptr;capabilities["tabVersion"]=nullptr;
+  capabilities["input"]["request"]={{"version",1},{"method","capabilities"},{"params",Json::object()}};
+  Executor capability_executor(browser,{}, {},[](const Json&,const Authorization&) {
+    return Json{{"version",1},{"ok",true},{"value",{{"methods",Json::array({"tab.click","tab.screenshot","tab.back","kelpie.local-extension"})},
+        {"extensions",Json::array({"local"})}}}};
+  });
+  const auto projected=capability_executor.Execute(capabilities,guard)["output"]["response"]["value"];
+  assert(projected["methods"]==Json::array({"tab.click","tab.screenshot"}) && projected["extensions"].empty());
+  auto listed=control_command;listed["tabId"]=nullptr;listed["tabVersion"]=nullptr;
+  listed["input"]["request"]={{"version",1},{"method","tabs.list"},{"params",Json::object()}};
+  Executor list_executor(browser,{}, {},[](const Json&,const Authorization&) {
+    return Json{{"version",1},{"ok",true},{"value",Json::array({{{"id","owned"}}})}};
+  });
+  const auto list_result=list_executor.Execute(listed,guard);
+  assert(list_result["output"]["response"]["value"].is_array());
+  assert(list_result["output"]["tabs"]==Json::array({{{"tabId","owned"},{"tabVersion","document-1"}}}));
+  auto unsupported=control_command;unsupported["input"]["request"]["method"]="tab.back";
+  dispatched=false;control_executor.Execute(unsupported,guard);assert(!dispatched);
+  auto forbidden=listed;forbidden["input"]["request"]={{"version",1},{"method","tabs.new"},{"params",{{"url","https://authentication.unlikeotherai.com/login"}}}};
+  dispatched=false;control_executor.Execute(forbidden,guard);assert(!dispatched);
   std::string split="\x81\x05hello";auto half=split.substr(0,4);assert(!DecodeFrame(half));half+=split.substr(4);assert(DecodeFrame(half)->payload=="hello");
   std::string masked="\x81\x80";bool rejected=false;try { DecodeFrame(masked); }catch(...) { rejected=true; }assert(rejected);
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();

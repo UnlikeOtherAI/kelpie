@@ -8,10 +8,12 @@ class Executor {
  public:
   using Infer=std::function<Json(const Json&)>;
   using Admission=std::function<std::shared_ptr<void>(const std::string&,const Json&)>;
-  Executor(DesktopBrowserControl& browser,Infer infer={},Admission admission={})
-      :browser_(browser),infer_(std::move(infer)),admission_(std::move(admission)) {}
+  using Authorization=std::function<bool()>;
+  using Control=std::function<Json(const Json&,const Authorization&)>;
+  Executor(DesktopBrowserControl& browser,Infer infer={},Admission admission={},Control control={})
+      :browser_(browser),infer_(std::move(infer)),admission_(std::move(admission)),control_(std::move(control)) {}
   Json Execute(const Json& command,std::shared_ptr<const std::atomic<bool>> cancelled);
  private:
-  DesktopBrowserControl& browser_; Infer infer_; Admission admission_;
+  DesktopBrowserControl& browser_; Infer infer_; Admission admission_; Control control_;
 };
 }

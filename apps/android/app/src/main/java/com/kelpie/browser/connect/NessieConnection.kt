@@ -71,7 +71,7 @@ object NessieConnection {
         appContext = context.applicationContext
         secrets = SecretStore.get(context)
         host = handlers
-        browser = ConnectBrowser(handlers, java.io.File(context.filesDir, "local-models"))
+        browser = ConnectBrowser(handlers, java.io.File(context.filesDir, "local-models"), context.applicationContext)
         if (accountObserver == null) {
             accountObserver =
                 scope.launch {
@@ -128,6 +128,15 @@ object NessieConnection {
     }
 
     fun <T> changeTabRemotely(action: () -> T): T {
+        remoteTabMutation = true
+        return try {
+            action()
+        } finally {
+            remoteTabMutation = false
+        }
+    }
+
+    suspend fun <T> changeTabRemotelySuspending(action: suspend () -> T): T {
         remoteTabMutation = true
         return try {
             action()
@@ -213,7 +222,11 @@ object NessieConnection {
                         "label" to
                             deviceLabel(),
                         "platform" to "android",
-                        "capabilities" to listOf("browser.control", "page.extract"),
+                        "capabilities" to buildList {
+                            add("browser.control")
+                            if (browser?.supportsControlV1 == true) add("browser.control.v1")
+                            add("page.extract")
+                        },
                         "lifecycle" to lifecycle,
                         "modelReady" to ready,
                         "modelInstalled" to (browser?.modelInstalled ?: false),
