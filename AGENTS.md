@@ -12,6 +12,7 @@
 - API reference: [docs/api/](docs/api/) — all HTTP/MCP methods (core, LLM-optimized, devtools, browser management)
 - CLI reference: [docs/cli.md](docs/cli.md) — commands, flags, group operations, LLM help system
 - Persistent pairing and exact-socket token reuse: [docs/functionality.md](docs/functionality.md#pairing--authentication).
+- Native UOA-backed outbound Nessie connectivity, document pins, and durable job results: [docs/nessie-connect.md](docs/nessie-connect.md).
 - Windows/Linux outbound Nessie account connections and native verification: [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 - UI documentation: [docs/ui/](docs/ui/) — browser app screens, settings panel, platform specifics
 
@@ -133,7 +134,7 @@ Each component owns its version in its own manifest — do not create a central 
 ## Windows release ownership
 
 - Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
-  (`0.1.8`); keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+  (`0.1.12`); keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
   in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.

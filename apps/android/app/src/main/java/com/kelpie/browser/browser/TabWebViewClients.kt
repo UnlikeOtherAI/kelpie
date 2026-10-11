@@ -47,6 +47,10 @@ private fun tabWebViewClient(
             url: String,
             favicon: Bitmap?,
         ) {
+            tab.documentVersion =
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()
             }

@@ -74,6 +74,9 @@ Runs inference against the active backend.
 - Platform AI on mobile currently accepts text only.
 - Remote Ollama on mobile proxies the request to the configured `/api/generate` or `/api/chat` endpoint.
 - If Ollama is configured but unavailable, the request fails explicitly instead of silently falling back.
+- On macOS, `messages` supplies prior conversation turns (the current `prompt` is appended once). Local Ollama and native chat capture the current page from `tabId`, including accessible image/logo labels. Supply `tabId` in multi-tab windows; ambiguous or closed tabs fail explicitly. Chat and OpenAI-compatible preload extraction failures return `PAGE_CONTEXT_UNAVAILABLE`. The OpenAI page-text tool uses the same accessible-name snapshot. The browser panel supplies its full per-tab history; each model's context limit still applies.
+
+On iOS and Android, all existing backends preserve caller-supplied `messages` and use explicit, tab-targeted page evidence; see [mobile AI context](mobile-ai-context.md). Windows dialog conversation behavior is documented in [local GGUF](local-gguf.md#windows-tab-conversations).
 
 Examples:
 
@@ -184,5 +187,6 @@ Fitness levels: `no_storage` (free disk is below the download size), `not_recomm
 | `RECORDING_ALREADY_ACTIVE` | `ai-record` start was called while already recording |
 | `NO_RECORDING_ACTIVE` | `ai-record` stop was called without an active recording |
 | `AUTH_REQUIRED` | `ai-catalog`/`ai-fitness` need a HuggingFace token configured on the device |
+| `PAGE_CONTEXT_UNAVAILABLE` | macOS could not read or decode the requested page snapshot |
 | `AI_UNAVAILABLE` | The device's AI manager is not initialized |
 | `MISSING_PARAM` | `ai-fitness` was called without the required `model` |

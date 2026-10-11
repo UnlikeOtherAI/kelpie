@@ -1,5 +1,9 @@
 # Nessie account connection
 
+Native build/test evidence and remaining real-device checks are recorded in [verification](nessie-connect-verification.md).
+
+Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
+
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.
 UOA remains the sole identity authority. Native OAuth requests `kelpie.connect` alongside
@@ -17,14 +21,15 @@ Development overrides must explicitly trust both the UOA-approved resource and g
 
 First frame: `hello` with `protocol: 1`, `ticket`, random install UUID
 `installationId`, bounded `label`, `platform`, `capabilities`, `lifecycle` and
-`modelReady`. Installation metadata never establishes identity. Capabilities list only
+`modelInstalled`, `modelReady`, `modelCapabilities: ["text"]`, and
+`delegatedBrowsing: false`. Installation metadata never establishes identity. Capabilities list only
 implemented actions. Lifecycle is `ready`, `paused`, or `signed_out`; a background
 mobile WebView is paused. Installed model, loaded model readiness and text/tool support
 are distinct. Embedded GGUF supports text extraction, not a delegated browser tool loop.
 
 `welcome` returns `protocol`, `deviceId`, random socket `generation`, `heartbeatMs`
 and `maxFrameBytes`. Every later frame contains this `generation`.
-`auth` renews `ticket`; `heartbeat` carries current `lifecycle` and `modelReady`.
+`auth` renews `ticket`; `heartbeat` carries current `lifecycle` and all four model fields.
 
 `command` carries UUID `jobId`, UUID `attemptId`, positive `seq`, ISO `deadline`,
 `operation`, `tabId`, `tabVersion` and object `input`. Operations are `tabs`, `open`,
@@ -63,3 +68,46 @@ is bounded (32 MiB, 8192 attempt identities) and exhaustion fails closed.
 Sign-out/account change cancels local jobs, closes the socket, and discards the prior
 account journal. Reconnection revalidates UOA authority. Mobile execution is foreground
 only; no iOS background browser or extraction capability is advertised.
+
+## Native browser adapter
+
+Nessie controls live in Settings and appear beside the visible browser while a job is
+running or paused. Pause cancels the current job; Resume allows new jobs; Stop cancels
+and leaves the device paused. A person switching or closing the controlled tab pauses
+remote work. Returning to the foreground does not override a person's pause.
+
+Apple and Android reuse their existing browser handlers through a job-owned context.
+macOS supports both WebKit tabs and the visible Chromium/CEF surface. CEF exposes its
+one current surface as one tab; `open` navigates that surface. Each main-frame start
+rotates a native document identity, including reloads to the same URL. Remote `type`
+sets the selected editable control through the existing atomic `fill` handler; it
+does not write to an unrelated focused control. Only validated selector/text, HTTP(S)
+URL, and bounded scroll inputs enter handlers. No caller-supplied JavaScript is accepted.
+
+`tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
+`{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
+the character count without echoing its contents. `snapshot` returns
+`{tabId,tabVersion,page}` using compact interactable elements. Explicit
+`input.includeScreenshot: true` adds the existing viewport JPEG response under
+`screenshot`, including `image` base64 and CSS-pixel coordinate metadata.
+Visible element entries include the existing unique selector builder's `selector`.
+The shared `get-page-text` handler returns `content`, bounded by optional `maxLength`
+(1–100000, default 100000); extraction requests 6000 and uses that field.
+Each job's mutation fence includes its immutable job/attempt/deadline and native
+account, foreground, connection and document authority. Later jobs cannot inherit it.
+
+`extract` takes `question` and `maxOutputCharacters`. It reads at most 6000 page
+characters, verifies the document before and after local inference, and returns
+`{tabId,tabVersion,summary,evidence:[{url,excerpt,observedAt}],modelCapabilities:["text"]}`.
+It uses the loaded embedded model only, with no model/provider fallback or cloud cost.
+Backgrounding, cancellation, account changes, deadline expiry, and connection loss
+stop active work and preserve a terminal result for acknowledgement/reconciliation.
+The desktop browser must also remain visible and active; hiding/backgrounding the Mac
+pauses its lifecycle. Device labels use the system device name when available and remain
+bounded operational metadata.
+
+For isolated Android verification, `./gradlew assembleDebug -PkelpieVerificationProfile=true`
+builds `com.kelpie.browser.nessieverify` with local HTTP port 18420, leaving an installed Kelpie app's data and listener untouched.
+This debug-only profile is for browser/UI checks; production OAuth verification uses the
+registered production app. Native UI tests use their own simulator/emulator and never
+terminate another person's Kelpie instance.

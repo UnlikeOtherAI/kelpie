@@ -33,6 +33,20 @@ inline constexpr std::string_view kVisibleElementsScript = R"JS(
 })()
 )JS";
 
+// Appended inside a page-text snapshot so text and accessible names share the
+// same document evaluation. Logos can be readable even when innerText is empty.
+inline constexpr std::string_view kPageLabelsScript = R"JS(
+const accessibleLabels = root ? Array.from(root.querySelectorAll('img[alt],[aria-label],[aria-labelledby],svg')).flatMap(node => {
+  const rect = node.getBoundingClientRect();
+  const style = getComputedStyle(node);
+  if (!rect.width || !rect.height || style.visibility === 'hidden' || style.display === 'none' || node.closest('[aria-hidden="true"],[hidden]')) return [];
+  const references = (node.getAttribute('aria-labelledby') || '').split(/\s+/)
+    .map(id => document.getElementById(id)?.textContent || '').join(' ').trim();
+  return [node.getAttribute('alt'), node.getAttribute('aria-label'), references,
+    node.matches('svg') ? node.querySelector('title')?.textContent : ''].filter(value => value && value.trim()).map(value => value.trim());
+}) : [];
+)JS";
+
 inline constexpr std::string_view kPageTextScript = R"JS(
 (() => {
   const root = document.body;

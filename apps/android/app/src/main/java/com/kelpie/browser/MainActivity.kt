@@ -114,7 +114,21 @@ class MainActivity : ComponentActivity() {
         }
 
         registerHandlers(deviceInfo)
+        com.kelpie.browser.connect.NessieConnection
+            .start(this, handlerContext)
         startServer(deviceInfo)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.kelpie.browser.connect.NessieConnection
+            .setForeground(true)
+    }
+
+    override fun onPause() {
+        com.kelpie.browser.connect.NessieConnection
+            .setForeground(false)
+        super.onPause()
     }
 
     private fun registerHandlers(deviceInfo: DeviceInfo) {
@@ -227,6 +241,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        com.kelpie.browser.connect.NessieConnection
+            .detach(handlerContext)
         com.kelpie.browser.account.UOAAccount
             .detach(this)
         handlerContext.dialogState.dismissPending()

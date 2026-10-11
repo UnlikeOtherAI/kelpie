@@ -20,6 +20,7 @@ struct TabSpec {
 final class Tab: ObservableObject, Identifiable {
     let id = UUID()
     let renderer: WKWebViewRenderer
+    let chatSession: AIChatSession
 
     /// Storage container this tab is bound to; `nil` means the shared default
     /// store. Immutable: a tab cannot change identity mid-life, and a partition
@@ -33,7 +34,11 @@ final class Tab: ObservableObject, Identifiable {
     /// of the page title.
     @Published var name: String?
     @Published var title: String = "Start Page"
-    @Published var currentURL: String = ""
+    @Published var currentURL: String = "" {
+        didSet {
+            if currentURL != oldValue { chatSession.allowActions = false }
+        }
+    }
     @Published var isLoading: Bool = false
     @Published var favicon: NSImage?
     @Published var isStartPage: Bool = true
@@ -54,6 +59,7 @@ final class Tab: ObservableObject, Identifiable {
         self.partition = spec.partition
         self.persistent = spec.persistent
         self.renderer = WKWebViewRenderer(dataStore: spec.dataStore)
+        self.chatSession = AIChatSession(tabId: id.uuidString)
     }
 
     deinit {
@@ -152,6 +158,7 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addTab(spec: TabSpec = TabSpec()) -> Tab {
+        NessieConnection.shared.personChangedTab()
         let tab = Tab(spec: spec)
         bind(tab)
         tabs.append(tab)
@@ -161,6 +168,7 @@ final class TabStore: ObservableObject {
     }
 
     func closeTab(id: UUID) {
+        if id == activeTabID { NessieConnection.shared.personChangedTab() }
         guard let idx = tabs.firstIndex(where: { $0.id == id }) else { return }
 
         if tabs.count == 1 {
@@ -183,6 +191,7 @@ final class TabStore: ObservableObject {
     }
 
     func selectTab(id: UUID) {
+        if id != activeTabID { NessieConnection.shared.personChangedTab() }
         guard tabs.contains(where: { $0.id == id }) else { return }
         activeTabID = id
         persistSession()
@@ -208,6 +217,7 @@ final class TabStore: ObservableObject {
     }
 
     private func unbind(_ tab: Tab) {
+        tab.chatSession.close()
         tab.renderer.onStateChange = nil
         tabSinks.removeValue(forKey: tab.id)
     }

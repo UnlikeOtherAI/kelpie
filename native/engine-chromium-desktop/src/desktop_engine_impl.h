@@ -68,6 +68,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     // erase this owner early, otherwise cancellation and shutdown can leave a
     // live callback pointing at destroyed state.
     bool closing = false;
+    std::shared_ptr<TabChatSession> chat_session = std::make_shared<TabChatSession>();
   };
 
   CefRefPtr<CefClient> client;

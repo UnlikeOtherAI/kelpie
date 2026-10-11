@@ -25,9 +25,16 @@ function start(extra=[]) {
   };
 }
 async function close() {
-  if(!child || child.exitCode!==null)return;
+  if(!child)return;
+  if(child.exitCode!==null || child.signalCode!==null) {
+    assert.equal(child.signalCode,null,'Linux browser must not terminate by signal');
+    assert.equal(child.exitCode,0,'Linux browser must exit successfully');
+    return;
+  }
   await control(readiness,'close-browser',{});
-  await waitFor(()=>child.exitCode!==null,'graceful Linux shutdown',15000);
+  await waitFor(()=>child.exitCode!==null || child.signalCode!==null,'graceful Linux shutdown',15000);
+  assert.equal(child.signalCode,null,'Linux browser must not terminate by signal');
+  assert.equal(child.exitCode,0,'Linux browser must exit successfully');
   assert.equal(await fileExists(readinessFile),false,'shutdown removes readiness');
 }
 try {
@@ -49,6 +56,6 @@ try {
   await close();
   console.log('PASS Linux native HTTP/MCP, trusted input, screenshots, partitions, profile ownership, session restore and readiness cleanup');
 } finally {
-  if(child && child.exitCode===null)await close().catch(error=>{child.kill('SIGTERM');console.error(error.message);});
+  if(child && child.exitCode===null && child.signalCode===null)await close().catch(error=>{child.kill('SIGTERM');console.error(error.message);});
   await fixture.close();
 }

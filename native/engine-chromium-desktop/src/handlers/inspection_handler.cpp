@@ -141,10 +141,11 @@ nlohmann::json InspectionHandler::PageText(const nlohmann::json& params) const {
     if (!mode.empty() && mode != "readable" && mode != "full" && mode != "markdown") return InvalidParams("mode is invalid");
     const std::string selected_mode = mode.empty() ? "readable" : mode;
     std::string script = "(() => { const root = " + (selector.empty() ? std::string("document.body") : "document.querySelector(" + JsStringLiteral(selector) + ")") +
-        "; if (!root) return {text:'', length:0, mode:" + JsStringLiteral(selected_mode) + "};"
-        "const text = " + (selected_mode == "markdown"
-          ? "Array.from(root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre')).map((node) => { const tag=node.tagName.toLowerCase(); const value=(node.innerText || '').trim(); if (!value) return ''; if (tag[0] === 'h') return '#'.repeat(Number(tag[1])) + ' ' + value; if (tag === 'li') return '- ' + value; if (tag === 'pre') return '```\\n' + value + '\\n```'; return value; }).filter(Boolean).join('\\n\\n')"
-          : "root.innerText || ''") + "; return {text, length: text.length, mode: " + JsStringLiteral(selected_mode) + "}; })()";
+        "; const text = " + (selected_mode == "markdown"
+          ? "Array.from(root ? root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,pre') : []).map((node) => { const tag=node.tagName.toLowerCase(); const value=(node.innerText || '').trim(); if (!value) return ''; if (tag[0] === 'h') return '#'.repeat(Number(tag[1])) + ' ' + value; if (tag === 'li') return '- ' + value; if (tag === 'pre') return '```\\n' + value + '\\n```'; return value; }).filter(Boolean).join('\\n\\n')"
+          : "root ? root.innerText || '' : ''") + ";" + std::string(kPageLabelsScript) +
+        " return {text, length: text.length, mode: " + JsStringLiteral(selected_mode) +
+        ", url: location.href, title: document.title, accessibleLabels: [...new Set(accessibleLabels)]}; })()";
     return Evaluate(params, script);
   } catch (const std::invalid_argument& error) { return InvalidParams(error.what()); }
 }

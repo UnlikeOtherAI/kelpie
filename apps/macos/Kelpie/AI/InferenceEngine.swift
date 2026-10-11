@@ -10,6 +10,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
     @MainActor @Published private(set) var capabilities: [String] = []
 
     private let queue = DispatchQueue(label: "com.kelpie.inference", qos: .userInitiated)
+    private let cancellationLock = NSLock()
+    private var cancellationGeneration = UUID()
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
     private var vocab: OpaquePointer?
@@ -30,11 +32,24 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         case inferenceFailed(String)
         case visionNotSupported
         case audioNotSupported
+        case cancelled
     }
 
     private static var backendInitialized = false
 
     private init() {}
+
+    func cancel() {
+        cancellationLock.lock()
+        cancellationGeneration = UUID()
+        cancellationLock.unlock()
+    }
+
+    private func currentCancellation() -> UUID {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return cancellationGeneration
+    }
 
     func load(path: String, name: String, capabilities: [String]) async throws {
         // Auto-unload previous model if any
@@ -122,6 +137,12 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         }
     }
 
+    private func inputError(audio: Data?, image: Data?) -> InferenceError? {
+        if image != nil && !loadedCapabilities.contains("vision") { return .visionNotSupported }
+        if audio != nil && !loadedCapabilities.contains("audio") { return .audioNotSupported }
+        return nil
+    }
+
     func infer(
         prompt: String,
         audio: Data? = nil,
@@ -129,18 +150,19 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         maxTokens: Int = 512,
         temperature: Float = 0.7
     ) async throws -> InferenceResult {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
+        let generation = currentCancellation()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
             queue.async {
+                guard self.currentCancellation() == generation else {
+                    continuation.resume(throwing: InferenceError.cancelled)
+                    return
+                }
                 guard self.model != nil, let ctx = self.ctx, let vocab = self.vocab else {
                     continuation.resume(throwing: InferenceError.noModelLoaded)
                     return
                 }
-                if image != nil && !self.loadedCapabilities.contains("vision") {
-                    continuation.resume(throwing: InferenceError.visionNotSupported)
-                    return
-                }
-                if audio != nil && !self.loadedCapabilities.contains("audio") {
-                    continuation.resume(throwing: InferenceError.audioNotSupported)
+                if let error = self.inputError(audio: audio, image: image) {
+                    continuation.resume(throwing: error)
                     return
                 }
 
@@ -155,6 +177,12 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 let tokenCount = llama_tokenize(vocab, prompt, Int32(utf8Count), tokens, Int32(maxTokenCount), true, false)
                 guard tokenCount > 0 else {
                     continuation.resume(throwing: InferenceError.inferenceFailed("Tokenization failed"))
+                    return
+                }
+
+                guard Int(tokenCount) + max(1, maxTokens) <= Int(llama_n_ctx(ctx)) else {
+                    let message = "Conversation and page exceed the model's context window. Use a model with a larger context window."
+                    continuation.resume(throwing: InferenceError.inferenceFailed(message))
                     return
                 }
 
@@ -196,6 +224,10 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 var curPos = tokenCount
 
                 for _ in 0..<maxTokens {
+                    guard self.currentCancellation() == generation else {
+                        continuation.resume(throwing: InferenceError.cancelled)
+                        return
+                    }
                     let newTokenId = llama_sampler_sample(sampler, ctx, batch.n_tokens - 1)
 
                     if llama_vocab_is_eog(vocab, newTokenId) {
@@ -223,24 +255,20 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                     }
                 }
 
-                let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
-                let elapsedMs = Int(elapsed / 1_000_000)
-
-                // Build output string
-                output.append(0) // null terminator
-                let resultText = String(cString: output)
-
-                continuation.resume(returning: InferenceResult(
-                    text: resultText,
-                    tokensUsed: Int(generatedCount),
-                    inferenceTimeMs: elapsedMs
-                ))
+                continuation.resume(returning: self.result(output, tokens: generatedCount, startedAt: startedAt))
             }
         }
     }
 
     var memoryUsageMB: Int {
         queue.sync { estimatedMemoryUsageMB }
+    }
+
+    private func result(_ output: [CChar], tokens: Int32, startedAt: DispatchTime) -> InferenceResult {
+        // The model emits token bytes; terminate once before converting the final text.
+        let text = String(cString: output + [0])
+        let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
+        return InferenceResult(text: text, tokensUsed: Int(tokens), inferenceTimeMs: Int(elapsed / 1_000_000))
     }
 
     private func tokenToPiece(vocab: OpaquePointer, token: llama_token) -> [CChar] {

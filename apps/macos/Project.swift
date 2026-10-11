@@ -103,6 +103,7 @@ let embedGeckoHelper = TargetScript.post(
 
 let macOSLinkerFlags: SettingValue = .array([
     "-lkelpie_core_state",
+    "-lkelpie_core_connect",
     "-lkelpie_core_protocol",
     "-lkelpie_core_automation",
     "-lkelpie_core_mcp",
@@ -156,6 +157,7 @@ let kelpieApp = Target.target(
             "HEADER_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/Kelpie/Renderer",
                 "$(PROJECT_DIR)/../../native/core-state/include",
+                "$(PROJECT_DIR)/../../native/core-connect/include",
                 "$(PROJECT_DIR)/../../native/core-protocol/include",
                 "$(PROJECT_DIR)/../../native/core-automation/include",
                 "$(PROJECT_DIR)/../../native/core-mcp/include",
@@ -165,6 +167,7 @@ let kelpieApp = Target.target(
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/../../native/.build/core-state",
+                "$(PROJECT_DIR)/../../native/.build/core-connect",
                 "$(PROJECT_DIR)/../../native/.build/core-protocol",
                 "$(PROJECT_DIR)/../../native/.build/core-automation",
                 "$(PROJECT_DIR)/../../native/.build/core-mcp",

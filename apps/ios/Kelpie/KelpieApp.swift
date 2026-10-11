@@ -108,6 +108,7 @@ struct KelpieApp: App {
 
     private func startServices() {
         serverState.startHTTPServer()
+        NessieConnection.shared.start(context: serverState.handlerContext)
         serverState.ensureMDNSAdvertising()
         ExternalDisplayManager.shared.startMonitoring()
         OpenAIEndpointMonitor.shared.start()
@@ -123,12 +124,14 @@ struct KelpieApp: App {
     private func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
+            NessieConnection.shared.setForeground(true)
             serverState.ensureMDNSAdvertising()
         case .background:
+            NessieConnection.shared.setForeground(false)
             serverState.stopMDNS()
             SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeBrowserTabID)
         case .inactive:
-            break
+            NessieConnection.shared.setForeground(false)
         @unknown default:
             break
         }

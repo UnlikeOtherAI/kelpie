@@ -19,7 +19,6 @@ struct BrowserView: View {
     @State private var showBookmarks = false
     @State var chromeAppearance = BrowserChromeAppearance()
     @State private var showNetworkInspector = false
-    @StateObject private var aiChatSession = AIChatSession()
     @State var isAIPanelOpen: Bool = UserDefaults.standard.bool(forKey: "com.kelpie.macos.ai-panel-open")
     @State var aiPanelTab: AIPanelTab = .models
     @State var aiPanelWidth: CGFloat = {
@@ -40,6 +39,7 @@ struct BrowserView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
+                ConnectControls(compact: true)
                 if !serverState.isScriptRecording {
                     Group {
                         if isWindowFullscreen {
@@ -157,13 +157,12 @@ struct BrowserView: View {
                     }
 
                     // AI panel — outside the overlay ZStack so buttons are always clickable
-                    if isAIPanelOpen && !serverState.isScriptRecording {
+                    if isAIPanelOpen && !serverState.isScriptRecording, let tab = tabStore.activeTab {
                         AppKitResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
                         AIChatPanel(
                             aiState: aiState,
-                            session: aiChatSession,
+                            session: tab.chatSession,
                             selectedTab: $aiPanelTab,
-                            activeTabId: tabStore.activeTab?.id.uuidString,
                             onClose: { isAIPanelOpen = false }
                         )
                         .frame(width: aiPanelWidth)
@@ -190,7 +189,6 @@ struct BrowserView: View {
         .onChange(of: browserState.currentURL) { _, _ in
             isChromeCollapsed = false
             hoveredLinkURL = ""
-            aiChatSession.reset()
             Task { @MainActor in
                 await serverState.handlerContext.persistRendererCookiesToSharedJar()
             }

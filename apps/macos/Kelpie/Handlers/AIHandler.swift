@@ -71,8 +71,14 @@ struct AIHandler {
     }
 
     let defaultOllamaEndpoint = "http://localhost:11434"
-    let openAIService = OpenAIEndpointService.shared
+    let openAIService: OpenAIEndpointService
     var openAI: OpenAIInference { OpenAIInference(service: openAIService) }
+
+    init(context: HandlerContext, router: Router? = nil, openAIService: OpenAIEndpointService = .shared) {
+        self.context = context
+        self.router = router
+        self.openAIService = openAIService
+    }
 
     func register(on router: Router) {
         router.register("ai-status") { _ in await status() }
@@ -317,6 +323,8 @@ struct AIHandler {
                 code: "AUDIO_NOT_SUPPORTED",
                 message: "Model does not support audio. Transcribe via platform STT and resend as text."
             )
+        case .cancelled:
+            return errorResponse(code: "INFERENCE_CANCELLED", message: "Local inference was stopped")
         }
     }
 

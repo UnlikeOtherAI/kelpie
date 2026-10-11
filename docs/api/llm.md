@@ -408,6 +408,9 @@ Response:
   "count": 4
 }
 ```
+Native visible element entries also include a unique `selector`, usable for an
+explicit subsequent click or fill on the same pinned document.
+
 ## Page Text Extraction
 
 ### `getPageText`
@@ -417,7 +420,8 @@ Extract the main readable content from the page, stripping navigation, ads, foot
 POST /v1/get-page-text
 {
   "mode": "readable",         // "readable" (main content only) | "full" (all visible text) | "markdown" (structured markdown)
-  "selector": null             // optional, extract from specific element
+  "selector": null,            // optional, extract from specific element
+  "maxLength": 100000          // optional, native content bound 1–100000 characters
 }
 
 Response:
@@ -431,6 +435,19 @@ Response:
   "excerpt": "This is the main article text..."
 }
 ```
+macOS, iOS and Android preserve their existing page-text fields and add `url` and
+`accessibleLabels`. On macOS, selector-scoped reads use the same strict snapshot
+as local chat and OpenAI-compatible context; `textTruncated` and `labelsTruncated`
+report bounded evidence. The API's body text remains uncapped. Read failures are
+returned explicitly, including before OpenAI-compatible inference. Mobile context
+behavior is described in [mobile AI context](mobile-ai-context.md).
+
+Desktop Chromium additionally returns `text`, `length`, `mode`, `url`, `title`
+and `accessibleLabels`. Labels include visible image alt text, ARIA names and SVG
+titles from the same document snapshot, including logos with no body text. These
+fields also apply when a `selector` scopes extraction. A blank page returns empty
+text and labels; a failed tab read returns an error rather than empty evidence.
+
 ## Form State
 
 ### `getFormState`

@@ -183,10 +183,18 @@ struct AIHandler {
         }
     }
 
-    private func infer(_ body: [String: Any]) async -> [String: Any] {
+    private func infer(_ input: [String: Any]) async -> [String: Any] {
         let stateSnapshot = await MainActor.run { () -> (backend: String, model: String?, endpoint: String, available: Bool) in
             let state = AIState.shared
             return (state.backend, state.activeModel, state.ollamaEndpoint, state.isAvailable)
+        }
+
+        let body: [String: Any]
+        do {
+            _ = try AIConversation.messages(input)
+            body = stateSnapshot.backend == "openai" ? input : try await preparePageContext(input)
+        } catch let error as AIHandlerError { return error.response } catch {
+            return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }
 
         switch stateSnapshot.backend {
@@ -221,13 +229,6 @@ struct AIHandler {
             return errorResponse(
                 code: "VISION_NOT_SUPPORTED",
                 message: "Platform AI currently supports text-only inference on iOS"
-            )
-        }
-
-        if body["messages"] != nil {
-            return errorResponse(
-                code: "INVALID_PARAM",
-                message: "messages is only supported when the Ollama backend is active"
             )
         }
 
@@ -365,12 +366,10 @@ struct AIHandler {
     ) throws -> [String: Any] {
         var normalizedMessages = messages
 
-        if let prompt = nonEmptyString(body["prompt"]) {
-            normalizedMessages.append([
-                "role": "user",
-                "content": prompt
-            ])
-        }
+        var current = body
+        current.removeValue(forKey: "messages")
+        let prompt = AIConversation.prompt(current)
+        if !prompt.isEmpty { normalizedMessages.append(["role": "user", "content": prompt]) }
 
         guard !normalizedMessages.isEmpty else {
             throw AIHandlerError(code: "MISSING_PARAM", message: "messages or prompt is required")
@@ -432,19 +431,7 @@ struct AIHandler {
     }
 
     private func composePrompt(from body: [String: Any]) -> String {
-        let prompt = nonEmptyString(body["prompt"])
-        let text = nonEmptyString(body["text"])
-
-        switch (prompt, text) {
-        case let (.some(prompt), .some(text)):
-            return "\(prompt)\n\nContext:\n\(text)"
-        case let (.some(prompt), nil):
-            return prompt
-        case let (nil, .some(text)):
-            return text
-        default:
-            return ""
-        }
+        AIConversation.prompt(body)
     }
 
     private func normalizedImages(from body: [String: Any]) -> [String] {
@@ -459,12 +446,6 @@ struct AIHandler {
         return []
     }
 
-    private func nonEmptyString(_ value: Any?) -> String? {
-        guard let string = value as? String else { return nil }
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
     private func normalizedOllamaEndpoint(_ endpoint: String?) -> String {
         let trimmed = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let base = trimmed.isEmpty ? AIState.defaultOllamaEndpoint : trimmed
@@ -473,14 +454,5 @@ struct AIHandler {
 
     private func elapsedMs(since start: CFAbsoluteTime) -> Int {
         Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
-    }
-}
-
-private struct AIHandlerError: Error {
-    let code: String
-    let message: String
-
-    var response: [String: Any] {
-        errorResponse(code: code, message: message)
     }
 }

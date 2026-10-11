@@ -17,6 +17,7 @@ struct SettingsView: View {
     var body: some View {
         VStack {
             Form {
+                Section("Nessie") { ConnectControls() }
                 Section("Device") {
                     row("Name", serverState.deviceInfo.name)
                     row("Model", serverState.deviceInfo.model)

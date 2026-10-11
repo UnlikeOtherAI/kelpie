@@ -432,6 +432,7 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     // permanently closing tab when a beforeunload prompt rejects CloseBrowser(false).
     // The CEF lifetime callback remains the sole owner-removal point.
     impl->tabs[closing_index].closing = true;
+    impl->tabs[closing_index].chat_session->Close();
     closing->GetHost()->CloseBrowser(true);
     impl->RecountPartitions();
     impl->UpdateActiveState();

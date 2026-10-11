@@ -253,6 +253,7 @@ private struct BrowserCommands: Commands {
 
 @main
 struct KelpieApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var browserState = BrowserState()
     @StateObject private var rendererState: RendererState
     @StateObject private var serverState: ServerState
@@ -285,7 +286,11 @@ struct KelpieApp: App {
                 rendererState: rendererState,
                 viewportState: serverState.viewportState
             )
-            .onAppear { Self.startServices(serverState: serverState, rendererState: rendererState) }
+            .onAppear {
+                Self.startServices(serverState: serverState, rendererState: rendererState)
+                NessieConnection.shared.setForeground(scenePhase == .active)
+            }
+            .onChange(of: scenePhase) { phase in NessieConnection.shared.setForeground(phase == .active) }
             .frame(
                 minWidth: ViewportState.minimumShellSize.width,
                 minHeight: ViewportState.minimumShellSize.height
@@ -302,6 +307,7 @@ struct KelpieApp: App {
 
     private static func startServices(serverState: ServerState, rendererState: RendererState) {
         serverState.startHTTPServer(rendererState: rendererState)
+        NessieConnection.shared.start(context: serverState.handlerContext)
         #if DEBUG
         if canBind(port: 8421) {
             AppReveal.start(port: 8421)

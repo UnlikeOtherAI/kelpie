@@ -26,12 +26,11 @@ extension AIHandler {
         }
 
         let contextMode = body["context"] as? String
-        let explicitText = body["text"] as? String
         let contextText: String?
-        if let explicitText {
-            contextText = explicitText
-        } else {
-            contextText = await preloadedContext(mode: contextMode, tabId: tabId)
+        do {
+            contextText = try await inferenceContext(body, tabId: tabId)
+        } catch {
+            return errorResponse(code: "PAGE_CONTEXT_UNAVAILABLE", message: "Could not read this tab: \(error.localizedDescription)")
         }
         var image: Data?
         if contextMode == "screenshot" {

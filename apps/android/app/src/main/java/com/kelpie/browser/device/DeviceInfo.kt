@@ -22,7 +22,7 @@ data class DeviceInfo(
     companion object {
         fun collect(
             context: Context,
-            port: Int = 8420,
+            port: Int = BuildConfig.LOCAL_HTTP_PORT,
         ): DeviceInfo {
             val id = DeviceIdentity.getOrCreate(context)
             val name = "${Build.MANUFACTURER} ${Build.MODEL}".trim()

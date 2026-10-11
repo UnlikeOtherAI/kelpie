@@ -5,6 +5,14 @@ const HTML = `<!doctype html>
 <style>body { min-height: 2400px; font-family: sans-serif; } #status { margin-top: 32px; }</style>
 </head><body>
 <h1 id="heading">Kelpie Windows acceptance fixture</h1>
+<div id="logos">
+<img width="28" height="28" alt="Kelpie image logo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Crect width='28' height='28' fill='red'/%3E%3C/svg%3E">
+<svg width="28" height="28" role="img"><title>Kelpie SVG logo</title><rect width="28" height="28" fill="blue"/></svg>
+<svg width="28" height="28" aria-label="Kelpie ARIA logo"><circle cx="14" cy="14" r="12"/></svg>
+<span id="logo-name" hidden>Kelpie referenced logo</span>
+<svg width="28" height="28" aria-labelledby="logo-name"><rect width="28" height="28"/></svg>
+<img width="28" height="28" alt="Hidden logo" hidden>
+</div>
 <a id="next-link" href="/next">Next page</a>
 <input id="text-input" aria-label="Fixture text" autocomplete="off">
 <select id="select-input" aria-label="Fixture select"><option value="first">First</option><option value="second">Second</option></select>
