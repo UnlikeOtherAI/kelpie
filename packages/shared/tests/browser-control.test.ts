@@ -1,9 +1,9 @@
+import { createKelpieBrowserBackend } from "./fixtures/native-browser.js";
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 import {
   BrowserControlError, BrowserControlEnvelopeSchema, BrowserControlRequestSchema, BROWSER_CONTROL_DESCRIPTION, browserControlInputSchema,
   browserSnapshot, createBrowserBackend, createBrowserClient, createBrowserControlProxy,
-  createKelpieBrowserBackend,
 } from "../src/browser-control/index.js";
 import type { BrowserControlRequest } from "../src/browser-control/index.js";
 

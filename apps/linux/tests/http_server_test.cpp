@@ -36,8 +36,9 @@ int main() {
   kelpie::linuxapp::HttpServer server;
   std::string error;
   assert(!server.Start(18420,"",[](std::string_view,const nlohmann::json&,int*) { return nlohmann::json::object(); },&error));
-  assert(server.Start(18420,"secret-token",[&handled](std::string_view endpoint,const nlohmann::json&,int*) {
-    ++handled; return nlohmann::json{{"success",true},{"endpoint",std::string(endpoint)}};
+  assert(server.Start(18420,"secret-token",[&handled](std::string_view endpoint,const nlohmann::json& body,int*) {
+    ++handled;
+    if (endpoint == "mcp" && !body.contains("id")) return nlohmann::json(nullptr); return nlohmann::json{{"success",true},{"endpoint",std::string(endpoint)}};
   },&error));
   const int port=server.port();
 
@@ -65,6 +66,19 @@ int main() {
   assert(accepted.find("\"endpoint\":\"get-url\"")!=std::string::npos);
   assert(handled==1);
 
+  const std::string rpc="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}";
+  const auto mcp_request = [&](const std::string& header) { return "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\n"+header+"Content-Length: "+std::to_string(rpc.size())+"\r\n\r\n"+rpc; };
+  assert(StatusIs(Send(port,mcp_request("")),401));
+  const auto mcp=Send(port,mcp_request("Authorization: Bearer secret-token\r\n"));
+  assert(StatusIs(mcp,200));
+  assert(mcp.find("\"endpoint\":\"mcp\"")!=std::string::npos);
+  assert(StatusIs(Send(port,"GET /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),405));
+  assert(StatusIs(Send(port,mcp_request("Authorization: Bearer secret-token\r\nOrigin: https://evil.test\r\n")),403));
+  assert(StatusIs(Send(port,mcp_request("Authorization: Bearer secret-token\r\nMCP-Protocol-Version: invalid\r\n")),400));
+  const std::string notification="{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}";
+  const auto initialized=Send(port,"POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nAuthorization: Bearer secret-token\r\nContent-Length: "+std::to_string(notification.size())+"\r\n\r\n"+notification);
+  assert(StatusIs(initialized,202));
+  assert(initialized.substr(initialized.find("\r\n\r\n")+4).empty());
   assert(StatusIs(Send(port,"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),200));
   assert(accepted.find("Access-Control-Allow-Origin")==std::string::npos);
   assert(StatusIs(Send(port,"OPTIONS /v1/get-url HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: http://evil.test\r\n\r\n"),405));

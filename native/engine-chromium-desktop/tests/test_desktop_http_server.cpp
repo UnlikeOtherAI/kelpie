@@ -37,6 +37,8 @@ int main() {
   kelpie::DesktopMcpServer mcp;
   mcp.SetRouter(&router);
   mcp.SetRegistry(&registry);
+  const kelpie::DesktopMcpServer::Config gateway_config;
+  router.Register("browser-control", [&](const nlohmann::json& request) { return mcp.HandleBrowserRequest(request, gateway_config); });
   kelpie::DesktopHttpServer server;
   server.SetRouter(&router);
   server.SetMcpServer(&mcp);
@@ -59,6 +61,14 @@ int main() {
   const auto navigate = client.Post("/v1/navigate", control_headers,
                                     R"({"url":"https://example.com"})", "application/json");
   assert(navigate && navigate->status == 200);
+  const auto core_denied = client.Post("/v1/browser-control", "{}", "application/json");
+  assert(core_denied && core_denied->status == 401);
+  const auto core = client.Post("/v1/browser-control", control_headers,
+    R"({"version":1,"method":"tab.goto","tabId":"a","params":{"url":"https://example.com"}})", "application/json");
+  assert(core && core->status == 200 && nlohmann::json::parse(core->body)["ok"] == true);
+  const auto invalid_core = client.Post("/v1/browser-control", control_headers,
+    R"({"version":1,"method":"evaluate","params":{"script":"SECRET"}})", "application/json");
+  assert(invalid_core && invalid_core->status == 200 && nlohmann::json::parse(invalid_core->body)["ok"] == false);
   const auto get_mcp = client.Get("/mcp");
   assert(get_mcp && get_mcp->status == 405);
 

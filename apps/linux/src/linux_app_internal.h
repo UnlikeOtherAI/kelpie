@@ -11,6 +11,7 @@
 #include "linux_app.h"
 #include "profile_session.h"
 #include "kelpie/bookmark_store.h"
+#include "kelpie/browser_gateway.h"
 #include "kelpie/desktop_engine.h"
 #include "kelpie/console_store.h"
 #include "kelpie/handler_context.h"
@@ -38,6 +39,9 @@ struct LinuxApp::Impl {
   DeviceInfoLinux device_info;
   ProfileSession profile;
   HttpServer http_server;
+  std::recursive_mutex browser_mutex;
+  std::unique_ptr<kelpie::BrowserGateway> browser_gateway;
+  bool gateway_dispatch = false;
   bool running = false;
   bool shutdown_requested = false;
   int bound_port = 0;

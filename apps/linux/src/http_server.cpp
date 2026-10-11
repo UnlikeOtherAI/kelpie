@@ -24,6 +24,12 @@ std::string HttpStatusText(int status) {
   switch (status) {
     case 200:
       return "OK";
+    case 202:
+      return "Accepted";
+    case 403:
+      return "Forbidden";
+    case 406:
+      return "Not Acceptable";
     case 204:
       return "No Content";
     case 400:
@@ -132,7 +138,7 @@ json ParseJsonBody(const std::string& request) {
 }
 
 /** Every `Authorization` header value in the request head (case-insensitive name). */
-std::vector<std::string> AuthorizationValues(const std::string& request) {
+std::vector<std::string> HeaderValues(const std::string& request, std::string_view field) {
   std::vector<std::string> values;
   const std::size_t header_end = request.find("\r\n\r\n");
   std::istringstream lines(request.substr(0, header_end));
@@ -144,11 +150,29 @@ std::vector<std::string> AuthorizationValues(const std::string& request) {
     if (colon == std::string::npos) continue;
     std::string name = line.substr(0, colon);
     std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (name != "authorization") continue;
+    if (name != field) continue;
     const std::size_t start = line.find_first_not_of(' ', colon + 1);
     values.push_back(start == std::string::npos ? std::string() : line.substr(start));
   }
   return values;
+}
+
+std::string Header(const std::string& request, std::string_view name) {
+  const auto values = HeaderValues(request, name);
+  return values.size() == 1 ? values.front() : std::string();
+}
+bool LocalControlRequest(const std::string& request) {
+  if (!HeaderValues(request, "origin").empty()) return false;
+  const auto host = Header(request, "host");
+  const auto separator = host.rfind(':');
+  const auto name = separator == std::string::npos ? host : host.substr(0, separator);
+  return name == "127.0.0.1" || name == "localhost" || name == "[::1]";
+}
+bool McpHeaders(const std::string& request) {
+  const auto content = Header(request, "content-type");
+  const auto accept = Header(request, "accept");
+  return content.substr(0, content.find(';')) == "application/json" &&
+      accept.find("application/json") != std::string::npos && accept.find("text/event-stream") != std::string::npos;
 }
 
 bool ConstantTimeEqual(std::string_view lhs, std::string_view rhs) {
@@ -162,7 +186,7 @@ bool ConstantTimeEqual(std::string_view lhs, std::string_view rhs) {
 
 /** True when the request carries exactly one `Bearer <token>` header. */
 bool HasControlToken(const std::string& request, const std::string& token) {
-  const std::vector<std::string> values = AuthorizationValues(request);
+  const std::vector<std::string> values = HeaderValues(request, "authorization");
   if (token.empty() || values.size() != 1) return false;
   constexpr std::string_view scheme = "bearer ";
   const std::string& value = values.front();
@@ -297,7 +321,11 @@ void HttpServer::AcceptLoop() {
       } else {
         response = TextResponse(200, page, "text/html; charset=utf-8");
       }
-    } else if (method == "POST" && path.rfind("/v1/", 0) == 0 && !HasControlToken(request, control_token_)) {
+    } else if (path == "/mcp" && method == "GET") {
+      response = "HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    } else if (path == "/mcp" && !LocalControlRequest(request)) {
+      response = JsonResponse(403, {{"error", "Local client required"}});
+    } else if (method == "POST" && (path.rfind("/v1/", 0) == 0 || path == "/mcp") && !HasControlToken(request, control_token_)) {
       status = 401;
       response = JsonResponse(status, {
           {"success", false},
@@ -307,12 +335,13 @@ void HttpServer::AcceptLoop() {
       const json body = ParseJsonBody(request);
       const json payload = handler_ != nullptr ? handler_(path.substr(4), body, &status) : json::object();
       response = JsonResponse(status, payload);
-    } else if (method == "GET" && path == "/mcp") {
-      status = 501;
-      response = JsonResponse(status, {
-          {"success", false},
-          {"error", {{"code", "PLATFORM_NOT_SUPPORTED"}, {"message", "MCP HTTP is not implemented yet"}}},
-      });
+    } else if (method == "POST" && path == "/mcp" && !McpHeaders(request)) {
+      response = JsonResponse(406, {{"error", "MCP requires JSON content and JSON/SSE accept types"}});
+    } else if (method == "POST" && path == "/mcp" && !Header(request, "mcp-protocol-version").empty() && Header(request, "mcp-protocol-version") != "2025-06-18") {
+      response = JsonResponse(400, {{"error", "Unsupported MCP-Protocol-Version"}});
+    } else if (method == "POST" && path == "/mcp") {
+      const json payload = handler_ != nullptr ? handler_("mcp", ParseJsonBody(request), &status) : json::object();
+      response = payload.is_null() ? TextResponse(202, "", "application/json") : JsonResponse(status, payload);
     } else {
       status = method == "GET" || method == "POST" ? 404 : 405;
       response = JsonResponse(status, {

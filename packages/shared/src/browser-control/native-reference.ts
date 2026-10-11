@@ -1,8 +1,13 @@
 /** Ephemeral reference data, not a content script. Replaced by the next snapshot and lost on navigation. */
 export function rememberNativeSnapshot(collected: { snapshot: unknown; targets: Record<string, Element> }, key = "__kelpieBrowserControlRefs"): unknown {
-  Object.defineProperty(window, key, {
-    configurable: true, writable: true, value: { targets: collected.targets, url: location.href },
-  });
+  const registry = window as unknown as Record<string, { cleanup?: () => void } | undefined>;
+  registry[key]?.cleanup?.();
+  const state = { targets: collected.targets, url: location.href, cleanup: () => undefined };
+  const events = ["pagehide", "popstate", "hashchange"];
+  const invalidate = (): void => { state.targets = {}; };
+  for (const event of events) window.addEventListener(event, invalidate);
+  state.cleanup = () => { for (const event of events) window.removeEventListener(event, invalidate); };
+  Object.defineProperty(window, key, { configurable: true, writable: true, value: state });
   return collected.snapshot;
 }
 
@@ -31,14 +36,21 @@ export function actOnNativeReference(ref: string, key: string, method: "tab.clic
   if (!state || !el?.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: false };
   if (!(el instanceof HTMLElement) || !(el.getRootNode() instanceof Document)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   if (method === "tab.type" && !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !el.isContentEditable) return { error: "UNSUPPORTED", mayHaveCompleted: false };
+  if (method === "tab.type" && el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && (el.disabled || el.readOnly)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
   // Focus may synchronously invoke page handlers, so verify again immediately before the mutation.
   el.focus();
-  if (!el.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: true };
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- focus handlers can detach the node synchronously.
+  if (!el.isConnected || state.url !== location.href || state.targets[ref] !== el) return { error: "STALE_REFERENCE", mayHaveCompleted: true };
+  if (method === "tab.type" && ((el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type)) ||
+    ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && (el.disabled || el.readOnly)) ||
+    (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !el.isContentEditable))) return { error: "UNSUPPORTED", mayHaveCompleted: true };
   if (method === "tab.click") el.click();
   else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     const prototype = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-    Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(el, el.value + text);
+    const value = Object.getOwnPropertyDescriptor(prototype, "value");
+    if (!value?.get || !value.set) return { error: "UNSUPPORTED", mayHaveCompleted: true };
+    value.set.call(el, String(value.get.call(el)) + text);
     el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   } else {
     el.append(document.createTextNode(text));

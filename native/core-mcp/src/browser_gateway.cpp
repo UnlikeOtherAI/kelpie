@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <map>
 #include <random>
+#include <sstream>
+#include <iomanip>
 #include <set>
 #include <string>
 namespace kelpie {
@@ -16,9 +18,10 @@ json Failure(const std::string& code, bool uncertain = false) {
 json Success(json value) { return {{"version", 1}, {"ok", true}, {"value", std::move(value)}}; }
 std::string Identity() {
   std::random_device random;
-  std::string output;
-  for (int i = 0; i < 8; ++i) output += std::to_string(random());
-  return output;
+  std::ostringstream output;
+  output << std::hex << std::setfill('0');
+  for (int i = 0; i < 4; ++i) output << std::setw(8) << static_cast<unsigned int>(random());
+  return output.str();
 }
 const std::map<std::string, std::string> kRoutes = {
   {"tabs.list", "get-tabs"}, {"tabs.new", "new-tab"}, {"tabs.select", "switch-tab"}, {"tabs.close", "close-tab"},
@@ -40,7 +43,7 @@ struct BrowserGateway::Impl {
     for (const auto& method : config.value("nativeMethods", json::array())) native.insert(method.get<std::string>());
     for (const auto& method : json::parse(browser_assets::mutations)) mutations.insert(method.get<std::string>());
     methods = {"documentation", "capabilities"};
-    for (const auto& route : kRoutes) if (native.count(route.second)) methods.insert(route.first);
+    for (const auto& route : kRoutes) if (config.value("browserAvailable", true) && native.count(route.second)) methods.insert(route.first);
     if (config.value("fixedReader", false)) methods.insert("tab.snapshot");
     else { methods.erase("tab.click"); methods.erase("tab.type"); }
     if (!config.value("allowActions", true)) {
@@ -188,7 +191,11 @@ json BrowserGateway::Advance(json result) {
       else if (method == "tabs.list") value = result.at("tabs");
       else if (method == "tabs.new") value = result.contains("tab") ? result["tab"] : json{{"id", result.at("tabId")}};
       else if (method == "tab.url" || method == "tab.title") value = result.value(method == "tab.url" ? "url" : "title", std::string());
-      else if (method == "tab.screenshot") value = {{"type", "image"}, {"mimeType", "image/png"}, {"data", result.at("image")}};
+      else if (method == "tab.screenshot") {
+        const std::string format = result.value("format", std::string("png"));
+        if (format != "png" && format != "jpeg" && format != "webp") { fail(); return Next(); }
+        value = {{"type", "image"}, {"mimeType", "image/" + format}, {"data", result.at("image")}};
+      }
       impl_->Finish(Success(value));
     }
   } catch (...) { fail(); }
@@ -227,12 +234,12 @@ json BrowserGateway::Extensions(const json& names) const {
 }
 json BrowserGateway::BeginMcp(json rpc) {
   const json id = rpc.is_object() ? rpc.value("id", json(nullptr)) : json(nullptr);
+  const bool notification = rpc.is_object() && !rpc.contains("id") && rpc.contains("jsonrpc") && rpc["jsonrpc"] == "2.0" && rpc.contains("method") && rpc["method"].is_string();
   const auto complete = [](json value) { return json{{"kind", "complete"}, {"response", value}}; };
-  const auto error = [&](int code) { return complete({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", "Invalid or unavailable MCP request."}}}}); };
+  const auto error = [&](int code) { return complete(notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", "Invalid or unavailable MCP request."}}}}); };
   if (impl_->active) return error(-32000);
   impl_->mcp = false;
   if (!rpc.is_object() || !rpc.contains("jsonrpc") || !rpc["jsonrpc"].is_string() || rpc["jsonrpc"] != "2.0" || !rpc.contains("method") || !rpc["method"].is_string()) return error(-32600);
-  const bool notification = !rpc.contains("id");
   const auto answer = [&](json value) { return complete(notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", id}, {"result", value}}); };
   const std::string method = rpc["method"];
   if (method == "initialize") return answer({{"protocolVersion", "2025-06-18"}, {"capabilities", {{"tools", json::object()}}}, {"serverInfo", {{"name", "kelpie"}, {"version", "1"}}}});

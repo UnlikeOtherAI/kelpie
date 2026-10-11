@@ -9,7 +9,7 @@
 - System architecture: [docs/architecture.md](docs/architecture.md) — components, data flow, protocols
 - Tech stack: [docs/tech-stack.md](docs/tech-stack.md) — platform choices, dependencies, repo structure
 - Feature catalogue: [docs/functionality.md](docs/functionality.md) — description of every user-facing feature
-- Shared browser core: [docs/api/browser-control.md](docs/api/browser-control.md); portable schemas and adapters live only in `packages/shared/src/browser-control`, and real headless conformance is a separate `test:browser` command.
+- Shared browser core: [docs/api/browser-control.md](docs/api/browser-control.md); native HTTP/MCP and CLI forwarding share one persistent gateway with compact extension discovery; portable schemas and adapters live only in `packages/shared/src/browser-control`, and real headless conformance is a separate `test:browser` command.
 - API reference: [docs/api/](docs/api/) — all HTTP/MCP methods (core, LLM-optimized, devtools, browser management)
 - CLI reference: [docs/cli.md](docs/cli.md) — commands, flags, group operations, LLM help system
 - Persistent pairing and exact-socket token reuse: [docs/functionality.md](docs/functionality.md#pairing--authentication).

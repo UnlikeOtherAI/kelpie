@@ -57,6 +57,7 @@ export const BrowserMcpTools = [
   "kelpie_find_element",
   "kelpie_find_button",
   "kelpie_find_link",
+  "kelpie_get_links",
   "kelpie_find_input",
   "kelpie_evaluate",
   "kelpie_toast",
@@ -145,6 +146,7 @@ export const BrowserMcpTools = [
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
 
 export const BrowserToolUnsupportedPlatforms = {
+  kelpie_get_links: ["ios", "android", "linux", "windows"],
   kelpie_ai_status: ["linux", "windows"],
   kelpie_ai_load: ["linux", "windows"],
   kelpie_ai_unload: ["linux", "windows"],
@@ -286,6 +288,7 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "find-element": "kelpie_find_element",
   "find-button": "kelpie_find_button",
   "find-link": "kelpie_find_link",
+  "get-links": "kelpie_get_links",
   "find-input": "kelpie_find_input",
   "evaluate": "kelpie_evaluate",
   "toast": "kelpie_toast",
