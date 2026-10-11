@@ -27,7 +27,7 @@ DesktopRouter& DesktopCoreBrowser::router() { return impl_->router; }
 nlohmann::json EvaluateBrowserFixed(DesktopBrowserControl& control, const nlohmann::json& params) {
   try {
     TabLease lease;
-    auto result = control.ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    auto result = ResolveTabForRequest(control, params, &lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
     nlohmann::json value;
     result = control.EvaluateBrowserControl(lease, RequireString(params, "expression"), &value, ControlTimeout(params));

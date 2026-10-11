@@ -1,6 +1,34 @@
 # Native Nessie connection verification
 
-Verification on 2026-10-11 used dedicated worktrees and profiles. No existing Kelpie
+## Canonical browser-control migration
+
+The account transport now carries the same browser-control v1 requests as native
+HTTP, MCP and the CLI. These checks exercise the added account job/document guards
+and the persistent gateway; they do not establish live production UOA dispatch.
+
+| Host | Revision | Check | Result |
+| --- | --- | --- | --- |
+| FedoraMaxis / CEF-enabled Linux | `9b51ca74` | Full native/app build, final incremental C++17 rebuild and CTest | Build passed; 34/34 tests |
+| Maxis / Windows 0.1.13 candidate | `d3c7b150` | CI CEF build and existing native control acceptance journey | Passed MCP, nested inference/cancellation, canonical snapshot/append typing/stale refs/screenshot and late-callback ownership |
+| dictator / macOS WebKit | `ea4cccd6` | Account job navigation, cancellation and effect-time document checks | 3/3 focused tests; SwiftLint zero violations across 280 files |
+| dictator / iOS 26.5 simulator | `63922b34` | Real WebKit account goto/new document pin, shared-ref append typing, stale-document refusal and callback retirement | 1/1 focused test |
+| umac / Android verification-profile emulator | `112bdd7e`, clean-tree formatting `a2cfade3` | JVM tests, connected account navigation tests and ktlint | 140 JVM tests and 8/8 connected tests passed, including canonical goto/new pin and competing human navigation; all ktlint tasks reran and passed on the clean committed tree |
+| dictator / native Release | `e8be48a4` | iPhoneOS archives and macOS native build | Passed; navigation URL normalization remains C++17-compatible |
+| dictator / iPhone and iPad Release candidates | `e8be48a4` | Separate device builds and strict signature verification | Both passed with the existing Apple Development identity; both device UDIDs are provisioned |
+
+The iOS 27.0 disposable fixture stalled in WebKit's synchronous Screen Time XPC
+path; only the 26.5 runtime pass is counted above. A disposable macOS CEF account
+fixture reached native navigation but crashed during CEF GPU/network startup, so
+that account-specific CEF journey remains unverified. Root-slash normalization and
+conservative redirect refusal have unit coverage. Apple account connections do not
+advertise unsupported trusted key presses.
+
+Release publication, signature verification and physical-device installation are
+separate checks. The tables below record the preceding account-connection work.
+
+## Initial account connection
+
+Initial verification on 2026-10-11 used dedicated worktrees and profiles. No existing Kelpie
 installation, account store, or running user's process was replaced or stopped.
 
 | Host | Revision | Check | Result |

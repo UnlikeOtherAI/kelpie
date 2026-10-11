@@ -65,7 +65,12 @@ final class BrowserControlGateway {
         return extensionMethods[name]
     }
 
-    func request(_ body: [String: Any], mcp: Bool = false) async -> [String: Any] {
+    func request(
+        _ body: [String: Any],
+        mcp: Bool = false,
+        authorizeAccountStep: Authorize? = nil,
+        dispatchAccountStep: Dispatch? = nil
+    ) async -> [String: Any] {
         guard lease?.begin() != false else {
             let failure: [String: Any] = ["version": 1, "ok": false, "error": ["code": "BUSY", "message": "A browser operation is pending", "mayHaveCompleted": false]]
             return mcp ? ["jsonrpc": "2.0", "id": body["id"] ?? NSNull(), "error": ["code": -32000, "message": "A browser operation is pending"]] : failure
@@ -90,12 +95,13 @@ final class BrowserControlGateway {
             case "authorize":
                 let request = step["request"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
-                step = advance(["success": authorize(request, mutates)])
+                let permitted = authorize(request, mutates) && (authorizeAccountStep?(request, mutates) ?? true)
+                step = advance(["success": permitted])
             case "dispatch":
-                guard !Task.isCancelled else { return cancel() }
                 let method = step["method"] as? String ?? ""
                 let params = step["params"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
+                guard !Task.isCancelled, authorizeAccountStep?(body, mutates) ?? true else { return cancel() }
                 if ["ai-infer", "ai-record"].contains(method) {
                     // Product inference owns its existing model/run deadlines. Its
                     // nested browser calls each acquire the shared admission lease.
@@ -107,7 +113,7 @@ final class BrowserControlGateway {
                     step = advance(result)
                     continue
                 }
-                guard let result = await boundedDispatch(method: method, params: params, mutates: mutates) else {
+                guard let result = await boundedDispatch(method: method, params: params, mutates: mutates, dispatchOverride: dispatchAccountStep) else {
                     return cancel()
                 }
                 guard !Task.isCancelled else {
@@ -148,7 +154,12 @@ final class BrowserControlGateway {
     }
 
     /// A late renderer completion cannot advance a cancelled coordinator or replay a command.
-    private func boundedDispatch(method: String, params: [String: Any], mutates: Bool) async -> [String: Any]? {
+    private func boundedDispatch(
+        method: String,
+        params: [String: Any],
+        mutates: Bool,
+        dispatchOverride: Dispatch?
+    ) async -> [String: Any]? {
         let completion = BrowserDispatchCompletion()
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -158,7 +169,7 @@ final class BrowserControlGateway {
                 // A deadline can end the response, but cannot retire renderer work.
                 lease?.retainPending()
                 Task { @MainActor in
-                    let result = await dispatch(method, params, mutates)
+                    let result = await (dispatchOverride ?? dispatch)(method, params, mutates)
                     lease?.retirePending()
                     completion.finish(result)
                 }

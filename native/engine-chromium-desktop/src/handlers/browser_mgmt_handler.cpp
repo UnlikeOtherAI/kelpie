@@ -26,6 +26,10 @@ nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) co
     if (url != params.end() && (!url->is_string() || url->get<std::string>().empty())) return InvalidParams("url must be a non-empty string");
     NewTabRequest request;
     request.url = url == params.end() ? std::string() : url->get<std::string>();
+    if (const auto& job = ScopedBrowserControlLease::Current()) {
+      request.cancelled = job->cancelled;
+      request.deadline = job->deadline;
+    }
     if (const auto invalid = ReadPartitionFields(params, &request)) return *invalid;
     TabSnapshot tab;
     const auto result = RequireBrowserControl(runtime_).CreateTab(request, &tab, ControlTimeout(params));
@@ -37,7 +41,7 @@ nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) co
 nlohmann::json BrowserManagementHandler::SwitchTab(const nlohmann::json& params) const {
   try {
     TabLease lease;
-    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    const auto resolved = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
     if (!resolved.ok) return ControlError(resolved);
     const auto result = RequireBrowserControl(runtime_).ActivateTab(lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
@@ -48,7 +52,7 @@ nlohmann::json BrowserManagementHandler::SwitchTab(const nlohmann::json& params)
 nlohmann::json BrowserManagementHandler::CloseTab(const nlohmann::json& params) const {
   try {
     TabLease lease;
-    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    const auto resolved = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
     if (!resolved.ok) return ControlError(resolved);
     const auto result = RequireBrowserControl(runtime_).CloseTab(lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);

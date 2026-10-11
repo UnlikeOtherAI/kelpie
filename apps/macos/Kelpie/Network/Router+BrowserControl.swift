@@ -125,8 +125,12 @@ extension Router {
     }
 
     @MainActor
-    func browserControl(_ body: [String: Any]) async -> [String: Any] {
-        await directGateway().request(body)
+    func browserControl(
+        _ body: [String: Any],
+        authorizeAccountStep: BrowserControlGateway.Authorize? = nil,
+        dispatchAccountStep: BrowserControlGateway.Dispatch? = nil
+    ) async -> [String: Any] {
+        await directGateway().request(body, authorizeAccountStep: authorizeAccountStep, dispatchAccountStep: dispatchAccountStep)
     }
 
     @MainActor
@@ -233,7 +237,7 @@ extension Router {
     }
 
     @MainActor
-    private func browserDispatch(method: String, params: [String: Any], pinnedTabId: String?) async -> [String: Any] {
+    func browserDispatch(method: String, params: [String: Any], pinnedTabId: String?) async -> [String: Any] {
         var params = params
         if let pinnedTabId { params["tabId"] = pinnedTabId }
         if let target = params["tabId"] as? String, !target.isEmpty {

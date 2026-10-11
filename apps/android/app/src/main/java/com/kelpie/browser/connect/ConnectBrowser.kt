@@ -1,5 +1,6 @@
 package com.kelpie.browser.connect
 
+import android.content.Context
 import android.net.Uri
 import com.kelpie.browser.ai.LocalInference
 import com.kelpie.browser.handlers.HandlerContext
@@ -17,6 +18,7 @@ import java.time.Instant
 class ConnectBrowser(
     private val context: HandlerContext,
     private val modelDirectory: java.io.File,
+    private val appContext: Context,
     private val authority: (Map<String, Any?>) -> Boolean = NessieConnection::authorizes,
 ) {
     private var extractionRequest: com.kelpie.browser.ai.InferenceRequest? = null
@@ -49,6 +51,7 @@ class ConnectBrowser(
 
         @Suppress("UNCHECKED_CAST")
         val input = command["input"] as Map<String, Any?>
+        if (operation == "control") return accountControl.execute(command, input)
         if (operation == "tabs") return mapOf("tabs" to tabs())
         if (operation == "open") {
             check(context.scriptPlaybackState?.recordingError("new-tab") == null) { "Recording is in progress" }
@@ -118,6 +121,9 @@ class ConnectBrowser(
         val safeResult = if (operation == "type") mapOf("success" to true, "characters" to (input["text"] as? String).orEmpty().length) else result
         return mapOf("tabId" to tabId, "tabVersion" to version(tabId), "result" to safeResult)
     }
+
+    private val accountControl = ConnectBrowserAccountControl(context, appContext, authority)
+    val supportsControlV1: Boolean get() = accountControl.supportsControlV1
 
     private suspend fun navigate(
         command: Map<String, Any?>,

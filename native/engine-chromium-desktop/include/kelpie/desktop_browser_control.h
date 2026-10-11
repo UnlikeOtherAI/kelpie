@@ -23,6 +23,25 @@ struct TabLease {
   bool require_active = false;
 };
 
+// A canonical account-control dispatch carries one immutable job-owned lease
+// through the synchronous native router call. Handlers copy this lease before
+// submitting renderer work, so timeout/cancellation cannot clear the guard a
+// late native callback relies on.
+class ScopedBrowserControlLease {
+ public:
+  explicit ScopedBrowserControlLease(TabLease lease)
+      : previous_(current_) { current_ = std::move(lease); }
+  ~ScopedBrowserControlLease() { current_ = std::move(previous_); }
+  ScopedBrowserControlLease(const ScopedBrowserControlLease&) = delete;
+  ScopedBrowserControlLease& operator=(const ScopedBrowserControlLease&) = delete;
+
+  static const std::optional<TabLease>& Current() { return current_; }
+
+ private:
+  std::optional<TabLease> previous_;
+  inline static thread_local std::optional<TabLease> current_;
+};
+
 struct TabSnapshot {
   std::string id;
   std::uint64_t generation = 0;

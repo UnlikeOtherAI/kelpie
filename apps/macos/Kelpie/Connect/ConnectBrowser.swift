@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class ConnectBrowser {
     struct Failure: Error { let message: String; init(_ message: String) { self.message = message } }
-    private let context: HandlerContext
+    let context: HandlerContext
     private var extractionRequest: InferenceRequest?
     private var extractionBusy: Bool { extractionRequest != nil }
     private var cachedModelReady = false
@@ -21,6 +21,22 @@ final class ConnectBrowser {
     }
 
     init(context: HandlerContext) { self.context = context }
+
+    // Enabled when the shared gateway is bound to a job-owned dispatch context.
+    var supportsControlV1: Bool { context.browserRouter != nil }
+
+    static func navigationDestinationMatches(current: String, destination: String?) -> Bool {
+        guard let destination else { return true }
+        func normalized(_ raw: String) -> URLComponents? {
+            guard var components = URLComponents(string: raw), components.scheme != nil, components.host != nil else { return nil }
+            components.scheme = components.scheme?.lowercased()
+            components.host = components.host?.lowercased()
+            if components.path.isEmpty { components.path = "/" }
+            return components
+        }
+        guard let current = normalized(current), let destination = normalized(destination) else { return false }
+        return current == destination
+    }
 
     var isReady: Bool {
         #if os(iOS)
@@ -48,10 +64,13 @@ final class ConnectBrowser {
         extractionRequest?.cancel()
     }
 
+    // This is the durable operation router; each operation's handlers stay split below.
+    // swiftlint:disable:next cyclomatic_complexity
     func execute(_ command: [String: Any]) async throws -> [String: Any] {
         guard isReady, let operation = command["operation"] as? String,
               let input = command["input"] as? [String: Any] else { throw Failure("Browser is not ready") }
         try Task.checkCancellation()
+        if operation == "control" { return await executeControl(command, input: input) }
         if operation == "tabs" { return ["tabs": tabs()] }
         if operation == "open" {
             let owner = context.browserRouter
@@ -147,7 +166,7 @@ final class ConnectBrowser {
             pinned.remoteNavigationWaitGuard = { authorized() && bridge.documentNavigationCount() <= count + 1 }
             pinned.remoteNavigationReadGuard = {
                 guard authorized(), !bridge.isLoading(), bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
-                return destination == nil || URL(string: bridge.currentURL()) == URL(string: destination ?? "")
+                return Self.navigationDestinationMatches(current: bridge.currentURL(), destination: destination)
             }
             let result = await router.handle(method: operation, body: body).json
             try requireSuccess(result)
@@ -199,7 +218,7 @@ final class ConnectBrowser {
         return raw
     }
 
-    private func tabs() -> [[String: Any]] {
+    func tabs() -> [[String: Any]] {
         #if os(iOS)
         return context.tabStore?.tabs.map { tab in
             ["tabId": tab.id.uuidString, "tabVersion": ConnectDocument.version(tab.webView),
@@ -222,7 +241,7 @@ final class ConnectBrowser {
         #endif
     }
 
-    private func version(_ tabID: String) throws -> String {
+    func version(_ tabID: String) throws -> String {
         guard let uuid = UUID(uuidString: tabID) else { throw Failure("Tab not found") }
         #if os(iOS)
         guard let tab = context.tabStore?.tabs.first(where: { $0.id == uuid }), !tab.webView.isLoading else {

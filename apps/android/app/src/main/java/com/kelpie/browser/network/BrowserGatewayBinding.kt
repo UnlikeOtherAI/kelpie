@@ -50,6 +50,18 @@ class BrowserGatewayBinding(
         return lock.withLock { session(native.intersect(methods), descriptors, allowActions, tabId) }
     }
 
+    /** Uses the process-wide reference registry and admission lease for account commands. */
+    suspend fun accountControl(
+        request: Map<String, Any?>,
+        authority: suspend () -> Boolean,
+        dispatch: (suspend (String, Map<String, Any?>) -> Map<String, Any?>)? = null,
+    ): Map<String, Any?>? =
+        direct.call(
+            request,
+            authorizeAccountStep = { _, _ -> authority() },
+            dispatchAccountStep = dispatch,
+        )
+
     private fun session(
         native: Set<String>,
         descriptors: List<Map<String, Any?>>,

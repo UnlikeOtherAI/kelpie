@@ -233,13 +233,38 @@ inline DesktopBrowserControl::Timeout ControlTimeout(const nlohmann::json& param
   return std::chrono::milliseconds(std::clamp(value, 1, 30000));
 }
 
+inline BrowserControlResult ResolveTabForRequest(DesktopBrowserControl& control,
+                                                  const nlohmann::json& params,
+                                                  TabLease* lease,
+                                                  DesktopBrowserControl::Timeout timeout) {
+  const auto& scoped = ScopedBrowserControlLease::Current();
+  if (!scoped) return control.ResolveTab(OptionalTabId(params), OptionalGeneration(params), lease, timeout);
+  if (!lease || (params.contains("tabId") && params["tabId"] != scoped->id) ||
+      (params.contains("generation") && params["generation"] != scoped->generation)) {
+    return BrowserControlResult::Failure("TAB_STALE", "The tab lease does not match this account job");
+  }
+  // Return the current snapshot for read-only handlers that render tab metadata,
+  // while retaining the immutable job lease for the actual renderer operation.
+  // ResolveTab performs the document/active/cancel/deadline checks on the owner
+  // thread; a later document change is still rejected by the copied lease.
+  TabLease current;
+  BrowserControlResult result = control.ResolveTab(scoped->id, scoped->generation, &current, timeout);
+  if (!result.ok || !result.tab ||
+      (scoped->document_version && result.tab->document_version != *scoped->document_version) ||
+      (scoped->require_active && !result.tab->active)) {
+    return result.ok ? BrowserControlResult::Failure("TAB_STALE", "The tab lease does not match this account job") : result;
+  }
+  *lease = *scoped;
+  return result;
+}
+
 inline BrowserControlResult EvaluateForTab(const DesktopHandlerRuntime& runtime,
                                            const nlohmann::json& params,
                                            const std::string& expression,
                                            nlohmann::json* value) {
   TabLease lease;
-  BrowserControlResult result = RequireBrowserControl(runtime).ResolveTab(
-      OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+  BrowserControlResult result = ResolveTabForRequest(RequireBrowserControl(runtime), params,
+                                                      &lease, ControlTimeout(params));
   if (!result.ok) return result;
   return RequireBrowserControl(runtime).Evaluate(lease, expression, value, ControlTimeout(params));
 }

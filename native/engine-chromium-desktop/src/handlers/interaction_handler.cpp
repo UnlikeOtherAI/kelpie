@@ -7,8 +7,7 @@ nlohmann::json Dispatch(const DesktopHandlerRuntime& runtime, const nlohmann::js
                         nlohmann::json input) {
   try {
     TabLease lease;
-    auto result = RequireBrowserControl(runtime).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease,
-                                                            ControlTimeout(params));
+    auto result = ResolveTabForRequest(RequireBrowserControl(runtime), params, &lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
     nlohmann::json output;
     result = RequireBrowserControl(runtime).DispatchTrustedInput(lease, std::move(input), &output, ControlTimeout(params));

@@ -201,6 +201,64 @@ class BrowserGatewayTests {
             assertEquals(1, abi.destroyed)
         }
 
+    @Test fun accountAuthorityIsRecheckedAtRendererDispatchAndUsesJobOwnedTarget() =
+        runBlocking {
+            var checks = 0
+            var publicDispatches = 0
+            var jobDispatches = 0
+            val session =
+                BrowserGatewaySession(
+                    emptyMap(),
+                    Mutex(),
+                    { _, _ -> true },
+                    { _, _ ->
+                        publicDispatches++
+                        mapOf("success" to true)
+                    },
+                    Abi(),
+                )
+            val denied =
+                session.call(
+                    mapOf("tabId" to "owned"),
+                    authorizeAccountStep = { _, _ -> ++checks == 1 },
+                    dispatchAccountStep = { _, _ ->
+                        jobDispatches++
+                        mapOf("success" to true)
+                    },
+                )!!
+            assertEquals(false, denied["ok"])
+            assertEquals(2, checks)
+            assertEquals(0, publicDispatches)
+            assertEquals(0, jobDispatches)
+            session.close()
+
+            val overrideSession =
+                BrowserGatewaySession(
+                    emptyMap(),
+                    Mutex(),
+                    { _, _ -> true },
+                    { _, _ ->
+                        publicDispatches++
+                        mapOf("success" to true)
+                    },
+                    Abi(),
+                )
+            val completed =
+                overrideSession.call(
+                    mapOf("tabId" to "owned"),
+                    dispatchAccountStep = { method, params ->
+                        assertEquals("click", method)
+                        assertTrue(params.isEmpty())
+                        jobDispatches++
+                        mapOf("success" to true)
+                    },
+                )!!
+            assertEquals(true, completed["ok"])
+            assertEquals(0, publicDispatches)
+            assertEquals(1, jobDispatches)
+            overrideSession.close()
+        }
+
     @Test fun timeoutCancelsUncertainTransactionWithoutRepeatingAction() =
         runBlocking {
             val abi = Abi()

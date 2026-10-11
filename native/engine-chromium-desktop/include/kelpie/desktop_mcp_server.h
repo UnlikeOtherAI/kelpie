@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "kelpie/platform.h"
+#include "kelpie/desktop_browser_control.h"
 
 namespace kelpie {
 
@@ -34,12 +35,16 @@ class DesktopMcpServer {
   void SetRouter(const DesktopRouter* router);
   void SetRegistry(const McpRegistry* registry);
   using FixedReader = std::function<json(const json&)>;
+  using StepAuthorization = std::function<bool()>;
   void SetFixedReader(FixedReader reader);
   void SetPendingCheck(std::function<bool()> pending);
   void NotifyDocumentChanged() const;
   std::shared_ptr<void> GuardDispatch(std::string_view method, const json& params) const;
   void InvalidateReferences(std::string_view method, const json& params) const;
   json HandleBrowserRequest(const json& request, const Config& config) const;
+  json HandleBrowserRequestAuthorized(const json& request, const Config& config,
+                                      const StepAuthorization& authorize,
+                                      const std::optional<TabLease>& job_lease = std::nullopt) const;
 
   bool Run(const Config& config);
   // Returns null for a valid JSON-RPC notification.  Stdio callers must not

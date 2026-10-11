@@ -7,8 +7,9 @@ Device labels and compact model evidence obey wire UTF-16 length limits while pr
 Extraction cancellation owns a separate request authority flag in the native model
 runtime, including before worker dispatch. Pause/Stop never invokes a global model
 cancel for that remote extraction, so it cannot cancel a person's separate AI chat.
-Snapshots include observed unique selectors from the existing DOM selector builder,
-bounded to 2000 characters; elements without a bounded selector are omitted.
+Legacy snapshots and extraction include observed unique selectors from the existing
+DOM selector builder, bounded to 2000 characters; elements without a bounded selector
+are omitted. Canonical browser control uses the shared gateway's opaque references.
 
 The durable ledger acknowledges cancellation even before command delivery by retaining
 a cancelled attempt tombstone and sequence-2 receipt. A later command for that attempt
@@ -26,6 +27,9 @@ Android navigation reserves one explicit destination at the native mutation poin
 completion metadata reads may transfer to its first matching document start and resulting pin;
 cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
 invalidate that lease. Redirects that produce another document start fail closed and need a fresh snapshot.
+Canonical account `tab.goto` uses this same lease: admission and renderer dispatch require the
+original document version, and only the owned navigation's completion read may return with its
+new outer `tabVersion`. A competing human navigation is not adopted as the job result.
 Android and CEF do not expose a unique native navigation object. Their conservative
 leases require the observed main-frame start and destination; hash-only navigation
 that emits no such start cannot acquire a completion pin and fails on the job deadline.
@@ -35,6 +39,8 @@ the iOS mutation checks authority immediately before calling WebKit. CEF complet
 exactly the expected native main-frame navigation count and destination for navigate/reload.
 Another document start or native user input revokes completion authority. Redirects that change
 the expected CEF destination require a fresh snapshot rather than inheriting its contents.
+Canonical account navigation uses that same CEF transition fence while retaining its immutable
+job cancellation, deadline, generation and active-tab lease through the wait.
 
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.
@@ -64,13 +70,26 @@ and `maxFrameBytes`. Every later frame contains this `generation`.
 `auth` renews `ticket`; `heartbeat` carries current `lifecycle` and all four model fields.
 
 `command` carries UUID `jobId`, UUID `attemptId`, positive `seq`, ISO `deadline`,
-`operation`, `tabId`, `tabVersion` and object `input`. Operations are `tabs`, `open`,
-`navigate`, `snapshot`, `click`, `type`, `scroll`, `back`, `forward`, `reload`, `extract`.
-`tabs` and `open` are unbound (`tabId`/`tabVersion` null). Every other operation requires
-a matching existing tab and current document version. Changing or reloading the document
-invalidates its version, even when the URL is unchanged. Native execution makes the
-authorized tab visible; unrelated tabs, cookies, account endpoints and arbitrary script
-execution are outside this operation allowlist.
+`operation`, `tabId`, `tabVersion` and object `input`. Legacy operation names remain
+for persisted jobs during migration. New browser control uses `operation:"control"`
+with `input:{request:<canonical Browser Control v1 request>}` and is advertised only
+when the device hello includes the distinct `browser.control.v1` capability. The old
+`browser.control` capability is retained for legacy clients and does not imply v1.
+Canonical `capabilities`, `documentation`, `tabs.list` and `tabs.new` requests are
+unbound (`tabId`/`tabVersion` null); every other method needs the same explicit
+`request.tabId` and outer tab id plus the current outer document version. A successful
+control result wraps the unchanged canonical response as `{response}` and adds
+transport-only `tab:{tabId,tabVersion}` or `tabs:[{tabId,tabVersion}]` pins when
+available. Canonical `tabs.list.value` remains an array whose entries use `id`.
+Changing or reloading the document invalidates its version, even when the URL is
+unchanged. Control uses the persistent native browser gateway, including its reference
+registry, admission lease and renderer-operation fence; it does not translate references
+into selectors or expose arbitrary scripts, cookies, account endpoints or extensions.
+Screenshots retain the canonical typed image response and are projected through the
+job-owned file service before model presentation. Native execution requires the named
+tab to remain active except for an explicit `tabs.select`; account sign-in surfaces are
+forbidden as both current and destination pages. macOS does not advertise `page.press`:
+its native trusted-key method is unavailable on Apple account connections.
 
 `event` carries job/attempt/seq and `state` (`accepted`, `progress`, `completed`,
 `failed`, `cancelled`), optional object `output` and bounded `error`.
@@ -111,18 +130,25 @@ remote work. Returning to the foreground does not override a person's pause.
 Apple and Android reuse their existing browser handlers through a job-owned context.
 Their isolated routers share the original browser gateway's admission and reference
 invalidation. Android also shares its renderer callback retirement tracker; Apple
-keeps the admission lease until the awaited handler completes. A common browser
+keeps the admission lease until the awaited handler completes, including after a
+cancelled or timed-out response while a native callback is still pending. Apple's
+control-v1 route binds each dispatch to one immutable renderer, active tab, document
+version, job authorization and deadline; handler reads and effects recheck that
+fence, and navigation uses the native issued-navigation lease. A common browser
 operation cannot overlap remote renderer work. Extraction releases that browser
 admission before local model inference, and rechecks its immutable document authority
-after inference. The selector/evidence wire remains version 1.
+after inference. Legacy selector/evidence results remain decodable for persisted jobs;
+new browser jobs use the shared browser-control v1 contract above.
 macOS supports both WebKit tabs and the visible Chromium/CEF surface. CEF exposes its
 one current surface as one tab; `open` navigates that surface. Each main-frame start
-rotates a native document identity, including reloads to the same URL. Remote `type`
-sets the selected editable control through the existing atomic `fill` handler; it
-does not write to an unrelated focused control. Only validated selector/text, HTTP(S)
-URL, and bounded scroll inputs enter handlers. No caller-supplied JavaScript is accepted.
+rotates a native document identity, including reloads to the same URL. The legacy
+`type` operation sets the selected editable control through the existing atomic
+`fill` handler. Canonical `control` requests use opaque snapshot references, and
+`tab.type` appends through the shared fixed action; neither is converted to a selector
+or an unrelated focused control. Only canonical methods in the account allowlist are
+advertised. No caller-supplied JavaScript is accepted.
 
-`tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
+For legacy jobs, `tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
 `{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
 the character count without echoing its contents. `snapshot` returns
 `{tabId,tabVersion,page}` using the shared value-free fixed snapshot reader. Explicit
@@ -136,7 +162,10 @@ Form values, textarea defaults and contenteditable text are excluded. Extraction
 requests 6000 characters from `text`. Apple evaluates in its existing private
 browser-control world; Android retains its documented page-realm limitations.
 Each job's mutation fence includes its immutable job/attempt/deadline and native
-account, foreground, connection and document authority. Later jobs cannot inherit it.
+account, foreground, connection and document authority. Canonical account requests
+reuse the persistent common browser gateway and reference owner while carrying the
+job's authorization, deadline, cancellation and document guard through renderer
+dispatch. Later jobs cannot inherit that authority.
 
 `extract` takes `question` and `maxOutputCharacters`. It reads at most 6000 page
 characters, verifies the document before and after local inference, and returns

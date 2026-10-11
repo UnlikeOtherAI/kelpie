@@ -36,13 +36,24 @@ class MockControl final : public kelpie::DesktopBrowserControl {
  public:
   std::string last_script;
   kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false; std::uint64_t nav_requested = 1; std::uint64_t nav_completed = 1; std::string nav_error; int nav_polls = 0;
+  bool owned_navigation = false; bool replace_owned_navigation = false; std::string owned_destination; std::string owned_source_version="source-doc"; std::string owned_new_version="owned-doc";
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
   kelpie::BrowserControlResult GetTabs(std::vector<kelpie::TabSnapshot>* tabs, Timeout) override { *tabs={first,second}; return kelpie::BrowserControlResult::Success(); }
   kelpie::BrowserControlResult GetNavigationState(kelpie::TabLease lease, kelpie::BrowserNavigationState* state, Timeout) override {
     ++nav_polls;
+    if (owned_navigation && !lease.document_version) {
+      first.document_version = owned_new_version;
+      first.url = owned_destination;
+      const auto authority_end=first.url.find_first_of("/?#",first.url.find("://")+3);
+      if(authority_end==std::string::npos)first.url.push_back('/');
+      first.title = "Owned destination";
+      if (replace_owned_navigation) { ++nav_requested; first.document_version="human-doc"; first.url="https://human.test"; }
+    }
     if (nav_error.empty() && nav_completed == 0 && nav_polls >= 2) nav_completed = nav_requested;
-    *state = {lease.id == "second" ? second : first, nav_requested, nav_completed, nav_error};
+    auto tab = lease.id == "second" ? second : first;
+    if (owned_navigation && lease.document_version) { tab.document_version=owned_source_version; tab.url="https://one.test"; }
+    *state = {tab, nav_requested, nav_completed, nav_error};
     return kelpie::BrowserControlResult::Success(state->tab);
   }
   kelpie::BrowserControlResult ResolveTab(const std::optional<std::string>& id, const std::optional<std::uint64_t>& gen, kelpie::TabLease* lease, Timeout) override {
@@ -68,7 +79,7 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   }
   kelpie::BrowserControlResult ActivateTab(kelpie::TabLease lease, Timeout) override { last_lease=lease; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult CloseTab(kelpie::TabLease lease, Timeout) override { last_lease=lease; return kelpie::BrowserControlResult::Success(second); }
-  kelpie::BrowserControlResult Navigate(std::optional<kelpie::TabLease> lease, std::string, kelpie::TabSnapshot* tab, Timeout) override { last_lease=*lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
+  kelpie::BrowserControlResult Navigate(std::optional<kelpie::TabLease> lease, std::string url, kelpie::TabSnapshot* tab, Timeout) override { last_lease=*lease; if (owned_navigation) { owned_destination=url; nav_requested++; nav_completed=nav_requested; first.url=url; first.document_version=owned_new_version; first.title="Owned destination"; } *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Back(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
@@ -142,6 +153,27 @@ int main() {
   control.nav_polls = 0; control.nav_requested = 4; control.nav_completed = 0;
   auto loaded = router.Dispatch("navigate", {{"url", "https://two.test"}});
   assert(loaded.status_code == 200 && control.nav_completed == 4 && control.nav_polls >= 2 && loaded.body.contains("loadTime"));
+  // Account navigation retains its source pin for dispatch, then transfers only
+  // one observed document transition while preserving the job's active lease.
+  control.owned_navigation=true; control.replace_owned_navigation=false; control.nav_requested=20; control.nav_completed=20;
+  control.first.document_version=control.owned_source_version; control.first.url="https://one.test"; control.first.title="One";
+  auto owned_cancel=std::make_shared<const std::atomic<bool>>(false);
+  auto owned_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+  nlohmann::json owned_goto;
+  { kelpie::ScopedBrowserControlLease job(kelpie::TabLease{"first",3,control.owned_source_version,owned_cancel,owned_deadline,true});
+    owned_goto=router.Dispatch("navigate",{{"tabId","first"},{"generation",3},{"url","https://owned.test"}}).body; }
+  assert(owned_goto["success"]==true && owned_goto["url"]=="https://owned.test/");
+  assert(control.last_lease.cancelled==owned_cancel && control.last_lease.deadline==owned_deadline && control.last_lease.require_active);
+  control.replace_owned_navigation=true; control.nav_requested=30; control.nav_completed=30;
+  control.first.document_version=control.owned_source_version; control.first.url="https://one.test"; control.first.title="One";
+  { kelpie::ScopedBrowserControlLease job(kelpie::TabLease{"first",3,control.owned_source_version,owned_cancel,owned_deadline,true});
+    auto human_race=router.Dispatch("navigate",{{"tabId","first"},{"generation",3},{"url","https://owned.test"}});
+    assert(human_race.body["success"]==false && human_race.body["error"]["code"]=="NAVIGATION_ERROR"); }
+  control.owned_navigation=false; control.replace_owned_navigation=false;
+  control.first.document_version="source-doc"; control.first.url="https://one.test";
+  { kelpie::ScopedBrowserControlLease job(kelpie::TabLease{"first",3,std::string("source-doc"),owned_cancel,owned_deadline,true});
+    auto current=router.Dispatch("get-current-url",{{"tabId","first"},{"generation",3}});
+    assert(current.body["success"]==true && current.body["url"]=="https://one.test"); }
   control.nav_error = "DNS failed"; control.nav_requested = 5; control.nav_completed = 0; control.nav_polls = 0;
   assert(router.Dispatch("navigate", {{"url", "https://two.test"}}).status_code == 502); control.nav_error.clear(); control.nav_completed = 5;
   auto a11y=router.Dispatch("get-accessibility-tree", {{"tabId", "second"}, {"generation", 9}, {"interactableOnly", true}, {"maxDepth", 2}});
@@ -161,6 +193,11 @@ int main() {
   assert(!plain_tab.body["tab"].contains("partition") && !plain_tab.body["tab"].contains("name"));
   assert(!plain_tab.body["tab"].contains("persistent"));
   assert(!control.last_new_tab.partition.has_value() && control.last_new_tab.persistent);
+  auto new_tab_cancel=std::make_shared<const std::atomic<bool>>(false);
+  const auto new_tab_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(4);
+  { kelpie::ScopedBrowserControlLease job(kelpie::TabLease{{},{},std::nullopt,new_tab_cancel,new_tab_deadline,false});
+    assert(router.Dispatch("new-tab",{{"url","https://example.test"}}).status_code==200); }
+  assert(control.last_new_tab.cancelled==new_tab_cancel && control.last_new_tab.deadline==new_tab_deadline);
   // name/partition/persistent travel through to the engine and back out again.
   auto isolated=router.Dispatch("new-tab",{{"url","https://example.test"},{"name","Sam"},{"partition","sam.eng-lead"},{"persistent",false}});
   assert(isolated.status_code==200);
