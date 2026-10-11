@@ -133,8 +133,7 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
-  (`0.1.8`); keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
   in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.
