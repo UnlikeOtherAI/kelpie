@@ -1,6 +1,7 @@
 #include "connect_executor.h"
 #include "connect_text.h"
 #include "kelpie/browser_gateway.h"
+#include "kelpie/screenshot_fit.h"
 #include <charconv>
 #include <ctime>
 #include <cstdio>
@@ -246,9 +247,17 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
               {"excerpt",Utf8Prefix(text.value("text",""),1200)},{"observedAt",observed}}})},
           {"tabId",lease.id},{"tabVersion",*lease.document_version},{"modelCapabilities",Json::array({"text"})}};
     }else if(input.value("includeScreenshot",false)) {
-      BrowserScreenshot image;const auto result=browser_.Screenshot(lease,&image,timeout);
-      if(!result.ok)return Failed(result.error_code);
-      if(image.base64_data.size()>640*1024)return Failed("SCREENSHOT_TOO_LARGE");
+      // Every retake reuses the job lease, so its document/active/cancel/deadline fences hold.
+      BrowserScreenshot image;std::string error;
+      const auto fit=FitScreenshot(kAccountScreenshotBase64Limit,[&](std::optional<int> quality) -> std::optional<std::size_t> {
+        image=BrowserScreenshot{};
+        if(quality) { image.format="jpeg";image.quality=quality; }
+        const auto result=browser_.Screenshot(lease,&image,timeout);
+        if(!result.ok) { error=result.error_code;return std::nullopt; }
+        return image.base64_data.size();
+      });
+      if(fit==ScreenshotFit::kFailed)return Failed(error);
+      if(fit==ScreenshotFit::kTooLarge)return Failed("SCREENSHOT_TOO_LARGE");
       output["image"]=image.base64_data;output["mimeType"]=image.mime_type;output["coordinateSpace"]="viewport-css-pixels";
     }
   } else if(operation=="click" || operation=="type") {

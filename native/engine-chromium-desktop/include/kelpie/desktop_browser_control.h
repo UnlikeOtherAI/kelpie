@@ -129,6 +129,10 @@ struct BrowserControlResult {
 };
 
 struct BrowserScreenshot {
+  // Requested viewport encoding: "png", or "jpeg" with an optional 1-100 quality.
+  std::string format = "png";
+  std::optional<int> quality;
+  // Captured image.
   std::string mime_type = "image/png";
   std::string base64_data;
 };

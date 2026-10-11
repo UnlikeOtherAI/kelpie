@@ -4,10 +4,12 @@
 #include "encrypted_blob_store.h"
 #include "account_protocol.h"
 #include "kelpie/desktop_mcp_server.h"
+#include "kelpie/screenshot_fit.h"
 #include <cassert>
 #include <fstream>
 #include <ctime>
 #include <future>
+#include <map>
 using namespace kelpie;
 using namespace kelpie::connect;
 namespace {
@@ -39,7 +41,14 @@ class Browser final:public DesktopBrowserControl {
   BrowserControlResult Reload(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
   BrowserControlResult Evaluate(TabLease lease,std::string,Json* out,Timeout timeout)override { assert(timeout<=std::chrono::seconds(10));const auto r=Check(lease);if(r.ok)*out={{"text","Page content"}};return r; }
   BrowserControlResult EvaluateBrowserControl(TabLease lease,std::string script,Json* out,Timeout timeout)override { return Evaluate(lease,std::move(script),out,timeout); }
-  BrowserControlResult Screenshot(TabLease lease,BrowserScreenshot* out,Timeout)override { const auto r=Check(lease);out->base64_data="AA==";return r; }
+  // Base64 length per encoding (quality 0 = PNG); a document change before shot N fails its fence.
+  std::map<int,std::size_t> shot_sizes={{0,4}}; std::vector<std::optional<int>> shots; std::size_t stale_at_shot=0;
+  BrowserControlResult Screenshot(TabLease lease,BrowserScreenshot* out,Timeout)override {
+    assert((out->format=="jpeg")==out->quality.has_value());
+    shots.push_back(out->quality); if(shots.size()==stale_at_shot)tab.document_version="document-2";
+    const auto r=Check(lease); const auto size=shot_sizes.count(out->quality.value_or(0))?shot_sizes[out->quality.value_or(0)]:4;
+    out->mime_type="image/"+out->format;out->base64_data=std::string(size,'A');return r;
+  }
   BrowserControlResult DispatchTrustedInput(TabLease lease,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok){++effects;*out={{"success",true}};}return r; }
   BrowserControlResult DevTools(TabLease lease,std::string,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok)*out={{"nodes",Json::array()}};return r; }
   BrowserControlResult GetCookies(TabLease,const Json&,Json*,Timeout)override { std::abort(); }
@@ -73,6 +82,19 @@ int main() {
   assert(executor.Execute(Command("extract",{{"question","Read page"}}),guard)["error"]=="MODEL_NOT_READY");
   assert(executor.Execute(Command("snapshot"),guard)["output"]["page"]["text"]=="Page content");
   assert(!executor.Execute(Command("snapshot"),guard)["output"].contains("image"));
+  // Legacy screenshots fit the account budget: PNG first, then JPEG 80/60/40 under the same lease.
+  const auto shot=[&] { browser.shots.clear();return executor.Execute(Command("snapshot",{{"includeScreenshot",true}}),guard); };
+  auto small=shot();
+  assert(small["output"]["mimeType"]=="image/png" && small["output"]["image"]==std::string(4,'A') && browser.shots.size()==1);
+  browser.shot_sizes={{0,kAccountScreenshotBase64Limit+1},{80,kAccountScreenshotBase64Limit+1},{60,1000},{40,10}};
+  auto fitted=shot();
+  assert(fitted["output"]["mimeType"]=="image/jpeg" && fitted["output"]["image"].get<std::string>().size()==1000);
+  assert(browser.shots==std::vector<std::optional<int>>({std::nullopt,80,60}));
+  browser.shot_sizes={{0,kAccountScreenshotBase64Limit+1},{80,kAccountScreenshotBase64Limit+1},{60,kAccountScreenshotBase64Limit+1},{40,kAccountScreenshotBase64Limit+1}};
+  assert(shot()["error"]=="SCREENSHOT_TOO_LARGE" && browser.shots.size()==4);
+  browser.stale_at_shot=2;
+  assert(shot()["error"]=="STALE" && browser.shots.size()==2);
+  browser.stale_at_shot=0;browser.tab.document_version="document-1";browser.shot_sizes={{0,4}};
   Executor local(browser,[](const Json& request) { assert(!request.contains("context") && request["agent"]==false);return Json{{"success",true},{"response",std::string(100,'a')}}; });
   assert(local.Execute(Command("extract",{{"question","Read page"},{"maxOutputCharacters",64}}),guard)["output"]["summary"].get<std::string>().size()==64);
   const auto extracted=local.Execute(Command("extract",{{"question","Read page"}}),guard)["output"];

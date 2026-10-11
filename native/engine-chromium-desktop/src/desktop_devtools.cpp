@@ -311,20 +311,25 @@ std::optional<DesktopDevToolsSession::Json> DesktopDevToolsSession::ScreenshotPa
   const auto format_value = options.find("format");
   if (format_value != options.end() && !format_value->is_string()) return std::nullopt;
   const std::string format = format_value == options.end() ? "png" : format_value->get<std::string>();
-  if (format != "png") return std::nullopt;
-  Json params = {{"format", "png"}, {"captureBeyondViewport", false}};
-  if (options.contains("quality")) params["quality"] = options["quality"];
+  if (format != "png" && format != "jpeg") return std::nullopt;
+  Json params = {{"format", format}, {"captureBeyondViewport", false}};
+  if (const auto quality = options.find("quality"); quality != options.end() && !quality->is_null()) {
+    // CDP ignores quality for PNG; reject it rather than pretend it applied.
+    if (format != "jpeg" || !quality->is_number_integer() || *quality < 1 || *quality > 100) return std::nullopt;
+    params["quality"] = *quality;
+  }
   return params;
 }
 
-DesktopDevToolsSession::Result DesktopDevToolsSession::ParseScreenshotResult(const Result& protocol_result) {
+DesktopDevToolsSession::Result DesktopDevToolsSession::ParseScreenshotResult(const Result& protocol_result,
+                                                                             const std::string& format) {
   if (!protocol_result.ok) return protocol_result;
   if (!protocol_result.value.is_object()) return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return an object");
   const auto data = protocol_result.value.find("data");
   if (data == protocol_result.value.end() || !data->is_string() || data->get<std::string>().empty()) {
-    return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return encoded PNG data");
+    return Failure("CDP_MALFORMED_RESULT", "Page.captureScreenshot did not return encoded image data");
   }
-  return {true, {}, {}, {{"mimeType", "image/png"}, {"data", *data}}, false};
+  return {true, {}, {}, {{"mimeType", "image/" + format}, {"data", *data}}, false};
 }
 
 DesktopDevToolsSession::Json DesktopDevToolsSession::TrustedKeyParams(const Json& input, bool key_up) {
