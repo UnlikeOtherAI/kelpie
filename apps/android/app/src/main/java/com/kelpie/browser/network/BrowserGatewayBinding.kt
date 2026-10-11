@@ -244,6 +244,6 @@ class BrowserGatewayBinding(
 
     companion object {
         private val REENTRANT_METHODS = setOf("ai-infer", "ai-record", "ai-cancel", "abort-script", "get-script-status")
-        private val READ_METHODS = AgentBrowserPolicy.methods(false) + setOf("get-tabs", "get-current-url", "get-capabilities", "get-device-info")
+        private val READ_METHODS = AgentBrowserPolicy.methods(false) + setOf("connect-snapshot", "get-tabs", "get-current-url", "get-capabilities", "get-device-info")
     }
 }

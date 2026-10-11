@@ -37,19 +37,20 @@ final class ConnectAuthorizationTests: XCTestCase {
         context.renderer = renderer
         context.activeEngineIsChromium = true // Isolated renderer; do not resolve the host app's windows.
         #endif
-        view.loadHTMLString("<title>Controls</title><button class='same'>Go</button><button class='same'>Go</button><input>", baseURL: nil)
+        view.loadHTMLString("<title>Controls</title><button id='same'>Go</button><button id='same'>Go</button><input value='private-secret'><textarea>private-secret</textarea><div contenteditable>private-secret</div>", baseURL: nil)
         for _ in 0..<200 {
             if !view.isLoading, view.title == "Controls" { break }
             try await Task.sleep(for: .milliseconds(20))
         }
         let router = Router()
-        LLMHandler(context: context).register(on: router)
-        let snapshot = await router.handle(method: "get-visible-elements", body: ["interactableOnly": true]).json
+        ConnectSnapshot(context: context).register(on: router)
+        let snapshot = await router.handle(method: "connect-snapshot", body: [:]).json
         XCTAssertEqual(snapshot["success"] as? Bool, true)
         let elements = try XCTUnwrap(snapshot["elements"] as? [[String: Any]])
         let selectors = elements.compactMap { $0["selector"] as? String }
-        XCTAssertEqual(selectors.count, 3)
-        XCTAssertEqual(Set(selectors).count, 3)
+        XCTAssertEqual(selectors.count, 4)
+        XCTAssertEqual(Set(selectors).count, 4)
+        XCTAssertFalse((snapshot["text"] as? String ?? "").contains("private-secret"))
         for selector in selectors {
             XCTAssertLessThanOrEqual(selector.utf16.count, 2000)
             let matches = try await view.evaluateJavaScript("document.querySelectorAll('\(JSEscape.string(selector))').length")

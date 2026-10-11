@@ -33,7 +33,9 @@ private val json =
     }
 private val mainHandler = Handler(Looper.getMainLooper())
 
-class HandlerContext(val browserRetirement: BrowserGatewayRetirement = BrowserGatewayRetirement()) {
+class HandlerContext(
+    val browserRetirement: BrowserGatewayRetirement = BrowserGatewayRetirement(),
+) {
     companion object {
         const val DEFAULT_OVERLAY_RGB = "59,130,246"
     }
@@ -137,8 +139,11 @@ class HandlerContext(val browserRetirement: BrowserGatewayRetirement = BrowserGa
                         wv.evaluateJavascript(script) { result ->
                             browserRetirement.complete(ticket)
                             if (cont.isActive) {
-                                if (guard?.invoke() == false) cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
-                                else cont.resume(result ?: "null")
+                                if (guard?.invoke() == false) {
+                                    cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
+                                } else {
+                                    cont.resume(result ?: "null")
+                                }
                             }
                         }
                     } catch (error: Exception) {

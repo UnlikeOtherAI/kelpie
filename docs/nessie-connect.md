@@ -125,12 +125,16 @@ URL, and bounded scroll inputs enter handlers. No caller-supplied JavaScript is 
 `tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,active}]}`. `open` returns
 `{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
 the character count without echoing its contents. `snapshot` returns
-`{tabId,tabVersion,page}` using compact interactable elements. Explicit
+`{tabId,tabVersion,page}` using the shared value-free fixed snapshot reader. Explicit
 `input.includeScreenshot: true` adds the existing viewport JPEG response under
 `screenshot`, including `image` base64 and CSS-pixel coordinate metadata.
-Visible element entries include the existing unique selector builder's `selector`.
-The shared `get-page-text` handler returns `content`, bounded by optional `maxLength`
-(1–100000, default 100000); extraction requests 6000 and uses that field.
+Page entries include bounded `url`, `title`, `text`, `truncated` and observed
+`elements:[{selector,tag,role,label}]`. Every selector resolves uniquely to the
+observed element; duplicate IDs and document roots are checked. Snapshot and
+extraction reuse the canonical collector without creating a reference registry.
+Form values, textarea defaults and contenteditable text are excluded. Extraction
+requests 6000 characters from `text`. Apple evaluates in its existing private
+browser-control world; Android retains its documented page-realm limitations.
 Each job's mutation fence includes its immutable job/attempt/deadline and native
 account, foreground, connection and document authority. Later jobs cannot inherit it.
 

@@ -26,6 +26,13 @@ template <typename Action> char* Invoke(KelpieBrowserGatewayRef gateway, Action 
 }
 }
 extern "C" {
+char* kelpie_browser_selector_snapshot_expression(const char* options) {
+  try {
+    const auto value = Parse(options, 4096);
+    if (!value.is_object()) return nullptr;
+    return Copy({{"expression", kelpie::CollectBrowserSelectorSnapshotExpression(value)}});
+  } catch (...) { return nullptr; }
+}
 KelpieBrowserGatewayRef kelpie_browser_gateway_create(const char* config) {
   try {
     const auto value = Parse(config);

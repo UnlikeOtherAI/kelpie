@@ -159,6 +159,12 @@ void SelectedAndMapping() {
   assert(direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "invalid"}})["response"]["error"]["code"] == "COMMAND_FAILED");
 }
 void CAbi() {
+  assert(!kelpie_browser_selector_snapshot_expression(nullptr));
+  assert(!kelpie_browser_selector_snapshot_expression("[]"));
+  assert(!kelpie_browser_selector_snapshot_expression(std::string(4097, 'x').c_str()));
+  char* reader = kelpie_browser_selector_snapshot_expression("{\"maxChars\":6000,\"maxElements\":150}");
+  assert(reader && json::parse(reader)["expression"] == kelpie::CollectBrowserSelectorSnapshotExpression({{"maxChars",6000},{"maxElements",150}}));
+  kelpie_mcp_free_string(reader);
   const auto gateway = kelpie_browser_gateway_create("{\"nativeMethods\":[]}");
   assert(gateway);
   char* result = kelpie_browser_gateway_begin(gateway, "{\"version\":1,\"method\":\"documentation\"}");
