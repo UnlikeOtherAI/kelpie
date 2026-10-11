@@ -438,7 +438,8 @@ creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browse
 provides a token-free stdio bridge for local development agents and local Nessie executors.
 `kelpie browser stop <name>` requests orderly app shutdown and clears its alias state only after
 that launch removes readiness. Windows home, native toast, and fullscreen are callable through
-HTTP and MCP; remote browser control is not shipped.
+HTTP and MCP. Account-based remote browser control uses the separate authenticated
+[Nessie connection](#nessie-account-connection).
 
 On macOS, Windows and Linux, the selected tab carries the sampled page colour continuously into the navigation area below. Inactive tabs and the entire title strip stay static light gray, including on dark pages. Page colours animate while the gray strip remains unchanged. On macOS, a bounded trailing sample catches sticky-header colour transitions after the last scroll event.
 
