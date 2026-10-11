@@ -318,9 +318,9 @@ bool WindowsApp::InitializeDesktopRuntime() {
           return inference_->ExecuteOwned("ai-infer",body,guard,/*native_only=*/true);
         },[this](const std::string& method,const json& target) {
           return desktop_app_->mcp_server().GuardDispatch(method,target);
-        },[this](const json& request,const connect::Executor::Authorization& authorize) {
+        },[this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
           DesktopMcpServer::Config config; config.platform=Platform::kWindows; config.engine="chromium";
-          return desktop_app_->mcp_server().HandleBrowserRequestAuthorized(request,config,authorize);
+          return desktop_app_->mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
         });
         return executor.Execute(command,guard);
       },[this](const auto& guard) { if(inference_)inference_->CancelOwned(guard); },

@@ -122,7 +122,9 @@ int main() {
   auto control_command=Json{{"operation","control"},{"input",{{"request",canonical_request}}},
       {"deadline","2099-10-11T12:00:00.000Z"},{"tabId","owned"},{"tabVersion","document-1"}};
   bool dispatched=false;int authority_checks=0;Json seen;
-  Executor control_executor(browser,{}, {},[&](const Json& request,const Authorization& authorize) {
+  Executor control_executor(browser,{}, {},[&](const Json& request,const TabLease& job_lease,const Executor::Authorization& authorize) {
+    assert(job_lease.id=="owned" && job_lease.generation==7 && job_lease.document_version=="document-1");
+    assert(job_lease.cancelled==guard && job_lease.require_active && job_lease.deadline.has_value());
     seen=request;dispatched=true;authority_checks++;assert(authorize());
     return Json{{"version",1},{"ok",true},{"value",{{"success",true}}}};
   });
@@ -134,13 +136,13 @@ int main() {
   browser.tab.active=false;dispatched=false;
   control_executor.Execute(control_command,guard);assert(!dispatched);browser.tab.active=true;
   auto screenshot=control_command;screenshot["input"]["request"]={{"version",1},{"method","tab.screenshot"},{"tabId","owned"},{"params",Json::object()}};
-  Executor image_executor(browser,{}, {},[](const Json&,const Authorization&) {
+  Executor image_executor(browser,{}, {},[](const Json&,const TabLease&,const Executor::Authorization&) {
     return Json{{"version",1},{"ok",true},{"value",{{"type","image"},{"mimeType","image/png"},{"data","opaque-image"}}}};
   });
   assert(image_executor.Execute(screenshot,guard)["output"]["response"]["value"]["type"]=="image");
   auto capabilities=control_command;capabilities["tabId"]=nullptr;capabilities["tabVersion"]=nullptr;
   capabilities["input"]["request"]={{"version",1},{"method","capabilities"},{"params",Json::object()}};
-  Executor capability_executor(browser,{}, {},[](const Json&,const Authorization&) {
+  Executor capability_executor(browser,{}, {},[](const Json&,const TabLease&,const Executor::Authorization&) {
     return Json{{"version",1},{"ok",true},{"value",{{"methods",Json::array({"tab.click","tab.screenshot","tab.back","kelpie.local-extension"})},
         {"extensions",Json::array({"local"})}}}};
   });
@@ -148,7 +150,7 @@ int main() {
   assert(projected["methods"]==Json::array({"tab.click","tab.screenshot"}) && projected["extensions"].empty());
   auto listed=control_command;listed["tabId"]=nullptr;listed["tabVersion"]=nullptr;
   listed["input"]["request"]={{"version",1},{"method","tabs.list"},{"params",Json::object()}};
-  Executor list_executor(browser,{}, {},[](const Json&,const Authorization&) {
+  Executor list_executor(browser,{}, {},[](const Json&,const TabLease&,const Executor::Authorization&) {
     return Json{{"version",1},{"ok",true},{"value",Json::array({{{"id","owned"}}})}};
   });
   const auto list_result=list_executor.Execute(listed,guard);

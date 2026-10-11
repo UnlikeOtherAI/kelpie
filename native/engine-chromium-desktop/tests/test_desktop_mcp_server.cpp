@@ -1,6 +1,10 @@
 #include "kelpie/desktop_mcp_server.h"
 
 #include <cassert>
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -26,11 +30,28 @@ int main() {
       "delete-cookies", "clear-cookies", "get-storage", "set-storage", "clear-storage",
       "resize-viewport", "reset-viewport", "set-fullscreen", "get-fullscreen",
   };
+  std::string live_document = "document-1";
+  bool live_active = true;
+  int guarded_effects = 0;
+  std::optional<kelpie::TabLease> late_lease;
   for (const auto& endpoint : endpoints) {
-    router.Register(endpoint, [](const nlohmann::json& params) {
+    router.Register(endpoint, [&, endpoint](const nlohmann::json& params) {
+      if (endpoint == "navigate" && kelpie::ScopedBrowserControlLease::Current()) {
+        late_lease = *kelpie::ScopedBrowserControlLease::Current();
+        if (!late_lease->document_version || *late_lease->document_version != live_document ||
+            (late_lease->require_active && !live_active) ||
+            (late_lease->cancelled && late_lease->cancelled->load()) ||
+            (late_lease->deadline && std::chrono::steady_clock::now() >= *late_lease->deadline))
+          return nlohmann::json{{"success", false}, {"error", {{"code", "TAB_STALE"}}}};
+        ++guarded_effects;
+      }
       return nlohmann::json{{"success", true}, {"params", params}};
     });
   }
+  router.BeforeDispatch([&](std::string_view method, const nlohmann::json&) {
+    if (method == "navigate") { live_document = "document-2"; live_active = false; }
+    return std::shared_ptr<void>();
+  });
 
   kelpie::McpRegistry registry;
   kelpie::DesktopMcpServer server;
@@ -40,6 +61,23 @@ int main() {
   kelpie::DesktopMcpServer::Config config;
   config.platform = kelpie::Platform::kWindows;
   config.engine = "chromium";
+
+  auto cancel = std::make_shared<std::atomic<bool>>(false);
+  kelpie::TabLease pinned{"owned", 7, "document-1", cancel,
+      std::chrono::steady_clock::now() + std::chrono::seconds(20), true};
+  const auto raced_control = server.HandleBrowserRequestAuthorized(
+      {{"version", 1}, {"method", "tab.goto"}, {"tabId", "owned"},
+       {"params", {{"url", "https://example.org"}}}}, config, [] { return true; }, pinned);
+  assert(!raced_control["ok"].get<bool>() && guarded_effects == 0);
+  assert(late_lease && late_lease->document_version == "document-1" && late_lease->cancelled == cancel);
+  assert(!kelpie::ScopedBrowserControlLease::Current());
+  // A renderer callback that outlives the account request retains the original
+  // lease and cannot re-resolve onto the document that replaced it mid-dispatch.
+  live_document = "document-2";
+  if (late_lease->document_version == live_document) ++guarded_effects;
+  assert(guarded_effects == 0);
+  router.BeforeDispatch([](std::string_view, const nlohmann::json&) { return std::shared_ptr<void>(); });
+  live_document = "document-1"; live_active = true;
 
   const auto init = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},

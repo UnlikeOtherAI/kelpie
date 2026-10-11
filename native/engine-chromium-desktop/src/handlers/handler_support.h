@@ -233,13 +233,27 @@ inline DesktopBrowserControl::Timeout ControlTimeout(const nlohmann::json& param
   return std::chrono::milliseconds(std::clamp(value, 1, 30000));
 }
 
+inline BrowserControlResult ResolveTabForRequest(DesktopBrowserControl& control,
+                                                  const nlohmann::json& params,
+                                                  TabLease* lease,
+                                                  DesktopBrowserControl::Timeout timeout) {
+  const auto& scoped = ScopedBrowserControlLease::Current();
+  if (!scoped) return control.ResolveTab(OptionalTabId(params), OptionalGeneration(params), lease, timeout);
+  if (!lease || (params.contains("tabId") && params["tabId"] != scoped->id) ||
+      (params.contains("generation") && params["generation"] != scoped->generation)) {
+    return BrowserControlResult::Failure("TAB_STALE", "The tab lease does not match this account job");
+  }
+  *lease = *scoped;
+  return BrowserControlResult::Success();
+}
+
 inline BrowserControlResult EvaluateForTab(const DesktopHandlerRuntime& runtime,
                                            const nlohmann::json& params,
                                            const std::string& expression,
                                            nlohmann::json* value) {
   TabLease lease;
-  BrowserControlResult result = RequireBrowserControl(runtime).ResolveTab(
-      OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+  BrowserControlResult result = ResolveTabForRequest(RequireBrowserControl(runtime), params,
+                                                      &lease, ControlTimeout(params));
   if (!result.ok) return result;
   return RequireBrowserControl(runtime).Evaluate(lease, expression, value, ControlTimeout(params));
 }

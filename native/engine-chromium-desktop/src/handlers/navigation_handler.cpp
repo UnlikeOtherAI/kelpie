@@ -9,8 +9,7 @@ namespace {
 
 BrowserControlResult Resolve(const DesktopHandlerRuntime& runtime, const nlohmann::json& params,
                              TabLease* lease) {
-  return RequireBrowserControl(runtime).ResolveTab(OptionalTabId(params), OptionalGeneration(params), lease,
-                                                    ControlTimeout(params));
+  return ResolveTabForRequest(RequireBrowserControl(runtime), params, lease, ControlTimeout(params));
 }
 
 nlohmann::json SnapshotResponse(const BrowserControlResult& result, const TabSnapshot& tab) {

@@ -37,7 +37,7 @@ nlohmann::json BrowserManagementHandler::NewTab(const nlohmann::json& params) co
 nlohmann::json BrowserManagementHandler::SwitchTab(const nlohmann::json& params) const {
   try {
     TabLease lease;
-    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    const auto resolved = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
     if (!resolved.ok) return ControlError(resolved);
     const auto result = RequireBrowserControl(runtime_).ActivateTab(lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);
@@ -48,7 +48,7 @@ nlohmann::json BrowserManagementHandler::SwitchTab(const nlohmann::json& params)
 nlohmann::json BrowserManagementHandler::CloseTab(const nlohmann::json& params) const {
   try {
     TabLease lease;
-    const auto resolved = RequireBrowserControl(runtime_).ResolveTab(OptionalTabId(params), OptionalGeneration(params), &lease, ControlTimeout(params));
+    const auto resolved = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
     if (!resolved.ok) return ControlError(resolved);
     const auto result = RequireBrowserControl(runtime_).CloseTab(lease, ControlTimeout(params));
     if (!result.ok) return ControlError(result);

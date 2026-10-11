@@ -46,7 +46,10 @@ Legacy bound operations use the named tab's current document version, activate t
 and retain its lease through native owner-thread execution. Canonical bound requests
 require their named tab to remain active, except explicit `tabs.select`, and check
 account authority, job deadline, cancellation, document identity and account-surface
-policy at renderer dispatch. Person-driven tab selection
+policy at renderer dispatch. The desktop route handlers consume the same immutable
+job-owned `TabLease` instead of resolving a fresh document after authorization; each
+native renderer operation captures that lease through completion, including a late
+callback after its caller times out. Person-driven tab selection
 pauses active work; bound owner-thread calls also require the target to remain active. Document versions change
 on main-frame load, including same-URL reload, and are independent of tab lifetime.
 Queued effects also carry cancellation and immutable full job deadline guards.
