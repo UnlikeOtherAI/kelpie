@@ -27,7 +27,8 @@ class BrowserGatewaySession(
     suspend fun call(
         request: Map<String, Any?>,
         mcp: Boolean = false,
-    ): Map<String, Any?>? = withBrowserGatewayLease(lock, retirement) {
+    ): Map<String, Any?>? =
+        withBrowserGatewayLease(lock, retirement) {
             check(handle != 0L) { "The browser gateway has closed" }
             beforeBegin()
             var step = decode(abi.begin(handle, OpenAIJson.encode(OpenAIJson.fromAny(request)), mcp))
@@ -47,7 +48,7 @@ class BrowserGatewaySession(
                 if (error is CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) throw error
                 cancelled
             }
-    }
+        }
 
     private suspend fun dispatchStep(step: Map<String, Any?>): Map<String, Any?> {
         if (step["mutates"] == true) beforeMutation()

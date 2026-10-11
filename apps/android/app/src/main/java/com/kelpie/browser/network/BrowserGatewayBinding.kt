@@ -31,8 +31,11 @@ class BrowserGatewayBinding(
             direct.call(request) ?: errorResponse("GATEWAY_ERROR", "The browser returned no response")
         }
         router.register("mcp") { request ->
-            if (BrowserGatewayReentrant.permits(request, extensions, REENTRANT_METHODS)) reentrant(request)
-            else direct.call(request, mcp = true) ?: emptyMap()
+            if (BrowserGatewayReentrant.permits(request, extensions, REENTRANT_METHODS)) {
+                reentrant(request)
+            } else {
+                direct.call(request, mcp = true) ?: emptyMap()
+            }
         }
     }
 
@@ -79,23 +82,47 @@ class BrowserGatewayBinding(
         return gateway
     }
 
-    private fun authorize(request: Map<String, Any?>, mutates: Boolean, allowActions: Boolean, pinned: String?): Boolean =
+    private fun authorize(
+        request: Map<String, Any?>,
+        mutates: Boolean,
+        allowActions: Boolean,
+        pinned: String?,
+    ): Boolean =
         ctx.scriptPlaybackState?.recordingError(request["method"] as? String ?: "browser-control") == null &&
-            BrowserGatewayTabPolicy.permits(request, mutates, allowActions, pinned,
-                ctx.tabStore?.activeTabId?.value ?: "0", ctx.tabStore?.tabs?.value?.map { it.id }?.toSet() ?: setOf("0"))
+            BrowserGatewayTabPolicy.permits(
+                request,
+                mutates,
+                allowActions,
+                pinned,
+                ctx.tabStore?.activeTabId?.value ?: "0",
+                ctx.tabStore
+                    ?.tabs
+                    ?.value
+                    ?.map { it.id }
+                    ?.toSet() ?: setOf("0"),
+            )
 
     /** Model inference owns its own lifecycle; only its nested renderer calls acquire the browser lease. */
     private suspend fun reentrant(request: Map<String, Any?>): Map<String, Any?> {
-        val gateway = BrowserGatewaySession(
-            mapOf("nativeMethods" to methods.intersect(REENTRANT_METHODS).toList(),
-                "extensions" to extensions.filter { it["method"] in REENTRANT_METHODS }, "allowActions" to true,
-                "requireAuthorization" to true, "fixedReader" to false),
-            Mutex(), authorize = { value, mutates -> authorize(value, mutates, true, null) },
-            dispatch = { method, params -> router.handle(method, params, fromGateway = true).second },
-            dispatchTimeoutMs = null,
-        )
-        return try { gateway.call(request, mcp = true) ?: emptyMap() }
-        finally { withContext(kotlinx.coroutines.NonCancellable) { gateway.close() } }
+        val gateway =
+            BrowserGatewaySession(
+                mapOf(
+                    "nativeMethods" to methods.intersect(REENTRANT_METHODS).toList(),
+                    "extensions" to extensions.filter { it["method"] in REENTRANT_METHODS },
+                    "allowActions" to true,
+                    "requireAuthorization" to true,
+                    "fixedReader" to false,
+                ),
+                Mutex(),
+                authorize = { value, mutates -> authorize(value, mutates, true, null) },
+                dispatch = { method, params -> router.handle(method, params, fromGateway = true).second },
+                dispatchTimeoutMs = null,
+            )
+        return try {
+            gateway.call(request, mcp = true) ?: emptyMap()
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { gateway.close() }
+        }
     }
 
     suspend fun <T> legacy(

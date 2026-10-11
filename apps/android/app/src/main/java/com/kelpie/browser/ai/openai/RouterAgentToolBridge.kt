@@ -59,8 +59,9 @@ class RouterAgentToolBridge(
                             ?.mapNotNull { it as? Map<*, *> }
                             ?.firstOrNull { it["type"] == "text" }
                             ?.get("text") as? String
-                    val result = text?.let { OpenAIJson.parseObjectOrNull(it)?.let(OpenAIJson::toMap) }
-                        ?: mapOf("ok" to false, "error" to "Invalid gateway tool result")
+                    val result =
+                        text?.let { OpenAIJson.parseObjectOrNull(it)?.let(OpenAIJson::toMap) }
+                            ?: mapOf("ok" to false, "error" to "Invalid gateway tool result")
                     if ((result["error"] as? Map<*, *>)?.get("mayHaveCompleted") == true) {
                         throw OpenAIException("ACTION_UNCERTAIN", "The action may have completed. This run stopped; observe and reconcile in a later request.", diagnostics = result)
                     }

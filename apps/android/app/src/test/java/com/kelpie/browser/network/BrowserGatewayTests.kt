@@ -210,68 +210,80 @@ class BrowserGatewayTests {
             session.close()
         }
 
-    @Test fun timedOutRendererLeaseWaitsForCallbackThenAllowsExplicitReconciliation() = runBlocking {
-        val lock = Mutex()
-        val retirement = BrowserGatewayRetirement()
-        val target = Any()
-        lateinit var ticket: Any
-        var dispatches = 0
-        val session = BrowserGatewaySession(emptyMap(), lock, { _, _ -> true }, { _, _ ->
-            if (++dispatches == 1) {
-                ticket = retirement.start(target) {}
-                awaitCancellation()
-            }
-            mapOf("success" to true)
-        }, Abi(), 20, retirement = retirement)
-        assertEquals(false, session.call(emptyMap())!!["ok"])
-        val next = async { session.call(emptyMap()) }
-        kotlinx.coroutines.delay(25)
-        assertEquals(1, dispatches)
-        assertFalse(next.isCompleted)
-        retirement.complete(ticket)
-        assertEquals(true, next.await()!!["ok"])
-        assertEquals(2, dispatches)
-        session.close()
-    }
-
-    @Test fun confirmedRendererTeardownRetiresLostCallbackWithoutPermanentLatch() = runBlocking {
-        val retirement = BrowserGatewayRetirement()
-        val target = Any()
-        var cancelled = false
-        retirement.start(target) { cancelled = true }
-        val pending = retirement.waitForPending()!!
-        retirement.retireTarget(target)
-        assertTrue(cancelled)
-        pending.await()
-        assertEquals(null, retirement.waitForPending())
-    }
-
-    @Test fun cancelledLegacyRendererWorkKeepsSharedLeaseUntilCallback() = runBlocking {
-        val lock = Mutex()
-        val retirement = BrowserGatewayRetirement()
-        val target = Any()
-        lateinit var ticket: Any
-        val started = CompletableDeferred<Unit>()
-        val first = launch {
-            withBrowserGatewayLease(lock, retirement) {
-                ticket = retirement.start(target) {}
-                started.complete(Unit)
-                awaitCancellation()
-            }
+    @Test fun timedOutRendererLeaseWaitsForCallbackThenAllowsExplicitReconciliation() =
+        runBlocking {
+            val lock = Mutex()
+            val retirement = BrowserGatewayRetirement()
+            val target = Any()
+            lateinit var ticket: Any
+            var dispatches = 0
+            val session =
+                BrowserGatewaySession(emptyMap(), lock, { _, _ -> true }, { _, _ ->
+                    if (++dispatches == 1) {
+                        ticket = retirement.start(target) {}
+                        awaitCancellation()
+                    }
+                    mapOf("success" to true)
+                }, Abi(), 20, retirement = retirement)
+            assertEquals(false, session.call(emptyMap())!!["ok"])
+            val next = async { session.call(emptyMap()) }
+            kotlinx.coroutines.delay(25)
+            assertEquals(1, dispatches)
+            assertFalse(next.isCompleted)
+            retirement.complete(ticket)
+            assertEquals(true, next.await()!!["ok"])
+            assertEquals(2, dispatches)
+            session.close()
         }
-        started.await()
-        first.cancelAndJoin()
-        val next = async { withBrowserGatewayLease(lock, retirement) { "reconciled" } }
-        kotlinx.coroutines.delay(25)
-        assertFalse(next.isCompleted)
-        retirement.complete(ticket)
-        assertEquals("reconciled", next.await())
-    }
+
+    @Test fun confirmedRendererTeardownRetiresLostCallbackWithoutPermanentLatch() =
+        runBlocking {
+            val retirement = BrowserGatewayRetirement()
+            val target = Any()
+            var cancelled = false
+            retirement.start(target) { cancelled = true }
+            val pending = retirement.waitForPending()!!
+            retirement.retireTarget(target)
+            assertTrue(cancelled)
+            pending.await()
+            assertEquals(null, retirement.waitForPending())
+        }
+
+    @Test fun cancelledLegacyRendererWorkKeepsSharedLeaseUntilCallback() =
+        runBlocking {
+            val lock = Mutex()
+            val retirement = BrowserGatewayRetirement()
+            val target = Any()
+            lateinit var ticket: Any
+            val started = CompletableDeferred<Unit>()
+            val first =
+                launch {
+                    withBrowserGatewayLease(lock, retirement) {
+                        ticket = retirement.start(target) {}
+                        started.complete(Unit)
+                        awaitCancellation()
+                    }
+                }
+            started.await()
+            first.cancelAndJoin()
+            val next = async { withBrowserGatewayLease(lock, retirement) { "reconciled" } }
+            kotlinx.coroutines.delay(25)
+            assertFalse(next.isCompleted)
+            retirement.complete(ticket)
+            assertEquals("reconciled", next.await())
+        }
 
     @Test fun reentrantAdmissionUsesOnlyConfiguredExtensionMethods() {
         val descriptors = listOf(mapOf<String, Any?>("name" to "kelpie_ai_ask", "method" to "ai-infer"))
-        fun permits(name: String, args: Map<String, Any?> = emptyMap()) = BrowserGatewayReentrant.permits(
-            mapOf("method" to "tools/call", "params" to mapOf("name" to name, "arguments" to args)), descriptors, setOf("ai-infer"))
+
+        fun permits(
+            name: String,
+            args: Map<String, Any?> = emptyMap(),
+        ) = BrowserGatewayReentrant.permits(
+            mapOf("method" to "tools/call", "params" to mapOf("name" to name, "arguments" to args)),
+            descriptors,
+            setOf("ai-infer"),
+        )
         assertTrue(permits("kelpie_ai_ask"))
         assertTrue(permits("kelpie_extension", mapOf("name" to "kelpie_ai_ask")))
         assertFalse(permits("ai-infer"))
@@ -279,24 +291,26 @@ class BrowserGatewayTests {
         assertFalse(BrowserGatewayReentrant.permits(mapOf("method" to "tools/list"), descriptors, setOf("ai-infer")))
     }
 
-    @Test fun outerInferenceHandleAllowsNestedAndConcurrentBrowserTransactions() = runBlocking {
-        val browserLock = Mutex()
-        val started = CompletableDeferred<Unit>()
-        val provider = CompletableDeferred<Unit>()
-        val browser = BrowserGatewaySession(emptyMap(), browserLock, { _, _ -> true }, { _, _ -> mapOf("success" to true) }, Abi())
-        val inference = BrowserGatewaySession(emptyMap(), Mutex(), { _, _ -> true }, { _, _ ->
+    @Test fun outerInferenceHandleAllowsNestedAndConcurrentBrowserTransactions() =
+        runBlocking {
+            val browserLock = Mutex()
+            val started = CompletableDeferred<Unit>()
+            val provider = CompletableDeferred<Unit>()
+            val browser = BrowserGatewaySession(emptyMap(), browserLock, { _, _ -> true }, { _, _ -> mapOf("success" to true) }, Abi())
+            val inference =
+                BrowserGatewaySession(emptyMap(), Mutex(), { _, _ -> true }, { _, _ ->
+                    assertEquals(true, browser.call(emptyMap())!!["ok"])
+                    started.complete(Unit)
+                    provider.await()
+                    mapOf("success" to true)
+                }, Abi(), dispatchTimeoutMs = null)
+            val outer = async { inference.call(emptyMap(), mcp = true) }
+            started.await()
             assertEquals(true, browser.call(emptyMap())!!["ok"])
-            started.complete(Unit)
-            provider.await()
-            mapOf("success" to true)
-        }, Abi(), dispatchTimeoutMs = null)
-        val outer = async { inference.call(emptyMap(), mcp = true) }
-        started.await()
-        assertEquals(true, browser.call(emptyMap())!!["ok"])
-        assertFalse(outer.isCompleted)
-        provider.complete(Unit)
-        assertEquals(true, outer.await()!!["ok"])
-        inference.close()
-        browser.close()
-    }
+            assertFalse(outer.isCompleted)
+            provider.complete(Unit)
+            assertEquals(true, outer.await()!!["ok"])
+            inference.close()
+            browser.close()
+        }
 }

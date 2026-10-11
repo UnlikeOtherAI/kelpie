@@ -132,7 +132,9 @@ class HandlerContext {
                         browserRetirement.complete(ticket)
                         if (cont.isActive) cont.resumeWithException(error)
                     }
-                } else browserRetirement.complete(ticket)
+                } else {
+                    browserRetirement.complete(ticket)
+                }
             }
         }
 
