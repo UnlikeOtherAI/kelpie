@@ -27,14 +27,14 @@ const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
 // Fail the native build if an authoritative schema requires validation we do not implement.
 const supported = new Set(['$schema', '$defs', '$ref', 'type', 'properties', 'required', 'additionalProperties',
   'description', 'enum', 'const', 'anyOf', 'oneOf', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum',
-  'minLength', 'maxLength', 'pattern', 'items', 'minItems', 'maxItems', 'default']);
+  'minLength', 'maxLength', 'pattern', 'propertyNames', 'items', 'minItems', 'maxItems', 'default']);
 function auditSchema(schema) {
   if (typeof schema === 'boolean') return;
   for (const [key, value] of Object.entries(schema)) {
     if (!supported.has(key)) throw new Error(`Unsupported native schema keyword: ${key}`);
     if (key === 'properties' || key === '$defs') Object.values(value).forEach(auditSchema);
     else if (key === 'anyOf' || key === 'oneOf') value.forEach(auditSchema);
-    else if (['items', 'additionalProperties'].includes(key)) auditSchema(value);
+    else if (['items', 'additionalProperties', 'propertyNames'].includes(key)) auditSchema(value);
   }
 }
 Object.values(extensionSchemas).forEach(auditSchema);

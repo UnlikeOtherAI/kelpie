@@ -171,4 +171,9 @@ void CAbi() {
   kelpie_mcp_free_string(result);
   kelpie_browser_gateway_destroy(large_gateway);
 }
-int main() { Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+void Notifications() {
+  kelpie::BrowserGateway gateway({{"nativeMethods", json::array()}});
+  assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
+  assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
+}
+int main() { Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

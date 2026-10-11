@@ -234,12 +234,12 @@ json BrowserGateway::Extensions(const json& names) const {
 }
 json BrowserGateway::BeginMcp(json rpc) {
   const json id = rpc.is_object() ? rpc.value("id", json(nullptr)) : json(nullptr);
+  const bool notification = rpc.is_object() && !rpc.contains("id") && rpc.contains("jsonrpc") && rpc["jsonrpc"] == "2.0" && rpc.contains("method") && rpc["method"].is_string();
   const auto complete = [](json value) { return json{{"kind", "complete"}, {"response", value}}; };
-  const auto error = [&](int code) { return complete({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", "Invalid or unavailable MCP request."}}}}); };
+  const auto error = [&](int code) { return complete(notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", "Invalid or unavailable MCP request."}}}}); };
   if (impl_->active) return error(-32000);
   impl_->mcp = false;
   if (!rpc.is_object() || !rpc.contains("jsonrpc") || !rpc["jsonrpc"].is_string() || rpc["jsonrpc"] != "2.0" || !rpc.contains("method") || !rpc["method"].is_string()) return error(-32600);
-  const bool notification = !rpc.contains("id");
   const auto answer = [&](json value) { return complete(notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", id}, {"result", value}}); };
   const std::string method = rpc["method"];
   if (method == "initialize") return answer({{"protocolVersion", "2025-06-18"}, {"capabilities", {{"tools", json::object()}}}, {"serverInfo", {{"name", "kelpie"}, {"version", "1"}}}});

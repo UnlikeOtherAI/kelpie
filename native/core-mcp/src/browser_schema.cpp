@@ -65,6 +65,10 @@ bool Validate(const json& root, const json& schema, json* value, int depth) {
   if (value->is_object()) {
     const auto properties = schema.value("properties", json::object());
     for (auto it = value->begin(); it != value->end(); ++it) {
+      if (schema.contains("propertyNames")) {
+        json key = it.key();
+        if (!Validate(root, schema["propertyNames"], &key, depth + 1)) return false;
+      }
       if (properties.contains(it.key())) {
         if (!Validate(root, properties[it.key()], &it.value(), depth + 1)) return false;
       } else if (schema.contains("additionalProperties")) {
