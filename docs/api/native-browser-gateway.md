@@ -128,3 +128,8 @@ spoof resistance, editable-value omission, atomic observed actions, append, stal
 DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairing
 tokens stay in process memory and new fixture grants are revoked; existing CLI
 grants are preserved, and fixture tabs close afterward.
+
+The rich inference extension delegates admission to its inner browser requests;
+it does not hold the browser lease across model inference. Its existing model
+and run deadlines remain authoritative, avoiding both self-blocked tool loops
+and a detached outer timeout while an AI turn continues to act.

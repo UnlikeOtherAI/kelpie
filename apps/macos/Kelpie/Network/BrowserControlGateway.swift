@@ -55,7 +55,8 @@ final class BrowserControlGateway {
             let failure: [String: Any] = ["version": 1, "ok": false, "error": ["code": "BUSY", "message": "A browser operation is pending", "mayHaveCompleted": false]]
             return mcp ? ["jsonrpc": "2.0", "id": body["id"] ?? NSNull(), "error": ["code": -32000, "message": "A browser operation is pending"]] : failure
         }
-        defer { lease?.end() }
+        var ownsLease = true
+        defer { if ownsLease { lease?.end() } }
         guard handle != nil else {
             let error: [String: Any] = ["code": "UNAVAILABLE", "message": "Browser coordinator is unavailable", "mayHaveCompleted": false]
             return mcp
@@ -80,6 +81,17 @@ final class BrowserControlGateway {
                 let method = step["method"] as? String ?? ""
                 let params = step["params"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
+                if method == "ai-infer" {
+                    // Product inference owns its existing model/run deadlines. Its
+                    // nested browser calls each acquire the shared admission lease.
+                    // Holding it across inference would block its own tool loop.
+                    lease?.end()
+                    ownsLease = false
+                    let result = await dispatch(method, params, mutates)
+                    guard !Task.isCancelled else { return cancel() }
+                    step = advance(result)
+                    continue
+                }
                 guard let result = await boundedDispatch(method: method, params: params, mutates: mutates) else {
                     return cancel()
                 }

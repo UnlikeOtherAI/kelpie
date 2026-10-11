@@ -136,6 +136,25 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTFail("Retired callback must release control after cancellation")
     }
 
+    func testInferenceExtensionDelegatesLeaseToItsNestedBrowserCalls() async {
+        let lease = BrowserControlLease()
+        let nested = BrowserControlGateway(
+            methods: ["navigate"], extensions: [], targeting: "direct", allowActions: true, lease: lease,
+            dispatch: { _, _, _ in successResponse() }, authorize: { _, _ in true }
+        )
+        let methods = ["ai-infer"]
+        let outer = BrowserControlGateway(
+            methods: methods, extensions: BrowserControlGateway.extensions(platform: 2, methods: methods), targeting: "direct", allowActions: true, lease: lease,
+            dispatch: { _, _, _ in
+                let result = await nested.request(["version": 1, "method": "tab.goto", "tabId": "own", "params": ["url": "https://example.test"]])
+                return successResponse(["nestedSucceeded": result["ok"] as? Bool ?? false])
+            }, authorize: { _, _ in true }
+        )
+        let result = await outer.callTool(name: "kelpie_extension", arguments: ["name": "kelpie_ai_ask", "arguments": ["prompt": "fixture"]])
+        let value = BrowserControlGateway.canonicalResult(result)["value"] as? [String: Any]
+        XCTAssertEqual(value?["nestedSucceeded"] as? Bool, true)
+    }
+
     func testLegacyExtensionRetargetIsRefusedBeforeDispatch() async {
         let dispatcher = RecordingDispatcher()
         let gateway = await dispatcher.browserSession(tabId: "visible", allowActions: true)
