@@ -211,7 +211,7 @@ final class AIState: ObservableObject {
         return AIChatReply(response: response)
     }
 
-    /// Cancels in-flight inference on the OpenAI-compatible backend.
+    /// Every backend receives the same tab identity and complete conversation.
     static func chatRequest(
         prompt: String, history: [AIChatMessage], tabId: String?, backend: AIBackend, allowActions: Bool
     ) -> [String: Any] {
@@ -226,6 +226,7 @@ final class AIState: ObservableObject {
         return body
     }
 
+    /// Cancels in-flight inference on the OpenAI-compatible backend.
     func cancelInference() async {
         _ = try? await sendLocalRequest(method: "ai-cancel", body: [:])
     }
