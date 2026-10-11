@@ -26,3 +26,7 @@ target_link_libraries(kelpie_core_mcp
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
+
+if(MSVC)
+  target_compile_options(kelpie_core_mcp PRIVATE /utf-8)
+endif()

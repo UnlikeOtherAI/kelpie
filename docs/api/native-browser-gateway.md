@@ -49,7 +49,8 @@ tools remain callable and discoverable through that catalogue.
 CMake explicitly runs `pnpm install --frozen-lockfile`, builds the shared package,
 and generates the schema, documentation, fixed reader and Zod parity fixtures in
 the build directory. Native builds require Node 20+ and pnpm; generated assets
-are never committed. CMake regenerates when authoritative sources or lockfiles
+are never committed. A portable source lock serializes dependency/build generation across concurrent
+Android ABI configurations. CMake regenerates when authoritative sources or lockfiles
 change. CI/native release jobs must install those tools before configuring CMake.
 Run `test_browser_gateway` via CTest for schema defaults/bounds, malformed requests,
 authorization, cancellation, cross-tab refs, no retries and binary MCP output.

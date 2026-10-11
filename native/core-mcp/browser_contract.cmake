@@ -3,6 +3,7 @@ get_filename_component(KELPIE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSO
 find_program(KELPIE_NODE_EXECUTABLE NAMES node REQUIRED)
 find_program(KELPIE_PNPM_EXECUTABLE NAMES pnpm.cmd pnpm REQUIRED)
 set(KELPIE_BROWSER_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/browser_contract.h")
+file(LOCK "${KELPIE_REPO_ROOT}/.build-browser-contract.lock" TIMEOUT 300)
 execute_process(COMMAND "${KELPIE_PNPM_EXECUTABLE}" install --frozen-lockfile
   WORKING_DIRECTORY "${KELPIE_REPO_ROOT}" RESULT_VARIABLE install_status)
 if(NOT install_status EQUAL 0)
@@ -21,6 +22,7 @@ function(kelpie_generate_browser_contract)
   endif()
 endfunction()
 kelpie_generate_browser_contract()
+file(LOCK "${KELPIE_REPO_ROOT}/.build-browser-contract.lock" RELEASE)
 file(GLOB browser_sources CONFIGURE_DEPENDS "${KELPIE_REPO_ROOT}/packages/shared/src/browser-control/*.ts")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${browser_sources}
   "${KELPIE_REPO_ROOT}/pnpm-lock.yaml" "${KELPIE_REPO_ROOT}/scripts/native/generate-browser-contract.mjs")
