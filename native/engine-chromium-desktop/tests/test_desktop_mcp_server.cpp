@@ -44,34 +44,27 @@ int main() {
   const auto init = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},
        {"params", {{"protocolVersion", "2025-06-18"}}}}, config);
-  assert(init["result"]["serverInfo"]["name"] == "kelpie-desktop");
+  assert(init["result"]["serverInfo"]["name"] == "kelpie");
   assert(init["result"]["protocolVersion"] == "2025-06-18");
 
   const auto tools = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/list"}}, config);
   const auto& listed = tools["result"]["tools"];
-  std::set<std::string> expected_names;
-  for (const auto& tool : registry.all_tools()) {
-    if (endpoints.find(tool.http_endpoint) != endpoints.end()) expected_names.insert(tool.name);
-  }
-  std::set<std::string> actual_names;
-  for (const auto& tool : listed) {
-    actual_names.insert(tool["name"].get<std::string>());
-    const auto& schema = tool["inputSchema"];
-    assert(schema["type"] == "object");
-    assert(schema["additionalProperties"] == false);
-    assert(schema["properties"].is_object());
-    assert(schema["required"].is_array());
-  }
-  assert(actual_names == expected_names);
-  assert(actual_names.find("kelpie_bookmarks_list") != actual_names.end());
-  assert(actual_names.find("kelpie_history_list") != actual_names.end());
-  assert(actual_names.find("kelpie_clear_cookies") != actual_names.end());
-  assert(actual_names.find("kelpie_screenshot_annotated") == actual_names.end());
-
-  const auto schema_for = [&listed](const char* name) -> const nlohmann::json& {
-    for (const auto& tool : listed) if (tool["name"] == name) return tool["inputSchema"];
-    assert(false); return listed[0]["inputSchema"];
+  assert(listed.size() == 4);
+  assert(listed.dump().size() < 24000);
+  assert(listed[0]["name"] == "kelpie_browser_control");
+  const auto names = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 3}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extensions"}}}}, config);
+  assert(names["result"]["content"].dump().find("kelpie_bookmarks_list") != std::string::npos);
+  const auto discovered = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 4}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extension_tools"}, {"arguments", {{"names", {"kelpie_fill", "kelpie_screenshot", "kelpie_resize_viewport", "kelpie_bookmarks_remove"}}}}}}}, config);
+  const auto schemas = nlohmann::json::parse(discovered["result"]["content"][0]["text"].get<std::string>())["value"];
+  const auto schema_for = [&schemas](const char* name) -> const nlohmann::json& {
+    for (const auto& tool : schemas) if (tool["name"] == name) return tool["inputSchema"];
+    assert(false); return schemas[0]["inputSchema"];
   };
+  const auto rich_call = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 5}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_bookmarks_list"}, {"arguments", nlohmann::json::object()}}}}}}, config);
+  assert(rich_call["result"]["isError"] == false);
   const auto& fill = schema_for("kelpie_fill");
   assert(fill["required"] == nlohmann::json::array({"selector", "value"}));
   assert(fill["properties"]["value"]["minLength"] == 0);

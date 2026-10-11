@@ -40,7 +40,7 @@ struct BrowserGateway::Impl {
     for (const auto& method : config.value("nativeMethods", json::array())) native.insert(method.get<std::string>());
     for (const auto& method : json::parse(browser_assets::mutations)) mutations.insert(method.get<std::string>());
     methods = {"documentation", "capabilities"};
-    for (const auto& route : kRoutes) if (native.count(route.second)) methods.insert(route.first);
+    for (const auto& route : kRoutes) if (config.value("browserAvailable", true) && native.count(route.second)) methods.insert(route.first);
     if (config.value("fixedReader", false)) methods.insert("tab.snapshot");
     else { methods.erase("tab.click"); methods.erase("tab.type"); }
     if (!config.value("allowActions", true)) {

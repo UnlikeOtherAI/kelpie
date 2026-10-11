@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { BrowserControlError, browserControlMutates } from "./protocol.js";
-import type { BrowserControlBackend, BrowserControlRequest, BrowserTabInfo } from "./protocol.js";
-import { createBrowserBackend } from "./reference.js";
-import { collectBrowserSnapshot } from "./snapshot.js";
-import { rememberNativeSnapshot, resolveNativeReference } from "./native-reference.js";
-import type { BrowserSnapshot } from "./protocol.js";
-import type { BrowserOperations } from "./reference.js";
+import { BrowserControlError, browserControlMutates } from "../../src/browser-control/protocol.js";
+import type { BrowserControlBackend, BrowserControlRequest, BrowserTabInfo } from "../../src/browser-control/protocol.js";
+import { createBrowserBackend } from "../../src/browser-control/reference.js";
+import { collectBrowserSnapshot } from "../../src/browser-control/snapshot.js";
+import { rememberNativeSnapshot, resolveNativeReference } from "../../src/browser-control/native-reference.js";
+import type { BrowserSnapshot } from "../../src/browser-control/protocol.js";
+import type { BrowserOperations } from "../../src/browser-control/reference.js";
 
 export interface KelpieBrowserBinding {
   /** Already authenticated and scoped to a device/allocation. Must not retry a dispatched mutation. */

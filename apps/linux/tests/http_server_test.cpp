@@ -65,6 +65,12 @@ int main() {
   assert(accepted.find("\"endpoint\":\"get-url\"")!=std::string::npos);
   assert(handled==1);
 
+  const std::string rpc="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}";
+  const auto mcp_request = [&](const std::string& header) { return "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\n"+header+"Content-Length: "+std::to_string(rpc.size())+"\r\n\r\n"+rpc; };
+  assert(StatusIs(Send(port,mcp_request("")),401));
+  const auto mcp=Send(port,mcp_request("Authorization: Bearer secret-token\r\n"));
+  assert(StatusIs(mcp,200));
+  assert(mcp.find("\"endpoint\":\"mcp\"")!=std::string::npos);
   assert(StatusIs(Send(port,"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"),200));
   assert(accepted.find("Access-Control-Allow-Origin")==std::string::npos);
   assert(StatusIs(Send(port,"OPTIONS /v1/get-url HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: http://evil.test\r\n\r\n"),405));

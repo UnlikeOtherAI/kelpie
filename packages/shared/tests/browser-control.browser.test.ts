@@ -1,14 +1,34 @@
+import { createKelpieBrowserBackend } from "./fixtures/native-browser.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 import {
-  createBrowserClient, createBrowserControlProxy, createKelpieBrowserBackend, createPlaywrightBrowserBackend,
+  createBrowserClient, createBrowserControlProxy, createPlaywrightBrowserBackend,
 } from "../src/browser-control/index.js";
 import type { BrowserControlBackend, BrowserTabClient } from "../src/browser-control/index.js";
+import { actOnNativeReference, rememberNativeSnapshot } from "../src/browser-control/native-reference.js";
 
 let engine: Browser;
 beforeAll(async () => { engine = await chromium.launch({ headless: true }); });
 afterAll(async () => { await engine?.close(); });
+describe("fixed native atomic DOM actions", () => {
+  it("appends through a native setter and refuses replaced or non-text targets", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<input id="text" value="initial"><input id="number" type="number" value="12"><input id="file" type="file"><input id="readonly" onfocus="this.readOnly=true"><button id="button">Click</button>');
+      await page.evaluate(`(${rememberNativeSnapshot.toString()})({ snapshot: {}, targets: Object.fromEntries([...document.querySelectorAll("input,button")].map((el) => [el.id, el])) })`);
+      // Serialize the actual generated function, as native platforms do.
+      const invoke = (ref: string, method = "tab.type", text = "!"): Promise<unknown> => page.evaluate(`(${actOnNativeReference.toString()})(${JSON.stringify(ref)},"__kelpieBrowserControlRefs",${JSON.stringify(method)},${JSON.stringify(text)})`);
+      await page.evaluate(() => { const el = document.querySelector<HTMLInputElement>("#text")!; Object.defineProperty(el, "value", { get: () => "initial", set: () => { throw new Error("React own setter must not run"); } }); });
+      expect(await invoke("text")).toEqual({ ok: true });
+      expect(await page.evaluate(() => Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.get!.call(document.querySelector("#text")))).toBe("initial!");
+      for (const ref of ["number", "file"]) expect(await invoke(ref)).toEqual({ error: "UNSUPPORTED", mayHaveCompleted: false });
+      expect(await invoke("readonly")).toEqual({ error: "UNSUPPORTED", mayHaveCompleted: true });
+      await page.evaluate(() => { const el = document.querySelector("#button")!; el.replaceWith(el.cloneNode(true)); document.querySelector("#button")!.setAttribute("data-sn-ref", "button"); });
+      expect(await invoke("button", "tab.click")).toEqual({ error: "STALE_REFERENCE", mayHaveCompleted: false });
+    } finally { await page.close(); }
+  });
+});
 const fixture = `<title>Control fixture</title><h1>Observe</h1>
 <label>Email<input id="email" value="INITIAL_SECRET"></label>
 <label>Password<input type="password" value="PASSWORD_SECRET"></label>

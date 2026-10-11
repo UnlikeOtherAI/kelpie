@@ -297,7 +297,7 @@ void HttpServer::AcceptLoop() {
       } else {
         response = TextResponse(200, page, "text/html; charset=utf-8");
       }
-    } else if (method == "POST" && path.rfind("/v1/", 0) == 0 && !HasControlToken(request, control_token_)) {
+    } else if (method == "POST" && (path.rfind("/v1/", 0) == 0 || path == "/mcp") && !HasControlToken(request, control_token_)) {
       status = 401;
       response = JsonResponse(status, {
           {"success", false},
@@ -307,12 +307,9 @@ void HttpServer::AcceptLoop() {
       const json body = ParseJsonBody(request);
       const json payload = handler_ != nullptr ? handler_(path.substr(4), body, &status) : json::object();
       response = JsonResponse(status, payload);
-    } else if (method == "GET" && path == "/mcp") {
-      status = 501;
-      response = JsonResponse(status, {
-          {"success", false},
-          {"error", {{"code", "PLATFORM_NOT_SUPPORTED"}, {"message", "MCP HTTP is not implemented yet"}}},
-      });
+    } else if (method == "POST" && path == "/mcp") {
+      const json payload = handler_ != nullptr ? handler_("mcp", ParseJsonBody(request), &status) : json::object();
+      response = payload.is_null() ? TextResponse(202, "", "application/json") : JsonResponse(status, payload);
     } else {
       status = method == "GET" || method == "POST" ? 404 : 405;
       response = JsonResponse(status, {

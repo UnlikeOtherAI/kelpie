@@ -4,4 +4,4 @@ export * from "./client.js";
 export * from "./snapshot.js";
 export * from "./playwright.js";
 export * from "./reference.js";
-export * from "./kelpie.js";
+export * from "./native.js";

@@ -47,6 +47,14 @@ describe("Windows local alias MCP stdio", () => {
           response.end(JSON.stringify({ success: true, supported: ["navigate", "screenshot", "get-capabilities"] }));
           return;
         }
+        if (request.url === "/v1/browser-control") {
+          const input = JSON.parse(body) as { method: string; params?: { url?: string; selector?: string } };
+          const value = input.method === "capabilities" ? { version: 1, methods: ["tab.goto", "tab.screenshot"], extensions: [] }
+            : input.method === "tab.screenshot" ? { type: "image", data: "cG5n", mimeType: "image/png" } : null;
+          const fail = input.params?.url?.includes("fail");
+          response.end(JSON.stringify(fail ? { version: 1, ok: false, error: { code: "COMMAND_FAILED", message: "Observe again", mayHaveCompleted: true } } : { version: 1, ok: true, value }));
+          return;
+        }
         if (request.url === "/v1/navigate") {
           navigationAuthorized = true;
           const url = JSON.parse(body).url as string;
@@ -76,7 +84,7 @@ describe("Windows local alias MCP stdio", () => {
     catch (error) { throw new Error(`${String(error)}\n${childErrors}`, { cause: error }); }
     const tools = await client.listTools();
     expect(capabilityAuthorized).toBe(true);
-    expect(tools.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["kelpie_navigate", "kelpie_screenshot", "kelpie_get_capabilities"]));
+    expect(tools.tools.map((tool) => tool.name)).toEqual(["kelpie_browser_control", "kelpie_extensions", "kelpie_extension_tools", "kelpie_extension"]);
     expect(tools.tools.map((tool) => tool.name)).not.toContain("kelpie_ai_ask");
     expect(tools.tools.map((tool) => tool.name)).not.toContain("kelpie_find_element");
 
@@ -102,7 +110,9 @@ describe("Windows local alias MCP stdio", () => {
     const invalid = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "tab.click", tabId: "owned-tab", params: { ref: "e1", selector: "#guess" } } } });
     expect(invalid.isError).toBe(true);
 
-    const navigation = await client.callTool({ name: "kelpie_navigate", arguments: { url: "https://example.test" } });
+    const discovery = await client.callTool({ name: "kelpie_extension_tools", arguments: { names: ["kelpie_navigate"] } });
+    expect(JSON.stringify(discovery.content)).toContain("url");
+    const navigation = await client.callTool({ name: "kelpie_extension", arguments: { name: "kelpie_navigate", arguments: { url: "https://example.test" } } });
     expect(navigation.isError).not.toBe(true);
     expect(navigationAuthorized).toBe(true);
     const failure = await client.callTool({ name: "kelpie_navigate", arguments: { url: "https://fail.test" } });

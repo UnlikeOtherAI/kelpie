@@ -105,6 +105,7 @@ class LinuxApp {
   std::string ConsumeToast();
 
  private:
+  json HandleBrowserGateway(const json& request, bool mcp);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };
