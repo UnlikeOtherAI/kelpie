@@ -1,4 +1,4 @@
-# Tab-scoped local AI context
+# Tab-scoped local AI context across existing platform surfaces
 
 ## Root cause
 
@@ -14,7 +14,7 @@ The macOS panel sends a tab ID only for OpenAI-compatible endpoints. Ollama's pa
 
 ## Verification and delivery
 
-Run macOS Swift lint, Xcode build/tests on this Mac (Apple frameworks required), and the installed app against local Ollama. Verify page questions and recall with multiple tabs. Bump only macOS, open one PR, merge after checks, publish a macOS artifact and dated GitHub release, install and verify it locally.
+Run macOS Swift lint, Xcode build/tests on this Mac (Apple frameworks required), and the installed app against local Ollama. Verify page questions and recall with multiple tabs. Verify iOS/Android API parity and Windows/Linux native builds with targeted tests. Bump the five affected native components, open one PR, merge after checks, publish their artifacts and a dated GitHub release, then install and verify the published builds on available hosts. The CLI is unchanged.
 
 ## Cross-Provider Review
 
@@ -23,3 +23,10 @@ Reviewed before implementation by Codex and Google Gemma 4 E4B through local Oll
 Accepted: pin the session and page to the same tab; strict snapshot decoding; explicit read-error reporting; permit conversation recall in prompts; guard duplicate sends and both successful/failed late completions; reset action permission in the owning tab lifecycle. Complete history remains subject to the model context window, with a clear native context-limit error.
 
 Rejected: adding a second session registry (Tab owns the session), blocking model-health refresh during requests (no await before the selected model is captured), and cancelling work simply when switching tabs (the request should finish in its originating tab). Closing a tab invalidates its completion without invoking the existing global backend cancellation API. Existing Stop behavior is outside this local-chat repair.
+
+
+## Platform scope
+
+The user requested Sol agents across all platforms and confirmed that this repair covers existing AI paths only. macOS has the chat sidebar; Windows has an Ask/result surface. iOS and Android expose AI APIs without a chat panel, so their fixes preserve caller-supplied conversations and correct page targeting. Linux has no local AI chat service; shared page extraction is covered without introducing a new service or UI. Mobile implementations must remain equivalent.
+
+Windows uses the same ownership rule through `DesktopEngine::Tab` with a mutex-protected conversation and completion token. Google Gemma reviewed this supplement before implementation: accepted explicit extraction failures and synchronized close/completion tests; rejected cross-launch persistence because the requested lifetime ends on tab close. Separate Sol agents own macOS, mobile, and Windows/Linux changes, integrated into one delivery.
