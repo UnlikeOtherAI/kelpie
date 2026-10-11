@@ -26,6 +26,8 @@ describe("fixed native atomic DOM actions", () => {
       expect(await invoke("readonly")).toEqual({ error: "UNSUPPORTED", mayHaveCompleted: true });
       await page.evaluate(() => { const el = document.querySelector("#button")!; el.replaceWith(el.cloneNode(true)); document.querySelector("#button")!.setAttribute("data-sn-ref", "button"); });
       expect(await invoke("button", "tab.click")).toEqual({ error: "STALE_REFERENCE", mayHaveCompleted: false });
+      await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })));
+      expect(await invoke("text")).toEqual({ error: "STALE_REFERENCE", mayHaveCompleted: false });
     } finally { await page.close(); }
   });
 });

@@ -43,7 +43,7 @@ renderer realm where available. The generated scripts retain ephemeral DOM objec
 identity under a per-gateway random key; the native coordinator privately owns
 admitted refs per tab and snapshot. In a page realm this is a correctness guard,
 not isolation from hostile page scripts; bindings must report their realm honestly.
-Navigation/replaced nodes, another tab's ref and old snapshots refuse. `tab.click` performs synthetic DOM activation on the captured object; `tab.type` appends through native value setters and an input event on text inputs/textarea, or text-node append in contenteditable. Number/file/date/checkbox inputs refuse typing before focus. After focus, eligibility and connection are checked again because page handlers can mutate them; refusal then reports uncertainty. Rich native input extensions retain their event guarantees.
+The ephemeral renderer registry also clears on pagehide/popstate/hashchange, so a BFCache restoration cannot revive an observed handle. Navigation/replaced nodes, another tab's ref and old snapshots refuse. `tab.click` performs synthetic DOM activation on the captured object; `tab.type` appends through native value setters and an input event on text inputs/textarea, or text-node append in contenteditable. Number/file/date/checkbox inputs refuse typing before focus. After focus, eligibility and connection are checked again because page handlers can mutate them; refusal then reports uncertainty. Rich native input extensions retain their event guarantees.
 Native screenshots currently support viewport PNG; other request options refuse.
 Explicit native timeouts support 1–30,000ms; zero or larger limits refuse.
 Selected-tab readers inspect active identity first and never switch in read-only
