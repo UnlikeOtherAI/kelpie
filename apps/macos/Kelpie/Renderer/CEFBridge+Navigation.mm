@@ -25,7 +25,7 @@
 - (void)cefBridgeUpdateMainFrameHTTPStatusCode:(NSInteger)statusCode {
     _mainFrameHTTPStatusCode = statusCode;
     if (statusCode == 0) {
-        @synchronized (self) { _documentVersion = NSUUID.UUID.UUIDString; }
+        @synchronized (self) { _documentVersion = NSUUID.UUID.UUIDString; ++_documentNavigationCount; }
     }
 }
 
@@ -34,6 +34,10 @@
         if (!_documentVersion) _documentVersion = NSUUID.UUID.UUIDString;
         return _documentVersion;
     }
+}
+
+- (NSUInteger)documentNavigationCount {
+    @synchronized (self) { return _documentNavigationCount; }
 }
 
 - (NSInteger)mainFrameHTTPStatusCode { return _mainFrameHTTPStatusCode; }

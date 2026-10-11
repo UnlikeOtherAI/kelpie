@@ -5,6 +5,8 @@ import AppKit
 final class HandlerContext {
     /// A remote job's isolated context can only resolve its pinned document.
     var remoteDocumentGuard: (() -> Bool)?
+    var remoteNavigationReadGuard: (() -> Bool)?
+    var remoteNavigationWaitGuard: (() -> Bool)?
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     var renderer: (any RendererEngine)?

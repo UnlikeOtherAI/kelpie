@@ -8,6 +8,11 @@ Android navigation reserves one explicit destination at the native mutation poin
 completion metadata reads may transfer to its first matching document start and resulting pin;
 cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
 invalidate that lease. Redirects that produce another document start fail closed and need a fresh snapshot.
+Apple WebKit binds completion to the issued `WKNavigation` object and its document start;
+the iOS mutation checks authority immediately before calling WebKit. CEF completion requires
+exactly the expected native main-frame navigation count and destination for navigate/reload.
+Another document start or native user input revokes completion authority. Redirects that change
+the expected CEF destination require a fresh snapshot rather than inheriting its contents.
 
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.

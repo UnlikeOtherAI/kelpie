@@ -78,6 +78,12 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     weak var webView: WKWebView?
     /// A remote job's isolated context can only evaluate its pinned document.
     var remoteDocumentGuard: (() -> Bool)?
+    var remoteNavigationReadGuard: (() -> Bool)?
+    var remoteNavigationWaitGuard: (() -> Bool)?
+
+    func navigationIssued(_ navigation: AnyObject?) {
+        if let webView { ConnectDocument.issued(webView, navigation: navigation) }
+    }
     var tabStore: TabStore?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false

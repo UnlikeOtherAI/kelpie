@@ -288,20 +288,24 @@ struct BrowserView: View {
     }
 
     func navigate(_ urlString: String) {
+        NessieConnection.shared.personInteracted()
         tabStore.activeBrowserTab?.isStartPage = false
         guard let webView = browserState.webView, let url = URL(string: urlString) else { return }
         webView.load(URLRequest(url: url))
     }
 
     func goBack() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.goBack()
     }
 
     func goForward() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.goForward()
     }
 
     func reload() {
+        NessieConnection.shared.personInteracted()
         browserState.webView?.reload()
     }
 }

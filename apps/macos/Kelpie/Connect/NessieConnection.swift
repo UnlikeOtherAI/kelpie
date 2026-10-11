@@ -2,6 +2,8 @@ import Combine
 import Foundation
 #if os(iOS)
 import UIKit
+#else
+import AppKit
 #endif
 
 /// One authenticated outbound socket per install. The account bearer stays at UOA.
@@ -30,10 +32,19 @@ final class NessieConnection: ObservableObject {
     private var controlledTab: String?
     private var remoteTabMutation = false
     private var epoch = UUID()
+    #if os(macOS)
+    private var personInputMonitor: Any?
+    #endif
 
     func start(context: HandlerContext) {
         guard browser == nil else { return }
         browser = ConnectBrowser(context: context)
+        #if os(macOS)
+        personInputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .keyDown, .scrollWheel]) { [weak self] event in
+            MainActor.assumeIsolated { self?.personInteracted() }
+            return event
+        }
+        #endif
         accountSubscription = UOAAccount.shared.$profile.map { $0?.sub }.removeDuplicates().sink { [weak self] sub in
             Task { @MainActor in self?.accountChanged(sub) }
         }
@@ -60,9 +71,17 @@ final class NessieConnection: ObservableObject {
     func claimTab(_ tabID: String) { controlledTab = tabID }
 
     func personChangedTab() {
+        personTookControl(reason: "The person changed tabs")
+    }
+
+    func personInteracted() {
+        personTookControl(reason: "The person took control of the page")
+    }
+
+    private func personTookControl(reason: String) {
         guard controlledTab != nil, !remoteTabMutation else { return }
         paused = true
-        stopCurrent(reason: "The person changed tabs")
+        stopCurrent(reason: reason)
         publishLifecycle()
     }
 

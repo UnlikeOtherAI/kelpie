@@ -95,6 +95,9 @@ final class ConnectBrowser {
         InteractionHandler(context: pinned).register(on: isolated)
         ScrollHandler(context: pinned).register(on: isolated)
         LLMHandler(context: pinned).register(on: isolated)
+        if ["navigate", "back", "forward", "reload"].contains(operation) {
+            return try await navigate(operation, input: input, tabID: tabID, expected: expected, pinned: pinned, router: isolated, command: command)
+        }
         if operation == "extract" { return try await extract(input, tabID: tabID, expected: expected, router: isolated) }
         if operation == "snapshot" {
             let visible = await isolated.handle(method: "get-visible-elements", body: ["tabId": tabID, "interactableOnly": true]).json
@@ -120,6 +123,43 @@ final class ConnectBrowser {
         // A navigation intentionally changes the document; return its new pin.
         let safeResult = operation == "type" ? ["success": true, "characters": (body["text"] as? String ?? "").count] : result
         return ["tabId": tabID, "tabVersion": try version(tabID), "result": safeResult]
+    }
+
+    private func navigate(
+        _ operation: String, input: [String: Any], tabID: String, expected: String,
+        pinned: HandlerContext, router: Router, command: [String: Any]
+    ) async throws -> [String: Any] {
+        var body = try validatedInput(operation, input)
+        body["tabId"] = tabID
+        let authorized = { NessieConnection.shared.authorizes(command) }
+        #if os(macOS)
+        if let cef = pinned.renderer as? CEFRenderer, let bridge = cef.bridge {
+            let count = bridge.documentNavigationCount()
+            let changesDocument = operation == "navigate" || operation == "reload" || (operation == "back" ? cef.canGoBack : cef.canGoForward)
+            let destination = operation == "navigate" ? body["url"] as? String : operation == "reload" ? cef.currentURL?.absoluteString : nil
+            pinned.remoteNavigationWaitGuard = { authorized() && bridge.documentNavigationCount() <= count + 1 }
+            pinned.remoteNavigationReadGuard = {
+                guard authorized(), !bridge.isLoading(), bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
+                return destination == nil || URL(string: bridge.currentURL()) == URL(string: destination ?? "")
+            }
+            let result = await router.handle(method: operation, body: body).json
+            try requireSuccess(result)
+            try await pinned.waitForNavigationRead()
+            return ["tabId": tabID, "tabVersion": try version(tabID), "result": result]
+        }
+        guard let view = pinned.renderer as? WKWebViewRenderer else { throw Failure("Browser unavailable") }
+        #else
+        guard let view = pinned.webView else { throw Failure("Browser unavailable") }
+        #endif
+        let lease = ConnectNavigationLease(initial: expected)
+        ConnectDocument.reserve(view, lease: lease)
+        defer { ConnectDocument.reserve(view, lease: nil) }
+        pinned.remoteNavigationReadGuard = { lease.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: authorized()) }
+        pinned.remoteNavigationWaitGuard = { lease.allowsWait(version: ConnectDocument.version(view), authorized: authorized()) }
+        let result = await router.handle(method: operation, body: body).json
+        try requireSuccess(result)
+        try await pinned.waitForNavigationRead()
+        return ["tabId": tabID, "tabVersion": try version(tabID), "result": result]
     }
 
     private func validatedInput(_ operation: String, _ input: [String: Any]) throws -> [String: Any] {

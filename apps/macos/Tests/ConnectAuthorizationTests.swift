@@ -2,6 +2,29 @@ import XCTest
 @testable import Kelpie
 
 final class ConnectAuthorizationTests: XCTestCase {
+    @MainActor
+    func testNavigationCompletionBelongsToItsIssuedNativeObject() {
+        let token = NSObject()
+        let lease = ConnectNavigationLease(initial: "old")
+        lease.issued(token)
+        XCTAssertFalse(lease.allowsRead(version: "old", loading: false, authorized: true))
+        lease.started(previous: "old", version: "new", navigation: token)
+        XCTAssertTrue(lease.allowsRead(version: "new", loading: false, authorized: true))
+        XCTAssertFalse(lease.allowsRead(version: "new", loading: true, authorized: true))
+        XCTAssertFalse(lease.allowsRead(version: "new", loading: false, authorized: false))
+        lease.started(previous: "new", version: "later", navigation: NSObject())
+        XCTAssertFalse(lease.allowsRead(version: "later", loading: false, authorized: true))
+    }
+
+    @MainActor
+    func testUnrelatedNavigationCannotSupplyCompletionMetadata() {
+        let lease = ConnectNavigationLease(initial: "old")
+        lease.issued(NSObject())
+        lease.started(previous: "old", version: "unrelated", navigation: NSObject())
+        XCTAssertFalse(lease.allowsRead(version: "unrelated", loading: false, authorized: true))
+        XCTAssertFalse(lease.allowsWait(version: "unrelated", authorized: true))
+    }
+
     func testWireTextBoundsPreserveUnicode() {
         XCTAssertEqual(ConnectText.bounded(String(repeating: "😀", count: 100), to: 120).utf16.count, 120)
         XCTAssertEqual(ConnectText.bounded("a😀", to: 2), "a")

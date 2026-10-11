@@ -1,5 +1,7 @@
 package com.kelpie.browser.ui
 
+import com.kelpie.browser.connect.NessieConnection
+
 import android.app.Activity
 import android.content.Context
 import android.webkit.WebView
@@ -232,25 +234,21 @@ fun BrowserScreen(
                     canGoForward = canGoForward,
                     isCollapsed = bottomBarCollapsed,
                     onNavigate = { url ->
-                        com.kelpie.browser.connect.NessieConnection
-                            .personInteracted()
+                        NessieConnection.personInteracted()
                         tabStore.activeTab?.isStartPage = false
                         webView?.loadUrl(url)
                     },
                     onBack = {
-                        com.kelpie.browser.connect.NessieConnection
-                            .personInteracted()
+                        NessieConnection.personInteracted()
                         webView?.goBack()
                     },
                     onForward = {
-                        com.kelpie.browser.connect.NessieConnection
-                            .personInteracted()
+                        NessieConnection.personInteracted()
                         webView?.goForward()
                     },
                     isLoading = isLoading,
                     onReload = {
-                        com.kelpie.browser.connect.NessieConnection
-                            .personInteracted()
+                        NessieConnection.personInteracted()
                         if (isLoading) webView?.stopLoading() else webView?.reload()
                     },
                     onBookmarks = { showBookmarks = true },
@@ -435,8 +433,7 @@ fun BrowserScreen(
                 currentTitle = pageTitle,
                 currentUrl = currentUrl,
                 onNavigate = { url ->
-                    com.kelpie.browser.connect.NessieConnection
-                        .personInteracted()
+                    NessieConnection.personInteracted()
                     webView?.loadUrl(url)
                 },
                 onDismiss = { showBookmarks = false },
@@ -451,8 +448,7 @@ fun BrowserScreen(
         ) {
             HistorySheet(
                 onNavigate = { url ->
-                    com.kelpie.browser.connect.NessieConnection
-                        .personInteracted()
+                    NessieConnection.personInteracted()
                     webView?.loadUrl(url)
                 },
                 onDismiss = { showHistory = false },

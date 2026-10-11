@@ -102,6 +102,7 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 - (NSInteger)mainFrameHTTPStatusCode;
 /// Native main-frame load identity; changes even for same-URL reloads.
 - (NSString *)documentVersion;
+- (NSUInteger)documentNavigationCount;
 @end
 
 NS_ASSUME_NONNULL_END
