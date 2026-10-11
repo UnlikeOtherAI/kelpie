@@ -54,7 +54,11 @@ struct BrowserGateway::Impl {
   }
   void Finish(json response) {
     if (response.is_object() && response.contains("error")) response["error"]["mayHaveCompleted"] = uncertain || response["error"].value("mayHaveCompleted", false);
-    if (mutation && request.contains("tabId")) refs.erase(request["tabId"].get<std::string>());
+    if (mutation) {
+      if (request.contains("tabId")) refs.erase(request["tabId"].get<std::string>());
+      else if (request.contains("params") && request["params"].contains("tabId")) refs.erase(request["params"]["tabId"].get<std::string>());
+      else refs.clear();
+    }
     active = false;
     if (mcp) response = notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", rpc_id}, {"result", BrowserMcpResult(response)}};
     step = {{"kind", "complete"}, {"response", std::move(response)}};
@@ -183,6 +187,9 @@ json BrowserGateway::Advance(json result) {
     }
   } catch (...) { fail(); }
   return Next();
+}
+void BrowserGateway::InvalidateReferences(const std::string& tab_id) {
+  if (tab_id.empty()) impl_->refs.clear(); else impl_->refs.erase(tab_id);
 }
 json BrowserGateway::Cancel() {
   if (impl_->active) impl_->Finish(Failure("CANCELLED", impl_->uncertain));

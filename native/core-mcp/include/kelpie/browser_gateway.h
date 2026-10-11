@@ -13,6 +13,7 @@ class BrowserGateway {
   nlohmann::json Next() const;
   nlohmann::json Advance(nlohmann::json native_response);
   nlohmann::json Cancel();
+  void InvalidateReferences(const std::string& tab_id = {});
   nlohmann::json Capabilities() const;
   nlohmann::json ToolList() const;
   nlohmann::json Extensions(const nlohmann::json& names) const;
