@@ -1,5 +1,7 @@
 # Nessie account connection
 
+Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
+
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.
 UOA remains the sole identity authority. Native OAuth requests `kelpie.connect` alongside

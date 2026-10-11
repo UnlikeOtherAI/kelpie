@@ -332,7 +332,7 @@ object NessieConnection {
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            runCatching { finish(command, "failed", error = error.message?.take(2000) ?: "Browser action failed", connection = connection) }
+            runCatching { finish(command, "failed", error = ConnectText.bounded(error.message ?: "Browser action failed", 2000), connection = connection) }
         } finally {
             expiry?.cancel()
             if (command["jobId"] == currentCommand?.get("jobId") && command["attemptId"] == currentCommand?.get("attemptId")) {
@@ -433,12 +433,11 @@ object NessieConnection {
     }
 
     private fun deviceLabel(): String =
-        runCatching {
+        ConnectText.bounded(runCatching {
             android.provider.Settings.Global
                 .getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
                 ?.takeIf { it.isNotBlank() }
-        }.getOrNull()?.take(120) ?: android.os.Build.MODEL
-            .take(120)
+        }.getOrNull() ?: android.os.Build.MODEL, 120)
 
     private fun installationId(): String {
         val prefs = appContext?.getSharedPreferences("nessie.connect", Context.MODE_PRIVATE) ?: error("App unavailable")

@@ -342,9 +342,9 @@ final class NessieConnection: ObservableObject {
 
     private var deviceLabel: String {
         #if os(iOS)
-        return String(UIDevice.current.name.prefix(120))
+        return ConnectText.bounded(UIDevice.current.name, to: 120)
         #else
-        return String(ProcessInfo.processInfo.hostName.prefix(120))
+        return ConnectText.bounded(ProcessInfo.processInfo.hostName, to: 120)
         #endif
     }
 }
