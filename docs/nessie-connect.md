@@ -8,6 +8,10 @@ Android navigation reserves one explicit destination at the native mutation poin
 completion metadata reads may transfer to its first matching document start and resulting pin;
 cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
 invalidate that lease. Redirects that produce another document start fail closed and need a fresh snapshot.
+Android and CEF do not expose a unique native navigation object. Their conservative
+leases require the observed main-frame start and destination; hash-only navigation
+that emits no such start cannot acquire a completion pin and fails on the job deadline.
+WebKit likewise requires its issued navigation object to produce a matching start.
 Apple WebKit binds completion to the issued `WKNavigation` object and its document start;
 the iOS mutation checks authority immediately before calling WebKit. CEF completion requires
 exactly the expected native main-frame navigation count and destination for navigate/reload.
