@@ -20,6 +20,11 @@ Works identically with real devices, iOS Simulators, and Android Emulators — a
 
 ## Pairing & Authentication
 
+Signed-in Windows and Linux Chromium apps also connect outbound to Nessie under the
+same UOA account, without pairing or team setup. Their account menu shows connection
+status and Pause/Stop controls; see [desktop Nessie connection](desktop-nessie-connect.md).
+This connection uses a dedicated, scoped UOA ticket and does not expose local listeners.
+
 Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires a bearer token issued by the on-device user.
 
 **Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, the CLI posts a pairing request to the device. The device shows a modal with the requester's self-reported client name and offers three responses:
@@ -240,6 +245,12 @@ For verified platform coverage and remaining inference gaps, see
 AI inference on macOS, iOS, Android and Windows; Linux does not yet expose AI handlers. Windows implements the inference and endpoint methods described below, without the recording/catalog methods. HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`, `ai-catalog`, `ai-fitness`, plus `ai-endpoints`, `ai-endpoint-save`, `ai-endpoint-remove`, `ai-endpoint-models`, `ai-endpoint-test`, `ai-endpoint-health` and `ai-cancel`) and corresponding MCP tools let language models query local AI without sending data to the cloud. `ai-catalog` returns the approved on-device model catalog and `ai-fitness` scores a model against a device's RAM/disk — both are supported on iOS, Android, and macOS and require a HuggingFace token configured on the device. On iOS and Android, AI remains available from the browser shell while the visible URL-bar shortcut is reserved for the 3D inspector.
 
 **macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`kelpie ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
+
+**macOS tab conversations:** Each open tab keeps its own in-memory conversation and draft until the tab closes. Switching tabs, navigating, and closing/reopening the AI panel preserve the conversation. Every backend receives previous user/assistant messages in order, without a ten-message cutoff (subject to its model context window). Local chat reads the originating tab explicitly and includes current page text plus accessible image/logo labels. Read failures are shown as errors rather than passed to the model as an empty page. Closing a tab clears its conversation; restored tabs start fresh after an app restart.
+
+**Windows tab conversations:** The Local AI dialog keeps a separate in-memory transcript for its originating tab, includes page context by default, and sends all prior turns. Reopening the dialog or navigating preserves that transcript; closing the tab clears it and ignores late replies. Page text includes accessible image, ARIA and SVG names on both Windows and Linux.
+
+**iOS and Android API context:** Existing AI APIs accept complete caller-supplied conversation history on every backend. Page-text, DOM and accessibility context capture the requested tab without switching it. Page-text evidence includes the title, URL, text and accessible labels. Invalid tabs and extraction failures return errors. Mobile does not add a chat panel or a second conversation store; API clients own their conversation history. See [mobile AI context](api/mobile-ai-context.md).
 
 **iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) provides text inference when available on iOS 26 or later with supported hardware and Apple Intelligence enabled. Users can select an OpenAI-compatible or Ollama endpoint on a LAN computer when on-device inference is unavailable.
 

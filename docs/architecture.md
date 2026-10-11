@@ -91,6 +91,10 @@ Each browser app has four internal layers:
 
 ### Shared Native Libraries (`native/`)
 
+Windows/Linux account gateway coordination and owner-thread document leases follow
+[desktop Nessie connection](desktop-nessie-connect.md), using `desktop-connect`,
+`desktop-account` encrypted storage and the shared `core-connect` durable ledger.
+
 Cross-platform C++17 static libraries with C ABI, shared by all platforms via bridging headers (Swift) or JNI (Kotlin). Each module lives under `native/core-*` and follows the same pattern: opaque pointer handle, `extern "C"` API, nlohmann_json, CMake build, assert-based tests.
 
 | Module | Purpose |

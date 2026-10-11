@@ -18,6 +18,7 @@ int main() {
   auto directory = std::filesystem::temp_directory_path() / NewInferenceId();
   std::filesystem::create_directories(directory);
   int calls = 0;
+  json sent;
   bool fail = false;
   bool discovery = true;
   std::promise<void> entered, release;
@@ -31,6 +32,7 @@ int main() {
       return {{"data", json::array({{{"id", "tiny"}}})}};
     }
     assert(body && body->at("model") == "tiny" && body->at("stream") == false);
+    sent = *body;
     if (blocking) { entered.set_value(); released.wait(); }
     return {{"choices", json::array({{{"message", {{"content", "4"}}}, {"finish_reason", "stop"}}})}};
   };
@@ -44,6 +46,37 @@ int main() {
     assert(loaded["loaded"] == true);
     auto answer = service.Execute("ai-infer", {{"prompt", "2 + 2?"}, {"agent", false}});
     assert(answer["response"] == "4");
+    kelpie::DesktopRouter router;
+    service.Register(router);
+    json snapshot = {{"success", true}, {"url", "https://second.test"}, {"title", "Second"},
+        {"text", std::string(15000, 'x')}, {"accessibleLabels", json::array({"Kelpie logo", "Accessible SVG title"})}};
+    router.Register("get-page-text", [&](const json& params) {
+      assert(params.at("tabId") == "second" && params.at("generation") == 9);
+      return snapshot;
+    });
+    json history = json::array();
+    for (int index = 0; index < 15; ++index) {
+      history.push_back({{"role", "user"}, {"content", "Remember " + std::to_string(index)}});
+      history.push_back({{"role", "assistant"}, {"content", "Saved"}});
+    }
+    history.push_back({{"role", "user"}, {"content", "Which logo?"}});
+    const json chat = {{"messages", history}, {"context", "page_text"}, {"tabId", "second"}, {"generation", 9}};
+    assert(service.Execute("ai-infer", chat)["response"] == "4");
+    assert(sent["messages"].size() == 31);
+    assert(sent["messages"][0]["content"] == "Remember 0");
+    const auto current = sent["messages"].back()["content"].get<std::string>();
+    assert(current.find("Kelpie logo") != std::string::npos && current.find("Accessible SVG title") != std::string::npos);
+    assert(current.find("https://second.test") != std::string::npos && current.find("textTruncated") != std::string::npos);
+    const int before_error = calls;
+    snapshot = {{"success", false}, {"error", {{"code", "TAB_NOT_FOUND"}, {"message", "Closed"}}}};
+    assert(service.Execute("ai-infer", chat)["error"]["code"] == "TAB_NOT_FOUND");
+    assert(calls == before_error);
+    snapshot = {{"success", true}, {"text", "malformed snapshot"}};
+    assert(service.Execute("ai-infer", chat)["error"]["code"] == "PAGE_CONTEXT_FAILED");
+    assert(calls == before_error);
+    snapshot = {{"success", true}, {"url", "about:blank"}, {"title", ""}, {"text", ""}, {"accessibleLabels", json::array()}};
+    assert(service.Execute("ai-infer", chat)["response"] == "4");
+
     discovery = false;
     assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
     discovery = true;
@@ -74,5 +107,11 @@ int main() {
     assert(removed["success"] == true);
     assert(restored.Execute("ai-status")["backend"] == "none");
   }
+  const auto model=directory/"downloaded.gguf";std::ofstream(model)<<"installed model placeholder";
+  auto savedSettings=ReadInferenceStore(directory/"inference.v1.dpapi");savedSettings["localModel"]=model.string();savedSettings["backend"]="none";
+  WriteInferenceStore(directory/"inference.v1.dpapi",savedSettings);
+  { InferenceService restored(directory,request);const auto status=restored.Execute("ai-status");assert(status["modelInstalled"]==true && status["loaded"]==false); }
+  std::filesystem::remove(model);
+  { InferenceService restored(directory,request);assert(restored.Execute("ai-status")["modelInstalled"]==false); }
   std::filesystem::remove_all(directory);
 }

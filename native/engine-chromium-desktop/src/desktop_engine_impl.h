@@ -15,6 +15,7 @@
 #include "kelpie/favicon_registry.h"
 #include "desktop_devtools.h"
 #include "desktop_partition_registry.h"
+#include "document_version.h"
 
 namespace kelpie {
 
@@ -41,6 +42,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   struct Tab {
     std::string id;
     std::uint64_t generation = 1;
+    std::string document_version=NextDocumentVersion();
     CefRefPtr<CefBrowser> browser;
     CefRefPtr<DesktopDevToolsSession> devtools;
     DesktopDialogAdapter dialogs;
@@ -66,6 +68,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
     // erase this owner early, otherwise cancellation and shutdown can leave a
     // live callback pointing at destroyed state.
     bool closing = false;
+    std::shared_ptr<TabChatSession> chat_session = std::make_shared<TabChatSession>();
   };
 
   CefRefPtr<CefClient> client;

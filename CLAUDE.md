@@ -2,6 +2,8 @@
 
 @./AGENTS.md
 
+Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
+
 ## What This Is
 
 Kelpie is an LLM-first browser for iOS and Android that enables language models to control real mobile browsers on the local network via mDNS discovery, HTTP API, and MCP. A companion Node.js CLI orchestrates individual and group commands across multiple devices.
@@ -47,5 +49,5 @@ When dispatching work to Codex (`timeout 1800 codex exec "<prompt>"`), minimize 
 ## Windows release ownership
 
 The Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
-(currently `0.1.8`), mirrored in `resources/kelpie.rc`, `device_info_windows.h` and `windows_runtime.cpp`. Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
+(currently `0.1.12`), mirrored in `resources/kelpie.rc`, `device_info_windows.h` and `windows_runtime.cpp`. Releases use the CEF sandbox bootstrap and matching runtime assets. Verify
 loopback readiness-token control and the CLI stdio alias bridge before publication.

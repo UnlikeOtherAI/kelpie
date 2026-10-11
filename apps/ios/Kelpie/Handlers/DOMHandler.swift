@@ -20,17 +20,19 @@ struct DOMHandler {
         let js = """
         (function() {
             var el = document.querySelector('\(JSEscape.string(selector))');
-            if (!el) return JSON.stringify({found: false});
+            if (!el) return {found: false};
             var html = el.outerHTML;
-            return JSON.stringify({found: true, html: html, nodeCount: el.querySelectorAll('*').length + 1});
+            return {found: true, html: html, nodeCount: el.querySelectorAll('*').length + 1};
         })()
         """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
+            let result = try await PageTextSnapshot.object(context: context, body: body, script: js)
             guard result["found"] as? Bool == true else {
                 return errorResponse(code: "ELEMENT_NOT_FOUND", message: "Selector not found: \(selector)")
             }
             return successResponse(["html": result["html"] ?? "", "nodeCount": result["nodeCount"] ?? 0])
+        } catch let error as AIHandlerError {
+            return error.response
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }

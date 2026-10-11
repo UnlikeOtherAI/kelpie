@@ -273,6 +273,7 @@ async function runBrowserActions(readiness, fixtureUrl) {
   const second = tabSnapshot(await control(readiness, "new-tab", { url: fixtureUrl }));
   const third = tabSnapshot(await control(readiness, "new-tab", { url: `${fixtureUrl}/next` }));
   await expectControlError(readiness, "evaluate", { expression: "document.title" }, "TAB_REQUIRED");
+  await expectControlError(readiness, "get-page-text", {}, "TAB_REQUIRED");
   await expectControlError(readiness, "evaluate", {
     tabId: second.id, generation: second.generation + 1, expression: "document.title",
   }, "TAB_STALE");
@@ -299,6 +300,24 @@ async function runBrowserActions(readiness, fixtureUrl) {
       return evalResult(response) === expected;
     }, `background tab ${tab.id} title`);
   }));
+  const evidence = resultValue(await control(readiness, "get-page-text", {
+    tabId: original.id, generation: original.generation,
+  }));
+  assert.equal(evidence.title, "Kelpie Windows fixture");
+  assert.equal(sameUrl(evidence.url, fixtureUrl), true);
+  for (const label of ["Kelpie image logo", "Kelpie SVG logo", "Kelpie ARIA logo", "Kelpie referenced logo"]) {
+    assertion(evidence.accessibleLabels.includes(label), `page snapshot must include ${label}`);
+  }
+  assert.equal(evidence.accessibleLabels.includes("Hidden logo"), false);
+  const otherEvidence = resultValue(await control(readiness, "get-page-text", {
+    tabId: second.id, generation: second.generation,
+  }));
+  assert.equal(otherEvidence.title, "Kelpie next page");
+  assert.deepEqual(otherEvidence.accessibleLabels, []);
+  const scopedEvidence = resultValue(await control(readiness, "get-page-text", {
+    tabId: original.id, generation: original.generation, selector: "#logos",
+  }));
+  assertion(scopedEvidence.accessibleLabels.includes("Kelpie image logo"), "selector extraction keeps accessible names");
   const activeBeforeHiddenShot = activeTab(await control(readiness, "get-tabs", {}));
   const originalImage = imageFrom(await control(readiness, "screenshot", {
     tabId: original.id, generation: original.generation, format: "png",
@@ -316,6 +335,7 @@ async function runBrowserActions(readiness, fixtureUrl) {
     await control(readiness, "close-tab", { tabId: tab.id, generation: tab.generation });
   }
   assert.equal(tabsFrom(await control(readiness, "get-tabs", {})).length, 1, "closing the last tab must replace it with a blank tab");
+  await expectControlError(readiness, "get-page-text", { tabId: original.id, generation: original.generation }, "TAB_NOT_FOUND");
 
   await control(readiness, "navigate", { url: fixtureUrl });
 }

@@ -16,6 +16,10 @@ class AccountService {
       std::shared_ptr<AccountSessionStore> store=std::make_shared<MemoryAccountSessionStore>());
   ~AccountService();
   AccountState State() const;
+  // Stable issuer/subject reference only; no token or copied profile escapes.
+  std::string ConnectionOwner() const;
+  // Blocking on the connection worker. Reuses the rotating refresh lifecycle.
+  nlohmann::json ConnectionTicket();
   std::string Bookmarks() const; // Memory only; safe on CEF's IO thread.
   nlohmann::json BookmarkAction(const std::string& action,const nlohmann::json& params, std::optional<std::uint64_t> expected={});
   // Launch restore: signs in from the stored session in the background. False when none is stored.
@@ -65,6 +69,7 @@ class AccountService {
   AccountState state_;
   std::uint64_t generation_=0;
   std::string token_, refresh_token_, client_id_;
+  std::string subject_;
   nlohmann::json bookmarks_=nlohmann::json::array();
   std::chrono::steady_clock::time_point expiry_{};
   std::shared_ptr<AccountLogin> login_;

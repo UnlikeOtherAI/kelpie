@@ -1,7 +1,7 @@
 // AES-256-GCM session store for Linux. The random key lives in its own 0600
 // file beside the sealed session, inside a 0700 directory the store owns, so it
 // works headless without Secret Service or a desktop keyring.
-#include "account_session_store.h"
+#include "encrypted_blob_store.h"
 #include <fcntl.h>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -9,18 +9,19 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cerrno>
+#include <stdexcept>
 #include "account_protocol.h"
 
 namespace kelpie::account {
 namespace {
 constexpr char kMagic[] = "KUS1";
-constexpr std::size_t kMagicSize = 4, kKeySize = 32, kNonceSize = 12, kTagSize = 16, kMaxSealed = 16384;
+constexpr std::size_t kMagicSize = 4, kKeySize = 32, kNonceSize = 12, kTagSize = 16;
 using Context = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
 
 unsigned char* Bytes(std::string& text) { return reinterpret_cast<unsigned char*>(text.data()); }
 const unsigned char* Bytes(const std::string& text) { return reinterpret_cast<const unsigned char*>(text.data()); }
 void Wipe(std::string& text) { if (!text.empty()) OPENSSL_cleanse(text.data(), text.size()); text.clear(); }
-const std::string& Aad() { static const std::string aad(kAccountSessionKey); return aad; }
+
 
 bool Exists(const std::filesystem::path& path) { struct stat info {}; return lstat(path.c_str(), &info) == 0; }
 
@@ -77,7 +78,7 @@ bool WritePrivate(const std::filesystem::path& file, const std::string& data) {
   return true;
 }
 
-std::optional<std::string> Seal(const std::string& key, const std::string& plain) {
+std::optional<std::string> Seal(const std::string& key, const std::string& plain, const std::string& aad) {
   std::string nonce(kNonceSize, '\0'), cipher(plain.size(), '\0'), tag(kTagSize, '\0');
   if (RAND_bytes(Bytes(nonce), static_cast<int>(kNonceSize)) != 1) return std::nullopt;
   Context context(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
@@ -86,7 +87,7 @@ std::optional<std::string> Seal(const std::string& key, const std::string& plain
       EVP_EncryptInit_ex(context.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr) == 1 &&
       EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_IVLEN, static_cast<int>(kNonceSize), nullptr) == 1 &&
       EVP_EncryptInit_ex(context.get(), nullptr, nullptr, Bytes(key), Bytes(nonce)) == 1 &&
-      EVP_EncryptUpdate(context.get(), nullptr, &length, Bytes(Aad()), static_cast<int>(Aad().size())) == 1 &&
+      EVP_EncryptUpdate(context.get(), nullptr, &length, Bytes(aad), static_cast<int>(aad.size())) == 1 &&
       EVP_EncryptUpdate(context.get(), Bytes(cipher), &length, Bytes(plain), static_cast<int>(plain.size())) == 1 &&
       EVP_EncryptFinal_ex(context.get(), Bytes(cipher) + length, &tail) == 1 &&
       EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_GET_TAG, static_cast<int>(kTagSize), tag.data()) == 1;
@@ -94,7 +95,7 @@ std::optional<std::string> Seal(const std::string& key, const std::string& plain
   return std::string(kMagic, kMagicSize) + nonce + cipher + tag;
 }
 
-std::optional<std::string> Unseal(const std::string& key, const std::string& sealed) {
+std::optional<std::string> Unseal(const std::string& key, const std::string& sealed, const std::string& aad) {
   if (sealed.size() <= kMagicSize + kNonceSize + kTagSize || sealed.compare(0, kMagicSize, kMagic) != 0)
     return std::nullopt;
   const auto nonce = sealed.substr(kMagicSize, kNonceSize);
@@ -107,7 +108,7 @@ std::optional<std::string> Unseal(const std::string& key, const std::string& sea
       EVP_DecryptInit_ex(context.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr) == 1 &&
       EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_IVLEN, static_cast<int>(kNonceSize), nullptr) == 1 &&
       EVP_DecryptInit_ex(context.get(), nullptr, nullptr, Bytes(key), Bytes(nonce)) == 1 &&
-      EVP_DecryptUpdate(context.get(), nullptr, &length, Bytes(Aad()), static_cast<int>(Aad().size())) == 1 &&
+      EVP_DecryptUpdate(context.get(), nullptr, &length, Bytes(aad), static_cast<int>(aad.size())) == 1 &&
       EVP_DecryptUpdate(context.get(), Bytes(plain), &length, Bytes(cipher), static_cast<int>(cipher.size())) == 1 &&
       EVP_CIPHER_CTX_ctrl(context.get(), EVP_CTRL_GCM_SET_TAG, static_cast<int>(kTagSize), tag.data()) == 1 &&
       EVP_DecryptFinal_ex(context.get(), Bytes(plain) + length, &tail) == 1;
@@ -116,26 +117,28 @@ std::optional<std::string> Unseal(const std::string& key, const std::string& sea
   return plain;
 }
 
-class EncryptedFileSessionStore final : public AccountSessionStore {
+class EncryptedFileBlobStore final : public EncryptedBlobStore {
  public:
-  explicit EncryptedFileSessionStore(std::filesystem::path directory)
-      : directory_(std::move(directory)), session_(directory_ / kAccountSessionKey),
-        key_(directory_ / (std::string(kAccountSessionKey) + ".key")) {}
+  EncryptedFileBlobStore(std::filesystem::path directory, std::string name, std::size_t maximum)
+      : directory_(std::move(directory)), session_(directory_ / name),
+        key_(directory_ / (name + ".key")), aad_(std::move(name)), maximum_(maximum) {}
 
-  std::optional<AccountSession> Load() override {
-    if (!SecureDirectory(directory_, false) || !Exists(session_)) return std::nullopt;
+  std::optional<std::string> Load() override {
+    if (!Exists(session_)) return std::nullopt;
+    if (!SecureDirectory(directory_, false)) throw std::runtime_error("Encrypted data unavailable");
     auto key = ReadPrivate(key_, kKeySize);
-    const auto sealed = ReadPrivate(session_, kMaxSealed);
-    std::optional<AccountSession> session;
+    const auto sealed = ReadPrivate(session_, maximum_ + 32);
+    std::optional<std::string> session;
     if (key && key->size() == kKeySize && sealed) {
-      if (auto plain = Unseal(*key, *sealed)) { session = DecodeAccountSession(*plain); Wipe(*plain); }
+      if (auto plain = Unseal(*key, *sealed, aad_)) { session = std::move(*plain); }
     }
     if (key) Wipe(*key);
-    if (!session) Clear();
+    if (!session) throw std::runtime_error("Encrypted data unavailable");
     return session;
   }
 
-  bool Save(const AccountSession& session) override {
+  bool Save(const std::string& value) override {
+    if (value.size() > maximum_) return false;
     if (!SecureDirectory(directory_, true)) return false;
     auto key = ReadPrivate(key_, kKeySize);
     if (!key || key->size() != kKeySize) {
@@ -145,8 +148,8 @@ class EncryptedFileSessionStore final : public AccountSessionStore {
         return false;
       }
     }
-    auto plain = EncodeAccountSession(session);
-    const auto sealed = Seal(*key, plain);
+    auto plain = value;
+    const auto sealed = Seal(*key, plain, aad_);
     Wipe(plain);
     Wipe(*key);
     return sealed && WritePrivate(session_, *sealed);
@@ -159,10 +162,13 @@ class EncryptedFileSessionStore final : public AccountSessionStore {
 
  private:
   std::filesystem::path directory_, session_, key_;
+  std::string aad_;
+  std::size_t maximum_;
 };
 }  // namespace
 
-std::shared_ptr<AccountSessionStore> MakeAccountSessionStore(const std::filesystem::path& directory) {
-  return std::make_shared<EncryptedFileSessionStore>(directory / "uoa");
+std::shared_ptr<EncryptedBlobStore> MakeEncryptedBlobStore(const std::filesystem::path& directory,
+    const std::string& name, std::size_t maximum) {
+  return std::make_shared<EncryptedFileBlobStore>(directory / "uoa", name, maximum);
 }
 }  // namespace kelpie::account

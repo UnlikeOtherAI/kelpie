@@ -28,7 +28,7 @@ void WindowsApp::OnAccountRequested() {
   if (!state.signed_in && !state.signing_in) {
     if (!account_->StartSignIn(config_.profile_dir,[this](const std::string& url) {
       const auto window=[this](const std::string& login) {
-        return OpenAccountLoginWindow(login,[this] { if (account_) account_->SignOut(); });
+        return OpenAccountLoginWindow(login,[this] { if(connection_)connection_->SignOut();if (account_) account_->SignOut(); });
       };
       return account::OpenLoginSurface(url,/*app_window_allowed=*/true,window,OpenAccountBrowser)!=account::LoginSurface::kNone;
     })) MessageBeep(MB_OK);
@@ -40,6 +40,12 @@ void WindowsApp::OnAccountRequested() {
     AppendMenuW(menu,MF_STRING|MF_DISABLED,0,MenuLabel(state.name.empty()?state.email:state.name).c_str());
     AppendMenuW(menu,MF_STRING|(state.busy?MF_DISABLED:0),2,state.busy?L"Syncing favorites...":L"Refresh favorites");
     AppendMenuW(menu,MF_STRING,3,L"Sign out");
+    if(connection_) {
+      AppendMenuW(menu,MF_STRING|MF_DISABLED,0,MenuLabel(connection_->Status()).c_str());
+      AppendMenuW(menu,MF_STRING,4,connection_->paused()?L"Resume Nessie work":L"Pause Nessie work");
+      AppendMenuW(menu,MF_STRING,5,connection_->enabled()?L"Stop Nessie connection":L"Connect to Nessie");
+      AppendMenuW(menu,MF_STRING,6,L"Sign in again to grant Nessie access");
+    }
   } else if (state.signing_in) {
     AppendMenuW(menu,MF_STRING|MF_DISABLED,0,L"Complete login/register");
     AppendMenuW(menu,MF_STRING,3,L"Cancel sign-in");
@@ -49,6 +55,9 @@ void WindowsApp::OnAccountRequested() {
   const auto selected=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTALIGN,bounds.right,bounds.bottom,0,shell_->hwnd(),nullptr);
   DestroyMenu(menu);
   if (selected==2) account_->StartBookmarkAction("refresh");
-  if (selected==3) account_->SignOut();
+  if (selected==3 || selected==6) { if(connection_)connection_->SignOut(); account_->SignOut(); }
+  if (selected==4 && connection_)connection_->Pause(!connection_->paused());
+  if (selected==5 && connection_)connection_->Enable(!connection_->enabled());
+  if (selected==6)OnAccountRequested();
 }
 }  // namespace kelpie::windows

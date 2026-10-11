@@ -83,11 +83,15 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   impl_->started=true;
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
   impl_->account.RestoreSession();
+  impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine());
+  impl_->connection=std::make_unique<connect::Client>(impl_->account,impl_->config.profile_dir,"linux",runtime.device_id,
+      [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return impl_->connect_executor->Execute(command,cancelled); });
   return true;
 }
 void LinuxApp::RequestShutdown() { impl_->closing=true; }
 bool LinuxApp::FinishShutdown() {
   if(!impl_->closing) return false;
+  if(impl_->connection) { impl_->connection->Shutdown(); if(!impl_->connection->Drain())return false; impl_->connection.reset(); impl_->connect_executor.reset(); }
   impl_->account.Shutdown(); impl_->desktop.BeginShutdown();
   if(!CloseAccountLoginWindow()) return false;
   if(!impl_->account.Drain() || !impl_->desktop.IsShutdownReady()) return false;
@@ -98,6 +102,7 @@ bool LinuxApp::FinishShutdown() {
 bool LinuxApp::IsRunning() const { return impl_->running && !impl_->closing; }
 void LinuxApp::PumpBrowser() {
   impl_->desktop.Tick(); impl_->account.Poll();
+  if(impl_->connection)impl_->connection->Update(false);
   if(!impl_->account.State().signing_in) CloseAccountLoginWindow();
   if(impl_->started && !impl_->closing && std::chrono::steady_clock::now()-impl_->last_save>std::chrono::seconds(1)) {
     impl_->Save(); impl_->last_save=std::chrono::steady_clock::now();

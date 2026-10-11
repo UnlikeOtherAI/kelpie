@@ -113,10 +113,12 @@ json InferenceService::Probe(json& endpoint, bool generate) {
 }
 json InferenceService::Status() {
   const auto backend = settings_.value("backend", "none");
-  if (backend == "native") return local_.Execute("status", json::object());
-  if (backend != "openai") return Success({{"backend", "none"}, {"loaded", false}, {"capabilities", json::array()}});
+  std::error_code error;
+  const bool installed=std::filesystem::is_regular_file(std::filesystem::u8path(settings_.value("localModel","")),error);
+  if (backend == "native") { auto status=local_.Execute("status", json::object());status["modelInstalled"]=installed;return status; }
+  if (backend != "openai") return Success({{"backend", "none"}, {"loaded", false}, {"modelInstalled",installed},{"capabilities", json::array()}});
   auto endpoint = Public(Endpoint(settings_.value("activeEndpointId", "")));
-  return Success({{"backend", "openai"}, {"model", endpoint.value("model", "")}, {"endpoint", endpoint},
+  return Success({{"modelInstalled",installed},{"backend", "openai"}, {"model", endpoint.value("model", "")}, {"endpoint", endpoint},
       {"health", endpoint["health"]}, {"loaded", endpoint["health"].value("state", "unknown") == "ready"},
       {"capabilities", json::array({"text"})}});
 }

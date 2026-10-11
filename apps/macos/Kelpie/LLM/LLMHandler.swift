@@ -44,7 +44,7 @@ struct LLMHandler {
         let tabId = HandlerContext.tabId(from: body)
         let interactableOnly = body["interactableOnly"] as? Bool ?? false
         let js = """
-        (function(){\(elementSelectorBuilderScript())var els=document.querySelectorAll('*');var visible=[];for(var el of els){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left<window.innerWidth&&r.right>0){var tag=el.tagName.toLowerCase();if(\(interactableOnly)&&!['a','button','input','select','textarea'].includes(tag)&&!el.onclick&&el.getAttribute('role')!=='button')continue;visible.push({tag:tag,selector:kelpieBuildSelector(el),text:(el.textContent||'').trim().substring(0,100),rect:{x:r.x,y:r.y,width:r.width,height:r.height},role:el.getAttribute('role')||undefined,interactable:['a','button','input','select','textarea'].includes(tag)});if(visible.length>=200)break;}}return{viewport:{width:window.innerWidth,height:window.innerHeight,scrollX:window.scrollX,scrollY:window.scrollY},elements:visible,count:visible.length};})()
+        (function(){var els=document.querySelectorAll('*');var visible=[];for(var el of els){var r=el.getBoundingClientRect();if(r.width>0&&r.height>0&&r.top<window.innerHeight&&r.bottom>0&&r.left<window.innerWidth&&r.right>0){var tag=el.tagName.toLowerCase();if(\(interactableOnly)&&!['a','button','input','select','textarea'].includes(tag)&&!el.onclick&&el.getAttribute('role')!=='button')continue;visible.push({tag:tag,text:(el.textContent||'').trim().substring(0,100),rect:{x:r.x,y:r.y,width:r.width,height:r.height},role:el.getAttribute('role')||undefined,interactable:['a','button','input','select','textarea'].includes(tag)});if(visible.length>=200)break;}}return{viewport:{width:window.innerWidth,height:window.innerHeight,scrollX:window.scrollX,scrollY:window.scrollY},elements:visible,count:visible.length};})()
         """
         do {
             let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
@@ -59,13 +59,9 @@ struct LLMHandler {
     private func getPageText(_ body: [String: Any]) async -> [String: Any] {
         let tabId = HandlerContext.tabId(from: body)
         let selector = body["selector"] as? String ?? "body"
-        let maxLength = max(1, min(100000, body["maxLength"] as? Int ?? 100000))
-        let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim().substring(0,\(maxLength)),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js, tabId: tabId)
-            return successResponse(result)
+            let page = try await AIPageContext.gather(from: context, tabId: tabId, selector: selector, maxTextLength: nil)
+            return successResponse(page.pageTextPayload)
         } catch {
             if let tabError = tabErrorResponse(from: error) { return tabError }
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)

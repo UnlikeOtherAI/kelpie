@@ -210,12 +210,20 @@ void BrowserChrome::AccountMenu(GtkWidget* anchor) {
       g_signal_connect(value,"activate",G_CALLBACK(+[](GtkMenuItem* item,gpointer raw) {
         auto* app=static_cast<LinuxApp*>(raw); int action=GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item),"action"));
         if(action==1)app->AccountSignIn(); if(action==2)app->AccountSignOut(); if(action==3)app->AccountRefresh();
+        if(action==4)app->NessiePause(); if(action==5)app->NessieEnable();
+        if(action==6) { app->AccountSignOut(); app->AccountSignIn(); }
       }),&app_);
     }
   };
   item("Account",0);
   if(state.signed_in) { item(state.name.empty()?state.email:state.name,0); item(state.busy?"Syncing favorites…":"Refresh favorites",state.busy?0:3); item("Sign out and show local favorites",2); }
   else if(state.signing_in) { item("Complete login/register",0); item("Cancel sign-in",2); }
+  if(state.signed_in) {
+    item(app_.NessieStatus(),0);
+    item(app_.NessiePaused()?"Resume Nessie work":"Pause Nessie work",4);
+    item(app_.NessieEnabled()?"Stop Nessie connection":"Connect to Nessie",5);
+    item("Sign in again to grant Nessie access",6);
+  }
   if(!state.error.empty())item(state.error,0);
   g_signal_connect_swapped(menu,"selection-done",G_CALLBACK(gtk_widget_destroy),menu);
   gtk_widget_show_all(menu); gtk_menu_popup_at_widget(GTK_MENU(menu),anchor,GDK_GRAVITY_SOUTH_EAST,GDK_GRAVITY_NORTH_EAST,nullptr);

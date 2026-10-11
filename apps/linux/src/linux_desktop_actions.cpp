@@ -41,6 +41,7 @@ std::vector<TabSnapshot> LinuxApp::Tabs() const {
   return tabs;
 }
 void LinuxApp::NewTab(bool isolated) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   NewTabRequest request;
   if(isolated || impl_->isolate_new_tabs) request.partition="isolated-"+account::RandomAccountValue();
   TabSnapshot tab;
@@ -55,11 +56,13 @@ void LinuxApp::SetIsolateNewTabs(bool enabled) {
   } catch(const std::exception& error) { ShowToast(error.what()); }
 }
 void LinuxApp::ActivateTab(const std::string& id) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   for(const auto& tab:Tabs()) if(tab.id==id) {
     impl_->desktop.engine().ActivateTab({tab.id,tab.generation},std::chrono::seconds(1)); return;
   }
 }
 void LinuxApp::CloseTab(const std::string& id) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   for(const auto& tab:Tabs()) if(tab.id==id) {
     impl_->desktop.engine().CloseTab({tab.id,tab.generation},std::chrono::seconds(1)); return;
   }
@@ -108,7 +111,12 @@ void LinuxApp::AccountSignIn() {
     return account::OpenLoginSurface(url,!impl_->config.headless,window,OpenExternal)!=account::LoginSurface::kNone;
   })) ShowToast("Please wait for the current account request.");
 }
-void LinuxApp::AccountSignOut() { impl_->account.SignOut(); }
+void LinuxApp::AccountSignOut() { if(impl_->connection)impl_->connection->SignOut(); impl_->account.SignOut(); }
+std::string LinuxApp::NessieStatus() const { return impl_->connection?impl_->connection->Status():"Nessie unavailable"; }
+bool LinuxApp::NessiePaused() const { return impl_->connection && impl_->connection->paused(); }
+bool LinuxApp::NessieEnabled() const { return impl_->connection && impl_->connection->enabled(); }
+void LinuxApp::NessiePause() { if(impl_->connection)impl_->connection->Pause(!impl_->connection->paused()); }
+void LinuxApp::NessieEnable() { if(impl_->connection)impl_->connection->Enable(!impl_->connection->enabled()); }
 void LinuxApp::AccountRefresh() { impl_->account.StartBookmarkAction("refresh"); }
 void LinuxApp::ShowToast(const std::string& message) { std::lock_guard lock(impl_->state_mutex); impl_->toast=message; }
 std::string LinuxApp::ConsumeToast() { std::lock_guard lock(impl_->state_mutex); return std::exchange(impl_->toast,{}); }
