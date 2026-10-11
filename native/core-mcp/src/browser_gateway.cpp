@@ -56,7 +56,7 @@ struct BrowserGateway::Impl {
     if (response.is_object() && response.contains("error")) response["error"]["mayHaveCompleted"] = uncertain || response["error"].value("mayHaveCompleted", false);
     if (mutation) {
       if (request.contains("tabId")) refs.erase(request["tabId"].get<std::string>());
-      else if (request.contains("params") && request["params"].contains("tabId")) refs.erase(request["params"]["tabId"].get<std::string>());
+      else if (request.contains("params") && request["params"].contains("tabId") && request["params"]["tabId"].is_string()) refs.erase(request["params"]["tabId"].get<std::string>());
       else refs.clear();
     }
     active = false;

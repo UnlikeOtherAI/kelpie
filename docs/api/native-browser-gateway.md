@@ -12,6 +12,9 @@ Include `kelpie/browser_gateway_c_api.h`. Create with JSON containing
 two default true. Pass existing extension descriptors as
 `{name,method,description,inputSchema,mutates}`. Include only admitted functions;
 read-only AI sessions must disable actions and further restrict visible tabs.
+Native registry descriptors include `method`, `inputSchema` and structural
+`mutates` from the shared C++ extension catalogue; reuse those descriptors rather
+than copying schemas into Swift or Kotlin.
 
 Serialize the entire transaction, including policy checks. `begin` accepts a
 canonical request; `begin_mcp` accepts JSON-RPC. They return a step:

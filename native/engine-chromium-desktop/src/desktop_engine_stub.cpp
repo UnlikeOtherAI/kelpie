@@ -169,6 +169,10 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease, std::string, Json*, Timeo
   return UnsupportedControl();
 }
 
+BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease, std::string, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
 BrowserControlResult DesktopEngine::Screenshot(TabLease, BrowserScreenshot*, Timeout) {
   return UnsupportedControl();
 }

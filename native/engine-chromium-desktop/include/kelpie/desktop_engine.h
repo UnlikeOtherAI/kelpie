@@ -155,6 +155,8 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 std::string script,
                                 Json* value,
                                 Timeout timeout) override;
+  BrowserControlResult EvaluateBrowserControl(TabLease lease, std::string script,
+                                              Json* value, Timeout timeout) override;
   BrowserControlResult Screenshot(TabLease lease,
                                   BrowserScreenshot* image,
                                   Timeout timeout) override;

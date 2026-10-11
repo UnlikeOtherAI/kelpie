@@ -60,6 +60,14 @@ void References() {
   assert(step["method"] == "click");
   gateway.Advance({{"success", false}});
   assert(gateway.Begin(Request("tab.click", {{"ref", ref}}))["response"]["error"]["code"] == "STALE_REFERENCE");
+  step = gateway.Begin(Request("tab.snapshot"));
+  expression = step["params"]["expression"];
+  const auto fresh_start = expression.find("\"prefix\":\"") + 10;
+  const std::string fresh_ref = expression.substr(fresh_start, expression.find('"', fresh_start) - fresh_start) + "1";
+  snapshot["elements"][0]["ref"] = fresh_ref;
+  gateway.Advance({{"success", true}, {"result", snapshot}});
+  gateway.InvalidateReferences("a");
+  assert(gateway.Begin(Request("tab.click", {{"ref", fresh_ref}}))["response"]["error"]["code"] == "STALE_REFERENCE");
 }
 void Mcp() {
   kelpie::BrowserGateway gateway({{"nativeMethods", {"screenshot"}}, {"requireAuthorization", false}});
@@ -83,6 +91,10 @@ void ExtensionReachability() {
   assert(step["method"] == "bookmarks-add");
   assert(step["params"]["url"] == "https://example.org");
   assert(gateway.Advance({{"success", true}})["response"]["result"]["isError"] == false);
+  const json nullable_tool = {{"name", "mutable"}, {"method", "bookmarks-add"}, {"inputSchema", {{"type", "object"}}}};
+  kelpie::BrowserGateway nullable({{"nativeMethods", {"bookmarks-add"}}, {"requireAuthorization", false}, {"extensions", json::array({nullable_tool})}});
+  nullable.BeginMcp({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"}, {"params", {{"name", "mutable"}, {"arguments", {{"tabId", nullptr}}}}}});
+  assert(nullable.Advance({{"success", true}})["response"]["result"]["isError"] == false);
 }
 void SelectedAndMapping() {
   const json config = {{"nativeMethods", {"get-tabs", "switch-tab", "scroll", "screenshot", "get-current-url", "navigate"}}, {"targeting", "selected"}, {"allowActions", false}, {"requireAuthorization", false}};

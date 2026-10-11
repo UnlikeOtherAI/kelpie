@@ -1,6 +1,6 @@
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/browser_gateway.h"
-#include <cstdlib>
+#include <new>
 #include <cstring>
 #include <mutex>
 struct KelpieBrowserGateway {
@@ -11,7 +11,7 @@ struct KelpieBrowserGateway {
 namespace {
 char* Copy(const nlohmann::json& value) {
   const std::string text = value.dump();
-  char* output = static_cast<char*>(std::malloc(text.size() + 1));
+  char* output = new (std::nothrow) char[text.size() + 1];
   if (output) std::memcpy(output, text.c_str(), text.size() + 1);
   return output;
 }

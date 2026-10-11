@@ -33,6 +33,30 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
   return result;
 }
 
+BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease lease, std::string script, Json* value, Timeout timeout) {
+  if (!value) return BrowserControlResult::Failure("INTERNAL", "Result is required");
+  const auto started_at = std::chrono::steady_clock::now();
+  Json frames;
+  auto result = DevTools(lease, "Page.getFrameTree", Json::object(), &frames, timeout);
+  if (!result.ok) return result;
+  try {
+    const std::string frame = frames.at("frameTree").at("frame").at("id");
+    Json world;
+    result = DevTools(lease, "Page.createIsolatedWorld", {{"frameId", frame}, {"worldName", "kelpie.browser-control"}},
+                      &world, RemainingTimeout(started_at, timeout));
+    if (!result.ok) return result;
+    Json evaluated;
+    auto params = DesktopDevToolsSession::EvaluateParams(script);
+    params["contextId"] = world.at("executionContextId");
+    result = DevTools(lease, "Runtime.evaluate", params, &evaluated, RemainingTimeout(started_at, timeout));
+    if (!result.ok) return result;
+    if (evaluated.contains("exceptionDetails") || !evaluated.at("result").contains("value"))
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed");
+    *value = evaluated["result"]["value"];
+    return result;
+  } catch (...) { return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed"); }
+}
+
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
   const auto impl = impl_;
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
