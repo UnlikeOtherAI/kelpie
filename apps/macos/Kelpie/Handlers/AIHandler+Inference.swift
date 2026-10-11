@@ -24,10 +24,11 @@ extension AIHandler {
         let maxTokens = body["maxTokens"] as? Int ?? 512
         let temperature = body["temperature"] as? Double ?? 0.7
         let prompt = body["prompt"] as? String ?? ""
-        let explicitText = body["text"] as? String
         let contextMode = body["context"] as? String
         let audio = decodeBase64Field(body["audio"])
-        let messages = body["messages"] as? [[String: Any]]
+        if let messages = body["messages"] as? [[String: Any]] {
+            return await inferLocalChat(body, history: messages, backend: backendState)
+        }
 
         if backendState.backend == "ollama" {
             guard let model = backendState.model else {
@@ -42,26 +43,15 @@ extension AIHandler {
 
             do {
                 let image = contextMode == "screenshot" ? try await screenshotData(tabId: tabId) : nil
-                let result: InferenceEngine.InferenceResult
-                if let messages {
-                    result = try await inferWithOllamaAgentLoop(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        historyMessages: messages,
-                        image: image
-                    )
-                } else {
-                    let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-                    result = try await inferWithOllama(
-                        endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
-                        model: model,
-                        prompt: prompt,
-                        messages: nil,
-                        contextText: explicitText ?? fallbackContext,
-                        image: image
-                    )
-                }
+                let contextText = try await inferenceContext(body, tabId: tabId)
+                let result = try await inferWithOllama(
+                    endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
+                    model: model,
+                    prompt: prompt,
+                    messages: nil,
+                    contextText: contextText,
+                    image: image
+                )
                 return successResponse([
                     "response": result.text,
                     "tokensUsed": result.tokensUsed,
@@ -109,8 +99,7 @@ extension AIHandler {
         }
 
         do {
-            let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-            let preloaded = explicitText ?? fallbackContext
+            let preloaded = try await inferenceContext(body, tabId: tabId)
             let harness = InferenceHarness(context: context, router: router)
             let result = try await harness.run(prompt: prompt, audio: audio, preloadedContext: preloaded)
 
@@ -168,13 +157,28 @@ extension AIHandler {
     }
 
     @MainActor
-    func preloadedContext(mode: String?, tabId: String?) async -> String? {
-        guard ["page_text", "dom", "accessibility"].contains(mode ?? ""), let router else { return nil }
-        let pinned = context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString
-        guard tabId == nil || tabId == pinned else { return nil }
-        let browser = router.makeBrowserGateway(allowActions: false, pinnedTabId: pinned, agent: true)
-        let result = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": pinned ?? "", "params": ["maxChars": 6000]])
-        return BrowserControlGateway.encode(result)
+    func inferenceContext(_ body: [String: Any], tabId: String?) async throws -> String? {
+        if let text = body["text"] as? String { return text }
+        return try await preloadedContext(mode: body["context"] as? String, tabId: tabId)
+    }
+
+    @MainActor
+    func preloadedContext(mode: String?, tabId: String?) async throws -> String? {
+        guard mode != nil && mode != "screenshot" else { return nil }
+        guard ["page_text", "dom", "accessibility"].contains(mode ?? "") else {
+            throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported page context mode"])
+        }
+        let page = try await commonPageContext(tabId: tabId)
+        let data = try JSONSerialization.data(withJSONObject: page.pageTextPayload, options: [.sortedKeys])
+        return String(data: data, encoding: .utf8)
+    }
+
+    @MainActor
+    func commonPageContext(tabId: String?) async throws -> AIPageContext {
+        guard let router else {
+            throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Browser router is unavailable"])
+        }
+        return try AIPageContext(observation: await router.pageObservation(tabId: tabId))
     }
 
     @MainActor

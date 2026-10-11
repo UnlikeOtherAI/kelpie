@@ -171,13 +171,34 @@ class BrowserGatewayBinding(
         }
     }
 
-    suspend fun readContext(
-        tabId: String,
-        method: String,
-    ): Map<String, Any?> =
-        withBrowserGatewayLease(lock, ctx.browserRetirement) {
-            execute(method, mapOf("tabId" to tabId), tabId)
+    /** Captures an owned renderer without changing the visible tab; only the fixed common reader is admitted. */
+    suspend fun contextSnapshot(tabId: String?): Map<String, Any?> = withContext(Dispatchers.Main.immediate) {
+        val store = ctx.tabStore
+        val target = tabId ?: store?.activeTabId?.value ?: "0"
+        val view = if (store == null && target == "0") ctx.webView else store?.tabs?.value?.firstOrNull { it.id == target }?.webView
+        if (view == null) return@withContext errorResponse("TAB_NOT_FOUND", "The context tab is unavailable")
+        fun owned(): Boolean = if (store == null) ctx.webView === view else store.tabs.value.any { it.id == target && it.webView === view }
+        val gateway = BrowserGatewaySession(
+            mapOf("nativeMethods" to listOf("get-current-url"), "extensions" to emptyList<Any>(), "targeting" to "direct",
+                "fixedReader" to true, "allowActions" to false, "requireAuthorization" to true),
+            lock,
+            authorize = { request, mutates -> !mutates && request["method"] == "tab.snapshot" && request["tabId"] == target && owned() },
+            retirement = ctx.browserRetirement,
+            dispatch = { method, params ->
+                if (method != "browser-control-evaluate" || !owned()) errorResponse("TAB_NOT_FOUND", "The context tab changed")
+                else ctx.withBrowserTarget(view) {
+                    val result = invoke(method, params)
+                    if (owned()) result else errorResponse("TAB_NOT_FOUND", "The context tab changed")
+                }
+            },
+        )
+        try {
+            gateway.call(mapOf("version" to 1, "method" to "tab.snapshot", "tabId" to target,
+                "params" to mapOf("maxChars" to 12000, "maxElements" to 200))).orEmpty()
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable) { gateway.close() }
         }
+    }
 
     suspend fun closeSession(session: BrowserGatewaySession) {
         session.close()

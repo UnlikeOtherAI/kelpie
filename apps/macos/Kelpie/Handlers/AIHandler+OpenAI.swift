@@ -26,15 +26,11 @@ extension AIHandler {
         }
 
         let contextMode = body["context"] as? String
-        let explicitText = body["text"] as? String
         let contextText: String?
-        if let explicitText {
-            contextText = explicitText
-        } else {
-            if contextMode != nil {
-                let gateway = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
-                contextText = OpenAIAgentLoop.json(await gateway.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "", "params": [:]]))
-            } else { contextText = nil }
+        do {
+            contextText = try await inferenceContext(body, tabId: tabId)
+        } catch {
+            return errorResponse(code: "PAGE_CONTEXT_UNAVAILABLE", message: "Could not read this tab: \(error.localizedDescription)")
         }
         var image: Data?
         if contextMode == "screenshot" {

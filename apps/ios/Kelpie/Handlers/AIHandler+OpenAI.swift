@@ -52,10 +52,11 @@ extension AIHandler {
         if let explicitText = body["text"] as? String {
             contextText = explicitText
         } else {
-            if contextMode != nil {
-                let gateway = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
-                contextText = OpenAIAgentLoop.json(await gateway.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "", "params": [:]]))
-            } else { contextText = nil }
+            do {
+                contextText = try await preloadedContext(mode: contextMode, router: router, tabId: tabId)
+            } catch let error as AIHandlerError { return error.response } catch {
+                return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
+            }
         }
         var image: Data?
         if contextMode == "screenshot" {
@@ -103,19 +104,13 @@ extension AIHandler {
     }
 
     /// Page data for `context: page_text | dom | accessibility`, gathered with
-    /// the same router methods API callers use.
-    func preloadedContext(mode: String?, router: Router) async -> String? {
-        let request: (method: String, body: [String: Any])
-        switch mode {
-        case "page_text": request = ("get-page-text", [:])
-        case "dom": request = ("get-dom", ["selector": "body"])
-        case "accessibility": request = ("get-accessibility-tree", ["maxDepth": 3])
-        default: return nil
+    /// the bounded common snapshot, including accessible labels and truncation.
+    func preloadedContext(mode: String?, router: Router, tabId: String?) async throws -> String? {
+        guard mode != nil && mode != "screenshot" else { return nil }
+        guard ["page_text", "dom", "accessibility"].contains(mode ?? "") else {
+            throw AIHandlerError(code: "INVALID_PARAM", message: "Unsupported context mode")
         }
-        var result = await router.handle(method: request.method, body: request.body).json
-        guard result["success"] as? Bool == true else { return "" }
-        result.removeValue(forKey: "success")
-        return OpenAIAgentLoop.json(result)
+        return try AIConversation.commonEvidence(await router.pageObservation(tabId: tabId))
     }
 
     enum ScreenshotOutcome {
@@ -153,6 +148,8 @@ struct VisibleTabToolDispatcher: OpenAIToolDispatching {
                 message: "The tab this run is pinned to is no longer visible; Kelpie on iOS only acts on the visible tab."
             )
         }
-        return await base.dispatch(method: method, body: body)
+        var pinnedBody = body
+        if let pinnedTabId { pinnedBody["tabId"] = pinnedTabId }
+        return await base.dispatch(method: method, body: pinnedBody)
     }
 }
