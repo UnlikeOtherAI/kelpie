@@ -1,5 +1,6 @@
 #include "connect_executor.h"
 #include "websocket_codec.h"
+#include "connect_text.h"
 #include "encrypted_blob_store.h"
 #include "account_protocol.h"
 #include <cassert>
@@ -48,6 +49,10 @@ Json Command(std::string operation,Json input=Json::object()) {
 }
 }
 int main() {
+  assert(Utf8Prefix(std::string(119,'a')+"\xc3\xa9",120)==std::string(119,'a'));
+  assert(Utf8Prefix(std::string(118,'a')+"\xf0\x9f\x98\x80",120)==std::string(118,'a'));
+  assert(Utf8Prefix("\xc3\xa9\xf0\x9f\x98\x80",6)=="\xc3\xa9\xf0\x9f\x98\x80");
+  assert((!Json{{"label",Utf8Prefix(std::string(119,'a')+"\xc3\xa9",120)}}.dump().empty()));
   Browser browser;Executor executor(browser);auto guard=std::make_shared<std::atomic<bool>>(false);
   assert(executor.Execute(Command("click",{{"selector","#go"}}),guard)["state"]=="completed");
   assert(browser.effects==1 && browser.tab.active && browser.used.cancelled==guard && browser.used.document_version=="document-1");

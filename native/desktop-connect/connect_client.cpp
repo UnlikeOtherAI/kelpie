@@ -1,4 +1,5 @@
 #include "connect_client.h"
+#include "connect_text.h"
 #include "kelpie/connect.h"
 #include <algorithm>
 #include <thread>
@@ -15,7 +16,7 @@ std::string DeviceLabel(const std::string& platform) {
 #else
   if(gethostname(name,sizeof(name)-1)!=0)return "Kelpie "+platform;
 #endif
-  return std::string(name).substr(0,120);
+  return *name?kelpie::connect::Utf8Prefix(name,120):"Kelpie "+platform;
 }
 }
 namespace kelpie::connect {
