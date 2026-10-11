@@ -13,12 +13,15 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CountDownLatch
 
 /** Local emulator regression: uses the production TabStore, WebViewClient, router and handlers. */
 @RunWith(AndroidJUnit4::class)
@@ -43,14 +46,21 @@ class ConnectBrowserNavigationTest {
         runBlocking {
             for (switchTab in listOf(false, true)) {
                 fixture { browser, context, server, authority ->
-                    server.enqueue(page("Delayed").setBodyDelay(600, TimeUnit.MILLISECONDS))
+                    val permit = CountDownLatch(1)
+                    server.dispatcher = object : Dispatcher() {
+                        override fun dispatch(request: RecordedRequest): MockResponse {
+                            check(permit.await(5, TimeUnit.SECONDS))
+                            return page("Delayed")
+                        }
+                    }
                     val execution =
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()).async {
                             runCatching { browser.execute(command(context, url(server, "/delayed"))) }
                         }
                     withContext(Dispatchers.IO) { check(server.takeRequest(5, TimeUnit.SECONDS) != null) }
                     if (switchTab) context.tabStore!!.addTab() else authority.allowed = false
-                    assertTrue(execution.await().isFailure)
+                    permit.countDown()
+                    assertTrue("Must refuse completion after user tab change=$switchTab", execution.await().isFailure)
                 }
             }
         }
@@ -103,6 +113,7 @@ class ConnectBrowserNavigationTest {
                     .init(app)
                 com.kelpie.browser.browser.HomeStore
                     .init(app)
+                com.kelpie.browser.browser.SessionStore.clear(app)
                 val context = HandlerContext()
                 val store = TabStore(app, context, BrowserState())
                 context.tabStore = store
