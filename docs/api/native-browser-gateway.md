@@ -70,7 +70,7 @@ Windows one-shot inference page context now reads the bounded value-free common 
 
 ## Apple bindings
 
-macOS 0.1.29/build23 and iOS 0.1.14/build14 expose canonical requests at
+macOS 0.1.30/build24 and iOS 0.1.15/build15 expose canonical requests at
 `POST /v1/browser-control` and the compact four-tool catalog at `POST /mcp`.
 Both routes pass the existing pairing bearer/header gates. Canonical refusal and
 unknown outcomes retain HTTP200 with the versioned envelope; malformed JSON and
