@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { bearerHeaders, control, rawRequest, resultValue } from "./http.mjs";
+import { bearerHeaders, control, rawRequest, resultValue, waitFor } from "./http.mjs";
 
 /** Shared HTTP fixture also runs against Linux CEF; only private renderer/native routes can satisfy it. */
 export async function runCanonicalAcceptance(readiness, fixtureUrl) {
@@ -15,6 +15,7 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   assert.equal(created.ok, true);
   const tab = created.value.id;
   const evaluate = async (expression) => resultValue(await control(readiness, "evaluate", { tabId: tab, expression }));
+  await waitFor(() => evaluate('document.querySelector("#text-input") !== null'), "new native fixture document");
   await evaluate('document.querySelector("#text-input").value="INITIAL_SECRET"; document.body.insertAdjacentHTML("beforeend", \'<input type="password" value="PASSWORD_SECRET"><textarea>TEXTAREA_SECRET</textarea><div contenteditable="true"><p>EDITOR_SECRET</p></div>\'); true');
   const snapshot = await call("tab.snapshot", { maxChars: 12000 }, tab);
   assert.equal(snapshot.ok, true);
