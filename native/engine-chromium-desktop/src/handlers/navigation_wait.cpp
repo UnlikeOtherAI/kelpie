@@ -1,9 +1,37 @@
 #include "navigation_wait.h"
 
 #include <algorithm>
+#include <cctype>
 #include <thread>
 
 namespace kelpie {
+namespace {
+
+std::string NormalizeUrl(std::string url) {
+  const auto scheme_end = url.find("://");
+  if (scheme_end == std::string::npos) return url;
+  std::transform(url.begin(), url.begin() + static_cast<std::ptrdiff_t>(scheme_end), url.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  const auto authority_begin = scheme_end + 3;
+  const auto authority_end = url.find_first_of("/?#", authority_begin);
+  const auto end = authority_end == std::string::npos ? url.size() : authority_end;
+  std::transform(url.begin() + static_cast<std::ptrdiff_t>(authority_begin),
+                 url.begin() + static_cast<std::ptrdiff_t>(end),
+                 url.begin() + static_cast<std::ptrdiff_t>(authority_begin),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  auto authority = url.substr(authority_begin, end - authority_begin);
+  const auto scheme = url.substr(0, scheme_end);
+  if ((scheme == "https" && authority.ends_with(":443")) ||
+      (scheme == "http" && authority.ends_with(":80"))) {
+    authority.erase(authority.rfind(':'));
+  }
+  auto suffix = authority_end == std::string::npos ? std::string() : url.substr(authority_end);
+  if (suffix.empty()) suffix = "/";
+  if (suffix == "/") suffix.clear();
+  return scheme + "://" + authority + suffix;
+}
+
+}  // namespace
 
 NavigationWaitResult AwaitNavigation(const DesktopHandlerRuntime& runtime, const TabLease& lease,
                                      std::uint64_t request,
@@ -68,7 +96,7 @@ NavigationWaitResult AwaitOwnedNavigation(const DesktopHandlerRuntime& runtime, 
       return outcome;
     }
     if (state.tab.document_version != source_version) {
-      if (state.tab.url != destination ||
+      if (NormalizeUrl(state.tab.url) != NormalizeUrl(destination) ||
           (transitioned_version && state.tab.document_version != *transitioned_version)) {
         outcome.error = ErrorResponse(ErrorCode::kNavigationError, "The destination document changed during navigation");
         return outcome;
