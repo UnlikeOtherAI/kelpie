@@ -120,8 +120,11 @@ after existing bearer admission.
 The durable Apple candidate journey is `scripts/native/apple-browser-control-journey.mjs`.
 Launch the exact development candidate on a dedicated port (Mac `--port 18520`),
 then run `node scripts/native/apple-browser-control-journey.mjs http://127.0.0.1:18520 macos`
-or use the simulator's port and `ios`. Approve its visible one-session pairing
+or launch the Debug simulator with `--port 18530` and use that port plus `ios`.
+The journey first reuses an existing authorized exact-socket CLI client if present;
+otherwise approve its visible one-session pairing
 request. The fixture uses a standard MCP SDK client and exercises private-world
 spoof resistance, editable-value omission, atomic observed actions, append, stale
 DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairing
-tokens stay in process memory and are revoked; fixture tabs close afterward.
+tokens stay in process memory and new fixture grants are revoked; existing CLI
+grants are preserved, and fixture tabs close afterward.

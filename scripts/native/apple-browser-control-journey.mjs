@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { Client } from '../../packages/cli/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js';
 import { StreamableHTTPClientTransport } from '../../packages/cli/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js';
 
@@ -12,6 +14,7 @@ const endpoint = new URL(process.argv[2] ?? 'http://127.0.0.1:18520');
 assert.equal(endpoint.hostname, '127.0.0.1');
 const platform = process.argv[3] ?? 'macos';
 let token;
+let issuedSession = false;
 let replacement = 0;
 const fixture = http.createServer((req, res) => {
   if (req.url === '/command') {
@@ -107,14 +110,26 @@ let ownedTab;
 try {
   assert.equal((await wire('/v1/browser-control', {})).status, 401);
   assert.equal((await wire('/mcp', {})).status, 401);
-  const pairing = await wire('/v1/pair', { clientId: randomUUID(), clientName: 'Apple browser candidate fixture' });
-  assert.equal(pairing.status, 202);
-  console.log(`Waiting for visible native one-session pairing approval on ${endpoint.origin}`);
-  for (let attempt = 0; attempt < 180; attempt++) {
-    const status = await wire(`/v1/pair/status?requestId=${encodeURIComponent(pairing.body.requestId)}`, undefined, 'GET');
-    if (status.body?.token) { token = status.body.token; break; }
-    await pause(1000);
+  // Reuse an already authorized exact-socket CLI token where one exists.
+  // Never retarget credentials from another host/port, print them or revoke them.
+  const stored = await readFile(join(homedir(), '.kelpie', 'tokens.json'), 'utf8').then(JSON.parse).catch(() => null);
+  const suffix = `:${endpoint.hostname}:${endpoint.port}`;
+  const candidates = new Set(Object.entries(stored?.tokens ?? {}).filter(([key]) => key.endsWith(suffix)).map(([, value]) => value));
+  if (candidates.size === 1) {
+    token = [...candidates][0];
+    const probe = await wire('/v1/browser-control', { version: 1, method: 'tabs.list', params: {} });
+    if (probe.status !== 200 || probe.body?.ok !== true) token = undefined;
   }
+  if (!token) {
+    const pairing = await wire('/v1/pair', { clientId: randomUUID(), clientName: 'Apple browser candidate fixture' });
+    assert.equal(pairing.status, 202);
+    console.log(`Waiting for visible native one-session pairing approval on ${endpoint.origin}`);
+    for (let attempt = 0; attempt < 180; attempt++) {
+      const status = await wire(`/v1/pair/status?requestId=${encodeURIComponent(pairing.body.requestId)}`, undefined, 'GET');
+      if (status.body?.token) { token = status.body.token; issuedSession = true; break; }
+      await pause(1000);
+    }
+  } else console.log('Reusing existing authorized CLI access to this exact local socket');
   assert(token, 'Native pairing approval did not arrive');
   assert.equal((await wire('/mcp', undefined, 'GET')).status, 405);
   assert.equal((await wire('/mcp', {}, 'POST', { 'MCP-Protocol-Version': 'unsupported' })).status, 400);
@@ -162,6 +177,6 @@ try {
 } finally {
   if (ownedTab && token) await core('tabs.close', ownedTab).catch(() => {});
   if (client) await client.close().catch(() => {});
-  if (token) await wire('/v1/pair', undefined, 'DELETE').catch(() => {});
+  if (token && issuedSession) await wire('/v1/pair', undefined, 'DELETE').catch(() => {});
   fixture.close();
 }
