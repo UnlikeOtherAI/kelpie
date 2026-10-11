@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
-  BROWSER_CONTROL_DESCRIPTION, browserControlRequestSchema, BrowserControlError,
+  BROWSER_CONTROL_DESCRIPTION, BrowserControlRequestSchema, browserControlRequestSchema, BrowserControlError,
   createBrowserControlProxy, createKelpieBrowserBackend,
 } from "@unlikeotherai/kelpie-shared/browser-control";
 import type { BrowserControlTransport } from "@unlikeotherai/kelpie-shared/browser-control";
@@ -18,12 +18,15 @@ export function registerBrowserControl(server: McpServer, pinned?: DiscoveredDev
     methods: new Set(browserTools.map((tool) => tool.method)),
     call: () => Promise.reject(new Error("Schema inventory only.")),
   }).capabilities.methods;
-  const requestSchema = browserControlRequestSchema({ methods: nativeMethods });
+  const requestSchema = browserControlRequestSchema({ methods: nativeMethods, compact: true });
   const proxies = new Map<string, BrowserControlTransport>();
   server.registerTool("kelpie_browser_control", {
     description: BROWSER_CONTROL_DESCRIPTION,
     inputSchema: { device: z.string().optional(), request: requestSchema },
-  }, async ({ device: query, request }) => {
+  }, async ({ device: query, request: input }) => {
+    const parsed = BrowserControlRequestSchema.safeParse(input);
+    if (!parsed.success) return { isError: true, content: [{ type: "text", text: "INVALID_ARGUMENTS: The browser request does not match the strict version 1 contract." }] };
+    const request = parsed.data;
     const device = query ? await getDevice(query) : pinned ?? await getDevice("");
     if (!device) return { isError: true, content: [{ type: "text", text: "No browser device selected." }] };
     const key = `${device.id}@${device.ip}:${String(device.port)}@${device.localLaunchId ?? "remote"}`;

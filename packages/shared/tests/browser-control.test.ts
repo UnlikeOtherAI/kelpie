@@ -51,11 +51,13 @@ describe("browser control boundary", () => {
 
   it("derives compact scoped schemas from the same request variants", () => {
     const full = browserControlInputSchema();
+    const compact = browserControlInputSchema({ methods: ["tab.goto", "tab.click", "tab.type"], compact: true });
+    expect(JSON.stringify(compact).length).toBeLessThan(1500);
     const scoped = browserControlInputSchema({ methods: ["tabs.list", "tabs.new", "tabs.select", "tabs.close", "tab.snapshot", "tab.goto", "tab.click", "tab.type", "page.press", "page.scroll"] });
     expect(JSON.stringify(scoped)).not.toContain("locator.fill");
     expect(JSON.stringify(scoped).length).toBeLessThan(24_000);
     expect(JSON.stringify(full).length).toBeLessThan(24_000);
-    console.info("Browser catalogue bytes", { expanded: JSON.stringify(z.toJSONSchema(BrowserControlEnvelopeSchema)).length, factored: JSON.stringify(full).length, restricted: JSON.stringify(scoped).length, description: BROWSER_CONTROL_DESCRIPTION.length });
+    console.info("Browser catalogue bytes", { expanded: JSON.stringify(z.toJSONSchema(BrowserControlEnvelopeSchema)).length, factored: JSON.stringify(full).length, restricted: JSON.stringify(scoped).length, compact: JSON.stringify(compact).length, description: BROWSER_CONTROL_DESCRIPTION.length });
   });
 
   it("bounds metadata and exposes only normalized fields in snapshots", () => {
@@ -74,6 +76,10 @@ describe("browser control boundary", () => {
     expect(await tab.screenshot()).toEqual(Uint8Array.from([1, 2, 3]));
     await tab.click("e1");
     await tab.typeText("e2", "append");
+    await tab.pressKey(null, "Enter");
+    expect(transport.call).toHaveBeenLastCalledWith(request("page.press", { key: "Enter" }));
+    await expect(tab.pressKey("e2", "Enter")).rejects.toMatchObject({ code: "UNSUPPORTED_OPERATION" });
+    await expect(tab.typeText(null, "text")).rejects.toMatchObject({ code: "UNSUPPORTED_OPERATION" });
     await tab.playwright.getByRole("button", { name: "Save", exact: true }).click();
     expect(transport.call).toHaveBeenLastCalledWith(request("locator.click", { locator: [{ kind: "role", role: "button", name: "Save", exact: true }] }));
   });

@@ -69,8 +69,16 @@ export class BrowserTabClient {
   }
   getScreenshot(): Promise<Uint8Array> { return this.screenshot(); }
   click(ref: string | number): Promise<void> { return this.call("tab.click", { ref: String(ref) }); }
-  typeText(ref: string | number, text: string): Promise<void> { return this.call("tab.type", { ref: String(ref), text }); }
-  pressKey(key: string): Promise<void> { return this.call("page.press", { key }); }
+  typeText(ref: string | number | null, text: string): Promise<void> {
+    if (ref === null) return Promise.reject(new BrowserControlError("UNSUPPORTED_OPERATION", "Focused typing is not in the supported browser subset."));
+    return this.call("tab.type", { ref: String(ref), text });
+  }
+  pressKey(key: string): Promise<void>;
+  pressKey(ref: string | number | null, key: string): Promise<void>;
+  pressKey(refOrKey: string | number | null, key?: string): Promise<void> {
+    if (key !== undefined && refOrKey !== null) return Promise.reject(new BrowserControlError("UNSUPPORTED_OPERATION", "Observed-reference key presses are not supported."));
+    return this.call("page.press", { key: key ?? refOrKey });
+  }
   scroll(deltaY: number, deltaX = 0): Promise<void> { return this.call("page.scroll", { deltaX, deltaY }); }
 }
 export function createBrowserClient(transport: BrowserControlTransport) {

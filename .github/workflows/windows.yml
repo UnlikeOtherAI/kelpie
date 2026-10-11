@@ -1,10 +1,10 @@
 name: Windows CEF
 on:
   pull_request:
-    paths: [apps/windows/**, native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
+    paths: [apps/windows/**, native/**, packages/shared/**, pnpm-lock.yaml, scripts/native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
   push:
     branches: [main]
-    paths: [apps/windows/**, native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
+    paths: [apps/windows/**, native/**, packages/shared/**, pnpm-lock.yaml, scripts/native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/browser-contract
       - name: Verify harness process handling
         shell: pwsh
         run: node --test tests/windows/process.test.mjs

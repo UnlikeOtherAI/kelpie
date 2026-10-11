@@ -54,8 +54,12 @@ The async JavaScript SDK follows the supported Codex browser subset:
 `tab.typeText(ref,text)`, `getAXState/getScreenshot`, and `tab.playwright` locator
 builders. `screenshot()` returns `Uint8Array`; the wire carries a typed image.
 Unsupported Codex features are not emulated. Method schemas can be generated from
-`browserControlInputSchema({methods})`, retaining one authoritative schema while
-omitting unsupported variants from a product's model context.
+`browserControlInputSchema({methods,compact:true})`, retaining one authoritative
+method enum with open parameter contents for compact model context. The canonical
+request validator remains strict and validates every call before dispatch. Omit
+`compact` for full typed method schemas. `tab.pressKey(null,key)` and convenience
+`tab.pressKey(key)` target the page; non-null ref key presses and focused
+`typeText(null,text)` refuse explicitly in this supported subset.
 
 Run ordinary contract/native mock checks with `pnpm test`. Run real headless
 conformance separately after installing Chromium and building the package:

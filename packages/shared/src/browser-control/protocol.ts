@@ -52,7 +52,7 @@ export type BrowserControlMethod = BrowserControlRequest["method"];
 export interface BrowserTabInfo { id: string; url?: string; title?: string }
 export interface BrowserElement { ref: string; role: string; name: string }
 export interface BrowserSnapshot { url: string; title: string; text: string; truncated: boolean; elements?: BrowserElement[] }
-export interface BrowserImage { type: "image"; mimeType: "image/png" | "image/jpeg"; data: string }
+export interface BrowserImage { type: "image"; mimeType: "image/png" | "image/jpeg" | "image/webp"; data: string }
 export interface BrowserCapabilities { version: 1; methods: BrowserControlMethod[]; extensions: string[] }
 export interface BrowserControlFailure { code: string; message: string; mayHaveCompleted: boolean }
 export type BrowserControlResponse = { version: 1; ok: true; value: unknown } | { version: 1; ok: false; error: BrowserControlFailure };
@@ -69,13 +69,20 @@ const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "t
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();
-export function browserControlRequestSchema(options: { methods?: readonly BrowserControlMethod[] } = {}) {
-  if (!options.methods) return BrowserControlRequestSchema;
-  const allowed = new Set(options.methods);
-  const variants = BrowserControlRequestSchema.options.filter((option) => allowed.has(option.shape.method.value));
+export function browserControlRequestSchema(options: { methods?: readonly BrowserControlMethod[]; compact?: boolean } = {}) {
+  const allowed = options.methods ? new Set(options.methods) : undefined;
+  const variants = BrowserControlRequestSchema.options.filter((option) => !allowed || allowed.has(option.shape.method.value));
   if (!variants.length) throw new Error("At least one browser method must be included in the input schema.");
-  return z.union(variants);
+  if (options.compact) {
+    const shape = BrowserControlRequestSchema.options[0].shape;
+    return z.object({
+      version: shape.version, method: z.enum(variants.map((option) => option.shape.method.value)),
+      tabId: shape.tabId,
+      params: z.looseObject({}).default({}).describe("Call documentation once for method parameters; every call is validated against the strict v1 contract."),
+    }).strict();
+  }
+  return options.methods ? z.union(variants) : BrowserControlRequestSchema;
 }
-export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[] } = {}): Record<string, unknown> {
+export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[]; compact?: boolean } = {}): Record<string, unknown> {
   return z.toJSONSchema(z.object({ request: browserControlRequestSchema(options) }).strict(), { reused: "ref" });
 }
