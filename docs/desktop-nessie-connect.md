@@ -85,7 +85,8 @@ GTK viewport resize/reset uses the current allocated browser widget dimensions,
 independent of missing or stale CEF paint frames. Native Linux acceptance exercises
 resize immediately after readiness and again after browser actions.
 
-Verified on 2026-10-11 at source `3886012cfe0ca01560402d46557a0df3d27a3266`:
+Historical baseline on 2026-10-11, superseded by the integrated candidates below,
+at source `3886012cfe0ca01560402d46557a0df3d27a3266`:
 
 - Minis built Windows 0.1.12 Release with MSVC 19.51, pinned sandboxed CEF 152
   and embedded llama.cpp. All 50 CTest cases passed (15.55 seconds).
@@ -135,3 +136,55 @@ Ubuntu 22/Fedora matrix builds or system installation. Rendered account menus,
 live production WSS dispatch/revocation and full page-extraction jobs remain
 separate checks pending the coordinated Nessie deployment. The small model check
 proves native execution, not general answer quality or a measured cloud-token saving.
+
+## Integrated desktop candidates
+
+Windows 0.1.13 and Linux 0.1.12 include the upstream canonical browser gateway,
+shared transaction admission, reference retirement and value-free snapshot reader.
+Their desktop runtime source is `9c59b43e674c74133c6844a2b15c0a11e032c41a`.
+The Linux package manifest records `33ac28face7418a9548f45fe78abce5022c4b877`,
+which additionally fixes test-thread mutex ownership without changing product code.
+
+- Minis: full sandboxed Windows Release build and 53 CTest cases passed in
+  34.53 seconds. The affected executor test passed again after the test correction.
+  The extracted ZIP passed the real browser/HTTP/MCP, current CLI and Nessie MCP
+  client acceptance journey. A native renderer PNG is retained with its logs.
+  Visible native account-menu inspection confirmed reconnecting status, fresh
+  sign-in, Pause and Stop doorways. Clicking Pause exposed Resume; clicking Resume
+  restored Pause, and the app was left unpaused. Native menu crops are retained as
+  `windows/native-account-paused.png` and `windows/native-account-resumed.png`.
+  This verifies the controls, not cancellation of a live production gateway job.
+- Ubuntu 24.04.5: full CEF/GTK Release build and 34 CTest cases passed in 3.38
+  seconds. The extracted AppImage passed real GTK acceptance, including immediate
+  viewport resize/reset, trusted input, screenshots, partition/profile isolation,
+  persistent session restoration and authenticated graceful readiness cleanup.
+  Its separate canonical HTTP/MCP SDK journey passed too.
+- Fresh shared/CLI lint and build passed on Minis. Ordinary tests passed 79 shared
+  and 610 CLI cases; 64 provider/device cases explicitly skipped. These are not
+  evidence for external providers or physical devices.
+- Actual headless Chromium exercised the shared native selector expression against
+  duplicate IDs, duplicate ancestor IDs, escaped IDs and html/body roots. Every
+  emitted selector matched exactly its observed node; editable values were absent
+  and no reference registry was installed. Synthetic DOM PNG/JSON evidence is
+  retained under `desktop/selector-dom` in the external artifact directory.
+
+The Windows ZIP SHA-256 is
+`abf9280c09b3459f9c15ff18b5b338bf5abbbdfd7e9c7a605c73c2c7b75e68bb`.
+Linux tar.gz, DEB, RPM and AppImage candidates have version-specific checksums and
+source manifest in the external artifact directory. Publication, signing policy
+limitations and unverified distro matrices remain as described above.
+
+The same production OAuth verification profile was restored by the packaged
+Windows 0.1.13 browser, now launched with a visible native window for account-menu
+inspection. Its existing SmolLM2 weight was loaded through the normal native API;
+the synthetic question again returned “The verification lantern is blue.” with
+six generated tokens in 97 ms. Safe proofs record package source, native launch,
+sandbox and model readiness; no account bearer or copied identity profile is retained
+in verification output. Live production Nessie jobs remain pending deployment.
+
+One initial Linux acceptance run observed SIGSEGV during normal shutdown while
+compression and other checks overlapped. Subsequent packaged acceptance, the
+canonical MCP journey, four full debugger acceptance repetitions and another
+debugger run under bounded CPU load exited normally, including restored sessions.
+The original failure is preserved alongside successful logs; its cause has not yet
+been established, so these passes do not prove that the shutdown race is fixed.
