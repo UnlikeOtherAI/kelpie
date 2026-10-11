@@ -11,9 +11,12 @@ json Request(const std::string& method, json params = json::object(), const std:
 }
 void Contracts() {
   const auto schema = json::parse(kelpie::browser_assets::request_schema);
+  int index = 0;
   for (const auto& fixture : json::parse(kelpie::browser_assets::cases)) {
     auto value = fixture["input"];
     const bool accepted = kelpie::ValidateBrowserJson(schema, &value);
+    if (accepted != fixture["accepted"]) std::cerr << "Schema fixture mismatch " << index << " accepted=" << accepted << " expected=" << fixture["accepted"] << "\n";
+    ++index;
     assert(accepted == fixture["accepted"]);
     if (accepted) assert(value == fixture["output"]);
   }
@@ -73,8 +76,9 @@ void Mcp() {
   assert(content[1]["text"].get<std::string>().find("AQID") == std::string::npos);
 }
 void ExtensionReachability() {
-  kelpie::BrowserGateway gateway({{"nativeMethods", {"bookmarks-add"}}, {"requireAuthorization", false},
-    {"extensions", {{{"name", "kelpie_bookmarks_add"}, {"method", "bookmarks-add"}, {"mutates", true}, {"inputSchema", {{"type", "object"}, {"properties", {{"url", {{"type", "string"}}}}}, {"required", {"url"}}, {"additionalProperties", false}}}}}});
+  const json schema = {{"type", "object"}, {"properties", {{"url", {{"type", "string"}}}}}, {"required", {"url"}}, {"additionalProperties", false}};
+  const json tool = {{"name", "kelpie_bookmarks_add"}, {"method", "bookmarks-add"}, {"mutates", true}, {"inputSchema", schema}};
+  kelpie::BrowserGateway gateway({{"nativeMethods", {"bookmarks-add"}}, {"requireAuthorization", false}, {"extensions", json::array({tool})}});
   auto step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_bookmarks_add"}, {"arguments", {{"url", "https://example.org"}}}}}}}});
   assert(step["method"] == "bookmarks-add");
   assert(step["params"]["url"] == "https://example.org");
