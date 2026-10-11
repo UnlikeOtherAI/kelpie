@@ -111,3 +111,5 @@ snapshot requests keep the completion fence described above.
 Value-free snapshots include visible named SVG graphics as `img` elements, using
 ARIA names before a direct SVG `title`; unnamed and hidden graphics are omitted.
 This preserves accessible logo evidence for existing page-grounded conversations.
+
+The value-free fixed snapshot reader also omits text reached through accessible-name references when the referenced label inherits content editability from an ancestor.

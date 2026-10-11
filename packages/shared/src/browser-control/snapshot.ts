@@ -16,7 +16,7 @@ export function collectBrowserSnapshot(options: {
   let visited = 0;
   const ignored = "input,textarea,select,[contenteditable]:not([contenteditable='false']),script,style,noscript,template,[hidden],[aria-hidden='true']";
   const content = (node: Node, depth = 0): string => {
-    if (depth > 40 || (node instanceof Element && (node.matches(ignored) || getComputedStyle(node).visibility === "hidden" || getComputedStyle(node).display === "none"))) return "";
+    if (depth > 40 || (node instanceof Element && (node.matches(ignored) || node.closest("[contenteditable]:not([contenteditable='false'])") || getComputedStyle(node).visibility === "hidden" || getComputedStyle(node).display === "none"))) return "";
     if (node.nodeType === Node.TEXT_NODE) return (node.textContent ?? "").slice(0, 256);
     let value = "";
     for (const child of node.childNodes) {
