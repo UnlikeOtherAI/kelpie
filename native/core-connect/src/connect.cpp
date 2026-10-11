@@ -42,6 +42,12 @@ std::string Key(const Json& value) {
 bool Terminal(const std::string& state) {
   return state == "completed" || state == "failed" || state == "cancelled";
 }
+std::string BoundedError(const std::string& value) {
+  auto size = std::min<std::size_t>(value.size(), 2000);
+  // The byte bound is also below the wire UTF-16 limit. Do not split a UTF-8 code point.
+  while (size < value.size() && size > 0 && (static_cast<unsigned char>(value[size]) & 0xc0) == 0x80) --size;
+  return value.substr(0, size);
+}
 Json Event(const Json& command, const std::string& state) {
   return {{"type", "event"}, {"jobId", command.at("jobId")},
       {"attemptId", command.at("attemptId")}, {"seq", state == "accepted" ? 1 : 2}, {"state", state}};
@@ -177,7 +183,7 @@ struct KelpieConnect {
         throw std::invalid_argument("Result too large");
       event["output"] = result["output"];
     }
-    if (result.contains("error")) event["error"] = Text(result, "error").substr(0, 2000);
+    if (result.contains("error")) event["error"] = BoundedError(Text(result, "error"));
     job["event"] = event;
     job["terminal"] = true;
     job["terminalState"] = state;

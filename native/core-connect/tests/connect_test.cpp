@@ -141,6 +141,10 @@ int main() {
   auto invalid_date = command;
   invalid_date["deadline"] = "2026-02-30T00:00:00Z";
   assert(!kelpie_connect_execute_at(client, "receive", invalid_date.dump().c_str(), now));
+  std::string unicode_error = "a";
+  for (int i = 0; i < 1000; ++i) unicode_error += "\xf0\x9f\x98\x80";
+  const auto unicode_terminal = Execute(client, "complete", {{"jobId", id}, {"attemptId", id}, {"state", "failed"}, {"error", unicode_error}});
+  assert(unicode_terminal["decision"]["frames"][0]["error"].get<std::string>().size() == 1997);
   kelpie_connect_destroy(client);
   assert(!kelpie_connect_create("broken", "issuer/subject"));
 }
