@@ -64,6 +64,9 @@ final class AIPageContextTests: XCTestCase {
         XCTAssertEqual(tree["success"] as? Bool, true)
         XCTAssertTrue(OpenAIAgentLoop.json(tree).contains("Origin text"))
         XCTAssertEqual(store.activeBrowserTabID, second.id)
+        context.webView = first.webView // The UI's context pointer may lag a tab switch.
+        let activeSnapshot = try await PageTextSnapshot.read(context: context, body: [:])
+        XCTAssertEqual(activeSnapshot["title"] as? String, "Other tab")
         store.tabs.forEach { $0.invalidate() }
     }
 

@@ -44,7 +44,7 @@ enum PageTextSnapshot {
             }
             webView = tab.webView
         } else {
-            webView = context.webView
+            webView = context.tabStore?.activeBrowserTab?.webView ?? context.webView
         }
         guard let webView else { throw AIHandlerError(code: "NO_WEBVIEW", message: "No browser tab is available") }
         guard let raw = try await webView.evaluateJavaScript("JSON.stringify((\(script)))") as? String,

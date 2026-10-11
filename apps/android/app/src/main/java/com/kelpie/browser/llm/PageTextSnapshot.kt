@@ -53,7 +53,7 @@ object PageTextSnapshot {
                     context.tabStore?.tabs?.value?.firstOrNull { it.id == requested }?.webView
                         ?: throw OpenAIException("TAB_NOT_FOUND", "Tab $requested not found")
                 } else {
-                    context.webView ?: throw OpenAIException("NO_WEBVIEW", "No browser tab is available")
+                    (context.tabStore?.activeTab?.webView ?: context.webView) ?: throw OpenAIException("NO_WEBVIEW", "No browser tab is available")
                 }
             val raw = evaluate(webView, "JSON.stringify(($script))")
             decodeObject(raw)
