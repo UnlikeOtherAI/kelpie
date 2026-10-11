@@ -11,7 +11,7 @@ namespace kelpie {
 namespace {
 using json = nlohmann::json;
 json RpcError(int code, const json& request = json::object()) {
-  if (request.is_object() && !request.contains("id") && request.value("jsonrpc", std::string()) == "2.0" && request.contains("method") && request["method"].is_string()) return nullptr;
+  if (request.is_object() && !request.contains("id") && request.contains("jsonrpc") && request["jsonrpc"] == "2.0" && request.contains("method") && request["method"].is_string()) return nullptr;
   return {{"jsonrpc", "2.0"}, {"id", request.is_object() ? request.value("id", json(nullptr)) : json(nullptr)}, {"error", {{"code", code}, {"message", "Invalid MCP request"}}}};
 }
 }
@@ -21,7 +21,7 @@ class DesktopMcpServer::Impl {
   const McpRegistry* registry = nullptr;
   FixedReader reader;
   std::function<bool()> pending;
-  json gateway_config;
+  mutable json gateway_config;
   mutable std::recursive_mutex mutex;
   mutable std::unique_ptr<BrowserGateway> gateway;
   mutable bool internal_dispatch = false;
