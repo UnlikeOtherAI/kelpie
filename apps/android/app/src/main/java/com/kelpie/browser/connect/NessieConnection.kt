@@ -222,11 +222,12 @@ object NessieConnection {
                         "label" to
                             deviceLabel(),
                         "platform" to "android",
-                        "capabilities" to buildList {
-                            add("browser.control")
-                            if (browser?.supportsControlV1 == true) add("browser.control.v1")
-                            add("page.extract")
-                        },
+                        "capabilities" to
+                            buildList {
+                                add("browser.control")
+                                if (browser?.supportsControlV1 == true) add("browser.control.v1")
+                                add("page.extract")
+                            },
                         "lifecycle" to lifecycle,
                         "modelReady" to ready,
                         "modelInstalled" to (browser?.modelInstalled ?: false),
