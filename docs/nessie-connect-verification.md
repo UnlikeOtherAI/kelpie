@@ -24,6 +24,14 @@ installation, account store, or running user's process was replaced or stopped.
 | dictator / iOS 27 arm64 simulator | `f052d65` | Rebuilt native owned-request C API, eight authorization and five page-context tests | Passed, 13 tests |
 | umac / Android | `0e607b1` plus formatter-only `45a0314` | Strict ktlint, 122 JVM tests, arm64/x86_64 debug and instrumentation APK builds | Passed, zero failures |
 | umac / Android emulator x86_64 | `0e607b1` plus formatter-only `45a0314` | Actual WebView navigation, page guards, isolated inference cancellation, observed selectors | Passed, six tests |
+| dictator / consolidated macOS source | `7af3d5a` | Strict SwiftLint; full Debug build including CEF; owned router admission, shared reader and page-context XCTest | Zero violations in 278 files; 12 tests passed |
+| dictator / consolidated iOS arm64 simulator | `7af3d5a` | Fresh core-MCP/automation archives, shared value-free reader and job ownership XCTest | 15 tests passed |
+| dictator / iOS simulator visible UI | `d7573f4` (same Apple behavior) | More → Settings → Nessie, signed-out state | One UI test passed; screenshot reviewed |
+| dictator / native C++ | `d7573f4` | Fixed reader C API input bounds/ownership and durable connection journal | Two CTest executables passed |
+| umac / consolidated Android | `057d38868` (equivalent to `d7573f4` Android sources) | Strict ktlint, JVM tests, arm64/x86_64 JNI, isolated debug/test APKs | 139 tests passed; APK versions 0.1.15 code 15 |
+| umac / Android emulator x86_64 | `057d38868` | Actual shared-admission ConnectBrowser navigation, cancellation, selector/value exclusion and local-request isolation | Six instrumentation tests passed |
+| umac / Android visible UI | `057d38868` | Isolated app, More → Settings → Nessie | Signed out rendered at port 18420; screenshot reviewed |
+| dictator / iPhoneOS arm64 | `d7573f4` | Fresh native archives and normal Apple Development device build | Compile/link passed; signing still blocked by SSH keychain interaction |
 
 The navigation instrumentation proves a new document pin is returned after an owned
 navigation, cancellation and person tab selection refuse completion, an unrelated
@@ -33,8 +41,11 @@ not a timing delay, and an injected authority predicate; it does not prove produ
 UOA or WebSocket authentication. The production predicate remains the existing
 immutable job/account/deadline/connection authority.
 
-The additional DOM tests return distinct observed selectors for duplicate buttons
-and an empty input, and resolve every selector back to exactly one element. Owned
+The consolidated DOM tests reuse the canonical value-free collector and return
+distinct observed selectors for duplicate IDs, buttons and empty fields. Every
+selector resolves to exactly one element; input values, textarea defaults and
+contenteditable text are excluded. Apple uses the private browser-control world;
+Android retains its documented page-realm limitation. Owned
 cancellation tests cancel a separate extraction request before dispatch and verify
 another request remains available. They do not use a loaded GGUF fixture and therefore
 do not establish live token-generation cancellation or model quality.
@@ -50,8 +61,12 @@ profile uses port 18420; ordinary builds retain 8420. The initial isolated launc
 encountered an input-focus ANR while the host was busy and sharing the ordinary port.
 After assigning its own listener and restarting only the verification app, the
 Settings surface rendered. UIAutomator intermittently returned a null hierarchy on
-that emulator, so the final Android UI evidence is a rendered screenshot rather
-than an instrumentation test. The cause of the first startup timeout was not proven.
+that emulator, so the final Android Settings UI evidence is a rendered screenshot
+rather than a doorway instrumentation test. The cause of the first startup timeout
+was not proven. The consolidated browser instrumentation's first cold-boot run
+was killed by Android because its Google FontsProvider process died; ActivityManager
+recorded the exact dependency kill, with no native crash trace. After boot settled,
+all six tests passed in the same isolated profile. Both logs are retained.
 
 The Apple checks used arm64 simulator archives. An unrestricted generic simulator
 build attempted x86_64 and could not link the available arm64 native archives;
@@ -108,13 +123,26 @@ normal development upgrade of the merged 0.1.15 build 15 compiled and linked, an
 automatic provisioning found the existing Apple Development certificate and team
 `59S95D279D`. It failed signing `Kelpie.debug.dylib` with `errSecInternalComponent`:
 private-key access in the SSH session must be resolved interactively before retrying.
-No installation was attempted, so device developer-mode and install permissions remain unverified.
+The final 0.1.16 build 16 retry, after the user's GUI unlock, reached the same signing
+failure. Read-only diagnosis selected `login.keychain-db` as default/search-list
+keychain, found the logged-in Aqua session owned by dictator, and returned
+`User interaction is not allowed` from `SecKeychainCopySettings` over SSH.
+`launchctl asuser` could not switch audit sessions; an owned, valid LaunchAgent
+bootstrap into `gui/501` failed with input/output error before any job was created.
+No trust, ACL, password or keychain setting was changed. This distinguishes the
+SSH interaction barrier from a claim that the user's GUI keychain remains locked.
+The exact normal build command is preserved in `iphone-gui-build.sh` in the durable
+Mac artifact directory, for execution in the logged-in user's Terminal. No physical
+installation was attempted, so developer-mode and install permissions remain unverified.
 
 For macOS, the keychain advertises Apple Development and Mac App Store distribution
 identities, but no Developer ID Application identity. A normally signed, notarized
 distribution artifact is blocked by that missing identity. The installed Mac app was
-observed as 0.1.29 with an ad-hoc signature; it was preserved, and no new ad-hoc
-artifact was produced or installed by this lane.
+initially observed as 0.1.29 with an ad-hoc signature. The latest read-only check
+found the upstream 0.1.30 app signed with Apple Development and actively running;
+it was preserved. No new ad-hoc artifact was produced or installed by this lane.
+Development signing is acceptable for local verification, but this lane's signing
+access remains blocked. Missing Developer ID still blocks notarized public distribution.
 
 Verification roots to preserve before cleanup:
 
@@ -123,9 +151,13 @@ Verification roots to preserve before cleanup:
   `ios-navigation-merged.log`, `iphone-native-build.log`, and
   `iphone-device-merged-build.log`; simulator evidence is
   `apps/ios/.build/connect-navigation-merged.xcresult`.
+  Consolidated evidence adds `mac-reader-test.log`, `ios-reader-test.log`,
+  `ios-reader-doorway.log`, `native-reader-host-test.log`, `iphone-reader-device-build.log`,
+  and the `connect-reader.xcresult` / `connect-reader-doorway.xcresult` bundles.
 - Ubuntu: `/home/umac/Projects/kelpie/.worktrees/kelpie-connect-native-verify/source`.
   Preserve `android-navigation-merged-build.log`, `android-navigation-merged-rebuild.log`,
   `android-navigation-merged-test.log`, JVM XML reports, and the isolated debug APKs.
+  Consolidated evidence adds `android-reader-build.log` and `android-reader-test.log`.
 
 After server release and signed device upgrade, the live travel scenario still needs
 fresh UOA consent in the phone's Kelpie, the same UOA account in Nessie on the iPad,
