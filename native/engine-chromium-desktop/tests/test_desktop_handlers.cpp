@@ -45,6 +45,8 @@ class MockControl final : public kelpie::DesktopBrowserControl {
     if (owned_navigation && !lease.document_version) {
       first.document_version = owned_new_version;
       first.url = owned_destination;
+      const auto authority_end=first.url.find_first_of("/?#",first.url.find("://")+3);
+      if(authority_end==std::string::npos)first.url.push_back('/');
       first.title = "Owned destination";
       if (replace_owned_navigation) { ++nav_requested; first.document_version="human-doc"; first.url="https://human.test"; }
     }
@@ -160,7 +162,7 @@ int main() {
   nlohmann::json owned_goto;
   { kelpie::ScopedBrowserControlLease job(kelpie::TabLease{"first",3,control.owned_source_version,owned_cancel,owned_deadline,true});
     owned_goto=router.Dispatch("navigate",{{"tabId","first"},{"generation",3},{"url","https://owned.test"}}).body; }
-  assert(owned_goto["success"]==true && owned_goto["url"]=="https://owned.test");
+  assert(owned_goto["success"]==true && owned_goto["url"]=="https://owned.test/");
   assert(control.last_lease.cancelled==owned_cancel && control.last_lease.deadline==owned_deadline && control.last_lease.require_active);
   control.replace_owned_navigation=true; control.nav_requested=30; control.nav_completed=30;
   control.first.document_version=control.owned_source_version; control.first.url="https://one.test"; control.first.title="One";
