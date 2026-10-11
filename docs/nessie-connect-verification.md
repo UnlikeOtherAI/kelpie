@@ -144,6 +144,17 @@ it was preserved. No new ad-hoc artifact was produced or installed by this lane.
 Development signing is acceptable for local verification, but this lane's signing
 access remains blocked. Missing Developer ID still blocks notarized public distribution.
 
+Android release signing preflight found no release identity in the conventional
+`.android`, `.gradle`, `.config/kelpie` or `.kelpie` locations across the four hosts.
+Only debug keystores and an internal Gradle cache keystore were found. No credential
+contents were read. The existing workflow references `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`; repository
+secrets contain none of these, and release `2026-10-11.2` explicitly describes its
+APK/AAB as unsigned. A proper existing Kelpie release key path and alias, or an
+explicitly approved new signing identity, is required before release packaging.
+This lane produced no unsigned or debug-signed release substitute. Durable isolated
+debug/test APKs are verification artifacts only, with SHA-256 digests.
+
 Verification roots to preserve before cleanup:
 
 - Mac: `/Volumes/External/Projects/kelpie/.worktrees/kelpie-connect-native-verify`.
