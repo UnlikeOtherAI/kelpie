@@ -20,7 +20,12 @@ class DOMHandler(
         val safe = JSEscape.string(selector)
         val js = "(function(){var el=document.querySelector('$safe');return el?{html:el.outerHTML.substring(0,50000),length:el.outerHTML.length}:{html:'',length:0};})()"
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
+            successResponse(
+                com.kelpie.browser.llm.PageTextSnapshot
+                    .readObject(ctx, body, js),
+            )
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }

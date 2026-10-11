@@ -908,3 +908,11 @@ replaced `console.log`), the call resolves with `JavaScript evaluation timed
 out` instead of hanging the request.
 
 ---
+
+### `get-links` (macOS)
+
+Read up to 200 links with `href` and bounded text, preserving the local model's
+existing link observation. Optional `tabId`/`windowId` target the owning WebKit
+tab; Chromium uses its live renderer. The shared `kelpie_get_links` extension
+is read-only and remains admitted only by the local model profile, not the
+narrower remote inference profile.

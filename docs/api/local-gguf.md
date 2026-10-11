@@ -71,3 +71,15 @@ to commit `8345f333951c661d166b00e6f9362e553768f292`. The CPU runtime is linked
 statically; no separate inference executable is installed. GPU/NPU acceleration
 is not enabled in this baseline. Tests can run a real GGUF using
 `test_local_inference <path>`; the default test needs no downloaded weights.
+
+## Windows tab conversations
+
+The Local AI dialog initially includes page context and pins it to the active tab
+when opened. Its result area shows the tab's conversation. Every request sends
+all earlier user and assistant turns; navigating, switching tabs and reopening
+the dialog preserve them. Closing the tab clears the conversation and discards
+late replies. Conversations stay in memory and do not survive app restart.
+Page context includes the current URL, title, readable text and visible image,
+ARIA and SVG accessible names; failed reads surface an error before inference.
+Native `CONTEXT_TOO_LONG` errors remain explicit when full history plus the reply
+budget exceeds the loaded model context window.

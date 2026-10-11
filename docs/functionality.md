@@ -38,6 +38,8 @@ API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; M
 
 ## Browser Control
 
+Apple apps expose the shared versioned `POST /v1/browser-control` and authenticated `POST /mcp` surface. Common snapshots, references, append typing and navigation share one native coordinator; product tools are discovered separately. See [Apple binding](api/native-browser-gateway.md#apple-bindings).
+
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
 On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
@@ -54,9 +56,9 @@ Every platform keeps a persisted home page URL. Fresh launches load that URL ins
 
 ## Renderer Switching (macOS)
 
-Switch between Safari (WebKit), Chrome (Chromium/CEF), and Firefox (Gecko) rendering engines at runtime. Available via the UI segmented control and the `set-renderer` / `get-renderer` HTTP endpoints. Cookies are migrated automatically when switching to preserve login sessions.
+Switch between Safari (WebKit) and Chrome (Chromium/CEF) rendering engines at runtime. Available via the UI segmented control and the `set-renderer` / `get-renderer` HTTP endpoints. Cookies are migrated automatically when switching to preserve login sessions.
 
-Gecko uses a Firefox runtime bundled inside Kelpie.app (`Frameworks/KelpieGeckoHelper.app`) — no external Firefox installation required. Run `make gecko-runtime` once during setup to download and strip the runtime. The bundled binary is driven headless via the Firefox Remote Protocol (CDP-compatible WebSocket). The live view shows the Firefox-rendered page via screenshots at ~5fps.
+The current native app exposes WebKit and Chromium. The optional Gecko helper staging script does not provide a callable renderer or control capability.
 
 ## External Display — Apple TV (iOS)
 
@@ -240,6 +242,12 @@ For verified platform coverage and remaining inference gaps, see
 AI inference on macOS, iOS, Android and Windows; Linux does not yet expose AI handlers. Windows implements the inference and endpoint methods described below, without the recording/catalog methods. HTTP endpoints (`ai-status`, `ai-load`, `ai-unload`, `ai-infer`, `ai-record`, `ai-catalog`, `ai-fitness`, plus `ai-endpoints`, `ai-endpoint-save`, `ai-endpoint-remove`, `ai-endpoint-models`, `ai-endpoint-test`, `ai-endpoint-health` and `ai-cancel`) and corresponding MCP tools let language models query local AI without sending data to the cloud. `ai-catalog` returns the approved on-device model catalog and `ai-fitness` scores a model against a device's RAM/disk — both are supported on iOS, Android, and macOS and require a HuggingFace token configured on the device. On iOS and Android, AI remains available from the browser shell while the visible URL-bar shortcut is reserved for the 3D inspector.
 
 **macOS — native GGUF + Ollama + HF Cloud:** The CLI manages GGUF model downloads from HuggingFace (`kelpie ai pull`). The macOS app loads them via llama.cpp on Apple Silicon. An inference harness runs a lightweight agent loop (max 3 tool calls) so 2B models can request page data on demand instead of receiving everything upfront. Audio recording captures 16kHz mono PCM (max 30s) for voice input. Intel Macs get Ollama-only mode. HF cloud inference is available as a third backend when a token is set.
+
+**macOS tab conversations:** Each open tab keeps its own in-memory conversation and draft until the tab closes. Switching tabs, navigating, and closing/reopening the AI panel preserve the conversation. Every backend receives previous user/assistant messages in order, without a ten-message cutoff (subject to its model context window). Local chat reads the originating tab explicitly and includes current page text plus accessible image/logo labels. Read failures are shown as errors rather than passed to the model as an empty page. Closing a tab clears its conversation; restored tabs start fresh after an app restart.
+
+**Windows tab conversations:** The Local AI dialog keeps a separate in-memory transcript for its originating tab, includes page context by default, and sends all prior turns. Reopening the dialog or navigating preserves that transcript; closing the tab clears it and ignores late replies. Page text includes accessible image, ARIA and SVG names on both Windows and Linux.
+
+**iOS and Android API context:** Existing AI APIs accept complete caller-supplied conversation history on every backend. Page-text, DOM and accessibility context capture the requested tab without switching it. Page-text evidence includes the title, URL, text and accessible labels. Invalid tabs and extraction failures return errors. Mobile does not add a chat panel or a second conversation store; API clients own their conversation history. See [mobile AI context](api/mobile-ai-context.md).
 
 **iOS — Apple Intelligence + Ollama:** Platform AI (Foundation Models framework) provides text inference when available on iOS 26 or later with supported hardware and Apple Intelligence enabled. Users can select an OpenAI-compatible or Ollama endpoint on a LAN computer when on-device inference is unavailable.
 
@@ -551,6 +559,13 @@ immediately and asks UOA to revoke it in the background; quitting Kelpie keeps i
 the older memory-only session, which still ends at access-token expiry.
 
 ## Shared browser control
+
+Android exposes the common core directly at authenticated `/v1/browser-control`
+and `/mcp`. Its existing OpenAI-compatible agent uses the compact shared catalog
+with per-run tab and action permissions. Product extensions are discovered on
+demand; pairing and plain local inference retain their permissions. See
+[the Android binding](api/native-browser-gateway-android.md), including its WebView
+page-realm limitation and verification commands.
 
 Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-json>` and CLI MCP expose one versioned browser core used by runtime consumers. Native owns the persistent reference registry. The default MCP catalog advertises the core and three extension discovery/invocation tools; rich functions remain reachable through the generic extension caller. Its owning surface is machine-facing control, reached through HTTP, existing `kelpie mcp`, or a pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native methods are refused according to actual capabilities. The Linux no-CEF fallback supports the protocol with metadata-only core capabilities and legacy extensions. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).
 

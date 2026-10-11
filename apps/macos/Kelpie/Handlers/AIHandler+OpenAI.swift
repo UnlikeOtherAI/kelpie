@@ -26,12 +26,11 @@ extension AIHandler {
         }
 
         let contextMode = body["context"] as? String
-        let explicitText = body["text"] as? String
         let contextText: String?
-        if let explicitText {
-            contextText = explicitText
-        } else {
-            contextText = await preloadedContext(mode: contextMode, tabId: tabId)
+        do {
+            contextText = try await inferenceContext(body, tabId: tabId)
+        } catch {
+            return errorResponse(code: "PAGE_CONTEXT_UNAVAILABLE", message: "Could not read this tab: \(error.localizedDescription)")
         }
         var image: Data?
         if contextMode == "screenshot" {
@@ -53,13 +52,21 @@ extension AIHandler {
     /// keep the existing "tab required" rule so the caller must choose.
     @MainActor
     func pinTab(requested: String?) -> TabPin {
-        if context.activeEngineIsChromium { return .pinned(nil) }
+        if context.activeEngineIsChromium {
+            guard requested == nil || requested == "chromium" else { return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Unknown Chromium tab")) }
+            return .pinned("chromium")
+        }
         do {
             _ = try context.resolveRenderer(windowId: nil, tabId: requested)
         } catch {
             return .rejected(tabErrorResponse(from: error) ?? errorResponse(code: "NO_WEBVIEW", message: "No browser tab is available."))
         }
-        if let requested { return .pinned(requested) }
+        if let requested {
+            guard requested == context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString else {
+                return .rejected(errorResponse(code: "TAB_NOT_ACTIVE", message: "The agent runs in the visible tab"))
+            }
+            return .pinned(requested)
+        }
         return .pinned(context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString)
     }
 }

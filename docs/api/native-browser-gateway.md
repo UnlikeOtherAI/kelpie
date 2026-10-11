@@ -68,9 +68,105 @@ The Linux no-CEF fallback also serves authenticated canonical HTTP and compact M
 
 Windows one-shot inference page context now reads the bounded value-free common snapshot through the same native gateway. Its existing page_text/dom/accessibility labels select that shared representation; they do not inject raw DOM values. Windows still refuses agent execution and has no tool loop. Linux has no embedded inference tool loop to migrate. Native local GGUF also remains text/page-context only. Desktop navigation/title callbacks queue reference invalidation without taking the transaction mutex on the renderer thread; the next gateway step drains it.
 
+## Apple bindings
+
+macOS 0.1.29/build23 and iOS 0.1.14/build14 expose canonical requests at
+`POST /v1/browser-control` and the compact four-tool catalog at `POST /mcp`.
+Both routes pass the existing pairing bearer/header gates. Canonical refusal and
+unknown outcomes retain HTTP200 with the versioned envelope; malformed JSON and
+authentication failures retain HTTP4xx. The generated fixed evaluator has no
+public HTTP route.
+
+The shared Swift coordinator is compiled into both apps. WebKit uses the named
+`KelpieBrowserControl` content world. macOS Chromium uses the same existing
+bounded native CDP transport for main-frame discovery, an isolated world without
+universal access, and fixed evaluation. Page scripts cannot replace this world's
+reference registry. CEF rechecks renderer visibility between asynchronous frame,
+world and fixed-evaluation commands. Canonical clicks activate the observed DOM object and type
+appends with input/change events; rich extensions retain native input semantics.
+Navigation, renderer changes and legacy/rich mutations invalidate references.
+Chromium exposes one `chromium` handle and omits unsupported tab lifecycle methods.
+WebKit preserves explicit native tab/window ownership. iOS dispatch rechecks the
+selected WebView identity after asynchronous inspection; it never acts on a tab
+whose selected renderer changed. External-display WebKit exposes its own `external`
+handle through that display's separately authenticated server.
+
+OpenAI-compatible inference and the Mac local GGUF harness use a fresh policy-bound
+compact catalog per run. The remote lane retains its existing narrower admission;
+the local read-only lane retains console, errors, network, cookies, storage,
+links, DOM, element/form and accessibility reads through shared rich extensions.
+Local screenshot discovery requires the loaded model's vision capability; one
+image reaches inference separately from the bounded text, without base64 text.
+Only previously admitted product features appear;
+`allowActions:false` removes common and extension mutations. Both Apple agents
+stay in the visible pinned tab and refuse model-selected tab/window changes or
+later UI tab changes. iOS local GGUF inference remains a single-shot lane and uses
+the bounded common snapshot for optional page context. Ambiguous mutations stop the
+AI turn instead of feeding an error into another action attempt. A renderer deadline returns uncertainty and keeps the lease exclusive until its
+pending callback retires; later explicit requests can reconcile or continue. Late
+callbacks cannot advance the cancelled coordinator or replay the command.
+
+Mac candidate signing uses Xcode's real selected identity for staged CEF bundles
+and preserves helper entitlements; no script introduces ad-hoc signatures. Local
+Apple Development signing demonstrates a development candidate only. The current
+repository's release workflow does not establish Developer ID notarization, and
+iOS simulator artifacts do not establish physical-device signing or an IPA release.
+Binding regressions live in `BrowserControlGatewayTests` (compiled on both Apple
+targets), alongside the model-loop fixtures and shared native CTest coverage.
+`RealWebKitBrowserControlTests` runs the production Swift router, native C ABI,
+private reader/actions and screenshot against a non-persistent, XCTest-owned
+WebView/window on both platforms, without pairing or restoring user data.
+
+Apple `/mcp` accepts an authenticated MCP initialize/list/call handshake. Accepted
+notifications return HTTP 202 with an empty body; canonical operation failures
+remain HTTP 200 envelopes so clients preserve `mayHaveCompleted`. Authenticated
+GET returns 405; unsupported explicit `MCP-Protocol-Version` headers return 400.
+The native transport rejects browser-supplied Origin headers, including `null`,
+after existing bearer admission.
+
+The durable Apple candidate journey is `scripts/native/apple-browser-control-journey.mjs`.
+Launch the exact development candidate on a dedicated port (Mac `--port 18520`),
+then run `node scripts/native/apple-browser-control-journey.mjs http://127.0.0.1:18520 macos`
+or launch the Debug simulator with `--port 18530` and use that port plus `ios`.
+The journey always requests a new disposable one-session pairing; approve its
+visible native request. The fixture uses a standard MCP SDK client and exercises private-world
+spoof resistance, editable-value omission, atomic observed actions, append, stale
+DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairing
+tokens stay in process memory; the fixture always creates its own grant and
+asserts successful revocation and refusal of the old bearer. Fixture tabs close afterward.
+
+Long-running rich inference/recording extensions use a dedicated coordinator,
+selected by the authoritative extension descriptor, so the persistent direct
+coordinator remains available for other explicit requests. Inference delegates
+admission to its inner browser requests;
+it does not hold the browser lease across model inference. Its existing model
+and run deadlines remain authoritative, avoiding both self-blocked tool loops
+and a detached outer timeout while an AI turn continues to act.
+
+Apple WebKit retains the named private content world for the binding lifetime so
+observed DOM objects survive between snapshot and action. The iOS callback bridge
+awaits the actual WebKit result. Completed reads are discarded when their renderer
+or an agent's pinned visible tab changes during dispatch; dispatched mutations
+retain uncertainty. Isolated real-WebKit fixtures exercise this boundary on macOS
+and the iOS simulator, including captured-node activation, append, replacement
+refusal and single-image screenshot output.
 Run `node tests/native/run-control-acceptance.mjs <absolute-native-executable>`
 on the target host for the real MCP SDK handshake and canonical browser journey,
 including uncertain renderer timeout, BUSY refusal, late completion and recovery.
 On Windows the SDK journey also checks nested common inference page context and
 cancellation through an owned local mock endpoint. Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
 DOM refusal. Each run owns its temporary profile, token and exact process.
+
+Common Apple WK/CDP operations retain the pending lease until their actual result
+or confirmed renderer close. Legacy inner timeout and CDP agent-detach callbacks
+do not retire a common gesture. A real WebKit cancellation fixture holds a 9.5s
+page handler past the former 8s inner deadline; CDP callback fixtures cover the
+former 5s deadline, detach, late result and confirmed close separately.
+
+Only POST `/v1/pair` may enter pairing without a bearer. DELETE requires the
+existing bearer, revokes that client, and immediately rejects its old token on
+both Apple transports; the candidate journey uses this authenticated cleanup.
+
+## Per-tab conversation grounding
+
+The tab chat integration keeps caller history in full and captures one owned renderer for model grounding. Android and Apple preload paths invoke a read-only shared `tab.snapshot` transaction, bounded to 12,000 characters and 200 elements, through the existing renderer lease. Background WebKit/WebView observations do not switch the visible tab. Renderer identity and ownership are checked before and after evaluation; inactive Chromium targets are refused. Rich HTTP extraction remains an explicit extension/API, rather than a second default model observation path. Windows checks the captured tab generation before and after the common snapshot and adds evidence to the current user turn while retaining earlier conversation turns.

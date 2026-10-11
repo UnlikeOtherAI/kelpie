@@ -8,6 +8,8 @@ Kelpie is an LLM-first browser for iOS and Android that enables language models 
 
 Shared browser control and its separate headless conformance follow [docs/api/browser-control.md](docs/api/browser-control.md).
 
+Android JNI/HTTP/MCP and inference follow [docs/api/native-browser-gateway-android.md](docs/api/native-browser-gateway-android.md); builds need Node 20+ and pnpm alongside Java/SDK.
+
 npm package metadata and provenance follow AGENTS.md → Versioning.
 
 ## Claude-Specific Notes

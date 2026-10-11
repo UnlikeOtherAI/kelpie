@@ -30,3 +30,9 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   add_desktop_engine_test(test_desktop_network_events test_desktop_network_events.cpp)
 endif()
 
+
+add_executable(test_tab_chat_session test_tab_chat_session.cpp)
+kelpie_enable_test_assertions(test_tab_chat_session)
+target_include_directories(test_tab_chat_session PRIVATE ../include)
+target_link_libraries(test_tab_chat_session PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+add_test(NAME test_tab_chat_session COMMAND test_tab_chat_session)

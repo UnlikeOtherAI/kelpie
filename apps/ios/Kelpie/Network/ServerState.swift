@@ -26,7 +26,17 @@ final class ServerState: ObservableObject {
     private var preScriptOrientationLock: UIInterfaceOrientationMask?
 
     init(port: UInt16 = 8420) {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        let portIndex = arguments.firstIndex(of: "--port")
+        let override = portIndex.flatMap { index -> UInt16? in
+            guard arguments.indices.contains(index + 1), let value = UInt16(arguments[index + 1]), value > 0 else { return nil }
+            return value
+        }
+        self.deviceInfo = DeviceInfo.current(port: Int(override ?? port))
+        #else
         self.deviceInfo = DeviceInfo.current(port: Int(port))
+        #endif
         self.ipAddress = Self.getLocalIPAddress()
         let store = PairingStore()
         self.pairingStore = store

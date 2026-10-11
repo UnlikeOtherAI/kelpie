@@ -107,6 +107,23 @@ class HTTPServer(
                 install(ContentNegotiation) { json(json) }
 
                 routing {
+                    post("/mcp") {
+                        val parsed = parsedRequest(call)
+                        when (val decision = middleware.evaluate(parsed)) {
+                            is AuthDecision.Reject -> respondReject(call, decision)
+                            AuthDecision.Unauthenticated -> respondReject(call, AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required"))
+                            is AuthDecision.Authenticated -> handleAuthenticatedPost(call, "mcp")
+                        }
+                    }
+                    get("/mcp") {
+                        when (val decision = middleware.evaluate(parsedRequest(call))) {
+                            is AuthDecision.Reject -> respondReject(call, decision)
+                            else -> {
+                                call.response.header("Allow", "POST")
+                                call.respondText("", status = HttpStatusCode.MethodNotAllowed)
+                            }
+                        }
+                    }
                     // --- Health (unauth) ---
                     get("/health") {
                         call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
@@ -236,7 +253,10 @@ class HTTPServer(
         }
     }
 
-    private suspend fun handleAuthenticatedPost(call: ApplicationCall) {
+    private suspend fun handleAuthenticatedPost(
+        call: ApplicationCall,
+        overrideMethod: String? = null,
+    ) {
         // Validate Content-Length BEFORE reading the body to ensure a single
         // malicious multi-GB POST never gets buffered. Missing Content-Length
         // on POST is rejected.
@@ -270,7 +290,7 @@ class HTTPServer(
             return
         }
 
-        val method = call.parameters["method"] ?: ""
+        val method = overrideMethod ?: call.parameters["method"] ?: ""
         val bodyText = call.receiveText()
         // Defense-in-depth: if the client under-declared Content-Length and
         // streamed more bytes, reject.
@@ -294,6 +314,10 @@ class HTTPServer(
             return
         }
         val (status, result) = router.handle(method, body)
+        if (method == "mcp" && status == 200 && result.isEmpty()) {
+            call.respondText("", status = HttpStatusCode.Accepted)
+            return
+        }
         call.respondText(
             text = mapToJsonString(result),
             contentType = ContentType.Application.Json,

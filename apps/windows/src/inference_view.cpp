@@ -20,6 +20,9 @@ void Set(HWND window, int id, const std::string& value) {
 }
 struct State {
   InferenceService& service;
+  std::shared_ptr<TabChatSession> session;
+  TabLease tab;
+  std::optional<std::uint64_t> turn;
   HWND window = nullptr;
   json endpoints = json::array();
   std::string id;
@@ -28,6 +31,25 @@ struct State {
   bool closing = false;
   bool done = false;
 
+  std::string Transcript() const {
+    std::string text;
+    for (const auto& message : session->Messages()) {
+      text += message.at("role") == "user" ? "You: " : "Model: ";
+      text += message.at("content").get<std::string>() + "\r\n\r\n";
+    }
+    return text;
+  }
+  void SendChat() {
+    const auto captured = session->Begin(Text(window, Prompt));
+    if (!captured) return;
+    turn = captured->token;
+    json body = {{"messages", captured->messages}, {"agent", false},
+                 {"tabId", tab.id}, {"generation", tab.generation}};
+    if (SendMessageW(GetDlgItem(window, Page), BM_GETCHECK, 0, 0) == BST_CHECKED)
+      body["context"] = "page_text";
+    Start("ai-infer", body);
+    Set(window, Prompt, "");
+  }
   void Reload() {
     auto result = service.Execute("ai-endpoints");
     endpoints = result.value("endpoints", json::array());
@@ -52,13 +74,20 @@ struct State {
     operation = method;
     for (int control : {List, Name, URL, Key, Model, Save, Models, Test, Use, Remove, New, Browse, Load, Unload, Ask})
       EnableWindow(GetDlgItem(window, control), FALSE);
-    Set(window, Result, "Working…");
+    Set(window, Result, operation == "ai-infer" ? Transcript() + "Working…" : "Working…");
     pending = std::async(std::launch::async, [this, method, body] { return service.Execute(method, body); });
     SetTimer(window, 1, 100, nullptr);
   }
   void Complete() {
     if (!pending.valid() || pending.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
     auto result = pending.get(); KillTimer(window, 1);
+    if (turn) {
+      const auto answer = result.value("success", false) && result.value("response", json()).is_string()
+          ? std::optional(result.at("response").get<std::string>()) : std::nullopt;
+      const bool retained = session->Complete(*turn, answer);
+      turn.reset();
+      if (!retained) result = {{"success", false}, {"error", {{"message", "This tab was closed"}}}};
+    }
     if (closing) { DestroyWindow(window); done = true; return; }
     for (int control : {List, Name, URL, Key, Model, Save, Models, Test, Use, Remove, New, Browse, Load, Unload, Ask})
       EnableWindow(GetDlgItem(window, control), TRUE);
@@ -81,7 +110,7 @@ struct State {
     else if (operation == "ai-endpoint-save") { message = "Endpoint saved"; Set(window, Key, ""); }
     else if (operation == "ai-endpoint-remove") { message = "Endpoint removed"; id.clear(); }
     else message = "Model list refreshed";
-    Set(window, Result, message); Reload();
+    Set(window, Result, operation == "ai-infer" ? Transcript() + (result.value("success", false) ? "" : message) : message); Reload();
   }
 };
 HWND Add(HWND parent, int id, const wchar_t* kind, const wchar_t* text, int x, int y, int w, int h, DWORD style = 0) {
@@ -125,10 +154,15 @@ LRESULT CALLBACK Procedure(HWND window, UINT message, WPARAM wp, LPARAM lp) {
     state->window = window; SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
   }
   if (!state) return DefWindowProcW(window, message, wp, lp);
-  if (message == WM_CREATE) { CreateControls(window); state->Reload(); return 0; }
+  if (message == WM_CREATE) {
+    CreateControls(window); state->Reload();
+    SendMessageW(GetDlgItem(window, Page), BM_SETCHECK, BST_CHECKED, 0);
+    if (!state->Transcript().empty()) Set(window, Result, state->Transcript());
+    return 0;
+  }
   if (message == WM_TIMER) { state->Complete(); return 0; }
   if (message == WM_CLOSE) {
-    if (state->pending.valid()) { state->closing = true; state->service.Cancel(); }
+    if (state->pending.valid()) { state->closing = true; ShowWindow(window, SW_HIDE); }
     else { DestroyWindow(window); state->done = true; }
     return 0;
   }
@@ -159,20 +193,21 @@ LRESULT CALLBACK Procedure(HWND window, UINT message, WPARAM wp, LPARAM lp) {
     if (id == Use) state->Start("ai-load", {{"backend", "openai"}, {"endpoint", state->id}, {"model", Text(window, Model)}});
     if (id == Remove) state->Start("ai-endpoint-remove", {{"id", state->id}});
     if (id == Ask) {
-      json body = {{"prompt", Text(window, Prompt)}, {"agent", false}};
-      if (SendMessageW(GetDlgItem(window, Page), BM_GETCHECK, 0, 0) == BST_CHECKED) body["context"] = "page_text";
-      state->Start("ai-infer", body);
+      state->SendChat();
     }
     return 0;
   }
   return DefWindowProcW(window, message, wp, lp);
 }
 }
-void ShowInferenceSettings(HINSTANCE instance, HWND owner, InferenceService& service) {
+void ShowInferenceSettings(HINSTANCE instance, HWND owner, InferenceService& service, DesktopEngine& engine) {
   WNDCLASSW klass{}; klass.lpfnWndProc = Procedure; klass.hInstance = instance;
   klass.lpszClassName = L"KelpieInference"; klass.hbrBackground = GetSysColorBrush(COLOR_BTNFACE);
   klass.hCursor = LoadCursorW(nullptr, IDC_ARROW); RegisterClassW(&klass);
-  State state{service};
+  std::shared_ptr<TabChatSession> session;
+  const auto captured = engine.GetChatSession(std::nullopt, &session, std::chrono::seconds(2));
+  if (!captured.ok || !captured.tab || !session) return;
+  State state{service, session, {captured.tab->id, captured.tab->generation}};
   auto window = CreateWindowExW(WS_EX_DLGMODALFRAME, klass.lpszClassName, L"Local AI", WS_CAPTION | WS_SYSMENU,
       CW_USEDEFAULT, CW_USEDEFAULT, 706, 690, owner, nullptr, instance, &state);
   if (!window) return;

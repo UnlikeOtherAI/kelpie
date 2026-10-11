@@ -8,4 +8,7 @@
 #import "kelpie/local_inference_c.h"
 #import <os/proc.h>
 
+#include "kelpie/browser_gateway_c_api.h"
+#include "kelpie/mcp_c_api.h"
+
 #endif

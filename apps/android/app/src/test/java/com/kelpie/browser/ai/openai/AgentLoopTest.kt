@@ -14,14 +14,24 @@ class AgentLoopTest {
     private class RecordingDispatcher(
         val result: (String) -> Map<String, Any?> = { mapOf("success" to true, "url" to "https://example.com") },
     ) : ToolDispatcher {
+        var allowActions = false
+
+        // Legacy semantic fixtures exercise the loop independently of the production native catalog.
+        override val tools get() =
+            JsonArray(
+                AgentBrowserPolicy.methods(allowActions).map { method ->
+                    OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to method.replace('-', '_'))))
+                },
+            )
         val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
 
         override suspend fun dispatch(
             method: String,
             args: Map<String, Any?>,
         ): Map<String, Any?> {
-            calls += method to args
-            return result(method)
+            val native = method.replace('_', '-')
+            calls += native to args
+            return result(native)
         }
     }
 
@@ -54,11 +64,56 @@ class AgentLoopTest {
         allowActions: Boolean = false,
         maxSteps: Int = AgentLoop.DEFAULT_MAX_STEPS,
         progress: AgentProgress = AgentProgress(),
-    ) = AgentLoop(chat, dispatcher, allowActions, maxSteps, progress, actionSettleMs = 0)
+    ): AgentLoop {
+        if (dispatcher is RecordingDispatcher) dispatcher.allowActions = allowActions
+        return AgentLoop(chat, dispatcher, allowActions, maxSteps, progress, actionSettleMs = 0)
+    }
 
     private fun toolNames(tools: JsonArray?): List<String?> = tools.orEmpty().map { OpenAIJson.string(((it as JsonObject)["function"] as JsonObject)["name"]) }
 
     private fun toolResult(message: JsonObject): JsonObject = OpenAIJson.parseObjectOrNull(OpenAIJson.string(message["content"])!!)!!
+
+    @Test
+    fun commonGatewayCatalogDispatchesNestedRequestAndKeepsUncertainFailure() {
+        val names = listOf("kelpie_browser_control", "kelpie_extensions", "kelpie_extension_tools", "kelpie_extension")
+        val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
+        val dispatcher =
+            object : ToolDispatcher {
+                override val tools = JsonArray(names.map { name -> OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to name))) })
+
+                override suspend fun dispatch(
+                    method: String,
+                    args: Map<String, Any?>,
+                ): Map<String, Any?> {
+                    calls += method to args
+                    return mapOf("version" to 1, "ok" to false, "error" to mapOf("code" to "CANCELLED", "mayHaveCompleted" to true))
+                }
+            }
+        val chat =
+            ScriptedChat(
+                toolTurn(
+                    AssembledToolCall(
+                        0,
+                        "c1",
+                        "kelpie_browser_control",
+                        """{"request":{"version":1,"method":"tab.click","tabId":"one","params":{"ref":"observed"}}}""",
+                    ),
+                ),
+                answer("Action outcome unknown"),
+            )
+        val outcome = runBlocking { loop(chat, dispatcher, allowActions = true).run("Click it") }
+        assertEquals(listOf(AgentTaskList.TOOL_NAME) + names, toolNames(chat.toolSets.first()))
+        assertEquals(1, calls.size)
+        assertEquals("one", (calls.single().second["request"] as Map<*, *>)["tabId"])
+        assertFalse(outcome.steps.single().ok)
+        assertTrue(
+            outcome.steps
+                .single()
+                .preview
+                .contains("mayHaveCompleted"),
+        )
+        assertTrue(AgentLoop.systemPrompt(true).contains("never repeat an uncertain action"))
+    }
 
     @Test
     fun dispatchesToolsAndReturnsFinalAnswer() {
@@ -102,23 +157,12 @@ class AgentLoopTest {
     }
 
     @Test
-    fun dropsTabIdWindowIdAndUnknownArguments() {
-        val args = """{"selector":"#q","tabId":"evil","windowId":"w","script":"alert(1)","timeout":"99999"}"""
-        val chat = ScriptedChat(toolTurn(AssembledToolCall(0, "c1", "wait_for_element", args)), answer("done"))
-        val dispatcher = RecordingDispatcher()
-        runBlocking { loop(chat, dispatcher).run("x") }
-        val sent = dispatcher.calls.single().second
-        assertEquals(setOf("selector", "timeout"), sent.keys)
-        assertEquals(AgentTools.MAX_WAIT_TIMEOUT_MS, sent["timeout"])
-    }
-
-    @Test
     fun actionToolsOnlyOfferedWhenAllowed() {
-        val readOnly = toolNames(JsonArray(listOf(AgentTaskList.definition()) + AgentTools.definitions(false)))
+        val readOnly = listOf(AgentTaskList.TOOL_NAME) + AgentBrowserPolicy.methods(false).map { it.replace('-', '_') }
         assertFalse("click" in readOnly)
         assertTrue("get_page_text" in readOnly)
         assertTrue(AgentTaskList.TOOL_NAME in readOnly)
-        val withActions = toolNames(AgentTools.definitions(true))
+        val withActions = AgentBrowserPolicy.methods(true).map { it.replace('-', '_') }
         assertTrue(listOf("click", "fill", "select_option", "check", "uncheck").all { it in withActions })
         listOf("navigate", "evaluate", "screenshot", "get_cookies", "new_tab").forEach { assertFalse(it in withActions) }
 
@@ -131,7 +175,7 @@ class AgentLoopTest {
             outcome.steps
                 .single()
                 .preview
-                .contains("Page actions are not enabled"),
+                .contains("Unknown tool"),
         )
     }
 
@@ -140,7 +184,7 @@ class AgentLoopTest {
         val chat =
             ScriptedChat(
                 toolTurn(AssembledToolCall(0, null, "find_element", "{\"text\": ")),
-                toolTurn(AssembledToolCall(0, null, "find_element", "{}")),
+                toolTurn(AssembledToolCall(0, null, "unavailable_tool", "{}")),
                 answer("gave up"),
             )
         val dispatcher = RecordingDispatcher()
@@ -148,7 +192,7 @@ class AgentLoopTest {
         assertEquals("gave up", outcome.text)
         assertTrue(dispatcher.calls.isEmpty())
         assertTrue(outcome.steps[0].preview.contains("not valid JSON"))
-        assertTrue(outcome.steps[1].preview.contains("text is required"))
+        assertTrue(outcome.steps[1].preview.contains("Unknown tool"))
         assertEquals("call_1", OpenAIJson.string(chat.transcripts[1].last()["tool_call_id"]))
     }
 
