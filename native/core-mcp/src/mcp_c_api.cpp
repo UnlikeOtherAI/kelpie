@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "kelpie/mcp_registry.h"
+#include "kelpie/native_extension_schema.h"
 
 struct KelpieMcpRegistry {
   kelpie::McpRegistry registry;
@@ -87,6 +88,9 @@ char* kelpie_mcp_registry_tools_for_platform(KelpieMcpRegistryRef registry, int3
       payload.push_back({
           {"name", tool.name},
           {"http_endpoint", tool.http_endpoint},
+          {"method", tool.http_endpoint},
+          {"inputSchema", kelpie::NativeExtensionInputSchema(tool.http_endpoint)},
+          {"mutates", kelpie::NativeExtensionMutates(tool.http_endpoint)},
           {"description", tool.description},
           {"availability", kelpie::mcp_c_api_internal::AvailabilityToJson(tool.availability)},
       });

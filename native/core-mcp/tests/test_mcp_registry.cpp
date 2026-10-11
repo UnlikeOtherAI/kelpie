@@ -118,6 +118,9 @@ void TestCApi() {
   const json ios_tools = json::parse(ios_tools_json);
   kelpie_mcp_free_string(ios_tools_json);
   assert(ios_tools.size() == kelpie::McpRegistry().tools_for_platform(kelpie::Platform::kIos).size());
+  assert(ios_tools[0].contains("inputSchema"));
+  assert(ios_tools[0].contains("mutates"));
+  assert(ios_tools[0]["method"] == ios_tools[0]["http_endpoint"]);
   assert(ios_tools[0].contains("availability"));
 
   assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_IOS,
