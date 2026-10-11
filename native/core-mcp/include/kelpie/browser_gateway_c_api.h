@@ -9,6 +9,8 @@ typedef struct KelpieBrowserGateway* KelpieBrowserGatewayRef;
 // No transport, authentication, endpoint attachment or implicit pairing occurs here.
 KelpieBrowserGatewayRef kelpie_browser_gateway_create(const char* config_json);
 void kelpie_browser_gateway_destroy(KelpieBrowserGatewayRef gateway);
+// Pure fixed reader: returns {expression:string}, no transaction or reference registry.
+char* kelpie_browser_selector_snapshot_expression(const char* options_json);
 // Returned JSON: {kind:'authorize',request,mutates}, {kind:'dispatch',method,params,mutates},
 // or {kind:'complete',response}. Authorization completion is {success:true|false}.
 // Dispatch native result: existing {success:true,...} shape; fixed reader returns {success:true,result}.

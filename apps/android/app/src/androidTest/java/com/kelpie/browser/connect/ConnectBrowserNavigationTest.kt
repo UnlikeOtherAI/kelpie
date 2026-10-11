@@ -32,7 +32,7 @@ class ConnectBrowserNavigationTest {
             fixture { browser, context, server, _ ->
                 val tab = context.tabStore!!.activeTab!!
                 tab.webView.layout(0, 0, 800, 600)
-                tab.webView.loadDataWithBaseURL(url(server, "/controls"), "<title>Controls</title><button class='same'>Go</button><button class='same'>Go</button><input>", "text/html", "utf-8", null)
+                tab.webView.loadDataWithBaseURL(url(server, "/controls"), "<title>Controls</title><button id='same'>Go</button><button id='same'>Go</button><input value='private-secret'><textarea>private-secret</textarea><div contenteditable>private-secret</div>", "text/html", "utf-8", null)
                 withTimeout(5000) {
                     do {
                         delay(30)
@@ -42,8 +42,9 @@ class ConnectBrowserNavigationTest {
                 val page = result["page"] as Map<*, *>
                 val elements = page["elements"] as List<*>
                 val selectors = elements.map { (it as Map<*, *>)["selector"] as String }
-                assertEquals(3, selectors.size)
-                assertEquals(3, selectors.toSet().size)
+                assertEquals(4, selectors.size)
+                assertEquals(4, selectors.toSet().size)
+                assertTrue(!(page["text"] as String).contains("private-secret"))
                 for (selector in selectors) {
                     assertTrue(selector.length <= 2000)
                     val found = context.evaluateJSReturningJSON("({count:document.querySelectorAll(${org.json.JSONObject.quote(selector)}).length})")

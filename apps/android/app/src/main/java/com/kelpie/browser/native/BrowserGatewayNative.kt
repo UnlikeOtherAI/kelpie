@@ -29,6 +29,8 @@ object BrowserGatewayNative : BrowserGatewayAbi {
     )
 
     external fun extensions(): String
+
+    external fun selectorSnapshotExpression(options: String): String
 }
 
 interface BrowserGatewayAbi {
