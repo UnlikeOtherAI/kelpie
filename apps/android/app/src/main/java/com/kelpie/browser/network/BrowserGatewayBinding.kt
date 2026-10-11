@@ -141,7 +141,8 @@ class BrowserGatewayBinding(
         pinned: String?,
     ): Map<String, Any?> =
         withContext(Dispatchers.Main.immediate) {
-            val boundary = BrowserGatewayDispatch({ ctx.tabStore?.activeTabId?.value ?: "0" }, { ctx.webView })
+            val store = ctx.tabStore
+            val boundary = BrowserGatewayDispatch({ store?.activeTabId?.value ?: "0" }, { if (store == null) ctx.webView else store.activeTab?.webView })
             boundary.execute(method, params, pinned) { view ->
                 val result = if (view == null) invoke(method, params) else ctx.withBrowserTarget(view) { invoke(method, params) }
                 if (pinned != null && method == "get-tabs") {

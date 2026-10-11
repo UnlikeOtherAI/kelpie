@@ -208,7 +208,7 @@ def main():
     print('PASS MCP transport notification/version/Origin/GET boundaries', flush=True)
     FixtureHandler.fixture_query = '?instance=' + uuid.uuid4().hex
     fixture_url = f'http://10.0.2.2:{args.fixture_port}/fixture' + FixtureHandler.fixture_query
-    tab = core('tabs.new', params={'url': fixture_url})['id']
+    tab = core('tabs.new')['id']
     core('tab.goto', tab, {'url': fixture_url})
     subprocess.run([os.environ.get('NODE', 'node'), str(Path(__file__).with_name('android-browser-gateway-mcp.mjs'))],
         input=json.dumps({'base': args.base, 'token': token, 'tab': tab}).encode(), check=True)

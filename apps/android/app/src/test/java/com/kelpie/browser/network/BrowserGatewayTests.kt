@@ -1,6 +1,7 @@
 package com.kelpie.browser.network
 
 import com.kelpie.browser.ai.openai.OpenAIJson
+import com.kelpie.browser.handlers.NavigationCompletion
 import com.kelpie.browser.nativecore.BrowserGatewayAbi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -18,6 +19,14 @@ import org.junit.rules.TemporaryFolder
 
 class BrowserGatewayTests {
     @get:Rule val folder = TemporaryFolder()
+
+    @Test fun navigationRequiresReplacementDocumentAndPreservesRedirects() {
+        val state = mapOf("url" to "https://fixture.example/", "readyState" to "complete", "sameDocument" to true)
+        assertFalse(NavigationCompletion.hasLoaded(state))
+        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("url" to "https://redirect.example/")))
+        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false)))
+        assertFalse(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("readyState" to "loading")))
+    }
 
     private class Abi : BrowserGatewayAbi {
         var phase = 0
