@@ -37,13 +37,15 @@ export function collectBrowserSnapshot(options: {
       const roles: Record<string, string> = { button: "button", select: "combobox", textarea: "textbox", nav: "navigation", main: "main", img: "img" };
       const type = el.getAttribute("type") ?? "text";
       const inputRole = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : ["submit", "reset", "button", "image"].includes(type) ? "button" : type === "hidden" ? undefined : "textbox";
-      const role = el.getAttribute("role") ?? (tag === "input" ? inputRole : tag === "a" && el.hasAttribute("href") ? "link" : /^h[1-6]$/.test(tag) ? "heading" : roles[tag]);
       const labelled = (el.getAttribute("aria-labelledby")?.split(/\s+/) ?? []).map((id) => {
         const label = root.getElementById(id); return label ? content(label) : "";
       }).join(" ").trim();
       const labels = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
         ? Array.from(el.labels ?? []).map((label) => content(label)).join(" ") : "";
-      const name = clean([labelled, el.getAttribute("aria-label"), labels, el.getAttribute("alt"), el.getAttribute("placeholder"), content(el)].find((value) => value?.trim()) ?? "");
+      const svgTitle = tag === "svg" ? el.querySelector(":scope > title")?.textContent : "";
+      const namedSvg = tag === "svg" && [labelled, el.getAttribute("aria-label"), svgTitle].some((value) => value?.trim());
+      const role = el.getAttribute("role") ?? (tag === "input" ? inputRole : namedSvg ? "img" : tag === "a" && el.hasAttribute("href") ? "link" : /^h[1-6]$/.test(tag) ? "heading" : roles[tag]);
+      const name = clean([labelled, el.getAttribute("aria-label"), labels, el.getAttribute("alt"), el.getAttribute("placeholder"), svgTitle, content(el)].find((value) => value?.trim()) ?? "");
       if (role || (["p", "li", "td", "th"].includes(tag) && name)) {
         const ref = `${options.prefix}${String(elements.length + 1)}`;
         const line = `\n[${ref}] ${role ?? tag} ${JSON.stringify(name)}`;

@@ -161,4 +161,44 @@ BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method,
   return RunDevTools(impl_, lease, std::move(method), params, output, timeout);
 }
 
+BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output, Timeout timeout) {
+  if (!output) return BrowserControlResult::Failure("INTERNAL", "Result is required");
+  const auto started = std::chrono::steady_clock::now();
+  // Purpose-specific internal reads alone opt out of the action fence. Public
+  // DevTools, Evaluate and the canonical fixed reader always retain it.
+  const auto read = [&](const std::string& method, const Json& params, Json* value) {
+    const auto remaining = RemainingTimeout(started, timeout);
+    if (remaining <= Timeout::zero()) return DeadlineExceeded();
+    return RunDevTools(impl_, lease, method, params, value, remaining, {}, false);
+  };
+  Json before, viewport, captured, after, after_viewport;
+  auto result = read("Page.getFrameTree", Json::object(), &before);
+  if (!result.ok) return result;
+  result = read("Page.getLayoutMetrics", Json::object(), &viewport);
+  if (!result.ok) return result;
+  try {
+    const auto& layout = viewport.at("layoutViewport");
+    const double width = layout.at("clientWidth"), height = layout.at("clientHeight");
+    if (width <= 0 || width > 32768 || height <= 0)
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance viewport is unavailable");
+    // A clip can resize Alloy's live view: capture without clipping/emulation.
+    result = read("Page.captureScreenshot", {{"format", "png"}, {"fromSurface", true},
+                                           {"captureBeyondViewport", false}}, &captured);
+    if (!result.ok) return result;
+    result = read("Page.getFrameTree", Json::object(), &after);
+    if (!result.ok) return result;
+    result = read("Page.getLayoutMetrics", Json::object(), &after_viewport);
+    if (!result.ok) return result;
+    const auto& frame = before.at("frameTree").at("frame");
+    const auto& current = after.at("frameTree").at("frame");
+    if (frame.at("id") != current.at("id") || frame.at("loaderId") != current.at("loaderId") ||
+        frame.at("url") != current.at("url") || layout != after_viewport.at("layoutViewport"))
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance document changed");
+    *output = {{"url", frame.at("url")}, {"data", captured.at("data").get<std::string>()}};
+    return BrowserControlResult::Success();
+  } catch (...) {
+    return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance observation is unavailable");
+  }
+}
+
 }  // namespace kelpie

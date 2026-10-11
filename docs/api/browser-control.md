@@ -101,3 +101,13 @@ unknown; cancellation and tab/browser close remain reachable. A callback retires
 ownership automatically, without requiring a restart. MCP inference/recording
 uses an admitted outer request separate from the persistent browser gateway, so
 its existing nested browser observations can acquire the browser lease.
+
+Windows chrome appearance sampling uses a separate fixed internal CDP observation
+(frame/layout metadata and rendered pixels), without page JavaScript or ref writes.
+Its late callback remains owned but does not fence public browser commands. This
+is unavailable through model inputs: public evaluation, screenshot and canonical
+snapshot requests keep the completion fence described above.
+
+Value-free snapshots include visible named SVG graphics as `img` elements, using
+ARIA names before a direct SVG `title`; unnamed and hidden graphics are omitted.
+This preserves accessible logo evidence for existing page-grounded conversations.

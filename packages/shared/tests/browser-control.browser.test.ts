@@ -40,6 +40,10 @@ const fixture = `<title>Control fixture</title><h1>Observe</h1>
 <button>Duplicate</button><button>Duplicate</button>
 <label>Agree<input id="agree" type="checkbox"></label><select id="choice"><option value="a">Alpha</option><option value="b">Beta</option></select>
 <p id="count">0</p><div style="visibility:hidden"><p>HIDDEN_SECRET</p></div>
+<svg width="24" height="24" aria-label="Accessible logo"><title>Ignored SVG title</title><rect width="24" height="24"/></svg>
+<svg width="24" height="24"><title>Accessible SVG title</title><rect width="24" height="24"/></svg>
+<svg width="24" height="24"><rect width="24" height="24"/></svg>
+<svg hidden width="24" height="24"><title>HIDDEN_SECRET</title></svg>
 <script>document.querySelector('#save').onclick=()=>document.querySelector('#count').textContent=String(Number(document.querySelector('#count').textContent)+1);</script>`;
 
 function nativeBackend(pages: Map<string, Page>): BrowserControlBackend {
@@ -90,6 +94,12 @@ for (const adapter of ["playwright", "native-transport"] as const) {
       const short = await tab.snapshot({ maxElements: 2 });
       expect(short.elements).toHaveLength(2);
       expect(short.truncated).toBe(true);
+    });
+    it("includes visible named SVGs with accessible-name precedence", async () => {
+      const snapshot = await tab.snapshot();
+      expect(snapshot.elements?.filter((element) => element.role === "img").map((element) => element.name))
+        .toEqual(["Accessible logo", "Accessible SVG title"]);
+      expect(snapshot.text).not.toMatch(/Ignored SVG title|HIDDEN_SECRET/);
     });
     it("rejects cross-tab refs and appends to the observed editable element", async () => {
       const snapshot = await tab.snapshot();

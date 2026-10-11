@@ -200,6 +200,12 @@ class DesktopBrowserControl {
                                         Json* result,
                                         Timeout timeout) = 0;
 
+  // Internal chrome sampling only. The fixed CDP observation does not execute
+  // page JavaScript or update browser-control refs; callers cannot supply code.
+  virtual BrowserControlResult ReadAppearance(TabLease, Json*, Timeout) {
+    return BrowserControlResult::Failure("UNSUPPORTED", "Appearance sampling requires Chromium");
+  }
+
  protected:
   static BrowserControlResult PartitionsUnsupported() {
     // `activeEngine` is omitted rather than nulled when there is no engine to

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { bearerHeaders, control, rawRequest, resultValue } from "./http.mjs";
+import { bearerHeaders, control, rawRequest, resultValue, waitFor } from "./http.mjs";
 
 /** Shared HTTP fixture also runs against Linux CEF; only private renderer/native routes can satisfy it. */
 export async function runCanonicalAcceptance(readiness, fixtureUrl) {
@@ -15,6 +15,7 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   assert.equal(created.ok, true);
   const tab = created.value.id;
   const evaluate = async (expression) => resultValue(await control(readiness, "evaluate", { tabId: tab, expression }));
+  await waitFor(() => evaluate('document.querySelector("#text-input") !== null'), "new native fixture document");
   await evaluate('document.querySelector("#text-input").value="INITIAL_SECRET"; document.body.insertAdjacentHTML("beforeend", \'<input type="password" value="PASSWORD_SECRET"><textarea>TEXTAREA_SECRET</textarea><div contenteditable="true"><p>EDITOR_SECRET</p></div>\'); true');
   const snapshot = await call("tab.snapshot", { maxChars: 12000 }, tab);
   assert.equal(snapshot.ok, true);
@@ -26,8 +27,8 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   assert.ok(input);
   const typed = await call("tab.type", { ref: input.ref, text: "!" }, tab);
   assert.equal(typed.ok, true);
-  assert.equal(await evaluate('document.querySelector("#text-input").value'), "INITIAL_SECRET!");
   assert.equal((await call("tab.type", { ref: input.ref, text: "DUPLICATE" }, tab)).error.code, "STALE_REFERENCE");
+  assert.equal(await evaluate('document.querySelector("#text-input").value'), "INITIAL_SECRET!");
   await evaluate('setTimeout(()=>{const node=document.querySelector("#trusted-button");node.replaceWith(node.cloneNode(true));},1000);true');
   const fresh = await call("tab.snapshot", {}, tab);
   const button = fresh.value.elements.find(el => el.name === "Trusted action");
@@ -39,7 +40,7 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   const delayed = await rawRequest({ port: readiness.port, path: "/v1/evaluate", headers: bearerHeaders(readiness.token),
     body: JSON.stringify({ tabId: tab, timeout: 100, expression: 'new Promise(resolve=>setTimeout(()=>{window.__delayedCount=(window.__delayedCount||0)+1;resolve(window.__delayedCount);},1500))' }) });
   assert.equal(delayed.json.success, false);
-  assert.equal(delayed.json.error.details.operationMayHaveCompleted, true);
+  assert.equal(delayed.json.error.diagnostics.operationMayHaveCompleted, true);
   assert.equal((await call("tab.snapshot", {}, tab)).error.code, "BUSY");
   await new Promise(resolve => setTimeout(resolve, 1600));
   assert.equal((await call("tab.snapshot", {}, tab)).ok, true);

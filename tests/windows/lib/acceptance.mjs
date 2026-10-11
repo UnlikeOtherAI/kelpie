@@ -432,9 +432,13 @@ export async function runNessieClient(readiness, fixtureUrl, nessieRoot) {
   try {
     const tools = await manager.listTools(id, { timeoutMs: 10_000 });
     assertion(tools.some(tool => tool.name === "kelpie_extension"), "Nessie client did not discover extension caller");
-    const text = await manager.callTool(id, "kelpie_navigate", { url: fixtureUrl }, { timeoutMs: 10_000 });
+    const text = await manager.callTool(id, "kelpie_extension", {
+      name: "kelpie_navigate", arguments: { url: fixtureUrl },
+    }, { timeoutMs: 10_000 });
     assert.notEqual(text.isError, true, "Nessie client navigation must succeed");
-    const image = await manager.callTool(id, "kelpie_screenshot", { format: "png" }, { timeoutMs: 10_000 });
+    const image = await manager.callTool(id, "kelpie_extension", {
+      name: "kelpie_screenshot", arguments: { format: "png" },
+    }, { timeoutMs: 10_000 });
     assert.notEqual(image.isError, true, "Nessie client screenshot must succeed");
     decodePng(Buffer.from(imageFrom(image), "base64"));
   } finally {
@@ -459,9 +463,19 @@ export async function runNessieStdioClient({ cliPath, cliHome, alias, fixtureUrl
   try {
     const tools = await manager.listTools(id, { timeoutMs: 10_000 });
     assertion(tools.some(tool => tool.name === "kelpie_extension"), "Nessie stdio client did not discover extension caller");
-    const navigation = await manager.callTool(id, "kelpie_navigate", { url: fixtureUrl }, { timeoutMs: 10_000 });
+    const tabs = await manager.callTool(id, "kelpie_browser_control", {
+      request: { version: 1, method: "tabs.list" },
+    }, { timeoutMs: 10_000 });
+    assert.equal(tabs.isError, false);
+    const listed = JSON.parse(tabs.content.find(item => item.type === "text").text);
+    const tabId = listed.value[0].id;
+    const navigation = await manager.callTool(id, "kelpie_browser_control", {
+      request: { version: 1, method: "tab.goto", tabId, params: { url: fixtureUrl } },
+    }, { timeoutMs: 10_000 });
     assert.notEqual(navigation.isError, true, "Nessie stdio navigation through the CLI must succeed");
-    const screenshot = await manager.callTool(id, "kelpie_screenshot", { format: "png" }, { timeoutMs: 10_000 });
+    const screenshot = await manager.callTool(id, "kelpie_browser_control", {
+      request: { version: 1, method: "tab.screenshot", tabId },
+    }, { timeoutMs: 10_000 });
     assert.notEqual(screenshot.isError, true, "Nessie stdio screenshot through the CLI must succeed");
     assertion(screenshot.content?.some(item => item.type === "image" && item.mimeType === "image/png"),
       "Nessie stdio screenshot must expose a portable MCP PNG image block");

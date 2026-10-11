@@ -194,6 +194,8 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 Json* result,
                                 Timeout timeout) override;
 
+  BrowserControlResult ReadAppearance(TabLease lease, Json* result, Timeout timeout) override;
+
   class Impl;
 
  private:

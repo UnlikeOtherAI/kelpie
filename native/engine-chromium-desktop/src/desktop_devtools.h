@@ -1,4 +1,5 @@
 #pragma once
+#include "renderer_operation_ownership.h"
 
 #include <chrono>
 #include <atomic>
@@ -64,13 +65,14 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
 
    private:
     friend class DesktopDevToolsSession;
-    explicit Operation(int message_id) : message_id_(message_id) {}
+    Operation(int message_id, std::shared_ptr<std::atomic<std::size_t>> pending, bool fences_actions)
+        : message_id_(message_id), ownership_(std::move(pending), fences_actions) {}
 
     int message_id_;
     std::mutex mutex_;
     std::condition_variable completed_;
     bool done_ = false;
-    bool abandoned_ = false;
+    RendererOperationOwnership ownership_;
     Result result_;
   };
 
@@ -78,7 +80,7 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
   void Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink);
   std::shared_ptr<Operation> Begin(CefRefPtr<CefBrowser> browser,
                                    const std::string& method,
-                                   const Json& params);
+                                   const Json& params, bool fences_actions = true);
   // `interrupted` is polled while the reply is outstanding; when it returns
   // true the caller returns INTERRUPTED; ownership remains until the late result. It runs without any
   // session lock held, so it may hop to the CEF UI thread.

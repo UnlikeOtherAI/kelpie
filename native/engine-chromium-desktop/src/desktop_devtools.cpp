@@ -157,13 +157,13 @@ void DesktopDevToolsSession::Attach(CefRefPtr<CefBrowser> browser, NetworkEventS
 }
 
 std::shared_ptr<DesktopDevToolsSession::Operation> DesktopDevToolsSession::Begin(
-    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params) {
+    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params, bool fences_actions) {
   int message_id = 0;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     message_id = next_message_id_++;
   }
-  auto operation = std::shared_ptr<Operation>(new Operation(message_id));
+  auto operation = std::shared_ptr<Operation>(new Operation(message_id, unknown_operations_, fences_actions));
   if (!browser || method.empty() || !CefCurrentlyOn(TID_UI)) {
     Complete(operation, Failure("INTERNAL", "DevTools methods must begin on the CEF UI thread"));
     return operation;
@@ -226,10 +226,7 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::Wait(const std::shared_pt
   }
   // Keep the real operation owned after returning uncertainty. A late result or
   // confirmed tab teardown retires it; a timeout cannot admit a second action.
-  if (!operation->abandoned_) {
-    operation->abandoned_ = true;
-    unknown_operations_->fetch_add(1);
-  }
+  operation->ownership_.MarkUncertain();
   return stopped ? Failure("INTERRUPTED", "DevTools operation was interrupted", true)
                  : Failure("TIMEOUT", "DevTools operation timed out", true);
 }
@@ -416,7 +413,7 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::ParseProtocolResult(bool 
 void DesktopDevToolsSession::Complete(const std::shared_ptr<Operation>& operation, Result result) {
   std::lock_guard<std::mutex> lock(operation->mutex_);
   if (operation->done_) return;
-  if (operation->abandoned_) unknown_operations_->fetch_sub(1);
+  operation->ownership_.Retire();
   operation->result_ = std::move(result);
   operation->done_ = true;
   operation->completed_.notify_all();
