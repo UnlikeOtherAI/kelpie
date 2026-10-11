@@ -5,7 +5,7 @@ Back to the [CLI reference](../cli.md).
 ## MCP Server
 
 ### `kelpie mcp`
-Start the CLI as an MCP server (stdio transport).
+Start the CLI as an MCP server (stdio transport). The default four-tool catalog contains `kelpie_browser_control`, `kelpie_extensions`, `kelpie_extension_tools` and `kelpie_extension`; use discovery to reach all product extensions without advertising their full schemas repeatedly.
 
 ```bash
 kelpie mcp
