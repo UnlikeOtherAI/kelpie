@@ -39,7 +39,7 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   const delayed = await rawRequest({ port: readiness.port, path: "/v1/evaluate", headers: bearerHeaders(readiness.token),
     body: JSON.stringify({ tabId: tab, timeout: 100, expression: 'new Promise(resolve=>setTimeout(()=>{window.__delayedCount=(window.__delayedCount||0)+1;resolve(window.__delayedCount);},1500))' }) });
   assert.equal(delayed.json.success, false);
-  assert.equal(delayed.json.error.details.operationMayHaveCompleted, true);
+  assert.equal(delayed.json.error.diagnostics.operationMayHaveCompleted, true);
   assert.equal((await call("tab.snapshot", {}, tab)).error.code, "BUSY");
   await new Promise(resolve => setTimeout(resolve, 1600));
   assert.equal((await call("tab.snapshot", {}, tab)).ok, true);
