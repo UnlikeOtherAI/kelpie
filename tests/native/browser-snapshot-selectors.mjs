@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const fixture = process.argv[2];
 if (!fixture) throw new Error("Usage: node tests/native/browser-snapshot-selectors.mjs <browser_snapshot_fixture>");
@@ -42,6 +44,11 @@ try {
     assert.ok(!Object.hasOwn(element, "ref"));
   }
   assert.equal(await page.evaluate(() => Object.keys(window).some((key) => key.startsWith("__kelpieBrowserControlRefs"))), false);
+  if (process.env.KELPIE_TEST_ARTIFACT_DIR) {
+    await mkdir(process.env.KELPIE_TEST_ARTIFACT_DIR, { recursive: true });
+    await page.screenshot({ path: join(process.env.KELPIE_TEST_ARTIFACT_DIR, "selector-fixture.png") });
+    await writeFile(join(process.env.KELPIE_TEST_ARTIFACT_DIR, "selector-snapshot.json"), JSON.stringify(snapshot, null, 2));
+  }
   console.log("Native selector snapshot DOM conformance passed.");
 } finally {
   await browser.close();
