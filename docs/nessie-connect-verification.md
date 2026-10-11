@@ -154,6 +154,15 @@ APK/AAB as unsigned. A proper existing Kelpie release key path and alias, or an
 explicitly approved new signing identity, is required before release packaging.
 This lane produced no unsigned or debug-signed release substitute. Durable isolated
 debug/test APKs are verification artifacts only, with SHA-256 digests.
+The release workflow now fails before expensive Android work if any of its four
+signing secrets is absent, signs through Gradle, and checks APK/AAB signatures
+before staging assets. The signing identity choice remains pending; this guard
+does not provision credentials or establish a signed release.
+Focused validation parsed the workflow and checked both Bash scripts, exercised
+each missing-secret case and the complete configuration-presence case, verified
+an existing debug APK through the real Android SDK tool, and rejected unsigned
+APK/AAB fixtures before staging. No key was generated and no real signed release
+build was claimed. The validation log and script are retained with native evidence.
 
 Verification roots to preserve before cleanup:
 
