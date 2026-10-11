@@ -53,10 +53,10 @@ document version. Cancellation, deadline, active tab and document are checked ag
 after inference. Socket loss cancels in-flight work before any reconnect dispatch.
 Windows inference binds the remote job's transient cancellation identity under a
 request ownership lock. Pausing, stopping or losing that connection cancels only
-its own inference; a person's independent tab chat remains untouched. Backend
+its own inference; a person's independent tab chat remains untouched.
 Control changes capture that cancelled request identity while changing state, so
 a concurrent Resume and new command cannot redirect an older cancellation.
-selection is checked inside the inference lock so extraction cannot race a switch
+Backend selection is checked inside the inference lock so extraction cannot race a switch
 to a cloud endpoint. Native decoding also polls a request-owned authority flag,
 including model startup. Cancellation receipts for other job/attempt identities
 are durably acknowledged without cancelling the active job.
@@ -74,14 +74,53 @@ sandboxed CEF SDK; Linux requires its CEF runtime, curl/OpenSSL and GTK for menu
 Portable mocks do not verify production provisioning, real WSS revocation, installed
 model inference or the rendered platform menus. Those require native/integration checks.
 
-Verified on 2026-10-11: Minis built the full Windows Release app with MSVC 19.51,
-pinned sandboxed CEF 152 and embedded llama.cpp. Fourteen focused connection,
-account, inference-service and desktop router/MCP/HTTP/handler/network tests passed;
-the final deadline change additionally passed coordinator/executor tests. Ubuntu
-(`umac`, dedicated check checkout) built the full Release CEF 120/GTK app at code
-revision `50ba86f`; all thirteen equivalent connection/account/desktop regressions
-passed. Both builds used concurrency two and existing dependency caches. Tests cover
-mocked gateway frames and browser interfaces, including durable replay, loss-induced
-cancellation, strict capabilities, Unicode bounds, full job deadlines and page drift.
-These passes do not claim rendered account-menu verification, actual installed GGUF
-extraction, a published/installed release, or live UOA-to-Nessie provisioning/revocation.
+Verified on 2026-10-11 at source `3886012cfe0ca01560402d46557a0df3d27a3266`:
+
+- Minis built Windows 0.1.12 Release with MSVC 19.51, pinned sandboxed CEF 152
+  and embedded llama.cpp. All 50 CTest cases passed (15.55 seconds).
+- Ubuntu 24.04.5 (`umac`, dedicated checkout) built Linux 0.1.10 Release with
+  CEF 120/GTK. All 31 CTest cases passed (1.67 seconds). Both builds used
+  concurrency two and existing dependency caches.
+- The extracted Windows ZIP passed the real native acceptance runner: HTTP/MCP,
+  input, screenshots, browser state, partition isolation, profile locking, occupied
+  ports, session restore, graceful readiness cleanup, CLI alias and the built Nessie
+  MCP client. Renderer process tokens proved the CEF sandbox was active. Linux's
+  real native acceptance passed HTTP/MCP, trusted input, screenshots, partitions,
+  profile ownership, session restore and readiness cleanup.
+- Mocked gateway tests cover durable replay/receipts, current deadline admission,
+  loss-induced cancellation, unrelated cancellations, and overlapping Pause/Resume
+  with an older cancellation callback. Executor tests cover document drift,
+  Unicode bounds and immutable full job deadlines.
+- Windows ZIP and Linux tar.gz, DEB, RPM and AppImage candidates were generated
+  by the existing release scripts. ZIP SHA-256:
+  `12849b9e4b98db06b3fa101b4f887697ca8e2371d8823e488de2b1078eddbff9`.
+  Logs, artifact checksums and source revision are preserved outside the checkout
+  in `C:/Users/ondre/.codex/artifacts/kelpie-connect-20261011/desktop`.
+
+Production UOA verification used an isolated current-user encrypted profile and
+the existing AccountService native registration, normal PKCE loopback and visible
+hosted consent. It obtained the app's `kelpie.connect` grant and a real 120-second
+ticket with the exact Nessie audience; app identifier, scope and token-use claims
+were checked in memory. The temporary helper exited normally before the packaged
+Windows browser opened that same profile. The safe `verification-proof.json`
+contains registration/scope/audience/TTL facts only, never the bearer or profile.
+
+The packaged Windows browser loaded a 105,454,432-byte SmolLM2-135M-Instruct Q4_K_M
+GGUF via the existing authenticated `ai-load` API into that isolated profile.
+The [official base model](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct)
+and [quantization card](https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF)
+declare Apache-2.0. Download revision `09816acd5d99df7be770d85ea30822623dab342c`
+and file SHA-256 `2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d`
+are recorded with the artifact. With context 2048 and two threads, the synthetic
+page question returned “The verification lantern is blue.” using six generated
+tokens in 86 ms, with backend `native` and loaded/installed state true.
+`test_local_inference <GGUF>` also passed. Weights remain in the verification
+artifact cache and are neither bundled nor automatically downloaded by the product.
+
+These candidates are unpublished. The current Windows release workflow has no
+Authenticode step; the bootstrap/app report `NotSigned` despite the verified CEF
+sandbox. Linux packages were built/inspected on Ubuntu 24.04, without claiming
+Ubuntu 22/Fedora matrix builds or system installation. Rendered account menus,
+live production WSS dispatch/revocation and full page-extraction jobs remain
+separate checks pending the coordinated Nessie deployment. The small model check
+proves native execution, not general answer quality or a measured cloud-token saving.
