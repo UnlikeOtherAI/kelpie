@@ -9,6 +9,7 @@ const selector = (value: BrowserTextMatcher): string => {
   if (typeof value !== "string") throw new BrowserControlError("INVALID_ARGUMENTS", "CSS and frame selectors must be strings.");
   return value;
 };
+const isElementLocator = (scope: Page | Locator | FrameLocator): scope is Locator => "elementHandle" in scope;
 export function resolvePlaywrightLocator(page: Page, query: BrowserLocator): Locator {
   let scope: Page | Locator | FrameLocator = page;
   for (const step of query) {
@@ -21,16 +22,16 @@ export function resolvePlaywrightLocator(page: Page, query: BrowserLocator): Loc
       case "css": scope = scope.locator(selector(step.value)); break;
       case "frame": scope = scope.frameLocator(selector(step.value)); break;
       case "nth": {
-        if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "nth requires an element locator.");
+        if (!isElementLocator(scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "nth requires an element locator.");
         scope = step.index === -1 ? scope.last() : scope.nth(step.index); break;
       }
       case "filter": {
-        if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
+        if (!isElementLocator(scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
         scope = scope.filter({ hasText: step.hasText === undefined ? undefined : matcher(step.hasText), visible: step.visible }); break;
       }
     }
   }
-  if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an element inside the frame.");
+  if (!isElementLocator(scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an element inside the frame.");
   return scope;
 }
 
