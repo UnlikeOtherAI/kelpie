@@ -126,8 +126,13 @@ final class ConnectBrowser {
     }
 
     private func navigate(
-        _ operation: String, input: [String: Any], tabID: String, expected: String,
-        pinned: HandlerContext, router: Router, command: [String: Any]
+        _ operation: String,
+        input: [String: Any],
+        tabID: String,
+        expected: String,
+        pinned: HandlerContext,
+        router: Router,
+        command: [String: Any]
     ) async throws -> [String: Any] {
         var body = try validatedInput(operation, input)
         body["tabId"] = tabID
