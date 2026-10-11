@@ -247,24 +247,20 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                     }
                 }
 
-                let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
-                let elapsedMs = Int(elapsed / 1_000_000)
-
-                // Build output string
-                output.append(0) // null terminator
-                let resultText = String(cString: output)
-
-                continuation.resume(returning: InferenceResult(
-                    text: resultText,
-                    tokensUsed: Int(generatedCount),
-                    inferenceTimeMs: elapsedMs
-                ))
+                continuation.resume(returning: self.result(output, tokens: generatedCount, startedAt: startedAt))
             }
         }
     }
 
     var memoryUsageMB: Int {
         queue.sync { estimatedMemoryUsageMB }
+    }
+
+    private func result(_ output: [CChar], tokens: Int32, startedAt: DispatchTime) -> InferenceResult {
+        // The model emits token bytes; terminate once before converting the final text.
+        let text = String(cString: output + [0])
+        let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
+        return InferenceResult(text: text, tokensUsed: Int(tokens), inferenceTimeMs: Int(elapsed / 1_000_000))
     }
 
     private func tokenToPiece(vocab: OpaquePointer, token: llama_token) -> [CChar] {

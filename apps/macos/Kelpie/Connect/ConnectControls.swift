@@ -18,8 +18,12 @@ struct ConnectControls: View {
                 } else if connection.requiresSignIn {
                     control("Sign in again", icon: "person.badge.key", id: "nessie.sign-in", action: connection.renewConsent)
                 } else {
-                    control(connection.paused ? "Resume Nessie" : "Pause Nessie",
-                            icon: connection.paused ? "play.fill" : "pause.fill", id: "nessie.pause", action: connection.togglePause)
+                    control(
+                        connection.paused ? "Resume Nessie" : "Pause Nessie",
+                        icon: connection.paused ? "play.fill" : "pause.fill",
+                        id: "nessie.pause",
+                        action: connection.togglePause
+                    )
                     if connection.running { control("Stop Nessie", icon: "stop.fill", id: "nessie.stop", action: connection.stop) }
                 }
             }

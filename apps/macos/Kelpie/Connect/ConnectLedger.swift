@@ -15,7 +15,7 @@ final class ConnectLedger {
 
     func execute(_ operation: String, _ body: [String: Any]) throws -> [String: Any] {
         let input = try JSONSerialization.data(withJSONObject: body)
-        guard let raw = kelpie_connect_execute(handle, operation, String(decoding: input, as: UTF8.self)) else {
+        guard let encoded = String(data: input, encoding: .utf8), let raw = kelpie_connect_execute(handle, operation, encoded) else {
             throw Failure.protocolViolation
         }
         defer { kelpie_connect_free(raw) }
@@ -24,7 +24,8 @@ final class ConnectLedger {
             throw Failure.protocolViolation
         }
         let data = try JSONSerialization.data(withJSONObject: state)
-        try SecretStore.shared.setDurably(Self.key, value: String(decoding: data, as: UTF8.self))
+        guard let encodedState = String(data: data, encoding: .utf8) else { throw Failure.protocolViolation }
+        try SecretStore.shared.setDurably(Self.key, value: encodedState)
         return decision
     }
 
