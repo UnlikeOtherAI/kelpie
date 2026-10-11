@@ -6,6 +6,7 @@ import XCTest
 final class BrowserControlGatewayTests: XCTestCase {
     func testAuthenticatedRoutesUseCanonicalEnvelopeAndCompactMCP() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = PairingStore(storeURL: directory.appendingPathComponent("pairings.json"))
         guard case .created(let pairing) = store.startPairing(clientId: "browser-test", clientName: "test", sourceAddress: "127.0.0.1") else {
