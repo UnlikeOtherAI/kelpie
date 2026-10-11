@@ -33,7 +33,7 @@ struct BrowserGateway::Impl {
   std::map<std::string, std::set<std::string>> refs;
   std::string session = Identity(), stage, key;
   unsigned long generation = 0;
-  bool active = false, uncertain = false, mutation = false;
+  bool active = false, uncertain = false, mutation = false, selected_effect = false;
   bool mcp = false, notification = false, extension = false;
   json rpc_id;
   explicit Impl(json value) : config(std::move(value)) {
@@ -66,6 +66,7 @@ struct BrowserGateway::Impl {
   void Dispatch(std::string method, json params, std::string next_stage, bool mutates = false) {
     stage = std::move(next_stage);
     uncertain = uncertain || mutates;
+    selected_effect = selected_effect || (method == "switch-tab" && mutates);
     step = {{"kind", "dispatch"}, {"method", std::move(method)}, {"params", std::move(params)}, {"mutates", mutates}};
   }
   void Execute() {
@@ -89,7 +90,8 @@ struct BrowserGateway::Impl {
     if (method == "tab.click" || method == "tab.type") {
       const std::string ref = params["ref"];
       if (!refs[tab].count(ref)) { Finish(Failure("STALE_REFERENCE")); return; }
-      Dispatch("browser-control-evaluate", {{"tabId", tab}, {"expression", "(" + std::string(browser_assets::resolve) + ")(" + json(ref).dump() + "," + json(key).dump() + ")"}}, "resolve"); return;
+      const std::string expression = "(" + std::string(browser_assets::action) + ")(" + json(ref).dump() + "," + json(key).dump() + "," + json(method).dump() + "," + json(params.value("text", std::string())).dump() + ")";
+      Dispatch("browser-control-evaluate", {{"tabId", tab}, {"expression", expression}}, "action", true); return;
     }
     if (method == "tab.screenshot" && (params.value("fullPage", false) || params.value("format", std::string("png")) != "png" || params.contains("quality"))) {
       Finish(Failure("UNSUPPORTED")); return;
@@ -106,7 +108,7 @@ json BrowserGateway::Next() const { return impl_->step; }
 json BrowserGateway::Begin(json request) {
   if (impl_->active) return {{"kind", "complete"}, {"response", Failure("BUSY")}};
   impl_->mcp = false; impl_->extension = false;
-  impl_->request = request; impl_->active = true; impl_->uncertain = false; impl_->mutation = false;
+  impl_->request = request; impl_->active = true; impl_->uncertain = false; impl_->mutation = false; impl_->selected_effect = false;
   static const json schema = json::parse(browser_assets::request_schema);
   if (!ValidateBrowserJson(schema, &request)) { impl_->Finish(Failure("INVALID_ARGUMENTS")); return Next(); }
   impl_->request = request;
@@ -170,12 +172,16 @@ json BrowserGateway::Advance(json result) {
         impl_->refs[tab].insert(ref);
       }
       impl_->Finish(Success({{"url", snapshot.at("url")}, {"title", snapshot.at("title")}, {"text", snapshot["text"]}, {"truncated", snapshot.value("truncated", false)}, {"elements", elements}}));
-    } else if (impl_->stage == "resolve") {
-      const json target = result.at("result");
-      if (!target.contains("selector") || !target["selector"].is_string() || target["selector"].empty()) { impl_->Finish(Failure("STALE_REFERENCE", impl_->uncertain)); return Next(); }
-      json params = {{"tabId", tab}, {"selector", target["selector"]}};
-      if (method == "tab.type") params["text"] = impl_->request["params"]["text"];
-      impl_->Dispatch(kRoutes.at(method), params, "execute", true);
+    } else if (impl_->stage == "action") {
+      const json action = result.at("result");
+      if (action.value("ok", false)) impl_->Finish(Success(nullptr));
+      else {
+        // The fixed script can prove refusal before any mutation; preserve prior tab-selection uncertainty.
+        const std::string code = action.value("error", std::string());
+        if (code != "STALE_REFERENCE" && code != "UNSUPPORTED") { fail(); return Next(); }
+        impl_->uncertain = action.value("mayHaveCompleted", true) || impl_->selected_effect;
+        impl_->Finish(Failure(code));
+      }
     } else {
       json value = nullptr;
       if (impl_->extension) value = result;
