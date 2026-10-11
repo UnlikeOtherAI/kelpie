@@ -185,7 +185,7 @@ void CAbi() {
   kelpie_browser_gateway_destroy(large_gateway);
 }
 void Notifications() {
-  kelpie::BrowserGateway gateway({{"nativeMethods", json::array()}});
+  kelpie::BrowserGateway gateway(json{{"nativeMethods", json::array()}});
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
 }

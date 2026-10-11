@@ -175,3 +175,5 @@ Read-only, one-shot page observers execute the fixed reader without remembering 
 The macOS native single-shot harness also obtains its initial public URL/title metadata from its admitted common gateway. It has no separate page-summary JavaScript collector or silent empty-summary fallback.
 
 Desktop renderer retirement keeps native dialog observation and accept/dismiss controls reachable while a dialog-blocked renderer command remains outstanding. These recovery handlers use the existing native dialog state/callback; other browser actions and common observations stay busy until the renderer reply retires.
+
+Linux release builds also compile the native gateway contract tests on Ubuntu 22.04 with GCC 11 and nlohmann-json 3.10. Construct JSON gateway configurations explicitly when a single-entry initializer could also match the gateway's deleted copy constructor. Linux 0.1.11 includes this test-build portability correction; the browser protocol and runtime behavior are unchanged.
