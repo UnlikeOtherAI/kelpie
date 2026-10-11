@@ -124,7 +124,8 @@ int main() {
   bool dispatched=false;int authority_checks=0;Json seen;
   Executor control_executor(browser,{}, {},[&](const Json& request,const TabLease& job_lease,const Executor::Authorization& authorize) {
     assert(job_lease.id=="owned" && job_lease.generation==7 && job_lease.document_version=="document-1");
-    assert(job_lease.cancelled==guard && job_lease.require_active && job_lease.deadline.has_value());
+    assert(job_lease.cancelled==guard && job_lease.require_active && job_lease.deadline &&
+        *job_lease.deadline>std::chrono::steady_clock::now()+std::chrono::hours(24));
     seen=request;dispatched=true;authority_checks++;assert(authorize());
     return Json{{"version",1},{"ok",true},{"value",{{"success",true}}}};
   });
