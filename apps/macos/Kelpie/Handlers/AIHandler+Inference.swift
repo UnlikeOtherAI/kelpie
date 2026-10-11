@@ -24,7 +24,6 @@ extension AIHandler {
         let maxTokens = body["maxTokens"] as? Int ?? 512
         let temperature = body["temperature"] as? Double ?? 0.7
         let prompt = body["prompt"] as? String ?? ""
-        let explicitText = body["text"] as? String
         let contextMode = body["context"] as? String
         let audio = decodeBase64Field(body["audio"])
         if let messages = body["messages"] as? [[String: Any]] {
@@ -44,13 +43,13 @@ extension AIHandler {
 
             do {
                 let image = contextMode == "screenshot" ? try await screenshotData(tabId: tabId) : nil
-                let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
+                let contextText = try await inferenceContext(body, tabId: tabId)
                 let result = try await inferWithOllama(
                     endpoint: backendState.ollamaEndpoint ?? defaultOllamaEndpoint,
                     model: model,
                     prompt: prompt,
                     messages: nil,
-                    contextText: explicitText ?? fallbackContext,
+                    contextText: contextText,
                     image: image
                 )
                 return successResponse([
@@ -100,8 +99,7 @@ extension AIHandler {
         }
 
         do {
-            let fallbackContext = await preloadedContext(mode: contextMode, tabId: tabId)
-            let preloaded = explicitText ?? fallbackContext
+            let preloaded = try await inferenceContext(body, tabId: tabId)
             let harness = InferenceHarness(context: context)
             let result = try await harness.run(prompt: prompt, audio: audio, preloadedContext: preloaded)
 
@@ -159,39 +157,34 @@ extension AIHandler {
     }
 
     @MainActor
-    func preloadedContext(mode: String?, tabId: String?) async -> String? {
+    func inferenceContext(_ body: [String: Any], tabId: String?) async throws -> String? {
+        if let text = body["text"] as? String { return text }
+        return try await preloadedContext(mode: body["context"] as? String, tabId: tabId)
+    }
+
+    @MainActor
+    func preloadedContext(mode: String?, tabId: String?) async throws -> String? {
         switch mode {
         case nil:
             return nil
 
         case "page_text":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    var text = (el?.innerText || el?.textContent || '').trim();
-                    return {
-                        title: document.title || '',
-                        url: location.href || '',
-                        content: text,
-                        wordCount: text ? text.split(/\\s+/).length : 0
-                    };
-                })())
-                """, tabId: tabId
-            )) ?? ""
+            let page = try await AIPageContext.gather(from: context, tabId: tabId)
+            let data = try JSONSerialization.data(withJSONObject: page.pageTextPayload, options: [.sortedKeys])
+            return String(data: data, encoding: .utf8)
 
         case "dom":
-            return (try? await context.evaluateJSReturningString(
+            return try await context.evaluateJSReturningString(
                 """
                 JSON.stringify((function() {
                     var el = document.body || document.documentElement;
                     return { html: el ? el.outerHTML : '', selector: 'body' };
                 })())
                 """, tabId: tabId
-            )) ?? ""
+            )
 
         case "accessibility":
-            return (try? await context.evaluateJSReturningString(
+            return try await context.evaluateJSReturningString(
                 """
                 JSON.stringify((function() {
                     function walk(node, depth) {
@@ -211,7 +204,7 @@ extension AIHandler {
                     return walk(document.body, 0);
                 })())
                 """, tabId: tabId
-            )) ?? ""
+            )
 
         case "screenshot":
             return nil

@@ -37,7 +37,7 @@ extension AIHandler {
     func localChatPage(_ body: [String: Any], tabId: String?) async throws -> AIPageContext {
         if let text = body["text"] as? String { return AIPageContext(suppliedText: text) }
         if let mode = body["context"] as? String, mode == "dom" || mode == "accessibility" {
-            guard let text = await preloadedContext(mode: mode, tabId: tabId), !text.isEmpty else {
+            guard let text = try await preloadedContext(mode: mode, tabId: tabId), !text.isEmpty else {
                 throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Page extraction failed."])
             }
             return AIPageContext(suppliedText: text)

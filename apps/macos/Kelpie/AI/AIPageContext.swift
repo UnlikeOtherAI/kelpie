@@ -8,6 +8,8 @@ struct AIPageContext: Codable {
     let labels: [String]
     let textTruncated: Bool
     let labelsTruncated: Bool
+    let wordCount: Int
+    let language: String?
 
     init(suppliedText: String) {
         title = "Supplied context"
@@ -16,14 +18,23 @@ struct AIPageContext: Codable {
         labels = []
         textTruncated = false
         labelsTruncated = false
+        wordCount = suppliedText.split(whereSeparator: \.isWhitespace).count
+        language = nil
     }
 
-    static let script = #"""
+    static func snapshotScript(selector: String? = nil, maxTextLength: Int? = 16000) -> String {
+        let root = selector.map { "document.querySelector('\(JSEscape.string($0))')" } ??
+            "document.body || document.documentElement"
+        let content = maxTextLength.map { "text.substring(0, \(max(0, $0)))" } ?? "text"
+        let truncated = maxTextLength.map { "text.length > \(max(0, $0))" } ?? "false"
+        return #"""
     JSON.stringify((function() {
-        const root = document.body || document.documentElement;
-        const text = (root?.innerText || '').trim();
+        const root = \#(root);
+        const text = (root?.innerText || root?.textContent || '').trim();
         const labels = new Set();
-        for (const el of document.querySelectorAll('img,svg,[role="img"],[aria-label],[aria-labelledby]')) {
+        const names = 'img,svg,[role="img"],[aria-label],[aria-labelledby]';
+        const elements = root ? [...(root.matches(names) ? [root] : []), ...root.querySelectorAll(names)] : [];
+        for (const el of elements) {
             const style = getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden') continue;
             if (!el.getClientRects().length) continue;
@@ -33,16 +44,31 @@ struct AIPageContext: Codable {
                 (el.tagName.toLowerCase() === 'svg' ? el.querySelector('title')?.textContent : '') || '').trim();
             if (label) labels.add(label.substring(0, 500));
         }
-        return {title: document.title, url: location.href, text: text.substring(0, 16000),
-            labels: Array.from(labels).slice(0, 100), textTruncated: text.length > 16000,
-            labelsTruncated: labels.size > 100};
+        return {title: root ? document.title : '', url: location.href, text: \#(content),
+            labels: Array.from(labels).slice(0, 100), textTruncated: \#(truncated),
+            labelsTruncated: labels.size > 100, wordCount: text ? text.split(/\s+/).length : 0,
+            language: document.documentElement.lang || null};
     })())
     """#
+    }
 
     @MainActor
-    static func gather(from context: HandlerContext, tabId: String?) async throws -> Self {
-        let result = try await context.evaluateJSReturningString(script, tabId: tabId)
+    static func gather(
+        from context: HandlerContext, tabId: String?, selector: String? = nil, maxTextLength: Int? = 16000
+    ) async throws -> Self {
+        let result = try await context.evaluateJSReturningString(
+            snapshotScript(selector: selector, maxTextLength: maxTextLength), tabId: tabId
+        )
         return try JSONDecoder().decode(Self.self, from: Data(result.utf8))
+    }
+
+    var pageTextPayload: [String: Any] {
+        [
+            "title": title, "byline": NSNull(), "content": text, "wordCount": wordCount,
+            "language": language as Any? ?? NSNull(), "excerpt": String(text.prefix(200)),
+            "url": url, "accessibleLabels": labels,
+            "textTruncated": textTruncated, "labelsTruncated": labelsTruncated
+        ]
     }
 
     static let instructions = """
