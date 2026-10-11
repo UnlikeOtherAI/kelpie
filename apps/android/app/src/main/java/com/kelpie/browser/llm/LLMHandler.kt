@@ -60,7 +60,7 @@ class LLMHandler(
     private suspend fun getVisibleElements(body: Map<String, Any?>): Map<String, Any?> {
         val interactableOnly = body["interactableOnly"] as? Boolean ?: false
         val js =
-            "(function(){var els=document.querySelectorAll('*');var visible=[];" +
+            "(function(){" + elementSelectorBuilderScript() + "var els=document.querySelectorAll('*');var visible=[];" +
                 "for(var el of els){var r=el.getBoundingClientRect();" +
                 "if(r.width>0&&r.height>0&&r.top<window.innerHeight&&" +
                 "r.bottom>0&&r.left<window.innerWidth&&r.right>0){" +
@@ -68,7 +68,7 @@ class LLMHandler(
                 "if($interactableOnly&&" +
                 "!['a','button','input','select','textarea'].includes(tag)&&" +
                 "!el.onclick&&el.getAttribute('role')!=='button')continue;" +
-                "visible.push({tag:tag," +
+                "visible.push({tag:tag,selector:kelpieBuildSelector(el)," +
                 "text:(el.textContent||'').trim().substring(0,100)," +
                 "rect:{x:r.x,y:r.y,width:r.width,height:r.height}," +
                 "role:el.getAttribute('role')||undefined," +
@@ -86,12 +86,13 @@ class LLMHandler(
 
     private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> {
         val selector = body["selector"] as? String ?: "body"
+        val maxLength = ((body["maxLength"] as? Number)?.toInt() ?: 100000).coerceIn(1, 100000)
         val safe = JSEscape.string(selector)
         val js =
             "(function(){var el=document.querySelector('$safe');" +
                 "if(!el)return{title:'',content:'',wordCount:0};" +
                 "var t=el.innerText||el.textContent||'';" +
-                "return{title:document.title,content:t.trim()," +
+                "return{title:document.title,content:t.trim().substring(0,$maxLength)," +
                 "wordCount:t.trim().split(/\\s+/).length," +
                 "language:document.documentElement.lang||null," +
                 "excerpt:t.trim().substring(0,200)};})()"

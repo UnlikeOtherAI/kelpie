@@ -28,7 +28,7 @@ final class NessieConnection: ObservableObject {
     private var remoteTabMutation = false
     private var epoch = UUID()
 
-    func start(router: Router, context: HandlerContext) {
+    func start(context: HandlerContext) {
         guard browser == nil else { return }
         browser = ConnectBrowser(context: context)
         accountSubscription = UOAAccount.shared.$profile.map { $0?.sub }.removeDuplicates().sink { [weak self] sub in
@@ -71,6 +71,10 @@ final class NessieConnection: ObservableObject {
 
     private var lifecycle: String { foreground && !paused && browser?.isReady == true ? "ready" : "paused" }
     var canMutate: Bool { foreground && !paused && socket != nil && generation != nil && owner != nil && UOAAccount.shared.profile?.sub == owner }
+
+    func authorizes(_ command: [String: Any]) -> Bool {
+        canMutate && running && ConnectAuthorization(command)?.matches(currentCommand) == true
+    }
 
     func renewConsent() {
         UOAAccount.shared.signOut()
@@ -220,7 +224,7 @@ final class NessieConnection: ObservableObject {
         defer { expiry?.cancel() }
         do {
             guard let deadline = command["deadline"] as? String,
-                  let date = Self.deadline(deadline), date > Date(), date.timeIntervalSinceNow <= 86400 else { throw ConnectBrowser.Failure("Job deadline expired") }
+                  let date = ConnectAuthorization.parseDeadline(deadline), date > Date(), date.timeIntervalSinceNow <= 86400 else { throw ConnectBrowser.Failure("Job deadline expired") }
             expiry = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(max(0, date.timeIntervalSinceNow) * 1_000_000_000))
                 guard !Task.isCancelled else { return }
@@ -314,14 +318,6 @@ final class NessieConnection: ObservableObject {
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil
         generation = nil
-    }
-
-    private static func deadline(_ raw: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: raw) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: raw)
     }
 
     private var installationID: String {

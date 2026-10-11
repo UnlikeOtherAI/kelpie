@@ -302,7 +302,7 @@ struct KelpieApp: App {
 
     private static func startServices(serverState: ServerState, rendererState: RendererState) {
         serverState.startHTTPServer(rendererState: rendererState)
-        NessieConnection.shared.start(router: serverState.router, context: serverState.handlerContext)
+        NessieConnection.shared.start(context: serverState.handlerContext)
         #if DEBUG
         if canBind(port: 8421) {
             AppReveal.start(port: 8421)

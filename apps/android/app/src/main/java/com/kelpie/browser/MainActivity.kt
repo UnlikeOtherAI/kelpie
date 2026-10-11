@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
 
         registerHandlers(deviceInfo)
         com.kelpie.browser.connect.NessieConnection
-            .start(this, router, handlerContext)
+            .start(this, handlerContext)
         startServer(deviceInfo)
     }
 
