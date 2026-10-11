@@ -1,6 +1,6 @@
 {
   "name": "@unlikeotherai/kelpie-shared",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./browser-control": {
+      "types": "./dist/browser-control/index.d.ts",
+      "import": "./dist/browser-control/index.js"
     }
   },
   "publishConfig": {
@@ -27,5 +31,9 @@
     "type": "git",
     "url": "git+https://github.com/UnlikeOtherAI/kelpie.git",
     "directory": "packages/shared"
+  },
+  "dependencies": {
+    "zod": "^4.3.6",
+    "playwright-core": "1.62.1"
   }
 }

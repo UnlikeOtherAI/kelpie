@@ -6,8 +6,16 @@
     "composite": false,
     "verbatimModuleSyntax": false,
     "paths": {
-      "@unlikeotherai/kelpie-shared": ["../shared/src/index.ts"]
+      "@unlikeotherai/kelpie-shared": [
+        "../shared/src/index.ts"
+      ],
+      "@unlikeotherai/kelpie-shared/browser-control": [
+        "../shared/src/browser-control/index.ts"
+      ]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }

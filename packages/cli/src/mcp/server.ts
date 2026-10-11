@@ -11,6 +11,7 @@ import { scanForDevices } from "../discovery/scanner.js";
 import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
+import { registerBrowserControl } from "./browser-control.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import { ToolInputError } from "./ai-endpoint-tools.js";
 import { redactSecrets } from "../ai/endpoint-secrets.js";
@@ -58,6 +59,7 @@ export function createMcpServer(pinned?: DiscoveredDevice, callableTools?: Reado
     { capabilities: { tools: {} } },
   );
 
+  registerBrowserControl(server, pinned, callableTools);
   for (const tool of browserTools) {
     if (!isCallableOnPinnedDevice(tool, pinned, callableTools)) continue;
     registerBrowserTool(server, tool, pinned);
