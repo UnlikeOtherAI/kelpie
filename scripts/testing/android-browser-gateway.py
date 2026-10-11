@@ -165,6 +165,10 @@ def main():
     atexit.register(revoke)
 
     def native(method, params=None):
+        if method == 'evaluate':
+            value = rpc('kelpie_extension', {'name': 'kelpie_evaluate', 'arguments': params or {}})
+            assert value['ok'], 'Gateway fixture evaluation failed'
+            return value['value']
         status, result = request('/v1/' + method, params or {})
         assert status == 200 and result.get('success'), 'Native fixture operation failed: ' + method
         return result
@@ -174,7 +178,7 @@ def main():
         if tab:
             value['tabId'] = tab
         status, result = request('/v1/browser-control', value)
-        assert status == 200 and result['ok'] == succeeds, 'Canonical operation failed: ' + method
+        assert status == 200 and result['ok'] == succeeds, 'Canonical operation failed: ' + method + ': ' + json.dumps(result)
         return result.get('value') if succeeds else result['error']
 
     def rpc(name, arguments=None):
@@ -192,7 +196,8 @@ def main():
 
     for path in ('/v1/browser-control', '/mcp'):
         assert request(path, {'version': 1, 'method': 'capabilities'}, False)[0] == 401
-    print('PASS unauthenticated HTTP/MCP denial', flush=True)
+    assert request('/v1/pair', authenticated=False, http_method='DELETE')[0] == 401
+    print('PASS unauthenticated HTTP/MCP/revocation denial', flush=True)
     tap_ui_text('Get Started')
     status, pending = request('/v1/pair', {'clientId': str(uuid.uuid4()), 'clientName': 'Gateway emulator verification'}, False)
     assert status == 202
