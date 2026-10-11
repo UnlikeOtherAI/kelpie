@@ -243,8 +243,13 @@ final class NessieConnection: ObservableObject {
         }
     }
 
-    private func finish(_ command: [String: Any], state: String, output: [String: Any]? = nil,
-                        error: String? = nil, connection: URLSessionWebSocketTask?) async throws {
+    private func finish(
+        _ command: [String: Any],
+        state: String,
+        output: [String: Any]? = nil,
+        error: String? = nil,
+        connection: URLSessionWebSocketTask?
+    ) async throws {
         guard let ledger, let jobID = command["jobId"] as? String, let attemptID = command["attemptId"] as? String else { return }
         var result: [String: Any] = ["jobId": jobID, "attemptId": attemptID, "state": state]
         result["output"] = output
@@ -261,8 +266,9 @@ final class NessieConnection: ObservableObject {
         currentCommand = nil
         running = false
         do {
-            let decision = try ledger.execute("complete", ["jobId": jobID,
-                "attemptId": attemptID, "state": "cancelled", "error": reason])
+            let decision = try ledger.execute("complete", [
+                "jobId": jobID, "attemptId": attemptID, "state": "cancelled", "error": reason
+            ])
             if let socket { Task { try? await sendFrames(decision, connection: socket) } }
         } catch { status = "Recovery storage unavailable"; close() }
     }
@@ -286,7 +292,8 @@ final class NessieConnection: ObservableObject {
     private func publishHeartbeat(_ connection: URLSessionWebSocketTask) async {
         guard let generation else { return }
         let ready = await browser?.modelReady() ?? false
-        try? await send(["type": "heartbeat", "generation": generation,
+        try? await send([
+            "type": "heartbeat", "generation": generation,
             "lifecycle": lifecycle, "modelReady": ready, "modelInstalled": browser?.modelInstalled ?? false,
             "modelCapabilities": ["text"], "delegatedBrowsing": false], connection: connection)
     }
@@ -297,8 +304,8 @@ final class NessieConnection: ObservableObject {
 
     private func send(_ frame: [String: Any], connection: URLSessionWebSocketTask) async throws {
         let data = try JSONSerialization.data(withJSONObject: frame)
-        guard data.count <= 1024 * 1024 else { throw ConnectLedger.Failure.protocolViolation }
-        try await connection.send(.string(String(decoding: data, as: UTF8.self)))
+        guard data.count <= 1024 * 1024, let encoded = String(data: data, encoding: .utf8) else { throw ConnectLedger.Failure.protocolViolation }
+        try await connection.send(.string(encoded))
     }
 
     private func close() {

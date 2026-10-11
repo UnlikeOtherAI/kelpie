@@ -103,7 +103,8 @@ final class ConnectBrowser {
             if input["includeScreenshot"] as? Bool != true {
                 return ["tabId": tabID, "tabVersion": expected, "page": visible]
             }
-            let image = await isolated.handle(method: "screenshot", body: ["tabId": tabID,
+            let image = await isolated.handle(method: "screenshot", body: [
+                "tabId": tabID,
                 "format": "jpeg", "quality": 0.5, "resolution": "viewport", "fullPage": false]).json
             try requireSuccess(image)
             try verify(tabID, expected)
@@ -160,7 +161,8 @@ final class ConnectBrowser {
         } ?? []
         #else
         if let cef = context.renderer as? CEFRenderer, let bridge = cef.bridge {
-            return [["tabId": cef.connectionTabID, "tabVersion": bridge.documentVersion(),
+            return [[
+                "tabId": cef.connectionTabID, "tabVersion": bridge.documentVersion(),
                 "url": cef.currentURL?.absoluteString ?? "", "title": cef.currentTitle, "loading": cef.isLoading, "active": true]]
         }
         return WindowRegistry.shared.allEntries().flatMap { entry in
@@ -255,9 +257,12 @@ final class ConnectBrowser {
         try verify(tabID, expected)
         let source = tabs().first { $0["tabId"] as? String == tabID }
         let limit = max(64, min(6000, input["maxOutputCharacters"] as? Int ?? 4000))
-        return ["tabId": tabID, "tabVersion": expected, "summary": String(response.prefix(limit)),
+        return [
+            "tabId": tabID, "tabVersion": expected, "summary": String(response.prefix(limit)),
             "evidence": [["url": source?["url"] as? String ?? "", "excerpt": String(text.prefix(1200)),
-                          "observedAt": ISO8601DateFormatter().string(from: Date())]], "modelCapabilities": ["text"]]
+                          "observedAt": ISO8601DateFormatter().string(from: Date())]],
+            "modelCapabilities": ["text"]
+        ]
     }
 
     private func requireSuccess(_ result: [String: Any]) throws {
