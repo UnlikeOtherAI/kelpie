@@ -56,5 +56,15 @@ int main() {
   assert(events.pending_count() <= 512);
   events.Clear();
   assert(events.pending_count() == 0);
+
+  using Session = kelpie::DesktopDevToolsSession;
+  assert((*Session::ScreenshotParams(Json::object()))["format"] == "png");
+  const auto jpeg = Session::ScreenshotParams({{"format", "jpeg"}, {"quality", 60}});
+  assert(jpeg && (*jpeg)["format"] == "jpeg" && (*jpeg)["quality"] == 60);
+  assert(!Session::ScreenshotParams({{"format", "png"}, {"quality", 60}}));
+  assert(!Session::ScreenshotParams({{"format", "jpeg"}, {"quality", 101}}));
+  assert(!Session::ScreenshotParams({{"format", "webp"}}));
+  const Session::Result captured{true, {}, {}, {{"data", "AA=="}}, false};
+  assert(Session::ParseScreenshotResult(captured, "jpeg").value["mimeType"] == "image/jpeg");
   return 0;
 }

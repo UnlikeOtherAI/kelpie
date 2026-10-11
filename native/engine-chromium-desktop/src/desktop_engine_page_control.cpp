@@ -79,8 +79,10 @@ BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease lease, std::
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
   const auto impl = impl_;
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
-  const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(Json::object());
-  if (!screenshot_params) return BrowserControlResult::Failure("INTERNAL", "Screenshot parameters are invalid");
+  Json options = {{"format", image->format}};
+  if (image->quality) options["quality"] = *image->quality;
+  const auto screenshot_params = DesktopDevToolsSession::ScreenshotParams(options);
+  if (!screenshot_params) return BrowserControlResult::Failure("INVALID_PARAMS", "Screenshot format or quality is invalid");
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
   const auto started = impl->RunOnUi([impl, lease, pending, screenshot_params] {
@@ -93,7 +95,8 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot
   }, timeout);
   if (!started.ok) return started;
   const auto parsed = DesktopDevToolsSession::ParseScreenshotResult(
-      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout)));
+      pending->session->Wait(pending->operation, RemainingTimeout(started_at, timeout)),
+      screenshot_params->at("format").get<std::string>());
   const auto result = DevToolsResult(parsed);
   if (result.ok) {
     image->mime_type = parsed.value.value("mimeType", "image/png");

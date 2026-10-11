@@ -90,8 +90,10 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
 
   static Json EvaluateParams(const std::string& expression);
   static Result ParseEvaluateResult(const Result& protocol_result);
+  // Viewport capture params: format "png" (default) or "jpeg" with an
+  // optional 1-100 integer quality. Returns nullopt for any other request.
   static std::optional<Json> ScreenshotParams(const Json& options);
-  static Result ParseScreenshotResult(const Result& protocol_result);
+  static Result ParseScreenshotResult(const Result& protocol_result, const std::string& format);
   static Json TrustedKeyParams(const Json& input, bool key_up);
 
   void OnDevToolsMethodResult(CefRefPtr<CefBrowser> browser,

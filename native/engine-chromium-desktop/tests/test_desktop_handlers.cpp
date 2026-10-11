@@ -22,6 +22,7 @@
 #include "handlers/network_handler.h"
 #include "handlers/partition_handler.h"
 #include "handlers/renderer_handler.h"
+#include "handlers/screenshot_handler.h"
 #include "handlers/shell_handler.h"
 #include "handlers/viewport_handler.h"
 
@@ -84,7 +85,11 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; last_script=script; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
-  kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override { last_lease=lease; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second); }
+  std::string last_screenshot_format; std::optional<int> last_screenshot_quality;
+  kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override {
+    last_lease=lease; last_screenshot_format=image->format; last_screenshot_quality=image->quality;
+    image->mime_type="image/"+image->format; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second);
+  }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json& cookies, Json* out, Timeout) override { last_lease=lease; last_cookie=cookies; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult DeleteCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out={{"deleted",1}}; return kelpie::BrowserControlResult::Success(second); }
@@ -253,6 +258,16 @@ int main() {
   assert(tabs_listed.body["tabs"][1]["name"]=="Sam");
   control.second.partition.reset(); control.second.name.reset(); control.second.persistent.reset();
 
+  // The viewport route encodes PNG by default, or JPEG with an optional 1-100 quality.
+  kelpie::ScreenshotHandler screenshot_handler(runtime); screenshot_handler.Register(router);
+  auto png_shot=router.Dispatch("screenshot",second);
+  assert(png_shot.status_code==200 && png_shot.body["format"]=="png" && control.last_screenshot_format=="png" && !control.last_screenshot_quality);
+  auto jpeg_shot=router.Dispatch("screenshot",{{"tabId","second"},{"generation",9},{"format","jpeg"},{"quality",60}});
+  assert(jpeg_shot.status_code==200 && jpeg_shot.body["format"]=="jpeg" && control.last_screenshot_format=="jpeg" && control.last_screenshot_quality==60);
+  assert(router.Dispatch("screenshot",{{"quality",60}}).status_code==400);
+  assert(router.Dispatch("screenshot",{{"format","jpeg"},{"quality",0}}).status_code==400);
+  assert(router.Dispatch("screenshot",{{"format","jpeg"},{"quality",80.5}}).status_code==400);
+  assert(router.Dispatch("screenshot",{{"format","webp"}}).status_code==400);
   control.stale=true; auto stale=router.Dispatch("get-dialog",second); assert(stale.body["error"]["code"]=="TAB_STALE"); control.stale=false;
   control.timeout_eval=true; auto timeout=router.Dispatch("get-page-text",second); assert(timeout.status_code==408 && timeout.body["error"]["code"]=="TIMEOUT");
   return 0;
