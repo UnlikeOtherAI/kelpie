@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { CLI_MCP_PORT, httpToMcp, type BrowserMcpTool } from "@unlikeotherai/kelpie-shared";
 import { DEFAULT_MCP_BIND_HOST } from "../mcp/transport.js";
-import { localBrowserDevice, subcommandPort } from "./helpers.js";
+import { localBrowserDevice, requireDevice, subcommandPort } from "./helpers.js";
 import { sendCommand } from "../client/http-client.js";
 import type { DiscoveredDevice } from "../types.js";
 
@@ -43,13 +43,17 @@ export function registerMcp(program: Command): void {
         bind?: string;
         unsafeHost?: boolean;
       }, command: Command) => {
-        const globals = program.opts<{ browser?: string }>();
+        const globals = program.opts<{ browser?: string; device?: string }>();
         const local = globals.browser ? await localBrowserDevice(globals.browser) : undefined;
         if (globals.browser && !local) {
           process.stderr.write(`No ready local browser named ${globals.browser}\n`);
           process.exitCode = 4;
           return;
         }
+        // Match ordinary CLI commands (and pairing): an explicit device is the
+        // default MCP target, never whatever happens to answer discovery first.
+        const pinned = local ?? (globals.device ? await requireDevice(program) : undefined);
+        if (globals.device && !pinned) return;
         if (rejectsWindowsLocalHttpProxy(opts.http, local?.platform)) {
           process.stderr.write("Windows and Linux local aliases support MCP over CLI stdio only; use the browser's authenticated /mcp endpoint for HTTP.\n");
           process.exitCode = 4;
@@ -66,7 +70,7 @@ export function registerMcp(program: Command): void {
           }
         }
         const { createMcpServer } = await import("../mcp/server.js");
-        const server = createMcpServer(local ?? undefined, callableTools);
+        const server = createMcpServer(pinned ?? undefined, callableTools);
 
         if (opts.http) {
           const { startHttp } = await import("../mcp/transport.js");

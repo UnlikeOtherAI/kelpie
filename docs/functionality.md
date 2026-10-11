@@ -398,6 +398,10 @@ Every CLI command supports `--llm-help` for machine-readable documentation. `kel
 
 The CLI manages local browser aliases under `~/.kelpie`. On macOS, `kelpie browser register <name>` and `kelpie browser launch <name>` start a fresh Kelpie.app instance on an explicit or auto-assigned port. On Windows, users extract the release ZIP into a current-user-owned directory, register the executable with an absolute profile directory, and launch it through the same alias commands. Windows aliases use a protected readiness file and `kelpie --browser <name> mcp` for local agent stdio. Auto-assigned launch ports skip reserved ports such as `8421` so AppReveal and CLI MCP do not clash with launched browser instances.
 
+CLI MCP also honors `--device <id|name|ip>` as its default browser, using the
+same resolver as explicit pairing. Tools may override the target explicitly;
+an unresolved launch target fails instead of silently selecting another device.
+
 Published GitHub releases also build Android release artifacts and publish the CLI packages to npm automatically, so the release page and npm stay aligned with the tagged version.
 
 ## Settings Panel

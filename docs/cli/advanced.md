@@ -4,6 +4,12 @@ Back to the [CLI reference](../cli.md).
 
 ## MCP Server
 
+`kelpie --device <id|name|ip> mcp` pins the default target to the same device
+resolver used by ordinary CLI commands and `pair`. Calls that omit `device`
+use that target; an explicit per-call `device` still wins. An unresolved launch
+target stops startup instead of selecting another discovered browser. Pair the
+same address first when using an IP. This preserves socket-scoped approvals.
+
 ### `kelpie mcp`
 Start the CLI as an MCP server (stdio transport). The default four-tool catalog contains `kelpie_browser_control`, `kelpie_extensions`, `kelpie_extension_tools` and `kelpie_extension`; use discovery to reach all product extensions without advertising their full schemas repeatedly.
 
