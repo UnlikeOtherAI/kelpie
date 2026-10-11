@@ -17,18 +17,18 @@ class AgentLoopTest {
         var allowActions = false
 
         // Legacy semantic fixtures exercise the loop independently of the production native catalog.
-        override val tools get() = AgentTools.definitions(allowActions)
+        override val tools get() = JsonArray(AgentBrowserPolicy.methods(allowActions).map { method ->
+            OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to method.replace('-', '_'))))
+        })
         val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
 
         override suspend fun dispatch(
             method: String,
             args: Map<String, Any?>,
         ): Map<String, Any?> {
-            val tool = AgentTools.all.first { it.name == method }
-            val (sanitized, missing) = AgentTools.sanitize(tool, OpenAIJson.fromAny(args) as JsonObject)
-            if (sanitized == null) return mapOf("success" to false, "error" to "$missing is required")
-            calls += tool.method to sanitized
-            return result(tool.method)
+            val native = method.replace('_', '-')
+            calls += native to args
+            return result(native)
         }
     }
 
@@ -154,23 +154,12 @@ class AgentLoopTest {
     }
 
     @Test
-    fun dropsTabIdWindowIdAndUnknownArguments() {
-        val args = """{"selector":"#q","tabId":"evil","windowId":"w","script":"alert(1)","timeout":"99999"}"""
-        val chat = ScriptedChat(toolTurn(AssembledToolCall(0, "c1", "wait_for_element", args)), answer("done"))
-        val dispatcher = RecordingDispatcher()
-        runBlocking { loop(chat, dispatcher).run("x") }
-        val sent = dispatcher.calls.single().second
-        assertEquals(setOf("selector", "timeout"), sent.keys)
-        assertEquals(AgentTools.MAX_WAIT_TIMEOUT_MS, sent["timeout"])
-    }
-
-    @Test
     fun actionToolsOnlyOfferedWhenAllowed() {
-        val readOnly = toolNames(JsonArray(listOf(AgentTaskList.definition()) + AgentTools.definitions(false)))
+        val readOnly = listOf(AgentTaskList.TOOL_NAME) + AgentBrowserPolicy.methods(false).map { it.replace('-', '_') }
         assertFalse("click" in readOnly)
         assertTrue("get_page_text" in readOnly)
         assertTrue(AgentTaskList.TOOL_NAME in readOnly)
-        val withActions = toolNames(AgentTools.definitions(true))
+        val withActions = AgentBrowserPolicy.methods(true).map { it.replace('-', '_') }
         assertTrue(listOf("click", "fill", "select_option", "check", "uncheck").all { it in withActions })
         listOf("navigate", "evaluate", "screenshot", "get_cookies", "new_tab").forEach { assertFalse(it in withActions) }
 
@@ -192,7 +181,7 @@ class AgentLoopTest {
         val chat =
             ScriptedChat(
                 toolTurn(AssembledToolCall(0, null, "find_element", "{\"text\": ")),
-                toolTurn(AssembledToolCall(0, null, "find_element", "{}")),
+                toolTurn(AssembledToolCall(0, null, "unavailable_tool", "{}")),
                 answer("gave up"),
             )
         val dispatcher = RecordingDispatcher()
@@ -200,7 +189,7 @@ class AgentLoopTest {
         assertEquals("gave up", outcome.text)
         assertTrue(dispatcher.calls.isEmpty())
         assertTrue(outcome.steps[0].preview.contains("not valid JSON"))
-        assertTrue(outcome.steps[1].preview.contains("text is required"))
+        assertTrue(outcome.steps[1].preview.contains("Unknown tool"))
         assertEquals("call_1", OpenAIJson.string(chat.transcripts[1].last()["tool_call_id"]))
     }
 

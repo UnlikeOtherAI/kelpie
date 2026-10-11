@@ -54,8 +54,11 @@ class RouterAgentToolBridge(
                                 mcp = true,
                             ).orEmpty()
                     val payload = response["result"] as? Map<*, *> ?: return response
-                    val text = (payload["content"] as? List<*>)?.mapNotNull { it as? Map<*, *> }
-                        ?.firstOrNull { it["type"] == "text" }?.get("text") as? String
+                    val text =
+                        (payload["content"] as? List<*>)
+                            ?.mapNotNull { it as? Map<*, *> }
+                            ?.firstOrNull { it["type"] == "text" }
+                            ?.get("text") as? String
                     return text?.let { OpenAIJson.parseObjectOrNull(it)?.let(OpenAIJson::toMap) }
                         ?: mapOf("ok" to false, "error" to "Invalid gateway tool result")
                 }

@@ -1,13 +1,13 @@
 package com.kelpie.browser.network
 
-import com.kelpie.browser.ai.openai.AgentTools
+import com.kelpie.browser.ai.openai.AgentBrowserPolicy
 import com.kelpie.browser.ai.openai.OpenAIJson
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.nativecore.BrowserGatewayNative
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ConcurrentHashMap
@@ -37,9 +37,9 @@ class BrowserGatewayBinding(
         allowActions: Boolean,
         tabId: String,
     ): BrowserGatewaySession {
-        val admitted = AgentTools.offered(allowActions)
-        val descriptors = extensions.filter { descriptor -> admitted.any { it.method == descriptor["method"] } }
-        val native = admitted.map { it.method }.toSet() + "get-tabs" + if (allowActions) setOf("type") else emptySet()
+        val admitted = AgentBrowserPolicy.methods(allowActions)
+        val descriptors = extensions.filter { descriptor -> descriptor["method"] in admitted }
+        val native = admitted + "get-tabs" + if (allowActions) setOf("type") else emptySet()
         return lock.withLock { session(native.intersect(methods), descriptors, allowActions, tabId) }
     }
 
@@ -83,30 +83,7 @@ class BrowserGatewayBinding(
                     }
                 },
                 beforeMutation = { sessions.filter { it !== gateway }.forEach { it.invalidateLocked() } },
-                dispatch = { method, params ->
-                    withContext(Dispatchers.Main.immediate) {
-                        val active = ctx.tabStore?.activeTabId?.value ?: "0"
-                        if (!BrowserGatewayTabPolicy.permitsDispatch(method, params, pinned, active)) {
-                            errorResponse("TAB_CHANGED", "The requested tab is no longer active")
-                        } else if (method in setOf("switch-tab", "close-tab", "new-tab")) {
-                            router.handle(method, params, fromGateway = true).second
-                        } else {
-                            val view = ctx.webView
-                            if (view == null) errorResponse("NO_WEBVIEW", "No WebView") else ctx.withBrowserTarget(view) {
-                                val result = if (method == "browser-control-evaluate") {
-                                    val expression = params["expression"] as? String ?: error("Missing fixed reader")
-                                    val value = ctx.evaluateJSReturningJSON(expression)
-                                    if (value.isEmpty()) errorResponse("RENDERER_ERROR", "The fixed reader returned no JSON object")
-                                    else successResponse(mapOf("result" to value))
-                                } else router.handle(method, params, fromGateway = true).second
-                                if ((ctx.tabStore?.activeTabId?.value ?: "0") != active) errorResponse("TAB_CHANGED", "The requested tab changed during dispatch")
-                                else if (pinned != null && method == "get-tabs") result + ("tabs" to
-                                    (result["tabs"] as? List<*>)?.filter { (it as? Map<*, *>)?.get("id") == pinned }.orEmpty())
-                                else result
-                            }
-                        }
-                    }
-                },
+                dispatch = { method, params -> execute(method, params, pinned) },
             )
         sessions.add(gateway)
         return gateway
@@ -122,17 +99,29 @@ class BrowserGatewayBinding(
             action()
         }
 
-    suspend fun readContext(
-        tabId: String,
-        method: String,
-    ): Map<String, Any?> =
-        lock.withLock {
-            if ((ctx.tabStore?.activeTabId?.value ?: "0") != tabId) {
-                errorResponse("TAB_CHANGED", "The pinned tab is no longer active")
-            } else {
-                router.handle(method, emptyMap(), fromGateway = true).second
+    private suspend fun execute(method: String, params: Map<String, Any?>, pinned: String?): Map<String, Any?> =
+        withContext(Dispatchers.Main.immediate) {
+            val boundary = BrowserGatewayDispatch({ ctx.tabStore?.activeTabId?.value ?: "0" }, { ctx.webView })
+            boundary.execute(method, params, pinned) { view ->
+                val result = if (view == null) invoke(method, params) else ctx.withBrowserTarget(view) { invoke(method, params) }
+                if (pinned != null && method == "get-tabs") result + ("tabs" to
+                    (result["tabs"] as? List<*>)?.filter { (it as? Map<*, *>)?.get("id") == pinned }.orEmpty())
+                else result
             }
         }
+
+    private suspend fun invoke(method: String, params: Map<String, Any?>): Map<String, Any?> {
+        if (method != "browser-control-evaluate") return router.handle(method, params, fromGateway = true).second
+        val expression = params["expression"] as? String ?: error("Missing fixed reader")
+        if (ctx.webView == null) return errorResponse("NO_WEBVIEW", "No WebView")
+        val value = ctx.evaluateJSReturningJSON(expression)
+        return if (value.isEmpty()) errorResponse("RENDERER_ERROR", "The fixed reader returned no JSON object")
+        else successResponse(mapOf("result" to value))
+    }
+
+    suspend fun readContext(tabId: String, method: String): Map<String, Any?> = lock.withLock {
+        execute(method, mapOf("tabId" to tabId), tabId)
+    }
 
     suspend fun closeSession(session: BrowserGatewaySession) {
         session.close()
@@ -148,6 +137,6 @@ class BrowserGatewayBinding(
 
     companion object {
         private val REENTRANT_METHODS = setOf("ai-infer", "ai-record")
-        private val READ_METHODS = AgentTools.offered(false).map { it.method }.toSet() + setOf("get-tabs", "get-current-url", "get-capabilities", "get-device-info")
+        private val READ_METHODS = AgentBrowserPolicy.methods(false) + setOf("get-tabs", "get-current-url", "get-capabilities", "get-device-info")
     }
 }

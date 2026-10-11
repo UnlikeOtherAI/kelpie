@@ -9,10 +9,10 @@ import com.kelpie.browser.browser.DialogState
 import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.nativecore.AiManager
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.asContextElement
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -21,6 +21,7 @@ import java.util.Base64
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -40,11 +41,16 @@ class HandlerContext {
     private val operationWebView = ThreadLocal<WebView>()
     var webView: WebView?
         get() = operationWebView.get() ?: visibleWebView
-        set(value) { visibleWebView = value }
+        set(value) {
+            visibleWebView = value
+        }
 
     /** A suspended handler keeps its admitted renderer even if the visible tab changes. */
-    suspend fun <T> withBrowserTarget(view: WebView, block: suspend () -> T): T =
-        withContext(operationWebView.asContextElement(view)) { block() }
+    suspend fun <T> withBrowserTarget(
+        view: WebView,
+        block: suspend () -> T,
+    ): T = withContext(operationWebView.asContextElement(view)) { block() }
+
     var tabStore: TabStore? = null
     var browserDocumentChanged: ((String) -> Unit)? = null
     var keyboardObserver: KeyboardObserver? = null
@@ -106,15 +112,19 @@ class HandlerContext {
         }
 
     suspend fun evaluateJS(script: String): String =
-        suspendCoroutine { cont ->
+        suspendCancellableCoroutine { cont ->
             val wv = webView
             if (wv == null) {
                 cont.resumeWithException(IllegalStateException("No WebView"))
-                return@suspendCoroutine
+                return@suspendCancellableCoroutine
             }
             mainHandler.post {
-                wv.evaluateJavascript(script) { result ->
-                    cont.resume(result ?: "null")
+                if (cont.isActive) {
+                    try {
+                        wv.evaluateJavascript(script) { result -> if (cont.isActive) cont.resume(result ?: "null") }
+                    } catch (error: Exception) {
+                        if (cont.isActive) cont.resumeWithException(error)
+                    }
                 }
             }
         }

@@ -2,7 +2,12 @@ package com.kelpie.browser.network
 
 /** Structural run scope, checked for every canonical request and rich extension invocation. */
 object BrowserGatewayTabPolicy {
-    fun permitsDispatch(method: String, params: Map<String, Any?>, pinned: String?, active: String): Boolean {
+    fun permitsDispatch(
+        method: String,
+        params: Map<String, Any?>,
+        pinned: String?,
+        active: String,
+    ): Boolean {
         if (pinned != null && active != pinned) return false
         if (method in setOf("switch-tab", "close-tab", "new-tab")) return true
         val target = params["tabId"] as? String

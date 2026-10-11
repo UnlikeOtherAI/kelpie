@@ -100,16 +100,45 @@ class BrowserGatewayTests {
         assertFalse(BrowserGatewayTabPolicy.permitsDispatch("switch-tab", target, "one", "two"))
     }
 
-    @Test fun protocolFailureKeepsUncertaintyOnSuccessfulTransport() = runBlocking {
-        val router = Router()
-        val canonical = mapOf("version" to 1, "ok" to false, "error" to mapOf("code" to "CANCELLED", "mayHaveCompleted" to true))
-        router.register("browser-control") { canonical }
-        val response = router.handle("browser-control", emptyMap())
-        assertEquals(200, response.first)
-        assertEquals(true, (response.second["error"] as Map<*, *>)["mayHaveCompleted"])
-        router.register("mcp") { mapOf("jsonrpc" to "2.0", "id" to 1, "error" to mapOf("code" to -32602)) }
-        assertEquals(200, router.handle("mcp", emptyMap()).first)
+    @Test fun dispatchKeepsCapturedRendererAndRefusesResultAfterHumanSwitch() = runBlocking {
+        var active = "one"
+        var visible = "view-one"
+        val boundary = BrowserGatewayDispatch({ active }, { visible })
+        val admitted = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        var touched: String? = null
+        val call = async {
+            boundary.execute("navigate", mapOf("tabId" to "one"), null) { captured ->
+                admitted.complete(Unit)
+                finish.await()
+                touched = captured
+                mapOf("success" to true)
+            }
+        }
+        admitted.await()
+        active = "two"
+        visible = "view-two"
+        finish.complete(Unit)
+        assertEquals(false, call.await()["success"])
+        assertEquals("view-one", touched)
+        var invoked = false
+        boundary.execute("browser-control-evaluate", mapOf("tabId" to "one"), null) { invoked = true; emptyMap() }
+        assertFalse(invoked)
+        val noPage = BrowserGatewayDispatch<String>({ "0" }, { null })
+        assertEquals(true, noPage.execute("get-device-info", emptyMap(), null) { mapOf("success" to (it == null)) }["success"])
     }
+
+    @Test fun protocolFailureKeepsUncertaintyOnSuccessfulTransport() =
+        runBlocking {
+            val router = Router()
+            val canonical = mapOf("version" to 1, "ok" to false, "error" to mapOf("code" to "CANCELLED", "mayHaveCompleted" to true))
+            router.register("browser-control") { canonical }
+            val response = router.handle("browser-control", emptyMap())
+            assertEquals(200, response.first)
+            assertEquals(true, (response.second["error"] as Map<*, *>)["mayHaveCompleted"])
+            router.register("mcp") { mapOf("jsonrpc" to "2.0", "id" to 1, "error" to mapOf("code" to -32602)) }
+            assertEquals(200, router.handle("mcp", emptyMap()).first)
+        }
 
     @Test fun refusalNeverDispatchesAndClosureFreesOnce() =
         runBlocking {
