@@ -132,8 +132,8 @@ artifact cache and are neither bundled nor automatically downloaded by the produ
 These candidates are unpublished. The current Windows release workflow has no
 Authenticode step; the bootstrap/app report `NotSigned` despite the verified CEF
 sandbox. Linux packages were built/inspected on Ubuntu 24.04, without claiming
-Ubuntu 22/Fedora matrix builds or system installation. Rendered account menus,
-live production WSS dispatch/revocation and full page-extraction jobs remain
+Ubuntu 22/Fedora matrix builds or system installation. Live production WSS
+dispatch/revocation and full page-extraction jobs remain
 separate checks pending the coordinated Nessie deployment. The small model check
 proves native execution, not general answer quality or a measured cloud-token saving.
 
@@ -187,4 +187,4 @@ compression and other checks overlapped. Subsequent packaged acceptance, the
 canonical MCP journey, four full debugger acceptance repetitions and another
 debugger run under bounded CPU load exited normally, including restored sessions.
 The original failure is preserved alongside successful logs; its cause has not yet
-been established, so these passes do not prove that the shutdown race is fixed.
+been established, so these passes do not prove that the shutdown failure is resolved.
