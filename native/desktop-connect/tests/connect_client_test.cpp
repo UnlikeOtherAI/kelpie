@@ -4,6 +4,8 @@
 #undef assert
 #define assert(v) do { if(!(v)) { std::fprintf(stderr,"Assertion failed at line %d: %s\n",__LINE__,#v);std::abort(); } } while(false)
 #include <deque>
+#include <iomanip>
+#include <sstream>
 #include <thread>
 using namespace kelpie;
 using namespace kelpie::connect;
@@ -13,6 +15,16 @@ constexpr char kGeneration[]="10000000-0000-4000-8000-000000000001";
 constexpr char kDevice[]="10000000-0000-4000-8000-000000000002";
 constexpr char kJob[]="10000000-0000-4000-8000-000000000003";
 constexpr char kAttempt[]="10000000-0000-4000-8000-000000000004";
+std::string Deadline() {
+  const auto value=std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()+std::chrono::minutes(5));
+  std::tm utc{};
+#ifdef _WIN32
+  gmtime_s(&utc,&value);
+#else
+  gmtime_r(&value,&utc);
+#endif
+  std::ostringstream output;output<<std::put_time(&utc,"%Y-%m-%dT%H:%M:%S.000Z");return output.str();
+}
 struct Wire {
   std::mutex mutex;
   std::deque<std::string> incoming;
@@ -30,7 +42,7 @@ class Socket final:public Transport {
       assert(frame["capabilities"]==Json::array({"browser.control","page.extract"}) && !frame["label"].get<std::string>().empty());
       wire_->incoming.push_back(Json{{"type","welcome"},{"protocol",1},{"generation",kGeneration},{"deviceId",kDevice}}.dump());
       if(wire_->command)wire_->incoming.push_back(Json{{"type","command"},{"generation",kGeneration},{"jobId",kJob},{"attemptId",kAttempt},
-          {"seq",1},{"deadline","2099-10-11T12:00:00.000Z"},{"operation","click"},{"tabId","owned"},{"tabVersion","document"},{"input",{{"selector","#go"}}}}.dump());
+          {"seq",1},{"deadline",Deadline()},{"operation","click"},{"tabId","owned"},{"tabVersion","document"},{"input",{{"selector","#go"}}}}.dump());
     }
   }
   std::optional<std::string> Receive(std::chrono::milliseconds)override {
@@ -107,6 +119,32 @@ int main() {
     client.Shutdown();assert(Wait([&] { return client.Drain(); }));
   }
   std::filesystem::remove_all(cancelling_profile);
+  const auto resume_profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
+  auto resumed=std::make_shared<Wire>();std::mutex guards_mutex;
+  std::vector<std::shared_ptr<const std::atomic<bool>>> guards;
+  std::atomic<bool> callback_waiting=false,release_callback=false;
+  {
+    Client client(account,resume_profile,"windows",kDevice,[&](const Json&,const auto& guard) {
+      { std::lock_guard lock(guards_mutex);guards.push_back(guard); }
+      assert(Wait([&] { return guard->load(); }));return Json{{"state","cancelled"}};
+    },[&](const auto& guard) {
+      if(!callback_waiting.exchange(true)) {
+        assert(guard->load());assert(Wait([&] { return release_callback.load(); }));
+        std::lock_guard lock(guards_mutex);assert(guards.size()==2);
+        assert(guard==guards[0] && guard!=guards[1] && !guards[1]->load());
+      }
+    },[resumed] { return std::make_unique<Socket>(resumed); });
+    client.Update(false);assert(Wait([&] { std::lock_guard lock(guards_mutex);return guards.size()==1; }));
+    auto pausing=std::async(std::launch::async,[&] { client.Pause(true); });
+    assert(Wait([&] { return callback_waiting.load(); }));client.Pause(false);
+    constexpr auto next="10000000-0000-4000-8000-000000000008";
+    { std::lock_guard lock(resumed->mutex);resumed->incoming.push_back(Json{{"type","command"},
+      {"generation",kGeneration},{"jobId",next},{"attemptId",next},{"seq",1},{"deadline",Deadline()},
+      {"operation","click"},{"tabId","owned"},{"tabVersion","document"},{"input",{{"selector","#next"}}}}.dump()); }
+    assert(Wait([&] { std::lock_guard lock(guards_mutex);return guards.size()==2; }));
+    release_callback=true;pausing.get();client.Shutdown();assert(Wait([&] { return client.Drain(); }));
+  }
+  std::filesystem::remove_all(resume_profile);
   auto second=std::make_shared<Wire>();
   {
     Client client(account,profile,"windows",kDevice,execute,{},[second] { return std::make_unique<Socket>(second); });
