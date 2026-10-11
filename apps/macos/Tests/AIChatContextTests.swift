@@ -114,4 +114,25 @@ final class AIChatContextTests: XCTestCase {
             XCTFail("Missing tab was accepted")
         } catch { XCTAssertTrue(error is HandlerError) }
     }
+
+    func testSuppliedTextAndFullHistoryArePreservedInNativePrompt() async throws {
+        let handler = AIHandler(context: HandlerContext())
+        let supplied = "Explicit context with a logo named Philips"
+        let history = (0..<24).map { index in
+            ["role": index.isMultiple(of: 2) ? "user" : "assistant", "content": "Turn \(index)"]
+        }
+        // Explicit context remains usable without a browser tab or a page extraction.
+        let page = try await handler.localChatPage(
+            ["text": supplied, "context": "page_text", "messages": history], tabId: UUID().uuidString
+        )
+        XCTAssertEqual(page.text, supplied)
+        let prompt = try page.nativePrompt(prompt: "Recall the first turn", history: history)
+        let prefix = "Conversation (JSON, oldest first):\n"
+        let serialized = try XCTUnwrap(prompt.components(separatedBy: prefix).last?
+            .components(separatedBy: "\n\nAnswer the last user message:").first)
+        let messages = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(serialized.utf8)) as? [[String: String]])
+        XCTAssertEqual(Array(messages.dropLast()), history)
+        XCTAssertEqual(messages.last, ["role": "user", "content": "Recall the first turn"])
+        XCTAssertTrue(prompt.contains(supplied))
+    }
 }
