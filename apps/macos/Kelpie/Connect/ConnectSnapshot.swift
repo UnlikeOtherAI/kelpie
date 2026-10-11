@@ -15,7 +15,7 @@ final class ConnectSnapshot {
                     "prefix": "observed", "maxElements": 150,
                     "maxChars": max(64, min(16000, body["maxChars"] as? Int ?? 16000)), "includeShadow": false]
                 let data = try JSONSerialization.data(withJSONObject: options)
-                let raw = String(decoding: data, as: UTF8.self)
+                guard let raw = String(data: data, encoding: .utf8) else { throw CancellationError() }
                 guard let pointer = raw.withCString({ kelpie_browser_selector_snapshot_expression($0) }) else {
                     throw CancellationError()
                 }
