@@ -19,7 +19,7 @@ bool WebURL(const std::string& url) {
   std::transform(authority.begin(),authority.end(),authority.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
   return !authority.empty() && authority.find('@')==std::string::npos && authority!="authentication.unlikeotherai.com" && !authority.starts_with("authentication.unlikeotherai.com:");
 }
-std::chrono::milliseconds Remaining(const std::string& text) {
+std::chrono::milliseconds JobRemaining(const std::string& text) {
   std::tm value{}; int year,month,day,hour,minute,second;
   if(text.size()!=24 || text[19]!='.' || text[23]!='Z' ||
       std::sscanf(text.c_str(),"%4d-%2d-%2dT%2d:%2d:%2d",&year,&month,&day,&hour,&minute,&second)!=6)
@@ -33,11 +33,14 @@ std::chrono::milliseconds Remaining(const std::string& text) {
   int millis=0; const auto parsed=std::from_chars(text.data()+20,text.data()+23,millis);
   if(parsed.ec!=std::errc() || parsed.ptr!=text.data()+23)throw std::invalid_argument("Invalid deadline");
   const auto end=std::chrono::system_clock::from_time_t(seconds)+std::chrono::milliseconds(millis);
-  return std::min(std::chrono::milliseconds(10000),std::chrono::duration_cast<std::chrono::milliseconds>(end-std::chrono::system_clock::now()));
+  return std::chrono::duration_cast<std::chrono::milliseconds>(end-std::chrono::system_clock::now());
 }
+std::chrono::milliseconds Remaining(const std::string& text) { return std::min(std::chrono::milliseconds(10000),JobRemaining(text)); }
 }
 Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<bool>> cancelled) {
-  const auto timeout=Remaining(command.at("deadline"));
+  const auto job_remaining=JobRemaining(command.at("deadline"));
+  const auto deadline=std::chrono::steady_clock::now()+job_remaining;
+  const auto timeout=std::min(std::chrono::milliseconds(10000),job_remaining);
   if(timeout.count()<=0)return Failed("DEADLINE_EXCEEDED");
   if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
   const auto operation=command.at("operation").get<std::string>(); const auto input=command.at("input");
@@ -49,7 +52,7 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
   }
   if(operation=="open") {
     const auto url=input.at("url").get<std::string>();if(!WebURL(url))return Failed("INVALID_URL");
-    NewTabRequest request;request.url=url;request.cancelled=cancelled;request.deadline=std::chrono::steady_clock::now()+timeout;
+    NewTabRequest request;request.url=url;request.cancelled=cancelled;request.deadline=deadline;
     TabSnapshot tab; const auto result=browser_.CreateTab(request,&tab,timeout);
     if(!result.ok)return Failed(result.operation_may_have_completed?"UNKNOWN_EFFECTS":result.error_code);
     return {{"state","completed"},{"output",{{"tab",Tab(tab)}}}};
@@ -59,13 +62,11 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
   lease.document_version=command.at("tabVersion").get<std::string>();
   if(!resolved.ok)return Failed(resolved.error_code);
   lease.cancelled=cancelled;
-  lease.deadline=std::chrono::steady_clock::now()+Remaining(command.at("deadline"));
+  lease.deadline=deadline;
   if(resolved.tab && (resolved.tab->url.starts_with("https://authentication.unlikeotherai.com") || resolved.tab->url.starts_with("http://authentication.unlikeotherai.com")))return Failed("ACCOUNT_SURFACE_FORBIDDEN");
   if(!browser_.ActivateTab(lease,timeout).ok)return Failed("TAB_NOT_FOUND");
   if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
   lease.require_active=true;
-  lease.cancelled=cancelled;
-  lease.deadline=std::chrono::steady_clock::now()+Remaining(command.at("deadline"));
   Json output;
   if(operation=="navigate" || operation=="back" || operation=="forward" || operation=="reload") {
     TabSnapshot tab; BrowserControlResult result;
@@ -92,7 +93,7 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
           {"maxTokens",384},{"temperature",0.2},{"agent",false}});
       if(!answer.value("success",false))return Failed("EXTRACTION_FAILED");
       if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
-      if(Remaining(command.at("deadline")).count()<=0)return Failed("DEADLINE_EXCEEDED");
+      if(std::chrono::steady_clock::now()>=deadline || JobRemaining(command.at("deadline")).count()<=0)return Failed("DEADLINE_EXCEEDED");
       Json verified;const auto current=browser_.Evaluate(lease,"location.href",&verified,Remaining(command.at("deadline")));
       if(!current.ok)return Failed("PAGE_CHANGED");
       const auto now=std::chrono::system_clock::now();const auto seconds=std::chrono::system_clock::to_time_t(now);std::tm utc{};

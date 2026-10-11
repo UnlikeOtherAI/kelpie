@@ -5,6 +5,7 @@
 #include "account_protocol.h"
 #include <cassert>
 #include <fstream>
+#include <ctime>
 using namespace kelpie;
 using namespace kelpie::connect;
 namespace {
@@ -34,7 +35,7 @@ class Browser final:public DesktopBrowserControl {
   BrowserControlResult Back(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
   BrowserControlResult Forward(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
   BrowserControlResult Reload(TabLease lease,TabSnapshot* out,Timeout timeout)override { return Navigate(lease,"",out,timeout); }
-  BrowserControlResult Evaluate(TabLease lease,std::string,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok)*out={{"text","Page content"}};return r; }
+  BrowserControlResult Evaluate(TabLease lease,std::string,Json* out,Timeout timeout)override { assert(timeout<=std::chrono::seconds(10));const auto r=Check(lease);if(r.ok)*out={{"text","Page content"}};return r; }
   BrowserControlResult Screenshot(TabLease lease,BrowserScreenshot* out,Timeout)override { const auto r=Check(lease);out->base64_data="AA==";return r; }
   BrowserControlResult DispatchTrustedInput(TabLease lease,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok){++effects;*out={{"success",true}};}return r; }
   BrowserControlResult DevTools(TabLease lease,std::string,const Json&,Json* out,Timeout)override { const auto r=Check(lease);if(r.ok)*out={{"nodes",Json::array()}};return r; }
@@ -79,6 +80,18 @@ int main() {
   assert(changed_infer.Execute(Command("extract",{{"question","Read page"}}),guard)["error"]=="PAGE_CHANGED");browser.tab.document_version="document-1";
   Executor focus_infer(browser,[&](const Json&) { browser.tab.active=false;return Json{{"success",true},{"response","stale"}}; });
   assert(focus_infer.Execute(Command("extract",{{"question","Read page"}}),guard)["error"]=="PAGE_CHANGED");
+  const auto future_time=std::time(nullptr)+300;std::tm future{};
+#ifdef _WIN32
+  gmtime_s(&future,&future_time);
+#else
+  gmtime_r(&future_time,&future);
+#endif
+  char future_text[32]{};std::strftime(future_text,sizeof(future_text),"%Y-%m-%dT%H:%M:%S.000Z",&future);
+  auto long_job=Command("extract",{{"question","Read page"}});long_job["deadline"]=future_text;
+  std::optional<std::chrono::steady_clock::time_point> inference_deadline;
+  Executor long_inference(browser,[&](const Json&) { inference_deadline=browser.used.deadline;return Json{{"success",true},{"response","Answer"}}; });
+  assert(long_inference.Execute(long_job,guard)["state"]=="completed");
+  assert(inference_deadline==browser.used.deadline && inference_deadline && *inference_deadline-std::chrono::steady_clock::now()>std::chrono::minutes(4));
   std::string split="\x81\x05hello";auto half=split.substr(0,4);assert(!DecodeFrame(half));half+=split.substr(4);assert(DecodeFrame(half)->payload=="hello");
   std::string masked="\x81\x80";bool rejected=false;try { DecodeFrame(masked); }catch(...) { rejected=true; }assert(rejected);
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();
