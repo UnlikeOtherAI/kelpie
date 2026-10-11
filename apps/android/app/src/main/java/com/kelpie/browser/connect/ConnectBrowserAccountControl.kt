@@ -124,11 +124,16 @@ class ConnectBrowserAccountControl(
                     } else {
                         targetRouter.handle(nativeMethod, params, fromGateway = true).second
                     }
-                    val remainsAuthorized = if (navigationLease != null && targetTab != null) {
-                        navigationLease.allowsRead(targetTab.documentVersion, targetTab.isLoading, navigationAuthority())
-                    } else {
-                        accountAuthority(scope, command, tabId, expected, method == "tabs.select")
-                    }
+                    val remainsAuthorized =
+                        if (navigationLease != null && targetTab != null && nativeMethod == "navigate") {
+                            navigationLease.allowsRead(
+                                targetTab.documentVersion,
+                                targetTab.isLoading,
+                                navigationAuthority(),
+                            )
+                        } else {
+                            accountAuthority(scope, command, tabId, expected, method == "tabs.select")
+                        }
                     if (!remainsAuthorized) {
                         errorResponse("TAB_CHANGED", "The controlled page changed")
                     } else {
