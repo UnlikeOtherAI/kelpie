@@ -176,8 +176,10 @@ object NessieConnection {
         lifetime = scope.launch { connectLoop(current) }
     }
 
-    fun authorizes(command: Map<String, Any?>): Boolean = canMutate &&
-        state.value.running && ConnectAuthorization.from(command)?.matches(currentCommand) == true
+    fun authorizes(command: Map<String, Any?>): Boolean =
+        canMutate &&
+            state.value.running &&
+            ConnectAuthorization.from(command)?.matches(currentCommand) == true
 
     private suspend fun connectLoop(current: UUID) {
         var backoff = 2000L
@@ -432,9 +434,11 @@ object NessieConnection {
 
     private fun deviceLabel(): String =
         runCatching {
-            android.provider.Settings.Global.getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
+            android.provider.Settings.Global
+                .getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
                 ?.takeIf { it.isNotBlank() }
-        }.getOrNull()?.take(120) ?: android.os.Build.MODEL.take(120)
+        }.getOrNull()?.take(120) ?: android.os.Build.MODEL
+            .take(120)
 
     private fun installationId(): String {
         val prefs = appContext?.getSharedPreferences("nessie.connect", Context.MODE_PRIVATE) ?: error("App unavailable")
