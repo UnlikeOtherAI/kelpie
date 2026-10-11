@@ -81,6 +81,9 @@ describe("Windows local alias MCP stdio", () => {
     expect(tools.tools.map((tool) => tool.name)).not.toContain("kelpie_find_element");
 
     expect(tools.tools.map((tool) => tool.name)).toContain("kelpie_browser_control");
+    const coreDefinition = tools.tools.find((tool) => tool.name === "kelpie_browser_control")!;
+    expect(JSON.stringify(coreDefinition.inputSchema).length).toBeLessThan(24_000);
+    expect(JSON.stringify(coreDefinition.inputSchema)).not.toContain("locator.fill");
     const coreCapabilities = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "capabilities", params: {} } } });
     const capabilityText = (coreCapabilities.content as { type: string; text?: string }[]).find((item) => item.type === "text")?.text;
     const coreMethods = JSON.parse(capabilityText ?? "{}").value.methods as string[];

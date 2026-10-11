@@ -69,11 +69,13 @@ const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "t
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();
-export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[] } = {}): Record<string, unknown> {
-  if (!options.methods) return z.toJSONSchema(BrowserControlEnvelopeSchema, { reused: "ref" });
+export function browserControlRequestSchema(options: { methods?: readonly BrowserControlMethod[] } = {}) {
+  if (!options.methods) return BrowserControlRequestSchema;
   const allowed = new Set(options.methods);
   const variants = BrowserControlRequestSchema.options.filter((option) => allowed.has(option.shape.method.value));
   if (!variants.length) throw new Error("At least one browser method must be included in the input schema.");
-  const scoped = z.union(variants);
-  return z.toJSONSchema(z.object({ request: scoped }).strict(), { reused: "ref" });
+  return z.union(variants);
+}
+export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[] } = {}): Record<string, unknown> {
+  return z.toJSONSchema(z.object({ request: browserControlRequestSchema(options) }).strict(), { reused: "ref" });
 }
