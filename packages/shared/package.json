@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
     "test": "vitest run --exclude tests/browser-control.browser.test.ts",
     "lint": "eslint src/ tests/",
     "test:browser": "vitest run tests/browser-control.browser.test.ts"

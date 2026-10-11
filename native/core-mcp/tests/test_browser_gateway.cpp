@@ -82,6 +82,16 @@ void Mcp() {
   assert(content.size() == 2);
   assert(content[0]["type"] == "image");
   assert(content[1]["text"].get<std::string>().find("AQID") == std::string::npos);
+  const json extension = {{"name", "shot"}, {"method", "screenshot"}, {"mutates", false}, {"inputSchema", {{"type", "object"}}}};
+  kelpie::BrowserGateway rich({{"nativeMethods", {"screenshot"}}, {"requireAuthorization", false}, {"extensions", json::array({extension})}});
+  rich.BeginMcp({{"jsonrpc", "2.0"}, {"id", 3}, {"method", "tools/call"}, {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "shot"}, {"arguments", json::object()}}}}}});
+  step = rich.Advance({{"success", true}, {"image", "AQID"}, {"format", "jpeg"}});
+  const auto blocks = step["response"]["result"]["content"];
+  assert(blocks.size() == 2 && blocks[0]["mimeType"] == "image/jpeg");
+  assert(blocks[1]["text"].get<std::string>().find("AQID") == std::string::npos);
+  kelpie::BrowserGateway fallback({{"nativeMethods", {"navigate", "get-current-url"}}, {"browserAvailable", false}});
+  assert(fallback.Capabilities()["methods"].size() == 2);
+  assert(fallback.Begin(Request("tab.goto", {{"url", "url"}}))["response"]["error"]["code"] == "UNSUPPORTED");
 }
 void ExtensionReachability() {
   const json schema = {{"type", "object"}, {"properties", {{"url", {{"type", "string"}}}}}, {"required", {"url"}}, {"additionalProperties", false}};
@@ -130,6 +140,10 @@ void SelectedAndMapping() {
   step = direct.Begin(Request("tab.screenshot", {{"fullPage", false}}));
   assert(step["method"] == "screenshot");
   assert(!step["params"].contains("fullPage"));
+  step = direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "webp"}});
+  assert(step["response"]["value"]["mimeType"] == "image/webp");
+  direct.Begin(Request("tab.screenshot"));
+  assert(direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "invalid"}})["response"]["error"]["code"] == "COMMAND_FAILED");
 }
 void CAbi() {
   const auto gateway = kelpie_browser_gateway_create("{\"nativeMethods\":[]}");
@@ -157,4 +171,9 @@ void CAbi() {
   kelpie_mcp_free_string(result);
   kelpie_browser_gateway_destroy(large_gateway);
 }
-int main() { Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+void Notifications() {
+  kelpie::BrowserGateway gateway({{"nativeMethods", json::array()}});
+  assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
+  assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
+}
+int main() { Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

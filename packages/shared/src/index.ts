@@ -6,3 +6,5 @@ export * from "./auth-types.js";
 export * from "./coordinate-diagnostics-types.js";
 export * from "./partition.js";
 export * from "./mcp-tools.js";
+export * from "./extension-tools.js";
+export * from "./extension-ai-tools.js";

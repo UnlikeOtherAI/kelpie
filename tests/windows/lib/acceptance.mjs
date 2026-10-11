@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { control, expectControlError, mcpRequest, rawRequest, resultValue, sameUrl, waitFor } from "./http.mjs";
+import { runCanonicalAcceptance } from "./canonical-browser.mjs";
 import { decodePng } from "./png.mjs";
 
 function assertion(condition, message) {
@@ -366,9 +367,10 @@ async function runMcp(readiness, fixtureUrl) {
     assertion(typeof tool.name === "string" && tool.name.startsWith("kelpie_"), "MCP tools need kelpie_ names");
     assertion(tool.inputSchema?.type === "object", `MCP tool ${tool.name} needs an object input schema`);
   }
-  // Every Windows control exercised above must be exposed through MCP as well.
-  // Direct HTTP proves the action works; this inventory check prevents a usable
-  // route from being silently unavailable to development/Nessie agents.
+  assert.deepEqual(tools.map(tool => tool.name), ["kelpie_browser_control", "kelpie_extensions", "kelpie_extension_tools", "kelpie_extension"]);
+  assert.ok(Buffer.byteLength(JSON.stringify(tools)) < 24000);
+  const discovered = await mcpRequest(readiness, { jsonrpc: "2.0", id: 20, method: "tools/call", params: { name: "kelpie_extensions", arguments: {} } }, protocolVersion);
+  const names = JSON.parse(discovered.json.result.content.find(item => item.type === "text").text).value;
   for (const name of [
     "kelpie_navigate", "kelpie_back", "kelpie_forward", "kelpie_reload",
     "kelpie_evaluate", "kelpie_get_page_text", "kelpie_get_accessibility_tree", "kelpie_find_element",
@@ -380,15 +382,15 @@ async function runMcp(readiness, fixtureUrl) {
     "kelpie_bookmarks_add", "kelpie_bookmarks_list", "kelpie_history_list",
     "kelpie_set_home", "kelpie_get_home", "kelpie_resize_viewport", "kelpie_reset_viewport",
   ]) {
-    assertion(tools.some(tool => tool.name === name), `required MCP tool ${name} was not listed`);
+    assertion(names.includes(name), `required MCP extension ${name} was not discoverable`);
   }
 
-  const navigate = await mcpRequest(readiness, { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "kelpie_navigate", arguments: { url: fixtureUrl } } }, protocolVersion);
+  const navigate = await mcpRequest(readiness, { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "kelpie_extension", arguments: { name: "kelpie_navigate", arguments: { url: fixtureUrl } } } }, protocolVersion);
   assert.equal(navigate.status, 200, `MCP navigation failed: ${navigate.text}`);
   assert.notEqual(navigate.json?.result?.isError, true, "MCP navigation tool must be callable");
-  assert.equal(JSON.parse(navigate.json?.result?.content?.find(item => item.type === "text")?.text ?? "{}").success, true,
+  assert.equal(JSON.parse(navigate.json?.result?.content?.find(item => item.type === "text")?.text ?? "{}").value.success, true,
     "MCP navigation tool must return a success payload");
-  const screenshot = await mcpRequest(readiness, { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "kelpie_screenshot", arguments: { format: "png" } } }, protocolVersion);
+  const screenshot = await mcpRequest(readiness, { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "kelpie_extension", arguments: { name: "kelpie_screenshot", arguments: { format: "png" } } } }, protocolVersion);
   assert.equal(screenshot.status, 200, `MCP screenshot failed: ${screenshot.text}`);
   assert.notEqual(screenshot.json?.result?.isError, true, `MCP screenshot tool must be callable: ${screenshot.text.slice(0, 500)}`);
   decodePng(Buffer.from(imageFrom(screenshot.json?.result), "base64"));
@@ -409,7 +411,7 @@ export async function runNessieClient(readiness, fixtureUrl, nessieRoot) {
   });
   try {
     const tools = await manager.listTools(id, { timeoutMs: 10_000 });
-    assertion(tools.some(tool => tool.name === "kelpie_navigate"), "Nessie client did not discover kelpie_navigate");
+    assertion(tools.some(tool => tool.name === "kelpie_extension"), "Nessie client did not discover extension caller");
     const text = await manager.callTool(id, "kelpie_navigate", { url: fixtureUrl }, { timeoutMs: 10_000 });
     assert.notEqual(text.isError, true, "Nessie client navigation must succeed");
     const image = await manager.callTool(id, "kelpie_screenshot", { format: "png" }, { timeoutMs: 10_000 });
@@ -436,7 +438,7 @@ export async function runNessieStdioClient({ cliPath, cliHome, alias, fixtureUrl
   });
   try {
     const tools = await manager.listTools(id, { timeoutMs: 10_000 });
-    assertion(tools.some(tool => tool.name === "kelpie_navigate"), "Nessie stdio client did not discover kelpie_navigate");
+    assertion(tools.some(tool => tool.name === "kelpie_extension"), "Nessie stdio client did not discover extension caller");
     const navigation = await manager.callTool(id, "kelpie_navigate", { url: fixtureUrl }, { timeoutMs: 10_000 });
     assert.notEqual(navigation.isError, true, "Nessie stdio navigation through the CLI must succeed");
     const screenshot = await manager.callTool(id, "kelpie_screenshot", { format: "png" }, { timeoutMs: 10_000 });
@@ -453,6 +455,7 @@ export async function runCoreAcceptance(readiness, fixtureUrl) {
   await runSecurity(readiness);
   await runBrowserActions(readiness, fixtureUrl);
   await runMcp(readiness, fixtureUrl);
+  await runCanonicalAcceptance(readiness, fixtureUrl);
 }
 
 export async function runLiveAcceptance(readiness, fixtureUrl, nessieRoot) {
