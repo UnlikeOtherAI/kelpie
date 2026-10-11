@@ -129,12 +129,12 @@ Launch the exact development candidate on a dedicated port (Mac `--port 18520`),
 then run `node scripts/native/apple-browser-control-journey.mjs http://127.0.0.1:18520 macos`
 or launch the Debug simulator with `--port 18530` and use that port plus `ios`.
 The journey first reuses an existing authorized exact-socket CLI client if present;
-otherwise approve its visible one-session pairing
+approve its visible disposable one-session pairing
 request. The fixture uses a standard MCP SDK client and exercises private-world
 spoof resistance, editable-value omission, atomic observed actions, append, stale
 DOM replacement, screenshot presentation, and both Mac renderer profiles. Pairing
-tokens stay in process memory and new fixture grants are revoked; existing CLI
-grants are preserved, and fixture tabs close afterward.
+tokens stay in process memory; the fixture always creates its own grant and
+asserts successful revocation and refusal of the old bearer. Fixture tabs close afterward.
 
 Long-running rich inference/recording extensions use a dedicated coordinator,
 selected by the authoritative extension descriptor, so the persistent direct
