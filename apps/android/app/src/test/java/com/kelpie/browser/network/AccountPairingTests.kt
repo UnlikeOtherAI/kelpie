@@ -29,12 +29,13 @@ class AccountPairingTests {
     private fun request(
         token: String,
         duplicate: Boolean = false,
+        source: String = "peer",
     ) = ParsedRequest(
         "POST",
         "/v1/browser-control",
         mapOf("authorization" to if (duplicate) listOf("Bearer $token", "Bearer other") else listOf("Bearer $token")),
         false,
-        "peer",
+        source,
     )
 
     private suspend fun connect(auth: AccountPairingAuthorization): Pair<String, String> {
@@ -63,6 +64,7 @@ class AccountPairingTests {
             assertNull(store.validateBearer(token))
             assertEquals(AuthDecision.Authenticated("client"), auth.evaluate(request(token)))
             assertEquals(AuthDecision.Authenticated("client"), auth.evaluate(request(token)))
+            assertEquals(401, (auth.evaluate(request(token, source = "another-peer")) as AuthDecision.Reject).status)
             assertEquals(3, checks)
             assertNull(store().accountApproval(token))
         }

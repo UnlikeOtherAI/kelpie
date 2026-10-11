@@ -61,6 +61,7 @@ struct AccountPairingAuthorization {
               let header = request.headers["authorization"]?.first, header.lowercased().hasPrefix("bearer ") else { return decision }
         let token = String(header.dropFirst(7)).trimmingCharacters(in: .whitespaces)
         guard let approval = store.accountApproval(token), let grant = approval.accountGrant,
+              request.sourceAddress == grant.sourceAddress,
               await session() == grant.session,
               let expiry = await verify(grant.ticket, grant.challenge, approval.clientId, grant.session), expiry > now(),
               await session() == grant.session, store.accountApproval(token) == approval else { return decision }

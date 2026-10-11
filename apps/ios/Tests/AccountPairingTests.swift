@@ -7,10 +7,10 @@ final class AccountPairingTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: ["account": true, "clientId": "client", "clientName": "Client"].merging(fields) { _, new in new })
     }
 
-    private func request(_ token: String, duplicate: Bool = false) -> ParsedHTTPRequest {
+    private func request(_ token: String, duplicate: Bool = false, source: String = "peer") -> ParsedHTTPRequest {
         ParsedHTTPRequest(method: "POST", path: "/v1/browser-control", query: "",
                           headers: ["authorization": duplicate ? ["Bearer \(token)", "Bearer other"] : ["Bearer \(token)"]],
-                          body: Data(), sourceAddress: "peer", hasTransferEncoding: false)
+                          body: Data(), sourceAddress: source, hasTransferEncoding: false)
     }
 
     private func connect(_ auth: AccountPairingAuthorization) async throws -> (challenge: String, token: String) {
@@ -39,6 +39,8 @@ final class AccountPairingTests: XCTestCase {
         let second = await auth.evaluate(request(connected.token))
         XCTAssertEqual(first, .authenticated(clientId: "client"))
         XCTAssertEqual(second, first)
+        let otherPeer = await auth.evaluate(request(connected.token, source: "another-peer"))
+        guard case .reject(401, _, _) = otherPeer else { return XCTFail("Account bearer must stay source-bound") }
         XCTAssertEqual(checks, 3)
         XCTAssertNil(PairingStore(storeURL: nil).accountApproval(connected.token))
     }

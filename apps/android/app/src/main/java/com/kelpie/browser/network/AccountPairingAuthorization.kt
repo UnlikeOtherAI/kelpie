@@ -65,7 +65,7 @@ class AccountPairingAuthorization(
         val token = header.drop(7).trim()
         val approval = store.accountApproval(token) ?: return decision
         val grant = approval.accountGrant ?: return decision
-        if (session() != grant.session) return decision
+        if (request.sourceAddress != grant.sourceAddress || session() != grant.session) return decision
         val expiry = verify(grant.ticket, grant.challenge, approval.clientId, grant.session) ?: return decision
         if (expiry <= System.currentTimeMillis() || session() != grant.session || store.accountApproval(token) != approval) return decision
         return middleware.evaluate(request, verifiedAccountClientId = approval.clientId)
