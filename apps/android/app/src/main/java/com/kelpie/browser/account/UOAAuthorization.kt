@@ -57,7 +57,7 @@ class UOAAuthorization(
 
     companion object {
         const val CALLBACK = "com.unlikeotherai.kelpie://oauth/callback"
-        const val SCOPES = "openid profile settings.read settings.write"
+        const val SCOPES = "openid profile settings.read settings.write kelpie.connect"
 
         private fun randomValue(): String = base64(ByteArray(32).also(SecureRandom()::nextBytes))
 
