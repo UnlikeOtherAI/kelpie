@@ -26,7 +26,9 @@ struct DOMHandler {
                         href: link.href, text: (link.textContent || '').trim().substring(0, 200)
                     }))};
                 })()
-                """, windowId: HandlerContext.windowId(from: body), tabId: HandlerContext.tabId(from: body)
+                """,
+                windowId: HandlerContext.windowId(from: body),
+                tabId: HandlerContext.tabId(from: body)
             )
             return successResponse(result)
         } catch {

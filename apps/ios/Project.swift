@@ -98,6 +98,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/UOASessionTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
         .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
+        .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
         .target(name: "Kelpie"),

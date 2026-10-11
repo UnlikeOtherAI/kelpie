@@ -103,6 +103,7 @@ final class TabStore: ObservableObject {
 
     // Keyed by tab ID so unbind() can cancel cleanly.
     private var tabSinks: [UUID: AnyCancellable] = [:]
+    private var sessionPersistence = true
 
     init() {
         var restoredTabs: [Tab] = []
@@ -125,6 +126,14 @@ final class TabStore: ObservableObject {
         bind(initial)
         tabs = [initial]
         activeTabID = initial.id
+    }
+
+    /// An isolated renderer harness owns an in-memory tab without restoring,
+    /// observing or persisting a person's browser session/history.
+    init(isolatedTab: Tab) {
+        sessionPersistence = false
+        tabs = [isolatedTab]
+        activeTabID = isolatedTab.id
     }
 
     /// Rebuild one tab from its persisted record, or `nil` when it must not be
@@ -213,6 +222,7 @@ final class TabStore: ObservableObject {
     }
 
     private func persistSession() {
+        guard sessionPersistence else { return }
         SessionStore.save(tabs: tabs, activeID: activeTabID)
     }
 }

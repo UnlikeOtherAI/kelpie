@@ -113,6 +113,9 @@ repository's release workflow does not establish Developer ID notarization, and
 iOS simulator artifacts do not establish physical-device signing or an IPA release.
 Binding regressions live in `BrowserControlGatewayTests` (compiled on both Apple
 targets), alongside the model-loop fixtures and shared native CTest coverage.
+`RealWebKitBrowserControlTests` runs the production Swift router, native C ABI,
+private reader/actions and screenshot against a non-persistent, XCTest-owned
+WebView/window on both platforms, without pairing or restoring user data.
 
 Apple `/mcp` accepts an authenticated MCP initialize/list/call handshake. Accepted
 notifications return HTTP 202 with an empty body; canonical operation failures

@@ -164,10 +164,16 @@ final class BrowserControlGatewayTests: XCTestCase {
                 "name": "kelpie_ai_ask", "arguments": ["prompt": "fixture"]
             ]]
         ]) }
-        while pending == nil { await Task.yield() }
+        for _ in 0..<100 where pending == nil { await Task.yield() }
+        guard let pending else {
+            inference.cancel()
+            _ = await inference.value
+            XCTFail("Inference extension did not reach its admitted native handler")
+            return
+        }
         let independent = await router.browserControl(["version": 1, "method": "documentation", "params": [:]])
         XCTAssertEqual(independent["ok"] as? Bool, true)
-        pending?.resume(returning: successResponse(["response": "fixture"]))
+        pending.resume(returning: successResponse(["response": "fixture"]))
         let result = await inference.value
         XCTAssertEqual((result["result"] as? [String: Any])?["isError"] as? Bool, false)
     }
