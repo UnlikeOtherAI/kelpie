@@ -247,7 +247,7 @@ class ConnectBrowserNavigationTest {
                 }
                 val authority = Authority()
                 val expires = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
-                val browser = ConnectBrowser(context, app.cacheDir) { authority.allowed && System.nanoTime() < expires }
+                val browser = ConnectBrowser(context, app.cacheDir, app) { authority.allowed && System.nanoTime() < expires }
                 try {
                     withTimeout(10000) { block(browser, context, server, authority) }
                 } finally {
