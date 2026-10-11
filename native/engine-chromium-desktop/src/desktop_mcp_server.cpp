@@ -59,10 +59,11 @@ class DesktopMcpServer::Impl {
       return (*result)["image"].get_ref<const std::string&>().size();
     });
     if (refused) return gateway->Cancel()["response"];
-    if (fit != ScreenshotFit::kTooLarge) return std::nullopt;
-    gateway->Cancel();
-    return json{{"version", 1}, {"ok", false}, {"error", {{"code", "SCREENSHOT_TOO_LARGE"},
-        {"message", "The viewport screenshot exceeds the account result budget."}, {"mayHaveCompleted", false}}}};
+    // The gateway maps this native refusal to the canonical SCREENSHOT_TOO_LARGE failure.
+    if (fit == ScreenshotFit::kTooLarge)
+      *result = {{"success", false}, {"error", {{"code", "SCREENSHOT_TOO_LARGE"},
+          {"message", "The viewport screenshot exceeds the account result budget."}}}};
+    return std::nullopt;
   }
   json Run(json step, const DesktopMcpServer::StepAuthorization& authorize = {},
            const std::optional<TabLease>& job_lease = std::nullopt, std::size_t screenshot_limit = 0) const {

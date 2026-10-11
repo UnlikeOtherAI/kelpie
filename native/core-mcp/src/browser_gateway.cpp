@@ -156,7 +156,12 @@ json BrowserGateway::Advance(json result) {
   const auto fail = [&] { impl_->Finish(Failure("COMMAND_FAILED", impl_->uncertain)); };
   try {
     if (!result.is_object() || !result.value("success", false) || result.contains("error")) {
-      if (impl_->stage == "authorize" || impl_->stage == "authorize-select") impl_->Finish(Failure("ACCESS_DENIED")); else fail();
+      if (impl_->stage == "authorize" || impl_->stage == "authorize-select") impl_->Finish(Failure("ACCESS_DENIED"));
+      // A read whose image cannot fit its caller's result budget is a definite refusal, not an unknown failure.
+      else if (impl_->request["method"] == "tab.screenshot" && result.is_object() && result.contains("error") &&
+               result["error"].is_object() && result["error"].value("code", std::string()) == "SCREENSHOT_TOO_LARGE")
+        impl_->Finish(Failure("SCREENSHOT_TOO_LARGE"));
+      else fail();
       return Next();
     }
     const std::string method = impl_->request["method"];

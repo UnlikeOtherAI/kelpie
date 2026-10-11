@@ -157,6 +157,12 @@ void SelectedAndMapping() {
   assert(step["response"]["value"]["mimeType"] == "image/webp");
   direct.Begin(Request("tab.screenshot"));
   assert(direct.Advance({{"success", true}, {"image", "AQID"}, {"format", "invalid"}})["response"]["error"]["code"] == "COMMAND_FAILED");
+  direct.Begin(Request("tab.screenshot"));
+  const auto too_large = direct.Advance({{"success", false}, {"error", {{"code", "SCREENSHOT_TOO_LARGE"}, {"message", "budget"}}}});
+  assert(too_large["response"]["error"]["code"] == "SCREENSHOT_TOO_LARGE");
+  assert(too_large["response"]["error"]["mayHaveCompleted"] == false);
+  direct.Begin(Request("tab.goto", {{"url", "url"}}));
+  assert(direct.Advance({{"success", false}, {"error", {{"code", "SCREENSHOT_TOO_LARGE"}}}})["response"]["error"]["code"] == "COMMAND_FAILED");
 }
 void CAbi() {
   assert(!kelpie_browser_selector_snapshot_expression(nullptr));
