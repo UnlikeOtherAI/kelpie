@@ -1,5 +1,23 @@
 # Android browser gateway
 
+## Release signing
+
+Android release packaging uses local Gradle signing, including on GitHub runners.
+The release job requires `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` before contract generation or native
+builds start. Store the proper Kelpie release identity outside the checkout; the
+runner decodes it into a private file under `RUNNER_TEMP` and removes it on exit.
+Credentials are never included in artifacts or repository files.
+
+Gradle must produce `app-release.apk` and `app-release.aab`. The workflow verifies
+the APK with Android SDK `apksigner`, and requires `jarsigner` to confirm a signed
+App Bundle before copying either output to release staging. Missing configuration,
+unsigned outputs and failed signatures stop the Android job; there is no unsigned
+or debug signing fallback. Existing isolated debug APKs are test artifacts only.
+Signing ownership must be approved before creating or replacing a release identity.
+
+## Native gateway
+
 Android exposes authenticated `POST /v1/browser-control` and `POST /mcp` through
 the existing Ktor listener, pairing bearer policy, header validation and body
 bounds. Pairing still requires on-device approval. Kotlin drives authorization

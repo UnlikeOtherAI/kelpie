@@ -2,6 +2,8 @@
 
 @./AGENTS.md
 
+Android release signing requires all four configured secrets and verified APK/AAB signatures, with no unsigned fallback; follow [Android release signing](docs/api/native-browser-gateway-android.md#release-signing).
+
 Windows/Linux outbound Nessie account connections follow [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 
 ## What This Is

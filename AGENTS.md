@@ -122,6 +122,7 @@ Each component owns its version in its own manifest — do not create a central 
 | CLI       | `packages/cli/package.json` → `version` |
 
 - Published npm packages declare the canonical repository URL and package directory in their manifests; the release workflow verifies GitHub provenance during publication.
+- Android release signing requires all four configured secrets and verified APK/AAB signatures, with no unsigned fallback; follow [Android release signing](docs/api/native-browser-gateway-android.md#release-signing).
 - Bump only the component(s) being released — other components stay at their current version.
 - GitHub releases use a date tag (`release/YYYY-MM-DD`). The tag description must list every component version included in that release.
 - Every pushed fix, no matter how small, requires a full release/publish cycle. Do not push a fix without releasing it.
