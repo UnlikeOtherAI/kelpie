@@ -170,3 +170,5 @@ both Apple transports; the candidate journey uses this authenticated cleanup.
 ## Per-tab conversation grounding
 
 The tab chat integration keeps caller history in full and captures one owned renderer for model grounding. Android and Apple preload paths invoke a read-only shared `tab.snapshot` transaction, bounded to 12,000 characters and 200 elements, through the existing renderer lease. Background WebKit/WebView observations do not switch the visible tab. Renderer identity and ownership are checked before and after evaluation; inactive Chromium targets are refused. Rich HTTP extraction remains an explicit extension/API, rather than a second default model observation path. Windows checks the captured tab generation before and after the common snapshot and adds evidence to the current user turn while retaining earlier conversation turns.
+
+The macOS native single-shot harness also obtains its initial public URL/title metadata from its admitted common gateway. It has no separate page-summary JavaScript collector or silent empty-summary fallback.
