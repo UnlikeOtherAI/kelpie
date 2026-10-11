@@ -163,3 +163,7 @@ or confirmed renderer close. Legacy inner timeout and CDP agent-detach callbacks
 do not retire a common gesture. A real WebKit cancellation fixture holds a 9.5s
 page handler past the former 8s inner deadline; CDP callback fixtures cover the
 former 5s deadline, detach, late result and confirmed close separately.
+
+Only POST `/v1/pair` may enter pairing without a bearer. DELETE requires the
+existing bearer, revokes that client, and immediately rejects its old token on
+both Apple transports; the candidate journey uses this authenticated cleanup.

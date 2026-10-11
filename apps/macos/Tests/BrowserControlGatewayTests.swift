@@ -60,6 +60,12 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertEqual(tools?.first?["name"] as? String, "kelpie_browser_control")
         let internalRoute = try await fetch(port: port, path: "/v1/browser-control-evaluate", body: ["expression": "alert(1)"], token: token)
         XCTAssertEqual(internalRoute.0, 404)
+        let unauthenticatedDelete = try await fetch(port: port, path: "/v1/pair", body: [:], token: nil, method: "DELETE")
+        XCTAssertEqual(unauthenticatedDelete.0, 401)
+        let revoked = try await fetch(port: port, path: "/v1/pair", body: [:], token: token, method: "DELETE")
+        XCTAssertEqual(revoked.0, 200)
+        let oldBearer = try await fetch(port: port, path: "/v1/browser-control", body: ["version": 1, "method": "tabs.list", "params": [:]], token: token)
+        XCTAssertEqual(oldBearer.0, 401, "Authenticated DELETE must revoke only its own pairing")
     }
 
     func testReadonlyCannotSwitchOrWriteAndSelectedReaderDoesNotRetarget() async {
