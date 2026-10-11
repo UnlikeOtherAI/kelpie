@@ -13,7 +13,7 @@ const fixture = `<title>Control fixture</title><h1>Observe</h1>
 <label>Email<input id="email" value="INITIAL_SECRET"></label>
 <label>Password<input type="password" value="PASSWORD_SECRET"></label>
 <textarea placeholder="Notes">TEXTAREA_SECRET</textarea>
-<div contenteditable="true" aria-label="Draft">EDITABLE_SECRET</div>
+<div contenteditable="true" role="textbox" aria-label="Draft">EDITABLE_SECRET<p>EDITABLE_DESCENDANT_SECRET</p><button>EDITABLE_BUTTON_SECRET</button></div>
 <button id="save">Save</button><button>Save draft</button>
 <button>Duplicate</button><button>Duplicate</button>
 <label>Agree<input id="agree" type="checkbox"></label><select id="choice"><option value="a">Alpha</option><option value="b">Beta</option></select>
@@ -63,7 +63,7 @@ for (const adapter of ["playwright", "native-transport"] as const) {
     it("omits all form values and hidden content and obeys total text bounds", async () => {
       const snapshot = await tab.snapshot({ maxChars: 800 });
       expect(snapshot.text.length).toBeLessThanOrEqual(800);
-      expect(JSON.stringify(snapshot)).not.toMatch(/INITIAL_SECRET|PASSWORD_SECRET|TEXTAREA_SECRET|EDITABLE_SECRET|HIDDEN_SECRET/);
+      expect(JSON.stringify(snapshot)).not.toMatch(/INITIAL_SECRET|PASSWORD_SECRET|TEXTAREA_SECRET|EDITABLE_SECRET|EDITABLE_DESCENDANT_SECRET|EDITABLE_BUTTON_SECRET|HIDDEN_SECRET/);
       expect(snapshot.elements?.some((element) => element.name === "Email")).toBe(true);
       const short = await tab.snapshot({ maxElements: 2 });
       expect(short.elements).toHaveLength(2);

@@ -26,7 +26,7 @@ snapshots are refused. Native observations use a fixed package reader over the
 already-admitted `evaluate` route, storing only ephemeral element references on
 the page. Native actions verify original object identity and an exact unique
 structural selector immediately before the existing native click/type request.
-The two native requests are not an atomic browser transaction. Shadow DOM actions
+The registry is in the page realm and can be altered by page scripts; it is a correctness guard, not an isolation boundary against a hostile page. The direct native gateway must own references privately. The two native requests are not an atomic browser transaction. Shadow DOM actions
 are unsupported on that adapter. No arbitrary model evaluation is introduced.
 Mobile handlers select the requested tab before each command because they operate
 on the selected renderer.

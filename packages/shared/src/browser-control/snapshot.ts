@@ -28,6 +28,8 @@ export function collectBrowserSnapshot(options: {
   const visit = (root: Document | ShadowRoot): void => {
     for (const el of root.querySelectorAll(root instanceof Document ? "body *" : "*")) {
       if (++visited > 5000 || elements.length >= maxElements) { truncated = true; return; }
+      const editor = el.closest("[contenteditable]:not([contenteditable='false'])");
+      if (editor && editor !== el) continue;
       const tag = el.tagName.toLowerCase();
       const style = getComputedStyle(el);
       if (["script", "style", "noscript", "template", "option"].includes(tag) || el.closest("[hidden],[aria-hidden='true']")) continue;
@@ -50,7 +52,7 @@ export function collectBrowserSnapshot(options: {
         elements.push({ ref, role: role ?? tag, name });
         targets[ref] = el;
       }
-      if (el.shadowRoot && options.includeShadow !== false) visit(el.shadowRoot);
+      if (el.shadowRoot && !editor && options.includeShadow !== false) visit(el.shadowRoot);
     }
   };
   visit(document);
