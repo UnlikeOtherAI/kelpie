@@ -69,7 +69,7 @@ std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, c
   // Cancellation must stay reachable while a serialized inference extension awaits its provider.
   if (method == "ai-cancel" || method == "ai-infer" || method == "ai-record") return nullptr;
   auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
-  if (impl_->pending && impl_->pending() && method != "browser-control" && method != "close-tab" && method != "close-browser" && method != "get-device-info")
+  if (impl_->pending && impl_->pending() && method != "browser-control" && method != "close-tab" && method != "close-browser" && method != "get-device-info" && method != "get-dialog" && method != "handle-dialog")
     throw std::runtime_error("A prior renderer command is still pending");
   InvalidateReferences(method, params);
   return lock;
@@ -105,9 +105,10 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request, cons
         if (arguments.is_object() && arguments.contains("name") && arguments["name"].is_string()) name = arguments["name"];
       }
     }
-    if (name == "kelpie_ai_ask" || name == "kelpie_ai_record" || name == "kelpie_ai_cancel" || name == "kelpie_close_tab" || name == "kelpie_close_browser") {
+    if (name == "kelpie_ai_ask" || name == "kelpie_ai_record" || name == "kelpie_ai_cancel" || name == "kelpie_close_tab" || name == "kelpie_close_browser" || name == "kelpie_get_dialog" || name == "kelpie_handle_dialog") {
       // Inference owns its own request. Only its nested browser commands take
-      // the persistent gateway lease; cancellation/teardown remain reachable.
+      // the persistent gateway lease; cancellation/teardown and native modal
+      // recovery remain reachable so a pending dialog can retire its renderer call.
       BrowserGateway outer(impl_->gateway_config);
       auto step = outer.BeginMcp(request);
       if (step.value("kind", std::string()) == "complete") return step["response"];
