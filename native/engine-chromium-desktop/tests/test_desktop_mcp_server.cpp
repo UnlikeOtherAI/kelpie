@@ -127,5 +127,19 @@ int main() {
   assert(bad_same_site.contains("error"));
   assert(bad_same_site.at("error").at("code") == -32602);
 
+  std::string observed;
+  server.SetFixedReader([&](const nlohmann::json& params) {
+    const std::string expression = params.at("expression");
+    const auto start = expression.find("\"prefix\":\"") + 10;
+    observed = expression.substr(start, expression.find('"', start) - start) + "1";
+    return nlohmann::json{{"success", true}, {"result", {{"url", "https://same.test"}, {"title", "title"}, {"text", "button"},
+      {"elements", {{{"ref", observed}, {"role", "button"}, {"name", "Button"}}}}}}};
+  });
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tab.snapshot"}, {"tabId", "a"}}, config)["ok"] == true);
+  // Renderer callbacks only enqueue; same-URL restoration cannot revive an old observed handle.
+  server.NotifyDocumentChanged();
+  const auto stale = server.HandleBrowserRequest({{"version", 1}, {"method", "tab.click"}, {"tabId", "a"}, {"params", {{"ref", observed}}}}, config);
+  assert(stale["error"]["code"] == "STALE_REFERENCE");
+
   return 0;
 }

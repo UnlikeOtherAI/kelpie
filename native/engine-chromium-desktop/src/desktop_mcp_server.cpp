@@ -61,6 +61,8 @@ void DesktopMcpServer::SetRegistry(const McpRegistry* registry) { impl_->registr
 void DesktopMcpServer::SetFixedReader(FixedReader reader) { impl_->reader = std::move(reader); impl_->gateway.reset(); }
 void DesktopMcpServer::NotifyDocumentChanged() const { impl_->document_changed.store(true); }
 std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, const json& params) const {
+  // Cancellation must stay reachable while a serialized inference extension awaits its provider.
+  if (method == "ai-cancel") return nullptr;
   auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
   InvalidateReferences(method, params);
   return lock;
