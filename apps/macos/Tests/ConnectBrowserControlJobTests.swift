@@ -168,6 +168,8 @@ final class ConnectBrowserControlJobTests: XCTestCase {
         )
         let image = try XCTUnwrap((screenshot["value"] as? [String: Any])?["data"] as? String)
         XCTAssertNotNil(Data(base64Encoded: image))
+        XCTAssertEqual((screenshot["value"] as? [String: Any])?["mimeType"] as? String, "image/png",
+                       "A screenshot within the result budget keeps the requested PNG")
 
         let otherTab = store.addTab()
         let crossTab = await owner.browserControl(
@@ -294,6 +296,69 @@ final class ConnectBrowserControlJobTests: XCTestCase {
         XCTAssertFalse(ConnectBrowser.navigationDestinationMatches(
             current: "https://example.test/other", destination: "https://example.test"
         ))
+    }
+
+    func testIncompressibleAccountScreenshotFallsBackToJpegWithinResultBudget() async throws {
+        let tab = Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
+        let renderer = tab.renderer
+        let store = TabStore(isolatedTab: tab)
+        let tabID = tab.id.uuidString
+        let windowID = UUID().uuidString
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            styleMask: [.titled], backing: .buffered, defer: false
+        )
+        guard let webView = renderer.makeView() as? WKWebView else { return XCTFail("Fixture must use WebKit") }
+        window.contentView = webView
+        window.makeKeyAndOrderFront(nil)
+        WindowRegistry.shared.register(id: windowID, window: window, tabStore: store)
+        defer {
+            window.contentView = nil
+            window.orderOut(nil)
+            renderer.invalidate()
+            WindowRegistry.shared.unregister(id: windowID)
+        }
+        let context = HandlerContext()
+        context.renderer = renderer
+        let owner = Router()
+        owner.handlerContext = context
+        context.browserRouter = owner
+        ScreenshotHandler(context: context).register(on: owner)
+
+        // Per-pixel random noise defeats PNG compression, like a dense photographic page.
+        webView.loadHTMLString("""
+        <!doctype html><body style="margin:0"><canvas id="noise"></canvas><script>
+        const c=document.getElementById('noise');c.width=innerWidth;c.height=innerHeight;
+        const g=c.getContext('2d');const d=g.createImageData(c.width,c.height);
+        for(let i=0;i<d.data.length;i++)d.data[i]=i%4===3?255:Math.random()*256|0;
+        g.putImageData(d,0,0);document.title='ready';</script></body>
+        """, baseURL: URL(string: "https://fixture.test"))
+        for _ in 0..<150 {
+            if !webView.isLoading, webView.title == "ready" { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(webView.title, "ready")
+
+        let version = ConnectDocument.version(renderer)
+        let job = try ConnectBrowserControlJob(
+            source: context, owner: owner, command: Self.command(tabID: tabID, version: version),
+            tabID: tabID, expectedVersion: version, authorized: { true }
+        )
+        var formats: [String] = []
+        let screenshot = await owner.browserControl(
+            Self.request("tab.screenshot", tabID: tabID),
+            authorizeAccountStep: { _, _ in true },
+            dispatchAccountStep: { method, params, mutates in
+                formats.append(params["format"] as? String ?? "png")
+                return await job.dispatch(method: method, params: params, mutates: mutates)
+            }
+        )
+        let value = try XCTUnwrap(screenshot["value"] as? [String: Any], "\(screenshot)")
+        XCTAssertEqual(value["mimeType"] as? String, "image/jpeg")
+        let image = try XCTUnwrap(value["data"] as? String)
+        XCTAssertLessThanOrEqual(image.utf8.count, ConnectScreenshotBudget.maxImageCharacters)
+        XCTAssertNotNil(NSImage(data: try XCTUnwrap(Data(base64Encoded: image))))
+        XCTAssertEqual(formats, ["png"], "The gateway issues one canonical capture; the job owns the fallback")
     }
 
     private static func request(_ method: String, tabID: String, params: [String: Any] = [:]) -> [String: Any] {
