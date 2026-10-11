@@ -1,7 +1,28 @@
 import XCTest
+import WebKit
 @testable import Kelpie
 
 final class ConnectAuthorizationTests: XCTestCase {
+    #if os(iOS)
+    @MainActor
+    func testPageContextReadKeepsItsBeforeAndAfterJobFence() async throws {
+        let context = HandlerContext()
+        let view = WKWebView()
+        context.webView = view
+        context.remoteDocumentGuard = { false }
+        do {
+            _ = try await PageTextSnapshot.object(context: context, body: [:], script: "({value:1})")
+            XCTFail("Revoked job must not read page context")
+        } catch is CancellationError { }
+        var checks = 0
+        context.remoteDocumentGuard = { checks += 1; return checks == 1 }
+        do {
+            _ = try await PageTextSnapshot.object(context: context, body: [:], script: "({value:1})")
+            XCTFail("Revocation during evaluation must discard page context")
+        } catch is CancellationError { }
+        XCTAssertEqual(checks, 2)
+    }
+    #endif
     @MainActor
     func testNavigationCompletionBelongsToItsIssuedNativeObject() {
         let token = NSObject()

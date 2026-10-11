@@ -69,6 +69,18 @@ class ConnectBrowserNavigationTest {
         var allowed = true
     }
 
+    @Test
+    fun pageContextReadsKeepTheBeforeAndAfterJobFence() = runBlocking {
+        fixture { _, context, _, _ ->
+            context.remoteDocumentGuard = { false }
+            assertTrue(runCatching { com.kelpie.browser.llm.PageTextSnapshot.read(context, emptyMap()) }.isFailure)
+            var checks = 0
+            context.remoteDocumentGuard = { ++checks == 1 }
+            assertTrue(runCatching { com.kelpie.browser.llm.PageTextSnapshot.read(context, emptyMap()) }.isFailure)
+            assertEquals(2, checks)
+        }
+    }
+
     private suspend fun fixture(block: suspend (ConnectBrowser, HandlerContext, MockWebServer, Authority) -> Unit) {
         val server = MockWebServer()
         server.start()
@@ -114,7 +126,10 @@ class ConnectBrowserNavigationTest {
             "input" to mapOf("url" to url),
         )
 
-    private fun url(server: MockWebServer, path: String) = "http://127.0.0.1:${server.port}$path"
+    private fun url(
+        server: MockWebServer,
+        path: String,
+    ) = "http://127.0.0.1:${server.port}$path"
 
     private fun page(title: String) = MockResponse().setHeader("Content-Type", "text/html").setBody("<title>$title</title><p>Local fixture</p>")
 }
