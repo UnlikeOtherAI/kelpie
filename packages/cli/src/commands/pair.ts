@@ -26,7 +26,7 @@ import type { GlobalOptions } from "../types.js";
 export function registerPair(program: Command): void {
   program
     .command("pair")
-    .description("Pair the CLI with a Kelpie device (one-time, requires on-device approval)")
+    .description("Connect to a Kelpie device (automatic for the same authorized UOA account)")
     .option("--client-name <name>", "Client name shown on the device prompt", defaultClientName())
     .option(
       "--timeout-ms <ms>",

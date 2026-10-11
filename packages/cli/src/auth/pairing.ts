@@ -1,4 +1,5 @@
 import { API_VERSION_PREFIX } from "@unlikeotherai/kelpie-shared";
+import { pairAccount } from "./account-pairing.js";
 import type {
   PairRequest,
   PairResponse,
@@ -49,6 +50,11 @@ export interface PairContext {
   pollIntervalMs?: number;
   /** Side-effect hook (e.g. CLI progress dot). */
   onPending?: (info: { requestId: string; attempt: number }) => void;
+  /** An existing UOA session for automatic same-account access; never sent to the LAN device. */
+  accountAccessToken?: () => Promise<string | undefined>;
+  accountPairingTicket?: (challenge: string, clientId: string) => Promise<string>;
+  /** Called only when the device actually needs a manual approval. */
+  onApprovalRequired?: () => void;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
@@ -219,10 +225,13 @@ export async function pollPairStatus(
 
 /** Convenience: issue + poll in one call. */
 export async function pair(ctx: PairContext): Promise<PairResult> {
+  const account = await pairAccount(ctx);
+  if (account) return account;
   const initial = await requestPair(ctx);
   if (!initial.ok) {
     return { status: "error", code: initial.code, message: initial.message };
   }
+  ctx.onApprovalRequired?.();
   return pollPairStatus(ctx, initial.pending.requestId);
 }
 
@@ -239,7 +248,7 @@ export function redact(input: string): string {
   if (!input) return input;
   let out = input;
   out = out.replace(/(authorization\s*:\s*bearer\s+)([^\s]+)/gi, "$1[redacted]");
-  out = out.replace(/("(?:token|bearer)"\s*:\s*")([^"]+)(")/gi, "$1[redacted]$3");
+  out = out.replace(/("(?:token|bearer|accountTicket|pairing_ticket|access_token)"\s*:\s*")([^"]+)(")/gi, "$1[redacted]$3");
   out = out.replace(/\b[A-Za-z0-9_-]{40,}\b/g, "[redacted]");
   return out;
 }
@@ -251,7 +260,7 @@ export function redactObject(value: unknown): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (k === "token" || k === "bearer") {
+      if (["token", "bearer", "accountTicket", "pairing_ticket", "access_token"].includes(k)) {
         out[k] = "[redacted]";
       } else {
         out[k] = redactObject(v);

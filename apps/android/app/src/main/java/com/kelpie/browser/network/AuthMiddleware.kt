@@ -50,7 +50,10 @@ class AuthMiddleware(
             )
     }
 
-    fun evaluate(req: ParsedRequest): AuthDecision {
+    fun evaluate(
+        req: ParsedRequest,
+        verifiedAccountClientId: String? = null,
+    ): AuthDecision {
         val ambiguous = rejectAmbiguousHeaders(req)
         if (ambiguous != null) return ambiguous
 
@@ -66,7 +69,7 @@ class AuthMiddleware(
             extractBearer(req.headers)
                 ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required")
         val clientId =
-            store.validateBearer(bearer)
+            (store.validateBearer(bearer) ?: verifiedAccountClientId)
                 ?: return AuthDecision.Reject(401, "UNAUTHORIZED", "Invalid bearer token")
         if (req.path == "/mcp" || req.path == "/v1/mcp") {
             if (req.headers.containsKey("origin")) return AuthDecision.Reject(403, "FORBIDDEN", "Browser Origin is not permitted on MCP")

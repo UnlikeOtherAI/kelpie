@@ -14,6 +14,7 @@ All methods are available via three interfaces:
 | [devtools.md](devtools.md) | Console/JS errors, network log, network inspector, resource timeline, WebSocket monitoring, mutation observation, shadow DOM, request interception |
 | [browser.md](browser.md) | Dialogs/alerts, tabs, iframes, cookies/storage, clipboard, geolocation, JS evaluation, bookmarks, history, fullscreen, renderer management |
 | [partitions.md](partitions.md) | Per-tab storage isolation — partition lifecycle, error matrix, cookie-jar interaction |
+| [account-pairing.md](account-pairing.md) | Automatic LAN access for a verified shared UOA account, proof/session lifecycle |
 | [ai.md](ai.md) | Local inference backends, model switching, inference, and audio recording endpoints |
 | [ai-endpoints.md](ai-endpoints.md) | User-configured OpenAI-compatible endpoints: URL rules, health states, streaming, capabilities, the browser-agent tool loop, troubleshooting |
 
@@ -23,7 +24,7 @@ All methods are available via three interfaces:
 
 - Base URL: `http://{device-ip}:{port}/v1/`
 - Content-Type: `application/json`
-- Auth: bearer token via `Authorization: Bearer <token>`. Tokens are issued by `POST /v1/pair` + on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
+- Auth: bearer token via `Authorization: Bearer <token>`. `POST /v1/pair` accepts a verified shared-account proof or on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
 - Default Port: `8420`
 - Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
 - Concurrency: The common native gateway and legacy browser mutations share one admission lease. A competing operation returns `BUSY`; it is never replayed automatically. A timed-out renderer operation retains the lease until its callback retires; later explicit requests can then reconcile or continue without restarting.
@@ -32,7 +33,7 @@ All methods are available via three interfaces:
 
 ## Pairing & Auth
 
-The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI must obtain a bearer token via on-device approval before any automation works.
+The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI obtains a bearer through verified same-account access or manual on-device approval. The same-account [challenge contract](account-pairing.md) uses the existing pair endpoint and never opens the approval prompt.
 
 ### Endpoints
 

@@ -250,8 +250,7 @@ final class HTTPServer: @unchecked Sendable {
             return
         }
 
-        let middleware = AuthMiddleware(store: pairingStore)
-        let decision = middleware.evaluate(parsed)
+        let decision = await AccountPairingAuthorization(store: pairingStore).evaluate(parsed)
         switch decision {
         case let .reject(status, code, message):
             await send(connection: connection, response: PairingHTTPResponse.error(status: status, code: code, message: message))
@@ -267,7 +266,9 @@ final class HTTPServer: @unchecked Sendable {
         let pairEndpoints = PairEndpoints(store: pairingStore, onPendingChanged: onPendingPairChanged)
         switch (parsed.method, parsed.path) {
         case ("POST", "/v1/pair"):
-            let result = pairEndpoints.handlePairPost(body: parsed.body, sourceAddress: parsed.sourceAddress)
+            let result = AccountPairingAuthorization.handles(parsed.body)
+                ? await AccountPairingAuthorization(store: pairingStore).handlePost(body: parsed.body, sourceAddress: parsed.sourceAddress)
+                : pairEndpoints.handlePairPost(body: parsed.body, sourceAddress: parsed.sourceAddress)
             await send(
                 connection: connection,
                 response: PairingHTTPResponse.json(status: result.status, json: result.json, noStore: true)

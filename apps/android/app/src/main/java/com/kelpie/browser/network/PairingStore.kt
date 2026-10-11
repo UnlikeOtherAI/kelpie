@@ -47,6 +47,7 @@ class PairingStore(
         val sourceAddress: String,
         val createdAt: Long,
         val expiresAt: Long,
+        val accountSession: String? = null,
     )
 
     data class SessionApproval(
@@ -54,6 +55,16 @@ class PairingStore(
         val clientName: String,
         val tokenHashSha256: String,
         val approvedAt: Long,
+        val accountGrant: AccountGrant? = null,
+    )
+
+    /** UOA-verified challenge proof; kept only in memory and excluded from manual bearer validation. */
+    data class AccountGrant(
+        val session: String,
+        val ticket: String,
+        val challenge: String,
+        val expiresAt: Long,
+        val sourceAddress: String,
     )
 
     data class PendingIssuance(
@@ -166,6 +177,7 @@ class PairingStore(
         clientId: String,
         clientName: String,
         sourceAddress: String,
+        accountSession: String? = null,
     ): PairStart {
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
@@ -182,7 +194,8 @@ class PairingStore(
                     clientName = sanitizeClientName(clientName),
                     sourceAddress = sourceAddress,
                     createdAt = now,
-                    expiresAt = now + PENDING_TTL_MS,
+                    expiresAt = now + if (accountSession == null) PENDING_TTL_MS else 120_000,
+                    accountSession = accountSession,
                 )
             pending[req.requestId] = req
             pendingBySource[sourceAddress] = req.requestId
@@ -193,7 +206,7 @@ class PairingStore(
     fun visiblePending(): List<PendingRequest> =
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
-            pending.values.sortedBy { it.createdAt }
+            pending.values.filter { it.accountSession == null }.sortedBy { it.createdAt }
         }
 
     fun pendingRequest(requestId: String): PendingRequest? =
@@ -205,10 +218,23 @@ class PairingStore(
     fun approve(
         requestId: String,
         persist: Boolean,
+        accountGrant: AccountGrant? = null,
     ): Pair<String, String>? {
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
-            val entry = pending.remove(requestId) ?: return null
+            val entry = pending[requestId] ?: return null
+            if (entry.accountSession != accountGrant?.session) return null
+            if (accountGrant != null &&
+                (
+                    persist ||
+                        accountGrant.expiresAt <= System.currentTimeMillis() ||
+                        accountGrant.challenge != requestId ||
+                        accountGrant.sourceAddress != entry.sourceAddress
+                )
+            ) {
+                return null
+            }
+            pending.remove(requestId)
             pendingBySource.remove(entry.sourceAddress)
 
             val token = generateToken()
@@ -236,6 +262,7 @@ class PairingStore(
                         clientName = entry.clientName,
                         tokenHashSha256 = hash,
                         approvedAt = now,
+                        accountGrant = accountGrant,
                     ),
                 )
                 scope = "session"
@@ -288,14 +315,24 @@ class PairingStore(
                 match.lastSeenAt = System.currentTimeMillis()
                 return match.clientId
             }
-            val session = sessions.firstOrNull { constantTimeEqualsHex(it.tokenHashSha256, hash) }
+            val session = sessions.firstOrNull { it.accountGrant == null && constantTimeEqualsHex(it.tokenHashSha256, hash) }
             return session?.clientId
         }
     }
 
+    fun accountApproval(token: String): SessionApproval? =
+        synchronized(lock) {
+            gcLocked(System.currentTimeMillis())
+            val hash = hashToken(token)
+            sessions.firstOrNull { it.accountGrant != null && constantTimeEqualsHex(it.tokenHashSha256, hash) }
+        }
+
     fun revoke(clientId: String): Boolean {
         synchronized(lock) {
             val sizeBefore = persistent.size + sessions.size
+            sessions.filter { it.clientId == clientId }.forEach { approval ->
+                approval.accountGrant?.let { deniedSources[it.sourceAddress] = System.currentTimeMillis() + DENY_TTL_MS }
+            }
             persistent.removeAll { it.clientId == clientId }
             sessions.removeAll { it.clientId == clientId }
             val changed = sizeBefore != persistent.size + sessions.size
@@ -306,7 +343,11 @@ class PairingStore(
 
     fun listPersistent(): List<PairingRecord> = synchronized(lock) { persistent.toList() }
 
-    fun listSessions(): List<SessionApproval> = synchronized(lock) { sessions.toList() }
+    fun listSessions(): List<SessionApproval> =
+        synchronized(lock) {
+            gcLocked(System.currentTimeMillis())
+            sessions.toList()
+        }
 
     fun listDeniedSources(): List<Pair<String, Long>> =
         synchronized(lock) {
@@ -322,5 +363,6 @@ class PairingStore(
         }
         deniedSources.entries.removeAll { it.value <= now }
         pendingIssuances.entries.removeAll { it.value.expiresAt <= now }
+        sessions.removeAll { it.accountGrant?.expiresAt?.let { expiry -> expiry <= now } == true }
     }
 }

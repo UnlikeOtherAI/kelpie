@@ -52,6 +52,7 @@ object UOAAccount {
     private val mutableState = MutableStateFlow(State())
     val state = mutableState.asStateFlow()
     private var generation = UUID.randomUUID()
+    val pairingSession: String? get() = state.value.profile?.let { generation.toString() }
     private var attempt: Attempt? = null
     private var lifetime: Job? = null
     private var credentials: UOACredentials? = null

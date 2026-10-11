@@ -145,6 +145,16 @@ describe("redact", () => {
     expect(redact('{"token":"abc-xyz_DEF"}')).toContain('"token":"[redacted]"');
   });
 
+  it("masks account credentials and proofs even when shorter than bearer-shaped strings", () => {
+    const credentials = { accountTicket: "proof-1", pairing_ticket: "proof-2", access_token: "account-1" };
+    expect(redact(JSON.stringify(credentials))).toBe(
+      '{"accountTicket":"[redacted]","pairing_ticket":"[redacted]","access_token":"[redacted]"}',
+    );
+    expect(redactObject({ nested: credentials })).toEqual({
+      nested: { accountTicket: "[redacted]", pairing_ticket: "[redacted]", access_token: "[redacted]" },
+    });
+  });
+
   it("masks bare bearer-shaped strings", () => {
     const masked = redact("found token AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA in log");
     expect(masked).toContain("[redacted]");
