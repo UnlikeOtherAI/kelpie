@@ -173,10 +173,19 @@ class ConnectBrowserNavigationTest {
                 // Own verification profile only; establish a settled initial document through its real clients.
                 val tab = store.addTab()
                 context.webView = tab.webView
-                val router = com.kelpie.browser.network.Router().apply { handlerContext = context }
-                com.kelpie.browser.handlers.NavigationHandler(context).register(router)
-                com.kelpie.browser.llm.LLMHandler(context).register(router)
-                val gateway = com.kelpie.browser.network.BrowserGatewayBinding(router, context)
+                val router =
+                    com.kelpie.browser.network
+                        .Router()
+                        .apply { handlerContext = context }
+                com.kelpie.browser.handlers
+                    .NavigationHandler(context)
+                    .register(router)
+                com.kelpie.browser.llm
+                    .LLMHandler(context)
+                    .register(router)
+                val gateway =
+                    com.kelpie.browser.network
+                        .BrowserGatewayBinding(router, context)
                 gateway.register()
                 tab.webView.loadDataWithBaseURL(url(server, "/initial"), "<title>Initial</title>", "text/html", "utf-8", null)
                 withTimeout(5000) {

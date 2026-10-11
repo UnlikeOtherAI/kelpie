@@ -124,11 +124,13 @@ class NavigationHandler(
 
     private fun mayNavigate(): Boolean = ctx.remoteDocumentGuard?.invoke() != false && ctx.remoteNavigationStart?.invoke() != false
 
-    private suspend fun navigationState(script: String): Map<String, Any?> =
-        if (ctx.remoteNavigationReadGuard != null) ctx.navigationSnapshot() else ctx.evaluateJSReturningJSON(script)
+    private suspend fun navigationState(script: String): Map<String, Any?> = if (ctx.remoteNavigationReadGuard != null) ctx.navigationSnapshot() else ctx.evaluateJSReturningJSON(script)
 
-    private fun hasLoaded(state: Map<String, Any?>, requested: String, previous: String?): Boolean =
-        if (ctx.remoteNavigationReadGuard != null) state["readyState"] == "complete" else NavigationCompletion.hasLoaded(state, requested, previous)
+    private fun hasLoaded(
+        state: Map<String, Any?>,
+        requested: String,
+        previous: String?,
+    ): Boolean = if (ctx.remoteNavigationReadGuard != null) state["readyState"] == "complete" else NavigationCompletion.hasLoaded(state, requested, previous)
 
     private suspend fun getCurrentUrl(): Map<String, Any?> {
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
