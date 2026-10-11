@@ -17,7 +17,7 @@ export function collectBrowserSnapshot(options: {
   const url = location.href.slice(0, Math.min(4096, Math.floor(maxChars / 2)));
   const title = clean(document.title, Math.min(1024, Math.floor(maxChars / 4)));
   let text = `url: ${url}\ntitle: ${title}`;
-  truncated = truncated || url !== location.href || title !== clean(document.title, document.title.length);
+  if (url !== location.href || title !== clean(document.title, document.title.length)) truncated = true;
   let visited = 0;
   const ignored = "input,textarea,select,[contenteditable]:not([contenteditable='false']),script,style,noscript,template,[hidden],[aria-hidden='true']";
   const content = (node: Node, depth = 0): string => {
