@@ -81,7 +81,7 @@ void DesktopEngine::SetNetworkSink(JsonEventSink sink) {
 }
 
 CefRefPtr<DesktopDevToolsSession> DesktopEngine::Impl::NewDevToolsSession(CefRefPtr<CefBrowser> browser) {
-  CefRefPtr<DesktopDevToolsSession> session = new DesktopDevToolsSession();
+  CefRefPtr<DesktopDevToolsSession> session = new DesktopDevToolsSession(unknown_operations);
   // Forward through the engine so a sink installed later still receives events.
   session->Attach(browser, [this](const nlohmann::json& event) {
     if (network_sink) network_sink(event);

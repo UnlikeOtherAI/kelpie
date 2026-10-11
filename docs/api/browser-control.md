@@ -94,3 +94,10 @@ The Linux fallback advertises only its actual metadata/legacy capabilities. Its
 MCP HTTP route uses the desktop local-client, bearer, content/accept and protocol
 version guards. Unsupported SSE GET returns 405; accepted notifications return
 202 with an empty body. It does not advertise live browser observations.
+
+Desktop CDP timeouts retain execution ownership until the renderer's late reply or
+confirmed tab teardown. New browser commands refuse `BUSY` while completion is
+unknown; cancellation and tab/browser close remain reachable. A callback retires
+ownership automatically, without requiring a restart. MCP inference/recording
+uses an admitted outer request separate from the persistent browser gateway, so
+its existing nested browser observations can acquire the browser lease.
