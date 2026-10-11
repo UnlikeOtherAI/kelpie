@@ -103,8 +103,8 @@ int main() {
   assert(browser.effects==previous_effects);renderer_pending=false;
   Executor independent_inference(browser,[&](const Json&) {
     // An independent browser transaction can proceed while local decoding runs.
-    auto observer=std::async(std::launch::async,[&] { return common.GuardDispatch("get-tabs",Json::object()); });
-    assert(observer.wait_for(std::chrono::seconds(1))==std::future_status::ready);observer.get().reset();
+    auto observer=std::async(std::launch::async,[&] { const auto transaction=common.GuardDispatch("get-tabs",Json::object());return true; });
+    assert(observer.wait_for(std::chrono::seconds(1))==std::future_status::ready);assert(observer.get());
     return Json{{"success",true},{"response","Answer"}};
   },admission);
   assert(independent_inference.Execute(long_job,guard)["state"]=="completed");
