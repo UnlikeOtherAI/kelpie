@@ -23,7 +23,20 @@ final class ConnectBrowser {
     init(context: HandlerContext) { self.context = context }
 
     // Enabled when the shared gateway is bound to a job-owned dispatch context.
-    var supportsControlV1: Bool { true }
+    var supportsControlV1: Bool { context.browserRouter != nil }
+
+    static func navigationDestinationMatches(current: String, destination: String?) -> Bool {
+        guard let destination else { return true }
+        func normalized(_ raw: String) -> URLComponents? {
+            guard var components = URLComponents(string: raw), components.scheme != nil, components.host != nil else { return nil }
+            components.scheme = components.scheme?.lowercased()
+            components.host = components.host?.lowercased()
+            if components.path.isEmpty { components.path = "/" }
+            return components
+        }
+        guard let current = normalized(current), let destination = normalized(destination) else { return false }
+        return current == destination
+    }
 
     var isReady: Bool {
         #if os(iOS)
@@ -153,7 +166,7 @@ final class ConnectBrowser {
             pinned.remoteNavigationWaitGuard = { authorized() && bridge.documentNavigationCount() <= count + 1 }
             pinned.remoteNavigationReadGuard = {
                 guard authorized(), !bridge.isLoading(), bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
-                return destination == nil || URL(string: bridge.currentURL()) == URL(string: destination ?? "")
+                return Self.navigationDestinationMatches(current: bridge.currentURL(), destination: destination)
             }
             let result = await router.handle(method: operation, body: body).json
             try requireSuccess(result)

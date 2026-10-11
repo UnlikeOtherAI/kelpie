@@ -82,7 +82,8 @@ into selectors or expose arbitrary scripts, cookies, account endpoints or extens
 Screenshots retain the canonical typed image response and are projected through the
 job-owned file service before model presentation. Native execution requires the named
 tab to remain active except for an explicit `tabs.select`; account sign-in surfaces are
-forbidden as both current and destination pages.
+forbidden as both current and destination pages. macOS does not advertise `page.press`:
+its native trusted-key method is unavailable on Apple account connections.
 
 `event` carries job/attempt/seq and `state` (`accepted`, `progress`, `completed`,
 `failed`, `cancelled`), optional object `output` and bounded `error`.

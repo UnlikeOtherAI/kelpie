@@ -66,11 +66,15 @@ final class ConnectBrowserControlJob {
             context = pinned
             currentVersion = { renderer.isLoading ? nil : ConnectDocument.version(renderer) }
             stillPinned = {
-                WindowRegistry.shared.entry(containingTabId: id)?.tabStore.tabs.contains {
-                    $0.id == id && $0.renderer === renderer
-                } == true
+                !source.activeEngineIsChromium && source.renderer === renderer
+                    && WindowRegistry.shared.entry(containingTabId: id)?.tabStore.tabs.contains {
+                        $0.id == id && $0.renderer === renderer
+                    } == true
             }
-            active = { entry.tabStore.activeTabID == id && entry.tabStore.activeTab?.renderer === renderer }
+            active = {
+                !source.activeEngineIsChromium && source.renderer === renderer
+                    && entry.tabStore.activeTabID == id && entry.tabStore.activeTab?.renderer === renderer
+            }
             accountSurface = { Self.isAccountURL(renderer.currentURL?.absoluteString) }
         }
         #endif
@@ -155,7 +159,7 @@ final class ConnectBrowserControlJob {
     }
 
     private func navigation(method: String, params: [String: Any]) async -> [String: Any] {
-        var leasedView: WKWebView?
+        var leasedDocumentOwner: AnyObject?
         #if os(macOS)
         if let renderer = context.renderer as? CEFRenderer, let bridge = renderer.bridge {
             let count = bridge.documentNavigationCount()
@@ -170,40 +174,40 @@ final class ConnectBrowserControlJob {
             context.remoteNavigationReadGuard = { [weak self] in
                 guard let self, self.authorized(), self.stillPinned(), self.active(), !self.accountSurface(), !bridge.isLoading(),
                       bridge.documentNavigationCount() == count + (changesDocument ? 1 : 0) else { return false }
-                return destination == nil || URL(string: bridge.currentURL()) == URL(string: destination ?? "")
+                return ConnectBrowser.navigationDestinationMatches(current: bridge.currentURL(), destination: destination)
             }
         } else {
             guard let renderer = context.renderer as? WKWebViewRenderer,
                   let view = renderer.makeView() as? WKWebView else {
                 return errorResponse(code: "NO_WEBVIEW", message: "The pinned renderer is unavailable")
             }
-            leasedView = view
-            installWebKitNavigationLease(view)
+            leasedDocumentOwner = renderer
+            installWebKitNavigationLease(view, documentOwner: renderer)
         }
         #else
         guard let view = context.webView else { return errorResponse(code: "NO_WEBVIEW", message: "The pinned renderer is unavailable") }
-        leasedView = view
-        installWebKitNavigationLease(view)
+        leasedDocumentOwner = view
+        installWebKitNavigationLease(view, documentOwner: view)
         #endif
-        defer { if let leasedView { ConnectDocument.reserve(leasedView, lease: nil) } }
+        defer { if let leasedDocumentOwner { ConnectDocument.reserve(leasedDocumentOwner, lease: nil) } }
         let result = await router.handle(method: method, body: params, browserGatewayDispatch: true).json
         guard result["success"] as? Bool == true else { return result }
         do {
             try await context.waitForNavigationRead()
-            guard authorized(), stillPinned(), !accountSurface() else { throw CancellationError() }
+            guard authorized(), stillPinned(), active(), !accountSurface() else { throw CancellationError() }
             return result
         } catch {
             return errorResponse(code: "TAB_CHANGED", message: "Navigation lost its job-owned document")
         }
     }
 
-    private func installWebKitNavigationLease(_ view: WKWebView) {
+    private func installWebKitNavigationLease(_ view: WKWebView, documentOwner: AnyObject) {
         let lease = ConnectNavigationLease(initial: expectedVersion)
-        ConnectDocument.reserve(view, lease: lease)
+        ConnectDocument.reserve(documentOwner, lease: lease)
         context.remoteNavigationReadGuard = { [weak self] in
             guard let self else { return false }
             return lease.allowsRead(
-                version: ConnectDocument.version(view),
+                version: ConnectDocument.version(documentOwner),
                 loading: view.isLoading,
                 authorized: self.authorized() && self.stillPinned() && self.active() && !self.accountSurface()
             )
@@ -211,7 +215,7 @@ final class ConnectBrowserControlJob {
         context.remoteNavigationWaitGuard = { [weak self] in
             guard let self else { return false }
             return lease.allowsWait(
-                version: ConnectDocument.version(view),
+                version: ConnectDocument.version(documentOwner),
                 authorized: self.authorized() && self.stillPinned() && self.active() && !self.accountSurface()
             )
         }

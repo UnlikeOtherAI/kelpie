@@ -2,7 +2,7 @@ import Foundation
 
 private let accountControlMethods: Set<String> = [
     "capabilities", "documentation", "tabs.list", "tabs.new", "tabs.select", "tabs.close",
-    "tab.snapshot", "tab.screenshot", "tab.goto", "tab.click", "tab.type", "page.press", "page.scroll"
+    "tab.snapshot", "tab.screenshot", "tab.goto", "tab.click", "tab.type", "page.scroll"
 ]
 
 @MainActor
