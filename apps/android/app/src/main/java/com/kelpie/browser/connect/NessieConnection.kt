@@ -113,9 +113,17 @@ object NessieConnection {
     }
 
     fun personChangedTab() {
+        personTookControl("The person changed tabs")
+    }
+
+    fun personInteracted() {
+        personTookControl("The person took control of the page")
+    }
+
+    private fun personTookControl(reason: String) {
         if (controlledTab == null || remoteTabMutation) return
         mutableState.value = state.value.copy(paused = true)
-        stopCurrent("The person changed tabs")
+        stopCurrent(reason)
         publishLifecycle()
     }
 

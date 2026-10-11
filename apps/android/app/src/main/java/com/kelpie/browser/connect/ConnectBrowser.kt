@@ -78,6 +78,9 @@ class ConnectBrowser(
                 ScrollHandler(isolated).register(this)
                 LLMHandler(isolated).register(this)
             }
+        if (operation in listOf("navigate", "back", "forward", "reload")) {
+            return navigate(command, operation, input, tab, expected, isolated, target)
+        }
         if (operation == "extract") return extract(input, tabId, expected, target)
         if (operation == "snapshot") {
             val visible = target.handle("get-visible-elements", mapOf("interactableOnly" to true)).second
@@ -95,6 +98,40 @@ class ConnectBrowser(
         if (operation == "type" || operation == "scroll") verify(tabId, expected)
         val safeResult = if (operation == "type") mapOf("success" to true, "characters" to (input["text"] as? String).orEmpty().length) else result
         return mapOf("tabId" to tabId, "tabVersion" to version(tabId), "result" to safeResult)
+    }
+
+    private suspend fun navigate(
+        command: Map<String, Any?>,
+        operation: String,
+        input: Map<String, Any?>,
+        tab: com.kelpie.browser.browser.BrowserTab,
+        expected: String,
+        isolated: HandlerContext,
+        target: Router,
+    ): Map<String, Any?> {
+        val body = validatedInput(operation, input)
+        val history = tab.webView.copyBackForwardList()
+        val offset = if (operation == "back") -1 else 1
+        val destination = when (operation) {
+            "navigate" -> body["url"] as String
+            "reload" -> tab.webView.url
+            else -> history.getItemAtIndex(history.currentIndex + offset)?.url
+        }
+        val lease = ConnectNavigationLease(expected, destination)
+        fun authorized() = NessieConnection.authorizes(command) && context.tabStore?.activeTab?.id == tab.id
+        isolated.remoteNavigationStart = { lease.arm(tab.documentVersion, authorized()) }
+        isolated.remoteNavigationReadGuard = { lease.allowsRead(tab.documentVersion, tab.isLoading, authorized()) }
+        isolated.remoteNavigationWaitGuard = { lease.allowsWait(tab.documentVersion, authorized()) }
+        tab.remoteNavigationLease = lease
+        try {
+            val result = target.handle(operation, body).second
+            currentCoroutineContext().ensureActive()
+            requireSuccess(result)
+            check(lease.allowsRead(tab.documentVersion, tab.isLoading, authorized())) { "Navigation document changed or job stopped" }
+            return mapOf("tabId" to tab.id, "tabVersion" to version(tab.id), "result" to result)
+        } finally {
+            if (tab.remoteNavigationLease === lease) tab.remoteNavigationLease = null
+        }
     }
 
     private fun validatedInput(

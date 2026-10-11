@@ -4,6 +4,11 @@ Native build/test evidence and remaining real-device checks are recorded in [ver
 
 Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
 
+Android navigation reserves one explicit destination at the native mutation point. Only fixed
+completion metadata reads may transfer to its first matching document start and resulting pin;
+cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
+invalidate that lease. Redirects that produce another document start fail closed and need a fresh snapshot.
+
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.
 UOA remains the sole identity authority. Native OAuth requests `kelpie.connect` alongside

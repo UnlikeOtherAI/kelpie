@@ -36,6 +36,9 @@ class HandlerContext {
 
     var webView: WebView? = null
     var remoteDocumentGuard: (() -> Boolean)? = null
+    var remoteNavigationStart: (() -> Boolean)? = null
+    var remoteNavigationReadGuard: (() -> Boolean)? = null
+    var remoteNavigationWaitGuard: (() -> Boolean)? = null
     var tabStore: TabStore? = null
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
@@ -95,7 +98,9 @@ class HandlerContext {
             cleared
         }
 
-    suspend fun evaluateJS(script: String): String =
+    suspend fun evaluateJS(script: String): String = evaluateGuardedJS(script, remoteDocumentGuard)
+
+    private suspend fun evaluateGuardedJS(script: String, guard: (() -> Boolean)?): String =
         suspendCoroutine { cont ->
             val wv = webView
             if (wv == null) {
@@ -103,7 +108,7 @@ class HandlerContext {
                 return@suspendCoroutine
             }
             mainHandler.post {
-                if (remoteDocumentGuard?.invoke() == false) {
+                if (guard?.invoke() == false) {
                     cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
                     return@post
                 }
@@ -116,6 +121,23 @@ class HandlerContext {
     suspend fun evaluateJSReturningJSON(script: String): Map<String, Any?> {
         val wrapped = "JSON.stringify(($script))"
         val raw = evaluateJS(wrapped)
+        return parseObject(raw)
+    }
+
+    /** Fixed metadata only: callers cannot use the transferred pin for arbitrary script/mutations. */
+    suspend fun navigationSnapshot(): Map<String, Any?> {
+        while (remoteNavigationReadGuard?.invoke() == false) {
+            check(remoteNavigationWaitGuard?.invoke() == true) { "Navigation document changed or job stopped" }
+            kotlinx.coroutines.delay(25)
+        }
+        val raw = evaluateGuardedJS(
+            "JSON.stringify({url:location.href,title:document.title,readyState:document.readyState})",
+            remoteNavigationReadGuard ?: remoteDocumentGuard,
+        )
+        return parseObject(raw)
+    }
+
+    private fun parseObject(raw: String): Map<String, Any?> {
         // WebView returns a JSON-encoded string (escaped), so we need to unescape
         val unescaped =
             if (raw.startsWith("\"") && raw.endsWith("\"")) {

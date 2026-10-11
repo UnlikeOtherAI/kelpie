@@ -31,7 +31,7 @@ class NavigationHandler(
         }
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
         ctx.lastNavigationError = null
-        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.loadUrl(url) }
+        mainHandler.post { if (mayNavigate()) wv.loadUrl(url) }
         // Wait for page to start loading then finish
         delay(100)
         val timeout = (body["timeout"] as? Int) ?: 10000
@@ -40,7 +40,7 @@ class NavigationHandler(
             ctx.lastNavigationError?.let { err ->
                 return errorResponse("NAVIGATION_ERROR", err)
             }
-            val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+            val result = ctx.navigationSnapshot()
             if (result["readyState"] == "complete") {
                 return successResponse(
                     mapOf(
@@ -54,7 +54,7 @@ class NavigationHandler(
         }
         // Timeout reached. If the requested page is actually fully loaded, allow
         // success; otherwise return the last captured navigation error.
-        val finalState = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+        val finalState = ctx.navigationSnapshot()
         val finalUrl = finalState["url"] as? String
         if (finalState["readyState"] == "complete" && finalUrl != null && urlsMatch(finalUrl, url)) {
             return successResponse(
@@ -85,28 +85,28 @@ class NavigationHandler(
 
     private suspend fun back(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.goBack() }
+        mainHandler.post { if (mayNavigate()) wv.goBack() }
         delay(200)
-        val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val result = ctx.navigationSnapshot()
         return successResponse(result)
     }
 
     private suspend fun forward(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.goForward() }
+        mainHandler.post { if (mayNavigate()) wv.goForward() }
         delay(200)
-        val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val result = ctx.navigationSnapshot()
         return successResponse(result)
     }
 
     private suspend fun reload(): Map<String, Any?> {
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
-        mainHandler.post { if (ctx.remoteDocumentGuard?.invoke() != false) wv.reload() }
+        mainHandler.post { if (mayNavigate()) wv.reload() }
         delay(100)
         val timeout = 10000
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeout) {
-            val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title, readyState: document.readyState})")
+            val result = ctx.navigationSnapshot()
             if (result["readyState"] == "complete") {
                 return successResponse(
                     mapOf(
@@ -118,7 +118,7 @@ class NavigationHandler(
             }
             delay(100)
         }
-        val finalState = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
+        val finalState = ctx.navigationSnapshot()
         return successResponse(
             mapOf(
                 "url" to (finalState["url"] ?: wv.url ?: ""),
@@ -127,6 +127,8 @@ class NavigationHandler(
             ),
         )
     }
+
+    private fun mayNavigate(): Boolean = ctx.remoteDocumentGuard?.invoke() != false && ctx.remoteNavigationStart?.invoke() != false
 
     private suspend fun getCurrentUrl(): Map<String, Any?> {
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")
