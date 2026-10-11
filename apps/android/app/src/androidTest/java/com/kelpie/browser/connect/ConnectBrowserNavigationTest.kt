@@ -42,7 +42,9 @@ class ConnectBrowserNavigationTest {
         for (switchTab in listOf(false, true)) {
             fixture { browser, context, server, authority ->
                 server.enqueue(page("Delayed").setBodyDelay(600, TimeUnit.MILLISECONDS))
-                val execution = async { runCatching { browser.execute(command(context, server.url("/delayed").toString())) } }
+                val execution = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()).async {
+                    runCatching { browser.execute(command(context, server.url("/delayed").toString())) }
+                }
                 withContext(Dispatchers.IO) { check(server.takeRequest(5, TimeUnit.SECONDS) != null) }
                 if (switchTab) context.tabStore!!.addTab() else authority.allowed = false
                 assertTrue(execution.await().isFailure)
