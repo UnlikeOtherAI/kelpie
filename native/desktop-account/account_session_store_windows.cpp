@@ -91,7 +91,7 @@ class DpapiBlobStore final : public EncryptedBlobStore {
     return sealed && WriteSealed(file_, Adopt(output));
   }
 
-  void Clear() override { DeleteFileW(file_.c_str()); }
+  void Clear() override { if(!DeleteFileW(file_.c_str()) && GetLastError()!=ERROR_FILE_NOT_FOUND && GetLastError()!=ERROR_PATH_NOT_FOUND)throw std::runtime_error("Encrypted data unavailable"); }
 
  private:
   std::filesystem::path file_;

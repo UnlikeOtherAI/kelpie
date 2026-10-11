@@ -41,6 +41,7 @@ std::vector<TabSnapshot> LinuxApp::Tabs() const {
   return tabs;
 }
 void LinuxApp::NewTab(bool isolated) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   NewTabRequest request;
   if(isolated || impl_->isolate_new_tabs) request.partition="isolated-"+account::RandomAccountValue();
   TabSnapshot tab;
@@ -55,11 +56,13 @@ void LinuxApp::SetIsolateNewTabs(bool enabled) {
   } catch(const std::exception& error) { ShowToast(error.what()); }
 }
 void LinuxApp::ActivateTab(const std::string& id) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   for(const auto& tab:Tabs()) if(tab.id==id) {
     impl_->desktop.engine().ActivateTab({tab.id,tab.generation},std::chrono::seconds(1)); return;
   }
 }
 void LinuxApp::CloseTab(const std::string& id) {
+  if(impl_->connection)impl_->connection->UserTabChanged();
   for(const auto& tab:Tabs()) if(tab.id==id) {
     impl_->desktop.engine().CloseTab({tab.id,tab.generation},std::chrono::seconds(1)); return;
   }

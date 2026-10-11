@@ -355,8 +355,8 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
     account_->Poll();
     if(connection_) {
       const auto model=inference_->Execute("ai-status");
-      if(model.value("success",false))connect_model_ready_=model.value("loaded",false) && model.value("backend","")=="native";
-      connection_->Update(connect_model_ready_);
+      if(model.value("success",false)) { connect_model_ready_=model.value("loaded",false) && model.value("backend","")=="native";connect_model_installed_=model.value("modelInstalled",false); }
+      connection_->Update(connect_model_ready_,connect_model_installed_);
     }
     const auto state = account_->State();
     if (!state.signing_in) CloseAccountLoginWindow();

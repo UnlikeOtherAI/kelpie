@@ -28,7 +28,7 @@ void WindowsApp::OnAccountRequested() {
   if (!state.signed_in && !state.signing_in) {
     if (!account_->StartSignIn(config_.profile_dir,[this](const std::string& url) {
       const auto window=[this](const std::string& login) {
-        return OpenAccountLoginWindow(login,[this] { if (account_) account_->SignOut(); });
+        return OpenAccountLoginWindow(login,[this] { if(connection_)connection_->SignOut();if (account_) account_->SignOut(); });
       };
       return account::OpenLoginSurface(url,/*app_window_allowed=*/true,window,OpenAccountBrowser)!=account::LoginSurface::kNone;
     })) MessageBeep(MB_OK);

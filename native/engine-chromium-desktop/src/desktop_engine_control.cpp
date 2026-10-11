@@ -70,7 +70,7 @@ using namespace engine_control;
 DesktopEngine::Impl::Tab* DesktopEngine::Impl::FindTab(const TabLease& lease) {
   for (auto& tab : tabs) {
     if (tab.id == lease.id) {
-      return (!lease.cancelled || !lease.cancelled->load()) &&
+      return (!lease.require_active || (browser && tab.browser && browser->IsSame(tab.browser))) && (!lease.cancelled || !lease.cancelled->load()) &&
           (!lease.deadline || std::chrono::steady_clock::now()<*lease.deadline) && !tab.closing && tab.generation == lease.generation &&
           (!lease.document_version || *lease.document_version==tab.document_version) ? &tab : nullptr;
     }

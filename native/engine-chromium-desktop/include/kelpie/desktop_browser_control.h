@@ -20,6 +20,7 @@ struct TabLease {
   std::optional<std::string> document_version;
   std::shared_ptr<const std::atomic<bool>> cancelled;
   std::optional<std::chrono::steady_clock::time_point> deadline;
+  bool require_active = false;
 };
 
 struct TabSnapshot {

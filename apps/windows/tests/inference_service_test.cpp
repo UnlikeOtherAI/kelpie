@@ -74,5 +74,11 @@ int main() {
     assert(removed["success"] == true);
     assert(restored.Execute("ai-status")["backend"] == "none");
   }
+  const auto model=directory/"downloaded.gguf";std::ofstream(model)<<"installed model placeholder";
+  auto savedSettings=ReadInferenceStore(directory/"inference.v1.dpapi");savedSettings["localModel"]=model.string();savedSettings["backend"]="none";
+  WriteInferenceStore(directory/"inference.v1.dpapi",savedSettings);
+  { InferenceService restored(directory,request);const auto status=restored.Execute("ai-status");assert(status["modelInstalled"]==true && status["loaded"]==false); }
+  std::filesystem::remove(model);
+  { InferenceService restored(directory,request);assert(restored.Execute("ai-status")["modelInstalled"]==false); }
   std::filesystem::remove_all(directory);
 }

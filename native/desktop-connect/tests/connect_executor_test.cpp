@@ -1,6 +1,7 @@
 #include "connect_executor.h"
 #include "websocket_codec.h"
 #include "encrypted_blob_store.h"
+#include "account_protocol.h"
 #include <cassert>
 #include <fstream>
 using namespace kelpie;
@@ -14,7 +15,7 @@ class Browser final:public DesktopBrowserControl {
   BrowserControlResult Check(TabLease lease) {
     used=lease;
     if(lease.id!=tab.id || lease.generation!=tab.generation || !lease.document_version || *lease.document_version!=tab.document_version ||
-        (lease.cancelled && lease.cancelled->load()) || (lease.deadline && std::chrono::steady_clock::now()>=*lease.deadline))return BrowserControlResult::Failure("STALE","Stale");
+        (lease.require_active && !tab.active) || (lease.cancelled && lease.cancelled->load()) || (lease.deadline && std::chrono::steady_clock::now()>=*lease.deadline))return BrowserControlResult::Failure("STALE","Stale");
     return BrowserControlResult::Success(tab);
   }
   BrowserControlResult GetTabs(std::vector<TabSnapshot>* result,Timeout)override { *result={tab};return BrowserControlResult::Success(); }
@@ -64,7 +65,15 @@ int main() {
   assert(executor.Execute(Command("snapshot"),guard)["output"]["page"]["text"]=="Page content");
   assert(!executor.Execute(Command("snapshot"),guard)["output"].contains("image"));
   Executor local(browser,[](const Json& request) { assert(!request.contains("context") && request["agent"]==false);return Json{{"success",true},{"response",std::string(100,'a')}}; });
-  assert(local.Execute(Command("extract",{{"question","Read page"},{"maxOutputCharacters",64}}),guard)["output"]["text"].get<std::string>().size()==64);
+  assert(local.Execute(Command("extract",{{"question","Read page"},{"maxOutputCharacters",64}}),guard)["output"]["summary"].get<std::string>().size()==64);
+  const auto extracted=local.Execute(Command("extract",{{"question","Read page"}}),guard)["output"];
+  assert(extracted["tabId"]=="owned" && extracted["tabVersion"]=="document-1" && extracted["evidence"][0]["url"]=="https://example.org" && extracted["evidence"][0]["excerpt"]=="Page content" && extracted["evidence"][0].contains("observedAt"));
+  Executor cancel_infer(browser,[&](const Json&) { guard->store(true);return Json{{"success",true},{"response","stale"}}; });
+  assert(cancel_infer.Execute(Command("extract",{{"question","Read page"}}),guard)["state"]=="cancelled");guard->store(false);
+  Executor changed_infer(browser,[&](const Json&) { browser.tab.document_version="changed";return Json{{"success",true},{"response","stale"}}; });
+  assert(changed_infer.Execute(Command("extract",{{"question","Read page"}}),guard)["error"]=="PAGE_CHANGED");browser.tab.document_version="document-1";
+  Executor focus_infer(browser,[&](const Json&) { browser.tab.active=false;return Json{{"success",true},{"response","stale"}}; });
+  assert(focus_infer.Execute(Command("extract",{{"question","Read page"}}),guard)["error"]=="PAGE_CHANGED");
   std::string split="\x81\x05hello";auto half=split.substr(0,4);assert(!DecodeFrame(half));half+=split.substr(4);assert(DecodeFrame(half)->payload=="hello");
   std::string masked="\x81\x80";bool rejected=false;try { DecodeFrame(masked); }catch(...) { rejected=true; }assert(rejected);
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();

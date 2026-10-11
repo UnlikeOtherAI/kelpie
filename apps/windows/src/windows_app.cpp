@@ -205,6 +205,7 @@ std::optional<std::wstring> WindowsApp::BestUrlCompletion(std::wstring_view type
 }
 
 void WindowsApp::OnCreateTabRequested() {
+  if(connection_)connection_->UserTabChanged();
   CreateTabFromShell(config_.isolate_new_tabs);
 }
 
@@ -232,6 +233,7 @@ void WindowsApp::CreateTabFromShell(bool isolated) {
 }
 
 void WindowsApp::OnActivateTabRequested(std::string id, std::uint64_t generation) {
+  if(connection_)connection_->UserTabChanged();
   if (!desktop_app_) return;
   const auto result = desktop_app_->engine().ActivateTab({std::move(id), generation}, std::chrono::seconds(2));
   if (result.ok) SaveSession();
@@ -239,6 +241,7 @@ void WindowsApp::OnActivateTabRequested(std::string id, std::uint64_t generation
 }
 
 void WindowsApp::OnCloseTabRequested(std::string id, std::uint64_t generation) {
+  if(connection_)connection_->UserTabChanged();
   if (!desktop_app_) return;
   const auto result = desktop_app_->engine().CloseTab({std::move(id), generation}, std::chrono::seconds(5));
   if (result.ok) SaveSession();
