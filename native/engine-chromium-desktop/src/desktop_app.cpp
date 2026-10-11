@@ -320,6 +320,7 @@ bool DesktopApp::Start(const Config& config) {
     AppendNetwork(impl_->network_store, event);
   });
   impl_->engine.SetNavigationSink([this](const std::string& url, const std::string& title) {
+    impl_->mcp_server.NotifyDocumentChanged();
     impl_->history_store.Record(url, title);
     impl_->history_store.UpdateLatestTitle(url, title);
   });

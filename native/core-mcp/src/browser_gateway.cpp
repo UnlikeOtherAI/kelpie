@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <map>
 #include <random>
+#include <sstream>
+#include <iomanip>
 #include <set>
 #include <string>
 namespace kelpie {
@@ -16,9 +18,10 @@ json Failure(const std::string& code, bool uncertain = false) {
 json Success(json value) { return {{"version", 1}, {"ok", true}, {"value", std::move(value)}}; }
 std::string Identity() {
   std::random_device random;
-  std::string output;
-  for (int i = 0; i < 8; ++i) output += std::to_string(random());
-  return output;
+  std::ostringstream output;
+  output << std::hex << std::setfill('0');
+  for (int i = 0; i < 4; ++i) output << std::setw(8) << static_cast<unsigned int>(random());
+  return output.str();
 }
 const std::map<std::string, std::string> kRoutes = {
   {"tabs.list", "get-tabs"}, {"tabs.new", "new-tab"}, {"tabs.select", "switch-tab"}, {"tabs.close", "close-tab"},

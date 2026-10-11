@@ -4,6 +4,7 @@
 #include "kelpie/mcp_registry.h"
 #include "kelpie/native_extension_schema.h"
 #include <iostream>
+#include <atomic>
 #include <mutex>
 namespace kelpie {
 namespace {
@@ -20,6 +21,8 @@ class DesktopMcpServer::Impl {
   mutable std::recursive_mutex mutex;
   mutable std::unique_ptr<BrowserGateway> gateway;
   mutable bool internal_dispatch = false;
+  mutable std::atomic<bool> document_changed{false};
+  void DrainDocuments() const { if (gateway && document_changed.exchange(false)) gateway->InvalidateReferences(); }
   void Ensure(const Config& config) const {
     if (gateway) return;
     json methods = json::array(), extensions = json::array();
@@ -37,6 +40,7 @@ class DesktopMcpServer::Impl {
       if (step.value("kind", std::string()) == "authorize") { step = gateway->Advance({{"success", true}}); continue; }
       json result;
       try {
+        DrainDocuments();
         const std::string method = step.at("method");
         internal_dispatch = true;
         if (method == "browser-control-evaluate" && reader) result = reader(step.at("params"));
@@ -44,6 +48,7 @@ class DesktopMcpServer::Impl {
         else result = {{"success", false}};
         internal_dispatch = false;
         step = gateway->Advance(std::move(result));
+        DrainDocuments();
       } catch (...) { internal_dispatch = false; step = gateway->Cancel(); }
     }
     return step["response"];
@@ -54,6 +59,7 @@ DesktopMcpServer::~DesktopMcpServer() = default;
 void DesktopMcpServer::SetRouter(const DesktopRouter* router) { impl_->router = router; impl_->gateway.reset(); }
 void DesktopMcpServer::SetRegistry(const McpRegistry* registry) { impl_->registry = registry; impl_->gateway.reset(); }
 void DesktopMcpServer::SetFixedReader(FixedReader reader) { impl_->reader = std::move(reader); impl_->gateway.reset(); }
+void DesktopMcpServer::NotifyDocumentChanged() const { impl_->document_changed.store(true); }
 std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, const json& params) const {
   auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
   InvalidateReferences(method, params);
@@ -79,11 +85,13 @@ bool DesktopMcpServer::Run(const Config& config) {
 DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request, const Config& config) const {
   std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
   impl_->Ensure(config);
+  impl_->DrainDocuments();
   try { return impl_->Run(impl_->gateway->BeginMcp(request)); } catch (...) { return RpcError(-32600); }
 }
 DesktopMcpServer::json DesktopMcpServer::HandleBrowserRequest(const json& request, const Config& config) const {
   std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
   impl_->Ensure(config);
+  impl_->DrainDocuments();
   return impl_->Run(impl_->gateway->Begin(request));
 }
 }

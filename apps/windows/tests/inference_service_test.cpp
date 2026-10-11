@@ -23,6 +23,7 @@ int main() {
   std::promise<void> entered, release;
   auto released = release.get_future().share();
   bool blocking = false;
+  bool expect_context = false;
   auto request = [&](const std::string& base, const std::string& op, const std::string& key, const json* body) -> json {
     ++calls; assert(base == "http://localhost:11434/v1"); assert(key == "test-secret");
     if (fail) throw InferenceError("ENDPOINT_UNREACHABLE", "Offline");
@@ -31,11 +32,19 @@ int main() {
       return {{"data", json::array({{{"id", "tiny"}}})}};
     }
     assert(body && body->at("model") == "tiny" && body->at("stream") == false);
+    if (expect_context) assert(body->at("messages").dump().find("bounded snapshot") != std::string::npos);
     if (blocking) { entered.set_value(); released.wait(); }
     return {{"choices", json::array({{{"message", {{"content", "4"}}}, {"finish_reason", "stop"}}})}};
   };
   {
     InferenceService service(directory, request);
+    kelpie::DesktopRouter router;
+    router.Register("get-tabs", [](const json&) { return json{{"success", true}, {"tabs", {{{"id", "visible"}, {"active", true}}}}}; });
+    router.Register("browser-control", [](const json& input) {
+      assert(input["method"] == "tab.snapshot" && input["tabId"] == "visible" && input["params"]["maxChars"] == 12000);
+      return json{{"version", 1}, {"ok", true}, {"value", {{"text", "bounded snapshot"}, {"elements", json::array()}}}};
+    });
+    service.Register(router);
     auto saved = service.Execute("ai-endpoint-save", {{"name", "Local"}, {"baseURL", "http://localhost:11434"},
         {"model", "tiny"}, {"apiKey", "test-secret"}});
     assert(saved["success"] == true && calls == 0);
@@ -44,6 +53,10 @@ int main() {
     assert(loaded["loaded"] == true);
     auto answer = service.Execute("ai-infer", {{"prompt", "2 + 2?"}, {"agent", false}});
     assert(answer["response"] == "4");
+    expect_context = true;
+    assert(service.Execute("ai-infer", {{"prompt", "Read page"}, {"context", "dom"}})["response"] == "4");
+    expect_context = false;
+    assert(service.Execute("ai-infer", {{"prompt", "Act"}, {"agent", true}})["error"]["code"] == "TOOLS_NOT_SUPPORTED");
     discovery = false;
     assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);
     discovery = true;
