@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { TokenStore } from "../../src/auth/token-store.js";
 
 async function listen(server: Server): Promise<number> {
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
@@ -31,6 +32,43 @@ describe("Windows local alias MCP stdio", () => {
     await Promise.all(servers.map((server) => new Promise<void>((resolveClose) => server.close(() => resolveClose()))));
     await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
   });
+
+  it("uses an explicitly paired socket for core calls without a per-call device", async () => {
+    const token = "test-paired-socket";
+    let authorized = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      response.setHeader("content-type", "application/json");
+      if (request.headers.authorization !== `Bearer ${token}`) {
+        response.writeHead(401).end(JSON.stringify({ success: false }));
+        return;
+      }
+      authorized += 1;
+      expect(request.url).toBe("/v1/browser-control");
+      response.end(JSON.stringify({ version: 1, ok: true, value: { target: "paired socket" } }));
+    });
+    servers.push(server);
+    const port = await listen(server);
+    const root = await mkdtemp(join(tmpdir(), "kelpie-mcp-device-")); roots.push(root);
+    const address = `127.0.0.1:${port}`;
+    await new TokenStore(join(root, ".kelpie")).set(`direct:${address}`, "127.0.0.1", port, token);
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: ["--import", "tsx", resolve("src/index.ts"), "--device", address, "mcp"],
+      cwd: process.cwd(), env: { ...process.env, HOME: root, USERPROFILE: root, KELPIE_HOME: join(root, ".kelpie") },
+      stderr: "pipe",
+    });
+    transports.push(transport);
+    const client = new Client({ name: "paired-device-test", version: "test" });
+    await client.connect(transport);
+    const result = await client.callTool({ name: "kelpie_browser_control", arguments: {
+      request: { version: 1, method: "capabilities", params: {} },
+    } });
+    expect(result.isError).not.toBe(true);
+    expect(JSON.stringify(result.content)).toContain("paired socket");
+    expect(authorized).toBe(1);
+    await client.close();
+  }, SPAWNED_CLI_TIMEOUT_MS);
 
   it("uses the native callable catalogue and protected readiness capability through the MCP SDK", async () => {
     const token = "a".repeat(48);
