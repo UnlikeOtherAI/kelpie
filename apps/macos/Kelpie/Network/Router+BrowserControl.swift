@@ -97,7 +97,11 @@ extension Router {
         }
         #endif
         let gateway = BrowserControlGateway(
-            methods: ["get-current-url"], extensions: [], targeting: "direct", allowActions: false, lease: browserLease,
+            methods: ["get-current-url"],
+            extensions: [],
+            targeting: "direct",
+            allowActions: false,
+            lease: browserLease,
             dispatch: { method, params, mutates in
                 guard method == "browser-control-evaluate", !mutates, owned(), let expression = params["expression"] as? String else {
                     return errorResponse(code: "TAB_CHANGED", message: "The context renderer changed")

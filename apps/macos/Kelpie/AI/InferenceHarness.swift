@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-
 struct InferenceHarness {
     private let engine = InferenceEngine.shared
     private let context: HandlerContext
@@ -49,7 +48,6 @@ struct InferenceHarness {
         }
         let summary = "Untrusted page metadata: " + stringify(["title": value["title"] ?? "", "url": value["url"] ?? ""])
 
-
         if let preloadedContext {
             let fullPrompt = buildDirectAnswerPrompt(
                 userPrompt: prompt,
@@ -88,10 +86,7 @@ struct InferenceHarness {
                 toolCallsMade += 1
 
                 let result = await browser.callTool(name: toolCall.name, arguments: toolCall.args)
-                let canonical = BrowserControlGateway.canonicalResult(result)
-                if (canonical["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool == true {
-                    throw InferenceEngine.InferenceError.inferenceFailed("Browser outcome is uncertain; the model turn stopped without retrying")
-                }
+                try refuseUncertainOutcome(result)
                 let observation = BrowserModelObservation(result, vision: vision)
                 if let image = observation.image { pendingImage = image }
                 let toolResult = truncate(stringify(observation.text), maxTokens: toolTokenBudget)
@@ -118,6 +113,13 @@ struct InferenceHarness {
             totalTimeMs: elapsedMs(since: startedAt),
             transcription: transcription
         )
+    }
+
+    private func refuseUncertainOutcome(_ result: [String: Any]) throws {
+        let canonical = BrowserControlGateway.canonicalResult(result)
+        if (canonical["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool == true {
+            throw InferenceEngine.InferenceError.inferenceFailed("Browser outcome is uncertain; the model turn stopped without retrying")
+        }
     }
 
     private func truncate(_ text: String, maxTokens: Int) -> String {
