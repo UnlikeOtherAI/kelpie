@@ -35,8 +35,7 @@ evaluation, screenshots, cookies, storage and tab creation/closing remain outsid
 that inference scope. `allowActions:false` removes common mutations. Read-only
 inference refuses an inactive target; action-enabled inference can select it
 initially. Every operation rechecks the pinned active tab and both canonical
-`tabId` and extension argument `tabId`. Plain OpenAI and embedded GGUF inference
-keep optional pinned page context; GGUF does not acquire an agent loop.
+`tabId` and extension argument `tabId`. Plain OpenAI and embedded GGUF inference use bounded common snapshots against a captured owned renderer, including requested background tabs without selection. Full caller history is retained; public text/accessible names and truncation form the observation, with form values omitted. GGUF does not acquire an agent loop.
 
 One coroutine mutex serializes complete gateway transactions and ordinary legacy
 browser operations across HTTP, MCP and inference. Legacy mutations invalidate

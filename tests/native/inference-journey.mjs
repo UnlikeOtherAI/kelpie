@@ -17,7 +17,7 @@ export async function runInferenceJourney(client) {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    assert.ok(body.messages.some(message => message.content.includes("Untrusted page content")));
+    assert.ok(body.messages.some(message => message.content.includes("Untrusted current page evidence")));
     assert.ok(!JSON.stringify(body).includes("AI_INPUT_SECRET"));
     if (hold) { observed(); return; }
     response.end(JSON.stringify({ choices: [{ message: { role: "assistant", content: "fixture-answer" }, finish_reason: "stop" }] }));
