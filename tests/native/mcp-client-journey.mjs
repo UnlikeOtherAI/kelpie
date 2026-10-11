@@ -25,6 +25,12 @@ try {
   assert.equal(extensions.isError, false);
   const names = JSON.parse(extensions.content.find(block => block.type === "text").text).value;
   assert.ok(names.includes("kelpie_get_capabilities"));
+  const expanded = [];
+  for (let offset = 0; offset < names.length; offset += 20) {
+    const schemas = await client.callTool({ name: "kelpie_extension_tools", arguments: { names: names.slice(offset, offset + 20) } });
+    assert.equal(schemas.isError, false);
+    expanded.push(...JSON.parse(schemas.content.find(block => block.type === "text").text).value);
+  }
   const rich = await client.callTool({ name: "kelpie_extension", arguments: { name: "kelpie_get_capabilities", arguments: {} } });
   assert.equal(rich.isError, false);
   if (process.platform === "win32" && names.includes("kelpie_ai_ask")) await runInferenceJourney(client);
@@ -34,5 +40,9 @@ try {
   });
   assert.equal(notification.status, 202);
   assert.equal(await notification.text(), "");
-  console.log("Standard native MCP client journey passed", { catalogBytes: Buffer.byteLength(JSON.stringify(tools)), extensions: names.length, browserMethods: envelope.value.methods });
+  console.log("Standard native MCP client journey passed", {
+    defaultToolCount: tools.length, defaultCatalogBytes: Buffer.byteLength(JSON.stringify({ tools })),
+    expandedRichToolCount: expanded.length, expandedRichCatalogBytes: Buffer.byteLength(JSON.stringify({ tools: expanded })),
+    browserMethods: envelope.value.methods,
+  });
 } finally { await client.close(); }
