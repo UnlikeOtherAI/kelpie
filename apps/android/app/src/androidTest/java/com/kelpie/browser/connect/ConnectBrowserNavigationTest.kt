@@ -27,6 +27,21 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 class ConnectBrowserNavigationTest {
     @Test
+    fun extractionCancellationCannotCancelAnotherRequest() = runBlocking {
+        val extraction = com.kelpie.browser.ai.InferenceRequest()
+        val personChat = com.kelpie.browser.ai.InferenceRequest()
+        try {
+            extraction.cancel()
+            val stopped = com.kelpie.browser.ai.LocalInference.execute("infer", mapOf("prompt" to "Hello"), extraction)
+            assertEquals("INFERENCE_CANCELLED", (stopped["error"] as Map<*, *>)["code"])
+            val status = com.kelpie.browser.ai.LocalInference.execute("status", request = personChat)
+            assertEquals(true, status["success"])
+        } finally {
+            extraction.close()
+            personChat.close()
+        }
+    }
+    @Test
     fun navigationReturnsItsNewDocumentPin() =
         runBlocking {
             fixture { browser, context, server, _ ->

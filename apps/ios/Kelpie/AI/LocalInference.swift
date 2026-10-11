@@ -10,14 +10,14 @@ final class LocalInference: @unchecked Sendable {
 
     func cancel() { kelpie_local_cancel(engine) }
 
-    func execute(_ operation: String, body: [String: Any] = [:]) async -> [String: Any] {
+    func execute(_ operation: String, body: [String: Any] = [:], request: InferenceRequest? = nil) async -> [String: Any] {
         guard let data = try? JSONSerialization.data(withJSONObject: body),
               let input = String(data: data, encoding: .utf8) else {
             return errorResponse(code: "INVALID_PARAM", message: "Invalid inference parameters")
         }
         return await withCheckedContinuation { continuation in
             queue.async { [self] in
-                guard let raw = kelpie_local_execute(engine, operation, input) else {
+                guard let raw = kelpie_local_execute_owned(engine, operation, input, request?.handle) else {
                     continuation.resume(returning: errorResponse(code: "AI_UNAVAILABLE", message: "Local inference is unavailable"))
                     return
                 }

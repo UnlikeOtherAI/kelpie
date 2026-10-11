@@ -3,6 +3,20 @@ import WebKit
 @testable import Kelpie
 
 final class ConnectAuthorizationTests: XCTestCase {
+    func testExtractionCancellationCannotCancelAnotherRequest() async throws {
+        let extraction = InferenceRequest()
+        let personChat = InferenceRequest()
+        extraction.cancel()
+        #if os(iOS)
+        let stopped = await LocalInference.shared.execute("infer", body: ["prompt": "Hello"], request: extraction)
+        XCTAssertEqual((stopped["error"] as? [String: Any])?["code"] as? String, "INFERENCE_CANCELLED")
+        let status = await LocalInference.shared.execute("status", request: personChat)
+        XCTAssertEqual(status["success"] as? Bool, true)
+        #else
+        XCTAssertTrue(extraction.isCancelled)
+        XCTAssertFalse(personChat.isCancelled)
+        #endif
+    }
     #if os(iOS)
     @MainActor
     func testPageContextReadKeepsItsBeforeAndAfterJobFence() async throws {

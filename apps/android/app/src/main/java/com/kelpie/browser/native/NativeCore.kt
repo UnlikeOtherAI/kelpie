@@ -21,6 +21,10 @@ object NativeCore {
     ): String
 
     external fun cancelLocalInference()
+    external fun inferenceRequestCreate(): Long
+    external fun inferenceRequestCancel(request: Long)
+    external fun inferenceRequestDestroy(request: Long)
+    external fun localInferenceOwned(operation: String, body: String, request: Long): String
 
     external fun connectCreate(
         state: String,
