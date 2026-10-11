@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -16,6 +17,9 @@ namespace kelpie {
 struct TabLease {
   std::string id;
   std::uint64_t generation = 0;
+  std::optional<std::string> document_version;
+  std::shared_ptr<const std::atomic<bool>> cancelled;
+  std::optional<std::chrono::steady_clock::time_point> deadline;
 };
 
 struct TabSnapshot {
@@ -52,6 +56,7 @@ struct TabSnapshot {
   // Reported alongside `partition` so a caller learns what it actually got:
   // the first tab to resolve a partition fixes its persistence for the rest.
   std::optional<bool> persistent;
+  std::string document_version;
 };
 
 // Everything `new-tab` can ask for. `persistent` only means anything with a
@@ -61,6 +66,8 @@ struct NewTabRequest {
   std::optional<std::string> name;
   std::optional<std::string> partition;
   bool persistent = true;
+  std::shared_ptr<const std::atomic<bool>> cancelled;
+  std::optional<std::chrono::steady_clock::time_point> deadline;
 };
 
 struct PartitionInfo {

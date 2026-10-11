@@ -92,6 +92,7 @@ set(WINDOWS_THEME_HEADERS
 )
 
 add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-account" "${CMAKE_BINARY_DIR}/desktop-account")
+add_subdirectory("${KELPIE_NATIVE_ROOT}/desktop-connect" "${CMAKE_BINARY_DIR}/desktop-connect")
 
 include(inference.cmake)
 
@@ -203,7 +204,7 @@ target_include_directories(kelpie
     "${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
-target_link_libraries(kelpie PRIVATE kelpie_desktop_account shlwapi)
+target_link_libraries(kelpie PRIVATE kelpie_desktop_account kelpie_desktop_connect shlwapi)
 
 target_link_libraries(kelpie
   PRIVATE

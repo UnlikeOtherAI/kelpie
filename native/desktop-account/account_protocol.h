@@ -5,7 +5,7 @@
 
 namespace kelpie::account {
 inline constexpr char kAccountOrigin[] = "https://authentication.unlikeotherai.com";
-inline constexpr char kAccountScopes[] = "openid profile settings.read settings.write";
+inline constexpr char kAccountScopes[] = "openid profile settings.read settings.write kelpie.connect";
 inline constexpr char kAccountBookmarks[] = "/oauth/me/settings/browser/bookmarks";
 std::string RandomAccountValue();
 std::string AccountChallenge(const std::string& verifier);

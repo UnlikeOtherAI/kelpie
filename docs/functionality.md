@@ -20,6 +20,11 @@ Works identically with real devices, iOS Simulators, and Android Emulators — a
 
 ## Pairing & Authentication
 
+Signed-in Windows and Linux Chromium apps also connect outbound to Nessie under the
+same UOA account, without pairing or team setup. Their account menu shows connection
+status and Pause/Stop controls; see [desktop Nessie connection](desktop-nessie-connect.md).
+This connection uses a dedicated, scoped UOA ticket and does not expose local listeners.
+
 Every Kelpie device denies API and MCP traffic by default. Only the discovery endpoints (`/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, `/health`) accept unauthenticated requests; everything else requires a bearer token issued by the on-device user.
 
 **Pairing flow.** When the CLI hits an unauthenticated endpoint and gets a `401`, or when the user runs `kelpie pair <device>` explicitly, the CLI posts a pairing request to the device. The device shows a modal with the requester's self-reported client name and offers three responses:

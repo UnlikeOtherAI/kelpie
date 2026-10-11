@@ -12,6 +12,7 @@
 - API reference: [docs/api/](docs/api/) — all HTTP/MCP methods (core, LLM-optimized, devtools, browser management)
 - CLI reference: [docs/cli.md](docs/cli.md) — commands, flags, group operations, LLM help system
 - Persistent pairing and exact-socket token reuse: [docs/functionality.md](docs/functionality.md#pairing--authentication).
+- Windows/Linux outbound Nessie account connections and native verification: [docs/desktop-nessie-connect.md](docs/desktop-nessie-connect.md).
 - UI documentation: [docs/ui/](docs/ui/) — browser app screens, settings panel, platform specifics
 
 **Evolving docs — created as needed when work begins (do not auto-load):**

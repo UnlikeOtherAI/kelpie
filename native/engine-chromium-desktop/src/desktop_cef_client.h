@@ -58,6 +58,8 @@ class DesktopCefClient final : public CefClient,
   void OnLoadEnd(CefRefPtr<CefBrowser> browser,
                  CefRefPtr<CefFrame> frame,
                  int http_status_code) override;
+  void OnLoadStart(CefRefPtr<CefBrowser> browser,CefRefPtr<CefFrame> frame,
+                   TransitionType transition_type) override;
   void OnLoadError(CefRefPtr<CefBrowser> browser,
                    CefRefPtr<CefFrame> frame,
                    CefLoadHandler::ErrorCode error_code,

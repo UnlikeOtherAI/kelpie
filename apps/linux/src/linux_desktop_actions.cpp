@@ -108,7 +108,12 @@ void LinuxApp::AccountSignIn() {
     return account::OpenLoginSurface(url,!impl_->config.headless,window,OpenExternal)!=account::LoginSurface::kNone;
   })) ShowToast("Please wait for the current account request.");
 }
-void LinuxApp::AccountSignOut() { impl_->account.SignOut(); }
+void LinuxApp::AccountSignOut() { if(impl_->connection)impl_->connection->SignOut(); impl_->account.SignOut(); }
+std::string LinuxApp::NessieStatus() const { return impl_->connection?impl_->connection->Status():"Nessie unavailable"; }
+bool LinuxApp::NessiePaused() const { return impl_->connection && impl_->connection->paused(); }
+bool LinuxApp::NessieEnabled() const { return impl_->connection && impl_->connection->enabled(); }
+void LinuxApp::NessiePause() { if(impl_->connection)impl_->connection->Pause(!impl_->connection->paused()); }
+void LinuxApp::NessieEnable() { if(impl_->connection)impl_->connection->Enable(!impl_->connection->enabled()); }
 void LinuxApp::AccountRefresh() { impl_->account.StartBookmarkAction("refresh"); }
 void LinuxApp::ShowToast(const std::string& message) { std::lock_guard lock(impl_->state_mutex); impl_->toast=message; }
 std::string LinuxApp::ConsumeToast() { std::lock_guard lock(impl_->state_mutex); return std::exchange(impl_->toast,{}); }

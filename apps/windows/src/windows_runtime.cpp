@@ -311,6 +311,14 @@ bool WindowsApp::InitializeDesktopRuntime() {
   browser_view_->ShowFallback(false);
   SetTimer(shell_->hwnd(), 3, 300, nullptr);
   account_->RestoreSession();
+  connect_executor_=std::make_unique<connect::Executor>(desktop_app_->engine(),[this](const json& body) {
+    const auto status=inference_->Execute("ai-status");
+    if(!status.value("loaded",false) || status.value("backend","")!="native")return json{{"success",false}};
+    return inference_->Execute("ai-infer",body);
+  });
+  connection_=std::make_unique<connect::Client>(*account_,config_.profile_dir,"windows",runtime.device_id,
+      [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return connect_executor_->Execute(command,cancelled); },
+      [this] { if(inference_)inference_->Cancel(); });
   startup_diagnostics_.Ready();
   return true;
 }
@@ -319,6 +327,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
   // CEF must deliver every OnBeforeClose before CefShutdown. Keep the owner
   // and message pump alive if shutdown is still draining browser callbacks.
   if (desktop_app_) {
+    if(connection_) { connection_->Shutdown(); if(!connection_->Drain())return false; connection_.reset(); connect_executor_.reset(); }
     if (account_) { account_->Shutdown(); if (!account_->Drain()) return false; }
     if (!CloseAccountLoginWindow()) return false;
     if (!page_color_sampler_.Drain()) return false;
@@ -344,6 +353,11 @@ void WindowsApp::UpdateBrowserStateFromRuntime() {
   if (!desktop_app_) return;
   if (account_ && !close_lifecycle_.requested()) {
     account_->Poll();
+    if(connection_) {
+      const auto model=inference_->Execute("ai-status");
+      if(model.value("success",false))connect_model_ready_=model.value("loaded",false) && model.value("backend","")=="native";
+      connection_->Update(connect_model_ready_);
+    }
     const auto state = account_->State();
     if (!state.signing_in) CloseAccountLoginWindow();
     shell_->UpdateAccount(state.avatar, utf::Utf8ToWideDisplay(account::AccountLabel(state)), !state.error.empty(), state.busy);
