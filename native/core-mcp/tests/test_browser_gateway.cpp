@@ -56,9 +56,9 @@ void References() {
   assert(step["response"]["error"]["code"] == "STALE_REFERENCE");
   step = gateway.Begin(Request("tab.click", {{"ref", ref}}));
   assert(step["method"] == "browser-control-evaluate");
-  step = gateway.Advance({{"success", true}, {"result", {{"selector", "button:nth-child(1)"}}}});
-  assert(step["method"] == "click");
-  gateway.Advance({{"success", false}});
+  assert(step["mutates"] == true);
+  step = gateway.Advance({{"success", true}, {"result", {{"error", "STALE_REFERENCE"}, {"mayHaveCompleted", false}}}});
+  assert(step["response"]["error"]["mayHaveCompleted"] == false);
   assert(gateway.Begin(Request("tab.click", {{"ref", ref}}))["response"]["error"]["code"] == "STALE_REFERENCE");
   step = gateway.Begin(Request("tab.snapshot"));
   expression = step["params"]["expression"];

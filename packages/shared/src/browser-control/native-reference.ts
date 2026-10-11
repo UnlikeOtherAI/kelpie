@@ -10,7 +10,7 @@ export function rememberNativeSnapshot(collected: { snapshot: unknown; targets: 
 export function resolveNativeReference(ref: string, key = "__kelpieBrowserControlRefs"): { selector?: string; error?: string } {
   const state = (window as unknown as Record<string, { targets: Record<string, Element>; url: string } | undefined>)[key];
   const el = state?.targets[ref];
-  if (!el?.isConnected || state?.url !== location.href) return { error: "STALE_REFERENCE" };
+  if (!state || !el?.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE" };
   if (!(el.getRootNode() instanceof Document)) return { error: "UNSUPPORTED" };
   const parts: string[] = [];
   for (let node: Element | null = el; node; node = node.parentElement) {
@@ -22,4 +22,27 @@ export function resolveNativeReference(ref: string, key = "__kelpieBrowserContro
   const matches = document.querySelectorAll(selector);
   if (matches.length !== 1 || matches[0] !== el) return { error: "STALE_REFERENCE" };
   return { selector };
+}
+
+/** Atomic DOM activation/append on the captured object. Fixed internal script, never caller JavaScript. */
+export function actOnNativeReference(ref: string, key: string, method: "tab.click" | "tab.type", text = ""): { ok?: true; error?: string; mayHaveCompleted?: boolean } {
+  const state = (window as unknown as Record<string, { targets: Record<string, Element>; url: string } | undefined>)[key];
+  const el = state?.targets[ref];
+  if (!state || !el?.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: false };
+  if (!(el instanceof HTMLElement) || !(el.getRootNode() instanceof Document)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
+  if (method === "tab.type" && !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !el.isContentEditable) return { error: "UNSUPPORTED", mayHaveCompleted: false };
+  if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && (el.disabled || el.readOnly)) return { error: "UNSUPPORTED", mayHaveCompleted: false };
+  // Focus may synchronously invoke page handlers, so verify again immediately before the mutation.
+  el.focus();
+  if (!el.isConnected || state.url !== location.href) return { error: "STALE_REFERENCE", mayHaveCompleted: true };
+  if (method === "tab.click") el.click();
+  else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const prototype = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(el, el.value + text);
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+  } else {
+    el.append(document.createTextNode(text));
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+  }
+  return { ok: true };
 }
