@@ -35,7 +35,7 @@ int main() {
   Accept("ai-endpoint-save", {{"name", "local"}, {"baseURL", "http://localhost:1234/v1"}, {"capabilities", {{"vision", nullptr}, {"contextWindow", 128}}}});
   json invalid = {{"name", "local"}, {"baseURL", "http://localhost:1234/v1"}, {"capabilities", {{"contextWindow", 0}}}};
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("ai-endpoint-save"), &invalid));
-  invalid = {{"rules", {{{"pattern", "*"}, {"action", "mock"}, {"mockResponse", {{"status", 200}, {"headers", {{"test", 1}}}, {"body", ""}}}}}};
+  invalid = json::parse(R"({"rules":[{"pattern":"*","action":"mock","mockResponse":{"status":200,"headers":{"test":1},"body":""}}]})");
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("set-request-interception"), &invalid));
   invalid = {{"text", 1}};
   assert(!kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema("set-clipboard"), &invalid));

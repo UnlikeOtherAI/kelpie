@@ -287,6 +287,7 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "find-element": "kelpie_find_element",
   "find-button": "kelpie_find_button",
   "find-link": "kelpie_find_link",
+  "get-links": "kelpie_get_links",
   "find-input": "kelpie_find_input",
   "evaluate": "kelpie_evaluate",
   "toast": "kelpie_toast",
