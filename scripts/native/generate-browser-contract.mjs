@@ -5,7 +5,7 @@ import { z } from '../../packages/shared/node_modules/zod/index.js';
 import { BrowserControlRequestSchema, browserControlInputSchema, BROWSER_CONTROL_METHODS, browserControlMutates } from '../../packages/shared/dist/browser-control/protocol.js';
 import { BROWSER_CONTROL_DESCRIPTION, BROWSER_CONTROL_DOCUMENTATION } from '../../packages/shared/dist/browser-control/proxy.js';
 import { collectBrowserSnapshot } from '../../packages/shared/dist/browser-control/snapshot.js';
-import { rememberNativeSnapshot, resolveNativeReference } from '../../packages/shared/dist/browser-control/native-reference.js';
+import { rememberNativeSnapshot, resolveNativeReference, actOnNativeReference } from '../../packages/shared/dist/browser-control/native-reference.js';
 const output = process.argv[2];
 if (!output) throw new Error('Expected generated header path');
 const inputs = [
@@ -30,7 +30,7 @@ const assets = {
   methods: JSON.stringify(BROWSER_CONTROL_METHODS),
   mutations: JSON.stringify(BROWSER_CONTROL_METHODS.filter(browserControlMutates)),
   description: BROWSER_CONTROL_DESCRIPTION, documentation: BROWSER_CONTROL_DOCUMENTATION,
-  reader: collectBrowserSnapshot.toString(), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(),
+  reader: collectBrowserSnapshot.toString(), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
 };
 await mkdir(dirname(output), { recursive: true });
 await writeFile(output, '#pragma once\nnamespace kelpie::browser_assets {\n' + Object.entries(assets).map(([name, value]) => `inline constexpr char ${name}[] = R"KELPIE(${value})KELPIE";\n`).join('') + '}\n');
