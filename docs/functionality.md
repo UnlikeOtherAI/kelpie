@@ -43,6 +43,8 @@ API: `POST /v1/pair`, `GET /v1/pair/status?requestId=…`; CLI: `kelpie pair`; M
 
 ## Browser Control
 
+Apple apps expose the shared versioned `POST /v1/browser-control` and authenticated `POST /mcp` surface. Common snapshots, references, append typing and navigation share one native coordinator; product tools are discovered separately. See [Apple binding](api/native-browser-gateway.md#apple-bindings).
+
 Full navigation control: go to any URL, go back/forward, reload, get the current page URL and title. The browser uses Safari's user agent on iOS, Chrome's on Android, Chromium on Linux, and on macOS can switch between Safari/WebKit and Chrome/Chromium behavior so sites behave normally — Google OAuth, banking sites, and similar services work without being blocked as a WebView.
 
 On macOS, the desktop URL bar stays synced with both API/MCP-triggered navigation and user-driven page navigation, uses a pale top tab strip alongside the native close/minimize/maximize controls, an outlined navigation row and rounded address field, autocompletes previously visited URLs inline as you type, supports native fullscreen toggling for the active window from the Window menu or with `Cmd+F`, and maps `Cmd+R` to a hard refresh in both WebKit and Chromium so cached desktop state can be cleared without switching renderers. On Linux, the GTK shell matches the Windows title-strip tabs, outlined navigation controls, rounded address field, conditional favorites row and UOA account menu.
@@ -59,9 +61,9 @@ Every platform keeps a persisted home page URL. Fresh launches load that URL ins
 
 ## Renderer Switching (macOS)
 
-Switch between Safari (WebKit), Chrome (Chromium/CEF), and Firefox (Gecko) rendering engines at runtime. Available via the UI segmented control and the `set-renderer` / `get-renderer` HTTP endpoints. Cookies are migrated automatically when switching to preserve login sessions.
+Switch between Safari (WebKit) and Chrome (Chromium/CEF) rendering engines at runtime. Available via the UI segmented control and the `set-renderer` / `get-renderer` HTTP endpoints. Cookies are migrated automatically when switching to preserve login sessions.
 
-Gecko uses a Firefox runtime bundled inside Kelpie.app (`Frameworks/KelpieGeckoHelper.app`) — no external Firefox installation required. Run `make gecko-runtime` once during setup to download and strip the runtime. The bundled binary is driven headless via the Firefox Remote Protocol (CDP-compatible WebSocket). The live view shows the Firefox-rendered page via screenshots at ~5fps.
+The current native app exposes WebKit and Chromium. The optional Gecko helper staging script does not provide a callable renderer or control capability.
 
 ## External Display — Apple TV (iOS)
 
@@ -572,3 +574,15 @@ Browser jobs pin the exact document and completion results survive reconnect.
 Loaded on-device text models can extract bounded page evidence asynchronously; installed
 and ready models are advertised separately. Embedded GGUF does not run delegated
 browser tool loops. See [the native connection contract](nessie-connect.md).
+## Shared browser control
+
+Android exposes the common core directly at authenticated `/v1/browser-control`
+and `/mcp`. Its existing OpenAI-compatible agent uses the compact shared catalog
+with per-run tab and action permissions. Product extensions are discovered on
+demand; pairing and plain local inference retain their permissions. See
+[the Android binding](api/native-browser-gateway-android.md), including its WebView
+page-realm limitation and verification commands.
+
+Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-json>` and CLI MCP expose one versioned browser core used by runtime consumers. Native owns the persistent reference registry. The default MCP catalog advertises the core and three extension discovery/invocation tools; rich functions remain reachable through the generic extension caller. Its owning surface is machine-facing control, reached through HTTP, existing `kelpie mcp`, or a pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native methods are refused according to actual capabilities. The Linux no-CEF fallback supports the protocol with metadata-only core capabilities and legacy extensions. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).
+
+The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).

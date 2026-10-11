@@ -36,6 +36,7 @@ object AIConversation {
                 "title" to (result["title"] as? String).orEmpty().take(500),
                 "url" to (result["url"] as? String).orEmpty().take(2000),
                 "content" to (result["content"] as? String).orEmpty().take(12000),
+                "truncated" to (result["truncated"] == true),
                 "accessibleLabels" to
                     (result["accessibleLabels"] as? List<*>)
                         ?.filterIsInstance<String>()

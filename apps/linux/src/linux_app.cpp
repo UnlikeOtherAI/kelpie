@@ -209,6 +209,7 @@ LinuxApp::LinuxApp(AppConfig config, int argc, char* argv[])
 LinuxApp::~LinuxApp() = default;
 
 int LinuxApp::Run() {
+  if (impl_->config.mcp_stdio) { std::cerr << "Native stdio MCP is unsupported; use kelpie --browser <alias> mcp.\n"; return 1; }
 #if KELPIE_LINUX_HAS_CEF
   if (impl_->config.headless) {
     kelpie::DesktopEngine::Config engine_config =

@@ -172,6 +172,10 @@ class DesktopBrowserControl {
                                         std::string script,
                                         Json* value,
                                         Timeout timeout) = 0;
+  // Internal generated browser-control scripts execute in a private renderer world.
+  virtual BrowserControlResult EvaluateBrowserControl(TabLease, std::string, Json*, Timeout) {
+    return BrowserControlResult::Failure("PLATFORM_NOT_SUPPORTED", "Private browser reader is unavailable");
+  }
   virtual BrowserControlResult Screenshot(TabLease lease,
                                           BrowserScreenshot* image,
                                           Timeout timeout) = 0;
@@ -203,6 +207,12 @@ class DesktopBrowserControl {
                                         const Json& params,
                                         Json* result,
                                         Timeout timeout) = 0;
+
+  // Internal chrome sampling only. The fixed CDP observation does not execute
+  // page JavaScript or update browser-control refs; callers cannot supply code.
+  virtual BrowserControlResult ReadAppearance(TabLease, Json*, Timeout) {
+    return BrowserControlResult::Failure("UNSUPPORTED", "Appearance sampling requires Chromium");
+  }
 
  protected:
   static BrowserControlResult PartitionsUnsupported() {

@@ -1,379 +1,133 @@
 #include "kelpie/desktop_mcp_server.h"
-#include "inference_schema.h"
-
-#include <algorithm>
-#include <cstdint>
-#include <iostream>
-#include <optional>
-#include <string_view>
-
+#include "kelpie/browser_gateway.h"
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
-#include "kelpie/response_helpers.h"
-
+#include "kelpie/native_extension_schema.h"
+#include <iostream>
+#include <atomic>
+#include <mutex>
+#include <stdexcept>
 namespace kelpie {
 namespace {
-
-constexpr std::string_view kProtocolVersion = "2025-06-18";
-
-nlohmann::json JsonRpcResult(const nlohmann::json& id, const nlohmann::json& result) {
-  return {{"jsonrpc", "2.0"}, {"id", id}, {"result", result}};
+using json = nlohmann::json;
+json RpcError(int code, const json& request = json::object()) {
+  if (request.is_object() && !request.contains("id") && request.contains("jsonrpc") && request["jsonrpc"] == "2.0" && request.contains("method") && request["method"].is_string()) return nullptr;
+  return {{"jsonrpc", "2.0"}, {"id", request.is_object() ? request.value("id", json(nullptr)) : json(nullptr)}, {"error", {{"code", code}, {"message", "Invalid MCP request"}}}};
 }
-
-nlohmann::json JsonRpcError(const nlohmann::json& id, int code, const std::string& message) {
-  return {{"jsonrpc", "2.0"},
-          {"id", id},
-          {"error", {{"code", code}, {"message", message}}}};
 }
-
-bool IsJsonRpcRequest(const nlohmann::json& request) {
-  if (!request.is_object()) {
-    return false;
-  }
-  const auto jsonrpc = request.find("jsonrpc");
-  const auto method = request.find("method");
-  return jsonrpc != request.end() && jsonrpc->is_string() && *jsonrpc == "2.0" &&
-         method != request.end() && method->is_string();
-}
-
-bool IsNotification(const nlohmann::json& request) {
-  return IsJsonRpcRequest(request) && !request.contains("id");
-}
-
-nlohmann::json ReplyOrNothing(bool notification, nlohmann::json response) {
-  return notification ? nlohmann::json(nullptr) : std::move(response);
-}
-
-nlohmann::json InputSchema(std::string_view endpoint) {
-  if (endpoint.substr(0, 3) == "ai-") return InferenceInputSchema(endpoint);
-  nlohmann::json properties = nlohmann::json::object();
-  nlohmann::json required = nlohmann::json::array();
-  const auto string = [&properties](const char* name, bool required_field = false) {
-    properties[name] = {{"type", "string"}, {"minLength", required_field ? 1 : 0}};
-  };
-  const auto integer = [&properties](const char* name, int minimum = 0) {
-    properties[name] = {{"type", "integer"}, {"minimum", minimum}};
-  };
-  const auto number = [&properties](const char* name) {
-    properties[name] = {{"type", "number"}};
-  };
-  const auto tab_scoped = [&properties] {
-    properties["tabId"] = {{"type", "string"}, {"minLength", 1}};
-    properties["generation"] = {{"type", "integer"}, {"minimum", 0}};
-    properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}};
-  };
-  const auto require = [&required](const char* name) { required.push_back(name); };
-  const bool scoped = endpoint == "navigate" || endpoint == "back" || endpoint == "forward" ||
-      endpoint == "reload" || endpoint == "get-current-url" ||
-      endpoint == "switch-tab" || endpoint == "close-tab" || endpoint == "get-dom" ||
-      endpoint == "query-selector" || endpoint == "query-selector-all" ||
-      endpoint == "get-element-text" || endpoint == "get-attributes" || endpoint == "evaluate" ||
-      endpoint == "wait-for-element" || endpoint == "wait-for-navigation" || endpoint == "click" ||
-      endpoint == "fill" || endpoint == "type" || endpoint == "select-option" || endpoint == "check" ||
-      endpoint == "uncheck" || endpoint == "press-key" || endpoint == "scroll" ||
-      endpoint == "scroll-to-top" || endpoint == "scroll-to-bottom" || endpoint == "screenshot" ||
-      endpoint == "screenshot-annotated" || endpoint == "get-cookies" || endpoint == "set-cookie" ||
-      endpoint == "delete-cookies" || endpoint == "clear-cookies" || endpoint == "get-storage" ||
-      endpoint == "set-storage" || endpoint == "clear-storage" || endpoint == "get-dialog" ||
-      endpoint == "handle-dialog" || endpoint == "find-element" || endpoint == "find-button" ||
-      endpoint == "find-link" || endpoint == "find-input" || endpoint == "get-page-text" ||
-      endpoint == "get-visible-elements" || endpoint == "get-form-state" || endpoint == "get-accessibility-tree";
-  if (scoped) tab_scoped();
-
-  if (endpoint == "navigate" || endpoint == "set-home") { string("url", true); require("url"); }
-  else if (endpoint == "new-tab") { string("url", true); properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}}; }
-  else if (endpoint == "evaluate") { string("expression", true); require("expression"); }
-  else if (endpoint == "query-selector" || endpoint == "query-selector-all" || endpoint == "get-element-text" || endpoint == "get-attributes") { string("selector", true); require("selector"); }
-  else if (endpoint == "get-dom") string("selector");
-  else if (endpoint == "wait-for-element") {
-    string("selector", true);
-    properties["state"] = {{"enum", {"attached", "visible", "hidden"}}};
-    require("selector");
-  }
-  else if (endpoint == "click" || endpoint == "check" || endpoint == "uncheck") { string("selector", true); require("selector"); }
-  else if (endpoint == "fill" || endpoint == "select-option") { string("selector", true); string("value"); require("selector"); require("value"); }
-  else if (endpoint == "type") { string("text", true); string("selector"); require("text"); }
-  else if (endpoint == "press-key") {
-    string("key", true); string("code");
-    properties["modifiers"] = {{"type", "array"}, {"items", {{"type", "string"},
-        {"enum", {"Alt", "Control", "Meta", "Shift"}}}}};
-    require("key");
-  }
-  else if (endpoint == "scroll") {
-    number("deltaX");
-    number("deltaY");
-    require("deltaX"); require("deltaY");
-  }
-  else if (endpoint == "screenshot" || endpoint == "screenshot-annotated") { properties["format"]={{"const","png"}}; }
-  else if (endpoint == "get-cookies") { string("url"); string("name"); }
-  else if (endpoint == "set-cookie") {
-    string("name", true); string("value"); string("url"); string("domain"); string("path");
-    string("expires"); properties["httpOnly"] = {{"type", "boolean"}};
-    properties["secure"] = {{"type", "boolean"}};
-    properties["sameSite"] = {{"enum", {"Strict", "Lax", "None", "strict", "lax", "none"}}};
-    require("name"); require("value");
-  } else if (endpoint == "delete-cookies") {
-    string("name"); string("domain"); properties["deleteAll"]={{"type","boolean"}};
-  }
-  else if (endpoint == "get-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key"); }
-  else if (endpoint == "set-storage") { properties["type"]={{"enum",{"local","session"}}}; string("key",true); string("value"); require("key"); require("value"); }
-  else if (endpoint == "clear-storage") properties["type"]={{"enum",{"local","session","both"}}};
-  else if (endpoint == "handle-dialog") { properties["action"]={{"enum",{"accept","dismiss"}}}; string("promptText"); require("action"); }
-  else if (endpoint == "find-element") {
-    string("text", true); string("role"); string("selector"); require("text");
-  } else if (endpoint == "find-button" || endpoint == "find-link") {
-    string("text", true); require("text");
-  } else if (endpoint == "find-input") {
-    string("label"); string("placeholder"); string("name");
-  } else if (endpoint == "get-page-text") {
-    properties["mode"] = {{"enum", {"readable", "full", "markdown"}}}; string("selector");
-  } else if (endpoint == "get-visible-elements") {
-    properties["interactableOnly"] = {{"type", "boolean"}};
-    properties["includeText"] = {{"type", "boolean"}};
-  } else if (endpoint == "get-form-state") {
-    string("selector");
-  } else if (endpoint == "get-accessibility-tree") {
-    string("root"); properties["interactableOnly"] = {{"type", "boolean"}};
-    integer("maxDepth", 0);
-    properties["maxDepth"]["maximum"] = 100;
-  }
-  else if (endpoint == "toast") { string("message", true); require("message"); }
-  else if (endpoint == "set-fullscreen") { properties["enabled"]={{"type","boolean"}}; require("enabled"); }
-  else if (endpoint == "resize-viewport") {
-    integer("width", 1); integer("height", 1);
-    properties["width"]["maximum"] = 16384; properties["height"]["maximum"] = 16384;
-    require("width"); require("height");
-  }
-  else if (endpoint == "bookmarks-add") { string("url",true); string("title"); require("url"); }
-  else if (endpoint == "bookmarks-remove") { string("id",true); require("id"); }
-  else if (endpoint == "history-list" || endpoint == "get-history") integer("limit",1);
-  else if (endpoint == "get-tabs") {
-    properties["timeout"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 30000}};
-  } else if (endpoint == "get-console-messages") {
-    properties["level"] = {{"enum", {"log", "warn", "error", "info", "debug"}}};
-    string("since"); integer("limit", 1);
-  } else if (endpoint == "get-network-log") {
-    string("type"); string("since");
-    properties["status"] = {{"enum", {"success", "error", "pending"}}};
-    integer("limit", 1);
-  }
-  return {{"type", "object"}, {"properties", std::move(properties)}, {"required", std::move(required)}, {"additionalProperties", false}};
-}
-
-std::optional<std::string> ValidateToolArguments(const nlohmann::json& schema,
-                                                 const nlohmann::json& arguments) {
-  const auto& properties = schema.at("properties");
-  for (const auto& required : schema.at("required")) {
-    const std::string name = required.get<std::string>();
-    if (!arguments.contains(name)) return name + " is required";
-  }
-  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-    if (!properties.contains(it.key())) return "Unknown argument: " + it.key();
-    const auto& property = properties.at(it.key());
-    if (property.contains("const") && it.value() != property.at("const")) {
-      return it.key() + " must equal " + property.at("const").dump();
-    }
-    if (property.contains("enum") &&
-        std::find(property.at("enum").begin(), property.at("enum").end(), it.value()) ==
-            property.at("enum").end()) return it.key() + " has an invalid value";
-    const std::string type = property.value("type", std::string());
-    const bool type_ok = type.empty() ||
-        (type == "string" && it.value().is_string()) ||
-        (type == "integer" && it.value().is_number_integer()) ||
-        (type == "number" && it.value().is_number()) ||
-        (type == "boolean" && it.value().is_boolean()) ||
-        (type == "array" && it.value().is_array());
-    if (!type_ok) return it.key() + " has the wrong type";
-    if (it.value().is_array() && property.contains("items")) {
-      const auto& item_schema = property.at("items");
-      for (const auto& item : it.value()) {
-        if (item_schema.value("type", std::string()) == "string" && !item.is_string()) {
-          return it.key() + " items must be strings";
-        }
-        if (item_schema.contains("enum") &&
-            std::find(item_schema.at("enum").begin(), item_schema.at("enum").end(), item) ==
-                item_schema.at("enum").end()) return it.key() + " contains an invalid value";
-      }
-    }
-    if (it.value().is_string() && property.contains("minLength") &&
-        it.value().get_ref<const std::string&>().size() < property.at("minLength").get<std::size_t>()) {
-      return it.key() + " is too short";
-    }
-    if (it.value().is_number_integer()) {
-      if (it.value().is_number_unsigned()) {
-        const auto value = it.value().get<std::uint64_t>();
-        if ((property.contains("minimum") && property.at("minimum").get<std::uint64_t>() > value) ||
-            (property.contains("maximum") && value > property.at("maximum").get<std::uint64_t>())) {
-          return it.key() + " is out of range";
-        }
-      } else {
-        const auto value = it.value().get<std::int64_t>();
-        if ((property.contains("minimum") && value < property.at("minimum").get<std::int64_t>()) ||
-            (property.contains("maximum") && value > property.at("maximum").get<std::int64_t>())) {
-          return it.key() + " is out of range";
-        }
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-}  // namespace
-
 class DesktopMcpServer::Impl {
  public:
   const DesktopRouter* router = nullptr;
   const McpRegistry* registry = nullptr;
+  FixedReader reader;
+  std::function<bool()> pending;
+  mutable json gateway_config;
+  mutable std::recursive_mutex mutex;
+  mutable std::unique_ptr<BrowserGateway> gateway;
+  mutable bool internal_dispatch = false;
+  mutable std::atomic<bool> document_changed{false};
+  void DrainDocuments() const { if (gateway && document_changed.exchange(false)) gateway->InvalidateReferences(); }
+  void Ensure(const Config& config) const {
+    if (gateway) return;
+    json methods = json::array(), extensions = json::array();
+    if (router) for (const auto& method : router->RegisteredMethods()) if (router->IsCallable(method)) methods.push_back(method);
+    if (registry && router) for (const auto& tool : registry->all_tools()) {
+      if (!SupportsPlatform(tool.availability, config.platform) || !SupportsEngine(tool.availability, config.engine) || !router->IsCallable(tool.http_endpoint)) continue;
+      extensions.push_back({{"name", tool.name}, {"method", tool.http_endpoint}, {"description", tool.description},
+        {"inputSchema", NativeExtensionInputSchema(tool.http_endpoint)}, {"mutates", NativeExtensionMutates(tool.http_endpoint)}});
+    }
+    gateway_config = {{"nativeMethods", methods}, {"fixedReader", static_cast<bool>(reader)}, {"requireAuthorization", false}, {"extensions", extensions}};
+    gateway = std::make_unique<BrowserGateway>(gateway_config);
+  }
+  json Run(json step) const {
+    while (step.value("kind", std::string()) != "complete") {
+      if (step.value("kind", std::string()) == "authorize") { step = gateway->Advance({{"success", true}}); continue; }
+      json result;
+      try {
+        DrainDocuments();
+        const std::string method = step.at("method");
+        internal_dispatch = true;
+        if (method == "browser-control-evaluate" && reader) result = reader(step.at("params"));
+        else if (router) result = router->Dispatch(method, step.at("params")).body;
+        else result = {{"success", false}};
+        internal_dispatch = false;
+        step = gateway->Advance(std::move(result));
+        DrainDocuments();
+      } catch (...) { internal_dispatch = false; step = gateway->Cancel(); }
+    }
+    return step["response"];
+  }
 };
-
 DesktopMcpServer::DesktopMcpServer() : impl_(std::make_unique<Impl>()) {}
-
 DesktopMcpServer::~DesktopMcpServer() = default;
-
-void DesktopMcpServer::SetRouter(const DesktopRouter* router) {
-  impl_->router = router;
+void DesktopMcpServer::SetRouter(const DesktopRouter* router) { impl_->router = router; impl_->gateway.reset(); }
+void DesktopMcpServer::SetRegistry(const McpRegistry* registry) { impl_->registry = registry; impl_->gateway.reset(); }
+void DesktopMcpServer::SetFixedReader(FixedReader reader) { impl_->reader = std::move(reader); impl_->gateway.reset(); }
+void DesktopMcpServer::SetPendingCheck(std::function<bool()> pending) { impl_->pending = std::move(pending); }
+void DesktopMcpServer::NotifyDocumentChanged() const { impl_->document_changed.store(true); }
+std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, const json& params) const {
+  // Cancellation must stay reachable while a serialized inference extension awaits its provider.
+  if (method == "ai-cancel" || method == "ai-infer" || method == "ai-record") return nullptr;
+  auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
+  if (impl_->pending && impl_->pending() && method != "browser-control" && method != "close-tab" && method != "close-browser" && method != "get-device-info" && method != "get-dialog" && method != "handle-dialog")
+    throw std::runtime_error("A prior renderer command is still pending");
+  InvalidateReferences(method, params);
+  return lock;
 }
-
-void DesktopMcpServer::SetRegistry(const McpRegistry* registry) {
-  impl_->registry = registry;
+void DesktopMcpServer::InvalidateReferences(std::string_view method, const json& params) const {
+  std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
+  if (!impl_->gateway || impl_->internal_dispatch || method == "browser-control" || !NativeExtensionMutates(method)) return;
+  impl_->gateway->InvalidateReferences(params.contains("tabId") && params["tabId"].is_string() ? params["tabId"].get<std::string>() : "");
 }
-
 bool DesktopMcpServer::Run(const Config& config) {
-  std::istream& input = config.input != nullptr ? *config.input : std::cin;
-  std::ostream& output = config.output != nullptr ? *config.output : std::cout;
-
+  std::istream& input = config.input ? *config.input : std::cin;
+  std::ostream& output = config.output ? *config.output : std::cout;
   std::string line;
   while (std::getline(input, line)) {
-    if (line.empty()) {
-      continue;
-    }
-    nlohmann::json request;
-    try {
-      request = nlohmann::json::parse(line);
-    } catch (...) {
-      output << JsonRpcError(nullptr, -32700, "Invalid JSON") << '\n';
-      output.flush();
-      continue;
-    }
-    const json response = HandleRequest(request, config);
-    if (!response.is_null()) {
-      output << response.dump() << '\n';
-      output.flush();
-    }
+    if (line.empty()) continue;
+    json request = json::parse(line, nullptr, false);
+    const json response = request.is_discarded() ? RpcError(-32700) : HandleRequest(request, config);
+    if (!response.is_null()) { output << response.dump() << '\n'; output.flush(); }
   }
   return true;
 }
-
-DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request,
-                                                       const Config& config) const {
-  if (!IsJsonRpcRequest(request)) {
-    return JsonRpcError(nullptr, -32600, "Request must be a JSON-RPC 2.0 object with a method");
-  }
-  const bool notification = IsNotification(request);
-  if (request.contains("id") && !request["id"].is_null() &&
-      !request["id"].is_string() && !request["id"].is_number()) {
-    return JsonRpcError(nullptr, -32600, "id must be a string, number, or null");
-  }
-  const nlohmann::json id = notification ? nlohmann::json(nullptr) : request.value("id", nlohmann::json(nullptr));
-  const std::string method = request["method"].get<std::string>();
-  if (method.empty()) {
-    return ReplyOrNothing(notification, JsonRpcError(id, -32600, "method is required"));
-  }
-  if (impl_->registry == nullptr) {
-    return ReplyOrNothing(notification, JsonRpcError(id, -32000, "MCP registry is not configured"));
-  }
-  if (method == "initialize") {
-    const nlohmann::json params = request.contains("params") ? request["params"] : nlohmann::json::object();
-    if (!params.is_object()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "initialize.params must be an object"));
-    }
-    if (params.contains("protocolVersion") && !params["protocolVersion"].is_string()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "initialize.protocolVersion must be a string"));
-    }
-    // The transport is stateless, so return the version this server actually
-    // speaks.  A client offering a newer version can use this result to retry
-    // subsequent requests with the negotiated header value.
-    return ReplyOrNothing(notification, JsonRpcResult(id,
-                         {{"protocolVersion", kProtocolVersion},
-                          {"serverInfo", {{"name", config.server_name},
-                                          {"version", config.server_version}}},
-                          {"capabilities", {{"tools", nlohmann::json::object()}}}}));
-  }
-
-  if (method == "notifications/initialized") {
-    return ReplyOrNothing(notification, JsonRpcResult(id, nlohmann::json::object()));
-  }
-
-  if (method == "ping") {
-    return ReplyOrNothing(notification, JsonRpcResult(id, nlohmann::json::object()));
-  }
-
-  if (method == "tools/list") {
-    nlohmann::json tools = nlohmann::json::array();
-    for (const McpTool& tool : impl_->registry->all_tools()) {
-      if (!SupportsPlatform(tool.availability, config.platform) ||
-          !SupportsEngine(tool.availability, config.engine) || impl_->router == nullptr ||
-          !impl_->router->IsCallable(tool.http_endpoint)) {
-        continue;
+DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request, const Config& config) const {
+  std::unique_lock<std::recursive_mutex> lock(impl_->mutex);
+  impl_->Ensure(config);
+  impl_->DrainDocuments();
+  try {
+    std::string name;
+    if (request.is_object() && request.value("method", std::string()) == "tools/call") {
+      const auto params = request.value("params", json::object());
+      if (params.is_object() && params.contains("name") && params["name"].is_string()) name = params["name"];
+      if (name == "kelpie_extension") {
+        const auto arguments = params.value("arguments", json::object());
+        if (arguments.is_object() && arguments.contains("name") && arguments["name"].is_string()) name = arguments["name"];
       }
-      tools.push_back({{"name", tool.name},
-                       {"description", tool.description},
-                       {"inputSchema", InputSchema(tool.http_endpoint)}});
     }
-    return ReplyOrNothing(notification, JsonRpcResult(id, {{"tools", tools}}));
-  }
-
-  if (method == "tools/call") {
-    if (impl_->router == nullptr) {
-      return JsonRpcError(id, -32000, "Desktop router is not configured");
+    if (name == "kelpie_ai_ask" || name == "kelpie_ai_record" || name == "kelpie_ai_cancel" || name == "kelpie_close_tab" || name == "kelpie_close_browser" || name == "kelpie_get_dialog" || name == "kelpie_handle_dialog") {
+      // Inference owns its own request. Only its nested browser commands take
+      // the persistent gateway lease; cancellation/teardown and native modal
+      // recovery remain reachable so a pending dialog can retire its renderer call.
+      BrowserGateway outer(impl_->gateway_config);
+      auto step = outer.BeginMcp(request);
+      if (step.value("kind", std::string()) == "complete") return step["response"];
+      if (step["kind"] != "dispatch") return RpcError(-32600, request);
+      lock.unlock();
+      try { step = outer.Advance(impl_->router->Dispatch(step.at("method").get<std::string>(), step.at("params")).body); }
+      catch (...) { step = outer.Cancel(); }
+      return step["response"];
     }
-    const nlohmann::json params = request.contains("params") ? request["params"] : nlohmann::json::object();
-    if (!params.is_object()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "tools/call.params must be an object"));
-    }
-    if (!params.contains("name") || !params["name"].is_string() || params["name"].empty()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "params.name is required"));
-    }
-    const std::string tool_name = params["name"].get<std::string>();
-
-    const auto match = std::find_if(impl_->registry->all_tools().begin(),
-                                    impl_->registry->all_tools().end(),
-                                    [&](const McpTool& tool) { return tool.name == tool_name; });
-    if (match == impl_->registry->all_tools().end()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "Unknown tool: " + tool_name));
-    }
-    if (!SupportsPlatform(match->availability, config.platform) ||
-        !SupportsEngine(match->availability, config.engine) ||
-        !impl_->router->IsCallable(match->http_endpoint)) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32601, "Tool is not available in this runtime"));
-    }
-
-    const nlohmann::json arguments = params.contains("arguments") ? params["arguments"] : nlohmann::json::object();
-    if (!arguments.is_object()) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, "tools/call.arguments must be an object"));
-    }
-    if (const auto invalid = ValidateToolArguments(InputSchema(match->http_endpoint), arguments)) {
-      return ReplyOrNothing(notification, JsonRpcError(id, -32602, *invalid));
-    }
-
-    const DesktopRouter::Result result =
-        impl_->router->Dispatch(match->http_endpoint, arguments);
-    json content = {{{"type", "text"}, {"text", result.body.dump()}}};
-    if ((match->http_endpoint == "screenshot" || match->http_endpoint == "screenshot-annotated") &&
-        result.body.value("success", false) && result.body.contains("image") &&
-        result.body["image"].is_string()) {
-      const std::string format = result.body.value("format", std::string("png"));
-      content.push_back({{"type", "image"}, {"data", result.body["image"]},
-                         {"mimeType", "image/" + format}});
-    }
-    const json response = JsonRpcResult(id, {{"content", content},
-                                               {"structuredContent", result.body},
-                                               {"isError", !result.body.value("success", false)}});
-    return ReplyOrNothing(notification, response);
-  }
-
-  const json response = JsonRpcError(id, -32601, "Unsupported method: " + method);
-  return ReplyOrNothing(notification, response);
+    if (!name.empty() && impl_->pending && impl_->pending()) return RpcError(-32000, request);
+    return impl_->Run(impl_->gateway->BeginMcp(request));
+  } catch (...) { return RpcError(-32600, request); }
 }
-
-}  // namespace kelpie
+DesktopMcpServer::json DesktopMcpServer::HandleBrowserRequest(const json& request, const Config& config) const {
+  std::lock_guard<std::recursive_mutex> lock(impl_->mutex);
+  impl_->Ensure(config);
+  impl_->DrainDocuments();
+  if (impl_->pending && impl_->pending() && request.is_object() && request.value("method", std::string()) != "tabs.close")
+    return {{"version", 1}, {"ok", false}, {"error", {{"code", "BUSY"}, {"message", "A prior renderer command is still pending"}, {"mayHaveCompleted", false}}}};
+  return impl_->Run(impl_->gateway->Begin(request));
+}
+}

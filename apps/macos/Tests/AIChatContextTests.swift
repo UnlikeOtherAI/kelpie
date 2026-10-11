@@ -90,7 +90,9 @@ final class AIChatContextTests: XCTestCase {
         let context = HandlerContext()
         context.renderer = renderer
         context.activeEngineIsChromium = true // Route directly to this isolated test renderer.
-        let page = try await AIPageContext.gather(from: context, tabId: nil)
+        let router = Router()
+        router.handlerContext = context
+        let page = try AIPageContext(observation: await router.pageObservation(tabId: "chromium"))
         XCTAssertEqual(page.title, "Context fixture")
         XCTAssertTrue(page.text.contains("Customer companies"))
         for label in ["Spotify", "Vodafone", "Philips", "American Airlines"] {
@@ -102,17 +104,15 @@ final class AIChatContextTests: XCTestCase {
         XCTAssertTrue(prompt.contains("amber otter"))
         XCTAssertTrue(prompt.contains("conversation history"))
         _ = try await renderer.evaluateJS("JSON.stringify = function() { return '{}'; }; true")
-        do {
-            _ = try await AIPageContext.gather(from: context, tabId: nil)
-            XCTFail("Malformed snapshot was accepted as empty content")
-        } catch is DecodingError { /* expected */ }
+        let isolated = try AIPageContext(observation: await router.pageObservation(tabId: "chromium"))
+        XCTAssertTrue(isolated.labels.contains("Spotify"), "Page-world JSON changes cannot redirect private-world observations")
     }
 
     func testClosedTabIsRejectedInsteadOfReturningEmptyPage() async {
         do {
-            _ = try await AIPageContext.gather(from: HandlerContext(), tabId: UUID().uuidString)
+            _ = try AIPageContext(observation: await Router().pageObservation(tabId: UUID().uuidString))
             XCTFail("Missing tab was accepted")
-        } catch { XCTAssertTrue(error is HandlerError) }
+        } catch { XCTAssertFalse(error.localizedDescription.isEmpty) }
     }
 
     func testSuppliedTextAndFullHistoryArePreservedInNativePrompt() async throws {

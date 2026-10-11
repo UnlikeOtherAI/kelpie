@@ -7,9 +7,6 @@
 
 namespace kelpie::windows {
 namespace {
-// Read only viewport metadata; the color comes from Chromium's rendered pixels.
-constexpr char kViewport[] = R"JS(({url:location.href,x:scrollX,y:scrollY,width:innerWidth,height:innerHeight,time:performance.timeOrigin}))JS";
-
 std::optional<COLORREF> AverageEdge(const std::string& encoded) {
   if (encoded.empty() || encoded.size() > 16*1024*1024) return std::nullopt;
   DWORD size = 0;
@@ -71,24 +68,10 @@ std::optional<COLORREF> PageColorSampler::Poll(DesktopBrowserControl& engine,
   pending_ = std::async(std::launch::async, [&engine, lease, epoch] {
     Result sample{epoch, {}, std::nullopt};
     try {
-      nlohmann::json viewport, captured, after;
-      const auto timeout = std::chrono::milliseconds(400);
-      if (!engine.Evaluate(lease, kViewport, &viewport, timeout).ok || !viewport.is_object()) return sample;
-      const double width = viewport.value("width", 0.0), height = viewport.value("height", 0.0);
-      if (width<=0 || width>32768 || height<=0) return sample;
-      // Alloy resizes its live native view when CDP's clip option is present.
-      // Capture the existing view without emulation; average only its top band.
-      const nlohmann::json params{{"format","png"},{"fromSurface",true},
-                                  {"captureBeyondViewport",false}};
-      if (!engine.DevTools(lease,"Page.captureScreenshot",params,&captured,timeout).ok ||
-          !captured.is_object() || !captured.contains("data") || !captured["data"].is_string()) return sample;
-      if (!engine.Evaluate(lease,kViewport,&after,timeout).ok ||
-          after.value("url","") != viewport.value("url","") ||
-          after.value("time",0.0) != viewport.value("time",0.0) ||
-          after.value("x",0.0) != viewport.value("x",0.0) ||
-          after.value("y",0.0) != viewport.value("y",0.0)) return sample;
-      sample.url = viewport.value("url", "");
-      sample.color = AverageEdge(captured["data"].get<std::string>());
+      nlohmann::json appearance;
+      if (!engine.ReadAppearance(lease, &appearance, std::chrono::milliseconds(400)).ok) return sample;
+      sample.url = appearance.at("url").get<std::string>();
+      sample.color = AverageEdge(appearance.at("data").get<std::string>());
     } catch (...) {
       // A closed renderer or malformed page result cannot break chrome.
     }

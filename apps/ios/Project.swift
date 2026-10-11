@@ -42,6 +42,8 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/Browser/BookmarkStore.swift"),
         .glob("../macos/Kelpie/Browser/AddressInput.swift"),
         .glob("../macos/Kelpie/AI/OpenAICompatible/**/*.swift"),
+        .glob("../macos/Kelpie/Network/BrowserControlGateway.swift"),
+        .glob("../macos/Kelpie/Network/Router+BrowserControl.swift"),
     ],
     resources: [
         .glob(pattern: "Kelpie/Assets.xcassets"),
@@ -100,6 +102,8 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/UOASessionTests.swift"),
         .glob("../macos/Tests/ConnectAuthorizationTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
+        .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
+        .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
     dependencies: [
         .target(name: "Kelpie"),

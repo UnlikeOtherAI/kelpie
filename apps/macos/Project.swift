@@ -29,7 +29,9 @@ let embedCEFFramework = TargetScript.post(
     ln -sf Versions/Current/Resources "$CEF_DST/Resources"
     # Reconstructing the versioned framework changes its resource layout. Seal
     # that final bundle before Xcode signs the containing app.
-    codesign --force --sign - "$CEF_DST"
+    if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+      codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "$CEF_DST"
+    fi
     """,
     name: "Embed CEF Framework"
 )
@@ -63,8 +65,9 @@ let embedKelpieHelper = TargetScript.post(
         "@executable_path/../../../Chromium Embedded Framework.framework/Chromium Embedded Framework" \\
         "$exe_path" 2>/dev/null || true
 
-      codesign -fs - "$exe_path" 2>/dev/null || true
-      codesign -fs - "$app_dir" 2>/dev/null || true
+      if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --entitlements "${PROJECT_DIR}/KelpieHelper/KelpieHelper.entitlements" "$app_dir"
+      fi
     }
 
     rm -rf \\
@@ -90,7 +93,9 @@ let embedGeckoHelper = TargetScript.post(
     if [ -d "$GECKO_SRC" ]; then
       rm -rf "$GECKO_DST"
       cp -R "$GECKO_SRC" "$GECKO_DST"
-      codesign -fs - "$GECKO_DST" 2>/dev/null || true
+      if [ "${CODE_SIGNING_ALLOWED}" != "NO" ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+        codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "$GECKO_DST"
+      fi
       echo "Gecko helper embedded at $GECKO_DST"
     else
       echo "warning: KelpieGeckoHelper.app not found — run 'make gecko-runtime' first"
@@ -223,6 +228,7 @@ let kelpieTests = Target.target(
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
+        .glob("Tests/**/*.mm"),
     ],
     dependencies: [
         .target(name: "Kelpie"),
@@ -230,6 +236,11 @@ let kelpieTests = Target.target(
     settings: .settings(
         base: [
             "SWIFT_VERSION": "5.0",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++17",
+            "HEADER_SEARCH_PATHS": .array([
+                "$(PROJECT_DIR)/Kelpie/Renderer",
+                "$(PROJECT_DIR)/Frameworks/cef_include",
+            ]),
         ]
     )
 )

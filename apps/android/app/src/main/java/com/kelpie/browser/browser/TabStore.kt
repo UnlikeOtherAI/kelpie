@@ -164,6 +164,7 @@ class TabStore(
         } catch (_: Exception) {
         }
         webView.destroy()
+        handlerContext.browserRetirement.retireTarget(webView)
     }
 
     private fun restoredTabs(urls: List<String>): List<BrowserTab> =

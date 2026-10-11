@@ -7,6 +7,7 @@ import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import kotlinx.coroutines.delay
+import java.util.UUID
 
 private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -31,6 +32,10 @@ class NavigationHandler(
         }
         val wv = ctx.webView ?: return errorResponse("NO_WEBVIEW", "No WebView")
         ctx.lastNavigationError = null
+        // A same-URL reload must replace the document before a subsequent snapshot can be trusted.
+        val marker = "__kelpie_navigation_${UUID.randomUUID().toString().replace("-", "")}"
+        val previousUrl = ctx.evaluateJSReturningJSON("(window['$marker'] = true, {url: location.href})")["url"] as? String
+        val stateScript = "({url: location.href, title: document.title, readyState: document.readyState, sameDocument: window['$marker'] === true})"
         mainHandler.post { if (mayNavigate()) wv.loadUrl(url) }
         // Wait for page to start loading then finish
         delay(100)
@@ -40,8 +45,8 @@ class NavigationHandler(
             ctx.lastNavigationError?.let { err ->
                 return errorResponse("NAVIGATION_ERROR", err)
             }
-            val result = ctx.navigationSnapshot()
-            if (result["readyState"] == "complete") {
+            val result = navigationState(stateScript)
+            if (hasLoaded(result, url, previousUrl)) {
                 return successResponse(
                     mapOf(
                         "url" to (result["url"] ?: url),
@@ -54,9 +59,9 @@ class NavigationHandler(
         }
         // Timeout reached. If the requested page is actually fully loaded, allow
         // success; otherwise return the last captured navigation error.
-        val finalState = ctx.navigationSnapshot()
+        val finalState = navigationState(stateScript)
         val finalUrl = finalState["url"] as? String
-        if (finalState["readyState"] == "complete" && finalUrl != null && urlsMatch(finalUrl, url)) {
+        if (hasLoaded(finalState, url, previousUrl)) {
             return successResponse(
                 mapOf(
                     "url" to finalUrl,
@@ -70,17 +75,6 @@ class NavigationHandler(
             return errorResponse("NAVIGATION_ERROR", captured)
         }
         return errorResponse("TIMEOUT", "Navigation did not complete within ${timeout}ms")
-    }
-
-    private fun urlsMatch(
-        actual: String,
-        requested: String,
-    ): Boolean {
-        if (actual == requested) return true
-        // Normalise trailing slash so "https://example.com" matches "https://example.com/".
-        val a = actual.trimEnd('/')
-        val r = requested.trimEnd('/')
-        return a == r
     }
 
     private suspend fun back(): Map<String, Any?> {
@@ -129,6 +123,12 @@ class NavigationHandler(
     }
 
     private fun mayNavigate(): Boolean = ctx.remoteDocumentGuard?.invoke() != false && ctx.remoteNavigationStart?.invoke() != false
+
+    private suspend fun navigationState(script: String): Map<String, Any?> =
+        if (ctx.remoteNavigationReadGuard != null) ctx.navigationSnapshot() else ctx.evaluateJSReturningJSON(script)
+
+    private fun hasLoaded(state: Map<String, Any?>, requested: String, previous: String?): Boolean =
+        if (ctx.remoteNavigationReadGuard != null) state["readyState"] == "complete" else NavigationCompletion.hasLoaded(state, requested, previous)
 
     private suspend fun getCurrentUrl(): Map<String, Any?> {
         val result = ctx.evaluateJSReturningJSON("({url: location.href, title: document.title})")

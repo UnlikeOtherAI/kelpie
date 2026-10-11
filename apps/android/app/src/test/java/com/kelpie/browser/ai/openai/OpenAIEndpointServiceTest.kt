@@ -36,16 +36,15 @@ class OpenAIEndpointServiceTest {
             },
             agentTools =
                 object : AgentToolBridge {
-                    override suspend fun pinnedDispatcher(tabId: String?) =
-                        ToolDispatcher { method, _ ->
-                            if (method == "get-page-text") {
-                                mapOf("success" to true, "title" to "Fixture", "url" to "https://example.test", "content" to "page text", "accessibleLabels" to emptyList<String>())
-                            } else {
-                                mapOf("success" to true)
-                            }
-                        }
+                    override suspend fun pinnedDispatcher(
+                        tabId: String?,
+                        allowActions: Boolean,
+                    ) = ToolDispatcher { _, _ -> mapOf("success" to true) }
 
-                    override suspend fun pageContext(mode: String): String = "page text"
+                    override suspend fun pageContext(
+                        mode: String,
+                        tabId: String?,
+                    ): String = "page text"
                 },
         )
 

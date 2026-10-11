@@ -18,24 +18,20 @@ class SamplerBrowser : public DesktopBrowserControl {
   std::atomic<bool> release{true};
   std::atomic<int> calls{0};
   bool fail = false, navigate_during_capture = false;
-  Json capture_params;
-  BrowserControlResult Evaluate(TabLease, std::string, Json* out, Timeout) override {
-    const int call = ++calls;
+  BrowserControlResult ReadAppearance(TabLease, Json* out, Timeout timeout) override {
+    assert(timeout == std::chrono::milliseconds(400));
+    ++calls;
     while (!release) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     if (fail) return BrowserControlResult::Failure("TIMEOUT", "Fixture timeout");
-    *out = {{"url","https://test.invalid/"},{"width",1200},{"height",800},
-            {"x",0},{"y",0},{"time",navigate_during_capture ? call : 1}};
-    return BrowserControlResult::Success();
-  }
-  BrowserControlResult DevTools(TabLease, std::string method, const Json& params, Json* out, Timeout) override {
-    assert(method == "Page.captureScreenshot");
-    capture_params = params;
-    *out = {{"data",kBluePng}};
+    if (navigate_during_capture) return BrowserControlResult::Failure("COMMAND_FAILED", "Document changed");
+    *out = {{"url","https://test.invalid/"},{"data",kBluePng}};
     return BrowserControlResult::Success();
   }
   // Unused browser operations deliberately fail, so the fixture also constrains
   // the sampler to a read-only metadata/capture path.
   BrowserControlResult No() { assert(false); return BrowserControlResult::Failure("UNUSED", "Unexpected operation"); }
+  BrowserControlResult Evaluate(TabLease,std::string,Json*,Timeout) override { return No(); }
+  BrowserControlResult DevTools(TabLease,std::string,const Json&,Json*,Timeout) override { return No(); }
   BrowserControlResult GetTabs(std::vector<TabSnapshot>*,Timeout) override { return No(); }
   BrowserControlResult ResolveTab(const std::optional<std::string>&,const std::optional<std::uint64_t>&,TabLease*,Timeout) override { return No(); }
   BrowserControlResult CreateTab(const NewTabRequest&,TabSnapshot*,Timeout) override { return No(); }
@@ -76,9 +72,7 @@ int main() {
       color = sampler.Poll(browser,tab,1);
     }
     assert(color && GetBValue(*color)>GetRValue(*color));
-    assert(!browser.capture_params.contains("clip"));
-    assert(browser.capture_params["fromSurface"]==true);
-    assert(browser.calls==2);
+    assert(browser.calls==1);
     assert(sampler.Drain());
   }
   {
@@ -96,7 +90,7 @@ int main() {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     Drain(sampler);
-    assert(browser.calls==2); // No second request admitted while loading.
+    assert(browser.calls==1); // No second request admitted while loading.
   }
   for (bool navigation : {false,true}) {
     SamplerBrowser browser;

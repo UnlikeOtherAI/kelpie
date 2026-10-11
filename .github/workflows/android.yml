@@ -18,6 +18,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5.2.0

@@ -54,13 +54,13 @@ void TestRegistryFiltering() {
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 117);
-  assert(ios_tools.size() == 113);
-  assert(android_tools.size() == 113);
-  assert(macos_tools.size() == 111);
-  assert(windows_tools.size() == 111);
-  assert(webkit_tools.size() == 117);
-  assert(chromium_tools.size() == 117);
+  assert(all_tools.size() == 121);
+  assert(ios_tools.size() == 116);
+  assert(android_tools.size() == 116);
+  assert(macos_tools.size() == 115);
+  assert(windows_tools.size() == 114);
+  assert(webkit_tools.size() == 121);
+  assert(chromium_tools.size() == 121);
 
   // Storage partitions: macOS and Windows only until the others land them.
   assert(ContainsTool(windows_tools, "kelpie_get_partitions"));
@@ -118,6 +118,9 @@ void TestCApi() {
   const json ios_tools = json::parse(ios_tools_json);
   kelpie_mcp_free_string(ios_tools_json);
   assert(ios_tools.size() == kelpie::McpRegistry().tools_for_platform(kelpie::Platform::kIos).size());
+  assert(ios_tools[0].contains("inputSchema"));
+  assert(ios_tools[0].contains("mutates"));
+  assert(ios_tools[0]["method"] == ios_tools[0]["http_endpoint"]);
   assert(ios_tools[0].contains("availability"));
 
   assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_IOS,

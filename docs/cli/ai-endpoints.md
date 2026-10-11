@@ -131,7 +131,7 @@ kelpie ai status --device mac
 ## Agent runs
 
 With an OpenAI-compatible backend, `kelpie ai ask "<task>"` (no `--context`)
-runs Kelpie's agent loop on the device. The tab is pinned when the run starts.
+runs the existing agent loop on platforms that advertise it. Windows remains one-shot text/page-context inference and refuses `agent:true`; Linux has no embedded inference loop. Windows context modes use the bounded value-free common browser snapshot. The tab is pinned when the run starts.
 The model gets read-only tools — current URL, page text, visible elements,
 find element, form state, accessibility tree, wait for element — and, only with
 `--allow-actions`, click, fill, select option, check and uncheck in that pinned

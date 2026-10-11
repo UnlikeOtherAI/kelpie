@@ -197,8 +197,8 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
 
     func testAgentObservesActsAndAnswersInPinnedTab() async throws {
         let transport = agentTransport(steps: [
-            OpenAIFixtures.toolCallStream(name: "find_element", arguments: "{\"text\":\"Email\",\"tabId\":\"OTHER\",\"windowId\":\"w\"}"),
-            OpenAIFixtures.toolCallStream(name: "fill", arguments: "{\"selector\":\"#email\",\"value\":\"ada@example.com\"}", id: "call_2"),
+            OpenAIFixtures.toolCallStream(name: "kelpie_extension", arguments: "{\"name\":\"kelpie_find_element\",\"arguments\":{\"text\":\"Email\"}}"),
+            OpenAIFixtures.toolCallStream(name: "kelpie_extension", arguments: "{\"name\":\"kelpie_fill\",\"arguments\":{\"selector\":\"#email\",\"value\":\"ada@example.com\"}}", id: "call_2"),
             OpenAIFixtures.answerStream("Filled the email field and verified it.", reasoning: "done")
         ])
         let dispatcher = RecordingDispatcher()
@@ -231,12 +231,12 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         let messages = try XCTUnwrap(sent["messages"] as? [[String: Any]])
         XCTAssertEqual(messages.filter { $0["role"] as? String == "tool" }.count, 2)
         XCTAssertFalse(OpenAIAgentLoop.json(messages).contains("I should look at the page."))
-        XCTAssertEqual((sent["tools"] as? [Any])?.count, OpenAIBrowserToolCatalog.tools(allowActions: true).count + 1, "browser tools plus update_task_list")
+        XCTAssertEqual((sent["tools"] as? [Any])?.count, 5, "four shared browser tools plus update_task_list")
     }
 
     func testActionsAreNotOfferedOrExecutedWithoutPermission() async throws {
         let transport = agentTransport(steps: [
-            OpenAIFixtures.toolCallStream(name: "click", arguments: "{\"selector\":\"#delete\"}"),
+            OpenAIFixtures.toolCallStream(name: "kelpie_extension", arguments: "{\"name\":\"kelpie_click\",\"arguments\":{\"selector\":\"#delete\"}}"),
             OpenAIFixtures.answerStream("I cannot click without permission.")
         ])
         let dispatcher = RecordingDispatcher()
@@ -270,7 +270,7 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
             if body["tools"] == nil {
                 return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.answerStream("I read the page twice but did not finish."))
             }
-            return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.toolCallStream(name: "get_page_text", arguments: "{}"))
+            return .init(headers: ["Content-Type": "text/event-stream"], body: OpenAIFixtures.toolCallStream(name: "kelpie_extension", arguments: "{\"name\":\"kelpie_get_page_text\",\"arguments\":{}}"))
         }
         let client = OpenAIEndpointClient(baseURL: try .normalize("http://h:1/v1"), apiKey: nil, transport: transport)
         let outcome = try await OpenAIAgentLoop(client: client, model: model, dispatcher: RecordingDispatcher()).run(.init(
@@ -291,7 +291,7 @@ final class OpenAIServiceAndAgentTests: XCTestCase {
         let finished = "{\"tasks\":[{\"task\":\"Read the page\",\"done\":true},{\"task\":\"Report the title\",\"done\":true}]}"
         let transport = agentTransport(steps: [
             OpenAIFixtures.toolCallStream(name: "update_task_list", arguments: plan, id: "t1"),
-            OpenAIFixtures.toolCallStream(name: "get_page_text", arguments: "{}", id: "c1"),
+            OpenAIFixtures.toolCallStream(name: "kelpie_extension", arguments: "{\"name\":\"kelpie_get_page_text\",\"arguments\":{}}", id: "c1"),
             OpenAIFixtures.answerStream("Premature answer."),
             OpenAIFixtures.toolCallStream(name: "update_task_list", arguments: finished, id: "t2"),
             OpenAIFixtures.answerStream("The title is Riverside Book Club.")

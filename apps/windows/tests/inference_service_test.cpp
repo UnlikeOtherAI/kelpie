@@ -24,6 +24,7 @@ int main() {
   std::promise<void> entered, release;
   auto released = release.get_future().share();
   bool blocking = false;
+  bool expect_context = false;
   auto request = [&](const std::string& base, const std::string& op, const std::string& key, const json* body) -> json {
     ++calls; assert(base == "http://localhost:11434/v1"); assert(key == "test-secret");
     if (fail) throw InferenceError("ENDPOINT_UNREACHABLE", "Offline");
@@ -32,12 +33,20 @@ int main() {
       return {{"data", json::array({{{"id", "tiny"}}})}};
     }
     assert(body && body->at("model") == "tiny" && body->at("stream") == false);
+    if (expect_context) assert(body->at("messages").dump().find("bounded snapshot") != std::string::npos);
     sent = *body;
     if (blocking) { entered.set_value(); released.wait(); }
     return {{"choices", json::array({{{"message", {{"content", "4"}}}, {"finish_reason", "stop"}}})}};
   };
   {
     InferenceService service(directory, request);
+    kelpie::DesktopRouter router;
+    router.Register("get-tabs", [](const json&) { return json{{"success", true}, {"tabs", {{{"id", "visible"}, {"active", true}}}}}; });
+    router.Register("browser-control", [](const json& input) {
+      assert(input["method"] == "tab.snapshot" && input["tabId"] == "visible" && input["params"]["maxChars"] == 12000);
+      return json{{"version", 1}, {"ok", true}, {"value", {{"text", "bounded snapshot"}, {"title", "Fixture"}, {"url", "https://fixture.test"}, {"truncated", false}, {"elements", json::array()}}}};
+    });
+    service.Register(router);
     auto saved = service.Execute("ai-endpoint-save", {{"name", "Local"}, {"baseURL", "http://localhost:11434"},
         {"model", "tiny"}, {"apiKey", "test-secret"}});
     assert(saved["success"] == true && calls == 0);
@@ -46,12 +55,27 @@ int main() {
     assert(loaded["loaded"] == true);
     auto answer = service.Execute("ai-infer", {{"prompt", "2 + 2?"}, {"agent", false}});
     assert(answer["response"] == "4");
-    kelpie::DesktopRouter router;
-    service.Register(router);
-    json snapshot = {{"success", true}, {"url", "https://second.test"}, {"title", "Second"},
-        {"text", std::string(15000, 'x')}, {"accessibleLabels", json::array({"Kelpie logo", "Accessible SVG title"})}};
-    router.Register("get-page-text", [&](const json& params) {
-      assert(params.at("tabId") == "second" && params.at("generation") == 9);
+    router.Register("get-current-url", [](const json&) { return json{{"success", true}}; });
+    expect_context = true;
+    assert(service.Execute("ai-infer", {{"prompt", "Read page"}, {"context", "dom"}})["response"] == "4");
+    expect_context = false;
+    assert(service.Execute("ai-infer", {{"prompt", "Act"}, {"agent", true}})["error"]["code"] == "TOOLS_NOT_SUPPORTED");
+    bool stale_generation = false;
+    int ownership_checks = 0;
+    bool closes_during_snapshot = false;
+    router.Register("get-current-url", [&](const json& params) {
+      ++ownership_checks;
+      if (params.value("tabId", "") == "second") assert(params.at("generation") == 9);
+      return stale_generation ? json{{"success", false}, {"error", {{"code", "TAB_NOT_FOUND"}}}} : json{{"success", true}};
+    });
+    json snapshot = {{"version", 1}, {"ok", true}, {"value", {{"url", "https://second.test"}, {"title", "Second"},
+        {"text", std::string(12000, 'x')}, {"truncated", true}, {"elements", json::array({
+          {{"ref", "image1"}, {"role", "img"}, {"name", "Kelpie logo"}},
+          {{"ref", "image2"}, {"role", "img"}, {"name", "Accessible SVG title"}}})}}}};
+    router.Register("browser-control", [&](const json& input) {
+      assert(input.at("tabId") == "second" && input.at("method") == "tab.snapshot");
+      assert(!input.contains("generation") && input.at("params").at("maxChars") == 12000);
+      if (closes_during_snapshot) stale_generation = true;
       return snapshot;
     });
     json history = json::array();
@@ -66,16 +90,28 @@ int main() {
     assert(sent["messages"][0]["content"] == "Remember 0");
     const auto current = sent["messages"].back()["content"].get<std::string>();
     assert(current.find("Kelpie logo") != std::string::npos && current.find("Accessible SVG title") != std::string::npos);
-    assert(current.find("https://second.test") != std::string::npos && current.find("textTruncated") != std::string::npos);
+    assert(current.find("https://second.test") != std::string::npos && current.find("truncated") != std::string::npos);
     const int before_error = calls;
-    snapshot = {{"success", false}, {"error", {{"code", "TAB_NOT_FOUND"}, {"message", "Closed"}}}};
+    snapshot = {{"version", 1}, {"ok", false}, {"error", {{"code", "TAB_NOT_FOUND"}, {"message", "Closed"}}}};
     assert(service.Execute("ai-infer", chat)["error"]["code"] == "TAB_NOT_FOUND");
     assert(calls == before_error);
-    snapshot = {{"success", true}, {"text", "malformed snapshot"}};
+    snapshot = {{"version", 1}, {"ok", true}, {"value", {{"text", "malformed snapshot"}}}};
     assert(service.Execute("ai-infer", chat)["error"]["code"] == "PAGE_CONTEXT_FAILED");
     assert(calls == before_error);
-    snapshot = {{"success", true}, {"url", "about:blank"}, {"title", ""}, {"text", ""}, {"accessibleLabels", json::array()}};
+    snapshot = {{"version", 1}, {"ok", true}, {"value", {{"url", "about:blank"}, {"title", ""}, {"text", ""}, {"truncated", false}, {"elements", json::array()}}}};
     assert(service.Execute("ai-infer", chat)["response"] == "4");
+    const int before_stale = calls;
+    stale_generation = true;
+    assert(service.Execute("ai-infer", chat)["error"]["code"] == "TAB_NOT_FOUND");
+    assert(calls == before_stale && ownership_checks >= 2);
+    stale_generation = false;
+    closes_during_snapshot = true;
+    const int before_snapshot_close = calls;
+    const int before_checks = ownership_checks;
+    assert(service.Execute("ai-infer", chat)["error"]["code"] == "TAB_NOT_FOUND");
+    assert(calls == before_snapshot_close && ownership_checks == before_checks + 2);
+    stale_generation = false;
+    closes_during_snapshot = false;
 
     discovery = false;
     assert(service.Execute("ai-load", {{"backend", "openai"}, {"endpoint", "Local"}})["loaded"] == true);

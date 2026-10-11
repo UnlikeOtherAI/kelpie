@@ -404,7 +404,6 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     const auto closing_index = static_cast<std::size_t>(tab - impl->tabs.data());
     CefRefPtr<CefBrowser> closing = tab->browser;
-    CefRefPtr<DesktopDevToolsSession> closing_devtools = tab->devtools;
     const bool was_active = impl->browser && impl->browser->IsSame(closing);
     std::size_t live_tabs = 0;
     for (const auto& candidate : impl->tabs) if (!candidate.closing) ++live_tabs;
@@ -422,7 +421,6 @@ BrowserControlResult DesktopEngine::CloseTab(TabLease lease, Timeout timeout) {
         }
       }
     }
-    if (closing_devtools) closing_devtools->CancelAll();
 #if defined(_WIN32)
     if (was_active && impl->browser && impl->browser->GetHost()) {
       ShowWindow(impl->browser->GetHost()->GetWindowHandle(), SW_SHOW);

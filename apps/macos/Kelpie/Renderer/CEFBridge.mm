@@ -1,7 +1,6 @@
 #import "CEFBridge_Internal.h"
 
 #import <Foundation/Foundation.h>
-#import <objc/runtime.h>
 
 static NSString *const kCEFBridgeErrorDomain = @"com.kelpie.browser.cef";
 static NSString *const kEvalConsolePrefix = @"__kelpie_eval__:";
@@ -15,40 +14,6 @@ static NSString *const kEvalConsolePrefix = @"__kelpie_eval__:";
 // hangs — see GitHub issues #23/#24. This is a safety backstop; normal evals
 // complete in milliseconds.
 static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
-
-static BOOL gCEFInitialized = NO;
-static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
-
-@protocol CrAppProtocol
-- (BOOL)isHandlingSendEvent;
-@end
-
-@protocol CrAppControlProtocol <CrAppProtocol>
-- (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
-@end
-
-@protocol CefAppProtocol <CrAppControlProtocol>
-@end
-
-@interface NSApplication (KelpieCEFAppProtocol) <CefAppProtocol>
-@end
-
-@implementation NSApplication (KelpieCEFAppProtocol)
-
-- (BOOL)isHandlingSendEvent {
-    return [objc_getAssociatedObject(self, kCEFHandlingSendEventKey) boolValue];
-}
-
-- (void)setHandlingSendEvent:(BOOL)handlingSendEvent {
-    objc_setAssociatedObject(
-        self,
-        kCEFHandlingSendEventKey,
-        @(handlingSendEvent),
-        OBJC_ASSOCIATION_RETAIN_NONATOMIC
-    );
-}
-
-@end
 
 @implementation CEFBridge
 
@@ -77,70 +42,6 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
         dispatch_async(dispatch_get_main_queue(), ^{
             completion(nil, error);
         });
-    }
-}
-
-+ (BOOL)initializeCEF {
-    if (gCEFInitialized) {
-        return YES;
-    }
-
-    const char *apiHash = cef_api_hash(CEF_API_VERSION, 0);
-    NSLog(@"[CEF] Configured API version=%d hash=%s", cef_api_version(), apiHash != nullptr ? apiHash : "");
-
-    NSString *helperExecutable = [[NSBundle mainBundle].privateFrameworksPath stringByAppendingPathComponent:@"Kelpie Helper.app/Contents/MacOS/Kelpie Helper"];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:helperExecutable]) {
-        NSLog(@"[CEF] FATAL: Kelpie Helper.app not found at expected path: %@", helperExecutable);
-        return NO;
-    }
-
-    cef_main_args_t mainArgs = CEFBridgeMainArgs();
-    int exitCode = cef_execute_process(&mainArgs, nullptr, nullptr);
-    if (exitCode >= 0) {
-        return NO;
-    }
-
-    cef_settings_t settings = {};
-    settings.size = sizeof(settings);
-    settings.no_sandbox = 1;
-    settings.multi_threaded_message_loop = 0;
-
-    cef_string_t subprocessPath = CEFBridgeStringCreate(helperExecutable);
-    settings.browser_subprocess_path = subprocessPath;
-
-    NSString *frameworkPath = [[NSBundle mainBundle].privateFrameworksPath stringByAppendingPathComponent:@"Chromium Embedded Framework.framework"];
-    cef_string_t frameworkPathCEF = CEFBridgeStringCreate(frameworkPath);
-    settings.framework_dir_path = frameworkPathCEF;
-
-    NSString *bundlePath = [NSBundle mainBundle].bundlePath;
-    cef_string_t bundlePathCEF = CEFBridgeStringCreate(bundlePath);
-    settings.main_bundle_path = bundlePathCEF;
-
-    NSString *cachePath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"kelpie-cef-cache"];
-    [[NSFileManager defaultManager] createDirectoryAtPath:cachePath withIntermediateDirectories:YES attributes:nil error:nil];
-    cef_string_t cachePathCEF = CEFBridgeStringCreate(cachePath);
-    settings.cache_path = cachePathCEF;
-
-    const int ok = cef_initialize(&mainArgs, &settings, nullptr, nullptr);
-    CEFBridgeStringClear(&settings.browser_subprocess_path);
-    CEFBridgeStringClear(&settings.framework_dir_path);
-    CEFBridgeStringClear(&settings.main_bundle_path);
-    CEFBridgeStringClear(&settings.cache_path);
-    gCEFInitialized = ok != 0;
-    return gCEFInitialized;
-}
-
-+ (void)shutdownCEF {
-    if (!gCEFInitialized) {
-        return;
-    }
-    cef_shutdown();
-    gCEFInitialized = NO;
-}
-
-+ (void)doMessageLoopWork {
-    if (gCEFInitialized) {
-        cef_do_message_loop_work();
     }
 }
 

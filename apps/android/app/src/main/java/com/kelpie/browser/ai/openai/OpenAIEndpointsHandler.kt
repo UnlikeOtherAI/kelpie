@@ -38,14 +38,15 @@ class OpenAIEndpointsHandler(
         val request = InferRequest.fromBody(body)
         val dispatcher =
             try {
-                agentTools.pinnedDispatcher(request.tabId)
+                if (request.agentMode) agentTools.pinnedDispatcher(request.tabId, request.allowActions) else agentTools.contextDispatcher(request.tabId)
             } catch (e: OpenAIException) {
                 return errorResponse(e.code, e.message, e.diagnostics)
             }
-        return runtime().inference.infer(request, dispatcher, { mode ->
-            com.kelpie.browser.ai.AIPageContext
-                .evidence(mode, dispatcher)
-        })
+        return try {
+            runtime().inference.infer(request, dispatcher) { mode -> agentTools.pageContext(mode, dispatcher.pinnedTabId ?: request.tabId) }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { dispatcher.close() }
+        }
     }
 
     /** ai-unload: forget the persisted selection so it is not restored at launch. */
@@ -104,10 +105,18 @@ class OpenAIRuntimeParts(
 /** Android-side tab pinning and page-context gathering for agent and plain runs. */
 interface AgentToolBridge {
     /** Pins [tabId] (or the active tab) and returns a dispatcher bound to it. */
-    suspend fun pinnedDispatcher(tabId: String?): ToolDispatcher
+    suspend fun pinnedDispatcher(
+        tabId: String?,
+        allowActions: Boolean = false,
+    ): ToolDispatcher
+
+    suspend fun contextDispatcher(tabId: String?): ToolDispatcher = pinnedDispatcher(tabId, false)
 
     /** Returns page context for `context` (`page_text`, `dom`, `accessibility`) as text. */
-    suspend fun pageContext(mode: String): String?
+    suspend fun pageContext(
+        mode: String,
+        tabId: String? = null,
+    ): String?
 }
 
 /** Parses `ai-endpoint-save` bodies. `null` in `capabilities` clears a user override. */

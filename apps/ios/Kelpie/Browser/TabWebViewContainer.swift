@@ -96,6 +96,7 @@ struct TabWebViewContainer: UIViewRepresentable {
             container.addSubview(webView)
 
             currentWebView = webView
+            NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             chromeScroll = BrowserChromeScroll()
             observe(webView)
             syncBrowserState(from: webView)

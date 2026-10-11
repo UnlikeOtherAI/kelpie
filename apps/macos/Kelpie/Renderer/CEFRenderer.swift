@@ -213,6 +213,7 @@ final class CEFRenderer: RendererEngine {
         canGoBack = bridge.canGoBack()
         canGoForward = bridge.canGoForward()
         if isLoading, !previousLoading {
+            NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
         } else if !isLoading, previousLoading {
@@ -293,6 +294,20 @@ final class CEFRenderer: RendererEngine {
                     continuation.resume(returning: nil)
                 }
             }
+        }
+    }
+
+    func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
+        guard !containerView.isHidden else { throw HandlerError.rendererHidden }
+        guard let bridge else { throw HandlerError.noWebView }
+        return try await withCheckedThrowingContinuation { continuation in
+            bridge.evaluateBrowserControl(
+                script,
+                stillVisible: { [weak self] in self?.containerView.isHidden == false },
+                completion: { result, error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: result) }
+                }
+            )
         }
     }
 

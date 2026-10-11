@@ -37,6 +37,8 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
+bool DesktopEngine::HasPendingBrowserControl() const { return false; }
+
 bool DesktopEngine::Shutdown() { return true; }
 
 FaviconRegistry& DesktopEngine::favicons() { return impl_->favicons; }
@@ -171,6 +173,10 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease, std::string, Json*, Timeo
   return UnsupportedControl();
 }
 
+BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease, std::string, Json*, Timeout) {
+  return UnsupportedControl();
+}
+
 BrowserControlResult DesktopEngine::Screenshot(TabLease, BrowserScreenshot*, Timeout) {
   return UnsupportedControl();
 }
@@ -208,6 +214,10 @@ BrowserControlResult DesktopEngine::DevTools(TabLease,
                                              const Json&,
                                              Json*,
                                              Timeout) {
+  return UnsupportedControl();
+}
+
+BrowserControlResult DesktopEngine::ReadAppearance(TabLease, Json*, Timeout) {
   return UnsupportedControl();
 }
 

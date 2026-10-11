@@ -53,6 +53,7 @@ private fun tabWebViewClient(
                     .randomUUID()
                     .toString()
             tab.remoteNavigationLease?.started(previousVersion, tab.documentVersion, url)
+            handlerContext.browserDocumentChanged?.invoke(tab.id)
             if (isActive()) {
                 handlerContext.dialogState.dismissPending()
             }

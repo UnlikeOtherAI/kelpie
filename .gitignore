@@ -53,5 +53,7 @@ assets/old/
 # Git worktrees (local only)
 .worktrees/
 
+# Generated native contract bootstrap lock
+.build-browser-contract.lock
 # Local iOS release verification output
 apps/ios/.releasebuild/

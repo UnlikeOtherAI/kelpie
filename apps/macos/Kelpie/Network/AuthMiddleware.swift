@@ -32,7 +32,6 @@ struct AuthMiddleware {
     /// Exact-match decoded-path allowlist. Pre-routing — every other path must
     /// supply a valid bearer token.
     static let unauthAllowlist: Set<String> = [
-        "/v1/pair",
         "/v1/pair/status",
         "/v1/get-device-info",
         // Health is intentionally unauthenticated so operators can probe the
@@ -46,12 +45,11 @@ struct AuthMiddleware {
         if let headerReject = rejectAmbiguousHeaders(req) {
             return headerReject
         }
-        if Self.unauthAllowlist.contains(req.path) {
-            if req.path == "/v1/pair", req.method == "POST" {
-                if let csrf = csrfReject(req) { return csrf }
-            }
+        if req.path == "/v1/pair", req.method == "POST" {
+            if let csrf = csrfReject(req) { return csrf }
             return .unauthenticated
         }
+        if Self.unauthAllowlist.contains(req.path) { return .unauthenticated }
         // Everything else requires bearer.
         guard let bearer = extractBearer(req.headers) else {
             return .reject(status: 401, errorCode: "UNAUTHORIZED", message: "Authentication required")

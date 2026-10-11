@@ -6,7 +6,9 @@ import WebKit
 @MainActor
 final class TabStore: ObservableObject {
     @Published private(set) var tabs: [BrowserTab] = []
-    @Published var activeBrowserTabID: UUID?
+    @Published var activeBrowserTabID: UUID? {
+        didSet { if oldValue != activeBrowserTabID { NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil) } }
+    }
 
     var activeBrowserTab: BrowserTab? { tabs.first { $0.id == activeBrowserTabID } }
 

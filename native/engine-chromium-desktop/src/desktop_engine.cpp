@@ -284,7 +284,6 @@ bool DesktopEngine::Impl::Shutdown() {
   // CloseBrowser may synchronously run OnBeforeClose and erase/move tabs.
   // No reference or iterator into that mutable owner list can survive it.
   for (const auto& tab : closing) {
-    if (tab.devtools) tab.devtools->CancelAll();
     tab.chat_session->Close();
     if (tab.browser && tab.browser->GetHost()) tab.browser->GetHost()->CloseBrowser(true);
   }
@@ -336,6 +335,8 @@ DesktopEngine::~DesktopEngine() = default;
 bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
+
+bool DesktopEngine::HasPendingBrowserControl() const { return impl_->unknown_operations->load() != 0; }
 
 bool DesktopEngine::Shutdown() {
   return impl_->Shutdown();

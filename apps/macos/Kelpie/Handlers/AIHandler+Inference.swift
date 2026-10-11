@@ -100,7 +100,7 @@ extension AIHandler {
 
         do {
             let preloaded = try await inferenceContext(body, tabId: tabId)
-            let harness = InferenceHarness(context: context)
+            let harness = InferenceHarness(context: context, router: router)
             let result = try await harness.run(prompt: prompt, audio: audio, preloadedContext: preloaded)
 
             var response = successResponse([
@@ -164,54 +164,21 @@ extension AIHandler {
 
     @MainActor
     func preloadedContext(mode: String?, tabId: String?) async throws -> String? {
-        switch mode {
-        case nil:
-            return nil
-
-        case "page_text":
-            let page = try await AIPageContext.gather(from: context, tabId: tabId)
-            let data = try JSONSerialization.data(withJSONObject: page.pageTextPayload, options: [.sortedKeys])
-            return String(data: data, encoding: .utf8)
-
-        case "dom":
-            return try await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    return { html: el ? el.outerHTML : '', selector: 'body' };
-                })())
-                """, tabId: tabId
-            )
-
-        case "accessibility":
-            return try await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    function walk(node, depth) {
-                        if (!node || depth > 3) return null;
-                        var entry = {
-                            role: node.getAttribute('role') || node.tagName.toLowerCase(),
-                            name: (node.getAttribute('aria-label') || node.textContent || '').trim().substring(0, 80)
-                        };
-                        var children = [];
-                        for (var child of node.children) {
-                            var childResult = walk(child, depth + 1);
-                            if (childResult) children.push(childResult);
-                        }
-                        if (children.length) entry.children = children;
-                        return entry;
-                    }
-                    return walk(document.body, 0);
-                })())
-                """, tabId: tabId
-            )
-
-        case "screenshot":
-            return nil
-
-        default:
-            return nil
+        guard mode != nil && mode != "screenshot" else { return nil }
+        guard ["page_text", "dom", "accessibility"].contains(mode ?? "") else {
+            throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported page context mode"])
         }
+        let page = try await commonPageContext(tabId: tabId)
+        let data = try JSONSerialization.data(withJSONObject: page.pageTextPayload, options: [.sortedKeys])
+        return String(data: data, encoding: .utf8)
+    }
+
+    @MainActor
+    func commonPageContext(tabId: String?) async throws -> AIPageContext {
+        guard let router else {
+            throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: "Browser router is unavailable"])
+        }
+        return try AIPageContext(observation: await router.pageObservation(tabId: tabId))
     }
 
     @MainActor

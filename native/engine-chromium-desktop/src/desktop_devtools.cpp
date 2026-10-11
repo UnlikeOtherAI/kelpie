@@ -135,7 +135,8 @@ std::optional<DesktopNetworkEventAdapter::Json> DesktopNetworkEventAdapter::Obse
 
 void DesktopNetworkEventAdapter::Clear() { requests_.clear(); }
 
-DesktopDevToolsSession::DesktopDevToolsSession() = default;
+DesktopDevToolsSession::DesktopDevToolsSession(std::shared_ptr<std::atomic<std::size_t>> unknown_operations)
+    : unknown_operations_(std::move(unknown_operations)) {}
 DesktopDevToolsSession::~DesktopDevToolsSession() { CancelAll(); }
 
 void DesktopDevToolsSession::Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink) {
@@ -156,15 +157,19 @@ void DesktopDevToolsSession::Attach(CefRefPtr<CefBrowser> browser, NetworkEventS
 }
 
 std::shared_ptr<DesktopDevToolsSession::Operation> DesktopDevToolsSession::Begin(
-    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params) {
+    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params, bool fences_actions) {
   int message_id = 0;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     message_id = next_message_id_++;
   }
-  auto operation = std::shared_ptr<Operation>(new Operation(message_id));
+  auto operation = std::shared_ptr<Operation>(new Operation(message_id, unknown_operations_, fences_actions));
   if (!browser || method.empty() || !CefCurrentlyOn(TID_UI)) {
     Complete(operation, Failure("INTERNAL", "DevTools methods must begin on the CEF UI thread"));
+    return operation;
+  }
+  if (unknown_operations_->load() != 0) {
+    Complete(operation, Failure("BUSY", "A prior renderer operation is still pending"));
     return operation;
   }
   CefRefPtr<CefBrowserHost> host = browser->GetHost();
@@ -219,11 +224,9 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::Wait(const std::shared_pt
     lock.lock();
     if (operation->done_) return operation->result_;
   }
-  operation->abandoned_ = true;
-  lock.unlock();
-  std::lock_guard<std::mutex> pending_lock(mutex_);
-  const auto it = pending_.find(operation->message_id_);
-  if (it != pending_.end() && it->second == operation) pending_.erase(it);
+  // Keep the real operation owned after returning uncertainty. A late result or
+  // confirmed tab teardown retires it; a timeout cannot admit a second action.
+  operation->ownership_.MarkUncertain();
   return stopped ? Failure("INTERRUPTED", "DevTools operation was interrupted", true)
                  : Failure("TIMEOUT", "DevTools operation timed out", true);
 }
@@ -362,7 +365,10 @@ void DesktopDevToolsSession::OnDevToolsEvent(CefRefPtr<CefBrowser> browser, cons
   if (event) sink(*event);
 }
 
-void DesktopDevToolsSession::OnDevToolsAgentDetached(CefRefPtr<CefBrowser>) { CancelAll(); }
+void DesktopDevToolsSession::OnDevToolsAgentDetached(CefRefPtr<CefBrowser>) {
+  // Detaching a transport does not prove JavaScript stopped. Preserve ownership
+  // until the owning tab's confirmed OnBeforeClose callback calls CancelAll().
+}
 
 CefRefPtr<CefDictionaryValue> DesktopDevToolsSession::ToCefDictionary(const Json& object) {
   if (!object.is_object()) return nullptr;
@@ -406,7 +412,8 @@ DesktopDevToolsSession::Result DesktopDevToolsSession::ParseProtocolResult(bool 
 
 void DesktopDevToolsSession::Complete(const std::shared_ptr<Operation>& operation, Result result) {
   std::lock_guard<std::mutex> lock(operation->mutex_);
-  if (operation->done_ || operation->abandoned_) return;
+  if (operation->done_) return;
+  operation->ownership_.Retire();
   operation->result_ = std::move(result);
   operation->done_ = true;
   operation->completed_.notify_all();

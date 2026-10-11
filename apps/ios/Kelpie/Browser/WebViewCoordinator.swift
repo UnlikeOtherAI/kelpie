@@ -111,6 +111,7 @@ struct WebViewContainer: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
             ConnectDocument.navigated(webView, navigation: navigation)
+            NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
             observe(webView)
             // Each new provisional navigation starts clean — clear any error captured
             // by a superseded load so a cancelled-then-successful sequence is not fatal.

@@ -142,6 +142,10 @@ jobs:
             bash -lc '
               set -euo pipefail
               eval "${DISTRO_INSTALL}"
+              curl -fsSL https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz -o /tmp/kelpie-node.tar.xz
+              tar -xJf /tmp/kelpie-node.tar.xz -C /opt
+              export PATH="/opt/node-v22.14.0-linux-x64/bin:${PATH}"
+              npm install --global pnpm@10.12.4
 
               bash scripts/download-cef.sh linux
               make linux
@@ -211,6 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
 
       - uses: actions/setup-java@v5.2.0
         with:
@@ -382,6 +387,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/browser-contract
       - name: Verify harness process handling
         shell: pwsh
         run: node --test tests/windows/process.test.mjs

@@ -1,3 +1,4 @@
+import { registerCanonicalBrowserControl } from "./browser-control.js";
 import type { Command } from "commander";
 import { registerDiscover } from "./discover.js";
 import { registerDescribe } from "./describe.js";
@@ -55,6 +56,8 @@ export function registerAllCommands(program: Command): void {
   registerPair(program);
   registerBrowser(program);
   registerFeedback(program);
+
+  registerCanonicalBrowserControl(program);
 
   // Core: Navigation
   registerNavigate(program);

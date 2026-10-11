@@ -85,6 +85,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
         if let webView { ConnectDocument.issued(webView, navigation: navigation) }
     }
     var tabStore: TabStore?
+    var browserControlTabId: String?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
@@ -147,6 +148,9 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
     func evaluateJS(_ script: String) async throws -> Any? {
         try Task.checkCancellation()
         if let remoteDocumentGuard, !remoteDocumentGuard() { throw CancellationError() }
+        if let browserControlTabId, browserControlTabId != (tabStore?.activeBrowserTabID?.uuidString ?? (webView != nil ? "external" : nil)) {
+            throw HandlerError.noWebView
+        }
         guard let webView else { throw HandlerError.noWebView }
         return try await webView.evaluateJavaScript(script)
     }
