@@ -35,6 +35,14 @@ class ConnectBrowser(
     }
 
     suspend fun execute(command: Map<String, Any?>): Map<String, Any?> {
+        if (command["operation"] == "open") {
+            val gateway = context.browserGateway
+            if (gateway != null) return gateway.legacy("new-tab") { executeBrowser(command) }
+        }
+        return executeBrowser(command)
+    }
+
+    private suspend fun executeBrowser(command: Map<String, Any?>): Map<String, Any?> {
         check(ready) { "Browser is not ready" }
         currentCoroutineContext().ensureActive()
         val operation = command["operation"] as String
@@ -55,11 +63,15 @@ class ConnectBrowser(
         verify(tabId, expected)
         val store = context.tabStore ?: error("Browser unavailable")
         val tab = store.tabs.value.firstOrNull { it.id == tabId } ?: error("Tab not found")
-        NessieConnection.changeTabRemotely { store.selectTab(tabId) }
-        NessieConnection.claimTab(tabId)
+        val select: suspend () -> Unit = {
+            NessieConnection.changeTabRemotely { store.selectTab(tabId) }
+            NessieConnection.claimTab(tabId)
+        }
+        val gateway = context.browserGateway
+        if (gateway == null) select() else gateway.legacy("select-tab", select)
         val coroutine = currentCoroutineContext()
         val isolated =
-            HandlerContext().apply {
+            HandlerContext(context.browserRetirement).apply {
                 webView = tab.webView
                 scriptPlaybackState = context.scriptPlaybackState
                 remoteDocumentGuard = {
@@ -72,6 +84,7 @@ class ConnectBrowser(
             }
         val target =
             Router().apply {
+                browserGateway = context.browserGateway
                 handlerContext = isolated
                 scriptPlaybackState = context.scriptPlaybackState
                 NavigationHandler(isolated).register(this)

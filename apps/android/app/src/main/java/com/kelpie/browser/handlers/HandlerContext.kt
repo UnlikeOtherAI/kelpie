@@ -33,7 +33,7 @@ private val json =
     }
 private val mainHandler = Handler(Looper.getMainLooper())
 
-class HandlerContext {
+class HandlerContext(val browserRetirement: BrowserGatewayRetirement = BrowserGatewayRetirement()) {
     companion object {
         const val DEFAULT_OVERLAY_RGB = "59,130,246"
     }
@@ -58,7 +58,7 @@ class HandlerContext {
 
     var tabStore: TabStore? = null
     var browserDocumentChanged: ((String) -> Unit)? = null
-    val browserRetirement = BrowserGatewayRetirement()
+    var browserGateway: com.kelpie.browser.network.BrowserGatewayBinding? = null
     var keyboardObserver: KeyboardObserver? = null
     var scriptPlaybackState: ScriptPlaybackState? = null
     var annotationSessionId: String? = null

@@ -73,6 +73,7 @@ private func scaledImage(
 /// Shared context providing access to the WebView for all handlers.
 @MainActor
 final class HandlerContext: NSObject, WKScriptMessageHandler {
+    weak var browserRouter: Router?
     nonisolated static let defaultOverlayRGB = "59,130,246"
 
     weak var webView: WKWebView?

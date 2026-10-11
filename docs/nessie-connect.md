@@ -109,6 +109,12 @@ and leaves the device paused. A person switching or closing the controlled tab p
 remote work. Returning to the foreground does not override a person's pause.
 
 Apple and Android reuse their existing browser handlers through a job-owned context.
+Their isolated routers share the original browser gateway's admission and reference
+invalidation. Android also shares its renderer callback retirement tracker; Apple
+keeps the admission lease until the awaited handler completes. A common browser
+operation cannot overlap remote renderer work. Extraction releases that browser
+admission before local model inference, and rechecks its immutable document authority
+after inference. The selector/evidence wire remains version 1.
 macOS supports both WebKit tabs and the visible Chromium/CEF surface. CEF exposes its
 one current surface as one tab; `open` navigates that surface. Each main-frame start
 rotates a native document identity, including reloads to the same URL. Remote `type`

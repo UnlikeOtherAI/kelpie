@@ -54,6 +54,10 @@ final class ConnectBrowser {
         try Task.checkCancellation()
         if operation == "tabs" { return ["tabs": tabs()] }
         if operation == "open" {
+            let owner = context.browserRouter
+            guard owner?.browserLease.begin() != false else { throw Failure("A browser operation is pending") }
+            defer { owner?.browserLease.end() }
+            owner?.invalidateAllBrowserReferences()
             let url = try webURL(input["url"])
             if context.scriptPlaybackState?.recordingError(for: "new-tab") != nil { throw Failure("Recording is in progress") }
             #if os(macOS)
@@ -84,6 +88,7 @@ final class ConnectBrowser {
         }
         let pinned = try pin(tabID, expected: expected, command: command)
         let isolated = Router()
+        isolated.browserReferenceOwner = context.browserRouter
         isolated.handlerContext = pinned
         isolated.scriptPlaybackState = context.scriptPlaybackState
         NavigationHandler(context: pinned).register(on: isolated)
@@ -242,6 +247,9 @@ final class ConnectBrowser {
     }
 
     private func pin(_ tabID: String, expected: String, command: [String: Any]) throws -> HandlerContext {
+        let owner = context.browserRouter
+        guard owner?.browserLease.begin() != false else { throw Failure("A browser operation is pending") }
+        defer { owner?.browserLease.end() }
         try verify(tabID, expected)
         guard let uuid = UUID(uuidString: tabID) else { throw Failure("Tab not found") }
         let isolated = HandlerContext()

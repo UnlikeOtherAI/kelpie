@@ -143,14 +143,14 @@ class ConnectBrowserNavigationTest {
                     }.isFailure,
                 )
                 var checks = 0
-                context.remoteDocumentGuard = { ++checks == 1 }
+                context.remoteDocumentGuard = { ++checks <= 2 }
                 assertTrue(
                     runCatching {
                         com.kelpie.browser.llm.PageTextSnapshot
                             .read(context, emptyMap())
                     }.isFailure,
                 )
-                assertEquals(2, checks)
+                assertEquals(3, checks)
             }
         }
 
@@ -173,6 +173,11 @@ class ConnectBrowserNavigationTest {
                 // Own verification profile only; establish a settled initial document through its real clients.
                 val tab = store.addTab()
                 context.webView = tab.webView
+                val router = com.kelpie.browser.network.Router().apply { handlerContext = context }
+                com.kelpie.browser.handlers.NavigationHandler(context).register(router)
+                com.kelpie.browser.llm.LLMHandler(context).register(router)
+                val gateway = com.kelpie.browser.network.BrowserGatewayBinding(router, context)
+                gateway.register()
                 tab.webView.loadDataWithBaseURL(url(server, "/initial"), "<title>Initial</title>", "text/html", "utf-8", null)
                 withTimeout(5000) {
                     do {
@@ -185,6 +190,7 @@ class ConnectBrowserNavigationTest {
                 try {
                     withTimeout(10000) { block(browser, context, server, authority) }
                 } finally {
+                    gateway.close()
                     store.destroyAllTabs()
                 }
             }
