@@ -25,8 +25,8 @@ try {
   readiness = await waitForReadiness(readinessPath, 45000);
   assert.equal((await fetch(`http://127.0.0.1:${readiness.port}/health`)).status, 200);
   const sdk = await runCommand(process.execPath, [fileURLToPath(new URL("./mcp-client-journey.mjs", import.meta.url)), readinessPath]);
-  assert.equal(sdk.code, 0, sdk.stderr);
   console.log(sdk.stdout.trim());
+  assert.equal(sdk.code, 0, sdk.stderr);
   if (fallback) {
     const response = await rawRequest({ port: readiness.port, path: "/v1/browser-control", headers: bearerHeaders(readiness.token),
       body: JSON.stringify({ version: 1, method: "tab.snapshot", tabId: "stub" }) });

@@ -27,8 +27,8 @@ export async function runCanonicalAcceptance(readiness, fixtureUrl) {
   assert.ok(input);
   const typed = await call("tab.type", { ref: input.ref, text: "!" }, tab);
   assert.equal(typed.ok, true);
-  assert.equal(await evaluate('document.querySelector("#text-input").value'), "INITIAL_SECRET!");
   assert.equal((await call("tab.type", { ref: input.ref, text: "DUPLICATE" }, tab)).error.code, "STALE_REFERENCE");
+  assert.equal(await evaluate('document.querySelector("#text-input").value'), "INITIAL_SECRET!");
   await evaluate('setTimeout(()=>{const node=document.querySelector("#trusted-button");node.replaceWith(node.cloneNode(true));},1000);true');
   const fresh = await call("tab.snapshot", {}, tab);
   const button = fresh.value.elements.find(el => el.name === "Trusted action");

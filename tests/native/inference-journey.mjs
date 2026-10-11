@@ -24,15 +24,18 @@ export async function runInferenceJourney(client) {
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   try {
+    console.log("Native inference fixture: configuring owned endpoint");
     const saved = value(await rich("kelpie_ai_endpoint_save", { name: "owned-native-fixture", baseURL: `http://127.0.0.1:${server.address().port}/v1`, model: "fixture-model" }));
     assert.equal(saved.success, true);
     assert.equal((await rich("kelpie_ai_load", { backend: "openai", endpoint: "owned-native-fixture" })).isError, false);
     assert.equal((await rich("kelpie_evaluate", { expression: 'document.body.insertAdjacentHTML("beforeend",\'<input value="AI_INPUT_SECRET">\');true' })).isError, false);
     const args = { prompt: "Read fixture", context: "dom", agent: false };
+    console.log("Native inference fixture: common context read");
     const answer = await rich("kelpie_ai_ask", args);
     assert.equal(answer.isError, false);
     assert.equal(value(answer).response, "fixture-answer");
     hold = true;
+    console.log("Native inference fixture: pending provider cancellation");
     const inference = rich("kelpie_ai_ask", args);
     await Promise.race([observedRequest, new Promise((_, reject) => { const timeout = setTimeout(() => reject(new Error("Inference provider was not reached")), 5000); timeout.unref(); })]);
     const read = await client.callTool({ name: "kelpie_browser_control", arguments: { request: { version: 1, method: "documentation" } } });
