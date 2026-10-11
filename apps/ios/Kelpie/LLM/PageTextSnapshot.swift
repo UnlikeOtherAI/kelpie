@@ -26,6 +26,16 @@ enum PageTextSnapshot {
 
     @MainActor
     static func read(context: HandlerContext, body: [String: Any]) async throws -> [String: Any] {
+        let result = try await object(context: context, body: body, script: script(selector: body["selector"] as? String ?? "body"))
+        guard result["title"] is String, result["url"] is String,
+              result["content"] is String, result["accessibleLabels"] is [String] else {
+            throw AIHandlerError(code: "EVAL_ERROR", message: "Page text returned an invalid snapshot")
+        }
+        return result
+    }
+
+    @MainActor
+    static func object(context: HandlerContext, body: [String: Any], script: String) async throws -> [String: Any] {
         let webView: WKWebView?
         if let requested = body["tabId"] as? String {
             guard let id = UUID(uuidString: requested),
@@ -37,12 +47,9 @@ enum PageTextSnapshot {
             webView = context.webView
         }
         guard let webView else { throw AIHandlerError(code: "NO_WEBVIEW", message: "No browser tab is available") }
-        let script = script(selector: body["selector"] as? String ?? "body")
         guard let raw = try await webView.evaluateJavaScript("JSON.stringify((\(script)))") as? String,
               let data = raw.data(using: .utf8),
-              let result = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              result["title"] is String, result["url"] is String,
-              result["content"] is String, result["accessibleLabels"] is [String] else {
+              let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIHandlerError(code: "EVAL_ERROR", message: "Page text returned an invalid snapshot")
         }
         return result

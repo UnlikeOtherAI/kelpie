@@ -14,8 +14,7 @@ object AIPageContext {
         AIConversation.messages(body)
         val mode = body["context"] as? String ?: return body
         val available = bridge ?: throw OpenAIException("AI_UNAVAILABLE", "Browser router is unavailable")
-        val dispatcher =
-            if (mode == "page_text") available.pageDispatcher(body["tabId"] as? String) else available.pinnedDispatcher(body["tabId"] as? String)
+        val dispatcher = available.pageDispatcher(body["tabId"] as? String)
         return body + ("text" to evidence(mode, dispatcher))
     }
 

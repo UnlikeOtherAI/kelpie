@@ -51,7 +51,9 @@ class LLMHandler(
                 "if(!r)return{tree:{role:'none'},nodeCount:0};" +
                 "return{tree:walk(r,0),nodeCount:r.querySelectorAll('*').length};})()"
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
+            successResponse(PageTextSnapshot.readObject(ctx, body, js))
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
         } catch (e: Exception) {
             errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
         }

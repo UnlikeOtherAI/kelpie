@@ -24,11 +24,11 @@ class RouterAgentToolBridge(
                 throw OpenAIException(error?.get("code") as? String ?: "TAB_NOT_FOUND", error?.get("message") as? String ?: "No tab with id $tabId")
             }
         }
-        val pinned = tabStore?.activeTabId?.value ?: tabId
+        val pinned = tabId ?: tabStore?.activeTabId?.value
         return PinnedTabDispatcher(router, pinned) { ctx.tabStore?.activeTabId?.value }
     }
 
-    /** Page text handlers target captured WebViews directly and can read background tabs. */
+    /** Page context handlers target captured WebViews directly and can read background tabs. */
     fun pageDispatcher(tabId: String?): ToolDispatcher {
         val captured = tabId ?: ctx.tabStore?.activeTabId?.value
         return ToolDispatcher { method, args ->

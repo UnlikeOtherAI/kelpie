@@ -30,8 +30,10 @@ struct LLMHandler {
         (function(){function walk(el,depth){if(depth>"\(maxDepth)")return null;var role=el.getAttribute('role')||el.tagName.toLowerCase();var name=el.getAttribute('aria-label')||el.textContent?.trim().substring(0,50)||'';var node={role:role,name:name};if(el.getAttribute('aria-checked'))node.checked=el.getAttribute('aria-checked')==='true';if(el.disabled)node.disabled=true;if(document.activeElement===el)node.focused=true;var children=[];for(var c of el.children){var cn=walk(c,depth+1);if(cn)children.push(cn);}if(children.length)node.children=children;return node;}var root=document.querySelector('\(JSEscape.string(root))');if(!root)return{tree:{role:'none'},nodeCount:0};var tree=walk(root,0);var count=root.querySelectorAll('*').length;return{tree:tree,nodeCount:count};})()
         """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
+            let result = try await PageTextSnapshot.object(context: context, body: body, script: js)
             return successResponse(result)
+        } catch let error as AIHandlerError {
+            return error.response
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }

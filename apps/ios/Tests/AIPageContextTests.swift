@@ -54,6 +54,15 @@ final class AIPageContextTests: XCTestCase {
         XCTAssertTrue(names.contains("Kelpie emblem"))
         XCTAssertTrue(names.contains("Accessible name"))
         XCTAssertFalse(names.contains("Hidden logo"))
+        let router = Router()
+        DOMHandler(context: context).register(on: router)
+        LLMHandler(context: context).register(on: router)
+        let dom = await router.handle(method: "get-dom", body: ["tabId": first.id.uuidString]).json
+        XCTAssertEqual(dom["success"] as? Bool, true)
+        XCTAssertTrue((dom["html"] as? String ?? "").contains("Origin text"))
+        let tree = await router.handle(method: "get-accessibility-tree", body: ["tabId": first.id.uuidString]).json
+        XCTAssertEqual(tree["success"] as? Bool, true)
+        XCTAssertTrue(OpenAIAgentLoop.json(tree).contains("Origin text"))
         XCTAssertEqual(store.activeBrowserTabID, second.id)
         store.tabs.forEach { $0.invalidate() }
     }
