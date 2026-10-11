@@ -12,7 +12,7 @@ and the persistent gateway; they do not establish live production UOA dispatch.
 | Maxis / Windows 0.1.13 candidate | `d3c7b150` | CI CEF build and existing native control acceptance journey | Passed MCP, nested inference/cancellation, canonical snapshot/append typing/stale refs/screenshot and late-callback ownership |
 | dictator / macOS WebKit | `ea4cccd6` | Account job navigation, cancellation and effect-time document checks | 3/3 focused tests; SwiftLint zero violations across 280 files |
 | dictator / iOS 26.5 simulator | `63922b34` | Real WebKit account goto/new document pin, shared-ref append typing, stale-document refusal and callback retirement | 1/1 focused test |
-| umac / Android verification-profile emulator | `112bdd7e`, formatting `9903e855` | JVM tests, connected account navigation tests and ktlint | 140 JVM tests and 8/8 connected tests passed, including canonical goto/new pin and competing human navigation; ktlint passed |
+| umac / Android verification-profile emulator | `112bdd7e`, clean-tree formatting `a2cfade3` | JVM tests, connected account navigation tests and ktlint | 140 JVM tests and 8/8 connected tests passed, including canonical goto/new pin and competing human navigation; all ktlint tasks reran and passed on the clean committed tree |
 | dictator / native Release | `e8be48a4` | iPhoneOS archives and macOS native build | Passed; navigation URL normalization remains C++17-compatible |
 | dictator / iPhone and iPad Release candidates | `e8be48a4` | Separate device builds and strict signature verification | Both passed with the existing Apple Development identity; both device UDIDs are provisioned |
 
