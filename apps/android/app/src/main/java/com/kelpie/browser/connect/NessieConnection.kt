@@ -433,11 +433,14 @@ object NessieConnection {
     }
 
     private fun deviceLabel(): String =
-        ConnectText.bounded(runCatching {
-            android.provider.Settings.Global
-                .getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
-                ?.takeIf { it.isNotBlank() }
-        }.getOrNull() ?: android.os.Build.MODEL, 120)
+        ConnectText.bounded(
+            runCatching {
+                android.provider.Settings.Global
+                    .getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
+                    ?.takeIf { it.isNotBlank() }
+            }.getOrNull() ?: android.os.Build.MODEL,
+            120,
+        )
 
     private fun installationId(): String {
         val prefs = appContext?.getSharedPreferences("nessie.connect", Context.MODE_PRIVATE) ?: error("App unavailable")
