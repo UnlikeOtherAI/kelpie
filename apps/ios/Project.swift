@@ -79,8 +79,8 @@ let kelpieApp = Target.target(
             "OTHER_LDFLAGS": iOSLinkerFlags,
             "GENERATE_APP_INTENTS_METADATA": "NO",
             "APP_SHORTCUTS_ENABLE_FLEXIBLE_MATCHING": "NO",
-            "MARKETING_VERSION": "0.1.17",
-            "CURRENT_PROJECT_VERSION": "17",
+            "MARKETING_VERSION": "0.1.18",
+            "CURRENT_PROJECT_VERSION": "18",
             "TARGETED_DEVICE_FAMILY": "1,2",
             "DEVELOPMENT_TEAM": "59S95D279D",
             // Conditional native build dir — device vs simulator
@@ -102,6 +102,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/UOAAccountTests.swift"),
         .glob("../macos/Tests/UOASessionTests.swift"),
         .glob("../macos/Tests/ConnectAuthorizationTests.swift"),
+        .glob("../macos/Tests/ConnectScreenshotBudgetTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
         .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),

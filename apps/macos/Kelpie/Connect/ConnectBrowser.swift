@@ -127,9 +127,9 @@ final class ConnectBrowser {
             if input["includeScreenshot"] as? Bool != true {
                 return ["tabId": tabID, "tabVersion": expected, "page": visible]
             }
-            let image = await isolated.handle(method: "screenshot", body: [
-                "tabId": tabID,
-                "format": "jpeg", "quality": 0.5, "resolution": "viewport", "fullPage": false]).json
+            let legacy: [String: Any] = [
+                "tabId": tabID, "format": "jpeg", "quality": 80, "resolution": "viewport", "fullPage": false]
+            let image = await ConnectScreenshotBudget.fit(legacy) { await isolated.handle(method: "screenshot", body: $0).json }
             try requireSuccess(image)
             try verify(tabID, expected)
             return ["tabId": tabID, "tabVersion": expected, "page": visible, "screenshot": image]

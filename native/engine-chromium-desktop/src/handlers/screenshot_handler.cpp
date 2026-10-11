@@ -16,14 +16,19 @@ void ScreenshotHandler::Register(DesktopRouter& router) const {
 
 nlohmann::json ScreenshotHandler::Screenshot(const nlohmann::json& params, bool annotated) const {
   if (params.contains("fullPage")) return InvalidParams("fullPage screenshots are not supported");
-  if (const auto format = params.find("format"); format != params.end() &&
-      (!format->is_string() || format->get<std::string>() != "png")) {
-    return InvalidParams("format must be png");
+  BrowserScreenshot image;
+  if (const auto format = params.find("format"); format != params.end()) {
+    if (!format->is_string() || (*format != "png" && *format != "jpeg")) return InvalidParams("format must be png or jpeg");
+    image.format = format->get<std::string>();
+  }
+  if (const auto quality = params.find("quality"); quality != params.end()) {
+    if (image.format != "jpeg" || !quality->is_number_integer() || *quality < 1 || *quality > 100)
+      return InvalidParams("quality must be an integer from 1 to 100 with jpeg");
+    image.quality = quality->get<int>();
   }
   TabLease lease;
   auto result = ResolveTabForRequest(RequireBrowserControl(runtime_), params, &lease, ControlTimeout(params));
   if (!result.ok) return ControlError(result);
-  BrowserScreenshot image;
   result = RequireBrowserControl(runtime_).Screenshot(lease, &image, ControlTimeout(params));
   if (!result.ok) return ControlError(result);
 

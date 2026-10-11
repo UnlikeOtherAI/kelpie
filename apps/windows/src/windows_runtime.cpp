@@ -3,6 +3,7 @@
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
 #include "kelpie/desktop_mcp_server.h"
+#include "kelpie/screenshot_fit.h"
 #include "windows_utf.h"
 #include "kelpie/account_login_window.h"
 
@@ -147,7 +148,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.13";
+  runtime.app_version = "0.1.14";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;
@@ -320,6 +321,7 @@ bool WindowsApp::InitializeDesktopRuntime() {
           return desktop_app_->mcp_server().GuardDispatch(method,target);
         },[this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
           DesktopMcpServer::Config config; config.platform=Platform::kWindows; config.engine="chromium";
+          config.screenshot_base64_limit=kAccountScreenshotBase64Limit;
           return desktop_app_->mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
         });
         return executor.Execute(command,guard);

@@ -3,6 +3,7 @@
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
 #include "kelpie/native_extension_schema.h"
+#include "kelpie/screenshot_fit.h"
 #include <iostream>
 #include <atomic>
 #include <mutex>
@@ -39,8 +40,33 @@ class DesktopMcpServer::Impl {
     gateway_config = {{"nativeMethods", methods}, {"fixedReader", static_cast<bool>(reader)}, {"requireAuthorization", false}, {"extensions", extensions}};
     gateway = std::make_unique<BrowserGateway>(gateway_config);
   }
+  // Retakes an oversized capture as JPEG through the same router route, job
+  // lease scope and step authorization as the first capture. Returns a final
+  // response when the gateway step must not advance with `*result`.
+  std::optional<json> FitScreenshot(const json& params, std::size_t limit,
+                                    const DesktopMcpServer::StepAuthorization& authorize, json* result) const {
+    bool refused = false;
+    const auto fit = kelpie::FitScreenshot(limit, [&](std::optional<int> quality) -> std::optional<std::size_t> {
+      json attempt = params;
+      if (quality) {
+        if (authorize && !authorize()) { refused = true; return std::nullopt; }
+        attempt["format"] = "jpeg";
+        attempt["quality"] = *quality;
+      }
+      *result = router->Dispatch("screenshot", attempt).body;
+      if (!result->is_object() || !result->value("success", false) || !result->contains("image") ||
+          !(*result)["image"].is_string()) return std::nullopt;
+      return (*result)["image"].get_ref<const std::string&>().size();
+    });
+    if (refused) return gateway->Cancel()["response"];
+    // The gateway maps this native refusal to the canonical SCREENSHOT_TOO_LARGE failure.
+    if (fit == ScreenshotFit::kTooLarge)
+      *result = {{"success", false}, {"error", {{"code", "SCREENSHOT_TOO_LARGE"},
+          {"message", "The viewport screenshot exceeds the account result budget."}}}};
+    return std::nullopt;
+  }
   json Run(json step, const DesktopMcpServer::StepAuthorization& authorize = {},
-           const std::optional<TabLease>& job_lease = std::nullopt) const {
+           const std::optional<TabLease>& job_lease = std::nullopt, std::size_t screenshot_limit = 0) const {
     const auto lease_scope = job_lease ? std::make_unique<ScopedBrowserControlLease>(*job_lease) : nullptr;
     while (step.value("kind", std::string()) != "complete") {
       if (authorize && !authorize()) return gateway->Cancel()["response"];
@@ -51,6 +77,12 @@ class DesktopMcpServer::Impl {
         const std::string method = step.at("method");
         internal_dispatch = true;
         if (method == "browser-control-evaluate" && reader) result = reader(step.at("params"));
+        else if (method == "screenshot" && screenshot_limit && router) {
+          if (auto done = FitScreenshot(step.at("params"), screenshot_limit, authorize, &result)) {
+            internal_dispatch = false;
+            return *done;
+          }
+        }
         else if (router) result = router->Dispatch(method, step.at("params")).body;
         else result = {{"success", false}};
         internal_dispatch = false;
@@ -141,6 +173,6 @@ DesktopMcpServer::json DesktopMcpServer::HandleBrowserRequestAuthorized(
   impl_->DrainDocuments();
   if (impl_->pending && impl_->pending() && request.is_object() && request.value("method", std::string()) != "tabs.close")
     return {{"version", 1}, {"ok", false}, {"error", {{"code", "BUSY"}, {"message", "A prior renderer command is still pending"}, {"mayHaveCompleted", false}}}};
-  return impl_->Run(impl_->gateway->Begin(request), authorize, job_lease);
+  return impl_->Run(impl_->gateway->Begin(request), authorize, job_lease, config.screenshot_base64_limit);
 }
 }

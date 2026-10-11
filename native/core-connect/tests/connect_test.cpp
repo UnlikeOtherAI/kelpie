@@ -164,6 +164,21 @@ int main() {
   for (int i = 0; i < 1000; ++i) unicode_error += "\xf0\x9f\x98\x80";
   const auto unicode_terminal = Execute(client, "complete", {{"jobId", id}, {"attemptId", id}, {"state", "failed"}, {"error", unicode_error}});
   assert(unicode_terminal["decision"]["frames"][0]["error"].get<std::string>().size() == 1997);
+  // An oversized result (here larger than a wire frame) still terminates the
+  // reserved attempt as a bounded failure instead of being refused.
+  const std::string oversized_id = "a0000000-0000-4000-8000-000000000009";
+  auto oversized_command = command;
+  oversized_command["jobId"] = oversized_command["attemptId"] = oversized_id;
+  assert(Execute(client, "receive", oversized_command)["decision"]["kind"] == "command");
+  const auto oversized = Execute(client, "complete", {{"jobId", oversized_id}, {"attemptId", oversized_id},
+      {"state", "completed"}, {"output", {{"image", std::string(1100 * 1024, 'A')}}}});
+  const auto oversized_frame = oversized["decision"]["frames"][0];
+  assert(oversized["decision"]["kind"] == "terminal");
+  assert(oversized_frame["state"] == "failed");
+  assert(!oversized_frame.contains("output"));
+  assert(oversized_frame["error"].get<std::string>().rfind("RESULT_TOO_LARGE", 0) == 0);
+  assert(oversized["state"]["jobs"][oversized_id + ":" + oversized_id]["terminalState"] == "failed");
+  assert(oversized.dump().size() < 1024 * 1024);
   kelpie_connect_destroy(client);
   assert(!kelpie_connect_create("broken", "issuer/subject"));
 }

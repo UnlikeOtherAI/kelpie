@@ -151,11 +151,22 @@ final class ConnectBrowserControlJob {
         if ["navigate", "back", "forward", "reload"].contains(method) {
             return await navigation(method: method, params: params)
         }
-        let result = await router.handle(method: method, body: params, browserGatewayDispatch: true).json
+        let result = method == "screenshot"
+            ? await ConnectScreenshotBudget.fit(params) { await self.pinnedHandle(method: method, params: $0) }
+            : await router.handle(method: method, body: params, browserGatewayDispatch: true).json
         guard authorized(), stillPinned(), active(), !accountSurface(), currentVersion() == expectedVersion else {
             return errorResponse(code: "TAB_CHANGED", message: "The pinned document changed")
         }
         return result
+    }
+
+    /// Each budget recapture re-enters the same job fence as the first capture.
+    private func pinnedHandle(method: String, params: [String: Any]) async -> [String: Any] {
+        guard authorized(), stillPinned(), active(), !accountSurface(), currentVersion() == expectedVersion,
+              context.remoteDocumentGuard?() == true else {
+            return errorResponse(code: "TAB_CHANGED", message: "The pinned document changed")
+        }
+        return await router.handle(method: method, body: params, browserGatewayDispatch: true).json
     }
 
     private func navigation(method: String, params: [String: Any]) async -> [String: Any] {

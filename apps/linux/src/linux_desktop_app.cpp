@@ -3,6 +3,7 @@
 #include "headless_shell.h"
 #include "kelpie/response_helpers.h"
 #include "kelpie/desktop_mcp_server.h"
+#include "kelpie/screenshot_fit.h"
 #include "kelpie/account_login_window.h"
 #include <fstream>
 #include <iostream>
@@ -88,6 +89,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
       [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },
       [this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
         DesktopMcpServer::Config config; config.platform=Platform::kLinux; config.engine="chromium";
+        config.screenshot_base64_limit=kAccountScreenshotBase64Limit;
         return impl_->desktop.mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
       });
   impl_->connection=std::make_unique<connect::Client>(impl_->account,impl_->config.profile_dir,"linux",runtime.device_id,

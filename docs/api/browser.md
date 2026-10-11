@@ -6,9 +6,9 @@ For protocol details, errors, and MCP tool names, see [README.md](README.md).
 
 On Windows and Linux, `get-viewport`, `resize-viewport`, `reset-viewport`, console, and
 network-log methods describe browser-wide shell state and reject `tabId` or
-`generation`. Tab-scoped methods return the resolved tab lease. Windows
-`screenshot` emits PNG viewport images only; JPEG, full-page, and annotated
-screenshots are not available.
+`generation`. Tab-scoped methods return the resolved tab lease. Windows and
+Linux `screenshot` emit viewport images as PNG, or JPEG with an optional 1-100
+`quality`; full-page and annotated screenshots are not available.
 
 ---
 

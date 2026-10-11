@@ -577,6 +577,8 @@ Nessie can choose the person's ready device and drive its visible browser withou
 LAN pairing or an executor. Settings and the active browser expose Pause/Resume/Stop;
 switching the controlled tab or backgrounding a mobile app cancels active remote work.
 Browser jobs pin the exact document and completion results survive reconnect.
+Nessie can take a viewport screenshot of the controlled tab on every platform; an image
+too large for one job result is recaptured as a smaller JPEG so it still reaches the agent.
 Loaded on-device text models can extract bounded page evidence asynchronously; installed
 and ready models are advertised separately. Embedded GGUF does not run delegated
 browser tool loops. See [the native connection contract](nessie-connect.md).
