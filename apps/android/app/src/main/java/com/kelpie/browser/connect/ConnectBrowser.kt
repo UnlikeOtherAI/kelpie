@@ -1,9 +1,8 @@
 package com.kelpie.browser.connect
 
-import android.net.Uri
 import android.content.Context
+import android.net.Uri
 import com.kelpie.browser.ai.LocalInference
-import com.kelpie.browser.handlers.BrowserManagementHandler
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.InteractionHandler
 import com.kelpie.browser.handlers.NavigationHandler
@@ -12,9 +11,7 @@ import com.kelpie.browser.handlers.ScrollHandler
 import com.kelpie.browser.llm.LLMHandler
 import com.kelpie.browser.network.Router
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
 import java.time.Instant
 
 /** Job-owned handler contexts never inherit a newly selected tab or account endpoint. */

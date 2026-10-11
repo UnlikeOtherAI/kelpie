@@ -211,14 +211,21 @@ class BrowserGatewayTests {
                     emptyMap(),
                     Mutex(),
                     { _, _ -> true },
-                    { _, _ -> publicDispatches++; mapOf("success" to true) },
+                    { _, _ ->
+                        publicDispatches++
+                        mapOf("success" to true)
+                    },
                     Abi(),
                 )
-            val denied = session.call(
-                mapOf("tabId" to "owned"),
-                authorizeAccountStep = { _, _ -> ++checks == 1 },
-                dispatchAccountStep = { _, _ -> jobDispatches++; mapOf("success" to true) },
-            )!!
+            val denied =
+                session.call(
+                    mapOf("tabId" to "owned"),
+                    authorizeAccountStep = { _, _ -> ++checks == 1 },
+                    dispatchAccountStep = { _, _ ->
+                        jobDispatches++
+                        mapOf("success" to true)
+                    },
+                )!!
             assertEquals(false, denied["ok"])
             assertEquals(2, checks)
             assertEquals(0, publicDispatches)
@@ -230,18 +237,22 @@ class BrowserGatewayTests {
                     emptyMap(),
                     Mutex(),
                     { _, _ -> true },
-                    { _, _ -> publicDispatches++; mapOf("success" to true) },
+                    { _, _ ->
+                        publicDispatches++
+                        mapOf("success" to true)
+                    },
                     Abi(),
                 )
-            val completed = overrideSession.call(
-                mapOf("tabId" to "owned"),
-                dispatchAccountStep = { method, params ->
-                    assertEquals("click", method)
-                    assertTrue(params.isEmpty())
-                    jobDispatches++
-                    mapOf("success" to true)
-                },
-            )!!
+            val completed =
+                overrideSession.call(
+                    mapOf("tabId" to "owned"),
+                    dispatchAccountStep = { method, params ->
+                        assertEquals("click", method)
+                        assertTrue(params.isEmpty())
+                        jobDispatches++
+                        mapOf("success" to true)
+                    },
+                )!!
             assertEquals(true, completed["ok"])
             assertEquals(0, publicDispatches)
             assertEquals(1, jobDispatches)

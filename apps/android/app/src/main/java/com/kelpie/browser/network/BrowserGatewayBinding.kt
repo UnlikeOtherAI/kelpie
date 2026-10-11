@@ -55,11 +55,12 @@ class BrowserGatewayBinding(
         request: Map<String, Any?>,
         authority: suspend () -> Boolean,
         dispatch: (suspend (String, Map<String, Any?>) -> Map<String, Any?>)? = null,
-    ): Map<String, Any?>? = direct.call(
-        request,
-        authorizeAccountStep = { _, _ -> authority() },
-        dispatchAccountStep = dispatch,
-    )
+    ): Map<String, Any?>? =
+        direct.call(
+            request,
+            authorizeAccountStep = { _, _ -> authority() },
+            dispatchAccountStep = dispatch,
+        )
 
     private fun session(
         native: Set<String>,
