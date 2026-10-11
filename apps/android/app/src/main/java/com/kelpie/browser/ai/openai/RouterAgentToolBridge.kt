@@ -20,9 +20,9 @@ class RouterAgentToolBridge(
         val session = binding.agentSession(allowActions, pinned)
         try {
             val catalog = session.call(mapOf("jsonrpc" to "2.0", "id" to 1, "method" to "tools/list"), mcp = true)
-            val result = catalog?.get("result") as? Map<*, *> ?: error("Missing gateway catalog")
+            val catalogResult = catalog?.get("result") as? Map<*, *> ?: error("Missing gateway catalog")
             val definitions =
-                (result["tools"] as? List<*>).orEmpty().map { item ->
+                (catalogResult["tools"] as? List<*>).orEmpty().map { item ->
                     val tool = item as Map<*, *>
                     JsonObject(
                         mapOf(
