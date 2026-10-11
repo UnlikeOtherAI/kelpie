@@ -34,7 +34,7 @@ class NavigationHandler(
         ctx.lastNavigationError = null
         // A same-URL reload must replace the document before a subsequent snapshot can be trusted.
         val marker = "__kelpie_navigation_${UUID.randomUUID().toString().replace("-", "")}"
-        ctx.evaluateJS("window['$marker'] = true")
+        val previousUrl = ctx.evaluateJSReturningJSON("(window['$marker'] = true, {url: location.href})")["url"] as? String
         val stateScript = "({url: location.href, title: document.title, readyState: document.readyState, sameDocument: window['$marker'] === true})"
         mainHandler.post { wv.loadUrl(url) }
         // Wait for page to start loading then finish
@@ -46,7 +46,7 @@ class NavigationHandler(
                 return errorResponse("NAVIGATION_ERROR", err)
             }
             val result = ctx.evaluateJSReturningJSON(stateScript)
-            if (NavigationCompletion.hasLoaded(result)) {
+            if (NavigationCompletion.hasLoaded(result, url, previousUrl)) {
                 return successResponse(
                     mapOf(
                         "url" to (result["url"] ?: url),
@@ -61,7 +61,7 @@ class NavigationHandler(
         // success; otherwise return the last captured navigation error.
         val finalState = ctx.evaluateJSReturningJSON(stateScript)
         val finalUrl = finalState["url"] as? String
-        if (NavigationCompletion.hasLoaded(finalState)) {
+        if (NavigationCompletion.hasLoaded(finalState, url, previousUrl)) {
             return successResponse(
                 mapOf(
                     "url" to finalUrl,

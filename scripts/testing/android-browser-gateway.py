@@ -55,6 +55,11 @@ class FixtureHandler(BaseHTTPRequestHandler):
                 return self.send_json({})
             command, FixtureHandler.command = FixtureHandler.command, {}
             return self.send_json(command)
+        if self.path.startswith('/redirect'):
+            self.send_response(302)
+            self.send_header('Location', '/fixture' + FixtureHandler.fixture_query)
+            self.end_headers()
+            return
         if self.path == '/v1/models':
             return self.send_json({'object': 'list', 'data': [{'id': 'gateway-fixture'}]})
         self.send_response(200)
@@ -210,6 +215,16 @@ def main():
     fixture_url = f'http://10.0.2.2:{args.fixture_port}/fixture' + FixtureHandler.fixture_query
     tab = core('tabs.new')['id']
     core('tab.goto', tab, {'url': fixture_url})
+    native('evaluate', {'expression': 'window.navigationMarker = 1'})
+    core('tab.goto', tab, {'url': fixture_url + '#section'})
+    assert native('evaluate', {'expression': 'window.navigationMarker'})['result'] == 1
+    core('tab.goto', tab, {'url': fixture_url})
+    assert native('evaluate', {'expression': 'window.navigationMarker'})['result'] == 1
+    core('tab.goto', tab, {'url': fixture_url})
+    assert native('evaluate', {'expression': 'typeof window.navigationMarker'})['result'] == 'undefined'
+    core('tab.goto', tab, {'url': f'http://10.0.2.2:{args.fixture_port}/redirect'})
+    assert core('tab.url', tab) == fixture_url
+    print('PASS navigation same-URL replacement/fragment/redirect completion', flush=True)
     subprocess.run([os.environ.get('NODE', 'node'), str(Path(__file__).with_name('android-browser-gateway-mcp.mjs'))],
         input=json.dumps({'base': args.base, 'token': token, 'tab': tab}).encode(), check=True)
     assert 'page.press' not in core('capabilities')['methods']

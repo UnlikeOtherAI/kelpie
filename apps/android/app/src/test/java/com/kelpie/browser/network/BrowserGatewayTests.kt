@@ -22,10 +22,20 @@ class BrowserGatewayTests {
 
     @Test fun navigationRequiresReplacementDocumentAndPreservesRedirects() {
         val state = mapOf("url" to "https://fixture.example/", "readyState" to "complete", "sameDocument" to true)
-        assertFalse(NavigationCompletion.hasLoaded(state))
-        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("url" to "https://redirect.example/")))
-        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false)))
-        assertFalse(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("readyState" to "loading")))
+        assertFalse(NavigationCompletion.hasLoaded(state, "https://fixture.example/", "https://fixture.example/"))
+        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("url" to "https://redirect.example/"), "https://fixture.example/", "https://fixture.example/"))
+        assertTrue(NavigationCompletion.hasLoaded(state + ("sameDocument" to false), "https://fixture.example/", "https://fixture.example/"))
+        assertFalse(NavigationCompletion.hasLoaded(state + ("sameDocument" to false) + ("readyState" to "loading"), "https://fixture.example/", "https://fixture.example/"))
+    }
+
+    @Test fun navigationFragmentChangeCanCompleteInSameDocument() {
+        val old = "https://fixture.example/"
+        val target = "$old#section"
+        val state = mapOf("url" to target, "readyState" to "complete", "sameDocument" to true)
+        assertTrue(NavigationCompletion.hasLoaded(state, target, old))
+        assertTrue(NavigationCompletion.hasLoaded(state + ("url" to old), old, target))
+        assertFalse(NavigationCompletion.hasLoaded(state + ("url" to old), target, old))
+        assertFalse(NavigationCompletion.hasLoaded(state, target, "https://other.example/"))
     }
 
     private class Abi : BrowserGatewayAbi {

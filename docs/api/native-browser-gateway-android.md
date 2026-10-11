@@ -12,7 +12,8 @@ failures retain their transport error status. Page dispatch rechecks the request
 active tab on the main thread and keeps that admitted WebView across suspension.
 The renderer comes from the active tab object, avoiding a delayed UI cache.
 Navigation waits for a complete replacement document, including same-URL reloads,
-while preserving redirects; an old complete document cannot prematurely settle it.
+while preserving redirects and same-document fragment changes; an old complete
+document cannot prematurely settle a reload.
 MCP notifications receive an empty HTTP 202 response. Authenticated GET returns
 405, unsupported protocol-version headers return 400, and browser Origin headers
 are refused under the existing native-client boundary.
