@@ -4,6 +4,18 @@ Native build/test evidence and remaining real-device checks are recorded in [ver
 
 Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
 
+The durable ledger acknowledges cancellation even before command delivery by retaining
+a cancelled attempt tombstone and sequence-2 receipt. A later command for that attempt
+cannot execute. Cancellation of a terminal attempt replays its retained event; an
+already acknowledged attempt sends a lightweight receipt without old output. Receipt
+decisions never cancel another active attempt. Exact terminal acknowledgements compact
+known jobs to identity, deadline and terminal state. Only acknowledged terminal jobs
+are retired after deadline plus 60 seconds; unknown cancellation receipts retain at
+least the server's 15-minute admission window plus 60 seconds. A persisted nondecreasing
+local time floor prevents a backward clock jump from re-admitting a retired deadline.
+The core rejects expired commands before dispatch and deadlines over 15 minutes ahead;
+active and unacknowledged results are never discarded to make capacity.
+
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.
 UOA remains the sole identity authority. Native OAuth requests `kelpie.connect` alongside
