@@ -113,3 +113,5 @@ ARIA names before a direct SVG `title`; unnamed and hidden graphics are omitted.
 This preserves accessible logo evidence for existing page-grounded conversations.
 
 The value-free fixed snapshot reader also omits text reached through accessible-name references when the referenced label inherits content editability from an ancestor.
+
+Snapshot `truncated` also reports public text shortened by per-node or accessible-name bounds. Deliberately omitted form/editor values do not set this flag.
