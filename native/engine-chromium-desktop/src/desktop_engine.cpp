@@ -276,6 +276,7 @@ bool DesktopEngine::Impl::Shutdown() {
   shutting_down = true;
   for (auto& tab : tabs) {
     if (tab.devtools) tab.devtools->CancelAll();
+    tab.chat_session->Close();
     if (tab.browser && tab.browser->GetHost()) tab.browser->GetHost()->CloseBrowser(true);
   }
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);

@@ -431,6 +431,12 @@ Response:
   "excerpt": "This is the main article text..."
 }
 ```
+Desktop Chromium additionally returns `text`, `length`, `mode`, `url`, `title`
+and `accessibleLabels`. Labels include visible image alt text, ARIA names and SVG
+titles from the same document snapshot, including logos with no body text. These
+fields also apply when a `selector` scopes extraction. A blank page returns empty
+text and labels; a failed tab read returns an error rather than empty evidence.
+
 ## Form State
 
 ### `getFormState`

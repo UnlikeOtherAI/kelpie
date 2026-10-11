@@ -160,7 +160,7 @@ void WindowsApp::OnReloadRequested() {
 void WindowsApp::OnOpenSettingsRequested() {
   SettingsValues updated = CurrentSettings();
   if (settings_view_->ShowModal(instance_, shell_->hwnd(), CurrentSettings(), updated,
-      [this](HWND owner) { if (inference_) ShowInferenceSettings(instance_, owner, *inference_); })) {
+      [this](HWND owner) { if (inference_ && desktop_app_) ShowInferenceSettings(instance_, owner, *inference_, desktop_app_->engine()); })) {
     ApplySettings(updated);
   }
 }

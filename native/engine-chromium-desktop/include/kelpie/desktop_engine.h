@@ -12,6 +12,7 @@
 #include "kelpie/cef_renderer.h"
 #include "kelpie/favicon_registry.h"
 #include "kelpie/offscreen_frame.h"
+#include "kelpie/tab_chat_session.h"
 
 namespace kelpie {
 
@@ -126,6 +127,11 @@ class DesktopEngine final : public DesktopBrowserControl {
 
   CefRenderer& renderer();
   const CefRenderer& renderer() const;
+
+  // Select the active tab when no lease is supplied. The returned state belongs
+  // to that tab until it closes, independently of navigation and panel lifetime.
+  BrowserControlResult GetChatSession(std::optional<TabLease> lease,
+                                      std::shared_ptr<TabChatSession>* session, Timeout timeout);
 
   BrowserControlResult GetTabs(std::vector<TabSnapshot>* tabs, Timeout timeout) override;
   BrowserControlResult GetSessionState(SessionState* state, Timeout timeout);

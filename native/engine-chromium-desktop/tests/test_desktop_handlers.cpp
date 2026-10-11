@@ -34,6 +34,7 @@ class StubDeviceInfoProvider final : public kelpie::DeviceInfoProvider {
 
 class MockControl final : public kelpie::DesktopBrowserControl {
  public:
+  std::string last_script;
   kelpie::TabLease last_lease; nlohmann::json last_cookie; std::string last_devtools_method; nlohmann::json last_devtools_params; bool stale = false; bool timeout_eval = false; std::uint64_t nav_requested = 1; std::uint64_t nav_completed = 1; std::string nav_error; int nav_polls = 0;
   kelpie::TabSnapshot first{"first", 3, "https://one.test", "One", true};
   kelpie::TabSnapshot second{"second", 9, "https://two.test", "Two", false};
@@ -71,7 +72,7 @@ class MockControl final : public kelpie::DesktopBrowserControl {
   kelpie::BrowserControlResult Back(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Forward(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
   kelpie::BrowserControlResult Reload(kelpie::TabLease lease, kelpie::TabSnapshot* tab, Timeout) override { last_lease=lease; *tab=first; return kelpie::BrowserControlResult::Success(first); }
-  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
+  kelpie::BrowserControlResult Evaluate(kelpie::TabLease lease, std::string script, Json* value, Timeout) override { last_lease=lease; last_script=script; if(timeout_eval) return kelpie::BrowserControlResult::Failure("TIMEOUT","evaluation timed out"); if(script.find("readyState")!=std::string::npos) *value="complete"; else if(script.find("attached")!=std::string::npos) *value={{"attached",true},{"visible",true},{"text","matched"}}; else if(script.find("found")!=std::string::npos) *value={{"found",true},{"text","matched"}}; else *value={{"elements",nlohmann::json::array()},{"count",0}}; return kelpie::BrowserControlResult::Success(lease.id=="second"?second:first); }
   kelpie::BrowserControlResult Screenshot(kelpie::TabLease lease, kelpie::BrowserScreenshot* image, Timeout) override { last_lease=lease; image->base64_data="AA=="; return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult GetCookies(kelpie::TabLease lease, const Json&, Json* out, Timeout) override { last_lease=lease; *out=nlohmann::json::array({{{"name","a"},{"value","b"}}}); return kelpie::BrowserControlResult::Success(second); }
   kelpie::BrowserControlResult SetCookies(kelpie::TabLease lease, const Json& cookies, Json* out, Timeout) override { last_lease=lease; last_cookie=cookies; *out={{"set",true}}; return kelpie::BrowserControlResult::Success(second); }
@@ -96,6 +97,14 @@ int main() {
   runtime.viewport_supplier=[&](){return nlohmann::json{{"width",width},{"height",height},{"devicePixelRatio",1.0}};}; runtime.resize_viewport=[&](int w,int h){width=w;height=h;return true;}; runtime.reset_viewport=[&](){width=1280;height=720;return true;};
   kelpie::DesktopRouter router; kelpie::BookmarkHandler bookmark_handler(runtime); kelpie::HistoryHandler history_handler(runtime); kelpie::RendererHandler renderer_handler(runtime); kelpie::ViewportHandler viewport_handler(runtime); kelpie::DomHandler dom(runtime); kelpie::EvaluateHandler evaluate(runtime); kelpie::InteractionHandler interaction(runtime); kelpie::CookieHandler cookies(runtime); kelpie::DialogHandler dialogs(runtime); kelpie::InspectionHandler inspection(runtime); kelpie::ConsoleHandler console_handler(runtime); kelpie::NetworkHandler network_handler(runtime); kelpie::ShellHandler shell(runtime); kelpie::DeviceHandler device_handler(runtime); kelpie::BrowserManagementHandler browser_handler(runtime); kelpie::PartitionHandler partition_handler(runtime); kelpie::NavigationHandler navigation_handler(runtime);
   bookmark_handler.Register(router); history_handler.Register(router); renderer_handler.Register(router); viewport_handler.Register(router); dom.Register(router); evaluate.Register(router); interaction.Register(router); cookies.Register(router); dialogs.Register(router); inspection.Register(router); console_handler.Register(router); network_handler.Register(router); shell.Register(router); device_handler.Register(router); browser_handler.Register(router); partition_handler.Register(router); navigation_handler.Register(router);
+  auto page = router.Dispatch("get-page-text", {{"tabId", "second"}, {"generation", 9}});
+  assert(page.body["success"] == true && control.last_lease.id == "second");
+  assert(control.last_script.find("accessibleLabels") != std::string::npos);
+  assert(control.last_script.find("aria-labelledby") != std::string::npos);
+  assert(control.last_script.find("querySelector('title')") != std::string::npos);
+  control.timeout_eval = true;
+  assert(router.Dispatch("get-page-text", {{"tabId", "second"}}).body["error"]["code"] == "TIMEOUT");
+  control.timeout_eval = false;
   auto add=router.Dispatch("bookmarks-add",{{"url","https://example.com"},{"title","Example"}}); assert(add.status_code==200); assert(add.body["bookmarks"].size()==1);
   assert(router.Dispatch("get-bookmarks",nlohmann::json::object()).body["bookmarks"].size()==1); history.Record("https://example.com","Example"); assert(router.Dispatch("get-history",{{"limit",10}}).body["entries"].size()==1);
   assert(router.Dispatch("get-renderer",nlohmann::json::object()).body["current"]=="chromium"); assert(router.Dispatch("resize-viewport",{{"width",390},{"height",844}}).body["viewport"]["width"]==390); assert(router.Dispatch("reset-viewport",nlohmann::json::object()).body["viewport"]["width"]==1280);
