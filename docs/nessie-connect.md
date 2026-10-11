@@ -86,7 +86,10 @@ unchanged. Control uses the persistent native browser gateway, including its ref
 registry, admission lease and renderer-operation fence; it does not translate references
 into selectors or expose arbitrary scripts, cookies, account endpoints or extensions.
 Screenshots retain the canonical typed image response and are projected through the
-job-owned file service before model presentation. Native execution requires the named
+job-owned file service before model presentation. Account screenshots fit the result
+budget: a viewport capture whose base64 image exceeds 640 KiB is recaptured from the
+same fenced tab as JPEG at quality 80, 60, then 40, and the typed image reports the
+format actually returned. If none fits, the request fails with `SCREENSHOT_TOO_LARGE`. Native execution requires the named
 tab to remain active except for an explicit `tabs.select`; account sign-in surfaces are
 forbidden as both current and destination pages. macOS does not advertise `page.press`:
 its native trusted-key method is unavailable on Apple account connections.
@@ -96,7 +99,9 @@ its native trusted-key method is unavailable on Apple account connections.
 `ack` acknowledges that exact job/attempt/seq. `cancel` cancels the attempt.
 Event sequences are independent of command sequences: accepted is event 1 and the
 terminal result is event 2. A late acknowledgement of event 1 cannot discard event 2.
-Frames are at most 1 MiB and terminal output at most 768 KiB.
+Frames are at most 1 MiB and terminal output at most 768 KiB. A larger local result
+still terminates its attempt: the ledger records a `failed` event whose error starts
+with `RESULT_TOO_LARGE` and discards the output.
 
 ## Shared native ledger
 
@@ -152,8 +157,9 @@ For legacy jobs, `tabs` returns `{tabs:[{tabId,tabVersion,url,title,loading,acti
 `{tabId,tabVersion,tabs}`. Actions return `{tabId,tabVersion,result}`; typing reports
 the character count without echoing its contents. `snapshot` returns
 `{tabId,tabVersion,page}` using the shared value-free fixed snapshot reader. Explicit
-`input.includeScreenshot: true` adds the existing viewport JPEG response under
-`screenshot`, including `image` base64 and CSS-pixel coordinate metadata.
+`input.includeScreenshot: true` adds the existing viewport JPEG response (quality 80,
+lowered within the same budget) under `screenshot`, including `image` base64 and
+CSS-pixel coordinate metadata.
 Page entries include bounded `url`, `title`, `text`, `truncated` and observed
 `elements:[{selector,tag,role,label}]`. Every selector resolves uniquely to the
 observed element; duplicate IDs and document roots are checked. Snapshot and

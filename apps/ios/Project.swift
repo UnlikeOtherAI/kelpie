@@ -102,6 +102,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/UOAAccountTests.swift"),
         .glob("../macos/Tests/UOASessionTests.swift"),
         .glob("../macos/Tests/ConnectAuthorizationTests.swift"),
+        .glob("../macos/Tests/ConnectScreenshotBudgetTests.swift"),
         .glob("../macos/Tests/OpenAICompatible/**/*.swift"),
         .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),

@@ -150,6 +150,15 @@ class ConnectBrowserAccountControl(
                             } else {
                                 successResponse(mapOf("result" to value))
                             }
+                        } else if (nativeMethod == "screenshot") {
+                            // Each budget recapture re-enters the same job fence as the first capture.
+                            ConnectScreenshotBudget.fit(params) { body ->
+                                if (!accountAuthority(scope, command, tabId, expected, false)) {
+                                    errorResponse("TAB_CHANGED", "The controlled page changed")
+                                } else {
+                                    targetRouter.handle(nativeMethod, body, fromGateway = true).second
+                                }
+                            }
                         } else {
                             targetRouter.handle(nativeMethod, params, fromGateway = true).second
                         }

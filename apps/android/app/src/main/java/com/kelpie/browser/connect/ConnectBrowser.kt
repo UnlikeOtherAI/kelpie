@@ -109,7 +109,8 @@ class ConnectBrowser(
             requireSuccess(visible)
             verify(tabId, expected)
             if (input["includeScreenshot"] != true) return mapOf("tabId" to tabId, "tabVersion" to expected, "page" to visible)
-            val image = target.handle("screenshot", mapOf("format" to "jpeg", "quality" to 0.5, "resolution" to "viewport", "fullPage" to false)).second
+            val legacy = mapOf("format" to "jpeg", "quality" to 80, "resolution" to "viewport", "fullPage" to false)
+            val image = ConnectScreenshotBudget.fit(legacy) { target.handle("screenshot", it).second }
             requireSuccess(image)
             verify(tabId, expected)
             return mapOf("tabId" to tabId, "tabVersion" to expected, "page" to visible, "screenshot" to image)
