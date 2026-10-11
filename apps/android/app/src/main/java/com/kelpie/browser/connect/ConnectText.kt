@@ -2,7 +2,10 @@ package com.kelpie.browser.connect
 
 /** Wire lengths count UTF-16 units. Never split or emit an unpaired surrogate. */
 object ConnectText {
-    fun bounded(text: String, limit: Int): String {
+    fun bounded(
+        text: String,
+        limit: Int,
+    ): String {
         val result = StringBuilder()
         var offset = 0
         while (offset < text.length) {
