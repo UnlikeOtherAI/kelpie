@@ -14,14 +14,7 @@ Json Tab(const TabSnapshot& tab) {
 }
 Json Failed(const std::string& error) { return {{"state","failed"},{"error",error}}; }
 std::string SnapshotExpression() {
-  const auto collected=CollectBrowserSnapshotExpression({{"prefix","observed"},{"maxElements",150},{"maxChars",24000},{"includeShadow",false}});
-  // Preserve Nessie's selector wire using exactly the transient observed nodes.
-  // The common reader excludes editable values and owns bounded visible text.
-  return "((read)=>{read.snapshot.elements=read.snapshot.elements.map(item=>{const e=read.targets[item.ref];"
-      "let parts=[];for(let n=e;n&&n!==document.body;n=n.parentElement){parts.unshift(n.tagName.toLowerCase()+':nth-child('+(Array.from(n.parentElement?.children||[]).indexOf(n)+1)+')')}"
-      "const selector=e.id?'#'+CSS.escape(e.id):'body > '+parts.join(' > ');"
-      "return {tag:e.tagName.toLowerCase(),selector,label:item.name,role:item.role};}).filter(e=>e.selector.length<=2000);"
-      "return read.snapshot;})("+collected+")";
+  return CollectBrowserSelectorSnapshotExpression({{"prefix","observed"},{"maxElements",150},{"maxChars",24000},{"includeShadow",false}});
 }
 bool WebURL(const std::string& url) {
   if((!url.starts_with("https://") && !url.starts_with("http://")) || url.size()>8000 || url.find_first_of(" \r\n\t")!=std::string::npos || url.find('\0')!=std::string::npos)return false;
@@ -116,6 +109,8 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
       if(std::chrono::steady_clock::now()>=deadline || JobRemaining(command.at("deadline")).count()<=0)return Failed("DEADLINE_EXCEEDED");
       try { if(admission_)transaction=admission_("get-page-text",target); }
       catch(...) { return Failed("BROWSER_BUSY"); }
+      if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
+      if(std::chrono::steady_clock::now()>=deadline || JobRemaining(command.at("deadline")).count()<=0)return Failed("DEADLINE_EXCEEDED");
       Json verified;const auto current=browser_.Evaluate(lease,"location.href",&verified,Remaining(command.at("deadline")));
       if(!current.ok)return Failed("PAGE_CHANGED");
       const auto now=std::chrono::system_clock::now();const auto seconds=std::chrono::system_clock::to_time_t(now);std::tm utc{};

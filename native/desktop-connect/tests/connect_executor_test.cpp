@@ -110,6 +110,14 @@ int main() {
   assert(independent_inference.Execute(long_job,guard)["state"]=="completed");
   Executor retired_during_inference(browser,[&](const Json&) { renderer_pending=true;return Json{{"success",true},{"response","stale"}}; },admission);
   assert(retired_during_inference.Execute(long_job,guard)["error"]=="BROWSER_BUSY");renderer_pending=false;
+  int observations=0;
+  Executor stopped_while_readmitting(browser,[](const Json&) { return Json{{"success",true},{"response","stale"}}; },
+      [&](const auto& method,const auto& target) {
+        auto transaction=admission(method,target);
+        if(++observations==2)guard->store(true); // Stop while waiting to reenter the renderer.
+        return transaction;
+      });
+  assert(stopped_while_readmitting.Execute(long_job,guard)["state"]=="cancelled");guard->store(false);
   std::string split="\x81\x05hello";auto half=split.substr(0,4);assert(!DecodeFrame(half));half+=split.substr(4);assert(DecodeFrame(half)->payload=="hello");
   std::string masked="\x81\x80";bool rejected=false;try { DecodeFrame(masked); }catch(...) { rejected=true; }assert(rejected);
   const auto profile=std::filesystem::temp_directory_path()/account::RandomAccountValue();

@@ -1,4 +1,5 @@
 #include "kelpie/browser_gateway.h"
+#include "kelpie/element_selector_script.h"
 #include "browser_schema.h"
 #include "browser_contract.h"
 #include <algorithm>
@@ -32,6 +33,13 @@ const std::map<std::string, std::string> kRoutes = {
 }
 std::string CollectBrowserSnapshotExpression(const nlohmann::json& options) {
   return "(" + std::string(browser_assets::reader) + ")(" + options.dump() + ")";
+}
+std::string CollectBrowserSelectorSnapshotExpression(const nlohmann::json& options) {
+  return "((read)=>{" + ElementSelectorBuilderScript() +
+      "read.snapshot.elements=read.snapshot.elements.flatMap(item=>{"
+      "const node=read.targets[item.ref],selector=kelpieBuildSelector(node);"
+      "return selector?[{selector,tag:node.tagName.toLowerCase(),role:item.role,label:item.name}]:[];});"
+      "return read.snapshot;})(" + CollectBrowserSnapshotExpression(options) + ")";
 }
 struct BrowserGateway::Impl {
   json config, request, step = {{"kind", "complete"}, {"response", nullptr}};

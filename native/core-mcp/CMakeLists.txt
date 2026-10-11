@@ -21,6 +21,7 @@ target_include_directories(kelpie_core_mcp PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/
 target_link_libraries(kelpie_core_mcp
   PUBLIC
     kelpie_core_protocol
+    kelpie_core_automation
     nlohmann_json::nlohmann_json
 )
 
