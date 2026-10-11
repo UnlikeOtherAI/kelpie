@@ -16,6 +16,9 @@ empty ledger. Missing account state while launch restore runs preserves the jour
 Accepted/terminal events are persisted before sending, and a restart replays retained
 terminal results; potentially effective interrupted work becomes `UNKNOWN_EFFECTS`.
 
+Hello advertises `browser.control` and implemented `page.extract` on Windows.
+Device labels use the native computer hostname, bounded to 120 characters.
+
 Only a short-lived UOA connection ticket reaches the fixed gateway. Tickets remain in
 memory, are renewed before expiry, and a reconnect obtains a fresh ticket.401 gets the
 account service's one forced access refresh;403 retains the account and asks for fresh
@@ -27,7 +30,8 @@ see the [wire contract](nessie-connect.md).
 Browser execution uses an explicit operation allowlist. It never forwards arbitrary
 router calls, scripts, cookies, account settings or local-control credentials. Bound
 operations use the named tab's current document version, activate that tab visibly,
-and retain its lease through native owner-thread execution. Document versions change
+and retain its lease through native owner-thread execution. Person-driven tab selection
+pauses active work; bound owner-thread calls also require the target to remain active. Document versions change
 on main-frame load, including same-URL reload, and are independent of tab lifetime.
 Queued effects also carry cancellation and deadline guards. Inputs mirror the native
 wire contract: selector clicks, atomic field fill, bounded scroll deltas, compact page
@@ -36,11 +40,14 @@ snapshot and optional viewport PNG. PNGs beyond the terminal-output budget fail 
 embedded credentials and UOA account surfaces. Current private account-login windows
 are outside the normal tab set.
 
-Windows advertises extraction only while its embedded native text model is loaded.
+Windows reports extraction readiness only while its embedded native text model is loaded.
+Installed state checks the persisted local model path even when the model is unloaded.
 Configured remote inference endpoints do not establish device-local model readiness.
 Extraction uses bounded untrusted page text and a question, with no browser tool loop.
-Linux advertises no extraction/model capability. Model readiness changes reconnect to
-publish the current capabilities. The platform's existing inference UI owns model
+Its result contains a summary and URL/excerpt/time evidence with the pinned tab and
+document version. Cancellation, deadline, active tab and document are checked again
+after inference. Socket loss cancels in-flight work before any reconnect dispatch.
+Linux advertises no extraction/model capability. Heartbeats publish model readiness changes without reconnecting. The platform's existing inference UI owns model
 installation/loading; the Nessie connection never downloads or loads one implicitly.
 
 ## Verification
