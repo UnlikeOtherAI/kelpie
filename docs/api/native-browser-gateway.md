@@ -67,3 +67,9 @@ authorization, cancellation, cross-tab refs, no retries and binary MCP output.
 The Linux no-CEF fallback also serves authenticated canonical HTTP and compact MCP through this coordinator. Its core advertises only documentation/capabilities; existing metadata, navigation stub, bookmarks/history and diagnostics remain discoverable extensions. It does not advertise DOM observations or browser input.
 
 Windows one-shot inference page context now reads the bounded value-free common snapshot through the same native gateway. Its existing page_text/dom/accessibility labels select that shared representation; they do not inject raw DOM values. Windows still refuses agent execution and has no tool loop. Linux has no embedded inference tool loop to migrate. Native local GGUF also remains text/page-context only. Desktop navigation/title callbacks queue reference invalidation without taking the transaction mutex on the renderer thread; the next gateway step drains it.
+
+Run `node tests/native/run-control-acceptance.mjs <absolute-native-executable>`
+on the target host for the real MCP SDK handshake and canonical browser journey,
+including uncertain renderer timeout, BUSY refusal, late completion and recovery.
+Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
+DOM refusal. Each run owns its temporary profile, token and exact process.
