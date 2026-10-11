@@ -72,6 +72,41 @@ void Mcp() {
   assert(content[0]["type"] == "image");
   assert(content[1]["text"].get<std::string>().find("AQID") == std::string::npos);
 }
+void SelectedAndMapping() {
+  const json config = {{"nativeMethods", {"get-tabs", "switch-tab", "scroll", "screenshot", "get-current-url", "navigate"}}, {"targeting", "selected"}, {"allowActions", false}, {"requireAuthorization", false}};
+  kelpie::BrowserGateway read_only(config);
+  auto step = read_only.Begin(Request("tab.url"));
+  assert(step["method"] == "get-tabs");
+  step = read_only.Advance({{"success", true}, {"activeTab", "a"}, {"tabs", {{{"id", "a"}, {"active", true}}}}});
+  assert(step["method"] == "get-current-url");
+  read_only.Advance({{"success", true}, {"url", "url"}});
+  read_only.Begin(Request("tab.url", json::object(), "b"));
+  step = read_only.Advance({{"success", true}, {"activeTab", "a"}});
+  assert(step["response"]["error"]["code"] == "ACCESS_DENIED");
+  assert(step["response"]["error"]["mayHaveCompleted"] == false);
+  step = read_only.Begin(Request("tab.screenshot", {{"fullPage", true}}, "b"));
+  assert(step["kind"] == "complete");
+  assert(step["response"]["error"]["mayHaveCompleted"] == false);
+  auto writable = config; writable["allowActions"] = true;
+  kelpie::BrowserGateway actions(writable);
+  step = actions.Begin(Request("page.scroll", {{"deltaY", 42}}));
+  step = actions.Advance({{"success", true}, {"activeTab", "b"}});
+  assert(step["method"] == "switch-tab");
+  step = actions.Advance({{"success", true}});
+  assert(step["method"] == "scroll");
+  assert(step["params"]["deltaX"] == 0);
+  assert(step["params"]["deltaY"] == 42);
+  step = actions.Advance({{"success", false}});
+  assert(step["response"]["error"]["mayHaveCompleted"] == true);
+  kelpie::BrowserGateway direct({{"nativeMethods", {"navigate", "screenshot"}}, {"requireAuthorization", false}});
+  step = direct.Begin(Request("tab.goto", {{"url", "url"}, {"timeoutMs", 234}}));
+  assert(step["params"]["timeout"] == 234);
+  assert(!step["params"].contains("timeoutMs"));
+  direct.Cancel();
+  step = direct.Begin(Request("tab.screenshot", {{"fullPage", false}}));
+  assert(step["method"] == "screenshot");
+  assert(!step["params"].contains("fullPage"));
+}
 void CAbi() {
   const auto gateway = kelpie_browser_gateway_create("{\"nativeMethods\":[]}");
   assert(gateway);
@@ -83,4 +118,4 @@ void CAbi() {
   kelpie_mcp_free_string(result);
   kelpie_browser_gateway_destroy(gateway);
 }
-int main() { Contracts(); Sequencing(); References(); Mcp(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+int main() { Contracts(); Sequencing(); References(); Mcp(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

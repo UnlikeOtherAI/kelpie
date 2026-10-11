@@ -3,7 +3,7 @@
 `native/core-mcp` owns the canonical validator, capability projection, reference
 ownership, sequential operation state, and MCP translation. One persistent
 `KelpieBrowserGatewayRef` serves both `/v1/browser-control` and `/mcp` for a browser.
-The CLI forwards canonical requests to that same gateway. Authentication stays
+The final CLI integration forwards canonical requests to that same gateway. Authentication stays
 at the existing transport boundary; the gateway never pairs or attaches endpoints.
 
 Include `kelpie/browser_gateway_c_api.h`. Create with JSON containing
@@ -37,6 +37,9 @@ admitted refs per tab and snapshot. In a page realm this is a correctness guard,
 not isolation from hostile page scripts; bindings must report their realm honestly.
 Navigation/replaced nodes, another tab's ref and old snapshots refuse. Type appends.
 Native screenshots currently support viewport PNG; other request options refuse.
+Explicit native timeouts support 1–30,000ms; zero or larger limits refuse.
+Selected-tab readers inspect active identity first and never switch in read-only
+mode; writable switches require their own authorization step.
 Only implemented methods appear in capabilities. Rich locators remain Playwright.
 
 Default MCP tools are `kelpie_browser_control`, `kelpie_extensions` (names), and

@@ -11,8 +11,8 @@ if (!output) throw new Error('Expected generated header path');
 const inputs = [
   {version:1,method:"tabs.list"},
   {version:1,method:"page.scroll",tabId:"a",params:{deltaY:5}},
-  {version:1,method:"tab.type",tabId:"a",params:{ref:"e1",text:"😀".repeat(32768)}},
-  {version:1,method:"tab.type",tabId:"a",params:{ref:"e1",text:"😀".repeat(32769)}},
+  {version:1,method:"tab.type",tabId:"a",params:{ref:"e1",text:"😀".repeat(100)}},
+  {version:1,method:"tab.goto",params:{url:"x".repeat(8193)}},
   {version:1,method:"tab.snapshot",params:{maxElements:1001}},
   {version:1,method:"tab.snapshot",params:{maxChars:255}},
   {version:2,method:"tabs.list"},

@@ -46,13 +46,14 @@ struct BrowserGateway::Impl {
     if (!config.value("allowActions", true)) {
       for (const auto& method : mutations) methods.erase(method);
     }
-    if (config.value("targeting", std::string("direct")) == "selected" && !native.count("switch-tab")) {
+    if (config.value("targeting", std::string("direct")) == "selected" && !native.count("get-tabs")) {
       for (auto it = methods.begin(); it != methods.end();) {
         if (it->rfind("tab.", 0) == 0 || it->rfind("page.", 0) == 0) it = methods.erase(it); else ++it;
       }
     }
   }
   void Finish(json response) {
+    if (response.is_object() && response.contains("error")) response["error"]["mayHaveCompleted"] = uncertain || response["error"].value("mayHaveCompleted", false);
     if (mutation && request.contains("tabId")) refs.erase(request["tabId"].get<std::string>());
     active = false;
     if (mcp) response = notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", rpc_id}, {"result", BrowserMcpResult(response)}};
@@ -68,6 +69,7 @@ struct BrowserGateway::Impl {
     const std::string tab = request.value("tabId", std::string());
     json params = request.value("params", json::object());
     if (!tab.empty()) params["tabId"] = tab;
+    if (params.contains("timeoutMs")) { params["timeout"] = params["timeoutMs"]; params.erase("timeoutMs"); }
     if (extension) { Dispatch(method, params, "execute", mutation); return; }
     if (method == "capabilities") { Finish(Success(Capabilities())); return; }
     if (method == "documentation") { Finish(Success(browser_assets::documentation)); return; }
@@ -88,7 +90,7 @@ struct BrowserGateway::Impl {
     if (method == "tab.screenshot" && (params.value("fullPage", false) || params.value("format", std::string("png")) != "png" || params.contains("quality"))) {
       Finish(Failure("UNSUPPORTED")); return;
     }
-    if (method == "tab.screenshot") params["resolution"] = "viewport";
+    if (method == "tab.screenshot") { params["resolution"] = "viewport"; params.erase("fullPage"); }
     Dispatch(kRoutes.at(method), params, "execute", mutation);
   }
   json Capabilities() const { return {{"version", 1}, {"methods", methods}, {"extensions", {"kelpie"}}}; }
@@ -111,6 +113,14 @@ json BrowserGateway::Begin(json request) {
     impl_->Finish(Failure("TAB_REQUIRED")); return Next();
   }
   if (impl_->mutation && !impl_->config.value("allowActions", true)) { impl_->Finish(Failure("ACCESS_DENIED")); return Next(); }
+  const auto params = request["params"];
+  if ((params.contains("timeoutMs") && (params["timeoutMs"] == 0 || params["timeoutMs"] > 30000)) ||
+      (method == "tab.screenshot" && (params.value("fullPage", false) || params.value("format", std::string("png")) != "png" || params.contains("quality")))) {
+    impl_->Finish(Failure("UNSUPPORTED")); return Next();
+  }
+  if ((method == "tab.click" || method == "tab.type") && !impl_->refs[request["tabId"].get<std::string>()].count(params["ref"].get<std::string>())) {
+    impl_->Finish(Failure("STALE_REFERENCE")); return Next();
+  }
   if (impl_->config.value("requireAuthorization", true)) {
     impl_->stage = "authorize";
     impl_->step = {{"kind", "authorize"}, {"request", request}, {"mutates", impl_->mutation}};
@@ -122,16 +132,26 @@ json BrowserGateway::Advance(json result) {
   const auto fail = [&] { impl_->Finish(Failure("COMMAND_FAILED", impl_->uncertain)); };
   try {
     if (!result.is_object() || !result.value("success", false) || result.contains("error")) {
-      if (impl_->stage == "authorize") impl_->Finish(Failure("ACCESS_DENIED")); else fail();
+      if (impl_->stage == "authorize" || impl_->stage == "authorize-select") impl_->Finish(Failure("ACCESS_DENIED")); else fail();
       return Next();
     }
     const std::string method = impl_->request["method"];
     const std::string tab = impl_->request.value("tabId", std::string());
     if (impl_->stage == "authorize") {
       if (!impl_->extension && !tab.empty() && method != "tabs.close" && method != "tabs.select" && impl_->config.value("targeting", std::string("direct")) == "selected")
-        impl_->Dispatch("switch-tab", {{"tabId", tab}}, "select", true);
+        impl_->Dispatch("get-tabs", json::object(), "inspect-selected");
       else impl_->Execute();
-    } else if (impl_->stage == "select") impl_->Execute();
+    } else if (impl_->stage == "inspect-selected") {
+      std::string active = result.value("activeTab", std::string());
+      for (const auto& item : result.value("tabs", json::array())) if (item.value("active", false)) active = item.at("id").get<std::string>();
+      if (active == tab) impl_->Execute();
+      else if (!impl_->config.value("allowActions", true) || !impl_->native.count("switch-tab")) impl_->Finish(Failure("ACCESS_DENIED"));
+      else if (impl_->config.value("requireAuthorization", true)) {
+        impl_->stage = "authorize-select";
+        impl_->step = {{"kind", "authorize"}, {"request", {{"version", 1}, {"method", "tabs.select"}, {"tabId", tab}, {"params", json::object()}}}, {"mutates", true}};
+      } else impl_->Dispatch("switch-tab", {{"tabId", tab}}, "select", true);
+    } else if (impl_->stage == "authorize-select") impl_->Dispatch("switch-tab", {{"tabId", tab}}, "select", true);
+    else if (impl_->stage == "select") impl_->Execute();
     else if (impl_->stage == "observe") {
       json snapshot = result.at("result");
       if (!snapshot.is_object() || !snapshot.at("text").is_string() || !snapshot.at("elements").is_array()) { fail(); return Next(); }
@@ -196,7 +216,7 @@ json BrowserGateway::BeginMcp(json rpc) {
   const auto error = [&](int code) { return complete({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", code}, {"message", "Invalid or unavailable MCP request."}}}}); };
   if (impl_->active) return error(-32000);
   impl_->mcp = false;
-  if (!rpc.is_object() || rpc.value("jsonrpc", std::string()) != "2.0" || !rpc.contains("method") || !rpc["method"].is_string()) return error(-32600);
+  if (!rpc.is_object() || !rpc.contains("jsonrpc") || !rpc["jsonrpc"].is_string() || rpc["jsonrpc"] != "2.0" || !rpc.contains("method") || !rpc["method"].is_string()) return error(-32600);
   const bool notification = !rpc.contains("id");
   const auto answer = [&](json value) { return complete(notification ? json(nullptr) : json{{"jsonrpc", "2.0"}, {"id", id}, {"result", value}}); };
   const std::string method = rpc["method"];
