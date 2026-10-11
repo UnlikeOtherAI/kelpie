@@ -15,7 +15,7 @@ char* Copy(const nlohmann::json& value) {
   if (output) std::memcpy(output, text.c_str(), text.size() + 1);
   return output;
 }
-nlohmann::json Parse(const char* input, std::size_t limit = 131072) {
+nlohmann::json Parse(const char* input, std::size_t limit = 4 * 1024 * 1024) {
   if (!input || std::strlen(input) > limit) return nullptr;
   return nlohmann::json::parse(input, nullptr, false);
 }

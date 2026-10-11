@@ -141,5 +141,20 @@ void CAbi() {
   assert(json::parse(result)["response"]["ok"] == true);
   kelpie_mcp_free_string(result);
   kelpie_browser_gateway_destroy(gateway);
+  const auto large_gateway = kelpie_browser_gateway_create("{\"nativeMethods\":[\"type\"],\"fixedReader\":true}");
+  // JSON escaping can make a valid 65,536-code-unit string much larger than 128KiB.
+  std::string escaped;
+  for (int index = 0; index < 65536; ++index) escaped += "\\u0001";
+  const std::string large_request = "{\"version\":1,\"method\":\"tab.type\",\"tabId\":\"a\",\"params\":{\"ref\":\"unobserved\",\"text\":\"" + escaped + "\"}}";
+  result = kelpie_browser_gateway_begin(large_gateway, large_request.c_str());
+  assert(json::parse(result)["response"]["error"]["code"] == "STALE_REFERENCE");
+  kelpie_mcp_free_string(result);
+  std::string unicode;
+  for (int index = 0; index < 32768; ++index) unicode += "\xf0\x9f\x98\x80";
+  const auto unicode_request = Request("tab.type", {{"ref", "unobserved"}, {"text", unicode}}).dump();
+  result = kelpie_browser_gateway_begin(large_gateway, unicode_request.c_str());
+  assert(json::parse(result)["response"]["error"]["code"] == "STALE_REFERENCE");
+  kelpie_mcp_free_string(result);
+  kelpie_browser_gateway_destroy(large_gateway);
 }
 int main() { Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

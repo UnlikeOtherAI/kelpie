@@ -3,7 +3,7 @@
 #include <set>
 namespace kelpie {
 nlohmann::json NativeExtensionInputSchema(std::string_view endpoint) {
-  if (endpoint.substr(0, 3) == "ai-") return InferenceNativeExtensionInputSchema(endpoint);
+  if (endpoint.substr(0, 3) == "ai-") return InferenceInputSchema(endpoint);
   nlohmann::json properties = nlohmann::json::object();
   nlohmann::json required = nlohmann::json::array();
   const auto string = [&properties](const char* name, bool required_field = false) {

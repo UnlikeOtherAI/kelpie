@@ -29,7 +29,9 @@ canonical request; `begin_mcp` accepts JSON-RPC. They return a step:
 
 `next` reads the pending step; `advance` consumes its result. `cancel` is mandatory
 on renderer timeout/cancellation. A concurrent begin returns BUSY without replacing
-the active transaction. Free every returned C string with `kelpie_mcp_free_string`.
+the active transaction. The C ABI request JSON limit is 4MiB, sufficient for maximum escaped core typing
+text; renderer response JSON is bounded at 32MiB. Transport listeners may apply
+their own documented limits before admission. Free every returned C string with `kelpie_mcp_free_string`.
 Do not destroy a gateway while a renderer callback is pending.
 Call `kelpie_browser_gateway_invalidate_refs` for legacy mutations/navigation
 outside the canonical gateway; pass null to invalidate all tabs. Rich extension
