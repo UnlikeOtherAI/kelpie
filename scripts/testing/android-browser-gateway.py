@@ -253,13 +253,15 @@ def main():
             assert stopped['error']['diagnostics']['error']['mayHaveCompleted']
             assert FixtureHandler.model_stage == 2
             wait_title(tab, 'Slow:1')
+        elif mode == 'write':
+            assert rpc('kelpie_extension', {'name': 'kelpie_ai_ask', 'arguments': infer})['ok']
         else:
             native('ai-infer', infer)
         if mode == 'write':
             assert native('evaluate', {'expression': 'document.querySelector("#query").value'})['result'] == 'seed_AI'
             assert core('tab.title', tab) == 'Count:1'
     native('ai-endpoint-remove', {'id': endpoint})
-    print('PASS built-in agent compact catalog/read-only admission/observed-ref actions/uncertainty stop', flush=True)
+    print('PASS built-in agent catalog/admission/actions/uncertainty stop and MCP reentrant inference', flush=True)
     print('Actual last agent catalog characters:', FixtureHandler.model_catalog_chars, flush=True)
     core('tabs.close', other)
     server.shutdown()

@@ -17,7 +17,7 @@ class BrowserGatewaySession(
     private val authorize: suspend (Map<String, Any?>, Boolean) -> Boolean,
     private val dispatch: suspend (String, Map<String, Any?>) -> Map<String, Any?>,
     private val abi: BrowserGatewayAbi = BrowserGatewayNative,
-    private val dispatchTimeoutMs: Long = 30_000,
+    private val dispatchTimeoutMs: Long? = 30_000,
     private val beforeBegin: () -> Unit = {},
     private val beforeMutation: () -> Unit = {},
     private val retirement: BrowserGatewayRetirement? = null,
@@ -36,11 +36,7 @@ class BrowserGatewaySession(
                     val result =
                         when (step["kind"]) {
                             "authorize" -> mapOf("success" to authorize(objectValue(step["request"]), step["mutates"] == true))
-                            "dispatch" ->
-                                withTimeout(dispatchTimeoutMs) {
-                                    if (step["mutates"] == true) beforeMutation()
-                                    dispatch(step["method"] as String, objectValue(step["params"]))
-                                }
+                            "dispatch" -> if (dispatchTimeoutMs == null) dispatchStep(step) else withTimeout(dispatchTimeoutMs) { dispatchStep(step) }
                             else -> error("Invalid native browser step")
                         }
                     step = decode(abi.advance(handle, OpenAIJson.encode(OpenAIJson.fromAny(result))))
@@ -51,6 +47,11 @@ class BrowserGatewaySession(
                 if (error is CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) throw error
                 cancelled
             }
+    }
+
+    private suspend fun dispatchStep(step: Map<String, Any?>): Map<String, Any?> {
+        if (step["mutates"] == true) beforeMutation()
+        return dispatch(step["method"] as String, objectValue(step["params"]))
     }
 
     /** Called under the same router lock before legacy mutations touch the renderer. */

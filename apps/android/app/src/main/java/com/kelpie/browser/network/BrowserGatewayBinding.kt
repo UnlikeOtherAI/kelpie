@@ -20,7 +20,7 @@ class BrowserGatewayBinding(
     private val lock = Mutex()
     private val sessions = mutableSetOf<BrowserGatewaySession>()
     private val changedDocuments = ConcurrentHashMap.newKeySet<String>()
-    private val methods = router.registeredMethods - AndroidUnsupportedMethods.all - REENTRANT_METHODS
+    private val methods = router.registeredMethods - AndroidUnsupportedMethods.all
     private val extensions = nativeExtensions().filter { it["method"] in methods }
     private val direct = session(methods, extensions, true, null)
 
@@ -30,7 +30,10 @@ class BrowserGatewayBinding(
         router.register("browser-control") { request ->
             direct.call(request) ?: errorResponse("GATEWAY_ERROR", "The browser returned no response")
         }
-        router.register("mcp") { request -> direct.call(request, mcp = true) ?: emptyMap() }
+        router.register("mcp") { request ->
+            if (BrowserGatewayReentrant.permits(request, extensions, REENTRANT_METHODS)) reentrant(request)
+            else direct.call(request, mcp = true) ?: emptyMap()
+        }
     }
 
     suspend fun agentSession(
@@ -61,21 +64,7 @@ class BrowserGatewayBinding(
                     "requireAuthorization" to true,
                 ),
                 lock,
-                authorize = { request, mutates ->
-                    ctx.scriptPlaybackState?.recordingError(request["method"] as? String ?: "browser-control") == null &&
-                        BrowserGatewayTabPolicy.permits(
-                            request,
-                            mutates,
-                            allowActions,
-                            pinned,
-                            ctx.tabStore?.activeTabId?.value ?: "0",
-                            ctx.tabStore
-                                ?.tabs
-                                ?.value
-                                ?.map { it.id }
-                                ?.toSet() ?: setOf("0"),
-                        )
-                },
+                authorize = { request, mutates -> authorize(request, mutates, allowActions, pinned) },
                 beforeBegin = {
                     for (tabId in changedDocuments.toList()) {
                         changedDocuments.remove(tabId)
@@ -88,6 +77,25 @@ class BrowserGatewayBinding(
             )
         sessions.add(gateway)
         return gateway
+    }
+
+    private fun authorize(request: Map<String, Any?>, mutates: Boolean, allowActions: Boolean, pinned: String?): Boolean =
+        ctx.scriptPlaybackState?.recordingError(request["method"] as? String ?: "browser-control") == null &&
+            BrowserGatewayTabPolicy.permits(request, mutates, allowActions, pinned,
+                ctx.tabStore?.activeTabId?.value ?: "0", ctx.tabStore?.tabs?.value?.map { it.id }?.toSet() ?: setOf("0"))
+
+    /** Model inference owns its own lifecycle; only its nested renderer calls acquire the browser lease. */
+    private suspend fun reentrant(request: Map<String, Any?>): Map<String, Any?> {
+        val gateway = BrowserGatewaySession(
+            mapOf("nativeMethods" to methods.intersect(REENTRANT_METHODS).toList(),
+                "extensions" to extensions.filter { it["method"] in REENTRANT_METHODS }, "allowActions" to true,
+                "requireAuthorization" to true, "fixedReader" to false),
+            Mutex(), authorize = { value, mutates -> authorize(value, mutates, true, null) },
+            dispatch = { method, params -> router.handle(method, params, fromGateway = true).second },
+            dispatchTimeoutMs = null,
+        )
+        return try { gateway.call(request, mcp = true) ?: emptyMap() }
+        finally { withContext(kotlinx.coroutines.NonCancellable) { gateway.close() } }
     }
 
     suspend fun <T> legacy(
@@ -156,7 +164,7 @@ class BrowserGatewayBinding(
     private fun nativeExtensions(): List<Map<String, Any?>> = (OpenAIJson.parseOrNull(BrowserGatewayNative.extensions()) as? JsonArray).orEmpty().map { OpenAIJson.toMap(it as JsonObject) }
 
     companion object {
-        private val REENTRANT_METHODS = setOf("ai-infer", "ai-record")
+        private val REENTRANT_METHODS = setOf("ai-infer", "ai-record", "ai-cancel", "abort-script", "get-script-status")
         private val READ_METHODS = AgentBrowserPolicy.methods(false) + setOf("get-tabs", "get-current-url", "get-capabilities", "get-device-info")
     }
 }

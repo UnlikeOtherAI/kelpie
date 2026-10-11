@@ -16,8 +16,13 @@ are refused under the existing native-client boundary.
 
 The direct MCP catalog has four tools: `kelpie_browser_control`, `kelpie_extensions`,
 `kelpie_extension_tools`, and `kelpie_extension`. Extension availability follows
-registered, supported Android handlers. `ai-infer` and `ai-record` retain their HTTP
-entry points; recursive browser inference is excluded from direct gateway extensions.
+registered, supported Android handlers. Rich inference/recording remain available
+through their discovered extension schemas and their existing HTTP entry points.
+An outer inference/recording MCP invocation uses an ephemeral native handle and
+its existing provider/run deadlines; it does not hold the browser lease while
+waiting for model output. Inner renderer calls retain normal serialization, and
+cancellation/status extensions remain reachable. The per-run model catalog
+excludes recursive inference extensions under its existing semantic permissions.
 
 The existing OpenAI-compatible browser agent uses a gateway per run, the same
 compact catalog and its task-list tool. Its rich extension admission retains the

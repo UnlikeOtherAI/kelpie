@@ -267,4 +267,36 @@ class BrowserGatewayTests {
         retirement.complete(ticket)
         assertEquals("reconciled", next.await())
     }
+
+    @Test fun reentrantAdmissionUsesOnlyConfiguredExtensionMethods() {
+        val descriptors = listOf(mapOf<String, Any?>("name" to "kelpie_ai_ask", "method" to "ai-infer"))
+        fun permits(name: String, args: Map<String, Any?> = emptyMap()) = BrowserGatewayReentrant.permits(
+            mapOf("method" to "tools/call", "params" to mapOf("name" to name, "arguments" to args)), descriptors, setOf("ai-infer"))
+        assertTrue(permits("kelpie_ai_ask"))
+        assertTrue(permits("kelpie_extension", mapOf("name" to "kelpie_ai_ask")))
+        assertFalse(permits("ai-infer"))
+        assertFalse(permits("kelpie_extension", mapOf("name" to "unknown")))
+        assertFalse(BrowserGatewayReentrant.permits(mapOf("method" to "tools/list"), descriptors, setOf("ai-infer")))
+    }
+
+    @Test fun outerInferenceHandleAllowsNestedAndConcurrentBrowserTransactions() = runBlocking {
+        val browserLock = Mutex()
+        val started = CompletableDeferred<Unit>()
+        val provider = CompletableDeferred<Unit>()
+        val browser = BrowserGatewaySession(emptyMap(), browserLock, { _, _ -> true }, { _, _ -> mapOf("success" to true) }, Abi())
+        val inference = BrowserGatewaySession(emptyMap(), Mutex(), { _, _ -> true }, { _, _ ->
+            assertEquals(true, browser.call(emptyMap())!!["ok"])
+            started.complete(Unit)
+            provider.await()
+            mapOf("success" to true)
+        }, Abi(), dispatchTimeoutMs = null)
+        val outer = async { inference.call(emptyMap(), mcp = true) }
+        started.await()
+        assertEquals(true, browser.call(emptyMap())!!["ok"])
+        assertFalse(outer.isCompleted)
+        provider.complete(Unit)
+        assertEquals(true, outer.await()!!["ok"])
+        inference.close()
+        browser.close()
+    }
 }
