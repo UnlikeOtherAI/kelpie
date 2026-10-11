@@ -1,5 +1,7 @@
 # Nessie account connection
 
+Native build/test evidence and remaining real-device checks are recorded in [verification](nessie-connect-verification.md).
+
 Device labels and compact model evidence obey wire UTF-16 length limits while preserving valid Unicode.
 
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
