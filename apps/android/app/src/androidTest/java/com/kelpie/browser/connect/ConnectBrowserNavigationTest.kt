@@ -148,9 +148,10 @@ class ConnectBrowserNavigationTest {
                 )
                 val tab = context.tabStore!!.activeTab!!
                 val before = tab.documentVersion
-                val request = async(Dispatchers.Main) {
-                    browser.execute(canonicalGoto(tab.id, before, url(server, "/slow-control")))
-                }
+                val request =
+                    async(Dispatchers.Main) {
+                        browser.execute(canonicalGoto(tab.id, before, url(server, "/slow-control")))
+                    }
                 withContext(Dispatchers.IO) { assertTrue(server.takeRequest(5, TimeUnit.SECONDS) != null) }
                 withContext(Dispatchers.Main) {
                     tab.webView.loadDataWithBaseURL(url(server, "/human"), "<title>Human page</title>", "text/html", "utf-8", null)
@@ -255,7 +256,9 @@ class ConnectBrowserNavigationTest {
                 LLMHandler(context).register(router)
                 ConnectSnapshot(context).register(router)
                 BrowserManagementHandler(context, app).register(router)
-                val gateway = com.kelpie.browser.network.BrowserGatewayBinding(router, context)
+                val gateway =
+                    com.kelpie.browser.network
+                        .BrowserGatewayBinding(router, context)
                 gateway.register()
                 tab.webView.loadDataWithBaseURL(url(server, "/initial"), "<title>Initial</title>", "text/html", "utf-8", null)
                 withTimeout(5000) {
@@ -289,19 +292,25 @@ class ConnectBrowserNavigationTest {
             "input" to mapOf("url" to url),
         )
 
-    private fun canonicalGoto(tabId: String, tabVersion: String, destination: String): Map<String, Any?> =
+    private fun canonicalGoto(
+        tabId: String,
+        tabVersion: String,
+        destination: String,
+    ): Map<String, Any?> =
         mapOf(
             "operation" to "control",
             "tabId" to tabId,
             "tabVersion" to tabVersion,
-            "input" to mapOf(
-                "request" to mapOf(
-                    "version" to 1,
-                    "method" to "tab.goto",
-                    "tabId" to tabId,
-                    "params" to mapOf("url" to destination),
+            "input" to
+                mapOf(
+                    "request" to
+                        mapOf(
+                            "version" to 1,
+                            "method" to "tab.goto",
+                            "tabId" to tabId,
+                            "params" to mapOf("url" to destination),
+                        ),
                 ),
-            ),
         )
 
     private fun url(
