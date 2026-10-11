@@ -43,6 +43,9 @@ int main() {
   assert(recovery["decision"]["frames"][0]["error"].get<std::string>().find("UNKNOWN_EFFECTS") == 0);
   assert(Execute(client, "receive", command)["decision"]["kind"] == "duplicate");
   auto ack = Json{{"type", "ack"}, {"generation", generation}, {"jobId", id}, {"attemptId", id}, {"seq", 1}};
+  Execute(client, "receive", ack);
+  assert(!Welcome(client)["decision"]["frames"].empty()); // Delayed accepted ack cannot erase completion.
+  ack["seq"] = 2;
   const auto acknowledged = Execute(client, "receive", ack);
   assert(Welcome(client)["decision"]["frames"].empty());
   assert(Execute(client, "receive", command)["decision"]["kind"] == "duplicate");
