@@ -72,6 +72,8 @@ against the exact observed node, including duplicate IDs and document roots;
 selectors beyond 2,000 characters are omitted. Run real headless DOM conformance
 separately with `node tests/native/browser-snapshot-selectors.mjs <path-to-browser_snapshot_fixture>`
 after building that native test target and installing Playwright Chromium.
+Set `KELPIE_TEST_ARTIFACT_DIR` to retain its synthetic DOM screenshot and safe
+observed snapshot outside the checkout.
 
 The Linux no-CEF fallback also serves authenticated canonical HTTP and compact MCP through this coordinator. Its core advertises only documentation/capabilities; existing metadata, navigation stub, bookmarks/history and diagnostics remain discoverable extensions. It does not advertise DOM observations or browser input.
 
