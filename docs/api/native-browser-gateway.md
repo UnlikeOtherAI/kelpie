@@ -28,6 +28,9 @@ canonical request; `begin_mcp` accepts JSON-RPC. They return a step:
 on renderer timeout/cancellation. A concurrent begin returns BUSY without replacing
 the active transaction. Free every returned C string with `kelpie_mcp_free_string`.
 Do not destroy a gateway while a renderer callback is pending.
+Call `kelpie_browser_gateway_invalidate_refs` for legacy mutations/navigation
+outside the canonical gateway; pass null to invalidate all tabs. Rich extension
+mutations dispatched inside the gateway also invalidate their target refs.
 
 The special internal `browser-control-evaluate` dispatch executes a generated
 fixed reader/resolver, never model-authored JavaScript. Bind it to a private

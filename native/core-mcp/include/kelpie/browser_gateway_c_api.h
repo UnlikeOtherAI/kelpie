@@ -20,6 +20,8 @@ char* kelpie_browser_gateway_begin_mcp(KelpieBrowserGatewayRef gateway, const ch
 char* kelpie_browser_gateway_next(KelpieBrowserGatewayRef gateway);
 char* kelpie_browser_gateway_advance(KelpieBrowserGatewayRef gateway, const char* result_json);
 char* kelpie_browser_gateway_cancel(KelpieBrowserGatewayRef gateway);
+// Call on legacy mutations/navigation outside this gateway; null tab invalidates all refs.
+void kelpie_browser_gateway_invalidate_refs(KelpieBrowserGatewayRef gateway, const char* tab_id);
 // Every returned string is caller-owned; free with existing kelpie_mcp_free_string.
 #ifdef __cplusplus
 }

@@ -33,6 +33,11 @@ KelpieBrowserGatewayRef kelpie_browser_gateway_create(const char* config) {
     return new KelpieBrowserGateway(value);
   } catch (...) { return nullptr; }
 }
+void kelpie_browser_gateway_invalidate_refs(KelpieBrowserGatewayRef gateway, const char* tab_id) {
+  if (!gateway) return;
+  std::lock_guard<std::mutex> lock(gateway->mutex);
+  gateway->gateway.InvalidateReferences(tab_id ? tab_id : "");
+}
 void kelpie_browser_gateway_destroy(KelpieBrowserGatewayRef gateway) { delete gateway; }
 char* kelpie_browser_gateway_begin(KelpieBrowserGatewayRef gateway, const char* request) {
   return Invoke(gateway, [&](auto& control) { return control.Begin(Parse(request)); });
