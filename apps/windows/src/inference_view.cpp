@@ -39,7 +39,7 @@ struct State {
     }
     return text;
   }
-  void Ask() {
+  void SendChat() {
     const auto captured = session->Begin(Text(window, Prompt));
     if (!captured) return;
     turn = captured->token;
@@ -193,7 +193,7 @@ LRESULT CALLBACK Procedure(HWND window, UINT message, WPARAM wp, LPARAM lp) {
     if (id == Use) state->Start("ai-load", {{"backend", "openai"}, {"endpoint", state->id}, {"model", Text(window, Model)}});
     if (id == Remove) state->Start("ai-endpoint-remove", {{"id", state->id}});
     if (id == Ask) {
-      state->Ask();
+      state->SendChat();
     }
     return 0;
   }
