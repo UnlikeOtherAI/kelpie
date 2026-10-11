@@ -35,6 +35,7 @@ class DesktopMcpServer {
   void SetRegistry(const McpRegistry* registry);
   using FixedReader = std::function<json(const json&)>;
   void SetFixedReader(FixedReader reader);
+  void SetPendingCheck(std::function<bool()> pending);
   void NotifyDocumentChanged() const;
   std::shared_ptr<void> GuardDispatch(std::string_view method, const json& params) const;
   void InvalidateReferences(std::string_view method, const json& params) const;

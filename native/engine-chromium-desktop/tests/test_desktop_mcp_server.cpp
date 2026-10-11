@@ -140,5 +140,23 @@ int main() {
   const auto stale = server.HandleBrowserRequest({{"version", 1}, {"method", "tab.click"}, {"tabId", "a"}, {"params", {{"ref", observed}}}}, config);
   assert(stale["error"]["code"] == "STALE_REFERENCE");
 
+  bool pending = true;
+  server.SetPendingCheck([&] { return pending; });
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tabs.list"}}, config)["error"]["code"] == "BUSY");
+  const auto busy_rpc = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 123}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_browser_control"}, {"arguments", {{"request", {{"version", 1}, {"method", "tabs.list"}}}}}}}}, config);
+  assert(busy_rpc["id"] == 123 && busy_rpc["error"]["code"] == -32000);
+  pending = false; // The late renderer callback retired execution ownership.
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "documentation"}}, config)["ok"] == true);
+  bool nested = false;
+  router.Register("ai-infer", [&](const nlohmann::json&) {
+    const auto context = server.HandleBrowserRequest({{"version", 1}, {"method", "documentation"}}, config);
+    nested = context.value("ok", false);
+    return nlohmann::json{{"success", nested}};
+  });
+  server.SetRouter(&router);
+  const auto inference = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 124}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_ai_ask"}, {"arguments", {{"context", "page_text"}}}}}}}}, config);
+  assert(nested && inference["result"]["isError"] == false);
   return 0;
 }
