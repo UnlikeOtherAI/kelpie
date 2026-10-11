@@ -3,6 +3,38 @@ import WebKit
 @testable import Kelpie
 
 final class ConnectAuthorizationTests: XCTestCase {
+    @MainActor
+    func testSnapshotSelectorsIdentifyDuplicateButtonsAndEmptyInputs() async throws {
+        let context = HandlerContext()
+        #if os(iOS)
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
+        context.webView = view
+        #else
+        let renderer = WKWebViewRenderer(dataStore: .nonPersistent())
+        defer { renderer.invalidate() }
+        let view = try XCTUnwrap(renderer.makeView() as? WKWebView)
+        context.renderer = renderer
+        context.activeEngineIsChromium = true // Isolated renderer; do not resolve the host app's windows.
+        #endif
+        view.loadHTMLString("<title>Controls</title><button class='same'>Go</button><button class='same'>Go</button><input>", baseURL: nil)
+        for _ in 0..<200 {
+            if !view.isLoading, view.title == "Controls" { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let router = Router()
+        LLMHandler(context: context).register(on: router)
+        let snapshot = await router.handle(method: "get-visible-elements", body: ["interactableOnly": true]).json
+        XCTAssertEqual(snapshot["success"] as? Bool, true)
+        let elements = try XCTUnwrap(snapshot["elements"] as? [[String: Any]])
+        let selectors = elements.compactMap { $0["selector"] as? String }
+        XCTAssertEqual(selectors.count, 3)
+        XCTAssertEqual(Set(selectors).count, 3)
+        for selector in selectors {
+            XCTAssertLessThanOrEqual(selector.utf16.count, 2000)
+            let matches = try await view.evaluateJavaScript("document.querySelectorAll('\(JSEscape.string(selector))').length")
+            XCTAssertEqual(matches as? Int, 1)
+        }
+    }
     func testExtractionCancellationCannotCancelAnotherRequest() async throws {
         let extraction = InferenceRequest()
         let personChat = InferenceRequest()

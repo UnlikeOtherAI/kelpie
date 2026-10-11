@@ -27,6 +27,26 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 class ConnectBrowserNavigationTest {
     @Test
+    fun snapshotSelectorsIdentifyDuplicateButtonsAndEmptyInputs() = runBlocking {
+        fixture { browser, context, server, _ ->
+            val tab = context.tabStore!!.activeTab!!
+            tab.webView.layout(0, 0, 800, 600)
+            tab.webView.loadDataWithBaseURL(url(server, "/controls"), "<title>Controls</title><button class='same'>Go</button><button class='same'>Go</button><input>", "text/html", "utf-8", null)
+            withTimeout(5000) { do { delay(30) } while (tab.isLoading || tab.pageTitle != "Controls") }
+            val result = browser.execute(mapOf("operation" to "snapshot", "tabId" to tab.id, "tabVersion" to tab.documentVersion, "input" to emptyMap<String, Any>()))
+            val page = result["page"] as Map<*, *>
+            val elements = page["elements"] as List<*>
+            val selectors = elements.map { (it as Map<*, *>)["selector"] as String }
+            assertEquals(3, selectors.size)
+            assertEquals(3, selectors.toSet().size)
+            for (selector in selectors) {
+                assertTrue(selector.length <= 2000)
+                val found = context.evaluateJSReturningJSON("({count:document.querySelectorAll(${org.json.JSONObject.quote(selector)}).length})")
+                assertEquals(1, (found["count"] as Number).toInt())
+            }
+        }
+    }
+    @Test
     fun extractionCancellationCannotCancelAnotherRequest() = runBlocking {
         val extraction = com.kelpie.browser.ai.InferenceRequest()
         val personChat = com.kelpie.browser.ai.InferenceRequest()
@@ -136,6 +156,7 @@ class ConnectBrowserNavigationTest {
                 context.tabStore = store
                 // Own verification profile only; establish a settled initial document through its real clients.
                 val tab = store.addTab()
+                context.webView = tab.webView
                 tab.webView.loadDataWithBaseURL(url(server, "/initial"), "<title>Initial</title>", "text/html", "utf-8", null)
                 withTimeout(5000) {
                     do {
