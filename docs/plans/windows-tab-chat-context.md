@@ -49,3 +49,21 @@ duplicate and concurrent sends, late replies and errors after close, reopened
 tabs, page targeting, accessible-name evidence, malformed snapshots and read
 failures. Linux native CMake/CTest verifies shared desktop compilation; Windows
 CEF CI verifies native Windows integration when the LAN hosts lack its toolchain.
+
+Linux live acceptance exposed a reentrant shutdown defect: CEF can invoke
+`OnBeforeClose` synchronously from `CloseBrowser`, invalidating an iterator over
+the live tab list. GDB confirmed a null session mutex in `Impl::Shutdown`;
+the previous Linux 0.1.8 executable passed the same shutdown/restore flow.
+Shutdown now snapshots session, DevTools and browser ownership before callbacks,
+and releases the snapshot before `CefShutdown`. Partition deletion already uses
+stable browser handles. The permanent Linux harness asserts normal exit status
+and readiness removal, so a crash fails directly instead of appearing as a
+shutdown timeout.
+
+The final Linux CEF/GTK build passed all 27 native tests and the unmodified
+release acceptance harness, including accessible logo evidence, viewport
+resize/reset, both normal shutdowns, persistent session restore and readiness
+cleanup. A baseline-reproduced viewport timeout occurred on one retry; the
+unpressured final run passed. Windows 0.1.11 CEF CI and candidate live core flow
+passed before this shared shutdown fix; the final integrated PR must rebuild
+and test the final Windows source before merge.
