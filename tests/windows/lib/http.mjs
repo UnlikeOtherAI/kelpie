@@ -24,7 +24,14 @@ export async function rawRequest({ port, path, method = "POST", headers = {}, bo
     });
     request.setTimeout(10_000, () => request.destroy(new Error(`${method} ${path} timed out`)));
     request.once("error", reject);
-    if (body.length > 0) request.write(body);
+    if (body.length > 0) {
+      // Native fallback uses bounded Content-Length framing. Match fetch/MCP
+      // clients instead of Node's implicit chunked transfer for JSON fixtures.
+      if (!request.hasHeader("content-length") && !request.hasHeader("transfer-encoding")) {
+        request.setHeader("content-length", Buffer.byteLength(body));
+      }
+      request.write(body);
+    }
     request.end();
   });
 }

@@ -30,7 +30,7 @@ try {
   if (fallback) {
     const response = await rawRequest({ port: readiness.port, path: "/v1/browser-control", headers: bearerHeaders(readiness.token),
       body: JSON.stringify({ version: 1, method: "tab.snapshot", tabId: "stub" }) });
-    assert.equal(response.json.error.code, "UNSUPPORTED");
+    assert.equal(response.json.error.code, "UNSUPPORTED", response.text);
     assert.equal(response.json.error.mayHaveCompleted, false);
     console.log("Fallback refuses DOM capabilities before dispatch");
   } else await runCanonicalAcceptance(readiness, fixture.baseUrl);
