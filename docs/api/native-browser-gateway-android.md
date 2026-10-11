@@ -6,6 +6,11 @@ bounds. Pairing still requires on-device approval. Kotlin drives authorization
 and native dispatch; schemas, compact catalogs, extension descriptors, references
 and uncertainty come from `native/core-mcp` through JNI.
 
+Protocol failures return HTTP 200 with their canonical/MCP error envelope so
+clients retain uncertain outcomes; authentication, body and recording admission
+failures retain their transport error status. Page dispatch rechecks the requested
+active tab on the main thread and keeps that admitted WebView across suspension.
+
 The direct MCP catalog has four tools: `kelpie_browser_control`, `kelpie_extensions`,
 `kelpie_extension_tools`, and `kelpie_extension`. Extension availability follows
 registered, supported Android handlers. `ai-infer` and `ai-record` retain their HTTP

@@ -1,7 +1,5 @@
 package com.kelpie.browser
 
-import kotlinx.coroutines.launch
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -51,6 +49,7 @@ import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import com.kelpie.browser.ui.BrowserScreen
 import com.kelpie.browser.ui.theme.KelpieTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val accountLogin =
@@ -194,7 +193,9 @@ class MainActivity : ComponentActivity() {
         }
 
         router.registerFallbacks()
-        com.kelpie.browser.network.BrowserGatewayBinding(router, handlerContext).register()
+        com.kelpie.browser.network
+            .BrowserGatewayBinding(router, handlerContext)
+            .register()
     }
 
     private fun startServer(deviceInfo: DeviceInfo) {

@@ -105,10 +105,16 @@ class OpenAIRuntimeParts(
 /** Android-side tab pinning and page-context gathering for agent and plain runs. */
 interface AgentToolBridge {
     /** Pins [tabId] (or the active tab) and returns a dispatcher bound to it. */
-    suspend fun pinnedDispatcher(tabId: String?, allowActions: Boolean = false): ToolDispatcher
+    suspend fun pinnedDispatcher(
+        tabId: String?,
+        allowActions: Boolean = false,
+    ): ToolDispatcher
 
     /** Returns page context for `context` (`page_text`, `dom`, `accessibility`) as text. */
-    suspend fun pageContext(mode: String, tabId: String? = null): String?
+    suspend fun pageContext(
+        mode: String,
+        tabId: String? = null,
+    ): String?
 }
 
 /** Parses `ai-endpoint-save` bodies. `null` in `capabilities` clears a user override. */

@@ -10,6 +10,8 @@ import com.kelpie.browser.browser.KeyboardObserver
 import com.kelpie.browser.browser.TabStore
 import com.kelpie.browser.nativecore.AiManager
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.asContextElement
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -34,7 +36,15 @@ class HandlerContext {
         const val DEFAULT_OVERLAY_RGB = "59,130,246"
     }
 
-    var webView: WebView? = null
+    private var visibleWebView: WebView? = null
+    private val operationWebView = ThreadLocal<WebView>()
+    var webView: WebView?
+        get() = operationWebView.get() ?: visibleWebView
+        set(value) { visibleWebView = value }
+
+    /** A suspended handler keeps its admitted renderer even if the visible tab changes. */
+    suspend fun <T> withBrowserTarget(view: WebView, block: suspend () -> T): T =
+        withContext(operationWebView.asContextElement(view)) { block() }
     var tabStore: TabStore? = null
     var browserDocumentChanged: ((String) -> Unit)? = null
     var keyboardObserver: KeyboardObserver? = null

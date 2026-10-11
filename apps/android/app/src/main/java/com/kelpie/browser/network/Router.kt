@@ -60,7 +60,7 @@ class Router {
         val success = result["success"] as? Boolean ?: false
         val errorCode = (result["error"] as? Map<*, *>)?.get("code") as? String
         val status =
-            if (success) {
+            if (method == "browser-control" || method == "mcp" || success) {
                 200
             } else if (errorCode == "SCRIPT_PARTIAL_FAILURE" || errorCode == "SCRIPT_ABORTED" || result["aborted"] == true) {
                 200
