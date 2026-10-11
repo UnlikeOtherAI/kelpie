@@ -1,4 +1,5 @@
 #include "kelpie/connect.h"
+#include "journal_clock.h"
 #include <nlohmann/json.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <string>
 
 using Json = nlohmann::json;
+using Clock = kelpie::connect::JournalClock;
 namespace {
 constexpr std::size_t kMaxFrame = 1024 * 1024;
 constexpr std::size_t kMaxOutput = 768 * 1024;
@@ -39,6 +41,12 @@ std::string Key(const Json& value) {
 }
 bool Terminal(const std::string& state) {
   return state == "completed" || state == "failed" || state == "cancelled";
+}
+std::string BoundedError(const std::string& value) {
+  auto size = std::min<std::size_t>(value.size(), 2000);
+  // The byte bound is also below the wire UTF-16 limit. Do not split a UTF-8 code point.
+  while (size < value.size() && size > 0 && (static_cast<unsigned char>(value[size]) & 0xc0) == 0x80) --size;
+  return value.substr(0, size);
 }
 Json Event(const Json& command, const std::string& state) {
   return {{"type", "event"}, {"jobId", command.at("jobId")},
@@ -82,16 +90,38 @@ struct KelpieConnect {
           jobs[key]["event"].at("seq") == seq) {
         jobs[key]["acked"] = true;
         // Keep identity tombstones so duplicated mutations never execute again.
+        jobs[key]["terminalState"] = jobs[key]["event"].at("state");
         jobs[key].erase("event");
+        auto identity = Json{{"jobId", frame.at("jobId")}, {"attemptId", frame.at("attemptId")}};
+        if (jobs[key]["command"].contains("deadline")) identity["deadline"] = jobs[key]["command"]["deadline"];
+        jobs[key]["command"] = identity;
+        jobs[key]["tombstone"] = true;
       }
       return {{"kind", "ack"}};
     }
     if (type == "cancel") {
-      if (!jobs.contains(key) || jobs[key].value("terminal", false))
-        return {{"kind", "ignored"}};
+      if (!frame.at("seq").is_number_integer() || seq != 2 || frame.size() != 5)
+        throw std::invalid_argument("Invalid cancellation");
+      if (!jobs.contains(key)) {
+        if (jobs.size() >= 8192) throw std::runtime_error("Journal capacity reached");
+        Json identity = {{"jobId", frame.at("jobId")}, {"attemptId", frame.at("attemptId")}};
+        jobs[key] = {{"command", identity}, {"terminal", true}, {"acked", false},
+            {"cancelledBeforeCommand", true}, {"terminalState", "cancelled"}, {"event", Event(identity, "cancelled")},
+            {"retireAfter", journal.at("retirementTime").get<std::int64_t>() + Clock::maxDeadline + Clock::grace}};
+      }
+      if (jobs[key].value("terminal", false)) {
+        auto& job = jobs[key];
+        if (!job.contains("event")) job["event"] = Event(job["command"], job.value("terminalState", "cancelled"));
+        job["acked"] = false;
+        auto event = job["event"];
+        event["generation"] = generation;
+        // A receipt must never interrupt a different attempt currently executing on the device.
+        return {{"kind", "receipt"}, {"frames", Json::array({event})}};
+      }
       auto event = Event(jobs[key]["command"], "cancelled");
       jobs[key]["event"] = event;
       jobs[key]["terminal"] = true;
+      jobs[key]["terminalState"] = "cancelled";
       event["generation"] = generation;
       return {{"kind", "cancel"}, {"jobId", frame["jobId"]},
           {"attemptId", frame["attemptId"]}, {"frames", Json::array({event})}};
@@ -99,7 +129,9 @@ struct KelpieConnect {
     const auto operation = Text(frame, "operation");
     if (!kOperations.count(operation) || !frame.at("input").is_object())
       throw std::invalid_argument("Invalid command");
-    Text(frame, "deadline"); // Platform validates wall-clock expiry before dispatch.
+    const auto deadline = Clock::Deadline(Text(frame, "deadline"));
+    const auto now = journal.at("retirementTime").get<std::int64_t>();
+    if (deadline > now + Clock::maxDeadline) throw std::invalid_argument("Deadline exceeds admission window");
     if (operation != "tabs" && operation != "open") {
       if (Text(frame, "tabId").empty() || Text(frame, "tabVersion").empty())
         throw std::invalid_argument("A pinned tab document is required");
@@ -110,7 +142,8 @@ struct KelpieConnect {
       const auto& previous = jobs[key]["command"];
       auto comparable = frame;
       comparable.erase("generation");
-      if (previous != comparable) throw std::invalid_argument("Attempt identity reused");
+      if (!jobs[key].value("cancelledBeforeCommand", false) && !jobs[key].value("tombstone", false) && previous != comparable)
+        throw std::invalid_argument("Attempt identity reused");
       Json frames = Json::array();
       if (jobs[key].contains("event")) {
         auto event = jobs[key]["event"];
@@ -122,7 +155,16 @@ struct KelpieConnect {
     if (jobs.size() >= 8192) throw std::runtime_error("Journal capacity reached");
     auto command = frame;
     command.erase("generation");
-    jobs[key] = {{"command", command}, {"terminal", false}, {"acked", false}};
+    jobs[key] = {{"command", command}, {"terminal", false}, {"acked", false}, {"retireAfter", deadline + Clock::grace}};
+    if (deadline <= now) {
+      auto expired = Event(command, "failed");
+      expired["error"] = "COMMAND_EXPIRED: refresh page authority before retrying";
+      jobs[key]["event"] = expired;
+      jobs[key]["terminal"] = true;
+      jobs[key]["terminalState"] = "failed";
+      expired["generation"] = generation;
+      return {{"kind", "receipt"}, {"frames", Json::array({expired})}};
+    }
     auto accepted = Event(command, "accepted");
     accepted["generation"] = generation;
     return {{"kind", "command"}, {"command", frame}, {"frames", Json::array({accepted})}};
@@ -141,9 +183,10 @@ struct KelpieConnect {
         throw std::invalid_argument("Result too large");
       event["output"] = result["output"];
     }
-    if (result.contains("error")) event["error"] = Text(result, "error").substr(0, 2000);
+    if (result.contains("error")) event["error"] = BoundedError(Text(result, "error"));
     job["event"] = event;
     job["terminal"] = true;
+    job["terminalState"] = state;
     event["generation"] = generation;
     return {{"kind", "terminal"}, {"frames", Json::array({event})}};
   }
@@ -174,12 +217,16 @@ KelpieConnectRef kelpie_connect_create(const char* saved, const char* owner) {
 }
 void kelpie_connect_destroy(KelpieConnectRef client) { delete client; }
 char* kelpie_connect_execute(KelpieConnectRef client, const char* operation, const char* input) {
+  return kelpie_connect_execute_at(client, operation, input, Clock::Now());
+}
+char* kelpie_connect_execute_at(KelpieConnectRef client, const char* operation, const char* input, long long wall_clock_ms) {
   try {
     if (!client || !operation || !input || std::strlen(input) > kMaxFrame) return nullptr;
     const auto body = Json::parse(input);
     const auto before = client->journal;
     Json decision;
     try {
+      Clock::Maintain(client->journal, wall_clock_ms);
       const std::string op(operation);
       if (op == "receive") decision = client->Receive(body);
       else if (op == "complete") decision = client->Complete(body);

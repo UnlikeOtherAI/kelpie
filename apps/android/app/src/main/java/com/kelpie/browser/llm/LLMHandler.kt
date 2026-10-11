@@ -62,7 +62,7 @@ class LLMHandler(
     private suspend fun getVisibleElements(body: Map<String, Any?>): Map<String, Any?> {
         val interactableOnly = body["interactableOnly"] as? Boolean ?: false
         val js =
-            "(function(){var els=document.querySelectorAll('*');var visible=[];" +
+            "(function(){" + elementSelectorBuilderScript() + "var els=document.querySelectorAll('*');var visible=[];" +
                 "for(var el of els){var r=el.getBoundingClientRect();" +
                 "if(r.width>0&&r.height>0&&r.top<window.innerHeight&&" +
                 "r.bottom>0&&r.left<window.innerWidth&&r.right>0){" +
@@ -70,7 +70,7 @@ class LLMHandler(
                 "if($interactableOnly&&" +
                 "!['a','button','input','select','textarea'].includes(tag)&&" +
                 "!el.onclick&&el.getAttribute('role')!=='button')continue;" +
-                "visible.push({tag:tag," +
+                "var selector=kelpieBuildSelector(el);if(!selector||selector.length>2000)continue;visible.push({selector:selector,tag:tag," +
                 "text:(el.textContent||'').trim().substring(0,100)," +
                 "rect:{x:r.x,y:r.y,width:r.width,height:r.height}," +
                 "role:el.getAttribute('role')||undefined," +

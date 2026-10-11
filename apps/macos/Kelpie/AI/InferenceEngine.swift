@@ -164,12 +164,13 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         audio: Data? = nil,
         image: Data? = nil,
         maxTokens: Int = 512,
-        temperature: Float = 0.7
+        temperature: Float = 0.7,
+        request: InferenceRequest? = nil
     ) async throws -> InferenceResult {
         let generation = currentCancellation()
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<InferenceResult, Error>) in
             queue.async {
-                guard self.currentCancellation() == generation else {
+                guard self.currentCancellation() == generation, request?.isCancelled != true else {
                     continuation.resume(throwing: InferenceError.cancelled)
                     return
                 }
@@ -229,7 +230,7 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 var curPos = tokenCount
 
                 for _ in 0..<maxTokens {
-                    guard self.currentCancellation() == generation else {
+                    guard self.currentCancellation() == generation, request?.isCancelled != true else {
                         continuation.resume(throwing: InferenceError.cancelled)
                         return
                     }
