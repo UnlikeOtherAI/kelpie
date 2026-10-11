@@ -7,7 +7,7 @@ final class ConnectControlsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-hideWelcomeCard", "YES", "-sessionTabURLs", "()", "-homeURL", "about:blank"]
         app.launch()
-        let more = app.buttons["browser.more"]
+        let more = app.descendants(matching: .any)["browser.menu.fab"]
         XCTAssertTrue(more.waitForExistence(timeout: 15))
         more.tap()
         let settings = app.buttons["browser.menu.settings"]

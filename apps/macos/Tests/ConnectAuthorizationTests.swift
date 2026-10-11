@@ -2,6 +2,12 @@ import XCTest
 @testable import Kelpie
 
 final class ConnectAuthorizationTests: XCTestCase {
+    func testWireTextBoundsPreserveUnicode() {
+        XCTAssertEqual(ConnectText.bounded(String(repeating: "😀", count: 100), to: 120).utf16.count, 120)
+        XCTAssertEqual(ConnectText.bounded("a😀", to: 2), "a")
+        XCTAssertEqual(ConnectText.bounded("e\u{301}", to: 1), "")
+    }
+
     func testCancelledAndReplacementJobsCannotBorrowAuthority() throws {
         let command: [String: Any] = ["jobId": "job", "attemptId": "first", "deadline": "2030-01-01T00:00:00.123Z"]
         let authorization = try XCTUnwrap(ConnectAuthorization(command))

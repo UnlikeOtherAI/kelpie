@@ -286,7 +286,10 @@ struct KelpieApp: App {
                 rendererState: rendererState,
                 viewportState: serverState.viewportState
             )
-            .onAppear { Self.startServices(serverState: serverState, rendererState: rendererState) }
+            .onAppear {
+                Self.startServices(serverState: serverState, rendererState: rendererState)
+                NessieConnection.shared.setForeground(scenePhase == .active)
+            }
             .onChange(of: scenePhase) { phase in NessieConnection.shared.setForeground(phase == .active) }
             .frame(
                 minWidth: ViewportState.minimumShellSize.width,
