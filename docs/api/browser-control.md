@@ -1,9 +1,15 @@
 # Shared browser control v1
 
 The machine-facing core lives at `@unlikeotherai/kelpie-shared/browser-control`.
-Kelpie CLI MCP exposes it as `kelpie_browser_control`. Existing native tools
-remain extensions. Direct native servers retain their existing catalogues until
-their shared protocol adapters are delivered.
+Native HTTP `/v1/browser-control`, direct MCP, and CLI MCP expose the same native-owned
+gateway. The default MCP catalog contains `kelpie_browser_control`, extension name
+discovery, schema discovery, and `kelpie_extension` invocation. Rich product tools
+remain reachable through that advertised extension doorway and their existing names.
+The CLI forwards canonical requests; it does not own a second reference registry.
+
+For example, `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`.
+The same versioned JSON works through SDK, HTTP and MCP. Existing rich CLI commands
+remain available.
 
 The tool accepts `{device?, request:{version:1, method, tabId?, params}}`.
 Call `documentation` once for method details, then `capabilities` for the exact
@@ -22,18 +28,23 @@ limits are 200 elements and 16,000 text characters, with bounded metadata.
 `tab.click {ref}` and `tab.type {ref,text}` act only on the latest observed
 reference in that tab. Type appends. Observe again after every mutation or
 snapshot. Navigation, detached/replaced elements, another tab's refs and previous
-snapshots are refused. Native observations use a fixed package reader over the
-already-admitted `evaluate` route, storing only ephemeral element references on
-the page. Native actions verify original object identity and an exact unique
-structural selector immediately before the existing native click/type request.
-The registry is in the page realm and can be altered by page scripts; it is a correctness guard, not an isolation boundary against a hostile page. The direct native gateway must own references privately. The two native requests are not an atomic browser transaction. Shadow DOM actions
-are unsupported on that adapter. No arbitrary model evaluation is introduced.
-Mobile handlers select the requested tab before each command because they operate
-on the selected renderer.
+snapshots are refused. Native snapshots use the generated fixed reader, with an
+opaque generation per gateway. Captured DOM references live in the renderer realm;
+CEF uses a private isolated world. Android's WebView uses its page realm, so its
+registry is a correctness guard and not isolation against hostile page scripts.
+Native click/type are one fixed operation on the captured object, never a selector
+re-query: click performs DOM activation, and type appends through the native value
+setter and dispatches an input event (or appends a text node in contenteditable).
+These events are synthetic. Rich Kelpie input extensions retain their platform
+event guarantees; Playwright retains its native input behavior. Focus handlers can
+run synchronously, so object identity is checked again after focus; refusal after
+focus reports uncertainty. Shadow DOM actions are unsupported on native.
+No arbitrary model evaluation is introduced. Selected-renderer bindings inspect
+the actual current tab and authorize a switch only when needed; read-only sessions
+refuse other tabs without switching.
 
 Navigation uses `tab.goto/back/forward/reload`; observation uses `tab.url/title`,
-`tab.screenshot`; page input uses `page.press/scroll`. Mac/iOS/Android key press
-remains unsupported. Rich semantic locators, fill/check/select and frame scopes
+`tab.screenshot`; page input uses `page.press/scroll`. Key press support depends on actual advertised platform capabilities. Rich semantic locators, fill/check/select and frame scopes
 are implemented by Playwright only; the native adapter does not advertise them.
 Native extensions keep their own platform/input guarantees.
 
@@ -66,3 +77,20 @@ conformance separately after installing Chromium and building the package:
 `pnpm --filter @unlikeotherai/kelpie-shared test:browser`. This suite exercises
 Playwright and a mocked native HTTP-shaped transport backed by real browser pages;
 it does not establish physical native-device parity.
+
+Rich extension schemas come from `packages/shared/src/extension-tools.ts` and
+`extension-ai-tools.ts`, shared with the CLI. Native generation projects the
+forwarded body: device selection stays on the CLI host, native window/generation
+routing remains optional, and screenshots retain the CLI's viewport default.
+Native endpoint configuration does not accept `apiKeyEnv`; that field is resolved
+by the CLI host before its authenticated HTTP request. Existing device endpoint
+configuration retains its separate protected key path. Device handlers still
+validate semantic constraints such as partition identities and endpoint URLs.
+Generation refuses unsupported JSON Schema keywords; native tests cover every
+registered extension and forwarded argument shape. `get-links` is a read-only
+macOS WebKit/Chromium extension returning up to 200 href/text pairs.
+
+The Linux fallback advertises only its actual metadata/legacy capabilities. Its
+MCP HTTP route uses the desktop local-client, bearer, content/accept and protocol
+version guards. Unsupported SSE GET returns 405; accepted notifications return
+202 with an empty body. It does not advertise live browser observations.

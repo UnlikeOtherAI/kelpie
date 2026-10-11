@@ -136,10 +136,10 @@ describe("MCP browser result formatting", () => {
     const result = await formatBrowserToolResult("screenshot", payload, "Test Windows");
 
     expect(result.content).toEqual([
-      { type: "text", text: JSON.stringify({ ...payload, mimeType: "image/png" }) },
+      { type: "text", text: JSON.stringify({ ...payload, image: undefined, mimeType: "image/png" }) },
       { type: "image", data: "abc", mimeType: "image/png" },
     ]);
-    expect(result.structuredContent).toEqual({ ...payload, mimeType: "image/png" });
+    expect(result.structuredContent).toEqual({ ...payload, image: undefined, mimeType: "image/png" });
   });
 
   it("marks browser-control failures as MCP errors", async () => {
