@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 FIXTURE = b'''<!doctype html><meta name="viewport" content="width=device-width"><title>Gateway fixture</title>
+<p>Public gateway evidence</p><img alt="Gateway logo" width="40" height="40"><svg width="40" height="40"><title>Gateway SVG title</title></svg>
 <label>Query<input id="query" aria-label="Query" value="seed"></label>
 <button id="count" onclick="window.activationCount=(window.activationCount||0)+1;document.title='Count:'+window.activationCount">Count</button>
 <button id="slow" onclick="window.slowActivations=(window.slowActivations||0)+1;let end=Date.now()+35000;while(Date.now()<end){};document.title='Slow:'+window.slowActivations">Slow</button>
@@ -36,6 +37,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
     model_stage = 0
     model_catalog_chars = None
     fixture_query = ''
+    plain_payload = None
     tab = None
 
     def log_message(self, *_):
@@ -70,6 +72,16 @@ class FixtureHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        if self.model_mode == 'plain':
+            assert not body.get('tools'), 'Plain inference offered browser action tools'
+            FixtureHandler.plain_payload = body
+            assert len(body['messages']) == 31, 'History was truncated or an extra user turn was added'
+            assert body['messages'][0]['content'] == 'remember-0'
+            current = body['messages'][-1]['content']
+            assert 'Untrusted current page evidence' in current and 'Gateway logo' in current
+            assert 'Gateway SVG title' in current and 'Public gateway evidence' in current
+            assert 'seed' not in current, 'Form value leaked into common model grounding'
+            return self.answer()
         names = [tool['function']['name'] for tool in body.get('tools', [])]
         expected = ['update_task_list', 'kelpie_browser_control', 'kelpie_extensions', 'kelpie_extension_tools', 'kelpie_extension']
         assert names == expected, 'Agent did not offer the shared compact catalog'
@@ -285,6 +297,22 @@ def main():
         'model': 'gateway-fixture', 'capabilities': {'toolCalling': True}})['endpoint']['id']
     native('ai-load', {'backend': 'openai', 'endpoint': endpoint})
     FixtureHandler.tab = tab
+    # Plain history/context may read an owned background renderer without selecting it.
+    core('tab.goto', tab, {'url': fixture_url})
+    core('tabs.select', other)
+    FixtureHandler.model_mode, FixtureHandler.plain_payload = 'plain', None
+    history = [{'role': 'user' if i % 2 == 0 else 'assistant', 'content': 'remember-' + str(i)} for i in range(30)]
+    history.append({'role': 'user', 'content': 'Which logo is on the background page?'})
+    native('ai-infer', {'messages': history, 'context': 'page_text', 'agent': False, 'tabId': tab})
+    assert FixtureHandler.plain_payload is not None
+    listing = core('tabs.list')
+    assert next(item['id'] for item in listing if item['active']) == other, 'Context read switched the visible tab'
+    before_calls = len(FixtureHandler.calls)
+    status, closed = request('/v1/ai-infer', {'messages': history, 'context': 'page_text', 'agent': False, 'tabId': 'closed-owned-tab'})
+    assert status == 400 and closed['error']['code'] == 'TAB_NOT_FOUND'
+    assert len(FixtureHandler.calls) == before_calls
+    core('tabs.select', tab)
+    print('PASS common bounded background grounding/SVG/value omission/full 31-turn history/no selection', flush=True)
     for mode in ('read', 'write', 'timeout'):
         core('tab.goto', tab, {'url': fixture_url})
         FixtureHandler.model_mode, FixtureHandler.model_stage = mode, 0
