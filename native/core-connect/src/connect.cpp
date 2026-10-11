@@ -15,6 +15,9 @@ namespace {
 constexpr std::size_t kMaxFrame = 1024 * 1024;
 constexpr std::size_t kMaxOutput = 768 * 1024;
 constexpr std::size_t kMaxJournal = 32 * 1024 * 1024;
+constexpr const char* kResultTooLarge =
+    "RESULT_TOO_LARGE: the device result exceeded 768 KiB and was discarded; "
+    "observe the page before continuing.";
 const std::set<std::string> kOperations = {
     "tabs", "open", "control", "navigate", "snapshot", "click", "type", "scroll",
     "back", "forward", "reload", "extract"};
@@ -196,16 +199,21 @@ struct KelpieConnect {
       throw std::invalid_argument("Unknown terminal result");
     auto& job = journal["jobs"][key];
     if (job.value("terminal", false)) return {{"kind", "ignored"}};
-    auto event = Event(job["command"], state);
-    if (result.contains("output")) {
-      if (!result["output"].is_object() || result["output"].dump().size() > kMaxOutput)
-        throw std::invalid_argument("Result too large");
-      event["output"] = result["output"];
+    if (result.contains("output") && !result["output"].is_object())
+      throw std::invalid_argument("Invalid result output");
+    // An oversized result is still a terminal outcome. Record a bounded failure
+    // rather than refusing the completion, which would strand the reserved attempt.
+    const bool oversized = result.contains("output") && result["output"].dump().size() > kMaxOutput;
+    const auto outcome = oversized && state == "completed" ? std::string("failed") : state;
+    auto event = Event(job["command"], outcome);
+    if (oversized) event["error"] = kResultTooLarge;
+    else {
+      if (result.contains("output")) event["output"] = result["output"];
+      if (result.contains("error")) event["error"] = BoundedError(Text(result, "error"));
     }
-    if (result.contains("error")) event["error"] = BoundedError(Text(result, "error"));
     job["event"] = event;
     job["terminal"] = true;
-    job["terminalState"] = state;
+    job["terminalState"] = outcome;
     event["generation"] = generation;
     return {{"kind", "terminal"}, {"frames", Json::array({event})}};
   }
@@ -240,7 +248,10 @@ char* kelpie_connect_execute(KelpieConnectRef client, const char* operation, con
 }
 char* kelpie_connect_execute_at(KelpieConnectRef client, const char* operation, const char* input, long long wall_clock_ms) {
   try {
-    if (!client || !operation || !input || std::strlen(input) > kMaxFrame) return nullptr;
+    if (!client || !operation || !input) return nullptr;
+    // A local completion may exceed the wire frame; Complete bounds what is sent.
+    const auto limit = std::strcmp(operation, "complete") == 0 ? kMaxJournal : kMaxFrame;
+    if (std::strlen(input) > limit) return nullptr;
     const auto body = Json::parse(input);
     const auto before = client->journal;
     Json decision;
