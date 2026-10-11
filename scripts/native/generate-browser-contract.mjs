@@ -83,4 +83,14 @@ const assets = {
   reader: collectBrowserSnapshot.toString(), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
 };
 await mkdir(dirname(output), { recursive: true });
-await writeFile(output, '#pragma once\nnamespace kelpie::browser_assets {\n' + Object.entries(assets).map(([name, value]) => `inline constexpr char ${name}[] = R"KELPIE(${value})KELPIE";\n`).join('') + '}\n');
+// MSVC limits individual and concatenated string literals. UTF-8 byte arrays
+// also preserve arbitrary quotes/raw-string delimiters in authoritative assets.
+const array = (name, value) => {
+  const bytes = [...Buffer.from(value, 'utf8'), 0];
+  const rows = [];
+  for (let offset = 0; offset < bytes.length; offset += 32) {
+    rows.push(bytes.slice(offset, offset + 32).map(byte => byte < 128 ? String(byte) : `static_cast<char>(${byte})`).join(','));
+  }
+  return `inline constexpr char ${name}[] = {\n${rows.join(',\n')}\n};\n`;
+};
+await writeFile(output, '#pragma once\nnamespace kelpie::browser_assets {\n' + Object.entries(assets).map(([name, value]) => array(name, value)).join('') + '}\n');
