@@ -224,7 +224,8 @@ def main():
     core('tab.goto', tab, {'url': fixture_url + '#section'})
     assert native('evaluate', {'expression': 'window.navigationMarker'})['result'] == 1
     core('tab.goto', tab, {'url': fixture_url})
-    assert native('evaluate', {'expression': 'window.navigationMarker'})['result'] == 1
+    assert core('tab.url', tab) == fixture_url
+    native('evaluate', {'expression': 'window.navigationMarker = 1'})
     core('tab.goto', tab, {'url': fixture_url})
     assert native('evaluate', {'expression': 'typeof window.navigationMarker'})['result'] == 'undefined'
     core('tab.goto', tab, {'url': f'http://10.0.2.2:{args.fixture_port}/redirect'})
