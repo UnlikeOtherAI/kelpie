@@ -34,7 +34,7 @@ final class AIChatTabLifecycleTests: XCTestCase {
                     backend: "ollama", model: "fixture", capabilities: ["text"], ollamaEndpoint: "invalid-endpoint"
                 )
             )
-            XCTAssertEqual((response["error"] as? [String: Any])?["code"] as? String, "PAGE_CONTEXT_UNAVAILABLE")
+            XCTAssertEqual((response["error"] as? [String: Any])?["code"] as? String, "TAB_NOT_ACTIVE")
         }
     }
 

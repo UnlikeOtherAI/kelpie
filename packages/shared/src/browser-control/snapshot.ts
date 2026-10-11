@@ -8,20 +8,29 @@ export function collectBrowserSnapshot(options: {
   const maxChars = options.maxChars ?? 16_000;
   const elements: { ref: string; role: string; name: string }[] = [];
   const targets: Record<string, Element> = {};
-  const clean = (text: string, limit = 256): string => text.replace(/\s+/g, " ").trim().slice(0, limit);
+  let truncated = false;
+  const clean = (text: string, limit = 256): string => {
+    const value = text.replace(/\s+/g, " ").trim();
+    if (value.length > limit) truncated = true;
+    return value.slice(0, limit);
+  };
   const url = location.href.slice(0, Math.min(4096, Math.floor(maxChars / 2)));
   const title = clean(document.title, Math.min(1024, Math.floor(maxChars / 4)));
   let text = `url: ${url}\ntitle: ${title}`;
-  let truncated = url !== location.href || title !== clean(document.title, document.title.length);
+  if (url !== location.href || title !== clean(document.title, document.title.length)) truncated = true;
   let visited = 0;
   const ignored = "input,textarea,select,[contenteditable]:not([contenteditable='false']),script,style,noscript,template,[hidden],[aria-hidden='true']";
   const content = (node: Node, depth = 0): string => {
     if (depth > 40 || (node instanceof Element && (node.matches(ignored) || node.closest("[contenteditable]:not([contenteditable='false'])") || getComputedStyle(node).visibility === "hidden" || getComputedStyle(node).display === "none"))) return "";
-    if (node.nodeType === Node.TEXT_NODE) return (node.textContent ?? "").slice(0, 256);
+    if (node.nodeType === Node.TEXT_NODE) {
+      const value = node.textContent ?? "";
+      if (value.length > 256) truncated = true;
+      return value.slice(0, 256);
+    }
     let value = "";
     for (const child of node.childNodes) {
       value += ` ${content(child, depth + 1)}`;
-      if (value.length >= 512) break;
+      if (value.length >= 512) { if (child.nextSibling) truncated = true; break; }
     }
     return value;
   };

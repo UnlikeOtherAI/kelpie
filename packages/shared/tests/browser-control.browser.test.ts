@@ -96,6 +96,16 @@ for (const adapter of ["playwright", "native-transport"] as const) {
       expect(short.elements).toHaveLength(2);
       expect(short.truncated).toBe(true);
     });
+    it("discloses discarded public text without treating omitted editor values as truncation", async () => {
+      await page.setContent(`<p>${"public ".repeat(4000)}</p>`);
+      const long = await tab.snapshot();
+      expect(long.truncated).toBe(true);
+      expect(long.elements?.[0]?.name.length).toBeLessThanOrEqual(256);
+      await page.setContent(`<div contenteditable="true" role="textbox" aria-label="Draft">${"PRIVATE_SECRET".repeat(2000)}</div>`);
+      const privateSnapshot = await tab.snapshot();
+      expect(privateSnapshot.truncated).toBe(false);
+      expect(JSON.stringify(privateSnapshot)).not.toContain("PRIVATE_SECRET");
+    });
     it("omits inherited editor values used as external accessible labels", async () => {
       const snapshot = await tab.snapshot();
       expect(snapshot.elements?.some((element) => element.name === "Public action")).toBe(true);
