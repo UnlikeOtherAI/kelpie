@@ -10,7 +10,8 @@ void Accept(std::string_view endpoint, json arguments) {
   assert(kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema(endpoint), &arguments));
 }
 int main() {
-  for (const auto& tool : kelpie::McpRegistry().all_tools()) {
+  const kelpie::McpRegistry registry;
+  for (const auto& tool : registry.all_tools()) {
     const auto schema = kelpie::NativeExtensionInputSchema(tool.http_endpoint);
     if (!schema.is_object()) std::cerr << "Missing native contract: " << tool.http_endpoint << "\n";
     assert(schema.is_object());

@@ -14,7 +14,7 @@ const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
   const { device, ...fields } = tool.schema;
   // Native requests own routing; device selection is only a CLI argument. Preserve
   // the same fields forwarded by bodyFromArgs, including screenshot resolution defaults.
-  const shape = { windowId: z.string().optional(), generation: z.number().int().nonnegative().optional(), ...fields };
+  const shape = { timeout: z.number().int().min(1).max(30000).optional(), windowId: z.string().optional(), generation: z.number().int().nonnegative().optional(), ...fields };
   if (tool.name === 'kelpie_screenshot' || tool.name === 'kelpie_screenshot_annotated') shape.resolution = shape.resolution.default('viewport');
   if (tool.method === 'ai-endpoint-save') {
     delete shape.apiKeyEnv; // A CLI-host environment variable cannot be resolved on a device.

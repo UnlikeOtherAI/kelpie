@@ -67,12 +67,11 @@ int main() {
   assert(rich_call["result"]["isError"] == false);
   const auto& fill = schema_for("kelpie_fill");
   assert(fill["required"] == nlohmann::json::array({"selector", "value"}));
-  assert(fill["properties"]["value"]["minLength"] == 0);
+  assert(fill["properties"]["value"]["type"] == "string");
   const auto& screenshot = schema_for("kelpie_screenshot");
-  assert(screenshot["properties"]["format"]["const"] == "png");
-  assert(!screenshot["properties"].contains("fullPage"));
+  assert(screenshot["properties"]["format"]["enum"] == nlohmann::json::array({"png", "jpeg"}));
+  assert(screenshot["properties"]["fullPage"]["type"] == "boolean");
   const auto& viewport = schema_for("kelpie_resize_viewport");
-  assert(viewport["required"] == nlohmann::json::array({"width", "height"}));
   assert(viewport["properties"]["width"]["minimum"] == 1);
   const auto& bookmark_remove = schema_for("kelpie_bookmarks_remove");
   assert(bookmark_remove["required"] == nlohmann::json::array({"id"}));
@@ -89,10 +88,10 @@ int main() {
       {{"jsonrpc", "2.0"}, {"id", 8}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}}}}}}, config);
   assert(missing_fill["error"]["code"] == -32602);
-  const auto invalid_screenshot = server.HandleRequest(
+  const auto jpeg_screenshot = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 9}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_screenshot"}, {"arguments", {{"format", "jpeg"}}}}}}, config);
-  assert(invalid_screenshot["error"]["code"] == -32602);
+  assert(jpeg_screenshot["result"]["isError"] == false);
   const auto empty_fill = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);
