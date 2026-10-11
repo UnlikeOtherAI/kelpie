@@ -69,13 +69,20 @@ const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "t
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();
-export function browserControlRequestSchema(options: { methods?: readonly BrowserControlMethod[] } = {}) {
-  if (!options.methods) return BrowserControlRequestSchema;
-  const allowed = new Set(options.methods);
-  const variants = BrowserControlRequestSchema.options.filter((option) => allowed.has(option.shape.method.value));
+export function browserControlRequestSchema(options: { methods?: readonly BrowserControlMethod[]; compact?: boolean } = {}) {
+  const allowed = options.methods ? new Set(options.methods) : undefined;
+  const variants = BrowserControlRequestSchema.options.filter((option) => !allowed || allowed.has(option.shape.method.value));
   if (!variants.length) throw new Error("At least one browser method must be included in the input schema.");
-  return z.union(variants);
+  if (options.compact) {
+    const shape = BrowserControlRequestSchema.options[0].shape;
+    return z.object({
+      version: shape.version, method: z.enum(variants.map((option) => option.shape.method.value)),
+      tabId: shape.tabId,
+      params: z.looseObject({}).default({}).describe("Call documentation once for method parameters; every call is validated against the strict v1 contract."),
+    }).strict();
+  }
+  return options.methods ? z.union(variants) : BrowserControlRequestSchema;
 }
-export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[] } = {}): Record<string, unknown> {
+export function browserControlInputSchema(options: { methods?: readonly BrowserControlMethod[]; compact?: boolean } = {}): Record<string, unknown> {
   return z.toJSONSchema(z.object({ request: browserControlRequestSchema(options) }).strict(), { reused: "ref" });
 }
