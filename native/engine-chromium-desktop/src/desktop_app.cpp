@@ -10,6 +10,7 @@
 #include "kelpie/desktop_mdns.h"
 #include "kelpie/desktop_mcp_server.h"
 #include "kelpie/desktop_router.h"
+#include "kelpie/desktop_core_browser.h"
 #include "kelpie/history_store.h"
 #include "kelpie/start_page.h"
 #include "kelpie/handler_context.h"
@@ -319,6 +320,7 @@ bool DesktopApp::Start(const Config& config) {
     AppendNetwork(impl_->network_store, event);
   });
   impl_->engine.SetNavigationSink([this](const std::string& url, const std::string& title) {
+    impl_->mcp_server.NotifyDocumentChanged();
     impl_->history_store.Record(url, title);
     impl_->history_store.UpdateLatestTitle(url, title);
   });
@@ -348,6 +350,17 @@ bool DesktopApp::Start(const Config& config) {
   impl_->http_server.SetRouter(&impl_->router);
   impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
   impl_->mcp_server.SetRouter(&impl_->router);
+  impl_->mcp_server.SetFixedReader([this](const nlohmann::json& params) {
+    return EvaluateBrowserFixed(impl_->engine, params);
+  });
+  impl_->mcp_server.SetPendingCheck([this] { return impl_->engine.HasPendingBrowserControl(); });
+  const DesktopMcpServer::Config gateway_config{config.platform, config.engine_name, config.app_name, config.app_version};
+  impl_->router.Register("browser-control", [this, gateway_config](const nlohmann::json& request) {
+    return impl_->mcp_server.HandleBrowserRequest(request, gateway_config);
+  });
+  impl_->router.BeforeDispatch([this](std::string_view method, const nlohmann::json& params) {
+    return impl_->mcp_server.GuardDispatch(method, params);
+  });
   impl_->http_server.SetMcpServer(&impl_->mcp_server);
   DesktopHttpServer::Config server_config;
   server_config.port = config.port;

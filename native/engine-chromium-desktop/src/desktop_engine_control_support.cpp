@@ -19,15 +19,15 @@ DesktopBrowserControl::Timeout RemainingTimeout(std::chrono::steady_clock::time_
 BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease,
                                  std::string method, const nlohmann::json& params,
                                  nlohmann::json* output, DesktopBrowserControl::Timeout timeout,
-                                 const std::function<bool()>& interrupted) {
+                                 const std::function<bool()>& interrupted, bool fences_actions) {
   if (!output) return BrowserControlResult::Failure("INTERNAL", "result is required");
   const auto started_at = std::chrono::steady_clock::now();
   auto pending = std::make_shared<PendingDevTools>();
-  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending] {
+  const auto started = impl->RunOnUi([impl, lease, method = std::move(method), params, pending, fences_actions] {
     auto* tab = impl->FindTab(lease);
     if (!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND", "The tab does not exist or is stale");
     pending->session = tab->devtools;
-    pending->operation = pending->session->Begin(tab->browser, method, params);
+    pending->operation = pending->session->Begin(tab->browser, method, params, fences_actions);
     return BrowserControlResult::Success(impl->Snapshot(*tab));
   }, timeout);
   if (!started.ok) return started;

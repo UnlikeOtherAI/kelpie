@@ -199,7 +199,7 @@ struct DeviceHandler {
 private let macosCapabilityMethods = [
     "navigate", "back", "forward", "reload", "get-current-url", "set-home", "get-home",
     "debug-screens", "set-debug-overlay", "get-debug-overlay",
-    "screenshot", "get-dom", "query-selector", "query-selector-all", "get-element-text", "get-attributes",
+    "screenshot", "get-dom", "get-links", "query-selector", "query-selector-all", "get-element-text", "get-attributes",
     "click", "tap", "fill", "type", "select-option", "check", "uncheck", "swipe", "coordinate-diagnostics",
     "scroll", "scroll2", "scroll-to-top", "scroll-to-bottom", "scroll-to-y",
     "get-viewport", "get-device-info", "get-viewport-presets", "get-capabilities", "report-issue",

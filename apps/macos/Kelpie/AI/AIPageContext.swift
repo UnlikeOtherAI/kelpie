@@ -22,6 +22,26 @@ struct AIPageContext: Codable {
         language = nil
     }
 
+    init(observation: [String: Any]) throws {
+        guard observation["ok"] as? Bool == true,
+              let snapshot = observation["value"] as? [String: Any],
+              let title = snapshot["title"] as? String, let url = snapshot["url"] as? String,
+              let text = snapshot["text"] as? String, let truncated = snapshot["truncated"] as? Bool,
+              let elements = snapshot["elements"] as? [[String: Any]] else {
+            let error = observation["error"] as? [String: Any]
+            throw NSError(domain: "AIPageContext", code: 1, userInfo: [NSLocalizedDescriptionKey: error?["message"] as? String ?? "Invalid common page snapshot"])
+        }
+        self.title = title
+        self.url = url
+        self.text = text
+        labels = elements.compactMap { $0["name"] as? String }
+        textTruncated = truncated
+        labelsTruncated = truncated
+        wordCount = text.split(whereSeparator: \.isWhitespace).count
+        language = nil
+    }
+
+    /// Explicit rich HTTP extraction; model grounding uses init(observation:).
     static func snapshotScript(selector: String? = nil, maxTextLength: Int? = 16000) -> String {
         let root = selector.map { "document.querySelector('\(JSEscape.string($0))')" } ??
             "document.body || document.documentElement"

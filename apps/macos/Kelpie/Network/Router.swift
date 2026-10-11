@@ -1,23 +1,40 @@
 import Foundation
 
 /// Route handler receives parsed JSON body and returns a JSON-serializable response.
-typealias RouteHandler = @Sendable ([String: Any]) async -> [String: Any]
+typealias RouteHandler = @MainActor @Sendable ([String: Any]) async -> [String: Any]
 
 /// Maps POST /v1/{method} paths to handler functions.
 final class Router: @unchecked Sendable {
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
     var scriptPlaybackState: ScriptPlaybackState?
+    @MainActor var browserGateway: BrowserControlGateway?
+    @MainActor var browserGatewayProfile: String?
+    let browserLease = BrowserControlLease()
+    @MainActor var browserGateways: [WeakBrowserGateway] = []
+    var registeredMethods: [String] { Array(routes.keys) }
 
     func register(_ method: String, handler: @escaping RouteHandler) {
         routes[method] = handler
     }
 
+    @MainActor
     func handle(
         method: String,
         body: [String: Any],
-        bypassRecordingGate: Bool = false
+        bypassRecordingGate: Bool = false,
+        browserGatewayDispatch: Bool = false
     ) async -> (statusCode: Int, json: [String: Any]) {
+        if method == "browser-control" {
+            return (200, await browserControl(body))
+        }
+        let mutatingMethod = isBrowserMutation(method: method)
+        let legacyMutation = !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
+        if legacyMutation, browserLease.begin() == false {
+            return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
+        }
+        defer { if legacyMutation { browserLease.end() } }
+        invalidateBrowserReferences(method: method, body: body)
         guard let handler = routes[method] else {
             return (404, [
                 "success": false,

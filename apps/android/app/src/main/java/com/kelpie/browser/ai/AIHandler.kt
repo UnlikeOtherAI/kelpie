@@ -209,7 +209,7 @@ class AIHandler(
             val prepared = if (backend == AIState.OPENAI_BACKEND) body else AIPageContext.prepare(body, localContext)
             inferDispatch.infer(backend, prepared)
         } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
-            errorResponse(error.code, error.message)
+            errorResponse(error.code, error.message, error.diagnostics)
         }
     }
 

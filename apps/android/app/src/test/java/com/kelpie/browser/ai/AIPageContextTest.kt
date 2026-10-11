@@ -2,7 +2,6 @@ package com.kelpie.browser.ai
 
 import com.kelpie.browser.ai.openai.OpenAIException
 import com.kelpie.browser.ai.openai.OpenAIJson
-import com.kelpie.browser.ai.openai.ToolDispatcher
 import com.kelpie.browser.llm.PageTextSnapshot
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -43,14 +42,35 @@ class AIPageContextTest {
     @Test
     fun failedReadStopsInferenceAndRetainsError() =
         runBlocking {
-            val dispatcher = ToolDispatcher { _, _ -> mapOf("success" to false, "error" to mapOf("code" to "TAB_NOT_FOUND", "message" to "Tab closed")) }
             try {
-                AIPageContext.evidence("page_text", dispatcher)
+                AIPageContext.evidence(mapOf("ok" to false, "error" to mapOf("code" to "TAB_NOT_FOUND", "message" to "Tab closed")))
                 fail("A failed read must never be empty page context")
             } catch (error: OpenAIException) {
                 assertEquals("TAB_NOT_FOUND", error.code)
             }
         }
+
+    @Test
+    fun commonEvidenceIncludesGroundingButOmitsFormValues() {
+        val evidence =
+            AIPageContext.evidence(
+                mapOf(
+                    "ok" to true,
+                    "value" to
+                        mapOf(
+                            "title" to "Page",
+                            "url" to "https://example.test",
+                            "text" to "Public text",
+                            "truncated" to true,
+                            "elements" to listOf(mapOf("name" to "Logo", "value" to "secret-input")),
+                        ),
+                ),
+            )
+        assertTrue(evidence.contains("Logo"))
+        assertTrue(evidence.contains("truncated"))
+        assertFalse(evidence.contains("secret-input"))
+        assertFailure("EVAL_ERROR") { AIPageContext.evidence(mapOf("ok" to true, "value" to emptyMap<String, Any>())) }
+    }
 
     @Test
     fun snapshotDecodeDistinguishesEmptyPageFromFailedRead() {

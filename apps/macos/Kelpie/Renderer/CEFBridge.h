@@ -15,17 +15,6 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 
 @interface CEFBridge : NSObject
 
-/// Initialize CEF. Must be called once at app startup.
-/// Returns YES if this process should continue as the main app,
-/// NO if this is a helper subprocess (caller should exit).
-+ (BOOL)initializeCEF;
-
-/// Shut down CEF. Call before app termination.
-+ (void)shutdownCEF;
-
-/// Pump the CEF message loop. Call periodically from a timer.
-+ (void)doMessageLoopWork;
-
 /// Create a new browser instance.
 /// @param parentView The NSView to host the browser.
 /// @param url The initial URL to load.
@@ -70,6 +59,11 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 
 /// Evaluate JavaScript and return the result via callback.
 /// The callback receives the result as a JSON string, or nil on error.
+/// Internal fixed browser control only; executes in a private Chromium world.
+- (void)evaluateBrowserControl:(NSString *)expression
+                 stillVisible:(BOOL (^)(void))stillVisible
+                   completion:(void (^)(id _Nullable result, NSError * _Nullable error))completion;
+
 - (void)evaluateJavaScript:(NSString *)script
                 completion:(void (^ _Nonnull)(NSString * _Nullable result, NSError * _Nullable error))completion;
 
@@ -98,6 +92,21 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 
 /// Set callback for CEF dialog-state resets such as navigation cancellation.
 @property (nonatomic, copy, nullable) void (^onJavaScriptDialogReset)(void);
+
+@end
+
+@interface CEFBridge (Lifecycle)
+
+/// Initialize CEF. Must be called on the owner main thread before creating Chromium.
+/// Returns YES if this process should continue as the main app,
+/// NO if this is a helper subprocess (caller should exit).
++ (BOOL)initializeCEF;
+
+/// Shut down CEF. Call before app termination.
++ (void)shutdownCEF;
+
+/// Pump the CEF message loop. Call periodically from a timer.
++ (void)doMessageLoopWork;
 
 @end
 

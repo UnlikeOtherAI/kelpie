@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { registerExtensions } from "./extensions.js";
+import type { ExtensionEntry } from "./extensions.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
@@ -11,6 +14,7 @@ import { scanForDevices } from "../discovery/scanner.js";
 import { filterDevices } from "../group/filter.js";
 import { executeGroup, executeSmartQuery } from "../group/orchestrator.js";
 import { browserTools, cliTools } from "./tools.js";
+import { registerBrowserControl } from "./browser-control.js";
 import type { BrowserToolDef, CliToolDef } from "./tools.js";
 import { ToolInputError } from "./ai-endpoint-tools.js";
 import { redactSecrets } from "../ai/endpoint-secrets.js";
@@ -58,14 +62,17 @@ export function createMcpServer(pinned?: DiscoveredDevice, callableTools?: Reado
     { capabilities: { tools: {} } },
   );
 
+  const core = registerBrowserControl(server, pinned);
+  const extensions = new Map<string, ExtensionEntry>();
   for (const tool of browserTools) {
     if (!isCallableOnPinnedDevice(tool, pinned, callableTools)) continue;
-    registerBrowserTool(server, tool, pinned);
+    extensions.set(tool.name, registerBrowserTool(server, tool, pinned));
   }
   for (const tool of cliTools) {
-    registerCliTool(server, tool, pinned);
+    extensions.set(tool.name, registerCliTool(server, tool, pinned));
   }
 
+  registerExtensions(server, core, extensions);
   return server;
 }
 
@@ -100,13 +107,13 @@ function registerBrowserTool(
   server: McpServer,
   tool: BrowserToolDef,
   pinned?: DiscoveredDevice,
-): void {
+): ExtensionEntry {
   // With a pinned browser `device` is optional: omitting it targets the alias.
   const deviceSchema = tool.schema.device;
   const schema = pinned && deviceSchema
     ? { ...tool.schema, device: deviceSchema.optional() }
     : tool.schema;
-  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: schema }, async (args) => {
+  const handler = async (args: Record<string, unknown>): Promise<CallToolResult> => {
     const deviceId = args.device as string | undefined;
     const device = await resolveDevice(deviceId, pinned);
     if (!device) {
@@ -114,7 +121,7 @@ function registerBrowserTool(
     }
     let body: Record<string, unknown>;
     try {
-      body = tool.bodyFromArgs(args as Record<string, unknown>);
+      body = tool.bodyFromArgs(args);
     } catch (error) {
       if (!(error instanceof ToolInputError)) throw error;
       return errorToolResult({ success: false, error: { code: error.code, message: error.message } });
@@ -134,7 +141,10 @@ function registerBrowserTool(
       });
     }
     return formatBrowserToolResult(tool.method, result.data, device.name);
-  });
+  };
+  const description = describeTool(tool.description, tool.platforms);
+  server.registerTool(tool.name, { description, inputSchema: schema }, handler);
+  return { description, schema: z.object(schema).strict(), handler };
 }
 
 export async function formatBrowserToolResult(
@@ -197,7 +207,8 @@ function isNativeScreenshotResult(method: string, data: unknown): data is Screen
 function portableScreenshotResult(result: ScreenshotResult): CallToolResult {
   const format = normalizeImageFormat(result.format);
   const mimeType = `image/${format}`;
-  const metadata: JsonObject = { ...result, mimeType };
+  const { image: _image, ...details } = result;
+  const metadata: JsonObject = { ...details, mimeType };
   return {
     content: [
       { type: "text", text: JSON.stringify(metadata) },
@@ -269,9 +280,9 @@ function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: DiscoveredDevice): void {
-  server.registerTool(tool.name, { description: describeTool(tool.description, tool.platforms), inputSchema: tool.schema }, async (args) => {
-    const params = args as Record<string, unknown>;
+function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: DiscoveredDevice): ExtensionEntry {
+  const handler = async (args: Record<string, unknown>): Promise<CallToolResult> => {
+    const params = args;
 
     if (tool.kind === "discovery") {
       return handleDiscovery(tool.method, params, pinned);
@@ -292,7 +303,10 @@ function registerCliTool(server: McpServer, tool: CliToolDef, pinned?: Discovere
 
     const result = await executeGroup(devices, tool.method, body, timeout);
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  });
+  };
+  const description = describeTool(tool.description, tool.platforms);
+  server.registerTool(tool.name, { description, inputSchema: tool.schema }, handler);
+  return { description, schema: z.object(tool.schema).strict(), handler };
 }
 
 async function handleDiscovery(method: string, params: Record<string, unknown>, pinned?: DiscoveredDevice): Promise<{ content: { type: "text"; text: string }[] }> {

@@ -12,6 +12,7 @@ final class HandlerContext {
     /// hidden about:blank `WKWebViewRenderer`. Kept in sync by ServerState
     /// wherever the active renderer changes.
     var activeEngineIsChromium = false
+    var browserControlEngineName: String?
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
@@ -45,6 +46,7 @@ final class HandlerContext {
     /// tab windows reject empty `tabId` so LLMs are forced to be explicit
     /// about which tab they target.
     func resolveRenderer(windowId: String?, tabId: String?) throws -> any RendererEngine {
+        if let browserControlEngineName, browserControlEngineName != renderer?.engineName { throw HandlerError.rendererHidden }
         // Chromium (CEF) is a single-renderer engine. Tabs are modeled only for
         // WebKit, so resolving through the tab store here would return a hidden
         // WKWebViewRenderer that never navigated (stuck on about:blank): navigate
@@ -116,19 +118,19 @@ final class HandlerContext {
     }
 
     /// Convenience: evaluate JS on a specific tab.
-    func evaluateJS(_ script: String, tabId: String?) async throws -> Any? {
-        let target = try resolveRenderer(tabId: tabId)
+    func evaluateJS(_ script: String, windowId: String? = nil, tabId: String?) async throws -> Any? {
+        let target = try resolveRenderer(windowId: windowId, tabId: tabId)
         return try await target.evaluateJS(script)
     }
 
-    func evaluateJSReturningString(_ script: String, tabId: String?) async throws -> String {
-        let result = try await evaluateJS(script, tabId: tabId)
+    func evaluateJSReturningString(_ script: String, windowId: String? = nil, tabId: String?) async throws -> String {
+        let result = try await evaluateJS(script, windowId: windowId, tabId: tabId)
         return result as? String ?? String(describing: result ?? "null")
     }
 
-    func evaluateJSReturningJSON(_ script: String, tabId: String?) async throws -> [String: Any] {
+    func evaluateJSReturningJSON(_ script: String, windowId: String? = nil, tabId: String?) async throws -> [String: Any] {
         let wrapped = "JSON.stringify((\(script)))"
-        let jsonString = try await evaluateJSReturningString(wrapped, tabId: tabId)
+        let jsonString = try await evaluateJSReturningString(wrapped, windowId: windowId, tabId: tabId)
         guard let data = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return [:]
@@ -136,9 +138,9 @@ final class HandlerContext {
         return json
     }
 
-    func evaluateJSReturningArray(_ script: String, tabId: String?) async throws -> [[String: Any]] {
+    func evaluateJSReturningArray(_ script: String, windowId: String? = nil, tabId: String?) async throws -> [[String: Any]] {
         let wrapped = "JSON.stringify((\(script)))"
-        let jsonString = try await evaluateJSReturningString(wrapped, tabId: tabId)
+        let jsonString = try await evaluateJSReturningString(wrapped, windowId: windowId, tabId: tabId)
         guard let data = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             return []

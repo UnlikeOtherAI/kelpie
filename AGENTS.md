@@ -9,7 +9,9 @@
 - System architecture: [docs/architecture.md](docs/architecture.md) — components, data flow, protocols
 - Tech stack: [docs/tech-stack.md](docs/tech-stack.md) — platform choices, dependencies, repo structure
 - Feature catalogue: [docs/functionality.md](docs/functionality.md) — description of every user-facing feature
+- Shared browser core: [docs/api/browser-control.md](docs/api/browser-control.md); native HTTP/MCP and CLI forwarding share one persistent gateway with compact extension discovery; portable schemas and adapters live only in `packages/shared/src/browser-control`, and real headless conformance is a separate `test:browser` command.
 - API reference: [docs/api/](docs/api/) — all HTTP/MCP methods (core, LLM-optimized, devtools, browser management)
+- Android JNI/HTTP/MCP and inference: [docs/api/native-browser-gateway-android.md](docs/api/native-browser-gateway-android.md); builds need Node 20+ and pnpm alongside Java/SDK.
 - CLI reference: [docs/cli.md](docs/cli.md) — commands, flags, group operations, LLM help system
 - Persistent pairing and exact-socket token reuse: [docs/functionality.md](docs/functionality.md#pairing--authentication).
 - UI documentation: [docs/ui/](docs/ui/) — browser app screens, settings panel, platform specifics
@@ -131,10 +133,11 @@ Each component owns its version in its own manifest — do not create a central 
 
 ## Windows release ownership
 
-- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`
-  (`0.1.8`); keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
+- Windows desktop version is `project(kelpie_windows VERSION …)` in `apps/windows/CMakeLists.txt`; keep `resources/kelpie.rc`, `src/device_info_windows.h` and `src/windows_runtime.cpp`
   in step with it.
 - Build/package through the Windows CEF bootstrap path; a release must retain the sandbox and
   include matching CEF runtime assets.
 - Verify direct `/mcp`, `kelpie --browser <alias> mcp`, native tabs/navigation/autocomplete, and
   readiness cleanup before publishing.
+
+Native browser gateway bindings and reproducible generated contract builds follow [docs/api/native-browser-gateway.md](docs/api/native-browser-gateway.md).

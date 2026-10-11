@@ -48,6 +48,34 @@ BrowserControlResult DesktopEngine::Evaluate(TabLease lease, std::string script,
   return result;
 }
 
+BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease lease, std::string script, Json* value, Timeout timeout) {
+  if (!value) return BrowserControlResult::Failure("INTERNAL", "Result is required");
+  const auto started_at = std::chrono::steady_clock::now();
+  Json frames;
+  auto result = DevTools(lease, "Page.getFrameTree", Json::object(), &frames, timeout);
+  if (!result.ok) return result;
+  try {
+    const std::string frame = frames.at("frameTree").at("frame").at("id");
+    Json world;
+    result = DevTools(lease, "Page.createIsolatedWorld", {{"frameId", frame}, {"worldName", "kelpie.browser-control"}},
+                      &world, RemainingTimeout(started_at, timeout));
+    if (!result.ok) return result;
+    Json evaluated;
+    auto params = DesktopDevToolsSession::EvaluateParams(script);
+    params["contextId"] = world.at("executionContextId");
+    result = DevTools(lease, "Runtime.evaluate", params, &evaluated, RemainingTimeout(started_at, timeout));
+    if (!result.ok) return result;
+    if (evaluated.contains("exceptionDetails") || !evaluated.at("result").contains("value"))
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed");
+    // EvaluateParams returns the standard runtime envelope; unwrap it exactly
+    // as ordinary Evaluate does rather than handing the envelope to the gateway.
+    const auto parsed = DesktopDevToolsSession::ParseEvaluateResult({true, {}, {}, evaluated, false});
+    if (!parsed.ok) return DevToolsResult(parsed);
+    *value = parsed.value;
+    return result;
+  } catch (...) { return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed"); }
+}
+
 BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot* image, Timeout timeout) {
   const auto impl = impl_;
   if (image == nullptr) return BrowserControlResult::Failure("INTERNAL", "image is required");
@@ -131,6 +159,46 @@ BrowserControlResult DesktopEngine::DeleteCookies(TabLease lease, const Json& qu
 BrowserControlResult DesktopEngine::DevTools(TabLease lease, std::string method, const Json& params,
                                              Json* output, Timeout timeout) {
   return RunDevTools(impl_, lease, std::move(method), params, output, timeout);
+}
+
+BrowserControlResult DesktopEngine::ReadAppearance(TabLease lease, Json* output, Timeout timeout) {
+  if (!output) return BrowserControlResult::Failure("INTERNAL", "Result is required");
+  const auto started = std::chrono::steady_clock::now();
+  // Purpose-specific internal reads alone opt out of the action fence. Public
+  // DevTools, Evaluate and the canonical fixed reader always retain it.
+  const auto read = [&](const std::string& method, const Json& params, Json* value) {
+    const auto remaining = RemainingTimeout(started, timeout);
+    if (remaining <= Timeout::zero()) return DeadlineExceeded();
+    return RunDevTools(impl_, lease, method, params, value, remaining, {}, false);
+  };
+  Json before, viewport, captured, after, after_viewport;
+  auto result = read("Page.getFrameTree", Json::object(), &before);
+  if (!result.ok) return result;
+  result = read("Page.getLayoutMetrics", Json::object(), &viewport);
+  if (!result.ok) return result;
+  try {
+    const auto& layout = viewport.at("layoutViewport");
+    const double width = layout.at("clientWidth"), height = layout.at("clientHeight");
+    if (width <= 0 || width > 32768 || height <= 0)
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance viewport is unavailable");
+    // A clip can resize Alloy's live view: capture without clipping/emulation.
+    result = read("Page.captureScreenshot", {{"format", "png"}, {"fromSurface", true},
+                                           {"captureBeyondViewport", false}}, &captured);
+    if (!result.ok) return result;
+    result = read("Page.getFrameTree", Json::object(), &after);
+    if (!result.ok) return result;
+    result = read("Page.getLayoutMetrics", Json::object(), &after_viewport);
+    if (!result.ok) return result;
+    const auto& frame = before.at("frameTree").at("frame");
+    const auto& current = after.at("frameTree").at("frame");
+    if (frame.at("id") != current.at("id") || frame.at("loaderId") != current.at("loaderId") ||
+        frame.at("url") != current.at("url") || layout != after_viewport.at("layoutViewport"))
+      return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance document changed");
+    *output = {{"url", frame.at("url")}, {"data", captured.at("data").get<std::string>()}};
+    return BrowserControlResult::Success();
+  } catch (...) {
+    return BrowserControlResult::Failure("COMMAND_FAILED", "Appearance observation is unavailable");
+  }
 }
 
 }  // namespace kelpie

@@ -97,6 +97,7 @@ class DesktopEngine final : public DesktopBrowserControl {
 
   bool Initialize(const Config& config);
   bool Shutdown();
+  bool HasPendingBrowserControl() const;
   void DoMessageLoopWork();
   const std::string& last_error() const;
   bool IsActiveNativeBrowserAttached(void* parent_window, Timeout timeout);
@@ -161,6 +162,8 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 std::string script,
                                 Json* value,
                                 Timeout timeout) override;
+  BrowserControlResult EvaluateBrowserControl(TabLease lease, std::string script,
+                                              Json* value, Timeout timeout) override;
   BrowserControlResult Screenshot(TabLease lease,
                                   BrowserScreenshot* image,
                                   Timeout timeout) override;
@@ -190,6 +193,8 @@ class DesktopEngine final : public DesktopBrowserControl {
                                 const Json& params,
                                 Json* result,
                                 Timeout timeout) override;
+
+  BrowserControlResult ReadAppearance(TabLease lease, Json* result, Timeout timeout) override;
 
   class Impl;
 

@@ -243,6 +243,13 @@ async function verifyCliAndStdio(config, fixtureUrl) {
     await waitFor(async () => sameUrl((await control(readiness, "get-current-url", {})).url, fixtureUrl),
       "CLI-targeted navigation");
 
+    const canonical = await runCommand(process.execPath, [config.cli, "--browser", alias, "browser-control",
+      JSON.stringify({ version: 1, method: "tabs.list" })], { env: environment });
+    const canonicalResult = parseCliResult(canonical, "CLI canonical browser control");
+    assert.equal(canonicalResult.ok, true);
+    assert.ok(canonicalResult.value.length > 0);
+    assertNoCapabilityLeak(canonical, readiness, "CLI canonical browser control");
+
     await runNessieStdioClient({ cliPath: config.cli, cliHome, alias, fixtureUrl, nessieRoot: config.nessieRoot });
 
     const stopped = await runCommand(process.execPath, [config.cli, "browser", "stop", alias], { env: environment, timeoutMs: config.timeoutMs });

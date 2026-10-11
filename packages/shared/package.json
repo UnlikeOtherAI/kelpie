@@ -1,6 +1,6 @@
 {
   "name": "@unlikeotherai/kelpie-shared",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,15 +9,20 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./browser-control": {
+      "types": "./dist/browser-control/index.d.ts",
+      "import": "./dist/browser-control/index.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run",
-    "lint": "eslint src/ tests/"
+    "build": "node scripts/build.mjs",
+    "test": "vitest run --exclude tests/browser-control.browser.test.ts",
+    "lint": "eslint src/ tests/",
+    "test:browser": "vitest run tests/browser-control.browser.test.ts"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
@@ -27,5 +32,12 @@
     "type": "git",
     "url": "git+https://github.com/UnlikeOtherAI/kelpie.git",
     "directory": "packages/shared"
-  }
+  },
+  "dependencies": {
+    "zod": "^4.3.6",
+    "playwright-core": "1.62.1"
+  },
+  "files": [
+    "dist"
+  ]
 }

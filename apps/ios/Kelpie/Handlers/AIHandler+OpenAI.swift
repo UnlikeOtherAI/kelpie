@@ -86,7 +86,10 @@ extension AIHandler {
         guard context.webView != nil else {
             return .rejected(errorResponse(code: "NO_WEBVIEW", message: "No browser tab is available."))
         }
-        guard let tabStore = context.tabStore else { return .pinned(requested) }
+        guard let tabStore = context.tabStore else {
+            guard requested == nil || requested == "external" else { return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Unknown external tab")) }
+            return .pinned("external")
+        }
         guard let requested else { return .pinned(tabStore.activeBrowserTabID?.uuidString) }
         guard let id = UUID(uuidString: requested), tabStore.tabs.contains(where: { $0.id == id }) else {
             return .rejected(errorResponse(code: "TAB_NOT_FOUND", message: "Tab \(requested) not found"))
@@ -101,28 +104,13 @@ extension AIHandler {
     }
 
     /// Page data for `context: page_text | dom | accessibility`, gathered with
-    /// the same router methods API callers use.
+    /// the bounded common snapshot, including accessible labels and truncation.
     func preloadedContext(mode: String?, router: Router, tabId: String?) async throws -> String? {
-        let request: (method: String, body: [String: Any])
-        switch mode {
-        case "page_text": request = ("get-page-text", [:])
-        case "dom": request = ("get-dom", ["selector": "body"])
-        case "accessibility": request = ("get-accessibility-tree", ["maxDepth": 3])
-        default: return nil
+        guard mode != nil && mode != "screenshot" else { return nil }
+        guard ["page_text", "dom", "accessibility"].contains(mode ?? "") else {
+            throw AIHandlerError(code: "INVALID_PARAM", message: "Unsupported context mode")
         }
-        let dispatcher = VisibleTabToolDispatcher(
-            base: RouterToolDispatcher(router: router),
-            pinnedTabId: tabId,
-            visibleTabId: { [context] in await MainActor.run { context.tabStore?.activeBrowserTabID?.uuidString } }
-        )
-        var result = await dispatcher.dispatch(method: request.method, body: request.body)
-        guard result["success"] as? Bool == true else {
-            let details = result["error"] as? [String: Any]
-            throw AIHandlerError(code: details?["code"] as? String ?? "EVAL_ERROR", message: details?["message"] as? String ?? "Could not read page context")
-        }
-        if mode == "page_text" { return AIConversation.pageEvidence(result) }
-        result.removeValue(forKey: "success")
-        return OpenAIAgentLoop.json(result)
+        return try AIConversation.commonEvidence(await router.pageObservation(tabId: tabId))
     }
 
     enum ScreenshotOutcome {
@@ -148,6 +136,10 @@ struct VisibleTabToolDispatcher: OpenAIToolDispatching {
     let base: OpenAIToolDispatching
     let pinnedTabId: String?
     let visibleTabId: @Sendable () async -> String?
+
+    func browserSession(tabId: String?, allowActions: Bool) async -> BrowserControlGateway {
+        await base.browserSession(tabId: pinnedTabId ?? tabId, allowActions: allowActions)
+    }
 
     func dispatch(method: String, body: [String: Any]) async -> [String: Any] {
         if let pinnedTabId, await visibleTabId() != pinnedTabId {

@@ -32,6 +32,7 @@ final class ServerState: ObservableObject {
     /// Called by BrowserView when the active tab changes so the tab's renderer
     /// becomes the target for all handlers.
     func setActiveWebKitRenderer(_ renderer: WKWebViewRenderer) {
+        router.invalidateAllBrowserReferences()
         renderer.onScriptMessage = { [weak self] name, body in
             self?.handlerContext.handleScriptMessage(name: name, body: body)
         }

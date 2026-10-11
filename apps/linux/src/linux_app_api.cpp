@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <map>
 #include <set>
 
 #include "kelpie/error_codes.h"
@@ -66,74 +67,17 @@ LinuxApp::json LinuxApp::DeviceInfo() const {
   return payload;
 }
 
-LinuxApp::json LinuxApp::Capabilities() const {
-  const std::set<std::string> supported_routes = {
-      "navigate",         "back",            "forward",          "reload",
-      "get-current-url",  "set-home",        "get-home",         "evaluate",
-      "get-device-info",  "get-capabilities","get-bookmarks",    "add-bookmark",
-      "remove-bookmark",  "clear-bookmarks", "get-history",      "clear-history",
-      "get-network-log",  "get-console-messages", "get-js-errors","toast",
-      "report-issue",
-      "set-fullscreen",   "get-fullscreen",  "tap",              "click",
-      "screenshot",       "screenshot-annotated", "click-annotation",
-      "fill-annotation",
-      "get-tap-calibration", "set-tap-calibration",
-  };
-  const std::set<std::string> partial_routes = {"evaluate", "get-console-messages", "get-network-log"};
-
-  json supported = json::array();
-  json partial = json::array();
-  json unsupported = json::array();
-
-  for (const auto& tool : impl_->registry.tools_for_platform(kelpie::Platform::kLinux)) {
-    if (!kelpie::SupportsEngine(tool.availability, "chromium")) {
-      continue;
-    }
-    if (impl_->config.headless && tool.availability.requires_ui) {
-      unsupported.push_back(tool.http_endpoint);
-      continue;
-    }
-    if (!tool.availability.allowed_headless && impl_->config.headless) {
-      unsupported.push_back(tool.http_endpoint);
-      continue;
-    }
-    if ((tool.http_endpoint == "screenshot" || tool.http_endpoint == "screenshot-annotated") &&
-        !ScreenshotSupported()) {
-      unsupported.push_back(tool.http_endpoint);
-      continue;
-    }
-    if ((tool.http_endpoint == "click" || tool.http_endpoint == "click-annotation" ||
-         tool.http_endpoint == "fill-annotation") &&
-        !HasNativeBrowser()) {
-      unsupported.push_back(tool.http_endpoint);
-      continue;
-    }
-    if (supported_routes.count(tool.http_endpoint) == 0) {
-      unsupported.push_back(tool.http_endpoint);
-      continue;
-    }
-    if (partial_routes.count(tool.http_endpoint) != 0) {
-      partial.push_back(tool.http_endpoint);
-    } else {
-      supported.push_back(tool.http_endpoint);
-    }
-  }
-
-  return {{"success", true},
-          {"version", impl_->version},
-          {"platform", "linux"},
-          {"supported", supported},
-          {"partial", partial},
-          {"unsupported", unsupported}};
-}
-
 LinuxApp::json LinuxApp::HandleApiRequest(std::string_view endpoint,
                                           const json& params,
                                           int* status_code) {
-  if (status_code != nullptr) {
-    *status_code = 200;
-  }
-
+  std::lock_guard<std::recursive_mutex> lock(impl_->browser_mutex);
+  if (status_code != nullptr) *status_code = 200;
+  if (endpoint == "browser-control" || endpoint == "mcp") return HandleBrowserGateway(params, endpoint == "mcp");
+  if (impl_->browser_gateway && !impl_->gateway_dispatch) impl_->browser_gateway->InvalidateReferences();
+  static const std::map<std::string_view, std::string_view> aliases = {
+    {"bookmarks-list", "get-bookmarks"}, {"bookmarks-add", "add-bookmark"}, {"bookmarks-remove", "remove-bookmark"},
+    {"bookmarks-clear", "clear-bookmarks"}, {"history-list", "get-history"}, {"history-clear", "clear-history"}};
+  if (auto alias = aliases.find(endpoint); alias != aliases.end()) endpoint = alias->second;
   try {
     if (endpoint == "navigate") {
       const std::string url = params.value("url", "");

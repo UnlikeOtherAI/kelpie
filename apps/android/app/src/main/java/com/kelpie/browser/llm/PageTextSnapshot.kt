@@ -1,16 +1,13 @@
 package com.kelpie.browser.llm
 
-import android.webkit.WebView
 import com.kelpie.browser.ai.openai.OpenAIException
 import com.kelpie.browser.ai.openai.OpenAIJson
 import com.kelpie.browser.handlers.HandlerContext
 import com.kelpie.browser.handlers.JSEscape
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.coroutines.resume
 
 /** One ephemeral read against the requested WebView; switching tabs cannot redirect it. */
 object PageTextSnapshot {
@@ -58,7 +55,7 @@ object PageTextSnapshot {
                 } else {
                     (context.tabStore?.activeTab?.webView ?: context.webView) ?: throw OpenAIException("NO_WEBVIEW", "No browser tab is available")
                 }
-            val raw = evaluate(webView, "JSON.stringify(($script))")
+            val raw = context.withBrowserTarget(webView) { context.evaluateJS("JSON.stringify(($script))") }
             decodeObject(raw)
         }
 
@@ -85,12 +82,4 @@ object PageTextSnapshot {
             throw OpenAIException("EVAL_ERROR", "Page text returned an invalid snapshot")
         }
     }
-
-    private suspend fun evaluate(
-        webView: WebView,
-        script: String,
-    ): String =
-        suspendCancellableCoroutine { continuation ->
-            webView.evaluateJavascript(script) { raw -> if (continuation.isActive) continuation.resume(raw ?: "null") }
-        }
 }

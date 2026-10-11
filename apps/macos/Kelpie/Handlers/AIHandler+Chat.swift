@@ -42,7 +42,7 @@ extension AIHandler {
             }
             return AIPageContext(suppliedText: text)
         }
-        return try await AIPageContext.gather(from: context, tabId: tabId)
+        return try await commonPageContext(tabId: tabId)
     }
 
     private func runLocalChat(

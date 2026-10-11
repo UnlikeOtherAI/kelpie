@@ -28,6 +28,17 @@ final class AIPageContextTests: XCTestCase {
         XCTAssertLessThan(evidence.count, 13000)
     }
 
+    func testCommonEvidenceOmitsValuesAndReportsRefusal() throws {
+        let evidence = try AIConversation.commonEvidence(["ok": true, "value": [
+            "title": "Page", "url": "https://example.test", "text": "Public", "truncated": true,
+            "elements": [["name": "Logo", "value": "secret-input"]]
+        ]])
+        XCTAssertTrue(evidence.contains("Logo"))
+        XCTAssertTrue(evidence.contains("truncated"))
+        XCTAssertFalse(evidence.contains("secret-input"))
+        XCTAssertThrowsError(try AIConversation.commonEvidence(["ok": false, "error": ["code": "TAB_NOT_FOUND", "message": "Closed"]]))
+    }
+
     @MainActor
     func testSnapshotTargetsRequestedBackgroundTabAndAccessibleLogos() async throws {
         let context = HandlerContext()

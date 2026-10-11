@@ -85,6 +85,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
 
   bool initialized = false;
   std::atomic<bool> shutting_down = false;
+  std::shared_ptr<std::atomic<std::size_t>> unknown_operations = std::make_shared<std::atomic<std::size_t>>(0);
   std::string last_error;
   bool loading = false;
   bool can_go_back = false;

@@ -1,14 +1,15 @@
 import AppKit
 import Foundation
-
 struct InferenceHarness {
     private let engine = InferenceEngine.shared
     private let context: HandlerContext
+    private let router: Router?
     private let maxRounds = 3
     private let toolTokenBudget = 1500
 
-    init(context: HandlerContext) {
+    init(context: HandlerContext, router: Router?) {
         self.context = context
+        self.router = router
     }
 
     struct Result {
@@ -29,18 +30,28 @@ struct InferenceHarness {
 
     func run(prompt: String, audio: Data? = nil, preloadedContext: String? = nil) async throws -> Result {
         let startedAt = DispatchTime.now()
-        let summary = await PageSummary.gather(from: context)
         var totalTokens = 0
         var toolCallsMade = 0
         var rounds = 0
         var transcript: [String] = []
         var transcription: String?
         var pendingImage: Data?
+        let vision = await MainActor.run { engine.capabilities.contains("vision") }
+        guard let router else { throw InferenceEngine.InferenceError.inferenceFailed("Browser router is unavailable") }
+        let tabId = await MainActor.run { context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString }
+        let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true, admission: .localReadOnly(vision: vision))
+        let definitions = await browser.toolDefinitions()
+        let observation = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": tabId ?? "",
+                                                 "params": ["maxChars": 1200, "maxElements": 1]])
+        guard observation["ok"] as? Bool == true, let value = observation["value"] as? [String: Any] else {
+            throw InferenceEngine.InferenceError.inferenceFailed("Could not observe the pinned browser tab")
+        }
+        let summary = "Untrusted page metadata: " + stringify(["title": value["title"] ?? "", "url": value["url"] ?? ""])
 
         if let preloadedContext {
             let fullPrompt = buildDirectAnswerPrompt(
                 userPrompt: prompt,
-                pageSummary: summary.formatted(),
+                pageSummary: summary,
                 pageText: preloadedContext
             )
             let inference = try await engine.infer(prompt: fullPrompt, audio: audio, image: nil)
@@ -59,9 +70,10 @@ struct InferenceHarness {
         while rounds < maxRounds {
             let fullPrompt = buildPrompt(
                 userPrompt: prompt,
-                pageSummary: summary.formatted(),
+                pageSummary: summary,
                 preloadedContext: nil,
-                transcript: transcript
+                transcript: transcript,
+                toolDefinitions: stringify(definitions)
             )
             let inference = try await engine.infer(prompt: fullPrompt, audio: audio, image: pendingImage)
             totalTokens += inference.tokensUsed
@@ -73,13 +85,11 @@ struct InferenceHarness {
                 rounds += 1
                 toolCallsMade += 1
 
-                if toolCall.name == "get_screenshot" {
-                    pendingImage = try await captureScreenshot()
-                    transcript.append("Tool get_screenshot returned: Screenshot captured and attached.")
-                    continue
-                }
-
-                let toolResult = await executeTool(toolCall.name, args: toolCall.args)
+                let result = await browser.callTool(name: toolCall.name, arguments: toolCall.args)
+                try refuseUncertainOutcome(result)
+                let observation = BrowserModelObservation(result, vision: vision)
+                if let image = observation.image { pendingImage = image }
+                let toolResult = truncate(stringify(observation.text), maxTokens: toolTokenBudget)
                 transcript.append("Tool \(toolCall.name) returned: \(toolResult)")
                 continue
             }
@@ -105,246 +115,11 @@ struct InferenceHarness {
         )
     }
 
-    @MainActor
-    // swiftlint:disable:next function_body_length
-    func executeTool(_ name: String, args: [String: String]) async -> String {
-        let payload: Any
-
-        switch name {
-        case "get_text":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var el = document.body || document.documentElement;
-                    var text = (el?.innerText || el?.textContent || '').trim();
-                    return {
-                        title: document.title || '',
-                        content: text,
-                        wordCount: text ? text.split(/\\s+/).length : 0
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_dom":
-            // swiftlint:disable:next force_unwrapping
-            let selector = (args["selector"]?.isEmpty == false) ? args["selector"]! : "body"
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var el = document.querySelector('\(JSEscape.string(selector))');
-                    if (!el) return { found: false };
-                    return {
-                        found: true,
-                        selector: '\(JSEscape.string(selector))',
-                        html: el.outerHTML,
-                        nodeCount: el.querySelectorAll('*').length + 1
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_element":
-            let selector = args["selector"] ?? ""
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var el = document.querySelector('\(JSEscape.string(selector))');
-                    if (!el) return { found: false };
-                    var attrs = {};
-                    for (var i = 0; i < el.attributes.length; i++) {
-                        attrs[el.attributes[i].name] = el.attributes[i].value;
-                    }
-                    return {
-                        found: true,
-                        selector: '\(JSEscape.string(selector))',
-                        text: (el.textContent || '').trim(),
-                        attributes: attrs
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "find_element":
-            let text = args["text"] ?? ""
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    \(elementSelectorBuilderScript())
-                    var wanted = '\(JSEscape.string(text))'.toLowerCase();
-                    var all = document.querySelectorAll('*');
-                    for (var el of all) {
-                        var content = (el.textContent || '').trim();
-                        if (!content || !content.toLowerCase().includes(wanted)) continue;
-                        var rect = el.getBoundingClientRect();
-                        if (rect.width <= 0 || rect.height <= 0) continue;
-                        return {
-                            found: true,
-                            element: {
-                                tag: el.tagName.toLowerCase(),
-                                selector: kelpieBuildSelector(el),
-                                text: content.substring(0, 200)
-                            }
-                        };
-                    }
-                    return { found: false };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_forms":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    \(elementSelectorBuilderScript())
-                    var forms = document.querySelectorAll('form');
-                    return {
-                        formCount: forms.length,
-                        forms: Array.from(forms).map(function(form) {
-                            return {
-                                selector: kelpieBuildSelector(form),
-                                fields: Array.from(form.querySelectorAll('input,select,textarea')).map(function(el) {
-                                    return {
-                                        name: el.name || '',
-                                        type: el.type || el.tagName.toLowerCase(),
-                                        value: el.value || '',
-                                        required: !!el.required
-                                    };
-                                })
-                            };
-                        })
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_errors":
-            let errors = context.consoleMessages.filter { ($0["level"] as? String) == "error" }
-            payload = ["count": errors.count, "errors": Array(errors.suffix(20))]
-
-        case "get_console":
-            payload = [
-                "count": context.consoleMessages.count,
-                "messages": Array(context.consoleMessages.suffix(20))
-            ]
-
-        case "get_network":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var entries = performance.getEntriesByType('navigation').concat(
-                        performance.getEntriesByType('resource')
-                    );
-                    var recent = entries.slice(Math.max(0, entries.length - 20));
-                    return {
-                        count: entries.length,
-                        entries: recent.map(function(entry) {
-                            return {
-                                url: entry.name,
-                                initiator: entry.initiatorType || entry.entryType,
-                                duration: Math.round(entry.duration || 0)
-                            };
-                        })
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_cookies":
-            let cookies = await context.allCookies().map { cookie in
-                [
-                    "name": cookie.name,
-                    "value": cookie.value,
-                    "domain": cookie.domain,
-                    "path": cookie.path
-                ]
-            }
-            payload = ["count": cookies.count, "cookies": cookies]
-
-        case "get_storage":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var entries = {};
-                    for (var i = 0; i < localStorage.length; i++) {
-                        var key = localStorage.key(i);
-                        entries[key] = localStorage.getItem(key);
-                    }
-                    return { count: localStorage.length, entries: entries };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_links":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    var links = Array.from(document.querySelectorAll('a[href]')).slice(0, 200);
-                    return {
-                        count: links.length,
-                        links: links.map(function(link) {
-                            return {
-                                href: link.href,
-                                text: (link.textContent || '').trim().substring(0, 200)
-                            };
-                        })
-                    };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_visible":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    \(elementSelectorBuilderScript())
-                    var elements = [];
-                    var all = document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="link"]');
-                    for (var el of all) {
-                        var rect = el.getBoundingClientRect();
-                        if (rect.width <= 0 || rect.height <= 0) continue;
-                        if (rect.bottom <= 0 || rect.right <= 0 || rect.top >= window.innerHeight || rect.left >= window.innerWidth) continue;
-                        elements.push({
-                            tag: el.tagName.toLowerCase(),
-                            text: (el.textContent || el.value || '').trim().substring(0, 120),
-                            role: el.getAttribute('role') || '',
-                            selector: kelpieBuildSelector(el)
-                        });
-                        if (elements.length >= 100) break;
-                    }
-                    return { count: elements.length, elements: elements };
-                })()
-                """
-            )) ?? [:]
-
-        case "get_a11y":
-            payload = (try? await context.evaluateJSReturningJSON(
-                """
-                (function() {
-                    function walk(node, depth) {
-                        if (!node || depth > 3) return null;
-                        var item = {
-                            role: node.getAttribute('role') || node.tagName.toLowerCase(),
-                            name: (node.getAttribute('aria-label') || node.textContent || '').trim().substring(0, 80)
-                        };
-                        var children = [];
-                        for (var child of node.children) {
-                            var result = walk(child, depth + 1);
-                            if (result) children.push(result);
-                        }
-                        if (children.length) item.children = children;
-                        return item;
-                    }
-                    return { tree: walk(document.body, 0) };
-                })()
-                """
-            )) ?? [:]
-
-        default:
-            payload = ["error": "Unknown tool: \(name)"]
+    private func refuseUncertainOutcome(_ result: [String: Any]) throws {
+        let canonical = BrowserControlGateway.canonicalResult(result)
+        if (canonical["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool == true {
+            throw InferenceEngine.InferenceError.inferenceFailed("Browser outcome is uncertain; the model turn stopped without retrying")
         }
-
-        return truncate(stringify(payload), maxTokens: toolTokenBudget)
     }
 
     private func truncate(_ text: String, maxTokens: Int) -> String {
@@ -373,9 +148,10 @@ struct InferenceHarness {
         userPrompt: String,
         pageSummary: String,
         preloadedContext: String?,
-        transcript: [String]
+        transcript: [String],
+        toolDefinitions: String
     ) -> String {
-        var sections = [SystemPrompt.build(), "", pageSummary]
+        var sections = [SystemPrompt.build(tools: toolDefinitions), "", pageSummary]
         if let preloadedContext, !preloadedContext.isEmpty {
             sections.append("")
             sections.append("Context:")
@@ -392,18 +168,12 @@ struct InferenceHarness {
         return sections.joined(separator: "\n")
     }
 
-    private func parseToolCall(from text: String) -> (name: String, args: [String: String])? {
+    private func parseToolCall(from text: String) -> (name: String, args: [String: Any])? {
         guard let object = parseJSONObject(from: text),
               let tool = object["tool"] as? String else {
             return nil
         }
-        let args = (object["args"] as? [String: Any] ?? [:]).reduce(into: [String: String]()) { result, entry in
-            if let stringValue = entry.value as? String {
-                result[entry.key] = stringValue
-            } else {
-                result[entry.key] = String(describing: entry.value)
-            }
-        }
+        let args = object["args"] as? [String: Any] ?? [:]
         return (tool, args)
     }
 
@@ -457,16 +227,6 @@ struct InferenceHarness {
 
     private func extractTranscription(from text: String) -> String? {
         parseJSONObject(from: text)?["transcription"] as? String
-    }
-
-    private func captureScreenshot() async throws -> Data {
-        let image = try await context.takeSnapshot()
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else {
-            throw HandlerError.platformNotSupported("Failed to encode screenshot")
-        }
-        return png
     }
 
     private func stringify(_ value: Any) -> String {

@@ -40,11 +40,12 @@ final class AIPageContextToolTests: XCTestCase {
         let result = await router.handle(method: "get-page-text", body: ["selector": "#customers"])
         XCTAssertGreaterThan((result.json["content"] as? String)?.count ?? 0, 16000)
         XCTAssertEqual(result.json["textTruncated"] as? Bool, false)
-        let preload = try await AIHandler(context: context).preloadedContext(mode: "page_text", tabId: nil)
+        router.handlerContext = context
+        let preload = try await AIHandler(context: context, router: router).preloadedContext(mode: "page_text", tabId: nil)
         let serialized = try XCTUnwrap(preload)
         XCTAssertTrue(serialized.hasPrefix("{\"accessibleLabels\":"), "Keep names before body text when model input is truncated")
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(serialized.utf8)) as? [String: Any])
-        XCTAssertEqual((payload["content"] as? String)?.count, 16000)
+        XCTAssertLessThanOrEqual((payload["content"] as? String)?.count ?? 0, 12000)
         XCTAssertEqual(payload["textTruncated"] as? Bool, true)
         XCTAssertTrue((payload["accessibleLabels"] as? [String] ?? []).contains("Spotify"))
     }
@@ -78,7 +79,9 @@ final class AIPageContextToolTests: XCTestCase {
             declared: OpenAIDeclaredCapabilities()
         ))
         _ = try await service.select(endpoint.id, model: nil)
-        let handler = AIHandler(context: context, router: Router(), openAIService: service)
+        let router = Router()
+        router.handlerContext = context
+        let handler = AIHandler(context: context, router: router, openAIService: service)
         let body: [String: Any] = ["prompt": "Which customers?", "context": "page_text"]
         let success = await handler.inferWithOpenAI(body)
         XCTAssertEqual(success["success"] as? Bool, true)
@@ -87,12 +90,13 @@ final class AIPageContextToolTests: XCTestCase {
         let messages = try XCTUnwrap(payload["messages"] as? [[String: Any]])
         XCTAssertTrue((messages.last?["content"] as? String ?? "").contains("Spotify"))
         let beforeFailure = transport.requests.count
-        _ = try await renderer.evaluateJS("JSON.stringify = function() { throw new Error('snapshot failed'); }; true")
+        context.renderer = nil // The captured renderer is gone; refuse before calling the provider.
         for mode in ["page_text", "dom", "accessibility"] {
             let failure = await handler.inferWithOpenAI(["prompt": "Which customers?", "context": mode])
             XCTAssertEqual((failure["error"] as? [String: Any])?["code"] as? String, "PAGE_CONTEXT_UNAVAILABLE")
             XCTAssertEqual(transport.requests.count, beforeFailure, "Failed preload contacted the model")
         }
+        context.renderer = renderer
         let explicit = await handler.inferWithOpenAI(["prompt": "Summarize", "context": "page_text", "text": "Supplied evidence"])
         XCTAssertEqual(explicit["success"] as? Bool, true, "Explicit text must not attempt page extraction")
     }

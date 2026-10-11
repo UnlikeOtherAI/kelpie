@@ -44,42 +44,34 @@ int main() {
   const auto init = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},
        {"params", {{"protocolVersion", "2025-06-18"}}}}, config);
-  assert(init["result"]["serverInfo"]["name"] == "kelpie-desktop");
+  assert(init["result"]["serverInfo"]["name"] == "kelpie");
   assert(init["result"]["protocolVersion"] == "2025-06-18");
 
   const auto tools = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/list"}}, config);
   const auto& listed = tools["result"]["tools"];
-  std::set<std::string> expected_names;
-  for (const auto& tool : registry.all_tools()) {
-    if (endpoints.find(tool.http_endpoint) != endpoints.end()) expected_names.insert(tool.name);
-  }
-  std::set<std::string> actual_names;
-  for (const auto& tool : listed) {
-    actual_names.insert(tool["name"].get<std::string>());
-    const auto& schema = tool["inputSchema"];
-    assert(schema["type"] == "object");
-    assert(schema["additionalProperties"] == false);
-    assert(schema["properties"].is_object());
-    assert(schema["required"].is_array());
-  }
-  assert(actual_names == expected_names);
-  assert(actual_names.find("kelpie_bookmarks_list") != actual_names.end());
-  assert(actual_names.find("kelpie_history_list") != actual_names.end());
-  assert(actual_names.find("kelpie_clear_cookies") != actual_names.end());
-  assert(actual_names.find("kelpie_screenshot_annotated") == actual_names.end());
-
-  const auto schema_for = [&listed](const char* name) -> const nlohmann::json& {
-    for (const auto& tool : listed) if (tool["name"] == name) return tool["inputSchema"];
-    assert(false); return listed[0]["inputSchema"];
+  assert(listed.size() == 4);
+  assert(listed.dump().size() < 24000);
+  assert(listed[0]["name"] == "kelpie_browser_control");
+  const auto names = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 3}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extensions"}}}}, config);
+  assert(names["result"]["content"].dump().find("kelpie_bookmarks_list") != std::string::npos);
+  const auto discovered = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 4}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extension_tools"}, {"arguments", {{"names", {"kelpie_fill", "kelpie_screenshot", "kelpie_resize_viewport", "kelpie_bookmarks_remove"}}}}}}}, config);
+  const auto schemas = nlohmann::json::parse(discovered["result"]["content"][0]["text"].get<std::string>())["value"];
+  const auto schema_for = [&schemas](const char* name) -> const nlohmann::json& {
+    for (const auto& tool : schemas) if (tool["name"] == name) return tool["inputSchema"];
+    assert(false); return schemas[0]["inputSchema"];
   };
+  const auto rich_call = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 5}, {"method", "tools/call"},
+    {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_bookmarks_list"}, {"arguments", nlohmann::json::object()}}}}}}, config);
+  assert(rich_call["result"]["isError"] == false);
   const auto& fill = schema_for("kelpie_fill");
   assert(fill["required"] == nlohmann::json::array({"selector", "value"}));
-  assert(fill["properties"]["value"]["minLength"] == 0);
+  assert(fill["properties"]["value"]["type"] == "string");
   const auto& screenshot = schema_for("kelpie_screenshot");
-  assert(screenshot["properties"]["format"]["const"] == "png");
-  assert(!screenshot["properties"].contains("fullPage"));
+  assert(screenshot["properties"]["format"]["enum"] == nlohmann::json::array({"png", "jpeg"}));
+  assert(screenshot["properties"]["fullPage"]["type"] == "boolean");
   const auto& viewport = schema_for("kelpie_resize_viewport");
-  assert(viewport["required"] == nlohmann::json::array({"width", "height"}));
   assert(viewport["properties"]["width"]["minimum"] == 1);
   const auto& bookmark_remove = schema_for("kelpie_bookmarks_remove");
   assert(bookmark_remove["required"] == nlohmann::json::array({"id"}));
@@ -96,10 +88,10 @@ int main() {
       {{"jsonrpc", "2.0"}, {"id", 8}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}}}}}}, config);
   assert(missing_fill["error"]["code"] == -32602);
-  const auto invalid_screenshot = server.HandleRequest(
+  const auto jpeg_screenshot = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 9}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_screenshot"}, {"arguments", {{"format", "jpeg"}}}}}}, config);
-  assert(invalid_screenshot["error"]["code"] == -32602);
+  assert(jpeg_screenshot["result"]["isError"] == false);
   const auto empty_fill = server.HandleRequest(
       {{"jsonrpc", "2.0"}, {"id", 10}, {"method", "tools/call"},
        {"params", {{"name", "kelpie_fill"}, {"arguments", {{"selector", "#name"}, {"value", ""}}}}}}, config);
@@ -134,5 +126,58 @@ int main() {
   assert(bad_same_site.contains("error"));
   assert(bad_same_site.at("error").at("code") == -32602);
 
+  std::string observed;
+  server.SetFixedReader([&](const nlohmann::json& params) {
+    const std::string expression = params.at("expression");
+    const auto start = expression.find("\"prefix\":\"") + 10;
+    observed = expression.substr(start, expression.find('"', start) - start) + "1";
+    return nlohmann::json{{"success", true}, {"result", {{"url", "https://same.test"}, {"title", "title"}, {"text", "button"},
+      {"elements", {{{"ref", observed}, {"role", "button"}, {"name", "Button"}}}}}}};
+  });
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tab.snapshot"}, {"tabId", "a"}}, config)["ok"] == true);
+  // Renderer callbacks only enqueue; same-URL restoration cannot revive an old observed handle.
+  server.NotifyDocumentChanged();
+  const auto stale = server.HandleBrowserRequest({{"version", 1}, {"method", "tab.click"}, {"tabId", "a"}, {"params", {{"ref", observed}}}}, config);
+  assert(stale["error"]["code"] == "STALE_REFERENCE");
+
+  bool pending = true;
+  server.SetPendingCheck([&] { return pending; });
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tabs.list"}}, config)["error"]["code"] == "BUSY");
+  const auto busy_rpc = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 123}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_browser_control"}, {"arguments", {{"request", {{"version", 1}, {"method", "tabs.list"}}}}}}}}, config);
+  assert(busy_rpc["id"] == 123 && busy_rpc["error"]["code"] == -32000);
+  {
+    const auto observation = server.GuardDispatch("get-dialog", nlohmann::json::object());
+    assert(observation);
+  }
+  {
+    const auto handling = server.GuardDispatch("handle-dialog", {{"action", "accept"}});
+    assert(handling);
+  }
+  for (const auto* name : {"kelpie_get_dialog", "kelpie_handle_dialog"}) {
+    const auto arguments = std::string(name) == "kelpie_handle_dialog"
+      ? nlohmann::json{{"action", "accept"}} : nlohmann::json::object();
+    const auto recovery = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 125}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", name}, {"arguments", arguments}}}}}}, config);
+    assert(recovery["result"]["isError"] == false);
+    // Recovery alone does not clear ownership; only the actual late callback can.
+    assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tabs.list"}}, config)["error"]["code"] == "BUSY");
+  }
+  bool refused = false;
+  try { server.GuardDispatch("click", {{"selector", "button"}}); }
+  catch (const std::runtime_error&) { refused = true; }
+  assert(refused);
+  pending = false; // The late renderer callback retired execution ownership.
+  assert(server.HandleBrowserRequest({{"version", 1}, {"method", "documentation"}}, config)["ok"] == true);
+  bool nested = false;
+  router.Register("ai-infer", [&](const nlohmann::json&) {
+    const auto context = server.HandleBrowserRequest({{"version", 1}, {"method", "documentation"}}, config);
+    nested = context.value("ok", false);
+    return nlohmann::json{{"success", nested}};
+  });
+  server.SetRouter(&router);
+  const auto inference = server.HandleRequest({{"jsonrpc", "2.0"}, {"id", 124}, {"method", "tools/call"},
+      {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_ai_ask"}, {"arguments", {{"context", "page_text"}}}}}}}}, config);
+  assert(nested && inference["result"]["isError"] == false);
   return 0;
 }

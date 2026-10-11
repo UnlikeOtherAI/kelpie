@@ -157,6 +157,11 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         }
     }
 
+    func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
+        // The gateway bounds its response while retaining the real renderer lease.
+        try await BrowserControlWebKit.evaluate(script, in: webView)
+    }
+
     func allCookies() async -> [HTTPCookie] {
         await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
     }
@@ -280,6 +285,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         // Each new provisional navigation starts clean — clear any error captured
         // by a superseded load so a cancelled-then-successful sequence is not fatal.
+        NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
         self.lastNavigationError = nil
         self.documentNavigationStart = Date()
         self.capturedDocumentResponseURL = nil
