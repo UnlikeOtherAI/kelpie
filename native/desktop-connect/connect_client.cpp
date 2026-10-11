@@ -43,25 +43,35 @@ void Client::Update(bool ready,bool installed) {
 }
 void Client::Pause(bool value) {
   bool cancel=value;
+  std::shared_ptr<std::atomic<bool>> guard;
   { std::lock_guard lock(mutex_);paused_=value;
     try { if(!settings_->Save(Json{{"enabled",enabled_},{"paused",paused_}}.dump()))throw std::runtime_error("Storage unavailable"); }
     catch(...) { enabled_=false;cancel=true;status_="Nessie: storage unavailable"; }
-    if(cancel)cancelled_.load()->store(true);
+    if(cancel) { guard=cancelled_.load();guard->store(true); }
   }
-  if(cancel && cancel_)cancel_(cancelled_.load());changed_.notify_all();
+  if(guard && cancel_)cancel_(guard);changed_.notify_all();
 }
 void Client::Enable(bool value) {
   bool cancel=!value;
+  std::shared_ptr<std::atomic<bool>> guard;
   { std::lock_guard lock(mutex_);enabled_=value;
     try { if(!settings_->Save(Json{{"enabled",enabled_},{"paused",paused_}}.dump()))throw std::runtime_error("Storage unavailable"); }
     catch(...) { enabled_=false;cancel=true;status_="Nessie: storage unavailable"; }
-    if(cancel)cancelled_.load()->store(true);
+    if(cancel) { guard=cancelled_.load();guard->store(true); }
   }
-  if(cancel && cancel_)cancel_(cancelled_.load());changed_.notify_all();
+  if(guard && cancel_)cancel_(guard);changed_.notify_all();
 }
 void Client::UserTabChanged() { bool working; { std::lock_guard lock(mutex_);working=working_; } if(working)Pause(true); }
-void Client::SignOut() { { std::lock_guard lock(mutex_); owner_.clear(); discard_=true; cancelled_.load()->store(true); } if(cancel_)cancel_(cancelled_.load()); changed_.notify_all(); }
-void Client::Shutdown() { shutdown_=true; cancelled_.load()->store(true); if(cancel_)cancel_(cancelled_.load()); changed_.notify_all(); }
+void Client::SignOut() {
+  std::shared_ptr<std::atomic<bool>> guard;
+  { std::lock_guard lock(mutex_); owner_.clear(); discard_=true;guard=cancelled_.load();guard->store(true); }
+  if(cancel_)cancel_(guard);changed_.notify_all();
+}
+void Client::Shutdown() {
+  std::shared_ptr<std::atomic<bool>> guard;
+  { std::lock_guard lock(mutex_);shutdown_=true;guard=cancelled_.load();guard->store(true); }
+  if(cancel_)cancel_(guard);changed_.notify_all();
+}
 bool Client::Drain() { return !worker_.valid() || worker_.wait_for(std::chrono::seconds(0))==std::future_status::ready; }
 void Client::SetStatus(std::string value) { std::lock_guard lock(mutex_); status_=std::move(value); }
 std::string Client::Status() const { std::lock_guard lock(mutex_); return status_; }

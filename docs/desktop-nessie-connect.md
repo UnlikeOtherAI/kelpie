@@ -54,6 +54,8 @@ after inference. Socket loss cancels in-flight work before any reconnect dispatc
 Windows inference binds the remote job's transient cancellation identity under a
 request ownership lock. Pausing, stopping or losing that connection cancels only
 its own inference; a person's independent tab chat remains untouched. Backend
+Control changes capture that cancelled request identity while changing state, so
+a concurrent Resume and new command cannot redirect an older cancellation.
 selection is checked inside the inference lock so extraction cannot race a switch
 to a cloud endpoint. Native decoding also polls a request-owned authority flag,
 including model startup. Cancellation receipts for other job/attempt identities
