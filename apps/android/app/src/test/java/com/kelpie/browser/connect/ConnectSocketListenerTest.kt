@@ -14,14 +14,23 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ConnectSocketListenerTest {
     private class Socket : WebSocket {
         var closed = false
+
         override fun request(): Request = Request.Builder().url("https://example.test/").build()
+
         override fun queueSize(): Long = 0
+
         override fun send(text: String): Boolean = true
+
         override fun send(bytes: ByteString): Boolean = true
-        override fun close(code: Int, reason: String?): Boolean {
+
+        override fun close(
+            code: Int,
+            reason: String?,
+        ): Boolean {
             closed = true
             return true
         }
+
         override fun cancel() {}
     }
 
