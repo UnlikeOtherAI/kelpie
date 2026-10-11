@@ -165,13 +165,37 @@ int main() {
   assert(bad_same_site.at("error").at("code") == -32602);
 
   std::string observed;
+  bool enforce_pinned_reader = false;
+  int observed_action_effects = 0;
   server.SetFixedReader([&](const nlohmann::json& params) {
     const std::string expression = params.at("expression");
+    if (enforce_pinned_reader) {
+      const auto& scoped = kelpie::ScopedBrowserControlLease::Current();
+      if (!scoped || !scoped->document_version || *scoped->document_version != live_document ||
+          (scoped->require_active && !live_active) || (scoped->cancelled && scoped->cancelled->load()) ||
+          (scoped->deadline && std::chrono::steady_clock::now() >= *scoped->deadline))
+        return nlohmann::json{{"success", false}, {"error", {{"code", "TAB_STALE"}}}};
+      if (expression.find("tab.click") != std::string::npos) ++observed_action_effects;
+    }
     const auto start = expression.find("\"prefix\":\"") + 10;
     observed = expression.substr(start, expression.find('"', start) - start) + "1";
     return nlohmann::json{{"success", true}, {"result", {{"url", "https://same.test"}, {"title", "title"}, {"text", "button"},
       {"elements", {{{"ref", observed}, {"role", "button"}, {"name", "Button"}}}}}}};
   });
+  enforce_pinned_reader = true;
+  live_document = "document-1";
+  live_active = true;
+  const auto account_snapshot = server.HandleBrowserRequestAuthorized(
+      {{"version", 1}, {"method", "tab.snapshot"}, {"tabId", "owned"}}, config,
+      [] { return true; }, pinned);
+  assert(account_snapshot["ok"] == true && !observed.empty());
+  const auto account_click = server.HandleBrowserRequestAuthorized(
+      {{"version", 1}, {"method", "tab.click"}, {"tabId", "owned"},
+       {"params", {{"ref", observed}}}}, config,
+      [&] { live_document = "document-3"; return true; }, pinned);
+  assert(account_click["ok"] == false && observed_action_effects == 0);
+  assert(!kelpie::ScopedBrowserControlLease::Current());
+  enforce_pinned_reader = false;
   assert(server.HandleBrowserRequest({{"version", 1}, {"method", "tab.snapshot"}, {"tabId", "a"}}, config)["ok"] == true);
   // Renderer callbacks only enqueue; same-URL restoration cannot revive an old observed handle.
   server.NotifyDocumentChanged();
