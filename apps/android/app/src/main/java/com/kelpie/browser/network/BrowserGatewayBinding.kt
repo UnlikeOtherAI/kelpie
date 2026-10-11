@@ -26,6 +26,7 @@ class BrowserGatewayBinding(
 
     fun register() {
         router.browserGateway = this
+        ctx.browserGateway = this
         ctx.browserDocumentChanged = { tabId -> changedDocuments.add(tabId) }
         router.register("browser-control") { request ->
             direct.call(request) ?: errorResponse("GATEWAY_ERROR", "The browser returned no response")
@@ -235,6 +236,7 @@ class BrowserGatewayBinding(
 
     suspend fun close() {
         ctx.browserDocumentChanged = null
+        if (ctx.browserGateway === this) ctx.browserGateway = null
         lock.withLock { sessions.toList() }.forEach { closeSession(it) }
     }
 

@@ -127,6 +127,7 @@ final class ServerState: ObservableObject {
 
     private func registerHandlers(rendererState: RendererState) {
         let ctx = handlerContext
+        ctx.browserRouter = router
         ctx.scriptPlaybackState = scriptPlaybackState
         router.handlerContext = ctx
         router.scriptPlaybackState = scriptPlaybackState

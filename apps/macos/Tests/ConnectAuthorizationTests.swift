@@ -4,6 +4,27 @@ import WebKit
 
 final class ConnectAuthorizationTests: XCTestCase {
     @MainActor
+    func testRemoteRouterSharesCanonicalAdmissionUntilRendererRetires() async {
+        let owner = Router()
+        let remote = Router()
+        remote.browserReferenceOwner = owner
+        var calls = 0
+        remote.register("get-visible-elements") { _ in calls += 1; return ["success": true] }
+        XCTAssertTrue(owner.browserLease.begin())
+        let busy = await remote.handle(method: "get-visible-elements", body: [:]).json
+        XCTAssertEqual((busy["error"] as? [String: Any])?["code"] as? String, "BUSY")
+        XCTAssertEqual(calls, 0)
+        owner.browserLease.retainPending()
+        owner.browserLease.end()
+        let pending = await remote.handle(method: "get-visible-elements", body: [:]).json
+        XCTAssertEqual((pending["error"] as? [String: Any])?["code"] as? String, "BUSY")
+        owner.browserLease.retirePending()
+        let ready = await remote.handle(method: "get-visible-elements", body: [:]).json
+        XCTAssertEqual(ready["success"] as? Bool, true)
+        XCTAssertEqual(calls, 1)
+    }
+
+    @MainActor
     func testSnapshotSelectorsIdentifyDuplicateButtonsAndEmptyInputs() async throws {
         let context = HandlerContext()
         #if os(iOS)
