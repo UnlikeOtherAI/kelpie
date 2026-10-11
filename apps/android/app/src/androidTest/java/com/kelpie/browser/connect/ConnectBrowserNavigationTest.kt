@@ -70,16 +70,27 @@ class ConnectBrowserNavigationTest {
     }
 
     @Test
-    fun pageContextReadsKeepTheBeforeAndAfterJobFence() = runBlocking {
-        fixture { _, context, _, _ ->
-            context.remoteDocumentGuard = { false }
-            assertTrue(runCatching { com.kelpie.browser.llm.PageTextSnapshot.read(context, emptyMap()) }.isFailure)
-            var checks = 0
-            context.remoteDocumentGuard = { ++checks == 1 }
-            assertTrue(runCatching { com.kelpie.browser.llm.PageTextSnapshot.read(context, emptyMap()) }.isFailure)
-            assertEquals(2, checks)
+    fun pageContextReadsKeepTheBeforeAndAfterJobFence() =
+        runBlocking {
+            fixture { _, context, _, _ ->
+                context.remoteDocumentGuard = { false }
+                assertTrue(
+                    runCatching {
+                        com.kelpie.browser.llm.PageTextSnapshot
+                            .read(context, emptyMap())
+                    }.isFailure,
+                )
+                var checks = 0
+                context.remoteDocumentGuard = { ++checks == 1 }
+                assertTrue(
+                    runCatching {
+                        com.kelpie.browser.llm.PageTextSnapshot
+                            .read(context, emptyMap())
+                    }.isFailure,
+                )
+                assertEquals(2, checks)
+            }
         }
-    }
 
     private suspend fun fixture(block: suspend (ConnectBrowser, HandlerContext, MockWebServer, Authority) -> Unit) {
         val server = MockWebServer()
@@ -88,8 +99,10 @@ class ConnectBrowserNavigationTest {
             withContext(Dispatchers.Main) {
                 val app = InstrumentationRegistry.getInstrumentation().targetContext
                 check(app.packageName.endsWith(".nessieverify")) { "Requires the isolated verification profile" }
-                com.kelpie.browser.browser.HistoryStore.init(app)
-                com.kelpie.browser.browser.HomeStore.init(app)
+                com.kelpie.browser.browser.HistoryStore
+                    .init(app)
+                com.kelpie.browser.browser.HomeStore
+                    .init(app)
                 val context = HandlerContext()
                 val store = TabStore(app, context, BrowserState())
                 context.tabStore = store
