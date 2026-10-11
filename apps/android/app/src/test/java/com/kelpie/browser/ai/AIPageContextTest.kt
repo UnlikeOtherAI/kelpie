@@ -52,10 +52,20 @@ class AIPageContextTest {
 
     @Test
     fun commonEvidenceIncludesGroundingButOmitsFormValues() {
-        val evidence = AIPageContext.evidence(mapOf("ok" to true, "value" to mapOf(
-            "title" to "Page", "url" to "https://example.test", "text" to "Public text", "truncated" to true,
-            "elements" to listOf(mapOf("name" to "Logo", "value" to "secret-input")),
-        )))
+        val evidence =
+            AIPageContext.evidence(
+                mapOf(
+                    "ok" to true,
+                    "value" to
+                        mapOf(
+                            "title" to "Page",
+                            "url" to "https://example.test",
+                            "text" to "Public text",
+                            "truncated" to true,
+                            "elements" to listOf(mapOf("name" to "Logo", "value" to "secret-input")),
+                        ),
+                ),
+            )
         assertTrue(evidence.contains("Logo"))
         assertTrue(evidence.contains("truncated"))
         assertFalse(evidence.contains("secret-input"))

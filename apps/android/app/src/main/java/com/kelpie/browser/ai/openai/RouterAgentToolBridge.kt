@@ -92,24 +92,39 @@ class RouterAgentToolBridge(
     }
 
     override suspend fun contextDispatcher(tabId: String?): ToolDispatcher {
-        val target = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-            val id = tabId ?: ctx.tabStore?.activeTabId?.value ?: "0"
-            if (ctx.tabStore != null && ctx.tabStore?.tabs?.value?.none { it.id == id } == true) {
-                throw OpenAIException("TAB_NOT_FOUND", "Tab $id not found")
+        val target =
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                val id = tabId ?: ctx.tabStore?.activeTabId?.value ?: "0"
+                if (ctx.tabStore != null &&
+                    ctx.tabStore
+                        ?.tabs
+                        ?.value
+                        ?.none { it.id == id } == true
+                ) {
+                    throw OpenAIException("TAB_NOT_FOUND", "Tab $id not found")
+                }
+                id
             }
-            id
-        }
         return object : ToolDispatcher {
             override val pinnedTabId = target
-            override suspend fun dispatch(method: String, args: Map<String, Any?>): Map<String, Any?> =
-                throw OpenAIException("UNSUPPORTED", "Plain inference does not expose browser tools")
+
+            override suspend fun dispatch(
+                method: String,
+                args: Map<String, Any?>,
+            ): Map<String, Any?> = throw OpenAIException("UNSUPPORTED", "Plain inference does not expose browser tools")
         }
     }
 
-    override suspend fun pageContext(mode: String, tabId: String?): String? {
-        com.kelpie.browser.ai.AIPageContext.validateMode(mode)
-        val result = router.browserGateway?.contextSnapshot(tabId)
-            ?: throw OpenAIException("AI_UNAVAILABLE", "Browser router is unavailable")
-        return com.kelpie.browser.ai.AIPageContext.evidence(result)
+    override suspend fun pageContext(
+        mode: String,
+        tabId: String?,
+    ): String? {
+        com.kelpie.browser.ai.AIPageContext
+            .validateMode(mode)
+        val result =
+            router.browserGateway?.contextSnapshot(tabId)
+                ?: throw OpenAIException("AI_UNAVAILABLE", "Browser router is unavailable")
+        return com.kelpie.browser.ai.AIPageContext
+            .evidence(result)
     }
 }

@@ -82,5 +82,4 @@ object PageTextSnapshot {
             throw OpenAIException("EVAL_ERROR", "Page text returned an invalid snapshot")
         }
     }
-
 }
