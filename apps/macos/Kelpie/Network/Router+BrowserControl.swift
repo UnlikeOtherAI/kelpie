@@ -1,6 +1,44 @@
 import Foundation
 import WebKit
 
+/// Remote inference and local models retain their distinct existing admission policies.
+enum BrowserAgentAdmission {
+    case remote
+    case localReadOnly(vision: Bool)
+
+    func methods(allowActions: Bool) -> Set<String> {
+        switch self {
+        case .remote:
+            return Set(OpenAIBrowserToolCatalog.tools(allowActions: allowActions).map(\.routerMethod) + ["get-tabs", "get-current-url", "type"])
+        case .localReadOnly(let vision):
+            var methods: Set<String> = [
+                "get-tabs", "get-current-url", "get-page-text", "get-dom", "query-selector", "query-selector-all",
+                "get-element-text", "get-attributes", "find-element", "get-form-state", "get-js-errors",
+                "get-console-messages", "get-network-log", "get-resource-timeline", "get-cookies", "get-storage",
+                "get-links", "get-visible-elements", "get-accessibility-tree"
+            ]
+            if vision { methods.insert("screenshot") }
+            return methods
+        }
+    }
+}
+
+/// HTTP transport admission runs after the existing bearer/pairing middleware.
+enum BrowserMCPTransport {
+    static func refusal(_ request: ParsedHTTPRequest) -> PairingHTTPResponse? {
+        if request.headers["origin"] != nil {
+            return .error(status: 403, code: "FORBIDDEN", message: "Browser Origin is not permitted on this native endpoint")
+        }
+        if let versions = request.headers["mcp-protocol-version"], versions != ["2025-06-18"] {
+            return .error(status: 400, code: "UNSUPPORTED_PROTOCOL", message: "Unsupported MCP protocol version")
+        }
+        guard request.method == "POST" else {
+            return .error(status: 405, code: "METHOD_NOT_ALLOWED", message: "This MCP transport accepts POST only")
+        }
+        return nil
+    }
+}
+
 extension Router {
     @MainActor
     private var browserProfile: String {
@@ -31,7 +69,7 @@ extension Router {
     }
 
     @MainActor
-    func makeBrowserGateway(allowActions: Bool, pinnedTabId: String?, agent: Bool) -> BrowserControlGateway {
+    func makeBrowserGateway(allowActions: Bool, pinnedTabId: String?, agent: Bool, admission: BrowserAgentAdmission = .remote) -> BrowserControlGateway {
         #if os(iOS)
         let platform: Int32 = 0
         let targeting = "selected"
@@ -44,10 +82,8 @@ extension Router {
         if browserProfile == "chromium" { methods.removeAll { ["new-tab", "switch-tab", "close-tab"].contains($0) } }
         #endif
         if agent {
-            // The agent retains its existing admitted product extensions; scripts,
-            // cookies and machine settings are not admitted through discovery.
-            let allowed = Set(OpenAIBrowserToolCatalog.tools(allowActions: allowActions).map(\.routerMethod))
-            methods = methods.filter { allowed.contains($0) || ["get-tabs", "get-current-url", "type"].contains($0) }
+            let allowed = admission.methods(allowActions: allowActions)
+            methods = methods.filter { allowed.contains($0) }
         }
         let extensions = BrowserControlGateway.extensions(platform: platform, methods: methods)
         let profile = browserProfile

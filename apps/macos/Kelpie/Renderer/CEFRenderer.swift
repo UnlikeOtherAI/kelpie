@@ -300,9 +300,11 @@ final class CEFRenderer: RendererEngine {
         guard !containerView.isHidden else { throw HandlerError.rendererHidden }
         guard let bridge else { throw HandlerError.noWebView }
         return try await withCheckedThrowingContinuation { continuation in
-            bridge.evaluateBrowserControl(script) { result, error in
+            bridge.evaluateBrowserControl(script, stillVisible: { [weak self] in
+                self?.containerView.isHidden == false
+            }, completion: { result, error in
                 if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: result) }
-            }
+            })
         }
     }
 

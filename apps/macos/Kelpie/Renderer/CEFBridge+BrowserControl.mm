@@ -5,9 +5,11 @@
 @implementation CEFBridge (BrowserControl)
 
 - (void)evaluateBrowserControl:(NSString *)expression
+                 stillVisible:(BOOL (^)(void))stillVisible
                    completion:(void (^)(id result, NSError *error))completion {
     cef_browser_host_t *host = CEFBridgeCopyBrowserHost([self activeBrowser]);
-    if (host == nullptr) {
+    if (host == nullptr || !stillVisible()) {
+        if (host != nullptr) { host->base.release(&host->base); }
         completion(nil, [NSError errorWithDomain:@"KelpieBrowserControl" code:1 userInfo:nil]);
         return;
     }
@@ -18,11 +20,11 @@
     NSError *failure = [NSError errorWithDomain:@"KelpieBrowserControl" code:2 userInfo:nil];
     CEFBridgeSendDevToolsCommand(host, @"Page.getFrameTree", nil, ^(BOOL success, NSDictionary *tree) {
         NSString *frameID = tree[@"frameTree"][@"frame"][@"id"];
-        if (!success || ![frameID isKindOfClass:NSString.class]) { finish(nil, failure); return; }
+        if (!stillVisible() || !success || ![frameID isKindOfClass:NSString.class]) { finish(nil, failure); return; }
         NSDictionary *world = @{@"frameId": frameID, @"worldName": @"KelpieBrowserControl", @"grantUniveralAccess": @NO};
         CEFBridgeSendDevToolsCommand(host, @"Page.createIsolatedWorld", world, ^(BOOL created, NSDictionary *context) {
             NSNumber *contextID = context[@"executionContextId"];
-            if (!created || ![contextID isKindOfClass:NSNumber.class]) { finish(nil, failure); return; }
+            if (!stillVisible() || !created || ![contextID isKindOfClass:NSNumber.class]) { finish(nil, failure); return; }
             NSDictionary *params = @{@"expression": expression, @"contextId": contextID, @"returnByValue": @YES};
             CEFBridgeSendDevToolsCommand(host, @"Runtime.evaluate", params, ^(BOOL evaluated, NSDictionary *result) {
                 if (!evaluated || result[@"exceptionDetails"] != nil) { finish(nil, failure); return; }

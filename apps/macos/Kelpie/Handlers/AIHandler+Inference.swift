@@ -169,65 +169,12 @@ extension AIHandler {
 
     @MainActor
     func preloadedContext(mode: String?, tabId: String?) async -> String? {
-        switch mode {
-        case nil:
-            return nil
-
-        case "page_text":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    var text = (el?.innerText || el?.textContent || '').trim();
-                    return {
-                        title: document.title || '',
-                        url: location.href || '',
-                        content: text,
-                        wordCount: text ? text.split(/\\s+/).length : 0
-                    };
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "dom":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    var el = document.body || document.documentElement;
-                    return { html: el ? el.outerHTML : '', selector: 'body' };
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "accessibility":
-            return (try? await context.evaluateJSReturningString(
-                """
-                JSON.stringify((function() {
-                    function walk(node, depth) {
-                        if (!node || depth > 3) return null;
-                        var entry = {
-                            role: node.getAttribute('role') || node.tagName.toLowerCase(),
-                            name: (node.getAttribute('aria-label') || node.textContent || '').trim().substring(0, 80)
-                        };
-                        var children = [];
-                        for (var child of node.children) {
-                            var childResult = walk(child, depth + 1);
-                            if (childResult) children.push(childResult);
-                        }
-                        if (children.length) entry.children = children;
-                        return entry;
-                    }
-                    return walk(document.body, 0);
-                })())
-                """, tabId: tabId
-            )) ?? ""
-
-        case "screenshot":
-            return nil
-
-        default:
-            return nil
-        }
+        guard ["page_text", "dom", "accessibility"].contains(mode ?? ""), let router else { return nil }
+        let pinned = context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString
+        guard tabId == nil || tabId == pinned else { return nil }
+        let browser = router.makeBrowserGateway(allowActions: false, pinnedTabId: pinned, agent: true)
+        let result = await browser.request(["version": 1, "method": "tab.snapshot", "tabId": pinned ?? "", "params": ["maxChars": 6000]])
+        return BrowserControlGateway.encode(result)
     }
 
     @MainActor

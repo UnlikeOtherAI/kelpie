@@ -72,6 +72,7 @@ typedef void (^CEFBridgeJavaScriptDialogHandler)(
 /// The callback receives the result as a JSON string, or nil on error.
 /// Internal fixed browser control only; executes in a private Chromium world.
 - (void)evaluateBrowserControl:(NSString *)expression
+                 stillVisible:(BOOL (^)(void))stillVisible
                    completion:(void (^)(id _Nullable result, NSError * _Nullable error))completion;
 
 - (void)evaluateJavaScript:(NSString *)script

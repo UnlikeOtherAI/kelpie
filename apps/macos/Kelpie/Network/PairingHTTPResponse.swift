@@ -45,6 +45,7 @@ struct PairingHTTPResponse {
         case 401: statusText = "Unauthorized"
         case 403: statusText = "Forbidden"
         case 404: statusText = "Not Found"
+        case 405: statusText = "Method Not Allowed"
         case 408: statusText = "Request Timeout"
         case 411: statusText = "Length Required"
         case 413: statusText = "Payload Too Large"

@@ -14,7 +14,11 @@ final class BrowserControlGatewayTests: XCTestCase {
         let token = try XCTUnwrap(store.approve(requestId: pairing.requestId, persist: false)?.token)
         let router = Router()
         router.register("get-tabs") { _ in successResponse(["tabs": [["id": "own", "active": true, "url": "about:blank", "title": "Fixture"]]]) }
+        #if os(iOS)
+        let port: UInt16 = 18439
+        #else
         let port: UInt16 = 18429
+        #endif
         let server = try HTTPServer(port: port, router: router, pairingStore: store, deviceInfo: DeviceInfo.current(port: Int(port)))
         server.start()
         defer { server.stop() }
@@ -26,6 +30,12 @@ final class BrowserControlGatewayTests: XCTestCase {
             let denied = try await fetch(port: port, path: path, body: [:], token: nil)
             XCTAssertEqual(denied.0, 401)
         }
+        let unsupportedGet = try await fetch(port: port, path: "/mcp", body: [:], token: token, method: "GET")
+        XCTAssertEqual(unsupportedGet.0, 405)
+        let badVersion = try await fetch(port: port, path: "/mcp", body: [:], token: token, headers: ["MCP-Protocol-Version": "unsupported"])
+        XCTAssertEqual(badVersion.0, 400)
+        let browserOrigin = try await fetch(port: port, path: "/mcp", body: [:], token: token, headers: ["Origin": "https://example.test"])
+        XCTAssertEqual(browserOrigin.0, 403)
         let list = try await fetch(port: port, path: "/v1/browser-control", body: ["version": 1, "method": "tabs.list", "params": [:]], token: token)
         XCTAssertEqual(list.0, 200)
         XCTAssertEqual(list.1["ok"] as? Bool, true)
@@ -34,6 +44,15 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertEqual(failure.0, 200, "Canonical failures must remain parseable by the shared SDK")
         XCTAssertEqual(failure.1["ok"] as? Bool, false)
         XCTAssertEqual((failure.1["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, false)
+        let initialized = try await fetch(port: port, path: "/mcp", body: [
+            "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": [
+                "protocolVersion": "2025-06-18", "capabilities": [:], "clientInfo": ["name": "fixture", "version": "1"]
+            ]
+        ], token: token)
+        XCTAssertEqual(initialized.0, 200)
+        let notification = try await fetch(port: port, path: "/mcp", body: ["jsonrpc": "2.0", "method": "notifications/initialized"], token: token)
+        XCTAssertEqual(notification.0, 202)
+        XCTAssertTrue(notification.1.isEmpty)
         let mcp = try await fetch(port: port, path: "/mcp", body: ["jsonrpc": "2.0", "id": 3, "method": "tools/list"], token: token)
         let tools = (mcp.1["result"] as? [String: Any])?["tools"] as? [[String: Any]]
         XCTAssertEqual(tools?.count, 4)
@@ -64,7 +83,7 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertEqual(calls, ["get-tabs"], "Readonly inspection cannot implicitly switch the visible renderer")
     }
 
-    func testMutationTimeoutQuarantinesLeaseAndNeverReplays() async {
+    func testMutationTimeoutRetainsPendingLeaseThenAllowsExplicitRecovery() async {
         let lease = BrowserControlLease()
         var commands = 0
         let gateway = BrowserControlGateway(
@@ -76,7 +95,7 @@ final class BrowserControlGatewayTests: XCTestCase {
             timeoutNanoseconds: 10_000_000,
             dispatch: { _, _, _ in
                 commands += 1
-                try? await Task.sleep(nanoseconds: 100_000_000)
+                if commands == 1 { try? await Task.sleep(nanoseconds: 100_000_000) }
                 return successResponse()
             },
             authorize: { _, _ in true }
@@ -84,10 +103,37 @@ final class BrowserControlGatewayTests: XCTestCase {
         let request: [String: Any] = ["version": 1, "method": "tab.goto", "tabId": "own", "params": ["url": "https://example.test"]]
         let result = await gateway.request(request)
         XCTAssertEqual((result["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, true)
-        _ = await gateway.request(request)
+        let pending = await gateway.request(request)
+        XCTAssertEqual((pending["error"] as? [String: Any])?["code"] as? String, "BUSY")
         XCTAssertEqual(commands, 1)
         try? await Task.sleep(nanoseconds: 120_000_000)
-        XCTAssertFalse(lease.begin(), "A timed-out mutation requires an explicit browser restart")
+        let read = await gateway.request(["version": 1, "method": "documentation", "params": [:]])
+        XCTAssertEqual(read["ok"] as? Bool, true)
+        XCTAssertEqual(commands, 1, "A late callback cannot replay the timed-out action")
+        let explicit = await gateway.request(request)
+        XCTAssertEqual(explicit["ok"] as? Bool, true)
+        XCTAssertEqual(commands, 2, "A later explicit action works without restarting the app")
+    }
+
+    func testCancellationKeepsRendererExclusiveUntilCallbackRetires() async {
+        let lease = BrowserControlLease()
+        var pending: CheckedContinuation<[String: Any], Never>?
+        let gateway = BrowserControlGateway(
+            methods: ["navigate"], extensions: [], targeting: "direct", allowActions: true, lease: lease,
+            dispatch: { _, _, _ in await withCheckedContinuation { pending = $0 } }, authorize: { _, _ in true }
+        )
+        let action = Task { await gateway.request(["version": 1, "method": "tab.goto", "tabId": "own", "params": ["url": "https://example.test"]]) }
+        while pending == nil { await Task.yield() }
+        action.cancel()
+        let result = await action.value
+        XCTAssertEqual((result["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, true)
+        XCTAssertFalse(lease.begin())
+        pending?.resume(returning: successResponse())
+        for _ in 0..<100 {
+            if lease.begin() { lease.end(); return }
+            await Task.yield()
+        }
+        XCTFail("Retired callback must release control after cancellation")
     }
 
     func testLegacyExtensionRetargetIsRefusedBeforeDispatch() async {
@@ -100,13 +146,51 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertTrue(dispatcher.calls.isEmpty)
     }
 
-    private func fetch(port: UInt16, path: String, body: [String: Any], token: String?, method: String = "POST") async throws -> (Int, [String: Any]) {
+    func testLocalReadOnlyAdmissionRetainsRichReadsWithoutWideningRemotePolicy() {
+        let local = BrowserAgentAdmission.localReadOnly(vision: false).methods(allowActions: false)
+        for method in ["get-cookies", "get-storage", "get-dom", "get-links", "get-js-errors", "get-console-messages", "get-network-log", "get-form-state"] {
+            XCTAssertTrue(local.contains(method), "Local read capability must remain admitted: \(method)")
+        }
+        XCTAssertFalse(local.contains("screenshot"))
+        XCTAssertFalse(local.contains("evaluate"))
+        XCTAssertFalse(local.contains("click"))
+        XCTAssertFalse(local.contains("set-cookie"))
+        let vision = BrowserAgentAdmission.localReadOnly(vision: true).methods(allowActions: false)
+        XCTAssertTrue(vision.contains("screenshot"))
+        XCTAssertFalse(BrowserAgentAdmission.remote.methods(allowActions: false).contains("get-cookies"))
+    }
+
+    #if os(macOS)
+    func testLocalVisionReceivesOneImageWithoutBase64Text() {
+        let bytes = Data([137, 80, 78, 71, 1, 2, 3])
+        let encoded = bytes.base64EncodedString()
+        let canonical: [String: Any] = ["version": 1, "ok": true, "value": ["type": "image", "mimeType": "image/png"]]
+        let result: [String: Any] = ["isError": false, "content": [
+            ["type": "image", "mimeType": "image/png", "data": encoded],
+            ["type": "text", "text": BrowserControlGateway.encode(canonical)]
+        ]]
+        let vision = BrowserModelObservation(result, vision: true)
+        XCTAssertEqual(vision.image, bytes)
+        XCTAssertFalse(BrowserControlGateway.encode(vision.text).contains(encoded))
+        let readonlyText = BrowserModelObservation(result, vision: false)
+        XCTAssertNil(readonlyText.image)
+        XCTAssertFalse(BrowserControlGateway.encode(readonlyText.text).contains(encoded))
+        let legacy: [String: Any] = ["isError": false, "content": [["type": "text", "text": BrowserControlGateway.encode([
+            "version": 1, "ok": true, "value": ["success": true, "image": encoded, "format": "png"]
+        ])]]]
+        XCTAssertEqual(BrowserModelObservation(legacy, vision: true).image, bytes)
+        XCTAssertFalse(BrowserControlGateway.encode(BrowserModelObservation(legacy, vision: true).text).contains(encoded))
+    }
+    #endif
+
+    private func fetch(port: UInt16, path: String, body: [String: Any], token: String?, method: String = "POST", headers: [String: String] = [:]) async throws -> (Int, [String: Any]) {
         let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)\(path)"))
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 2
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if method == "POST" { request.httpBody = try JSONSerialization.data(withJSONObject: body) }
         let (data, response) = try await URLSession.shared.data(for: request)
         return ((response as? HTTPURLResponse)?.statusCode ?? 0, (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:])

@@ -37,10 +37,11 @@ struct InferenceHarness {
         var rounds = 0
         var transcript: [String] = []
         var transcription: String?
-        let pendingImage: Data? = nil
+        var pendingImage: Data?
+        let vision = await MainActor.run { engine.capabilities.contains("vision") }
         guard let router else { throw InferenceEngine.InferenceError.inferenceFailed("Browser router is unavailable") }
         let tabId = await MainActor.run { context.activeEngineIsChromium ? "chromium" : context.tabStore(windowId: nil, tabId: nil)?.activeTab?.id.uuidString }
-        let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true)
+        let browser = await router.makeBrowserGateway(allowActions: false, pinnedTabId: tabId, agent: true, admission: .localReadOnly(vision: vision))
         let definitions = await browser.toolDefinitions()
 
         if let preloadedContext {
@@ -81,7 +82,13 @@ struct InferenceHarness {
                 toolCallsMade += 1
 
                 let result = await browser.callTool(name: toolCall.name, arguments: toolCall.args)
-                let toolResult = truncate(stringify(result), maxTokens: toolTokenBudget)
+                let canonical = BrowserControlGateway.canonicalResult(result)
+                if (canonical["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool == true {
+                    throw InferenceEngine.InferenceError.inferenceFailed("Browser outcome is uncertain; the model turn stopped without retrying")
+                }
+                let observation = BrowserModelObservation(result, vision: vision)
+                if let image = observation.image { pendingImage = image }
+                let toolResult = truncate(stringify(observation.text), maxTokens: toolTokenBudget)
                 transcript.append("Tool \(toolCall.name) returned: \(toolResult)")
                 continue
             }

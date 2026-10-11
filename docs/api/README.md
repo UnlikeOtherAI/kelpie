@@ -26,7 +26,7 @@ All methods are available via three interfaces:
 - Auth: bearer token via `Authorization: Bearer <token>`. Tokens are issued by `POST /v1/pair` + on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
 - Default Port: `8420`
 - Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
-- Concurrency: The common native gateway and legacy browser mutations share one admission lease. A competing operation returns `BUSY`; it is never replayed automatically. Renderer mutation timeouts quarantine the lease until the browser restarts.
+- Concurrency: The common native gateway and legacy browser mutations share one admission lease. A competing operation returns `BUSY`; it is never replayed automatically. A timed-out renderer operation retains the lease until its callback retires; later explicit requests can then reconcile or continue without restarting.
 
 ---
 

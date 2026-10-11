@@ -10,7 +10,6 @@ final class BrowserControlGateway {
     private let dispatch: Dispatch
     private let authorize: Authorize
     private let mutatingMethods: Set<String>
-    private var uncertain = false
     private var navigationObserver: NSObjectProtocol?
     private let lease: BrowserControlLease?
     private let timeoutNanoseconds: UInt64
@@ -57,34 +56,34 @@ final class BrowserControlGateway {
             return mcp ? ["jsonrpc": "2.0", "id": body["id"] ?? NSNull(), "error": ["code": -32000, "message": "A browser operation is pending"]] : failure
         }
         defer { lease?.end() }
-        guard handle != nil else { return ["ok": false, "error": ["code": "UNAVAILABLE"]] }
+        guard handle != nil else {
+            let error: [String: Any] = ["code": "UNAVAILABLE", "message": "Browser coordinator is unavailable", "mayHaveCompleted": false]
+            return mcp
+                ? ["jsonrpc": "2.0", "id": body["id"] ?? NSNull(), "error": ["code": -32603, "message": "Browser coordinator is unavailable"]]
+                : ["version": 1, "ok": false, "error": error]
+        }
         var step = Self.decode(Self.encode(body).withCString {
             mcp ? kelpie_browser_gateway_begin_mcp(handle, $0) : kelpie_browser_gateway_begin(handle, $0)
         })
         while true {
             switch step["kind"] as? String {
             case "complete":
-                // JSON-RPC notifications have no body; the HTTP layer emits an empty object.
+                // JSON-RPC notifications have no body; the HTTP layer emits an empty 202 response.
                 let response = step["response"] as? [String: Any] ?? [:]
-                let canonical = mcp ? Self.canonicalResult(response["result"] as? [String: Any] ?? [:]) : response
-                uncertain = uncertain || (canonical["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool == true
                 return response
             case "authorize":
                 let request = step["request"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
-                step = advance(["success": (!uncertain || !mutates) && authorize(request, mutates)])
+                step = advance(["success": authorize(request, mutates)])
             case "dispatch":
                 guard !Task.isCancelled else { return cancel() }
                 let method = step["method"] as? String ?? ""
                 let params = step["params"] as? [String: Any] ?? [:]
                 let mutates = step["mutates"] as? Bool ?? true
                 guard let result = await boundedDispatch(method: method, params: params, mutates: mutates) else {
-                    uncertain = uncertain || mutates
-                    if mutates { lease?.quarantine() }
                     return cancel()
                 }
                 guard !Task.isCancelled else {
-                    uncertain = uncertain || mutates
                     return cancel()
                 }
                 step = advance(result)
@@ -123,13 +122,26 @@ final class BrowserControlGateway {
 
     /// A late renderer completion cannot advance a cancelled coordinator or replay a command.
     private func boundedDispatch(method: String, params: [String: Any], mutates: Bool) async -> [String: Any]? {
-        await withCheckedContinuation { continuation in
-            let completion = BrowserDispatchCompletion(continuation)
-            Task { @MainActor in completion.finish(await dispatch(method, params, mutates)) }
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
-                completion.finish(nil)
+        let completion = BrowserDispatchCompletion()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                completion.attach(continuation)
+                guard !Task.isCancelled else { completion.finish(nil); return }
+                // The callback owns a pending lease independently of the HTTP/AI task.
+                // A deadline can end the response, but cannot retire renderer work.
+                lease?.retainPending()
+                Task { @MainActor in
+                    let result = await dispatch(method, params, mutates)
+                    lease?.retirePending()
+                    completion.finish(result)
+                }
+                completion.timer = Task { @MainActor in
+                    do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch { return }
+                    completion.finish(nil)
+                }
             }
+        } onCancel: {
+            Task { @MainActor in completion.finish(nil) }
         }
     }
 
@@ -164,33 +176,41 @@ final class BrowserControlGateway {
 @MainActor
 private final class BrowserDispatchCompletion {
     private var continuation: CheckedContinuation<[String: Any]?, Never>?
-    init(_ continuation: CheckedContinuation<[String: Any]?, Never>) { self.continuation = continuation }
+    var timer: Task<Void, Never>?
+    func attach(_ continuation: CheckedContinuation<[String: Any]?, Never>) { self.continuation = continuation }
     func finish(_ result: [String: Any]?) {
         guard let continuation else { return }
         self.continuation = nil
+        timer?.cancel()
+        timer = nil
         continuation.resume(returning: result)
     }
 }
 
 final class BrowserControlLease: @unchecked Sendable {
     private let lock = NSLock()
-    private var busy = false
-    private var quarantined = false
+    private var activeRequest = false
+    private var pendingCallbacks = 0
     func begin() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        guard !busy && !quarantined else { return false }
-        busy = true
+        guard !activeRequest && pendingCallbacks == 0 else { return false }
+        activeRequest = true
         return true
     }
-    func quarantine() {
+    func retainPending() {
         lock.lock()
-        quarantined = true
+        pendingCallbacks += 1
+        lock.unlock()
+    }
+    func retirePending() {
+        lock.lock()
+        pendingCallbacks -= 1
         lock.unlock()
     }
     func end() {
         lock.lock()
-        busy = false
+        activeRequest = false
         lock.unlock()
     }
 }

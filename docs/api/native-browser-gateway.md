@@ -77,7 +77,8 @@ The shared Swift coordinator is compiled into both apps. WebKit uses the named
 `KelpieBrowserControl` content world. macOS Chromium uses the same existing
 bounded native CDP transport for main-frame discovery, an isolated world without
 universal access, and fixed evaluation. Page scripts cannot replace this world's
-reference registry. Canonical clicks activate the observed DOM object and type
+reference registry. CEF rechecks renderer visibility between asynchronous frame,
+world and fixed-evaluation commands. Canonical clicks activate the observed DOM object and type
 appends with input/change events; rich extensions retain native input semantics.
 Navigation, renderer changes and legacy/rich mutations invalidate references.
 Chromium exposes one `chromium` handle and omits unsupported tab lifecycle methods.
@@ -87,14 +88,19 @@ whose selected renderer changed. External-display WebKit exposes its own `extern
 handle through that display's separately authenticated server.
 
 OpenAI-compatible inference and the Mac local GGUF harness use a fresh policy-bound
-compact catalog per run. Only previously admitted product extensions appear;
+compact catalog per run. The remote lane retains its existing narrower admission;
+the local read-only lane retains console, errors, network, cookies, storage,
+links, DOM, element/form and accessibility reads through shared rich extensions.
+Local screenshot discovery requires the loaded model's vision capability; one
+image reaches inference separately from the bounded text, without base64 text.
+Only previously admitted product features appear;
 `allowActions:false` removes common and extension mutations. Both Apple agents
 stay in the visible pinned tab and refuse model-selected tab/window changes or
 later UI tab changes. iOS local GGUF inference remains a single-shot lane and uses
 the bounded common snapshot for optional page context. Ambiguous mutations stop the
-AI turn instead of feeding an error into another action attempt. A renderer mutation
-timeout quarantines the shared lease until browser restart; late callbacks cannot
-advance the cancelled coordinator.
+AI turn instead of feeding an error into another action attempt. A renderer deadline returns uncertainty and keeps the lease exclusive until its
+pending callback retires; later explicit requests can reconcile or continue. Late
+callbacks cannot advance the cancelled coordinator or replay the command.
 
 Mac candidate signing uses Xcode's real selected identity for staged CEF bundles
 and preserves helper entitlements; no script introduces ad-hoc signatures. Local
@@ -103,3 +109,10 @@ repository's release workflow does not establish Developer ID notarization, and
 iOS simulator artifacts do not establish physical-device signing or an IPA release.
 Binding regressions live in `BrowserControlGatewayTests` (compiled on both Apple
 targets), alongside the model-loop fixtures and shared native CTest coverage.
+
+Apple `/mcp` accepts an authenticated MCP initialize/list/call handshake. Accepted
+notifications return HTTP 202 with an empty body; canonical operation failures
+remain HTTP 200 envelopes so clients preserve `mayHaveCompleted`. Authenticated
+GET returns 405; unsupported explicit `MCP-Protocol-Version` headers return 400.
+The native transport rejects browser-supplied Origin headers, including `null`,
+after existing bearer admission.
