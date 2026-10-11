@@ -143,6 +143,22 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
         return nil
     }
 
+    private func promptBatch(tokens: UnsafeMutablePointer<llama_token>, count: Int32) -> llama_batch {
+        let batch = llama_batch_init(count, 0, 1)
+        for index in 0..<Int(count) {
+            batch.token[index] = tokens[index]
+            batch.pos[index] = Int32(index)
+            batch.n_seq_id[index] = 1
+            // swiftlint:disable:next force_unwrapping
+            batch.seq_id[index]![0] = 0
+            batch.logits[index] = 0
+        }
+        var populated = batch
+        populated.n_tokens = count
+        populated.logits[Int(count) - 1] = 1
+        return populated
+    }
+
     func infer(
         prompt: String,
         audio: Data? = nil,
@@ -190,19 +206,8 @@ final class InferenceEngine: ObservableObject, @unchecked Sendable {
                 llama_memory_clear(llama_get_memory(ctx), false)
 
                 // Prepare batch for prompt
-                var batch = llama_batch_init(Int32(tokenCount), 0, 1)
+                var batch = self.promptBatch(tokens: tokens, count: tokenCount)
                 defer { llama_batch_free(batch) }
-
-                for i in 0..<Int(tokenCount) {
-                    batch.token[i] = tokens[i]
-                    batch.pos[i] = Int32(i)
-                    batch.n_seq_id[i] = 1
-                    // swiftlint:disable:next force_unwrapping
-                    batch.seq_id[i]![0] = 0
-                    batch.logits[i] = 0
-                }
-                batch.n_tokens = tokenCount
-                batch.logits[Int(tokenCount) - 1] = 1
 
                 guard llama_decode(ctx, batch) == 0 else {
                     continuation.resume(throwing: InferenceError.inferenceFailed("Initial decode failed"))
