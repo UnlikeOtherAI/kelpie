@@ -19,7 +19,7 @@ export class BrowserLocatorClient {
   first(): BrowserLocatorClient { return this.nth(0); }
   last(): BrowserLocatorClient { return this.nth(-1); }
   filter(options: { hasText?: Match; visible?: boolean }): BrowserLocatorClient { return this.chain({ kind: "filter", ...options, hasText: options.hasText === undefined ? undefined : match(options.hasText) }); }
-  private call<T>(method: BrowserControlMethod, params: Record<string, unknown> = {}): Promise<T> { return this.tab.call(method, { locator: this.query, ...params }); }
+  private call<T>(method: BrowserControlMethod, params: object = {}): Promise<T> { return this.tab.call(method, { locator: this.query, ...params }); }
   click(options: Wait & { button?: "left" | "right" | "middle"; modifiers?: ("Alt" | "Control" | "ControlOrMeta" | "Meta" | "Shift")[] } = {}): Promise<void> { return this.call("locator.click", options); }
   dblclick(options: Wait = {}): Promise<void> { return this.call("locator.dblclick", options); }
   fill(value: string, options: Wait = {}): Promise<void> { return this.call("locator.fill", { value, ...options }); }
@@ -49,7 +49,7 @@ export class BrowserTabClient {
       locator: root.locator.bind(root), frameLocator: root.frameLocator.bind(root),
     };
   }
-  async call<T>(method: BrowserControlMethod, params: Record<string, unknown> = {}): Promise<T> {
+  async call<T>(method: BrowserControlMethod, params: object = {}): Promise<T> {
     const answer = await this.transport.call({ version: 1, method, tabId: this.id, params } as BrowserControlRequest);
     if (!answer.ok) throw new BrowserControlError(answer.error.code, answer.error.message, answer.error.mayHaveCompleted);
     return answer.value as T;

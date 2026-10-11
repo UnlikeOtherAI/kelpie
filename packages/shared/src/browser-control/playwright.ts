@@ -27,11 +27,11 @@ export function resolvePlaywrightLocator(page: Page, query: BrowserLocator): Loc
       }
       case "filter": {
         if (!("filter" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "filter requires an element locator.");
-        scope = scope.filter({ hasText: step.hasText === undefined ? undefined : matcher(step.hasText), visible: step.visible }); break;
+        scope = (scope as Locator).filter({ hasText: step.hasText === undefined ? undefined : matcher(step.hasText), visible: step.visible }); break;
       }
     }
   }
-  if (!("click" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an element inside the frame.");
+  if (!("elementHandle" in scope)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an element inside the frame.");
   return scope;
 }
 
@@ -122,7 +122,10 @@ export async function executePlaywrightPage(page: Page, request: BrowserControlR
       case "locator.press": await target.press(request.params.key, { timeout }); return null;
       case "locator.check": await target.check({ timeout }); return null;
       case "locator.uncheck": await target.uncheck({ timeout }); return null;
-      case "locator.selectOption": return target.selectOption(request.params.value, { timeout });
+      case "locator.selectOption": {
+        const value = request.params.value;
+        return target.selectOption(Array.isArray(value) ? value.map((option) => typeof option === "string" ? { value: option } : option) : value, { timeout });
+      }
       case "locator.innerText": return target.innerText({ timeout });
       case "locator.textContent": return target.textContent({ timeout });
       case "locator.getAttribute": return target.getAttribute(request.params.name, { timeout });
