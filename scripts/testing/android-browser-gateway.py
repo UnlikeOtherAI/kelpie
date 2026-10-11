@@ -20,8 +20,8 @@ from pathlib import Path
 
 FIXTURE = b'''<!doctype html><meta name="viewport" content="width=device-width"><title>Gateway fixture</title>
 <label>Query<input id="query" aria-label="Query" value="seed"></label>
-<button id="count" onclick="window.count=(window.count||0)+1;document.title='Count:'+window.count">Count</button>
-<button id="slow" onclick="window.slow=(window.slow||0)+1;let end=Date.now()+35000;while(Date.now()<end){};document.title='Slow:'+window.slow">Slow</button>
+<button id="count" onclick="window.activationCount=(window.activationCount||0)+1;document.title='Count:'+window.activationCount">Count</button>
+<button id="slow" onclick="window.slowActivations=(window.slowActivations||0)+1;let end=Date.now()+35000;while(Date.now()<end){};document.title='Slow:'+window.slowActivations">Slow</button>
 <script>setInterval(async()=>{let cmd=await(await fetch('/command')).json();
 if(cmd.replace){let el=document.querySelector('#count');el.replaceWith(el.cloneNode(true));document.title='Replaced'}
 if(cmd.spoof){let el=document.createElement('button');el.textContent='Spoof';el.setAttribute('data-sn-ref',cmd.spoof);
@@ -33,6 +33,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
     calls = []
     model_mode = 'read'
     model_stage = 0
+    model_catalog_chars = None
     tab = None
 
     def log_message(self, *_):
@@ -63,6 +64,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
         names = [tool['function']['name'] for tool in body.get('tools', [])]
         expected = ['update_task_list', 'kelpie_browser_control', 'kelpie_extensions', 'kelpie_extension_tools', 'kelpie_extension']
         assert names == expected, 'Agent did not offer the shared compact catalog'
+        FixtureHandler.model_catalog_chars = len(json.dumps(body['tools'], separators=(',', ':')))
         FixtureHandler.calls.append(names)
         stage = FixtureHandler.model_stage
         FixtureHandler.model_stage += 1
@@ -248,6 +250,7 @@ def main():
         if mode == 'timeout':
             status, stopped = request('/v1/ai-infer', infer)
             assert status == 400 and stopped['error']['code'] == 'ACTION_UNCERTAIN'
+            assert stopped['error']['diagnostics']['error']['mayHaveCompleted']
             assert FixtureHandler.model_stage == 2
             wait_title(tab, 'Slow:1')
         else:
@@ -257,6 +260,7 @@ def main():
             assert core('tab.title', tab) == 'Count:1'
     native('ai-endpoint-remove', {'id': endpoint})
     print('PASS built-in agent compact catalog/read-only admission/observed-ref actions/uncertainty stop', flush=True)
+    print('Actual last agent catalog characters:', FixtureHandler.model_catalog_chars, flush=True)
     core('tabs.close', other)
     server.shutdown()
     print('Android emulator gateway journey passed; physical device unverified', flush=True)
