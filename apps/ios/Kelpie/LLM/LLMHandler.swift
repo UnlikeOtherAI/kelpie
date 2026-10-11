@@ -53,13 +53,10 @@ struct LLMHandler {
 
     @MainActor
     private func getPageText(_ body: [String: Any]) async -> [String: Any] {
-        let selector = body["selector"] as? String ?? "body"
-        let js = """
-        (function(){var el=document.querySelector('\(JSEscape.string(selector))');if(!el)return{title:'',content:'',wordCount:0};var text=el.innerText||el.textContent||'';return{title:document.title,byline:null,content:text.trim(),wordCount:text.trim().split(/\\s+/).length,language:document.documentElement.lang||null,excerpt:text.trim().substring(0,200)};})()
-        """
         do {
-            let result = try await context.evaluateJSReturningJSON(js)
-            return successResponse(result)
+            return successResponse(try await PageTextSnapshot.read(context: context, body: body))
+        } catch let error as AIHandlerError {
+            return error.response
         } catch {
             return errorResponse(code: "EVAL_ERROR", message: error.localizedDescription)
         }

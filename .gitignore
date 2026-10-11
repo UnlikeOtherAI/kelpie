@@ -52,3 +52,6 @@ assets/old/
 
 # Git worktrees (local only)
 .worktrees/
+
+# Local iOS release verification output
+apps/ios/.releasebuild/

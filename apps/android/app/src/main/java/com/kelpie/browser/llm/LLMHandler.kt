@@ -85,20 +85,12 @@ class LLMHandler(
     }
 
     private suspend fun getPageText(body: Map<String, Any?>): Map<String, Any?> {
-        val selector = body["selector"] as? String ?: "body"
-        val safe = JSEscape.string(selector)
-        val js =
-            "(function(){var el=document.querySelector('$safe');" +
-                "if(!el)return{title:'',content:'',wordCount:0};" +
-                "var t=el.innerText||el.textContent||'';" +
-                "return{title:document.title,content:t.trim()," +
-                "wordCount:t.trim().split(/\\s+/).length," +
-                "language:document.documentElement.lang||null," +
-                "excerpt:t.trim().substring(0,200)};})()"
         return try {
-            successResponse(ctx.evaluateJSReturningJSON(js))
-        } catch (e: Exception) {
-            errorResponse("EVAL_ERROR", e.message ?: "Unknown error")
+            successResponse(PageTextSnapshot.read(ctx, body))
+        } catch (error: com.kelpie.browser.ai.openai.OpenAIException) {
+            errorResponse(error.code, error.message)
+        } catch (error: Exception) {
+            errorResponse("EVAL_ERROR", error.message ?: "Could not read page context")
         }
     }
 

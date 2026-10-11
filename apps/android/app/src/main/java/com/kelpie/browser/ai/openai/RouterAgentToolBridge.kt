@@ -28,25 +28,17 @@ class RouterAgentToolBridge(
         return PinnedTabDispatcher(router, pinned) { ctx.tabStore?.activeTabId?.value }
     }
 
-    override suspend fun pageContext(mode: String): String? {
-        val method =
-            when (mode) {
-                "page_text" -> "get-page-text"
-                "dom" -> "get-dom"
-                "accessibility", "accessibility_tree" -> "get-accessibility-tree"
-                "screenshot" -> throw OpenAIException(OpenAIErrorCode.VISION_NOT_SUPPORTED, "Screenshot context is not sent to OpenAI-compatible endpoints")
-                else -> throw OpenAIException("INVALID_PARAM", "context must be page_text, dom or accessibility")
-            }
-        val (_, result) = router.handle(method, emptyMap())
-        if (result["success"] != true) return null
-        val payload = if (mode == "page_text") result["content"] ?: result else result - "success"
-        val text = payload as? String ?: OpenAIJson.encode(OpenAIJson.fromAny(payload))
-        return AgentLoop.truncate(text, MAX_CONTEXT_CHARS)
+    /** Page text handlers target captured WebViews directly and can read background tabs. */
+    fun pageDispatcher(tabId: String?): ToolDispatcher {
+        val captured = tabId ?: ctx.tabStore?.activeTabId?.value
+        return ToolDispatcher { method, args ->
+            router.handle(method, if (captured == null) args else args + ("tabId" to captured)).second
+        }
     }
 
-    private companion object {
-        const val MAX_CONTEXT_CHARS = 24_000
-    }
+    override suspend fun pageContext(mode: String): String? =
+        com.kelpie.browser.ai.AIPageContext.evidence(mode, pinnedDispatcher(null))
+
 }
 
 /** Dispatches through the router with the pinned tab injected; refuses if the user switched tabs. */
