@@ -26,6 +26,29 @@ Snapshots share the same compact text format and omit password/input values. Scr
 
 ## Verification
 
+### Native delivery scope
+
+Every native app must serve the common contract directly through authenticated
+`/v1/browser-control` and its MCP surface. The CLI forwards that contract to the
+native owner; it must not maintain a second reference store. The native gateway
+and generated contract data are shared, with platform bindings for renderer
+dispatch. Existing richer features remain discoverable extensions.
+
+| Component | Required integration | Acceptance evidence |
+| --- | --- | --- |
+| Shared native libraries | Validator, gateway, capability schema and on-demand documentation | Contract conformance and refusal/uncertain-outcome tests |
+| macOS | Both renderers, HTTP/MCP and built-in AI tools | Swift lint/build, installed release and direct control journey |
+| iOS | HTTP/MCP and built-in AI tools | Swift lint/build and simulator journey; preserve visible-tab restrictions |
+| Android | HTTP/MCP and built-in AI tools | Gradle build/lint and emulator/device journey matching iOS |
+| Windows | Chromium HTTP/MCP and built-in AI tools | Native build/tests and direct control journey |
+| Linux | Chromium HTTP/MCP and built-in AI tools | Native build/tests and headless control journey |
+| CLI and shared SDK | Canonical transport, compact model catalog and extension discovery | Package tests, real MCP client, published install verification |
+
+Read-only AI requests must remain read-only, and platform capability differences
+must be advertised accurately. A successful TypeScript adapter test does not
+establish native execution. Track build, simulator, installed-app and physical
+device evidence separately in the final delivery report.
+
 The separate headless `test:browser` suite runs navigation, append, stale and replaced references, tab scoping, value-free bounds and screenshot scenarios against Playwright and a native-shaped mocked transport backed by Chromium. Playwright additionally verifies role/label lookup, fill versus append, checkbox/select, strict match and timeout. This does not establish physical-device native parity. Contract tests cover invalid commands, prototype/unknown fields, authorization, queue recovery, unknown mutation outcomes and capability refusal. Product tests cover real dispatch through the proxy plus their existing private-session and policy gates. Browser UI checks stay outside Nessie CI. Verify published package exports from a clean consumer before product release.
 
 Measure instruction size, response size, tool round trips and task completion on the same journeys. No token-saving percentage is claimed without a paired measurement.
