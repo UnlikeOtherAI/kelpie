@@ -17,9 +17,12 @@ class AgentLoopTest {
         var allowActions = false
 
         // Legacy semantic fixtures exercise the loop independently of the production native catalog.
-        override val tools get() = JsonArray(AgentBrowserPolicy.methods(allowActions).map { method ->
-            OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to method.replace('-', '_'))))
-        })
+        override val tools get() =
+            JsonArray(
+                AgentBrowserPolicy.methods(allowActions).map { method ->
+                    OpenAIJson.fromAny(mapOf("type" to "function", "function" to mapOf("name" to method.replace('-', '_'))))
+                },
+            )
         val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
 
         override suspend fun dispatch(

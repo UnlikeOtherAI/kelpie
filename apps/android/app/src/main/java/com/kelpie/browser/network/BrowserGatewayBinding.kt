@@ -99,29 +99,48 @@ class BrowserGatewayBinding(
             action()
         }
 
-    private suspend fun execute(method: String, params: Map<String, Any?>, pinned: String?): Map<String, Any?> =
+    private suspend fun execute(
+        method: String,
+        params: Map<String, Any?>,
+        pinned: String?,
+    ): Map<String, Any?> =
         withContext(Dispatchers.Main.immediate) {
             val boundary = BrowserGatewayDispatch({ ctx.tabStore?.activeTabId?.value ?: "0" }, { ctx.webView })
             boundary.execute(method, params, pinned) { view ->
                 val result = if (view == null) invoke(method, params) else ctx.withBrowserTarget(view) { invoke(method, params) }
-                if (pinned != null && method == "get-tabs") result + ("tabs" to
-                    (result["tabs"] as? List<*>)?.filter { (it as? Map<*, *>)?.get("id") == pinned }.orEmpty())
-                else result
+                if (pinned != null && method == "get-tabs") {
+                    result + (
+                        "tabs" to
+                            (result["tabs"] as? List<*>)?.filter { (it as? Map<*, *>)?.get("id") == pinned }.orEmpty()
+                    )
+                } else {
+                    result
+                }
             }
         }
 
-    private suspend fun invoke(method: String, params: Map<String, Any?>): Map<String, Any?> {
+    private suspend fun invoke(
+        method: String,
+        params: Map<String, Any?>,
+    ): Map<String, Any?> {
         if (method != "browser-control-evaluate") return router.handle(method, params, fromGateway = true).second
         val expression = params["expression"] as? String ?: error("Missing fixed reader")
         if (ctx.webView == null) return errorResponse("NO_WEBVIEW", "No WebView")
         val value = ctx.evaluateJSReturningJSON(expression)
-        return if (value.isEmpty()) errorResponse("RENDERER_ERROR", "The fixed reader returned no JSON object")
-        else successResponse(mapOf("result" to value))
+        return if (value.isEmpty()) {
+            errorResponse("RENDERER_ERROR", "The fixed reader returned no JSON object")
+        } else {
+            successResponse(mapOf("result" to value))
+        }
     }
 
-    suspend fun readContext(tabId: String, method: String): Map<String, Any?> = lock.withLock {
-        execute(method, mapOf("tabId" to tabId), tabId)
-    }
+    suspend fun readContext(
+        tabId: String,
+        method: String,
+    ): Map<String, Any?> =
+        lock.withLock {
+            execute(method, mapOf("tabId" to tabId), tabId)
+        }
 
     suspend fun closeSession(session: BrowserGatewaySession) {
         session.close()

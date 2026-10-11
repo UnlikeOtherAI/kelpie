@@ -100,33 +100,38 @@ class BrowserGatewayTests {
         assertFalse(BrowserGatewayTabPolicy.permitsDispatch("switch-tab", target, "one", "two"))
     }
 
-    @Test fun dispatchKeepsCapturedRendererAndRefusesResultAfterHumanSwitch() = runBlocking {
-        var active = "one"
-        var visible = "view-one"
-        val boundary = BrowserGatewayDispatch({ active }, { visible })
-        val admitted = CompletableDeferred<Unit>()
-        val finish = CompletableDeferred<Unit>()
-        var touched: String? = null
-        val call = async {
-            boundary.execute("navigate", mapOf("tabId" to "one"), null) { captured ->
-                admitted.complete(Unit)
-                finish.await()
-                touched = captured
-                mapOf("success" to true)
+    @Test fun dispatchKeepsCapturedRendererAndRefusesResultAfterHumanSwitch() =
+        runBlocking {
+            var active = "one"
+            var visible = "view-one"
+            val boundary = BrowserGatewayDispatch({ active }, { visible })
+            val admitted = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<Unit>()
+            var touched: String? = null
+            val call =
+                async {
+                    boundary.execute("navigate", mapOf("tabId" to "one"), null) { captured ->
+                        admitted.complete(Unit)
+                        finish.await()
+                        touched = captured
+                        mapOf("success" to true)
+                    }
+                }
+            admitted.await()
+            active = "two"
+            visible = "view-two"
+            finish.complete(Unit)
+            assertEquals(false, call.await()["success"])
+            assertEquals("view-one", touched)
+            var invoked = false
+            boundary.execute("browser-control-evaluate", mapOf("tabId" to "one"), null) {
+                invoked = true
+                emptyMap()
             }
+            assertFalse(invoked)
+            val noPage = BrowserGatewayDispatch<String>({ "0" }, { null })
+            assertEquals(true, noPage.execute("get-device-info", emptyMap(), null) { mapOf("success" to (it == null)) }["success"])
         }
-        admitted.await()
-        active = "two"
-        visible = "view-two"
-        finish.complete(Unit)
-        assertEquals(false, call.await()["success"])
-        assertEquals("view-one", touched)
-        var invoked = false
-        boundary.execute("browser-control-evaluate", mapOf("tabId" to "one"), null) { invoked = true; emptyMap() }
-        assertFalse(invoked)
-        val noPage = BrowserGatewayDispatch<String>({ "0" }, { null })
-        assertEquals(true, noPage.execute("get-device-info", emptyMap(), null) { mapOf("success" to (it == null)) }["success"])
-    }
 
     @Test fun protocolFailureKeepsUncertaintyOnSuccessfulTransport() =
         runBlocking {
