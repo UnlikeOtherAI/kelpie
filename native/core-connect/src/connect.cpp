@@ -82,16 +82,33 @@ struct KelpieConnect {
           jobs[key]["event"].at("seq") == seq) {
         jobs[key]["acked"] = true;
         // Keep identity tombstones so duplicated mutations never execute again.
+        jobs[key]["terminalState"] = jobs[key]["event"].at("state");
         jobs[key].erase("event");
       }
       return {{"kind", "ack"}};
     }
     if (type == "cancel") {
-      if (!jobs.contains(key) || jobs[key].value("terminal", false))
-        return {{"kind", "ignored"}};
+      if (!frame.at("seq").is_number_integer() || seq != 2 || frame.size() != 5)
+        throw std::invalid_argument("Invalid cancellation");
+      if (!jobs.contains(key)) {
+        if (jobs.size() >= 8192) throw std::runtime_error("Journal capacity reached");
+        Json identity = {{"jobId", frame.at("jobId")}, {"attemptId", frame.at("attemptId")}};
+        jobs[key] = {{"command", identity}, {"terminal", true}, {"acked", false},
+            {"cancelledBeforeCommand", true}, {"terminalState", "cancelled"}, {"event", Event(identity, "cancelled")}};
+      }
+      if (jobs[key].value("terminal", false)) {
+        auto& job = jobs[key];
+        if (!job.contains("event")) job["event"] = Event(job["command"], job.value("terminalState", "cancelled"));
+        job["acked"] = false;
+        auto event = job["event"];
+        event["generation"] = generation;
+        // A receipt must never interrupt a different attempt currently executing on the device.
+        return {{"kind", "receipt"}, {"frames", Json::array({event})}};
+      }
       auto event = Event(jobs[key]["command"], "cancelled");
       jobs[key]["event"] = event;
       jobs[key]["terminal"] = true;
+      jobs[key]["terminalState"] = "cancelled";
       event["generation"] = generation;
       return {{"kind", "cancel"}, {"jobId", frame["jobId"]},
           {"attemptId", frame["attemptId"]}, {"frames", Json::array({event})}};
@@ -110,7 +127,8 @@ struct KelpieConnect {
       const auto& previous = jobs[key]["command"];
       auto comparable = frame;
       comparable.erase("generation");
-      if (previous != comparable) throw std::invalid_argument("Attempt identity reused");
+      if (!jobs[key].value("cancelledBeforeCommand", false) && previous != comparable)
+        throw std::invalid_argument("Attempt identity reused");
       Json frames = Json::array();
       if (jobs[key].contains("event")) {
         auto event = jobs[key]["event"];
@@ -144,6 +162,7 @@ struct KelpieConnect {
     if (result.contains("error")) event["error"] = Text(result, "error").substr(0, 2000);
     job["event"] = event;
     job["terminal"] = true;
+    job["terminalState"] = state;
     event["generation"] = generation;
     return {{"kind", "terminal"}, {"frames", Json::array({event})}};
   }
