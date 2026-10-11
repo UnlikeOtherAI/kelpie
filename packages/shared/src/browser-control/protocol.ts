@@ -52,7 +52,7 @@ export type BrowserControlMethod = BrowserControlRequest["method"];
 export interface BrowserTabInfo { id: string; url?: string; title?: string }
 export interface BrowserElement { ref: string; role: string; name: string }
 export interface BrowserSnapshot { url: string; title: string; text: string; truncated: boolean; elements?: BrowserElement[] }
-export interface BrowserImage { type: "image"; mimeType: "image/png" | "image/jpeg"; data: string }
+export interface BrowserImage { type: "image"; mimeType: "image/png" | "image/jpeg" | "image/webp"; data: string }
 export interface BrowserCapabilities { version: 1; methods: BrowserControlMethod[]; extensions: string[] }
 export interface BrowserControlFailure { code: string; message: string; mayHaveCompleted: boolean }
 export type BrowserControlResponse = { version: 1; ok: true; value: unknown } | { version: 1; ok: false; error: BrowserControlFailure };
