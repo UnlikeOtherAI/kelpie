@@ -30,7 +30,7 @@ class ConnectBrowserNavigationTest {
                 server.enqueue(page("Owned destination"))
                 val tab = context.tabStore!!.activeTab!!
                 val previous = tab.documentVersion
-                val result = browser.execute(command(context, server.url("/destination").toString()))
+                val result = browser.execute(command(context, url(server, "/destination")))
                 assertEquals(tab.id, result["tabId"])
                 assertEquals(tab.documentVersion, result["tabVersion"])
                 assertNotEquals(previous, result["tabVersion"])
@@ -46,7 +46,7 @@ class ConnectBrowserNavigationTest {
                     server.enqueue(page("Delayed").setBodyDelay(600, TimeUnit.MILLISECONDS))
                     val execution =
                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext()).async {
-                            runCatching { browser.execute(command(context, server.url("/delayed").toString())) }
+                            runCatching { browser.execute(command(context, url(server, "/delayed"))) }
                         }
                     withContext(Dispatchers.IO) { check(server.takeRequest(5, TimeUnit.SECONDS) != null) }
                     if (switchTab) context.tabStore!!.addTab() else authority.allowed = false
@@ -59,9 +59,9 @@ class ConnectBrowserNavigationTest {
     fun unrelatedRedirectCannotBorrowCompletionPin() =
         runBlocking {
             fixture { browser, context, server, _ ->
-                server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", server.url("/other")))
+                server.enqueue(MockResponse().setResponseCode(302).addHeader("Location", url(server, "/other")))
                 server.enqueue(page("Redirected"))
-                assertTrue(runCatching { browser.execute(command(context, server.url("/requested").toString())) }.isFailure)
+                assertTrue(runCatching { browser.execute(command(context, url(server, "/requested"))) }.isFailure)
             }
         }
 
@@ -81,7 +81,7 @@ class ConnectBrowserNavigationTest {
                 context.tabStore = store
                 // Own verification profile only; establish a settled initial document through its real clients.
                 val tab = store.addTab()
-                tab.webView.loadDataWithBaseURL(server.url("/initial").toString(), "<title>Initial</title>", "text/html", "utf-8", null)
+                tab.webView.loadDataWithBaseURL(url(server, "/initial"), "<title>Initial</title>", "text/html", "utf-8", null)
                 withTimeout(5000) {
                     do {
                         delay(50)
@@ -111,6 +111,8 @@ class ConnectBrowserNavigationTest {
             "tabVersion" to context.tabStore!!.activeTab!!.documentVersion,
             "input" to mapOf("url" to url),
         )
+
+    private fun url(server: MockWebServer, path: String) = "http://127.0.0.1:${server.port}$path"
 
     private fun page(title: String) = MockResponse().setHeader("Content-Type", "text/html").setBody("<title>$title</title><p>Local fixture</p>")
 }
