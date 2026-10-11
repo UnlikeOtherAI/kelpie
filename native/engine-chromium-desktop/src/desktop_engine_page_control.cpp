@@ -52,7 +52,11 @@ BrowserControlResult DesktopEngine::EvaluateBrowserControl(TabLease lease, std::
     if (!result.ok) return result;
     if (evaluated.contains("exceptionDetails") || !evaluated.at("result").contains("value"))
       return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed");
-    *value = evaluated["result"]["value"];
+    // EvaluateParams returns the standard runtime envelope; unwrap it exactly
+    // as ordinary Evaluate does rather than handing the envelope to the gateway.
+    const auto parsed = DesktopDevToolsSession::ParseEvaluateResult({true, {}, {}, evaluated, false});
+    if (!parsed.ok) return DevToolsResult(parsed);
+    *value = parsed.value;
     return result;
   } catch (...) { return BrowserControlResult::Failure("COMMAND_FAILED", "Private browser reader failed"); }
 }
