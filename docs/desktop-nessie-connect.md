@@ -64,3 +64,15 @@ encrypted namespace isolation and result retention. Native Windows requires the 
 sandboxed CEF SDK; Linux requires its CEF runtime, curl/OpenSSL and GTK for menu checks.
 Portable mocks do not verify production provisioning, real WSS revocation, installed
 model inference or the rendered platform menus. Those require native/integration checks.
+
+Verified on 2026-10-11: Minis built the full Windows Release app with MSVC 19.51,
+pinned sandboxed CEF 152 and embedded llama.cpp. Fourteen focused connection,
+account, inference-service and desktop router/MCP/HTTP/handler/network tests passed;
+the final deadline change additionally passed coordinator/executor tests. Ubuntu
+(`umac`, dedicated check checkout) built the full Release CEF 120/GTK app at code
+revision `50ba86f`; all thirteen equivalent connection/account/desktop regressions
+passed. Both builds used concurrency two and existing dependency caches. Tests cover
+mocked gateway frames and browser interfaces, including durable replay, loss-induced
+cancellation, strict capabilities, Unicode bounds, full job deadlines and page drift.
+These passes do not claim rendered account-menu verification, actual installed GGUF
+extraction, a published/installed release, or live UOA-to-Nessie provisioning/revocation.
