@@ -5,6 +5,7 @@ No autopair: the harness taps the existing Yes, once approval UI. Bearers remain
 memory. The supplied adb must target only this test emulator (use ANDROID_SERIAL).
 """
 import argparse
+import atexit
 import json
 import os
 import re
@@ -22,7 +23,7 @@ FIXTURE = b'''<!doctype html><meta name="viewport" content="width=device-width">
 <label>Query<input id="query" aria-label="Query" value="seed"></label>
 <button id="count" onclick="window.activationCount=(window.activationCount||0)+1;document.title='Count:'+window.activationCount">Count</button>
 <button id="slow" onclick="window.slowActivations=(window.slowActivations||0)+1;let end=Date.now()+35000;while(Date.now()<end){};document.title='Slow:'+window.slowActivations">Slow</button>
-<script>setInterval(async()=>{let cmd=await(await fetch('/command')).json();
+<script>setInterval(async()=>{let cmd=await(await fetch('/command'+location.search)).json();
 if(cmd.replace){let el=document.querySelector('#count');el.replaceWith(el.cloneNode(true));document.title='Replaced'}
 if(cmd.spoof){let el=document.createElement('button');el.textContent='Spoof';el.setAttribute('data-sn-ref',cmd.spoof);
 el.onclick=()=>document.title='WRONG';document.body.append(el);document.title='Spoof ready'}},100)</script>'''
@@ -34,6 +35,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
     model_mode = 'read'
     model_stage = 0
     model_catalog_chars = None
+    fixture_query = ''
     tab = None
 
     def log_message(self, *_):
@@ -48,7 +50,9 @@ class FixtureHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path == '/command':
+        if self.path.startswith('/command'):
+            if self.path != '/command' + FixtureHandler.fixture_query:
+                return self.send_json({})
             command, FixtureHandler.command = FixtureHandler.command, {}
             return self.send_json(command)
         if self.path == '/v1/models':
@@ -120,13 +124,23 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     token = None
 
-    def request(path, value=None, authenticated=True, extra_headers=None):
+    def tap_ui_text(text):
+        subprocess.run([args.adb, 'shell', 'uiautomator', 'dump', '/sdcard/gateway-ui.xml'], check=True, stdout=subprocess.DEVNULL)
+        xml = subprocess.check_output([args.adb, 'shell', 'cat', '/sdcard/gateway-ui.xml'])
+        button = next((node for node in ET.fromstring(xml).iter('node') if node.get('text') == text), None)
+        if button is None:
+            return False
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', button.get('bounds')))
+        subprocess.run([args.adb, 'shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2)], check=True)
+        return True
+
+    def request(path, value=None, authenticated=True, extra_headers=None, http_method=None):
         data = None if value is None else json.dumps(value).encode()
         headers = {'Content-Type': 'application/json'}
         if authenticated and token:
             headers['Authorization'] = 'Bearer ' + token
         headers.update(extra_headers or {})
-        req = urllib.request.Request(args.base + path, data, headers)
+        req = urllib.request.Request(args.base + path, data, headers, method=http_method)
         try:
             with urllib.request.urlopen(req, timeout=45) as response:
                 body = response.read()
@@ -134,6 +148,16 @@ def main():
         except urllib.error.HTTPError as error:
             body = error.read()
             return error.code, json.loads(body) if body else None
+
+    def revoke():
+        nonlocal token
+        if token:
+            assert request('/v1/pair', http_method='DELETE')[0] == 200
+            assert request('/v1/browser-control', {'version': 1, 'method': 'capabilities'})[0] == 401
+            token = None
+            print('PASS disposable grant revoke and old bearer refusal', flush=True)
+
+    atexit.register(revoke)
 
     def native(method, params=None):
         status, result = request('/v1/' + method, params or {})
@@ -164,15 +188,11 @@ def main():
     for path in ('/v1/browser-control', '/mcp'):
         assert request(path, {'version': 1, 'method': 'capabilities'}, False)[0] == 401
     print('PASS unauthenticated HTTP/MCP denial', flush=True)
+    tap_ui_text('Get Started')
     status, pending = request('/v1/pair', {'clientId': str(uuid.uuid4()), 'clientName': 'Gateway emulator verification'}, False)
     assert status == 202
     for _ in range(15):
-        subprocess.run([args.adb, 'shell', 'uiautomator', 'dump', '/sdcard/gateway-ui.xml'], check=True, stdout=subprocess.DEVNULL)
-        xml = subprocess.check_output([args.adb, 'shell', 'cat', '/sdcard/gateway-ui.xml'])
-        button = next((node for node in ET.fromstring(xml).iter('node') if node.get('text') == 'Yes, once'), None)
-        if button is not None:
-            x1, y1, x2, y2 = map(int, re.findall(r'\d+', button.get('bounds')))
-            subprocess.run([args.adb, 'shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2)], check=True)
+        if tap_ui_text('Yes, once'):
             break
         time.sleep(1)
     else:
@@ -186,7 +206,8 @@ def main():
     assert request('/mcp', {}, extra_headers={'Origin': 'null'})[0] == 403
     assert request('/mcp', {'jsonrpc': '2.0', 'method': 'notifications/initialized'}) == (202, None)
     print('PASS MCP transport notification/version/Origin/GET boundaries', flush=True)
-    fixture_url = f'http://10.0.2.2:{args.fixture_port}/fixture'
+    FixtureHandler.fixture_query = '?instance=' + uuid.uuid4().hex
+    fixture_url = f'http://10.0.2.2:{args.fixture_port}/fixture' + FixtureHandler.fixture_query
     tab = core('tabs.new', params={'url': fixture_url})['id']
     core('tab.goto', tab, {'url': fixture_url})
     subprocess.run([os.environ.get('NODE', 'node'), str(Path(__file__).with_name('android-browser-gateway-mcp.mjs'))],
@@ -254,16 +275,20 @@ def main():
             assert FixtureHandler.model_stage == 2
             wait_title(tab, 'Slow:1')
         elif mode == 'write':
-            assert rpc('kelpie_extension', {'name': 'kelpie_ai_ask', 'arguments': infer})['ok']
+            inferred = rpc('kelpie_extension', {'name': 'kelpie_ai_ask', 'arguments': infer})
+            assert inferred['ok'], 'MCP inference failed'
+            assert inferred['value']['success'], 'Native inference failed'
         else:
             native('ai-infer', infer)
         if mode == 'write':
-            assert native('evaluate', {'expression': 'document.querySelector("#query").value'})['result'] == 'seed_AI'
+            actual = native('evaluate', {'expression': 'document.querySelector("#query").value'})['result']
+            assert actual == 'seed_AI', 'Agent field side effect mismatch: ' + str(actual) + '; fixture steps: ' + json.dumps(inferred['value'].get('steps'))
             assert core('tab.title', tab) == 'Count:1'
     native('ai-endpoint-remove', {'id': endpoint})
     print('PASS built-in agent catalog/admission/actions/uncertainty stop and MCP reentrant inference', flush=True)
     print('Actual last agent catalog characters:', FixtureHandler.model_catalog_chars, flush=True)
     core('tabs.close', other)
+    revoke()
     server.shutdown()
     print('Android emulator gateway journey passed; physical device unverified', flush=True)
 

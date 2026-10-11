@@ -97,6 +97,19 @@ class BrowserGatewayTests {
         assertFalse(BrowserGatewayTabPolicy.permits(mapOf("params" to mapOf("tabId" to "missing")), false, true, null, "one", setOf("one")))
     }
 
+    @Test fun disposablePairingRevocationRequiresIssuedBearer() {
+        val store = PairingStore(folder.root.resolve("revoke-pairings.json"))
+        val auth = AuthMiddleware(store)
+        val pending = store.startPairing("gateway-revoke", "Disposable gateway test", "127.0.0.1").request!!
+        val token = store.approve(pending.requestId, persist = false)!!.first
+        val request = ParsedRequest("DELETE", "/v1/pair", emptyMap(), false, "127.0.0.1")
+        assertEquals(401, (auth.evaluate(request) as AuthDecision.Reject).status)
+        val authorized = request.copy(headers = mapOf("authorization" to listOf("Bearer $token")))
+        val admitted = auth.evaluate(authorized) as AuthDecision.Authenticated
+        assertEquals(200, PairEndpoints(store) {}.handlePairDelete(admitted.clientId).status)
+        assertEquals(401, (auth.evaluate(authorized) as AuthDecision.Reject).status)
+    }
+
     @Test fun directTargetCannotFollowHumanSwitchBetweenInspectionAndDispatch() {
         val target = mapOf<String, Any?>("tabId" to "one")
         assertTrue(BrowserGatewayTabPolicy.permitsDispatch("browser-control-evaluate", target, null, "one"))

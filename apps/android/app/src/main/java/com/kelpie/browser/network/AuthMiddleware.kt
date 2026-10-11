@@ -54,7 +54,7 @@ class AuthMiddleware(
         val ambiguous = rejectAmbiguousHeaders(req)
         if (ambiguous != null) return ambiguous
 
-        if (req.path in UNAUTH_ALLOWLIST) {
+        if (req.path in UNAUTH_ALLOWLIST && (req.path != "/v1/pair" || req.method.equals("POST", ignoreCase = true))) {
             if (req.path == "/v1/pair" && req.method.equals("POST", ignoreCase = true)) {
                 val csrf = csrfReject(req)
                 if (csrf != null) return csrf
