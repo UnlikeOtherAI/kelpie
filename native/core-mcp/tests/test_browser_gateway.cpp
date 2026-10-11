@@ -62,7 +62,7 @@ void Mcp() {
   kelpie::BrowserGateway gateway({{"nativeMethods", {"screenshot"}}, {"requireAuthorization", false}});
   auto step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/list"}});
   const auto tools = step["response"]["result"]["tools"];
-  assert(tools.size() == 3);
+  assert(tools.size() == 4);
   assert(tools.dump().size() < 24000);
   step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"}, {"params", {{"name", "kelpie_browser_control"}, {"arguments", {{"request", Request("tab.screenshot")}}}}}});
   assert(step["method"] == "screenshot");
@@ -71,6 +71,14 @@ void Mcp() {
   assert(content.size() == 2);
   assert(content[0]["type"] == "image");
   assert(content[1]["text"].get<std::string>().find("AQID") == std::string::npos);
+}
+void ExtensionReachability() {
+  kelpie::BrowserGateway gateway({{"nativeMethods", {"bookmarks-add"}}, {"requireAuthorization", false},
+    {"extensions", {{{"name", "kelpie_bookmarks_add"}, {"method", "bookmarks-add"}, {"mutates", true}, {"inputSchema", {{"type", "object"}, {"properties", {{"url", {{"type", "string"}}}}}, {"required", {"url"}}, {"additionalProperties", false}}}}}});
+  auto step = gateway.BeginMcp({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"}, {"params", {{"name", "kelpie_extension"}, {"arguments", {{"name", "kelpie_bookmarks_add"}, {"arguments", {{"url", "https://example.org"}}}}}}}});
+  assert(step["method"] == "bookmarks-add");
+  assert(step["params"]["url"] == "https://example.org");
+  assert(gateway.Advance({{"success", true}})["response"]["result"]["isError"] == false);
 }
 void SelectedAndMapping() {
   const json config = {{"nativeMethods", {"get-tabs", "switch-tab", "scroll", "screenshot", "get-current-url", "navigate"}}, {"targeting", "selected"}, {"allowActions", false}, {"requireAuthorization", false}};
@@ -118,4 +126,4 @@ void CAbi() {
   kelpie_mcp_free_string(result);
   kelpie_browser_gateway_destroy(gateway);
 }
-int main() { Contracts(); Sequencing(); References(); Mcp(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+int main() { Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

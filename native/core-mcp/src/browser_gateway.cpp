@@ -196,7 +196,9 @@ json BrowserGateway::ToolList() const {
     {{"name", "kelpie_extensions"}, {"description", "List available product extension names. Fetch schemas with kelpie_extension_tools."},
       {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}}},
     {{"name", "kelpie_extension_tools"}, {"description", "Fetch tool schemas for up to 20 named product extensions, then call those tools."},
-      {"inputSchema", {{"type", "object"}, {"properties", {{"names", {{"type", "array"}, {"items", {{"type", "string"}}}, {"maxItems", 20}}}}}, {"required", {"names"}}, {"additionalProperties", false}}}}
+      {"inputSchema", {{"type", "object"}, {"properties", {{"names", {{"type", "array"}, {"items", {{"type", "string"}}}, {"maxItems", 20}}}}}, {"required", {"names"}}, {"additionalProperties", false}}}},
+    {{"name", "kelpie_extension"}, {"description", "Call a discovered product extension with its documented arguments."},
+      {"inputSchema", {{"type", "object"}, {"properties", {{"name", {{"type", "string"}, {"minLength", 1}, {"maxLength", 256}}}, {"arguments", {{"type", "object"}}}}}, {"required", {"name", "arguments"}}, {"additionalProperties", false}}}}
   });
 }
 json BrowserGateway::Extensions(const json& names) const {
@@ -226,7 +228,7 @@ json BrowserGateway::BeginMcp(json rpc) {
   if (method != "tools/call") return error(-32601);
   const json params = rpc.value("params", json::object());
   if (!params.is_object() || !params.contains("name") || !params["name"].is_string()) return error(-32602);
-  const std::string name = params["name"];
+  std::string name = params["name"];
   json arguments = params.value("arguments", json::object());
   if (!arguments.is_object()) return error(-32602);
   if (name == "kelpie_extensions" || name == "kelpie_extension_tools") {
@@ -234,6 +236,11 @@ json BrowserGateway::BeginMcp(json rpc) {
     const auto schema = list[name == "kelpie_extensions" ? 1 : 2]["inputSchema"];
     if (!ValidateBrowserJson(schema, &arguments)) return error(-32602);
     return answer(BrowserMcpResult(Success(Extensions(name == "kelpie_extensions" ? json(nullptr) : arguments["names"]))));
+  }
+  if (name == "kelpie_extension") {
+    if (!ValidateBrowserJson(ToolList()[3]["inputSchema"], &arguments)) return error(-32602);
+    name = arguments["name"];
+    arguments = arguments["arguments"];
   }
   if (name == "kelpie_browser_control") {
     if (arguments.size() != 1 || !arguments.contains("request")) return error(-32602);

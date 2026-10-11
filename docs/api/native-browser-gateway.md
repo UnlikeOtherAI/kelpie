@@ -42,9 +42,10 @@ Selected-tab readers inspect active identity first and never switch in read-only
 mode; writable switches require their own authorization step.
 Only implemented methods appear in capabilities. Rich locators remain Playwright.
 
-Default MCP tools are `kelpie_browser_control`, `kelpie_extensions` (names), and
-`kelpie_extension_tools` (schemas for up to 20 names). Previously available rich
-tools remain callable and discoverable through that catalogue.
+Default MCP tools are `kelpie_browser_control`, `kelpie_extensions` (names), `kelpie_extension_tools` (schemas for up to 20 names), and `kelpie_extension`
+`{name,arguments}`. Previously available rich tools remain callable by name and
+through the advertised generic extension tool, so embedded AI providers can
+reach every admitted feature without requiring dynamic function registration.
 
 CMake explicitly runs `pnpm install --frozen-lockfile`, builds the shared package,
 and generates the schema, documentation, fixed reader and Zod parity fixtures in
