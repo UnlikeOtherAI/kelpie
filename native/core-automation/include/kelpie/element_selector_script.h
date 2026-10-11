@@ -17,26 +17,31 @@ function kelpieEscapeAttribute(value) {
 }
 function kelpieBuildSelector(node) {
   if (!node || node.nodeType !== 1) return null;
-  if (node.id) return '#' + kelpieEscapeIdentifier(node.id);
+  function identifiesNode(candidate) {
+    if (candidate.length > 2000) return false;
+    try {
+      var matches = document.querySelectorAll(candidate);
+      return matches.length === 1 && matches[0] === node;
+    } catch (error) { return false; }
+  }
+  if (node.id) {
+    var id = '#' + kelpieEscapeIdentifier(node.id);
+    if (identifiesNode(id)) return id;
+  }
   var segments = [];
   var current = node;
   while (current && current.nodeType === 1) {
     var tag = current.tagName.toLowerCase();
     var segment = tag;
     if (current.id) {
-      segment += '#' + kelpieEscapeIdentifier(current.id);
-      segments.unshift(segment);
-      return segments.join(' > ');
+      var identified = [tag + '#' + kelpieEscapeIdentifier(current.id)].concat(segments).join(' > ');
+      if (identifiesNode(identified)) return identified;
     }
     var name = current.getAttribute && current.getAttribute('name');
     if (name) {
       var named = tag + '[name="' + kelpieEscapeAttribute(name) + '"]';
-      try {
-        if (document.querySelectorAll(named).length === 1) {
-          segments.unshift(named);
-          return segments.join(' > ');
-        }
-      } catch (error) {}
+      var namedPath = [named].concat(segments).join(' > ');
+      if (identifiesNode(namedPath)) return namedPath;
     }
     var parent = current.parentElement;
     if (parent) {
@@ -49,14 +54,10 @@ function kelpieBuildSelector(node) {
     }
     segments.unshift(segment);
     var candidate = segments.join(' > ');
-    try {
-      if (document.querySelectorAll(candidate).length === 1) {
-        return candidate;
-      }
-    } catch (error) {}
+    if (identifiesNode(candidate)) return candidate;
     current = parent;
   }
-  return segments.join(' > ');
+  return null;
 }
 )JS";
 }

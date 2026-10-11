@@ -10,6 +10,9 @@ target_link_libraries(test_browser_gateway PRIVATE kelpie_core_mcp)
 kelpie_enable_test_assertions(test_browser_gateway)
 add_test(NAME test_browser_gateway COMMAND test_browser_gateway)
 
+add_executable(browser_snapshot_fixture browser_snapshot_fixture.cpp)
+target_link_libraries(browser_snapshot_fixture PRIVATE kelpie_core_mcp)
+
 add_executable(test_native_extensions test_native_extensions.cpp)
 target_include_directories(test_native_extensions PRIVATE ../src "${CMAKE_CURRENT_BINARY_DIR}/../generated")
 target_link_libraries(test_native_extensions PRIVATE kelpie_core_mcp)
