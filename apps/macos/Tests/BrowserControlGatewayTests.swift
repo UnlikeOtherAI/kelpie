@@ -1,3 +1,4 @@
+import WebKit
 import XCTest
 @testable import Kelpie
 
@@ -224,6 +225,48 @@ final class BrowserControlGatewayTests: XCTestCase {
         XCTAssertFalse(BrowserControlGateway.encode(BrowserModelObservation(legacy, vision: true).text).contains(encoded))
     }
     #endif
+
+    func testProductionBoundaryDiscardsReadAfterRendererChangesDuringDispatch() async {
+        let result = await delayedProductionDispatch(method: "get-current-url", requestMethod: "tab.url")
+        XCTAssertEqual(result["ok"] as? Bool, false)
+        XCTAssertEqual((result["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, false)
+        XCTAssertFalse(BrowserControlGateway.encode(result).contains("private-old-renderer"))
+    }
+
+    func testProductionBoundaryKeepsMutationUncertaintyAfterRendererChanges() async {
+        let result = await delayedProductionDispatch(method: "navigate", requestMethod: "tab.goto")
+        XCTAssertEqual(result["ok"] as? Bool, false)
+        XCTAssertEqual((result["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, true)
+    }
+
+    private func delayedProductionDispatch(method: String, requestMethod: String) async -> [String: Any] {
+        let context = HandlerContext()
+        let router = Router()
+        router.handlerContext = context
+        #if os(iOS)
+        let initial = WKWebView()
+        let replacement = WKWebView()
+        context.webView = initial
+        let tabId = "external"
+        router.register("get-tabs") { _ in successResponse() }
+        #else
+        let tabId = "own"
+        #endif
+        var pending: CheckedContinuation<[String: Any], Never>?
+        router.register(method) { _ in await withCheckedContinuation { pending = $0 } }
+        let request = Task { await router.browserControl([
+            "version": 1, "method": requestMethod, "tabId": tabId,
+            "params": requestMethod == "tab.goto" ? ["url": "https://fixture.test"] : [:]
+        ]) }
+        while pending == nil { await Task.yield() }
+        #if os(iOS)
+        context.webView = replacement
+        #else
+        context.activeEngineIsChromium = true
+        #endif
+        pending?.resume(returning: successResponse(["url": "private-old-renderer"]))
+        return await request.value
+    }
 
     private func fetch(port: UInt16, path: String, body: [String: Any], token: String?, method: String = "POST", headers: [String: String] = [:]) async throws -> (Int, [String: Any]) {
         let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)\(path)"))

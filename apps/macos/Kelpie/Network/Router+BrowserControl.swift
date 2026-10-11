@@ -1,6 +1,20 @@
 import Foundation
 import WebKit
 
+/// Keep the named world alive: WebKit releases its globals with its last world owner.
+@MainActor
+enum BrowserControlWebKit {
+    static let world = WKContentWorld.world(name: "KelpieBrowserControl")
+
+    static func evaluate(_ expression: String, in webView: WKWebView) async throws -> Any? {
+        try await withCheckedThrowingContinuation { continuation in
+            webView.evaluateJavaScript(expression, in: nil, in: world) { result in
+                continuation.resume(with: result.map { Optional($0) })
+            }
+        }
+    }
+}
+
 /// Remote inference and local models retain their distinct existing admission policies.
 enum BrowserAgentAdmission {
     case remote
@@ -105,8 +119,21 @@ extension Router {
                 if agent && !self.agentTargetAllowed(tabId: pinnedTabId) {
                     return errorResponse(code: "TAB_CHANGED", message: "The pinned tab is no longer visible")
                 }
+                #if os(iOS)
+                let selectedView = self.handlerContext?.webView
+                #endif
                 if mutates { self.invalidateAllBrowserReferences() }
-                return await self.browserDispatch(method: method, params: params, pinnedTabId: agent ? pinnedTabId : nil)
+                let result = await self.browserDispatch(method: method, params: params, pinnedTabId: agent ? pinnedTabId : nil)
+                guard self.browserProfile == profile else { return errorResponse(code: "RENDERER_CHANGED", message: "Renderer changed") }
+                guard !agent || self.agentTargetAllowed(tabId: pinnedTabId) else {
+                    return errorResponse(code: "TAB_CHANGED", message: "The pinned tab is no longer visible")
+                }
+                #if os(iOS)
+                if !["new-tab", "switch-tab", "close-tab"].contains(method), selectedView !== self.handlerContext?.webView {
+                    return errorResponse(code: "TAB_CHANGED", message: "The selected renderer changed")
+                }
+                #endif
+                return result
             },
             authorize: { [weak self] request, mutates in
                 guard let self, self.browserProfile == profile else { return false }
@@ -180,7 +207,7 @@ extension Router {
                 #if os(iOS)
                 guard params["tabId"] as? String == selectedBrowserTabId,
                       let webView = context.webView else { return errorResponse(code: "TAB_CHANGED", message: "Tab is not active") }
-                let result = try await webView.evaluateJavaScript(expression, in: nil, in: .world(name: "KelpieBrowserControl"))
+                let result = try await BrowserControlWebKit.evaluate(expression, in: webView)
                 #else
                 let renderer = try context.resolveRenderer(tabId: params["tabId"] as? String)
                 let result = try await renderer.evaluateBrowserControlJS(expression)

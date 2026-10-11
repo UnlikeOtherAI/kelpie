@@ -159,7 +159,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
         try await withWebKitTimeout("Browser control") { completion in
-            webView.evaluateJavaScript(script, in: nil, in: .world(name: "KelpieBrowserControl")) { result in
+            webView.evaluateJavaScript(script, in: nil, in: BrowserControlWebKit.world) { result in
                 completion(result.map { Optional($0) })
             }
         }

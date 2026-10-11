@@ -143,3 +143,11 @@ admission to its inner browser requests;
 it does not hold the browser lease across model inference. Its existing model
 and run deadlines remain authoritative, avoiding both self-blocked tool loops
 and a detached outer timeout while an AI turn continues to act.
+
+Apple WebKit retains the named private content world for the binding lifetime so
+observed DOM objects survive between snapshot and action. The iOS callback bridge
+awaits the actual WebKit result. Completed reads are discarded when their renderer
+or an agent's pinned visible tab changes during dispatch; dispatched mutations
+retain uncertainty. Isolated real-WebKit fixtures exercise this boundary on macOS
+and the iOS simulator, including captured-node activation, append, replacement
+refusal and single-image screenshot output.

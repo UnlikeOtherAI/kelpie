@@ -22,7 +22,7 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         context.renderer = renderer
         webView = try XCTUnwrap(renderer.makeView() as? WKWebView)
         let windowId = UUID().uuidString
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = webView
         window.makeKeyAndOrderFront(nil)
         WindowRegistry.shared.register(id: windowId, window: window, tabStore: store)
@@ -52,9 +52,10 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         router.register("get-tabs") { _ in successResponse(["tabs": [["id": tabId, "active": true, "title": "Isolated fixture", "url": "https://fixture.test"]]]) }
         webView.loadHTMLString(Self.fixture, baseURL: URL(string: "https://fixture.test"))
         for _ in 0..<100 {
-            if (try? await webView.evaluateJavaScript("!!document.getElementById('entry')")) as? Bool == true { break }
+            if !webView.isLoading, (try? await webView.evaluateJavaScript("!!document.getElementById('entry')")) as? Bool == true { break }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
+        XCTAssertFalse(webView.isLoading, "Fixture navigation must settle before observation")
         let observed = try await snapshot(router, tabId: tabId)
         for secret in ["editable-secret", "textarea-secret", "password-secret", "seed-"] {
             XCTAssertFalse(BrowserControlGateway.encode(observed).contains(secret))
@@ -93,6 +94,38 @@ final class RealWebKitBrowserControlTests: XCTestCase {
         XCTAssertNotNil(Data(base64Encoded: encoded))
         XCTAssertFalse(content.filter { $0["type"] as? String == "text" }.contains { ($0["text"] as? String)?.contains(encoded) == true })
     }
+
+    #if os(macOS)
+    func testAgentReadDiscardsOutputWhenPinnedWindowLosesSelection() async {
+        let tab = Tab(spec: TabSpec(persistent: false, dataStore: .nonPersistent()))
+        let store = TabStore(isolatedTab: tab)
+        let windowId = UUID().uuidString
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.titled], backing: .buffered, defer: false)
+        window.makeKeyAndOrderFront(nil)
+        WindowRegistry.shared.register(id: windowId, window: window, tabStore: store)
+        defer {
+            WindowRegistry.shared.unregister(id: windowId)
+            window.orderOut(nil)
+            tab.renderer.invalidate()
+        }
+        let context = HandlerContext()
+        context.renderer = tab.renderer
+        let router = Router()
+        router.handlerContext = context
+        var pending: CheckedContinuation<[String: Any], Never>?
+        router.register("get-tabs") { _ in await withCheckedContinuation { pending = $0 } }
+        let gateway = router.makeBrowserGateway(allowActions: false, pinnedTabId: tab.id.uuidString, agent: true)
+        let read = Task { await gateway.request(["version": 1, "method": "tabs.list", "params": [:]]) }
+        while pending == nil { await Task.yield() }
+        WindowRegistry.shared.unregister(id: windowId)
+        window.orderOut(nil)
+        pending?.resume(returning: successResponse(["tabs": [["id": tab.id.uuidString, "title": "private-pinned-title"]]]))
+        let response = await read.value
+        XCTAssertEqual(response["ok"] as? Bool, false)
+        XCTAssertEqual((response["error"] as? [String: Any])?["mayHaveCompleted"] as? Bool, false)
+        XCTAssertFalse(BrowserControlGateway.encode(response).contains("private-pinned-title"))
+    }
+    #endif
 
     private func snapshot(_ router: Router, tabId: String) async throws -> [String: Any] {
         let result = await router.browserControl(["version": 1, "method": "tab.snapshot", "tabId": tabId, "params": ["maxChars": 2000, "maxElements": 100]])
