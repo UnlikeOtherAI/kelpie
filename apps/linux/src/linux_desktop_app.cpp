@@ -85,9 +85,14 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   impl_->profile.Publish(runtime.device_id,impl_->desktop.http_server().bound_port(),runtime.start_stdio_mcp);
   impl_->account.RestoreSession();
   impl_->connect_executor=std::make_unique<connect::Executor>(impl_->desktop.engine(),connect::Executor::Infer{},
-      [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); });
+      [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },
+      [this](const json& request,const connect::Executor::Authorization& authorize) {
+        DesktopMcpServer::Config config; config.platform=Platform::kLinux; config.engine="chromium";
+        return impl_->desktop.mcp_server().HandleBrowserRequestAuthorized(request,config,authorize);
+      });
   impl_->connection=std::make_unique<connect::Client>(impl_->account,impl_->config.profile_dir,"linux",runtime.device_id,
-      [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return impl_->connect_executor->Execute(command,cancelled); });
+      [this](const json& command,std::shared_ptr<const std::atomic<bool>> cancelled) { return impl_->connect_executor->Execute(command,cancelled); },
+      connect::Client::Cancel{},[] { return connect::MakeTransport(); },true);
   return true;
 }
 void LinuxApp::RequestShutdown() { impl_->closing=true; }

@@ -91,6 +91,12 @@ final class NessieConnection: ObservableObject {
         return action()
     }
 
+    func changeTabRemotely<T>(_ action: () async -> T) async -> T {
+        remoteTabMutation = true
+        defer { remoteTabMutation = false }
+        return await action()
+    }
+
     private var lifecycle: String { foreground && !paused && browser?.isReady == true ? "ready" : "paused" }
     var canMutate: Bool { foreground && !paused && browser?.isReady == true && socket != nil && generation != nil && owner != nil && UOAAccount.shared.profile?.sub == owner }
 
@@ -143,7 +149,7 @@ final class NessieConnection: ObservableObject {
                 try await send([
                     "type": "hello", "protocol": 1, "ticket": ticket.value,
                     "installationId": installationID, "label": deviceLabel, "platform": platform,
-                    "capabilities": ["browser.control", "page.extract"], "lifecycle": lifecycle,
+                    "capabilities": ["browser.control"] + (browser?.supportsControlV1 == true ? ["browser.control.v1"] : []) + ["page.extract"], "lifecycle": lifecycle,
                     "modelReady": ready, "modelInstalled": browser?.modelInstalled ?? false,
                     "modelCapabilities": ["text"], "delegatedBrowsing": false
                 ], connection: connection)

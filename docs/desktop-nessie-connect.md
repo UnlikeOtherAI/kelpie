@@ -16,7 +16,9 @@ empty ledger. Missing account state while launch restore runs preserves the jour
 Accepted/terminal events are persisted before sending, and a restart replays retained
 terminal results; potentially effective interrupted work becomes `UNKNOWN_EFFECTS`.
 
-Hello advertises `browser.control` and implemented `page.extract` on Windows.
+Hello retains legacy `browser.control` and advertises canonical `browser.control.v1`
+only when the shared persistent browser gateway is bound to the account connection.
+Windows also advertises its implemented `page.extract` support.
 Device labels use the native computer hostname, bounded to 120 UTF-8 bytes without
 splitting code points. Extraction summary, excerpt and source byte bounds use the
 same boundary rule so multilingual page content remains valid JSON.
@@ -29,24 +31,31 @@ The new scope never widens a refresh grant. UOA must provision `kelpie.connect` 
 exact registered app and configure its gateway resource before connections can work;
 see the [wire contract](nessie-connect.md).
 
-Browser execution uses an explicit operation allowlist. It never forwards arbitrary
-router calls, scripts, cookies, account settings or local-control credentials. Browser
-requests share the existing DesktopMcpServer transaction, canonical reference
-invalidation and unresolved renderer-operation fence with HTTP/MCP. No second
-browser admission state is created. The transaction is released during model decoding
+Legacy browser execution uses its explicit operation allowlist. Canonical v1 requests
+carry the shared Browser Control request unchanged in `input.request`; the canonical
+response stays under the transport wrapper's `response` field, while wrapper tab pins
+carry document versions. Account capabilities omit native MCP extensions that this
+transport cannot call. Both routes share the existing DesktopMcpServer gateway,
+reference registry, transaction, canonical invalidation and unresolved renderer-operation
+fence with HTTP/MCP. No second browser admission state is created. The transaction is released during model decoding
 and reacquired before validating the original document/deadline after inference.
 Snapshots reuse the common generated value-free reader in its native private world;
 transient observed nodes provide bounded CSS selectors for the existing Nessie wire.
 Editable values and raw accessibility trees are not forwarded.
-Bound operations use the named tab's current document version, activate that tab visibly,
-and retain its lease through native owner-thread execution. Person-driven tab selection
+Legacy bound operations use the named tab's current document version, activate that tab visibly,
+and retain its lease through native owner-thread execution. Canonical bound requests
+require their named tab to remain active, except explicit `tabs.select`, and check
+account authority, job deadline, cancellation, document identity and account-surface
+policy at renderer dispatch. Person-driven tab selection
 pauses active work; bound owner-thread calls also require the target to remain active. Document versions change
 on main-frame load, including same-URL reload, and are independent of tab lifetime.
 Queued effects also carry cancellation and immutable full job deadline guards.
 Individual browser calls remain bounded to ten seconds; local inference retains the
-original job deadline and cannot extend it when returning to the browser. Inputs mirror the native
-wire contract: selector clicks, atomic field fill, bounded scroll deltas, compact page
-snapshot and optional viewport PNG. PNGs beyond the terminal-output budget fail with
+original job deadline and cannot extend it when returning to the browser. Legacy inputs
+retain their selector/evidence contract, bounded scroll deltas, compact page snapshot and
+optional viewport PNG. Canonical `tab.type` appends through the common reference action.
+Canonical screenshots retain the typed image envelope and are projected by Nessie's
+job-owned file service. Legacy PNGs beyond the terminal-output budget fail with
 `SCREENSHOT_TOO_LARGE`; full-page capture is unsupported here. HTTP(S) navigation rejects
 embedded credentials and UOA account surfaces. Current private account-login windows
 are outside the normal tab set.

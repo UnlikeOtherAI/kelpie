@@ -7,6 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cctype>
+#include <set>
 namespace kelpie::connect {
 namespace {
 Json Tab(const TabSnapshot& tab) {
@@ -40,6 +41,26 @@ std::chrono::milliseconds JobRemaining(const std::string& text) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end-std::chrono::system_clock::now());
 }
 std::chrono::milliseconds Remaining(const std::string& text) { return std::min(std::chrono::milliseconds(10000),JobRemaining(text)); }
+Json ControlFailure(const std::string& code, bool uncertain = false) {
+  return {{"version",1},{"ok",false},{"error",{{"code",code},
+      {"message","Browser request refused; observe the page before continuing."},
+      {"mayHaveCompleted",uncertain}}}};
+}
+bool UnboundControlMethod(const std::string& method) {
+  return method=="capabilities" || method=="documentation" || method=="tabs.list" || method=="tabs.new";
+}
+bool AccountControlMethod(const std::string& method) {
+  static const std::set<std::string> methods={"capabilities","documentation","tabs.list","tabs.new","tabs.select","tabs.close",
+      "tab.snapshot","tab.screenshot","tab.goto","tab.click","tab.type","page.press","page.scroll"};
+  return methods.count(method)!=0;
+}
+bool AccountSurface(const std::string& url) {
+  const auto scheme=url.find("://"); if(scheme==std::string::npos)return false;
+  auto end=url.find_first_of("/?#",scheme+3); auto authority=url.substr(scheme+3,end==std::string::npos?end:end-scheme-3);
+  std::transform(authority.begin(),authority.end(),authority.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+  const auto colon=authority.rfind(':'); if(colon!=std::string::npos)authority.resize(colon);
+  return authority=="authentication.unlikeotherai.com";
+}
 }
 Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<bool>> cancelled) {
   const auto job_remaining=JobRemaining(command.at("deadline"));
@@ -48,6 +69,92 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
   if(timeout.count()<=0)return Failed("DEADLINE_EXCEEDED");
   if(cancelled->load())return {{"state","cancelled"},{"error","Stopped on this device"}};
   const auto operation=command.at("operation").get<std::string>(); const auto input=command.at("input");
+  if(operation=="control") {
+    if(!control_ || !input.contains("request") || !input["request"].is_object())
+      return {{"state","completed"},{"output",{{"response",ControlFailure("INVALID_ARGUMENTS")}}}};
+    const auto request=input["request"];
+    const auto method=request.value("method",std::string());
+    if(!AccountControlMethod(method))
+      return {{"state","completed"},{"output",{{"response",ControlFailure("UNSUPPORTED")}}}};
+    const auto params=request.value("params",Json::object());
+    if((method=="tabs.new" || method=="tab.goto") && params.is_object() &&
+        params.contains("url") && params["url"].is_string() &&
+        AccountSurface(params["url"].get<std::string>()))
+      return {{"state","completed"},{"output",{{"response",ControlFailure("ACCOUNT_SURFACE_FORBIDDEN")}}}};
+    const bool unbound=UnboundControlMethod(method);
+    const auto nullableText=[&](const char* key) {
+      const auto found=command.find(key);
+      return found==command.end() || found->is_null() ? std::string() : found->get<std::string>();
+    };
+    const std::string tab_id=nullableText("tabId");
+    const std::string expected=nullableText("tabVersion");
+    if(unbound ? (!tab_id.empty() || !expected.empty())
+               : (tab_id.empty() || expected.empty() || request.value("tabId",std::string())!=tab_id))
+      return {{"state","completed"},{"output",{{"response",ControlFailure("TAB_PIN_MISMATCH")}}}};
+    auto current=[&](std::vector<TabSnapshot>* tabs) -> const TabSnapshot* {
+      if(!browser_.GetTabs(tabs,timeout).ok)return nullptr;
+      const auto found=std::find_if(tabs->begin(),tabs->end(),[&](const auto& tab){return tab.id==tab_id;});
+      return found==tabs->end()?nullptr:&*found;
+    };
+    std::vector<TabSnapshot> before;
+    if(!unbound) {
+      const auto* tab=current(&before);
+      if(!tab || tab->document_version!=expected || tab->is_loading)
+        return {{"state","completed"},{"output",{{"response",ControlFailure("STALE_DOCUMENT")}}}};
+      if(AccountSurface(tab->url))
+        return {{"state","completed"},{"output",{{"response",ControlFailure("ACCOUNT_SURFACE_FORBIDDEN")}}}};
+    }
+    const Authorization authorized=[&,tab_id,expected,unbound,method] {
+      if(cancelled->load() || std::chrono::steady_clock::now()>=deadline)return false;
+      if(unbound)return true;
+      std::vector<TabSnapshot> tabs;
+      const auto* tab=current(&tabs);
+      if(!tab || tab->document_version!=expected || tab->is_loading || AccountSurface(tab->url))return false;
+      if(method!="tabs.select" && !tab->active)return false;
+      return true;
+    };
+    Json response;
+    try { response=control_(request,authorized); }
+    catch(...) { response=ControlFailure("BROWSER_FAILED",true); }
+    if(!response.is_object() || !response.contains("version") || response.value("version",0)!=1 || !response.contains("ok"))
+      response=ControlFailure("BROWSER_FAILED",true);
+    if(method=="capabilities" && response.value("ok",false) && response.contains("value") && response["value"].is_object()) {
+      response["value"]["extensions"]=Json::array();
+      if(response["value"].contains("methods") && response["value"]["methods"].is_array()) {
+        auto& methods=response["value"]["methods"];
+        for(auto it=methods.begin();it!=methods.end();) {
+          if(!it->is_string() || !AccountControlMethod(it->get<std::string>()))it=methods.erase(it);
+          else ++it;
+        }
+      }
+    }
+    Json output={{"response",response}};
+    if(method=="tabs.list" && response.value("ok",false)) {
+      const auto listed=response.value("value",Json::array());
+      std::vector<TabSnapshot> tabs;
+      if(listed.is_array() && browser_.GetTabs(&tabs,timeout).ok) {
+        output["tabs"]=Json::array();
+        for(const auto& item:listed) if(item.is_object() && item.contains("id")) {
+          const auto id=item.value("id",std::string());
+          const auto found=std::find_if(tabs.begin(),tabs.end(),[&](const auto& tab){return tab.id==id;});
+          if(found!=tabs.end())output["tabs"].push_back({{"tabId",found->id},{"tabVersion",found->document_version}});
+        }
+      }
+    } else if(method=="tabs.new" && response.value("ok",false)) {
+      const auto id=response.value("value",Json::object()).value("id",std::string());
+      std::vector<TabSnapshot> tabs;
+      if(!id.empty() && browser_.GetTabs(&tabs,timeout).ok) {
+        const auto found=std::find_if(tabs.begin(),tabs.end(),[&](const auto& tab){return tab.id==id;});
+        if(found!=tabs.end())output["tab"]={{"tabId",found->id},{"tabVersion",found->document_version}};
+      }
+    } else if(!unbound) {
+      std::vector<TabSnapshot> tabs;
+      const auto* tab=current(&tabs);
+      if(tab && (response.value("ok",false) || tab->document_version==expected))
+        output["tab"]={{"tabId",tab->id},{"tabVersion",tab->document_version}};
+    }
+    return {{"state","completed"},{"output",std::move(output)}};
+  }
   // Every bound operation visibly selects its target. Reuse the existing public
   // gateway's native transaction, pending-operation fence and ref invalidation.
   const std::string native_method=operation=="tabs"?"get-tabs":operation=="open"?"new-tab":"switch-tab";

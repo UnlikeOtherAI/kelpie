@@ -64,13 +64,25 @@ and `maxFrameBytes`. Every later frame contains this `generation`.
 `auth` renews `ticket`; `heartbeat` carries current `lifecycle` and all four model fields.
 
 `command` carries UUID `jobId`, UUID `attemptId`, positive `seq`, ISO `deadline`,
-`operation`, `tabId`, `tabVersion` and object `input`. Operations are `tabs`, `open`,
-`navigate`, `snapshot`, `click`, `type`, `scroll`, `back`, `forward`, `reload`, `extract`.
-`tabs` and `open` are unbound (`tabId`/`tabVersion` null). Every other operation requires
-a matching existing tab and current document version. Changing or reloading the document
-invalidates its version, even when the URL is unchanged. Native execution makes the
-authorized tab visible; unrelated tabs, cookies, account endpoints and arbitrary script
-execution are outside this operation allowlist.
+`operation`, `tabId`, `tabVersion` and object `input`. Legacy operation names remain
+for persisted jobs during migration. New browser control uses `operation:"control"`
+with `input:{request:<canonical Browser Control v1 request>}` and is advertised only
+when the device hello includes the distinct `browser.control.v1` capability. The old
+`browser.control` capability is retained for legacy clients and does not imply v1.
+Canonical `capabilities`, `documentation`, `tabs.list` and `tabs.new` requests are
+unbound (`tabId`/`tabVersion` null); every other method needs the same explicit
+`request.tabId` and outer tab id plus the current outer document version. A successful
+control result wraps the unchanged canonical response as `{response}` and adds
+transport-only `tab:{tabId,tabVersion}` or `tabs:[{tabId,tabVersion}]` pins when
+available. Canonical `tabs.list.value` remains an array whose entries use `id`.
+Changing or reloading the document invalidates its version, even when the URL is
+unchanged. Control uses the persistent native browser gateway, including its reference
+registry, admission lease and renderer-operation fence; it does not translate references
+into selectors or expose arbitrary scripts, cookies, account endpoints or extensions.
+Screenshots retain the canonical typed image response and are projected through the
+job-owned file service before model presentation. Native execution requires the named
+tab to remain active except for an explicit `tabs.select`; account sign-in surfaces are
+forbidden as both current and destination pages.
 
 `event` carries job/attempt/seq and `state` (`accepted`, `progress`, `completed`,
 `failed`, `cancelled`), optional object `output` and bounded `error`.
@@ -136,7 +148,10 @@ Form values, textarea defaults and contenteditable text are excluded. Extraction
 requests 6000 characters from `text`. Apple evaluates in its existing private
 browser-control world; Android retains its documented page-realm limitations.
 Each job's mutation fence includes its immutable job/attempt/deadline and native
-account, foreground, connection and document authority. Later jobs cannot inherit it.
+account, foreground, connection and document authority. Canonical account requests
+reuse the persistent common browser gateway and reference owner while carrying the
+job's authorization, deadline, cancellation and document guard through renderer
+dispatch. Later jobs cannot inherit that authority.
 
 `extract` takes `question` and `maxOutputCharacters`. It reads at most 6000 page
 characters, verifies the document before and after local inference, and returns

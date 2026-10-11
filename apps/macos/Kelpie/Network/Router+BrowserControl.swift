@@ -125,8 +125,12 @@ extension Router {
     }
 
     @MainActor
-    func browserControl(_ body: [String: Any]) async -> [String: Any] {
-        await directGateway().request(body)
+    func browserControl(
+        _ body: [String: Any],
+        authorizeAccountStep: BrowserControlGateway.Authorize? = nil,
+        dispatchAccountStep: BrowserControlGateway.Dispatch? = nil
+    ) async -> [String: Any] {
+        await directGateway().request(body, authorizeAccountStep: authorizeAccountStep, dispatchAccountStep: dispatchAccountStep)
     }
 
     @MainActor

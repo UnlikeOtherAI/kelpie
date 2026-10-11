@@ -29,7 +29,7 @@ struct Wire {
   std::mutex mutex;
   std::deque<std::string> incoming;
   std::vector<Json> sent;
-  bool command=true,disconnect=false;
+  bool command=true,disconnect=false,control_v1=false;
 };
 class Socket final:public Transport {
  public:
@@ -39,7 +39,8 @@ class Socket final:public Transport {
     const auto frame=Json::parse(raw);std::lock_guard lock(wire_->mutex);wire_->sent.push_back(frame);
     if(frame["type"]=="hello") {
       assert(frame["ticket"]=="scoped" && !frame.contains("access_token"));
-      assert(frame["capabilities"]==Json::array({"browser.control","page.extract"}) && !frame["label"].get<std::string>().empty());
+      auto capabilities=Json::array({"browser.control"});if(wire_->control_v1)capabilities.push_back("browser.control.v1");capabilities.push_back("page.extract");
+      assert(frame["capabilities"]==capabilities && !frame["label"].get<std::string>().empty());
       wire_->incoming.push_back(Json{{"type","welcome"},{"protocol",1},{"generation",kGeneration},{"deviceId",kDevice}}.dump());
       if(wire_->command)wire_->incoming.push_back(Json{{"type","command"},{"generation",kGeneration},{"jobId",kJob},{"attemptId",kAttempt},
           {"seq",1},{"deadline",Deadline()},{"operation","click"},{"tabId","owned"},{"tabVersion","document"},{"input",{{"selector","#go"}}}}.dump());
@@ -79,8 +80,9 @@ int main() {
     ++effects;return Json{{"state","completed"},{"output",{{"success",true}}}};
   };
   auto first=std::make_shared<Wire>();
+  first->control_v1=true;
   {
-    Client client(account,profile,"windows",kDevice,execute,{},[first] { return std::make_unique<Socket>(first); });
+    Client client(account,profile,"windows",kDevice,execute,{},[first] { return std::make_unique<Socket>(first); },true);
     client.Update(false);assert(Wait([&] { return Terminal(first); }));assert(effects==1);
     client.Pause(true);assert(client.paused());client.Shutdown();assert(Wait([&] { return client.Drain(); }));
   }
