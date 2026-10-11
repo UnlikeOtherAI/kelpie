@@ -26,6 +26,9 @@ Android navigation reserves one explicit destination at the native mutation poin
 completion metadata reads may transfer to its first matching document start and resulting pin;
 cancelled/replaced jobs, user page input, another tab, later document starts, and expired authority
 invalidate that lease. Redirects that produce another document start fail closed and need a fresh snapshot.
+Canonical account `tab.goto` uses this same lease: admission and renderer dispatch require the
+original document version, and only the owned navigation's completion read may return with its
+new outer `tabVersion`. A competing human navigation is not adopted as the job result.
 Android and CEF do not expose a unique native navigation object. Their conservative
 leases require the observed main-frame start and destination; hash-only navigation
 that emits no such start cannot acquire a completion pin and fails on the job deadline.
@@ -35,6 +38,8 @@ the iOS mutation checks authority immediately before calling WebKit. CEF complet
 exactly the expected native main-frame navigation count and destination for navigate/reload.
 Another document start or native user input revokes completion authority. Redirects that change
 the expected CEF destination require a fresh snapshot rather than inheriting its contents.
+Canonical account navigation uses that same CEF transition fence while retaining its immutable
+job cancellation, deadline, generation and active-tab lease through the wait.
 
 Signed-in native Kelpie connects outbound to `wss://api.nessie.works/api/kelpie/connect`.
 The connection never exposes the local HTTP listener or needs LAN pairing or an executor.

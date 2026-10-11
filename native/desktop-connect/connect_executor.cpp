@@ -120,10 +120,13 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
           resolved.tab->is_loading || (method != "tabs.select" && !resolved.tab->active))
         return {{"state", "completed"}, {"output", {{"response", ControlFailure("STALE_DOCUMENT")}}}};
       job_lease.document_version = expected;
-      job_lease.cancelled = cancelled;
-      job_lease.deadline = deadline;
       job_lease.require_active = method != "tabs.select";
     }
+    // ResolveTab may replace the lease value. Restore the immutable attempt
+    // authority only after that native observation for both bound and unbound
+    // methods, so a refreshed lease cannot erase cancellation or its deadline.
+    job_lease.cancelled = cancelled;
+    job_lease.deadline = deadline;
     Json response;
     try { response=control_(request,job_lease,authorized); }
     catch(...) { response=ControlFailure("BROWSER_FAILED",true); }

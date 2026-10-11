@@ -153,6 +153,11 @@ class ConnectBrowser(
         }
         val targetTab = tabId?.let { id -> context.tabStore?.tabs?.value?.firstOrNull { it.id == id } }
         if (!unbound && targetTab == null) return mapOf("response" to controlFailure("TAB_NOT_FOUND"))
+        val navigationLease = if (method == "tab.goto" && targetTab != null) {
+            val params = request["params"] as? Map<*, *>
+            ConnectNavigationLease(expected!!, params?.get("url") as? String)
+        } else null
+        fun navigationAuthority(): Boolean = accountOwnerAuthority(scope, command, tabId, method == "tabs.select")
         val isolated = targetTab?.let { tab ->
             HandlerContext(context.browserRetirement).apply {
                 webView = tab.webView
@@ -164,6 +169,16 @@ class ConnectBrowser(
                         context.tabStore?.tabs?.value?.any { it === tab } == true &&
                         tab.documentVersion == expected && !tab.isLoading &&
                         (method == "tabs.select" || context.tabStore?.activeTabId?.value == tab.id)
+                }
+                if (navigationLease != null) {
+                    remoteNavigationStart = { navigationLease.arm(tab.documentVersion, navigationAuthority()) }
+                    remoteNavigationReadGuard = {
+                        navigationLease.allowsRead(tab.documentVersion, tab.isLoading, navigationAuthority())
+                    }
+                    remoteNavigationWaitGuard = {
+                        navigationLease.allowsWait(tab.documentVersion, navigationAuthority())
+                    }
+                    tab.remoteNavigationLease = navigationLease
                 }
             }
         }
@@ -181,6 +196,16 @@ class ConnectBrowser(
                 BrowserManagementHandler(target, appContext).register(this)
             }
         }
+        val newTabRouter = if (method == "tabs.new") {
+            val unboundContext = HandlerContext(context.browserRetirement).apply {
+                tabStore = context.tabStore
+                browserGateway = gateway
+            }
+            Router().apply {
+                handlerContext = unboundContext
+                BrowserManagementHandler(unboundContext, appContext).register(this)
+            }
+        } else null
         val allowedDestination = { params: Map<String, Any?> ->
             val url = params["url"] as? String
             url == null || !isAccountURL(url)
@@ -202,7 +227,12 @@ class ConnectBrowser(
                     } else {
                         targetRouter.handle(nativeMethod, params, fromGateway = true).second
                     }
-                    if (!accountAuthority(scope, command, tabId, expected, method == "tabs.select")) {
+                    val remainsAuthorized = if (navigationLease != null && targetTab != null) {
+                        navigationLease.allowsRead(targetTab.documentVersion, targetTab.isLoading, navigationAuthority())
+                    } else {
+                        accountAuthority(scope, command, tabId, expected, method == "tabs.select")
+                    }
+                    if (!remainsAuthorized) {
                         errorResponse("TAB_CHANGED", "The controlled page changed")
                     } else {
                         result
@@ -211,14 +241,39 @@ class ConnectBrowser(
             }
         }
         val invoke = suspend {
-            val jobDispatch = if (unbound || method == "tabs.select") null else dispatch
+            val jobDispatch: (suspend (String, Map<String, Any?>) -> Map<String, Any?>)? = when {
+                method == "tabs.new" -> { nativeMethod, params ->
+                    if (nativeMethod != "new-tab" || !authority(command)) {
+                        errorResponse("JOB_AUTHORITY_CHANGED", "The browser job is no longer authorized")
+                    } else if (!allowedDestination(params)) {
+                        errorResponse("ACCOUNT_SURFACE_FORBIDDEN", "Account sign-in surfaces are unavailable")
+                    } else {
+                        withContext(Dispatchers.Main.immediate) {
+                            currentCoroutineContext().ensureActive()
+                            if (!authority(command)) {
+                                errorResponse("JOB_AUTHORITY_CHANGED", "The browser job is no longer authorized")
+                            } else {
+                                newTabRouter!!.handle(nativeMethod, params, fromGateway = true).second
+                            }
+                        }
+                    }
+                }
+                unbound || method == "tabs.select" -> null
+                else -> dispatch
+            }
             gateway.accountControl(request, { accountAuthority(scope, command, tabId, expected, method == "tabs.select") }, jobDispatch).orEmpty()
         }
-        val response = if (method in setOf("tabs.select", "tabs.new", "tabs.close")) {
-            NessieConnection.changeTabRemotelySuspending {
-                invoke()
+        val response = try {
+            if (method in setOf("tabs.select", "tabs.new", "tabs.close")) {
+                NessieConnection.changeTabRemotelySuspending {
+                    invoke()
+                }
+            } else invoke()
+        } finally {
+            if (navigationLease != null && targetTab != null && targetTab.remoteNavigationLease === navigationLease) {
+                targetTab.remoteNavigationLease = null
             }
-        } else invoke()
+        }
         if ((method == "tabs.select" || method == "tabs.new") && response["ok"] == true) {
             val canonicalValue = response["value"] as? Map<*, *>
             val claimed = if (method == "tabs.select") tabId else canonicalValue?.get("id") as? String
@@ -266,14 +321,27 @@ class ConnectBrowser(
         expected: String?,
         allowInactiveSelection: Boolean = false,
     ): Boolean {
-        if (scope[kotlinx.coroutines.Job]?.isActive != true || !authority(command)) return false
+        if (!accountOwnerAuthority(scope, command, tabId, allowInactiveSelection)) return false
         if (tabId != null && expected != null) {
             return runCatching {
-                version(tabId) == expected && !isAccountSurface(tabId) &&
-                    (allowInactiveSelection || context.tabStore?.activeTabId?.value == tabId)
+                version(tabId) == expected && !isAccountSurface(tabId)
             }.getOrDefault(false)
         }
         return true
+    }
+
+    private fun accountOwnerAuthority(
+        scope: kotlin.coroutines.CoroutineContext,
+        command: Map<String, Any?>,
+        tabId: String?,
+        allowInactiveSelection: Boolean = false,
+    ): Boolean {
+        if (scope[kotlinx.coroutines.Job]?.isActive != true || !authority(command)) return false
+        if (tabId == null) return true
+        return runCatching {
+            context.tabStore?.tabs?.value?.any { it.id == tabId } == true && !isAccountSurface(tabId) &&
+                (allowInactiveSelection || context.tabStore?.activeTabId?.value == tabId)
+        }.getOrDefault(false)
     }
 
     private fun controlFailure(code: String): Map<String, Any?> = mapOf(
