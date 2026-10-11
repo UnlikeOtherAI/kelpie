@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
+import { runInferenceJourney } from "./inference-journey.mjs";
 
 const readiness = JSON.parse(await readFile(process.argv[2], "utf8"));
 const require = createRequire(new URL("../../packages/cli/package.json", import.meta.url));
@@ -26,6 +27,7 @@ try {
   assert.ok(names.includes("kelpie_get_capabilities"));
   const rich = await client.callTool({ name: "kelpie_extension", arguments: { name: "kelpie_get_capabilities", arguments: {} } });
   assert.equal(rich.isError, false);
+  if (process.platform === "win32" && names.includes("kelpie_ai_ask")) await runInferenceJourney(client);
   const notification = await fetch(`http://127.0.0.1:${readiness.port}/mcp`, {
     method: "POST", headers: { authorization: `Bearer ${readiness.token}`, "content-type": "application/json", accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18" },
     body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),

@@ -71,5 +71,6 @@ Windows one-shot inference page context now reads the bounded value-free common 
 Run `node tests/native/run-control-acceptance.mjs <absolute-native-executable>`
 on the target host for the real MCP SDK handshake and canonical browser journey,
 including uncertain renderer timeout, BUSY refusal, late completion and recovery.
-Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
+On Windows the SDK journey also checks nested common inference page context and
+cancellation through an owned local mock endpoint. Pass `--fallback` for the no-CEF Linux executable; it instead verifies truthful
 DOM refusal. Each run owns its temporary profile, token and exact process.
