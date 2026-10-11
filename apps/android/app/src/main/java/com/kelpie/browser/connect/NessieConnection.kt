@@ -22,13 +22,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
 import org.json.JSONObject
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Native account-backed outbound WSS; no account access token reaches Nessie. */
 object NessieConnection {
@@ -55,6 +53,7 @@ object NessieConnection {
     private var generation: String? = null
     private var epoch = UUID.randomUUID()
     private var socket: WebSocket? = null
+    private var transportAuthority: AtomicBoolean? = null
     private var lifetime: Job? = null
     private var renewal: Job? = null
     private var heartbeat: Job? = null
@@ -139,6 +138,7 @@ object NessieConnection {
         foreground &&
             !state.value.paused &&
             socket != null &&
+            transportAuthority?.get() == true &&
             generation != null &&
             owner != null &&
             UOAAccount.state.value.profile
@@ -176,8 +176,8 @@ object NessieConnection {
         lifetime = scope.launch { connectLoop(current) }
     }
 
-    fun authorizes(command: Map<String, Any?>): Boolean =
-        canMutate && state.value.running && ConnectAuthorization.from(command)?.matches(currentCommand) == true
+    fun authorizes(command: Map<String, Any?>): Boolean = canMutate &&
+        state.value.running && ConnectAuthorization.from(command)?.matches(currentCommand) == true
 
     private suspend fun connectLoop(current: UUID) {
         var backoff = 2000L
@@ -188,8 +188,10 @@ object NessieConnection {
                 if (epoch != current) return
                 val frames = Channel<String>(64)
                 val opened = kotlinx.coroutines.CompletableDeferred<Unit>()
-                val connection = client.newWebSocket(Request.Builder().url(GATEWAY).build(), listener(frames, opened))
+                val authority = AtomicBoolean(true)
+                val connection = client.newWebSocket(Request.Builder().url(GATEWAY).build(), ConnectSocketListener(frames, opened, authority))
                 socket = connection
+                transportAuthority = authority
                 opened.await()
                 val ready = browser?.modelReady() ?: false
                 send(
@@ -199,8 +201,7 @@ object NessieConnection {
                         "ticket" to ticket.value,
                         "installationId" to installationId(),
                         "label" to
-                            android.os.Build.MODEL
-                                .take(120),
+                            deviceLabel(),
                         "platform" to "android",
                         "capabilities" to listOf("browser.control", "page.extract"),
                         "lifecycle" to lifecycle,
@@ -231,59 +232,6 @@ object NessieConnection {
             close()
             delay(backoff)
             backoff = (backoff * 2).coerceAtMost(60000)
-        }
-    }
-
-    private fun listener(
-        frames: Channel<String>,
-        opened: kotlinx.coroutines.CompletableDeferred<Unit>,
-    ) = object : WebSocketListener() {
-        override fun onOpen(
-            webSocket: WebSocket,
-            response: Response,
-        ) {
-            opened.complete(Unit)
-        }
-
-        override fun onMessage(
-            webSocket: WebSocket,
-            text: String,
-        ) {
-            if (text.toByteArray().size > 1024 * 1024 || frames.trySend(text).isFailure) {
-                frames.close(IllegalStateException("Invalid gateway frame"))
-                webSocket.close(1008, "Frame limit exceeded")
-            }
-        }
-
-        override fun onMessage(
-            webSocket: WebSocket,
-            bytes: ByteString,
-        ) {
-            if (bytes.size > 1024 * 1024) {
-                frames.close(IllegalStateException("Invalid gateway frame"))
-                webSocket.close(1008, "Frame limit exceeded")
-            } else {
-                onMessage(webSocket, bytes.utf8())
-            }
-        }
-
-        override fun onClosing(
-            webSocket: WebSocket,
-            code: Int,
-            reason: String,
-        ) {
-            webSocket.close(code, null)
-            opened.completeExceptionally(IllegalStateException("Gateway closed"))
-            frames.close()
-        }
-
-        override fun onFailure(
-            webSocket: WebSocket,
-            t: Throwable,
-            response: Response?,
-        ) {
-            opened.completeExceptionally(IllegalStateException("Gateway unavailable"))
-            frames.close(IllegalStateException("Gateway unavailable"))
         }
     }
 
@@ -320,6 +268,8 @@ object NessieConnection {
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
+                stopCurrent("Connection authority unavailable; reconcile page before continuing")
+                transportAuthority?.set(false)
                 connection.cancel()
                 return
             }
@@ -472,12 +422,19 @@ object NessieConnection {
     }
 
     private fun close() {
+        transportAuthority?.set(false)
         renewal?.cancel()
         heartbeat?.cancel()
         socket?.cancel()
         socket = null
         generation = null
     }
+
+    private fun deviceLabel(): String =
+        runCatching {
+            android.provider.Settings.Global.getString(appContext?.contentResolver, android.provider.Settings.Global.DEVICE_NAME)
+                ?.takeIf { it.isNotBlank() }
+        }.getOrNull()?.take(120) ?: android.os.Build.MODEL.take(120)
 
     private fun installationId(): String {
         val prefs = appContext?.getSharedPreferences("nessie.connect", Context.MODE_PRIVATE) ?: error("App unavailable")

@@ -1,5 +1,8 @@
 import Combine
 import Foundation
+#if os(iOS)
+import UIKit
+#endif
 
 /// One authenticated outbound socket per install. The account bearer stays at UOA.
 @MainActor
@@ -70,7 +73,7 @@ final class NessieConnection: ObservableObject {
     }
 
     private var lifecycle: String { foreground && !paused && browser?.isReady == true ? "ready" : "paused" }
-    var canMutate: Bool { foreground && !paused && socket != nil && generation != nil && owner != nil && UOAAccount.shared.profile?.sub == owner }
+    var canMutate: Bool { foreground && !paused && browser?.isReady == true && socket != nil && generation != nil && owner != nil && UOAAccount.shared.profile?.sub == owner }
 
     func authorizes(_ command: [String: Any]) -> Bool {
         canMutate && running && ConnectAuthorization(command)?.matches(currentCommand) == true
@@ -182,6 +185,7 @@ final class NessieConnection: ObservableObject {
                 try await send(["type": "auth", "generation": generation, "ticket": ticket.value], connection: connection)
                 expiry = ticket.expires
             } catch {
+                stopCurrent(reason: "Connection authority unavailable; reconcile page before continuing")
                 connection.cancel(with: .policyViolation, reason: nil)
                 return
             }
@@ -336,5 +340,11 @@ final class NessieConnection: ObservableObject {
         #endif
     }
 
-    private var deviceLabel: String { String(ProcessInfo.processInfo.hostName.prefix(120)) }
+    private var deviceLabel: String {
+        #if os(iOS)
+        return String(UIDevice.current.name.prefix(120))
+        #else
+        return String(ProcessInfo.processInfo.hostName.prefix(120))
+        #endif
+    }
 }

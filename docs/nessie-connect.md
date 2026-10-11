@@ -98,3 +98,12 @@ characters, verifies the document before and after local inference, and returns
 It uses the loaded embedded model only, with no model/provider fallback or cloud cost.
 Backgrounding, cancellation, account changes, deadline expiry, and connection loss
 stop active work and preserve a terminal result for acknowledgement/reconciliation.
+The desktop browser must also remain visible and active; hiding/backgrounding the Mac
+pauses its lifecycle. Device labels use the system device name when available and remain
+bounded operational metadata.
+
+For isolated Android verification, `./gradlew assembleDebug -PkelpieVerificationProfile=true`
+builds `com.kelpie.browser.nessieverify`, leaving an installed Kelpie app's data untouched.
+This debug-only profile is for browser/UI checks; production OAuth verification uses the
+registered production app. Native UI tests use their own simulator/emulator and never
+terminate another person's Kelpie instance.

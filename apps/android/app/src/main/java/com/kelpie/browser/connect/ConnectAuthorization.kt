@@ -11,7 +11,7 @@ data class ConnectAuthorization(
     fun matches(
         current: Map<String, Any?>?,
         now: Instant = Instant.now(),
-    ): Boolean = current?.get("jobId") == jobId && current?.get("attemptId") == attemptId && deadline > now
+    ): Boolean = current?.get("jobId") == jobId && current["attemptId"] == attemptId && deadline > now
 
     companion object {
         fun from(command: Map<String, Any?>): ConnectAuthorization? =

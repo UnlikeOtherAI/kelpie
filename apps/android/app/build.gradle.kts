@@ -32,6 +32,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (providers.gradleProperty("kelpieVerificationProfile").orNull == "true") {
+                applicationIdSuffix = ".nessieverify"
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
