@@ -156,6 +156,15 @@ int main() {
   const auto list_result=list_executor.Execute(listed,guard);
   assert(list_result["output"]["response"]["value"].is_array());
   assert(list_result["output"]["tabs"]==Json::array({{{"tabId","owned"},{"tabVersion","document-1"}}}));
+  auto new_tab_command=capabilities;
+  new_tab_command["input"]["request"]={{"version",1},{"method","tabs.new"},{"params",{{"url","https://example.org"}}}};
+  bool new_tab_authorized=false;
+  Executor new_tab_executor(browser,{}, {},[&](const Json&,const TabLease& job_lease,const Executor::Authorization& authorize) {
+    assert(job_lease.id.empty() && job_lease.cancelled==guard && job_lease.deadline.has_value());
+    new_tab_authorized=authorize();
+    return Json{{"version",1},{"ok",true},{"value",{{"id","new-tab"}}}};
+  });
+  assert(new_tab_executor.Execute(new_tab_command,guard)["state"]=="completed" && new_tab_authorized);
   auto unsupported=control_command;unsupported["input"]["request"]["method"]="tab.back";
   dispatched=false;control_executor.Execute(unsupported,guard);assert(!dispatched);
   auto forbidden=listed;forbidden["input"]["request"]={{"version",1},{"method","tabs.new"},{"params",{{"url","https://authentication.unlikeotherai.com/login"}}}};

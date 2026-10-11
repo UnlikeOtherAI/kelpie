@@ -1,6 +1,7 @@
 #include "navigation_handler.h"
 
 #include <chrono>
+#include <limits>
 
 #include "navigation_wait.h"
 
@@ -38,10 +39,29 @@ nlohmann::json NavigationHandler::Navigate(const nlohmann::json& params) const {
     // (docs/api/core.md), so the next command sees the new document.
     const auto started = std::chrono::steady_clock::now();
     const auto deadline = started + ControlTimeout(params);
+    BrowserNavigationState before;
+    const bool pinned_document = lease.document_version.has_value();
+    if (pinned_document) {
+      const BrowserControlResult observed = RequireBrowserControl(runtime_).GetNavigationState(lease, &before, ControlTimeout(params));
+      if (!observed.ok) return ControlError(observed);
+      if (before.requested == std::numeric_limits<std::uint64_t>::max())
+        return ErrorResponse("NAVIGATION_EXHAUSTED", "No more navigation requests are available");
+    }
+    const std::string destination = RequireString(params, "url");
     TabSnapshot tab;
-    const BrowserControlResult result = RequireBrowserControl(runtime_).Navigate(lease, RequireString(params, "url"), &tab,
+    const BrowserControlResult result = RequireBrowserControl(runtime_).Navigate(lease, destination, &tab,
                                                                                   ControlTimeout(params));
     if (!result.ok) return ControlError(result);
+    if (pinned_document) {
+      const NavigationWaitResult waited = AwaitOwnedNavigation(runtime_, lease, before.requested + 1,
+                                                               before.tab.document_version, destination, deadline);
+      if (!waited.ok) return waited.error;
+      if (runtime_.history_store != nullptr) runtime_.history_store->Record(waited.tab.url, waited.tab.title);
+      const auto load_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+      nlohmann::json response = SnapshotResponse(result, waited.tab);
+      response["loadTime"] = load_ms.count();
+      return response;
+    }
     BrowserNavigationState requested;
     const BrowserControlResult state = RequireBrowserControl(runtime_).GetNavigationState(lease, &requested, ControlTimeout(params));
     if (!state.ok) return ControlError(state);

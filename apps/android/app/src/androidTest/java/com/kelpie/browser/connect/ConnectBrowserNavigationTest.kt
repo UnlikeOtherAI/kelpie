@@ -100,6 +100,51 @@ class ConnectBrowserNavigationTest {
         }
 
     @Test
+    fun canonicalGotoReturnsItsOwnedDocumentPin() =
+        runBlocking {
+            fixture { browser, context, server, _ ->
+                server.enqueue(page("Canonical destination"))
+                val tab = context.tabStore!!.activeTab!!
+                val previous = tab.documentVersion
+                val result = browser.execute(canonicalGoto(tab.id, previous, url(server, "/canonical")))
+                val response = result["response"] as Map<*, *>
+                assertEquals(true, response["ok"])
+                assertEquals(tab.id, (result["tab"] as Map<*, *>)["tabId"])
+                assertEquals(tab.documentVersion, (result["tab"] as Map<*, *>)["tabVersion"])
+                assertNotEquals(previous, (result["tab"] as Map<*, *>)["tabVersion"])
+                assertEquals("Canonical destination", ((response["value"] as Map<*, *>)["title"]))
+            }
+        }
+
+    @Test
+    fun canonicalGotoDoesNotAdoptACompetingHumanNavigation() =
+        runBlocking {
+            fixture { browser, context, server, _ ->
+                server.enqueue(
+                    MockResponse()
+                        .setResponseCode(200)
+                        .setHeader("Content-Type", "text/html")
+                        .setBody("<title>Controlled</title>")
+                        .setBodyDelay(2, TimeUnit.SECONDS),
+                )
+                val tab = context.tabStore!!.activeTab!!
+                val before = tab.documentVersion
+                val request = async(Dispatchers.Main) {
+                    browser.execute(canonicalGoto(tab.id, before, url(server, "/slow-control")))
+                }
+                withContext(Dispatchers.IO) { assertTrue(server.takeRequest(5, TimeUnit.SECONDS) != null) }
+                withContext(Dispatchers.Main) {
+                    tab.webView.loadDataWithBaseURL(url(server, "/human"), "<title>Human page</title>", "text/html", "utf-8", null)
+                }
+                val result = withTimeout(8000) { request.await() }
+                val response = result["response"] as Map<*, *>
+                assertEquals(false, response["ok"])
+                assertNotEquals("Human page", (response["value"] as? Map<*, *>)?.get("title"))
+                assertNotEquals(before, tab.documentVersion)
+            }
+        }
+
+    @Test
     fun cancellationAndUserTabChangeRefuseCompletion() =
         runBlocking {
             for (switchTab in listOf(false, true)) {
@@ -224,6 +269,21 @@ class ConnectBrowserNavigationTest {
             "tabId" to context.tabStore!!.activeTab!!.id,
             "tabVersion" to context.tabStore!!.activeTab!!.documentVersion,
             "input" to mapOf("url" to url),
+        )
+
+    private fun canonicalGoto(tabId: String, tabVersion: String, destination: String): Map<String, Any?> =
+        mapOf(
+            "operation" to "control",
+            "tabId" to tabId,
+            "tabVersion" to tabVersion,
+            "input" to mapOf(
+                "request" to mapOf(
+                    "version" to 1,
+                    "method" to "tab.goto",
+                    "tabId" to tabId,
+                    "params" to mapOf("url" to destination),
+                ),
+            ),
         )
 
     private fun url(

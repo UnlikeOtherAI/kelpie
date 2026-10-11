@@ -243,8 +243,19 @@ inline BrowserControlResult ResolveTabForRequest(DesktopBrowserControl& control,
       (params.contains("generation") && params["generation"] != scoped->generation)) {
     return BrowserControlResult::Failure("TAB_STALE", "The tab lease does not match this account job");
   }
+  // Return the current snapshot for read-only handlers that render tab metadata,
+  // while retaining the immutable job lease for the actual renderer operation.
+  // ResolveTab performs the document/active/cancel/deadline checks on the owner
+  // thread; a later document change is still rejected by the copied lease.
+  TabLease current;
+  BrowserControlResult result = control.ResolveTab(scoped->id, scoped->generation, &current, timeout);
+  if (!result.ok || !result.tab ||
+      (scoped->document_version && result.tab->document_version != *scoped->document_version) ||
+      (scoped->require_active && !result.tab->active)) {
+    return result.ok ? BrowserControlResult::Failure("TAB_STALE", "The tab lease does not match this account job") : result;
+  }
   *lease = *scoped;
-  return BrowserControlResult::Success();
+  return result;
 }
 
 inline BrowserControlResult EvaluateForTab(const DesktopHandlerRuntime& runtime,

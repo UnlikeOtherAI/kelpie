@@ -114,14 +114,14 @@ Json Executor::Execute(const Json& command,std::shared_ptr<const std::atomic<boo
       return true;
     };
     TabLease job_lease;
+    job_lease.cancelled = cancelled;
+    job_lease.deadline = deadline;
     if (!unbound) {
       const auto resolved = browser_.ResolveTab(tab_id, std::nullopt, &job_lease, timeout);
       if (!resolved.ok || !resolved.tab || resolved.tab->document_version != expected ||
           resolved.tab->is_loading || (method != "tabs.select" && !resolved.tab->active))
         return {{"state", "completed"}, {"output", {{"response", ControlFailure("STALE_DOCUMENT")}}}};
       job_lease.document_version = expected;
-      job_lease.cancelled = cancelled;
-      job_lease.deadline = deadline;
       job_lease.require_active = method != "tabs.select";
     }
     Json response;
