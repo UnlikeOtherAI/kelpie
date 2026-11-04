@@ -147,7 +147,16 @@ class BrowserGatewayBinding(
             if (method !in READ_METHODS) sessions.forEach { it.invalidateLocked() }
             // Legacy HTTP calls arrive on a server thread, unlike canonical
             // dispatch. WebView creation and profile access require the UI thread.
-            withContext(Dispatchers.Main.immediate) { action() }
+            withContext(Dispatchers.Main.immediate) {
+                // Compose may not have attached the newly selected view yet.
+                // Resolve its identity from TabStore, as canonical dispatch does.
+                val view = ctx.tabStore?.activeTab?.webView
+                if (view == null || method in setOf("new-tab", "switch-tab", "close-tab", "delete-partition")) {
+                    action()
+                } else {
+                    ctx.withBrowserTarget(view) { action() }
+                }
+            }
         }
 
     private suspend fun execute(

@@ -66,10 +66,17 @@ class SessionStorageTest {
                     val created = router.handle("new-tab", mapOf("url" to "about:blank", "partition" to id))
                     assertEquals(200, created.first)
                     assertEquals(id, (created.second["tab"] as Map<*, *>)["partition"])
-                    withContext(Dispatchers.Main) { handler.webView = tabs.activeTab?.webView }
+                    withContext(Dispatchers.Main) {
+                        // Keep the visible binding stale, like the interval before
+                        // Compose attaches a new tab. Dispatch must use TabStore.
+                        val manager = PartitionRegistry.cookies(requireNotNull(tabs.activeTab).webView)
+                        manager.setCookie("https://fixture.invalid", "dispatch_identity=isolated; Path=/; HttpOnly")
+                        manager.flush()
+                    }
                     val inspected = router.handle("get-cookies", mapOf("url" to "https://fixture.invalid"))
                     assertEquals(200, inspected.first)
                     assertEquals(true, inspected.second["success"])
+                    assertTrue(inspected.second["cookies"].toString().contains("dispatch_identity"))
                 }
             } finally {
                 withContext(Dispatchers.Main) {

@@ -161,6 +161,10 @@ on the server coroutine. Canonical dispatch already enters the main thread.
 Legacy dispatch now enters that same main-thread boundary before creating a
 WebView or accessing its profile. A native regression calls the router from
 `Dispatchers.Default` and creates and inspects a real partitioned WebView.
+Legacy dispatch also resolves its selected renderer from TabStore before
+running a handler. Compose updates its visible-view binding later; using that
+binding could otherwise read the previous tab's profile immediately after a
+switch. The regression deliberately leaves that visible binding stale.
 
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
