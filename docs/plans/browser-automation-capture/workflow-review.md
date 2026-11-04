@@ -76,3 +76,7 @@ scratch/intermediate/encoder overhead. Do not claim a strict instantaneous disk
 cap from a retained-output limit. Backpressure and encoder footer reserve need
 actual media tests; preserve valid partial output instead of silently deleting the
 entire MP4 on finalization overflow.
+
+## Independent safety follow-up
+Fixing source d6d7a36666e11db45e7e42cfe09a62d1f2a2fcd8 passed all seven independent Node 24.19 source regressions on Maxis in 96 ms under QA-LIGHT-4. The fixture now models TreeWalker traversal and exact selector IDs without implementing the resolver's behavior. The original four defects passed, as did old-document token rejection, input-type change during focus and viewport change during focus. Secret capture/screenshot preflight and fixed safe resolver-error handling were confirmed by source review. This closes those source-level findings; real DOM and native Windows flows remain pending.
+Two bounded-name findings remain open: a SHOW_TEXT-only walker can traverse many nontext nodes without advancing its counted text budget, and aria-labelledby silently slices after 32 references without reporting that the complete accessible name was not checked. Both were sent to workflows. Reusable structured workflow extraction remains pending. No full native acceptance or release claim is made.
