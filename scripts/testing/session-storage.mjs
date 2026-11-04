@@ -12,6 +12,7 @@ const { values } = parseArgs({ options: {
   phase: { type: 'string', default: 'seed' }, port: { type: 'string', default: '18527' },
   mobile: { type: 'boolean', default: false },
   android: { type: 'boolean', default: false },
+  'manual-popup': { type: 'boolean', default: false },
 } });
 const mobile = values.mobile || values.android;
 assert(values.readiness && values.state, '--readiness and --state are required; use a disposable app profile');
@@ -108,11 +109,14 @@ try {
     })).result, false, 'The server-set HttpOnly cookie must be hidden from page scripts');
     await verify();
     const before = (await call('get-tabs')).tabs.map(item => item.id);
+    state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
+    await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
     await selected(state.isolated);
-    await call('click', { tabId: state.isolated, selector: '#popup' });
+    if (values['manual-popup']) console.log('Click “Open another tab” in the active native fixture page.');
+    else await call('click', { tabId: state.isolated, selector: '#popup' });
     if (mobile) {
       // Mobile opens target=_blank in its existing view; identity must remain intact.
-      const deadline = Date.now() + 15000;
+      const deadline = Date.now() + (values['manual-popup'] ? 60000 : 15000);
       while ((await call('get-tabs')).tabs.find(tab => tab.id === state.isolated)?.url !== origin + '/popup') {
         assert(Date.now() < deadline, 'Mobile popup must navigate its opener');
         await new Promise(resolve => setTimeout(resolve, 100));
