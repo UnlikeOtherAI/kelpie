@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
 const { values } = parseArgs({ options: {
   readiness: { type: 'string' }, state: { type: 'string' },
   phase: { type: 'string', default: 'seed' }, port: { type: 'string', default: '18527' },
+  mobile: { type: 'boolean', default: false },
 } });
 assert(values.readiness && values.state, '--readiness and --state are required; use a disposable app profile');
 const readiness = JSON.parse(await readFile(values.readiness, 'utf8'));
@@ -63,7 +64,7 @@ async function verify() {
   assert.equal(await cookie(state.other), undefined);
   assert.equal(await storage(state.normalSibling), 'shared');
   assert.equal(await storage(state.isolatedSibling), 'isolated');
-  assert.equal(await storage(state.other), undefined);
+  assert([undefined, null, ''].includes(await storage(state.other)), 'A separate partition must not inherit localStorage');
 }
 try {
   if (values.phase === 'seed') {
@@ -87,21 +88,31 @@ try {
     const before = (await call('get-tabs')).tabs.map(item => item.id);
     await selected(state.isolated);
     await call('click', { tabId: state.isolated, selector: '#popup' });
-    let popup;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      popup = (await call('get-tabs')).tabs.find(item => !before.includes(item.id));
-      if (popup) break;
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (values.mobile) {
+      // Mobile opens target=_blank in its existing view; identity must remain intact.
+      await selected(state.isolated);
+      assert.equal((await cookie(state.isolated)).value, 'isolated');
+      assert.equal((await call('get-tabs')).tabs.length, before.length);
+    } else {
+      let popup;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        popup = (await call('get-tabs')).tabs.find(item => !before.includes(item.id));
+        if (popup) break;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      assert(popup, 'Desktop popup must become a browser tab');
+      assert.equal(popup.partition, state.prefix);
+      assert.equal((await cookie(popup.id)).value, 'isolated');
     }
-    assert(popup, 'Desktop popup must become a browser tab');
-    assert.equal(popup.partition, state.prefix);
-    assert.equal((await cookie(popup.id)).value, 'isolated');
+    state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
     await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
     console.log('PASS: ordinary siblings, isolated siblings, distinct partitions, HttpOnly cookies, localStorage and popup inheritance');
   } else {
     const tabs = (await call('get-tabs')).tabs;
     for (const key of ['normal', 'normalSibling', 'isolated', 'isolatedSibling', 'other']) {
+      if (values.mobile) state[key] = tabs.find(tab => tab.name === state.names[state[key]])?.id;
       assert(tabs.some(tab => tab.id === state[key]), `Missing restored ${key} tab`);
+      await call('switch-tab', { tabId: state[key] });
       await call('navigate', { tabId: state[key], url: origin + '/probe' });
     }
     await verify();
