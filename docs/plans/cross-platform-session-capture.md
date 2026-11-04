@@ -194,6 +194,9 @@ Navigation reached the preceding view. iOS now snapshots the active WebView at
 legacy dispatch using a task-local value keyed to the HandlerContext instance.
 Suspension and UI rebinding cannot change that request's renderer; another
 context, canonical dispatch and pinned account jobs retain their own authority.
+The task-local target is weak, while the admitted request explicitly retains its
+view through completion. Child tasks cannot keep a closed renderer or its
+website store alive after their parent request ends.
 Missing active tabs fail explicitly. Android already uses the equivalent
 coroutine-local target under its gateway lease. iOS advances to 0.1.21.
 An unavailable page during restoration also made WebKit reset its URL to nil;

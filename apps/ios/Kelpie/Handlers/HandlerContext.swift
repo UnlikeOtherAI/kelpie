@@ -78,7 +78,7 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
 
     private struct BrowserTarget {
         let context: ObjectIdentifier
-        let view: WKWebView
+        weak var view: WKWebView?
     }
     @TaskLocal private static var operationTarget: BrowserTarget?
     private weak var visibleWebView: WKWebView?
@@ -92,7 +92,9 @@ final class HandlerContext: NSObject, WKScriptMessageHandler {
 
     /// Keep a suspended request on its admitted tab while SwiftUI updates the visible view.
     func withBrowserTarget<T>(_ view: WKWebView, action: () async -> T) async -> T {
-        await Self.$operationTarget.withValue(BrowserTarget(context: ObjectIdentifier(self), view: view)) { await action() }
+        // Child tasks inherit task locals; only this request should retain the renderer.
+        defer { withExtendedLifetime(view) {} }
+        return await Self.$operationTarget.withValue(BrowserTarget(context: ObjectIdentifier(self), view: view)) { await action() }
     }
     /// A remote job's isolated context can only evaluate its pinned document.
     var remoteDocumentGuard: (() -> Bool)?

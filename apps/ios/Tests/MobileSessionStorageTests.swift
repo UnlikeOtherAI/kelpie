@@ -150,6 +150,24 @@ final class MobileSessionStorageTests: XCTestCase {
         _ = await router.handle(method: "fixture-target", body: [:])
     }
 
+    func testInheritedTaskLocalsDoNotKeepRetiredWebViewsAlive() async {
+        let context = HandlerContext()
+        var view: WKWebView? = WKWebView()
+        let (events, continuation) = AsyncStream<Void>.makeStream()
+        var child: Task<Bool, Never>?
+        await context.withBrowserTarget(view!) {
+            child = Task {
+                for await _ in events { return context.webView == nil }
+                return false
+            }
+        }
+        view = nil
+        continuation.yield(())
+        continuation.finish()
+        let released = await child?.value
+        XCTAssertEqual(released, true)
+    }
+
     func testUnavailableRestoredPageKeepsItsSavedDestination() async throws {
         let view = WKWebView()
         let tab = BrowserTab(webView: view, isStartPage: false, recordsHistory: false, partition: "offline")
