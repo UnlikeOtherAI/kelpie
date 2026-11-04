@@ -1,87 +1,90 @@
 import type { BrowserSnapshot } from "./protocol.js";
+import { createBoundedDOMReader } from "./dom-reader.js";
 
-/** Fixed, self-contained page reader. It never reads form-control values. */
+/** Fixed value-free reader; serialize through fixedObservationReaderSource to include its primitives. */
 export function collectBrowserSnapshot(options: {
   maxElements?: number; maxChars?: number; prefix: string; includeShadow?: boolean; scope?: string; prioritize?: boolean;
-}): { snapshot: BrowserSnapshot; targets: Record<string, Element> } {
-  const maxElements = options.maxElements ?? 200;
-  const maxChars = options.maxChars ?? 16_000;
-  const elements: { ref: string; role: string; name: string }[] = [];
-  const targets: Record<string, Element> = {};
-  let truncated = false;
-  const clean = (text: string, limit = 256): string => {
-    const value = text.replace(/\s+/g, " ").trim();
-    if (value.length > limit) truncated = true;
-    return value.slice(0, limit);
-  };
+}, factory: typeof createBoundedDOMReader = createBoundedDOMReader): { snapshot: BrowserSnapshot; targets: Record<string, Element> } {
+  const dom = factory();
+  const maxElements = options.maxElements ?? 200, maxChars = options.maxChars ?? 16_000;
+  const elements: { ref: string; role: string; name: string }[] = [], targets: Record<string, Element> = {};
   const url = location.href.slice(0, Math.min(4096, Math.floor(maxChars / 2)));
-  const title = clean(document.title, Math.min(1024, Math.floor(maxChars / 4)));
-  let text = `url: ${url}\ntitle: ${title}`;
-  if (url !== location.href || title !== clean(document.title, document.title.length)) truncated = true;
-  let visited = 0;
-  const ignored = "input,textarea,select,[contenteditable]:not([contenteditable='false']),script,style,noscript,template,[hidden],[aria-hidden='true']";
-  const content = (node: Node, depth = 0): string => {
-    if (depth > 40 || (node instanceof Element && (node.matches(ignored) || node.closest("[contenteditable]:not([contenteditable='false'])") || getComputedStyle(node).visibility === "hidden" || getComputedStyle(node).display === "none"))) return "";
-    if (node.nodeType === Node.TEXT_NODE) {
-      const value = node.textContent ?? "";
-      if (value.length > 256) truncated = true;
-      return value.slice(0, 256);
+  if (url.length < location.href.length) dom.mark();
+  const title = dom.title(Math.min(1024, Math.floor(maxChars / 4)));
+  let text = "url: " + url + "\ntitle: " + title;
+  const root = dom.scope(options.scope);
+  const pool = dom.scan(root instanceof Document ? (root.body as HTMLElement | null) ?? root : root, "*", { includeRoot: !(root instanceof Document), shadow: options.includeShadow !== false, prunePrivate: true });
+  const ids = new Map<string, Element>(), labelsFor = new Map<string, Element[]>();
+  for (const el of pool.found) {
+    const id = dom.attr(el, "id", 1024);
+    if (id && !ids.has(id)) ids.set(id, el);
+    if (el.tagName.toLowerCase() === "label") {
+      const target = dom.attr(el, "for", 1024), labels = labelsFor.get(target) ?? [];
+      if (target && labels.length < 8) { labels.push(el); labelsFor.set(target, labels); }
+      else if (target) dom.mark();
     }
-    let value = "";
-    for (const child of node.childNodes) {
-      value += ` ${content(child, depth + 1)}`;
-      if (value.length >= 512) { if (child.nextSibling) truncated = true; break; }
-    }
-    return value;
+  }
+  const candidates = pool.found, candidateSet = new Set(candidates);
+  const priority = (el: Element): number => {
+    const tag = el.tagName.toLowerCase(), role = dom.attr(el, "role", 80);
+    if (["button", "input", "select", "textarea", "a"].includes(tag) || ["button", "link", "textbox", "combobox", "checkbox", "radio"].includes(role)) return 0;
+    if (/^h[1-6]$/.test(tag) || role === "heading") return 1;
+    return ["main", "nav"].includes(tag) || ["main", "navigation"].includes(role) ? 2 : 3;
   };
-  const visit = (root: Document | ShadowRoot | Element): void => {
-    const nodes = root.querySelectorAll(root instanceof Document ? "body *" : "*");
-    if (nodes.length > 5000) truncated = true;
-    const candidates = Array.from(nodes).slice(0, 5000);
-    if (root instanceof Element) candidates.unshift(root);
-    const priority = (el: Element): number => {
-      const tag = el.tagName.toLowerCase(), role = el.getAttribute("role") ?? "";
-      if (["button", "input", "select", "textarea", "a"].includes(tag) || ["button", "link", "textbox", "combobox", "checkbox", "radio"].includes(role)) return 0;
-      if (/^h[1-6]$/.test(tag) || role === "heading") return 1;
-      if (["main", "nav"].includes(tag) || ["main", "navigation"].includes(role)) return 2;
-      return 3;
-    };
-    if (options.prioritize !== false) candidates.sort((a, b) => priority(a) - priority(b));
-    for (const el of candidates) {
-      if (++visited > 5000 || elements.length >= maxElements) { truncated = true; return; }
-      const editor = el.closest("[contenteditable]:not([contenteditable='false'])");
-      if (editor && editor !== el) continue;
-      const tag = el.tagName.toLowerCase();
-      const style = getComputedStyle(el);
-      if (["script", "style", "noscript", "template", "option"].includes(tag) || el.closest("[hidden],[aria-hidden='true']")) continue;
-      if (el.getClientRects().length === 0 || style.visibility === "hidden" || style.visibility === "collapse") continue;
-      const roles: Record<string, string> = { button: "button", select: "combobox", textarea: "textbox", nav: "navigation", main: "main", img: "img" };
-      const type = el.getAttribute("type") ?? "text";
-      const inputRole = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : ["submit", "reset", "button", "image"].includes(type) ? "button" : type === "hidden" ? undefined : "textbox";
-      const labelled = (el.getAttribute("aria-labelledby")?.split(/\s+/) ?? []).map((id) => {
-        const label = root instanceof Element ? root.ownerDocument.getElementById(id) : root.getElementById(id);
-        return label && (!(root instanceof Element) || root.contains(label)) ? content(label) : "";
-      }).join(" ").trim();
-      const labels = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
-        ? Array.from(el.labels ?? []).filter((label) => !(root instanceof Element) || root.contains(label)).map((label) => content(label)).join(" ") : "";
-      const svgTitle = tag === "svg" ? el.querySelector(":scope > title")?.textContent : "";
-      const namedSvg = tag === "svg" && [labelled, el.getAttribute("aria-label"), svgTitle].some((value) => value?.trim());
-      const role = el.getAttribute("role") ?? (tag === "input" ? inputRole : namedSvg ? "img" : tag === "a" && el.hasAttribute("href") ? "link" : /^h[1-6]$/.test(tag) ? "heading" : roles[tag]);
-      const name = clean([labelled, el.getAttribute("aria-label"), labels, el.getAttribute("alt"), el.getAttribute("placeholder"), svgTitle, content(el)].find((value) => value?.trim()) ?? "");
-      if (role || (["p", "li", "td", "th"].includes(tag) && name)) {
-        const ref = `${options.prefix}${String(elements.length + 1)}`;
-        const line = `\n[${ref}] ${role ?? tag} ${JSON.stringify(name)}`;
-        if (text.length + line.length > maxChars) { truncated = true; return; }
-        text += line;
-        elements.push({ ref, role: role ?? tag, name });
-        targets[ref] = el;
+  if (options.prioritize !== false) {
+    const priorities = new Map(candidates.map((el) => [el, priority(el)]));
+    candidates.sort((a, b) => (priorities.get(a) ?? 3) - (priorities.get(b) ?? 3));
+  }
+  for (const el of candidates) {
+    if (elements.length >= maxElements) { dom.mark(); break; }
+    const tag = el.tagName.toLowerCase(), state = dom.state(el);
+    if (state.editorAncestor || !dom.visible(el) || ["script", "style", "noscript", "template", "option"].includes(tag)) continue;
+    const read = (node: Element): string => dom.text(node, 256).value;
+    const labelIds = dom.attr(el, "aria-labelledby", 1024).split(/\s+/).slice(0, 8);
+    let labelled = "";
+    for (const id of labelIds) {
+      const label = ids.get(id);
+      if (label?.getRootNode() === el.getRootNode()) labelled += " " + read(label);
+      if (labelled.length >= 256) { dom.mark(); break; }
+    }
+    let associated = "";
+    const id = dom.attr(el, "id", 1024);
+    if (["input", "textarea", "select"].includes(tag)) {
+      const labels = new Set(labelsFor.get(id) ?? []);
+      let parent = el.parentElement, depth = 0;
+      while (parent && ++depth <= 40) {
+        if (parent.tagName.toLowerCase() === "label" && (!options.scope || candidateSet.has(parent))) { labels.add(parent); break; }
+        parent = parent.parentElement;
       }
-      if (el.shadowRoot && !editor && options.includeShadow !== false) visit(el.shadowRoot);
+      if (depth > 40) dom.mark();
+      for (const label of labels) {
+        if (label.getRootNode() !== el.getRootNode()) continue;
+        associated += " " + read(label);
+        if (associated.length >= 256) { dom.mark(); break; }
+      }
     }
-  };
-  const scopes = options.scope ? document.querySelectorAll(options.scope) : [document];
-  const scope = scopes[0];
-  if (scopes.length !== 1 || !scope) throw new Error("OBSERVATION_SCOPE");
-  visit(scope);
-  return { targets, snapshot: { url, title, elements, text, truncated } };
+    let svgTitle = "";
+    if (tag === "svg") {
+      let child = el.firstElementChild, checked = 0;
+      while (child && ++checked <= 32) {
+        if (child.tagName.toLowerCase() === "title") { svgTitle = read(child); break; }
+        child = child.nextElementSibling;
+      }
+      if (checked > 32) dom.mark();
+    }
+    const roles: Record<string, string> = { button: "button", select: "combobox", textarea: "textbox", nav: "navigation", main: "main", img: "img" };
+    const type = dom.attr(el, "type", 32) || "text";
+    const inputRole = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : ["submit", "reset", "button", "image"].includes(type) ? "button" : type === "hidden" ? undefined : "textbox";
+    const aria = dom.attr(el, "aria-label", 256);
+    const namedSvg = tag === "svg" && [labelled, aria, svgTitle].some((value) => value.trim());
+    const role = dom.attr(el, "role", 80) || (tag === "input" ? inputRole : namedSvg ? "img" : tag === "a" && el.hasAttribute("href") ? "link" : /^h[1-6]$/.test(tag) ? "heading" : roles[tag]);
+    const name = dom.bounded([labelled, aria, associated, dom.attr(el, "alt", 256), dom.attr(el, "placeholder", 256), svgTitle].find((value) => value.trim()) ?? read(el), 256);
+    if (role || (["p", "li", "td", "th"].includes(tag) && name)) {
+      const ref = options.prefix + String(elements.length + 1);
+      const line = "\n[" + ref + "] " + (role ?? tag) + " " + JSON.stringify(name);
+      if (text.length + line.length > maxChars) { dom.mark(); break; }
+      text += line; elements.push({ ref, role: role ?? tag, name }); targets[ref] = el;
+    }
+  }
+  return { targets, snapshot: { url, title, elements, text, truncated: dom.truncated } };
 }

@@ -243,7 +243,9 @@ void ScriptAssets() {
 void FixedObservations() {
   kelpie::BrowserGateway unsupported({{"nativeMethods", json::array()}, {"fixedReader", false}, {"requireAuthorization", false}});
   assert(unsupported.Begin(Request("tab.status"))["response"]["error"]["code"] == "UNSUPPORTED");
+  assert(unsupported.Begin(Request("tab.webmcp.discover", {{"origin", "https://example.org"}}))["response"]["error"]["code"] == "UNSUPPORTED");
   kelpie::BrowserGateway gateway({{"nativeMethods", json::array()}, {"fixedReader", true}, {"requireAuthorization", false}, {"allowActions", false}});
+  assert(gateway.Begin(Request("tab.webmcp.call", {{"origin", "https://example.org"}, {"ref", "t1"}}))["response"]["error"]["code"] == "UNSUPPORTED");
   for (const auto* method : {"tab.status", "tab.ready", "tab.extract"}) {
     const json params = std::string(method) == "tab.extract"
       ? json{{"fields", {{{"name", "heading"}, {"selector", "h1"}}}}} : json::object();

@@ -2,8 +2,8 @@ import type { Page, Locator, FrameLocator, ElementHandle } from "playwright-core
 import { BrowserControlError, browserControlMutates } from "./protocol.js";
 import type { BrowserControlBackend, BrowserControlRequest, BrowserLocator, BrowserTextMatcher, BrowserTabInfo } from "./protocol.js";
 import { browserControlCapabilities } from "./proxy.js";
-import { collectBrowserSnapshot } from "./snapshot.js";
-import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from "./observations.js";
+import { fixedObservationExpression } from "./observation-source.js";
+import type { BrowserSnapshot } from "./protocol.js";
 
 const matcher = (value: BrowserTextMatcher): string | RegExp => typeof value === "string" ? value : new RegExp(value.source, value.flags);
 const selector = (value: BrowserTextMatcher): string => {
@@ -48,6 +48,8 @@ export interface PlaywrightBrowserBinding {
 /** Browserbase, local Chromium and test browsers use the same page implementation. Allocation stays outside it. */
 export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding): BrowserControlBackend {
   const capabilities = browserControlCapabilities();
+  // Typed catalogue membership grants no page-tool authority. Managed bindings own grants and actual API probes.
+  capabilities.methods = capabilities.methods.filter((method) => !method.startsWith("tab.webmcp."));
   const references = new Map<string, Map<string, ElementHandle>>();
   let generation = 0;
   const clear = async (id: string): Promise<void> => {
@@ -73,7 +75,7 @@ export function createPlaywrightBrowserBackend(binding: PlaywrightBrowserBinding
       const page = await binding.getPage(request.tabId);
       if (request.method === "tab.snapshot") {
         await clear(request.tabId);
-        const collected = await page.evaluateHandle(collectBrowserSnapshot, { ...request.params, prefix: `s${String(++generation)}e` });
+        const collected = await page.evaluateHandle(fixedObservationExpression("snapshot", { ...request.params, prefix: `s${String(++generation)}e` }));
         try {
           const snap = await collected.getProperty("snapshot");
           const value: unknown = await snap.jsonValue();
@@ -143,10 +145,10 @@ export async function executePlaywrightPage(page: Page, request: BrowserControlR
     case "tab.reload": await page.reload({ waitUntil: "domcontentloaded", timeout }); return null;
     case "tab.url": return page.url();
     case "tab.title": return page.title();
-    case "tab.extract": return page.evaluate(collectBrowserExtraction, request.params);
-    case "tab.status": return page.evaluate(collectBrowserPageStatus);
-    case "tab.ready": return page.evaluate(collectBrowserReadiness, request.params);
-    case "tab.snapshot": return (await page.evaluate(collectBrowserSnapshot, { ...request.params, prefix: "e" })).snapshot;
+    case "tab.extract": return page.evaluate<unknown>(fixedObservationExpression("extract", request.params));
+    case "tab.status": return page.evaluate<unknown>(fixedObservationExpression("status"));
+    case "tab.ready": return page.evaluate<unknown>(fixedObservationExpression("ready", request.params));
+    case "tab.snapshot": return (await page.evaluate<{ snapshot: BrowserSnapshot }>(fixedObservationExpression("snapshot", { ...request.params, prefix: "e" }))).snapshot;
     case "tab.screenshot": {
       const type = request.params.format ?? "png";
       const bytes = await page.screenshot({ type, fullPage: request.params.fullPage, ...(type === "jpeg" ? { quality: request.params.quality } : {}) });
