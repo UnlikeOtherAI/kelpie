@@ -13,7 +13,7 @@ overlay, direct MCP/CLI, remote artifact and installed-release evidence is
 | OBS | 3a63ea7d696a7850e2798b2c235aca784104d9db | Bounded canonical observations and generated native ABI |
 | WFL | d6d7a36666e11db45e7e42cfe09a62d1f2a2fcd8 | Strict workflows, bindings, target safety and presentation |
 | NUMERIC | f6fb0aee3e61fe9bbccad501718386ef6ce0b379 | Native C ABI presentation and TS-generated parity vectors; integrated 87cd6de7 |
-| CODEC | 8369571f6b821cc4bcfc853de2a78f5fc25e142d | Windows codecs, exclusive output opens, failure cleanup and decoded color checks |
+| CODEC | 2b2dc1c2673541ddfe13f2ab970283f396c4c3fd | Windows codecs, exact-handle MP4 ownership, failure cleanup and decoded color checks |
 | BACKEND | 28a9f3c71c81f3df6e87ac77b69d49363391cb2d | Managed sessions, restricted LP and WebMCP helpers |
 | QA | d81d6283df63e2c26c1aebbca8afd8a09facc8ec | Independent target regressions and observation review |
 | FIXTURE | 4fbd5e4ed4d0c2873eb632c4d12f96c91267c03a | Real DOM race triggers for future native runs |
@@ -50,7 +50,8 @@ that every platform ran them.
   Maxis Node 24.19; these are source-level stubs.
 - **CODEC-DECODE**: apps/windows/tests/script_media_encoder_test.cpp:
   Timing, AbortAndValidation, Budget(gif/mp4), StepBudget, GifRounding,
-  SmallBudgets, ExclusiveOwnership, PngFailureCleanup and GifPaletteChanges.
+  SmallBudgets, ExclusiveOwnership, PngFailureCleanup, GifPaletteChanges and
+  ExactHandleRollback (constructor/flush/both closes/replacement preservation).
   WIC decodes images and Media Foundation decodes MP4 samples.
 - **NUMERIC-PARITY**: native/core-automation/tests/test_script_presentation.cpp
   with scripts/native/generate-script-presentation.mjs; coordinator reports both
@@ -103,7 +104,7 @@ that every platform ran them.
 | CAP-08 | ScriptMediaEncoder::Finish and successful output retention | CODEC-DECODE AbortAndValidation/next capture | CODEC partial; sibling-format recovery reported; native cancellation pending |
 | ART-01 | scriptArtifactRequestSchema defines opaque chunk request only | WORKFLOW length bounds | WFL shape only; authenticated remote bytes/CLI retrieval pending |
 | ART-02 | No artifact-owner runtime reviewed in these checkpoints | Two-owner/revocation native eval pending | Pending |
-| ART-03 | scriptArtifactRequestSchema; WriteStepPNG lexical directory guard | WORKFLOW chunk bounds; CODEC-DECODE invalid path | WFL/CODEC partial; exclusive open fixed; failure-cleanup ownership question and transport tests pending |
+| ART-03 | scriptArtifactRequestSchema; WriteStepPNG lexical directory guard | WORKFLOW chunk bounds; CODEC-DECODE invalid path | WFL/CODEC partial; exact-handle ownership fixes and codec regressions closed; transport tests pending |
 | ART-04 | scriptArtifactSchema; ScriptMediaOutput codec metadata | CODEC-DECODE manifest timing/counts | WFL/CODEC partial; SHA-256, document provenance and partial state service pending |
 | SEC-01 | value-free observations; bindScriptInputs safe errors/sensitive/capture checks | OBS-BROWSER private canaries; WORKFLOW secrets | OBS/WFL; runtime logs/progress/output scrubbing pending |
 | SEC-02 | Fixed observation source; typed workflow excludes evaluate | OBS-SCHEMA; WORKFLOW arbitrary-code rejection | OBS/WFL; hostile-page real flow and WebMCP authority pending |
