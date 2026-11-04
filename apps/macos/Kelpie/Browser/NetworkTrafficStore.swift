@@ -4,7 +4,7 @@ import Foundation
 final class NetworkTrafficStore: ObservableObject {
     static let shared = NetworkTrafficStore()
 
-    struct TrafficEntry: Identifiable {
+    struct TrafficEntry: Identifiable, Codable, Sendable {
         let id: UUID
         let method: String
         let url: String
@@ -45,7 +45,7 @@ final class NetworkTrafficStore: ObservableObject {
         return entries[idx]
     }
 
-    private let key = "kelpie_network_traffic"
+    private let persistence: NetworkTrafficPersistence
     private let storeHandle = kelpie_network_traffic_store_create()
     private var isSynchronizingSelection = false
 
@@ -56,7 +56,8 @@ final class NetworkTrafficStore: ObservableObject {
         return formatter
     }()
 
-    private init() {
+    init(persistence: NetworkTrafficPersistence = NetworkTrafficPersistence()) {
+        self.persistence = persistence
         load()
     }
 
@@ -73,8 +74,29 @@ final class NetworkTrafficStore: ObservableObject {
         }
         guard appended == 1 else { return }
 
-        refreshFromCore()
-        persist()
+        // The core normalizes only this entry and evicts from the front. Avoid
+        // exporting and decoding every retained response body for each request.
+        let normalized = TrafficEntry(
+            id: entry.id,
+            method: String(bytes: entry.method.utf8.map { (97...122).contains($0) ? $0 - 32 : $0 }, encoding: .utf8) ?? entry.method,
+            url: entry.url,
+            statusCode: Int(Int32(truncatingIfNeeded: entry.statusCode)),
+            contentType: entry.contentType,
+            requestHeaders: entry.requestHeaders,
+            responseHeaders: entry.responseHeaders,
+            requestBody: entry.requestBody.flatMap { $0.isEmpty ? nil : $0 },
+            responseBody: entry.responseBody.flatMap { $0.isEmpty ? nil : $0 },
+            startTime: Self.iso8601Formatter.date(from: Self.iso8601Formatter.string(from: entry.startTime)) ?? entry.startTime,
+            duration: max(0, Int(Int32(truncatingIfNeeded: entry.duration))),
+            size: max(0, entry.size),
+            // The existing append_json bridge defaults this field to browser.
+            initiator: "browser"
+        )
+        entries.append(normalized)
+        let removed = entries.count - Int(kelpie_network_traffic_store_count(storeHandle))
+        if removed > 0 { entries.removeFirst(removed) }
+        synchronizeSelectionFromCore()
+        persistence.save(entries)
     }
 
     func appendDocumentNavigation(
@@ -85,40 +107,34 @@ final class NetworkTrafficStore: ObservableObject {
         size: Int = 0,
         startedAt: Date
     ) {
-        guard let storeHandle else { return }
-        let headersJSON = Self.makeJSONString(from: responseHeaders) ?? "{}"
-        let startTime = Self.iso8601Formatter.string(from: startedAt)
-        let duration = max(0, Int(Date().timeIntervalSince(startedAt) * 1000))
-
-        url.withCString { urlPointer in
-            contentType.withCString { contentTypePointer in
-                headersJSON.withCString { headersPointer in
-                    startTime.withCString { startTimePointer in
-                        kelpie_network_traffic_store_append_document_navigation(
-                            storeHandle,
-                            urlPointer,
-                            Int32(statusCode),
-                            contentTypePointer,
-                            headersPointer,
-                            Int64(max(0, size)),
-                            startTimePointer,
-                            Int32(duration)
-                        )
-                    }
-                }
-            }
-        }
-
-        refreshFromCore()
-        persist()
+        append(TrafficEntry(
+            id: UUID(),
+            method: "GET",
+            url: url,
+            statusCode: statusCode,
+            contentType: contentType,
+            requestHeaders: [:],
+            responseHeaders: responseHeaders,
+            requestBody: nil,
+            responseBody: nil,
+            startTime: startedAt,
+            duration: max(0, Int(Date().timeIntervalSince(startedAt) * 1000)),
+            size: max(0, size),
+            initiator: "browser"
+        ))
     }
 
     func clear() {
         guard let storeHandle else { return }
         kelpie_network_traffic_store_clear(storeHandle)
-        refreshFromCore()
-        persist()
+        entries = []
+        updateSelectedIndex(nil)
+        persistence.save(entries)
+        persistence.flush()
     }
+
+    /// Finish the last coalesced write before normal application termination.
+    func flush() { persistence.flush() }
 
     /// Real HTTP status codes captured from `WKNavigationResponse` for main-frame
     /// document navigations, keyed by absolute URL (most recent navigation wins).
@@ -186,11 +202,12 @@ final class NetworkTrafficStore: ObservableObject {
     private func load() {
         guard let storeHandle else { return }
 
-        let persistedJSON = loadPersistedJSON() ?? "[]"
+        guard let persistedJSON = loadPersistedJSON() else { return }
         persistedJSON.withCString { jsonPointer in
             kelpie_network_traffic_store_load_json(storeHandle, jsonPointer)
         }
         refreshFromCore()
+        if persistence.hasLegacyData { persistence.save(entries) }
     }
 
     private func refreshFromCore() {
@@ -202,11 +219,6 @@ final class NetworkTrafficStore: ObservableObject {
 
         entries = Self.decodeEntries(from: json) ?? []
         synchronizeSelectionFromCore()
-    }
-
-    private func persist() {
-        let payload = Self.jsonData(from: entries.map { entryToJSON($0) }) ?? Data("[]".utf8)
-        UserDefaults.standard.set(payload, forKey: key)
     }
 
     private func syncSelectionToCore() {
@@ -243,14 +255,11 @@ final class NetworkTrafficStore: ObservableObject {
     }
 
     private func loadPersistedJSON() -> String? {
-        if let data = UserDefaults.standard.data(forKey: key) {
-            return normalizedPersistedJSON(from: data)
+        if let data = persistence.load() {
+            if let json = normalizedPersistedJSON(from: data) { return json }
+            persistence.preserveUnreadableFile()
         }
-
-        if let string = UserDefaults.standard.string(forKey: key) {
-            return normalizedPersistedJSON(from: Data(string.utf8))
-        }
-
+        if let legacy = persistence.legacyData { return normalizedPersistedJSON(from: legacy) }
         return nil
     }
 

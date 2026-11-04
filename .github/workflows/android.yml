@@ -2,9 +2,27 @@ name: Android
 
 on:
   pull_request:
+    paths:
+      - 'apps/android/**'
+      - 'native/**'
+      - 'packages/shared/**'
+      - 'scripts/native/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/actions/browser-contract/**'
   push:
     branches:
       - main
+    paths:
+      - 'apps/android/**'
+      - 'native/**'
+      - 'packages/shared/**'
+      - 'scripts/native/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/actions/browser-contract/**'
   workflow_dispatch:
 
 permissions:

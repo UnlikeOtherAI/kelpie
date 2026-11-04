@@ -137,6 +137,12 @@ A built-in network traffic viewer accessible from the floating menu. Captures al
 
 **LLM integration:** the LLM can list and filter captured traffic, navigate to a specific request by index or URL pattern, and read its full details. When the user is viewing a specific request in the inspector, the LLM knows exactly which one and can debug it — inspecting headers, payloads, and response data.
 
+On macOS, capture updates the retained history incrementally so busy pages do not
+rebuild the entire history on every request. History is saved in batches to a
+private Application Support file, with a final save on normal quit. Existing
+history migrates automatically from preferences after the first successful file
+write. A forced quit can lose the most recent second of traffic.
+
 API: `network-list`, `network-detail`, `network-select`, `network-current`, `network-clear`.
 
 ## 3D DOM Inspector
