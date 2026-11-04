@@ -40,6 +40,10 @@ existing authenticated run-owner and browser-grant checks. Discovery still filte
 out any endpoint the selected native router does not implement. Other native
 platforms and renderer bindings do not advertise this workflow surface yet.
 
+## Native session preflight
+
+Without `sessionId`, a native workflow uses the current authenticated browser grant and pinned tab. A supplied ID must resolve to an existing owner-bound native session and tab grant. Native bindings without that resolver refuse with `SESSION_UNSUPPORTED` before target resolution, navigation, admission or input; they never ignore the ID or create a parallel session. This code is preserved through direct and generic MCP with a fixed safe message. Explicit completion uncertainty remains `mayHaveCompleted:true`; a timeout never proves a definite refusal.
+
 ## Artifact retrieval
 
 `POST /v1/get-script-artifact` and MCP `kelpie_get_script_artifact` accept `{runId,artifactId,offset?,length?}`. Offset is a nonnegative integer. Chunk length defaults to262144 and is at most1048576 bytes. The authenticated run owner and current browser grant must match on every status/cancel/download request.

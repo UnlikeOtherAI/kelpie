@@ -47,7 +47,7 @@ struct BrowserGateway::Impl {
   std::map<std::string, std::set<std::string>> refs;
   std::string session = Identity(), stage, key;
   unsigned long generation = 0;
-  bool active = false, uncertain = false, mutation = false, selected_effect = false;
+  bool active = false, uncertain = false, mutation = false, selected_effect = false, dispatch_prior_uncertain = false;
   bool mcp = false, notification = false, extension = false;
   json rpc_id;
   explicit Impl(json value) : config(std::move(value)) {
@@ -81,6 +81,7 @@ struct BrowserGateway::Impl {
   }
   void Dispatch(std::string method, json params, std::string next_stage, bool mutates = false) {
     stage = std::move(next_stage);
+    dispatch_prior_uncertain = uncertain;
     uncertain = uncertain || mutates;
     selected_effect = selected_effect || (method == "switch-tab" && mutates);
     step = {{"kind", "dispatch"}, {"method", std::move(method)}, {"params", std::move(params)}, {"mutates", mutates}};
@@ -165,6 +166,14 @@ json BrowserGateway::Advance(json result) {
   try {
     if (!result.is_object() || !result.value("success", false) || result.contains("error")) {
       if (impl_->stage == "authorize" || impl_->stage == "authorize-select") impl_->Finish(Failure("ACCESS_DENIED"));
+      else if (impl_->extension && impl_->stage == "execute" && impl_->request["method"] == "play-script" &&
+               impl_->request["params"].contains("sessionId") && result.is_object() && result.contains("error") &&
+               result["error"].is_object() && result["error"].value("code", std::string()) == "SESSION_UNSUPPORTED") {
+        // This trusted native preflight code proves no action; never copy native/page messages.
+        impl_->uncertain = impl_->dispatch_prior_uncertain || impl_->selected_effect ||
+          result.value("mayHaveCompleted", false) || result["error"].value("mayHaveCompleted", false);
+        impl_->Finish(Failure("SESSION_UNSUPPORTED"));
+      }
       // A read whose image cannot fit its caller's result budget is a definite refusal, not an unknown failure.
       else if (impl_->request["method"] == "tab.screenshot" && result.is_object() && result.contains("error") &&
                result["error"].is_object() && result["error"].value("code", std::string()) == "SCREENSHOT_TOO_LARGE")
@@ -309,6 +318,7 @@ json BrowserGateway::BeginMcp(json rpc) {
     if (impl_->mutation && !impl_->config.value("allowActions", true)) return error(-32601);
     impl_->request = {{"version", 1}, {"method", found["method"]}, {"params", arguments}};
     impl_->extension = true; impl_->active = true; impl_->uncertain = false;
+    impl_->selected_effect = false; impl_->dispatch_prior_uncertain = false;
     impl_->stage = "authorize";
     impl_->step = {{"kind", "authorize"}, {"request", impl_->request}, {"mutates", impl_->mutation}};
     if (!impl_->config.value("requireAuthorization", true)) Advance({{"success", true}});
