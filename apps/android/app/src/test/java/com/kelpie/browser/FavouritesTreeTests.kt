@@ -52,13 +52,21 @@ class FavouritesTreeTests {
         val state = UOASettingsValue()
         val first = "\"" + "a".repeat(64) + "\""
         val next = "\"" + "b".repeat(64) + "\""
-        fun frame(type: String, version: String, operation: String? = null, base: String = first) = buildJsonObject {
+
+        fun frame(
+            type: String,
+            version: String,
+            operation: String? = null,
+            base: String = first,
+        ) = buildJsonObject {
             put("protocolVersion", 1)
             put("namespace", "browser")
             put("key", "bookmarks")
             put("type", type)
             put("version", version)
-            if (operation == null) put("value", JsonArray(listOf("a", "b", "c").map(::JsonPrimitive))) else {
+            if (operation == null) {
+                put("value", JsonArray(listOf("a", "b", "c").map(::JsonPrimitive)))
+            } else {
                 put("baseVersion", base)
                 put("operation", Json.parseToJsonElement(operation))
             }

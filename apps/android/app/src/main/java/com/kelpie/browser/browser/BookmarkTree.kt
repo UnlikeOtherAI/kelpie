@@ -16,12 +16,35 @@ data class Bookmark(
 }
 
 sealed class BookmarkMutation {
-    data class Add(val bookmark: Bookmark) : BookmarkMutation()
-    data class Update(val id: String, val title: String? = null, val url: String? = null) : BookmarkMutation()
-    data class Move(val id: String, val parentId: String?, val beforeId: String? = null) : BookmarkMutation()
-    data class Remove(val id: String) : BookmarkMutation()
-    data class RemoveTree(val expected: List<Bookmark>) : BookmarkMutation()
-    data class Restore(val removed: List<Bookmark>, val beforeId: String?) : BookmarkMutation()
+    data class Add(
+        val bookmark: Bookmark,
+    ) : BookmarkMutation()
+
+    data class Update(
+        val id: String,
+        val title: String? = null,
+        val url: String? = null,
+    ) : BookmarkMutation()
+
+    data class Move(
+        val id: String,
+        val parentId: String?,
+        val beforeId: String? = null,
+    ) : BookmarkMutation()
+
+    data class Remove(
+        val id: String,
+    ) : BookmarkMutation()
+
+    data class RemoveTree(
+        val expected: List<Bookmark>,
+    ) : BookmarkMutation()
+
+    data class Restore(
+        val removed: List<Bookmark>,
+        val beforeId: String?,
+    ) : BookmarkMutation()
+
     data object Clear : BookmarkMutation()
 }
 
@@ -39,11 +62,17 @@ object BookmarkTree {
         }
     }
 
-    private fun parent(id: String?, nodes: List<Bookmark>) {
+    private fun parent(
+        id: String?,
+        nodes: List<Bookmark>,
+    ) {
         require(id == null || nodes.any { it.id == id && it.isFolder }) { "The destination folder no longer exists." }
     }
 
-    fun subtree(id: String, nodes: List<Bookmark>): List<Bookmark> {
+    fun subtree(
+        id: String,
+        nodes: List<Bookmark>,
+    ): List<Bookmark> {
         val root = nodes.firstOrNull { it.id == id } ?: return emptyList()
         val result = mutableListOf(root)
         val seen = mutableSetOf(id)
@@ -55,7 +84,10 @@ object BookmarkTree {
         return result
     }
 
-    fun apply(original: List<Bookmark>, mutation: BookmarkMutation): List<Bookmark> {
+    fun apply(
+        original: List<Bookmark>,
+        mutation: BookmarkMutation,
+    ): List<Bookmark> {
         val nodes = original.toMutableList()
         when (mutation) {
             is BookmarkMutation.Add -> {
@@ -95,7 +127,10 @@ object BookmarkTree {
         return nodes
     }
 
-    private fun move(nodes: MutableList<Bookmark>, mutation: BookmarkMutation.Move): List<Bookmark> {
+    private fun move(
+        nodes: MutableList<Bookmark>,
+        mutation: BookmarkMutation.Move,
+    ): List<Bookmark> {
         val index = nodes.indexOfFirst { it.id == mutation.id }
         require(index >= 0) { "This favourite no longer exists." }
         parent(mutation.parentId, nodes)

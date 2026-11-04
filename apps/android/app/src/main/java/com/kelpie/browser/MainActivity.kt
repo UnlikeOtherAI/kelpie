@@ -122,7 +122,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        com.kelpie.browser.browser.BookmarkStore.refreshAccountBookmarks()
+        com.kelpie.browser.browser.BookmarkStore
+            .refreshAccountBookmarks()
         com.kelpie.browser.connect.NessieConnection
             .setForeground(true)
     }

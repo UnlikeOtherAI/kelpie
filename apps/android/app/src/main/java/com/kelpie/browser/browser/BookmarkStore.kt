@@ -34,22 +34,25 @@ object BookmarkStore {
         _bookmarks.value = value.filterNot { it.isFolder }
     }
 
-    fun useAccount() = synchronized(lock) {
-        resetSession()
-        publish(emptyList())
-        account = AccountBookmarks({ value -> synchronized(lock) { publish(value) } }, { busy, error ->
-            isSyncing.value = busy
-            syncError.value = error
-        })
-        account?.enableEvents()
-        account?.enqueue()
-    }
+    fun useAccount() =
+        synchronized(lock) {
+            resetSession()
+            publish(emptyList())
+            account =
+                AccountBookmarks({ value -> synchronized(lock) { publish(value) } }, { busy, error ->
+                    isSyncing.value = busy
+                    syncError.value = error
+                })
+            account?.enableEvents()
+            account?.enqueue()
+        }
 
-    fun useLocalBookmarks() = synchronized(lock) {
-        resetSession()
-        account = null
-        if (::prefs.isInitialized) load()
-    }
+    fun useLocalBookmarks() =
+        synchronized(lock) {
+            resetSession()
+            account = null
+            if (::prefs.isInitialized) load()
+        }
 
     private fun resetSession() {
         account?.invalidate()
@@ -61,12 +64,14 @@ object BookmarkStore {
         canUndoRemoval.value = false
     }
 
-    fun init(context: Context) = synchronized(lock) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (account == null) load()
-    }
+    fun init(context: Context) =
+        synchronized(lock) {
+            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (account == null) load()
+        }
 
     fun refreshAccountBookmarks() = synchronized(lock) { account?.enqueue() }
+
     suspend fun flush() {
         val current = synchronized(lock) { account }
         current?.flush()
@@ -76,26 +81,33 @@ object BookmarkStore {
         }
     }
 
-    fun mutate(mutation: BookmarkMutation): Deferred<Unit>? = synchronized(lock) {
-        account?.let { return@synchronized it.enqueue(mutation) }
-        try {
-            loadError?.let { throw it }
-            val changed = BookmarkTree.apply(_nodes.value, mutation)
-            val encoded = AccountBookmarks.encode(changed).toString()
-            check(prefs.edit().putString(DATA_KEY, encoded).commit()) { "Favourites could not be saved." }
-            publish(changed)
-            syncError.value = null
-            null
-        } catch (error: Exception) {
-            syncError.value = error.message
-            CompletableDeferred<Unit>().also { it.completeExceptionally(error) }
+    fun mutate(mutation: BookmarkMutation): Deferred<Unit>? =
+        synchronized(lock) {
+            account?.let { return@synchronized it.enqueue(mutation) }
+            try {
+                loadError?.let { throw it }
+                val changed = BookmarkTree.apply(_nodes.value, mutation)
+                val encoded = AccountBookmarks.encode(changed).toString()
+                check(prefs.edit().putString(DATA_KEY, encoded).commit()) { "Favourites could not be saved." }
+                publish(changed)
+                syncError.value = null
+                null
+            } catch (error: Exception) {
+                syncError.value = error.message
+                CompletableDeferred<Unit>().also { it.completeExceptionally(error) }
+            }
         }
-    }
 
-    fun add(title: String, url: String, parentId: String? = null): Deferred<Unit>? =
-        mutate(BookmarkMutation.Add(Bookmark(title = title.ifEmpty { url }, url = url, parentId = parentId)))
+    fun add(
+        title: String,
+        url: String,
+        parentId: String? = null,
+    ): Deferred<Unit>? = mutate(BookmarkMutation.Add(Bookmark(title = title.ifEmpty { url }, url = url, parentId = parentId)))
+
     fun remove(id: String): Deferred<Unit>? = mutate(BookmarkMutation.RemoveTree(BookmarkTree.subtree(id, _nodes.value)))
+
     fun clear(): Deferred<Unit>? = mutate(BookmarkMutation.Clear)
+
     fun children(parentId: String?): List<Bookmark> = _nodes.value.filter { it.parentId == parentId }
 
     suspend fun removeWithUndo(id: String) {
@@ -119,15 +131,17 @@ object BookmarkStore {
         canUndoRemoval.value = false
     }
 
-    fun toJSON(): List<Map<String, Any?>> = _nodes.value.map {
-        mapOf("id" to it.id, "title" to it.title, "url" to it.url, "createdAt" to it.createdAt, "kind" to it.kind, "parentId" to it.parentId)
-    }
+    fun toJSON(): List<Map<String, Any?>> =
+        _nodes.value.map {
+            mapOf("id" to it.id, "title" to it.title, "url" to it.url, "createdAt" to it.createdAt, "kind" to it.kind, "parentId" to it.parentId)
+        }
 
     private fun load() {
         try {
             val raw = prefs.getString(DATA_KEY, null) ?: prefs.getString("data", "[]") ?: "[]"
-            val parsed = Json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonArray
-                ?: error("Saved favourites could not be read.")
+            val parsed =
+                Json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonArray
+                    ?: error("Saved favourites could not be read.")
             val decoded = AccountBookmarks.decode(parsed)
             check(decoded.size == parsed.size) { "Saved favourites have an unsupported format." }
             publish(decoded)

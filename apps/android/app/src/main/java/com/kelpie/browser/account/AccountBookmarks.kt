@@ -29,14 +29,21 @@ class AccountBookmarks(
     private var active = true
     private var queued = 0
     private var events: UOASettingsStream? = null
+
     fun enableEvents() {
-        events = UOASettingsStream(scope, "browser", "bookmarks", UOAAccount::settingsRequest) { value ->
-            if (active && queued == 0) {
-                val raw = if (value == kotlinx.serialization.json.JsonNull) JsonArray(emptyList()) else value as? JsonArray
-                    ?: error("Invalid favourites snapshot")
-                publish(decode(raw))
+        events =
+            UOASettingsStream(scope, "browser", "bookmarks", UOAAccount::settingsRequest) { value ->
+                if (active && queued == 0) {
+                    val raw =
+                        if (value == kotlinx.serialization.json.JsonNull) {
+                            JsonArray(emptyList())
+                        } else {
+                            value as? JsonArray
+                                ?: error("Invalid favourites snapshot")
+                        }
+                    publish(decode(raw))
+                }
             }
-        }
     }
 
     private var pending: Deferred<Unit>? = null
@@ -114,27 +121,43 @@ class AccountBookmarks(
             if (kind !in setOf("bookmark", "folder") || (kind == "bookmark" && url.isEmpty())) return null
             if (kind == "folder" && runCatching { UUID.fromString((item["id"] as? JsonPrimitive)?.contentOrNull) }.isFailure) return null
             val parent = (item["parentId"] as? JsonPrimitive)?.contentOrNull?.let { runCatching { UUID.fromString(it).toString() }.getOrNull() }
-            return Bookmark(id = identifier(item), title = (item["title"] as? JsonPrimitive)?.contentOrNull
-                ?: (item["name"] as? JsonPrimitive)?.contentOrNull ?: url,
-                url = url, createdAt = date(item["createdAt"] as? JsonPrimitive ?: item["created_at"] as? JsonPrimitive), kind = kind, parentId = parent)
+            return Bookmark(
+                id = identifier(item),
+                title =
+                    (item["title"] as? JsonPrimitive)?.contentOrNull
+                        ?: (item["name"] as? JsonPrimitive)?.contentOrNull ?: url,
+                url = url,
+                createdAt = date(item["createdAt"] as? JsonPrimitive ?: item["created_at"] as? JsonPrimitive),
+                kind = kind,
+                parentId = parent,
+            )
         }
 
-        fun encode(nodes: List<Bookmark>): JsonArray = JsonArray(nodes.map { node -> buildJsonObject {
-            put("id", node.id)
-            put("title", node.title)
-            put("url", node.url)
-            put("createdAt", node.createdAt)
-            put("kind", node.kind)
-            put("parentId", node.parentId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
-        } })
+        fun encode(nodes: List<Bookmark>): JsonArray =
+            JsonArray(
+                nodes.map { node ->
+                    buildJsonObject {
+                        put("id", node.id)
+                        put("title", node.title)
+                        put("url", node.url)
+                        put("createdAt", node.createdAt)
+                        put("kind", node.kind)
+                        put("parentId", node.parentId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+                    }
+                },
+            )
 
-        fun apply(raw: JsonArray, mutation: BookmarkMutation): JsonArray {
+        fun apply(
+            raw: JsonArray,
+            mutation: BookmarkMutation,
+        ): JsonArray {
             val changed = BookmarkTree.apply(decode(raw), mutation)
             val known = raw.mapNotNull { value -> decodeNode(value)?.let { it.id to (value as JsonObject) } }.toMap()
-            val merged = encode(changed).map { encoded ->
-                val node = encoded as JsonObject
-                JsonObject((known[(node["id"] as JsonPrimitive).content] ?: emptyMap()) + node)
-            }
+            val merged =
+                encode(changed).map { encoded ->
+                    val node = encoded as JsonObject
+                    JsonObject((known[(node["id"] as JsonPrimitive).content] ?: emptyMap()) + node)
+                }
             return JsonArray(merged + raw.filter { decodeNode(it) == null })
         }
 

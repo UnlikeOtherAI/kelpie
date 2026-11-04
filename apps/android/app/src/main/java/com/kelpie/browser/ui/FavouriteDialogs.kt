@@ -1,7 +1,7 @@
 package com.kelpie.browser.ui
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -25,7 +25,10 @@ import com.kelpie.browser.browser.BookmarkTree
 import kotlinx.coroutines.launch
 
 @Composable
-fun FavouriteEditDialog(node: Bookmark, dismiss: () -> Unit) {
+fun FavouriteEditDialog(
+    node: Bookmark,
+    dismiss: () -> Unit,
+) {
     var title by remember(node.id) { mutableStateOf(node.title) }
     var url by remember(node.id) { mutableStateOf(node.url) }
     val error by BookmarkStore.syncError.collectAsState()
@@ -39,8 +42,12 @@ fun FavouriteEditDialog(node: Bookmark, dismiss: () -> Unit) {
     }, confirmButton = {
         TextButton(onClick = {
             scope.launch {
-                val mutation = if (BookmarkStore.nodes.value.any { it.id == node.id }) BookmarkMutation.Update(node.id, title, if (node.isFolder) null else url)
-                else BookmarkMutation.Add(node.copy(title = title, url = if (node.isFolder) "" else url))
+                val mutation =
+                    if (BookmarkStore.nodes.value.any { it.id == node.id }) {
+                        BookmarkMutation.Update(node.id, title, if (node.isFolder) null else url)
+                    } else {
+                        BookmarkMutation.Add(node.copy(title = title, url = if (node.isFolder) "" else url))
+                    }
                 runCatching { BookmarkStore.mutate(mutation)?.await() }.onSuccess { dismiss() }
             }
         }, modifier = Modifier.testTag("browser.bookmarks.save")) { Text("Save") }
@@ -48,29 +55,53 @@ fun FavouriteEditDialog(node: Bookmark, dismiss: () -> Unit) {
 }
 
 @Composable
-fun FavouriteMoveDialog(node: Bookmark, nodes: List<Bookmark>, dismiss: () -> Unit) {
+fun FavouriteMoveDialog(
+    node: Bookmark,
+    nodes: List<Bookmark>,
+    dismiss: () -> Unit,
+) {
     var parent by remember(node.id) { mutableStateOf(node.parentId) }
     var before by remember(node.id) { mutableStateOf<String?>(null) }
     val excluded = BookmarkTree.subtree(node.id, nodes).map { it.id }.toSet()
     val scope = rememberCoroutineScope()
     val error by BookmarkStore.syncError.collectAsState()
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Move Favourite") }, text = {
-        Column {
-            FavouriteChoice("Folder", parent, listOf(null to "Top Level") + nodes.filter { it.isFolder && it.id !in excluded }.map { it.id to it.title }) { parent = it; before = null }
-            FavouriteChoice("Position", before, listOf(null to "At the End") + nodes.filter { it.parentId == parent && it.id != node.id }.map { it.id to "Before ${it.title}" }) { before = it }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        }
-    }, confirmButton = { TextButton(onClick = { scope.launch { runCatching { BookmarkStore.mutate(BookmarkMutation.Move(node.id, parent, before))?.await() }.onSuccess { dismiss() } } }) { Text("Move") } },
-        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Move Favourite") },
+        text = {
+            Column {
+                FavouriteChoice("Folder", parent, listOf(null to "Top Level") + nodes.filter { it.isFolder && it.id !in excluded }.map { it.id to it.title }) {
+                    parent = it
+                    before = null
+                }
+                FavouriteChoice("Position", before, listOf(null to "At the End") + nodes.filter { it.parentId == parent && it.id != node.id }.map { it.id to "Before ${it.title}" }) { before = it }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { scope.launch { runCatching { BookmarkStore.mutate(BookmarkMutation.Move(node.id, parent, before))?.await() }.onSuccess { dismiss() } } }) { Text("Move") }
+        },
+        dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
-private fun FavouriteChoice(label: String, value: String?, choices: List<Pair<String?, String>>, select: (String?) -> Unit) {
+private fun FavouriteChoice(
+    label: String,
+    value: String?,
+    choices: List<Pair<String?, String>>,
+    select: (String?) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         TextButton(onClick = { expanded = true }) { Text("$label: ${choices.firstOrNull { it.first == value }?.second ?: "Top Level"}") }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            choices.forEach { (id, title) -> DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; select(id) }) }
+            choices.forEach { (id, title) ->
+                DropdownMenuItem(text = { Text(title) }, onClick = {
+                    expanded = false
+                    select(id)
+                })
+            }
         }
     }
 }
