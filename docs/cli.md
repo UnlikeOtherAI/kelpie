@@ -670,6 +670,10 @@ local storage; tabs with different strings are fully isolated from each other
 and from the default container. Omitting `--partition` leaves the tab in the
 shared default container, exactly as before.
 
+Named persistent partitions also work on iOS 17+ and Android WebViews with
+multiple-profile support. Mobile rejects `--ephemeral` and `--non-persistent`
+before creating a tab. Partition deletion accepts listed `orphan:` IDs for cleanup.
+
 Partition identifiers are 1-128 characters drawn from `[A-Za-z0-9._-]`, must
 contain at least one letter or digit, and must not be `.`, `..`, `default`
 (case-insensitive) or start with `ephemeral-`. The CLI rejects a bad value

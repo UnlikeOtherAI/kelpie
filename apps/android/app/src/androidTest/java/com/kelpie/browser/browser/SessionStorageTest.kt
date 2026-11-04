@@ -25,6 +25,8 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.UUID
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 /** Real WebViews and the production TabStore/cookie handler, without touching existing app sessions. */
 @RunWith(AndroidJUnit4::class)
@@ -81,6 +83,12 @@ class SessionStorageTest {
                         assertTrue(cookies.getCookies(mapOf("url" to url)).toString().contains("isolated"))
                         handler.webView = other.webView
                         assertFalse(cookies.getCookies(mapOf("url" to url)).toString().contains(cookieName))
+                        first.webView.script("localStorage.setItem('$cookieName', 'shared')")
+                        isolated.webView.script("localStorage.setItem('$cookieName', 'isolated')")
+                        assertEquals("\"shared\"", second.webView.script("localStorage.getItem('$cookieName')"))
+                        assertEquals("\"isolated\"", sibling.webView.script("localStorage.getItem('$cookieName')"))
+                        assertEquals("null", other.webView.script("localStorage.getItem('$cookieName')"))
+                        assertEquals("false", first.webView.script("document.cookie.includes('$cookieName')"))
                         // The native login's default-profile WebView sees the ordinary session.
                         val login = WebView(context)
                         assertTrue(
@@ -111,6 +119,7 @@ class SessionStorageTest {
                         assertNull(PartitionRegistry.cookies(fresh.webView).getCookie(url))
                     } finally {
                         // Expire just this test cookie; never clear the person's cookie jar.
+                        tabs.tabs.value.firstOrNull { it.partition == null }?.webView?.script("localStorage.removeItem('$cookieName')")
                         android.webkit.CookieManager
                             .getInstance()
                             .setCookie(url, "$cookieName=; Max-Age=0; Path=/")
@@ -123,5 +132,10 @@ class SessionStorageTest {
             } finally {
                 server.shutdown()
             }
+        }
+
+    private suspend fun WebView.script(expression: String): String =
+        withTimeout(10_000) {
+            suspendCoroutine { continuation -> evaluateJavascript(expression) { continuation.resume(it) } }
         }
 }

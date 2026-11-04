@@ -201,7 +201,9 @@ pending profile as `orphan:kelpie-<uuid>`. Deleting that orphan retries removal.
 Startup retries pending purges before login or tab views load a profile. Reusing
 the original public name creates a fresh UUID and cannot recover the retired
 cookies. iOS removal errors retain the mapping for retry and report
-`PARTITION_IN_USE`.
+`PARTITION_IN_USE`. Normal iOS view teardown gets one bounded retry before
+that error. CLI and MCP deletion accept the orphan IDs returned by listing;
+those IDs remain invalid for creating tabs.
 
 ### Cookie endpoints and partitioned tabs
 

@@ -44,6 +44,9 @@ CookieManager and must instead use the target WebView's profile.
   record a durable pending deletion and report PARTITION_IN_USE when the engine
   refuses. Retry pending deletion before any profile loads on the next launch.
   Reusing a retired partition name creates a fresh profile, never the old one.
+- Expose mobile partition tools in the shared CLI and native MCP catalogues.
+  The deletion validator accepts engine-reported orphan IDs without allowing
+  those IDs to create tabs.
 - Keep Windows/Linux source unchanged unless runtime verification exposes a
   defect. Exercise their existing default/global CEF and explicit contexts.
 
@@ -81,6 +84,38 @@ partition isolation concerns website identity/storage and does not promise to
 hide requests from the app's inspector. Login surfaces have no capture bridge.
 No new redaction policy or partition-tagged network schema is introduced here.
 
-Release requires iOS/Android version bumps, docs, focused/native/manual checks,
-one merged PR and published/installed artifacts. Desktop changes/release only
-if verification finds a desktop defect.
+Release requires iOS/Android and CLI/shared version bumps, docs, focused/native/manual checks,
+one merged PR and published/installed artifacts. Windows 0.1.15 also normalizes the profile directory before deriving any CEF
+cache paths; the restart check found mixed separators triggering CEF's off-the-record fallback. Linux has no corresponding path change.
+
+## Runtime verification
+
+On 4 November 2026, iOS 26.5 on the existing iPhone 16 Pro Max and iPad Air
+simulators passed real WebKit HttpOnly cookie and localStorage checks through
+the paired HTTP interface. Ordinary siblings share identity; named siblings
+share only their named identity; another partition starts empty. Popup navigation
+keeps the opener's identity. Restart preserved both default and named stores.
+The native login sheet opened, cancelled back to the tab, and reopened.
+
+The deletion check exposed WebKit retaining a retired renderer briefly after
+SwiftUI removed its tab. A bounded 300 ms retry, matching Mac behavior, lets
+normal teardown finish. The final iPhone check deleted isolated tabs, preserved
+the ordinary session, and recreated the same public partition name with empty
+storage. Seventeen focused iOS tests also passed after integrating PR #177.
+
+Fedora 44 exercised the published `release/2026-10-11.3` RPM in its desktop
+session with the published CEF configuration. Shared/isolated HttpOnly cookies,
+localStorage, popup inheritance and persistence across restart passed.
+Windows 11 on Maxis passed the same sharing/isolation fixture using installed
+Kelpie 0.1.11. The extracted published 0.1.12 artifact on D: hit CEF network-service
+crashes and blank pages; that artifact's session behavior is not verified.
+The 0.1.11 restart check also exposed lost isolated localStorage with a
+forward-slash profile argument. CEF logged that it could not create the
+profile. Its ChromeBrowserContext compares the profile parent directly with
+the normalized user-data directory and silently creates an off-the-record
+profile on mismatch. Normalize the absolute Windows profile path before
+deriving the shared and named cache paths; do not change or copy cookie stores.
+
+The user explicitly chose to continue without real Google sign-in. These results
+verify native website storage, not a completed Google account authentication or
+provider account-chooser reuse.

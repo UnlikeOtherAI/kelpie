@@ -39,7 +39,8 @@ async function call(method, body = {}) {
 }
 async function selected(tabId) {
   await call('switch-tab', { tabId });
-  for (let attempt = 0; attempt < 100; attempt++) {
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
     const tabs = (await call('get-tabs')).tabs;
     const tab = tabs.find(item => item.id === tabId);
     if (tab && !tab.isLoading && tab.title === 'Session storage fixture') return;
