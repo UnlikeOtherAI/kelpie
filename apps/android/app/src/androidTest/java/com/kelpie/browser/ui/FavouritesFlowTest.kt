@@ -60,7 +60,7 @@ class FavouritesFlowTest {
     private fun drag(description: String, destinationTag: String) {
         val handle = ui.onNodeWithContentDescription(description)
         val origin = handle.fetchSemanticsNode().boundsInRoot.topLeft
-        val destination = ui.onNodeWithTag(destinationTag).fetchSemanticsNode().boundsInRoot.center - origin
+        val destination = ui.onNodeWithTag(destinationTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center - origin
         handle.performTouchInput {
             down(center)
             advanceEventTime(700)
