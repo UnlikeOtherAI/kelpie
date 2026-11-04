@@ -118,6 +118,21 @@ the normalized user-data directory and silently creates an off-the-record
 profile on mismatch. Normalize the absolute Windows profile path before
 deriving the shared and named cache paths; do not change or copy cookie stores.
 
+Android API 35 on Maxis (WebView 124.0.6367.219) passed the production
+TabStore/cookie-handler instrumentation: shared and named HttpOnly cookies,
+localStorage boundaries, profile mapping restoration, retirement and empty
+identity after reuse. A fresh MainActivity launch purged all three pending
+profiles. The full Gradle build, unit tests and ktlint passed.
+
+The final Linux source build passed all 35 native tests on Fedora 44. Native
+HTTP checks passed shared/named cookies and localStorage, popup inheritance,
+restart and deletion. The failure fixture covered an unavailable isolated
+store both first and later in the saved tabs: startup loaded no pages, kept
+the session intact, and recovered after removal of the injected fault.
+
+Portable checks on Maxis passed lint, build, 629 CLI tests (one skipped), the
+shared tests and three focused native MCP/gateway tests.
+
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
 provider account-chooser reuse.
