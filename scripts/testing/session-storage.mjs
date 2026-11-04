@@ -86,6 +86,37 @@ async function verify() {
   assert.equal(await storage(state.isolatedSibling), 'isolated');
   assert([undefined, null, ''].includes(await storage(state.other)), 'A separate partition must not inherit localStorage');
 }
+async function verifyPopup() {
+  const before = (await call('get-tabs')).tabs.map(item => item.id);
+  state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
+  await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
+  await selected(state.isolated);
+  if (values['manual-popup']) console.log('Click “Open another tab” in the active native fixture page.');
+  else await call('click', { tabId: state.isolated, selector: '#popup' });
+  if (mobile) {
+    // Mobile opens target=_blank in its existing view; identity must remain intact.
+    const deadline = Date.now() + (values['manual-popup'] ? 60000 : 15000);
+    while ((await call('get-tabs')).tabs.find(tab => tab.id === state.isolated)?.url !== origin + '/popup') {
+      assert(Date.now() < deadline, 'Mobile popup must navigate its opener');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    await selected(state.isolated);
+    assert.equal((await cookie(state.isolated)).value, 'isolated');
+    assert.equal((await call('get-tabs')).tabs.length, before.length);
+  } else {
+    let popup;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      popup = (await call('get-tabs')).tabs.find(item => !before.includes(item.id));
+      if (popup) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert(popup, 'Desktop popup must become a browser tab');
+    assert.equal(popup.partition, state.prefix);
+    assert.equal((await cookie(popup.id)).value, 'isolated');
+  }
+  state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
+  await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
+}
 try {
   if (values.phase === 'seed') {
     async function tab(name, path, partition) {
@@ -110,36 +141,12 @@ try {
       tabId: state.normal, expression: `document.cookie.includes(${JSON.stringify(state.cookie)})`,
     })).result, false, 'The server-set HttpOnly cookie must be hidden from page scripts');
     await verify();
-    const before = (await call('get-tabs')).tabs.map(item => item.id);
-    state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
-    await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
-    await selected(state.isolated);
-    if (values['manual-popup']) console.log('Click “Open another tab” in the active native fixture page.');
-    else await call('click', { tabId: state.isolated, selector: '#popup' });
-    if (mobile) {
-      // Mobile opens target=_blank in its existing view; identity must remain intact.
-      const deadline = Date.now() + (values['manual-popup'] ? 60000 : 15000);
-      while ((await call('get-tabs')).tabs.find(tab => tab.id === state.isolated)?.url !== origin + '/popup') {
-        assert(Date.now() < deadline, 'Mobile popup must navigate its opener');
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      await selected(state.isolated);
-      assert.equal((await cookie(state.isolated)).value, 'isolated');
-      assert.equal((await call('get-tabs')).tabs.length, before.length);
-    } else {
-      let popup;
-      for (let attempt = 0; attempt < 30; attempt++) {
-        popup = (await call('get-tabs')).tabs.find(item => !before.includes(item.id));
-        if (popup) break;
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      assert(popup, 'Desktop popup must become a browser tab');
-      assert.equal(popup.partition, state.prefix);
-      assert.equal((await cookie(popup.id)).value, 'isolated');
-    }
-    state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
-    await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
+    await verifyPopup();
     console.log('PASS: ordinary siblings, isolated siblings, distinct partitions, HttpOnly cookies, localStorage and popup inheritance');
+  } else if (values.phase === 'popup') {
+    await verify();
+    await verifyPopup();
+    console.log('PASS: native popup navigation preserves isolated identity');
   } else if (values.phase === 'cleanup') {
     for (const id of [state.prefix, `${state.prefix}-other`]) {
       await retire(id);
