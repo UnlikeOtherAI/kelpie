@@ -35,19 +35,31 @@ struct Budget {
 void ValidateFrame(const ScriptMediaFrame& frame);
 int Stride(const ScriptMediaFrame& frame);
 std::vector<std::uint8_t> EncodePNG(const ScriptMediaFrame& frame);
-void WritePNGBytes(const std::vector<std::uint8_t>&, const std::filesystem::path&);
+struct PngFileOps {
+  decltype(&::WriteFile) write = &::WriteFile;
+  decltype(&::CloseHandle) close = &::CloseHandle;
+};
+void WritePNGBytes(const std::vector<std::uint8_t>&, const std::filesystem::path&,
+                   const PngFileOps& = {});
+inline std::size_t FileBytes(const std::filesystem::path& path) {
+  std::error_code error;
+  const auto bytes = std::filesystem::file_size(path, error);
+  return error ? 0 : static_cast<std::size_t>(bytes);
+}
 
 class GifWriter {
  public:
   virtual ~GifWriter() = default;
   virtual bool Write(const ScriptMediaFrame&, double start_ms, double end_ms) = 0;
   virtual ScriptMediaOutput Finish() = 0;
+  virtual std::size_t BytesWritten() const = 0;
 };
 class VideoWriter {
  public:
   virtual ~VideoWriter() = default;
   virtual bool Write(const ScriptMediaFrame&, double start_ms, double end_ms) = 0;
   virtual ScriptMediaOutput Finish() = 0;
+  virtual std::size_t BytesWritten() const = 0;
 };
 
 std::unique_ptr<GifWriter> CreateGif(const std::filesystem::path&, Budget&);

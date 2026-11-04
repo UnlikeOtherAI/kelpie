@@ -113,6 +113,8 @@ class MfVideo final : public VideoWriter {
     Check(encoder_->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0));
   }
 
+  ~MfVideo() override { Discard(); }
+
   bool Write(const ScriptMediaFrame& frame, double start_ms, double end_ms) override {
     if (budget_.exceeded) return false;
     const auto start = static_cast<LONGLONG>(std::llround(start_ms * 10000));
@@ -133,25 +135,59 @@ class MfVideo final : public VideoWriter {
   }
 
   ScriptMediaOutput Finish() override {
-    Check(encoder_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0));
-    Check(encoder_->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0));
-    Pump();
-    if (!timings_.empty()) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
-    if (writer_) {
-      Check(writer_->Finalize());
-      writer_.Reset();
+    try {
+      Check(encoder_->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0));
+      Check(encoder_->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0));
+      Pump();
+      if (!timings_.empty()) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+      if (writer_) {
+        Check(writer_->Finalize());
+        writer_.Reset();
+        file_->Close();
+        file_.Reset();
+      }
+      return output_;
+    } catch (...) {
+      Discard();
+      throw;
     }
-    return output_;
+  }
+
+  std::size_t BytesWritten() const override {
+    return owns_file_ ? FileBytes(output_.path) : 0;
   }
 
  private:
+  void Discard() noexcept {
+    if (!file_) return;  // Completed output and other owners remain untouched.
+    writer_.Reset();
+    file_->Close();
+    file_.Reset();
+    if (owns_file_) DeleteFileW(output_.path.c_str());
+    owns_file_ = false;
+  }
+
   void OpenWriter() {
-    Check(MFCreateSinkWriterFromURL(output_.path.c_str(), nullptr, nullptr, &writer_));
-    Check(writer_->AddStream(encoded_type_.Get(), &stream_));
-    // Same compressed subtype means remux only; no implicit transcoding or
-    // hidden raw-frame encoder queue in the sink writer.
-    Check(writer_->SetInputMediaType(stream_, encoded_type_.Get(), nullptr));
-    Check(writer_->BeginWriting());
+    const auto opened = MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_FAIL_IF_EXIST,
+                                     MF_FILEFLAGS_NONE, output_.path.c_str(), &file_);
+    if (FAILED(opened)) {
+      if (GetFileAttributesW(output_.path.c_str()) != INVALID_FILE_ATTRIBUTES)
+        throw std::runtime_error("CAPTURE_OUTPUT_EXISTS");
+      throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+    }
+    owns_file_ = true;
+    try {
+      // The sink receives an already exclusive stream, never an overwriting URL.
+      Check(MFCreateSinkWriterFromURL(output_.path.c_str(), file_.Get(), nullptr, &writer_));
+      Check(writer_->AddStream(encoded_type_.Get(), &stream_));
+      // Same compressed subtype means remux only; no implicit transcoding or
+      // hidden raw-frame encoder queue in the sink writer.
+      Check(writer_->SetInputMediaType(stream_, encoded_type_.Get(), nullptr));
+      Check(writer_->BeginWriting());
+    } catch (...) {
+      Discard();
+      throw;
+    }
   }
 
   void Retain(IMFSample* sample) {
@@ -200,6 +236,8 @@ class MfVideo final : public VideoWriter {
   ComPtr<IMFTransform> encoder_;
   ComPtr<IMFMediaType> encoded_type_;
   ComPtr<IMFSinkWriter> writer_;
+  ComPtr<IMFByteStream> file_;
+  bool owns_file_ = false;
   MFT_OUTPUT_STREAM_INFO stream_info_{};
   DWORD stream_ = 0;
   std::deque<Timing> timings_;

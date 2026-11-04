@@ -1,4 +1,5 @@
 #include "script_media_encoder.h"
+#include "script_media_internal.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -11,7 +12,9 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <cmath>
+#include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -133,6 +136,11 @@ void Decode(const ScriptMediaOutput& output, bool colors) {
     if (colors) {
       Require(bytes[0] > 65 && bytes[0] < 100, "top MP4 row is not red");
       Require(bytes[(height - 1) * stride] < 60, "bottom MP4 row is not blue");
+      const auto chroma = static_cast<std::size_t>(stride) * height;
+      const auto bottom_uv = chroma + (height / 2 - 1) * stride;
+      Require(length > bottom_uv + 1, "missing MP4 chroma plane");
+      Require(bytes[chroma] < 115 && bytes[chroma + 1] > 200, "red chroma is wrong");
+      Require(bytes[bottom_uv] > 200 && bytes[bottom_uv + 1] < 130, "blue chroma is wrong");
     }
     Check(buffer->Unlock());
     ++count;
@@ -154,7 +162,14 @@ void Timing(const fs::path& root) {
   auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 30);
   Require(encoder->AddFrame(Frame(100)), "first frame rejected");
   Require(encoder->AddFrame(Frame(237)), "second frame rejected");
-  Require(encoder->AddFrame(Frame(690)), "third frame rejected");
+  auto padded = Frame(690);
+  const auto original = padded.bgra;
+  padded.stride += 16;
+  padded.bgra.assign(static_cast<std::size_t>(padded.stride) * padded.height, 0xcd);
+  for (int row = 0; row < padded.height; ++row)
+    std::copy_n(original.data() + row * padded.width * 4, padded.width * 4,
+                padded.bgra.data() + row * padded.stride);
+  Require(encoder->AddFrame(padded), "padded-stride frame rejected");
   Require(encoder->WriteStepPNG(Frame(0), directory / "step.png"), "step PNG rejected");
   ScriptMediaEncoder::WritePNG(Frame(0), directory / "independent.png");
   auto png = Image(directory / "step.png");
@@ -258,6 +273,108 @@ void GifRounding(const fs::path& root) {
   Decode(long_output.front(), true);
   std::cout << "GIF cumulative rounding and long final hold passed" << std::endl;
 }
+std::string FileContents(const fs::path& path) {
+  std::ifstream file(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+void SmallBudgets(const fs::path& root) {
+  const auto directory = Child(root, "small");
+  Throws([&] { ScriptMediaEncoder::Create(directory, {}, 30, 1023); }, "CAPTURE_INVALID_OPTIONS");
+  auto png = ScriptMediaEncoder::Create(directory, {}, 30, 1024);
+  Require(png->WriteStepPNG(Frame(0), directory / "small.png"), "small PNG budget rejected");
+  Require(png->bytes_written() <= 1024, "small PNG silently enlarged budget");
+  for (const auto* format : {"gif", "mp4"}) {
+    auto media = ScriptMediaEncoder::Create(Child(root, format == std::string("gif") ? "small-gif" : "small-mp4"),
+                                            {format}, 30, 1024);
+    media->AddFrame(Frame(0));
+    const auto outputs = media->Finish(40);
+    Require(media->bytes_written() <= 1024, "small media silently enlarged budget");
+    if (outputs.empty()) Require(media->budget_exceeded(), "empty output missing budget reason");
+    for (const auto& output : outputs) Decode(output, true);
+  }
+  std::cout << "canonical 1024-byte budgets honored without clamping" << std::endl;
+}
+void ExclusiveOwnership(const fs::path& root) {
+  for (const auto* format : {"gif", "mp4"}) {
+    const auto directory = Child(root, format == std::string("gif") ? "race-gif" : "race-mp4");
+    auto first = ScriptMediaEncoder::Create(directory, {format}, 30);
+    auto second = ScriptMediaEncoder::Create(directory, {format}, 30);
+    first->AddFrame(Frame(0));
+    second->AddFrame(Frame(0));
+    const auto output = first->Finish(50).front();
+    const auto before = FileContents(output.path);
+    Throws([&] { second->Finish(50); }, "CAPTURE_OUTPUT_EXISTS");
+    Require(second->bytes_written() == 0, "loser counted another encoder output");
+    Require(before == FileContents(output.path), "racing encoder overwrote media");
+    Decode(output, true);
+  }
+  const auto directory = Child(root, "sibling");
+  auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 30);
+  encoder->AddFrame(Frame(0));
+  { std::ofstream sentinel(directory / "capture.mp4"); sentinel << "owned by another writer"; }
+  Throws([&] { encoder->Finish(50); }, "CAPTURE_OUTPUT_EXISTS");
+  const auto outputs = encoder->Finish(0);
+  Require(outputs.size() == 1 && outputs.front().mime_type == "image/gif",
+          "format failure lost completed sibling");
+  Decode(outputs.front(), true);
+  Require(FileContents(directory / "capture.mp4") == "owned by another writer",
+          "failure cleanup deleted another writer file");
+  std::cout << "exclusive lazy opens and completed sibling preservation passed" << std::endl;
+}
+BOOL WINAPI PartialWrite(HANDLE file, LPCVOID bytes, DWORD count, LPDWORD written, LPOVERLAPPED overlap) {
+  WriteFile(file, bytes, std::min<DWORD>(count, 3), written, overlap);
+  return FALSE;
+}
+BOOL WINAPI FailedClose(HANDLE) { return FALSE; }
+void PngFailureCleanup(const fs::path& root) {
+  const auto directory = Child(root, "png-failure");
+  const auto bytes = kelpie::windows::media::EncodePNG(Frame(0));
+  const auto partial = directory / "partial.png";
+  kelpie::windows::media::PngFileOps write_failure{&PartialWrite, &CloseHandle};
+  Throws([&] { kelpie::windows::media::WritePNGBytes(bytes, partial, write_failure); },
+         "CAPTURE_OUTPUT_UNAVAILABLE");
+  Require(!fs::exists(partial), "failed partial write left invalid owned PNG");
+  const auto unclosed = directory / "unclosed.png";
+  kelpie::windows::media::PngFileOps close_failure{&WriteFile, &FailedClose};
+  Throws([&] { kelpie::windows::media::WritePNGBytes(bytes, unclosed, close_failure); },
+         "CAPTURE_OUTPUT_UNAVAILABLE");
+  Require(!fs::exists(unclosed), "failed close left invalid owned PNG");
+  const auto existing = directory / "existing.png";
+  ScriptMediaEncoder::WritePNG(Frame(0), existing);
+  Throws([&] { kelpie::windows::media::WritePNGBytes(bytes, existing, write_failure); },
+         "CAPTURE_OUTPUT_EXISTS");
+  Require(FileContents(existing) == std::string(bytes.begin(), bytes.end()),
+          "PNG failure damaged pre-existing file");
+  std::cout << "failed PNG partial writes/closes clean only newly owned files" << std::endl;
+}
+void GifPaletteChanges(const fs::path& root) {
+  auto encoder = ScriptMediaEncoder::Create(Child(root, "palette"), {"gif"}, 30);
+  encoder->AddFrame(Frame(0));
+  auto green = Frame(100);
+  for (std::size_t offset = 0; offset < green.bgra.size(); offset += 4) {
+    green.bgra[offset] = 0;
+    green.bgra[offset + 1] = 255;
+    green.bgra[offset + 2] = 0;
+  }
+  encoder->AddFrame(green);
+  const auto output = encoder->Finish(200).front();
+  Decode(output, false);
+  auto decoder = Image(output.path);
+  ComPtr<IWICBitmapFrameDecode> frame;
+  Check(decoder->GetFrame(1, &frame));
+  ComPtr<IWICImagingFactory> factory;
+  Check(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)));
+  ComPtr<IWICFormatConverter> converter;
+  Check(factory->CreateFormatConverter(&converter));
+  Check(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppBGRA,
+      WICBitmapDitherTypeNone, nullptr, 0, WICBitmapPaletteTypeCustom));
+  WICRect rect{0, 0, 1, 1};
+  BYTE pixel[4]{};
+  Check(converter->CopyPixels(&rect, 4, 4, pixel));
+  Require(pixel[1] > 200 && pixel[0] < 40 && pixel[2] < 40,
+          "later GIF frame inherited an earlier palette");
+  std::cout << "frame-varying GIF palettes decoded correctly" << std::endl;
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -274,6 +391,10 @@ int wmain(int argc, wchar_t** argv) {
     Budget(root, "mp4");
     StepBudget(root);
     GifRounding(root);
+    SmallBudgets(root);
+    ExclusiveOwnership(root);
+    PngFailureCleanup(root);
+    GifPaletteChanges(root);
     PROCESS_MEMORY_COUNTERS memory{};
     Check(GetProcessMemoryInfo(GetCurrentProcess(), &memory, sizeof(memory)) ? S_OK : E_FAIL);
     std::cout << "Peak working set bytes: " << memory.PeakWorkingSetSize

@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <limits>
 
 namespace kelpie::windows::media {
@@ -116,6 +115,8 @@ class WicGif final : public GifWriter {
     output_.mime_type = "image/gif";
   }
 
+  ~WicGif() override { if (file_ != INVALID_HANDLE_VALUE) Discard(); }
+
   bool Write(const ScriptMediaFrame& frame, double, double end_ms) override {
     const auto boundary = static_cast<std::uint64_t>(std::llround(end_ms / 10.0));
     if (boundary <= centiseconds_) {
@@ -130,9 +131,16 @@ class WicGif final : public GifWriter {
       ++output_.dropped_frames;
       return false;
     }
-    if (!file_.is_open()) {
-      file_.open(output_.path, std::ios::binary | std::ios::out);
-      if (!file_) throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+    if (file_ == INVALID_HANDLE_VALUE) {
+      file_ = CreateFileW(output_.path.c_str(), GENERIC_WRITE | DELETE, FILE_SHARE_READ,
+                          nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (file_ == INVALID_HANDLE_VALUE) {
+        const auto error = GetLastError();
+        if (error == ERROR_FILE_EXISTS || error == ERROR_ALREADY_EXISTS)
+          throw std::runtime_error("CAPTURE_OUTPUT_EXISTS");
+        throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+      }
+      owns_file_ = true;
       WriteBytes(parts.header.data(), parts.header.size());
       const std::uint8_t loop[] = {0x21, 0xff, 11, 'N', 'E', 'T', 'S', 'C', 'A',
                                   'P', 'E', '2', '.', '0', 3, 1, 0, 0, 0};
@@ -153,29 +161,55 @@ class WicGif final : public GifWriter {
     }
     centiseconds_ = boundary;
     output_.duration_ms = static_cast<double>(boundary) * 10;
-    file_.flush();
-    if (!file_) throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+
     return true;
   }
 
   ScriptMediaOutput Finish() override {
-    if (file_.is_open()) {
+    if (failed_) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+    if (file_ != INVALID_HANDLE_VALUE) {
       const std::uint8_t trailer = 0x3b;
       WriteBytes(&trailer, 1);  // Reserved with first frame, including budget stop.
-      file_.close();
-      if (!file_) throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+      if (!FlushFileBuffers(file_)) {
+        Discard();
+        throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+      }
+      if (!CloseHandle(file_)) {
+        Discard();
+        throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+      }
+      file_ = INVALID_HANDLE_VALUE;
     }
     return output_;
   }
 
+  std::size_t BytesWritten() const override {
+    return owns_file_ ? FileBytes(output_.path) : 0;
+  }
+
  private:
+  void Discard() noexcept {
+    FILE_DISPOSITION_INFO discard{TRUE};
+    SetFileInformationByHandle(file_, FileDispositionInfo, &discard, sizeof(discard));
+    CloseHandle(file_);
+    file_ = INVALID_HANDLE_VALUE;
+    owns_file_ = false;
+    failed_ = true;
+  }
+
   void WriteBytes(const std::uint8_t* bytes, std::size_t count) {
-    file_.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(count));
-    if (!file_) throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+    DWORD written = 0;
+    if (!WriteFile(file_, bytes, static_cast<DWORD>(count), &written, nullptr) ||
+        written != count) {
+      Discard();
+      throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+    }
   }
 
   Budget& budget_;
-  std::ofstream file_;
+  HANDLE file_ = INVALID_HANDLE_VALUE;
+  bool owns_file_ = false;
+  bool failed_ = false;
   ScriptMediaOutput output_;
   std::uint64_t centiseconds_ = 0;
 };
