@@ -77,3 +77,32 @@ CEF capture, UI overlays, direct MCP, CLI forwarding, authenticated remote
 artifact retrieval, manual playback or installed published releases. Canonical
 requirements CAP-01 through CAP-08, VIS-01/02 and ART-01 through ART-04 remain
 open at the integrated native-app level.
+
+## Follow-up source review
+
+Reviewed follow-up: 8369571f6b821cc4bcfc853de2a78f5fc25e142d.
+
+The original byte-limit mismatch, lazy-open overwrite, partial PNG cleanup and
+color-oracle gaps are addressed in source. The codec now accepts 1024 bytes
+without clamping. GIF uses CREATE_NEW; MP4 uses MFCreateFile FAIL_IF_EXIST and
+passes that stream to the sink. bytes_written counts only files the writer owns.
+PNG failure keeps a duplicate handle to the exact newly created file and marks
+that handle for deletion after write/close failure.
+
+Durable added checks are SmallBudgets, ExclusiveOwnership, PngFailureCleanup and
+GifPaletteChanges in script_media_encoder_test.cpp. Timing now supplies padded
+BGRA stride; decoded MP4 checks UV as well as Y. ExclusiveOwnership creates two
+encoders before either writes, verifies byte-identical decodable winner output
+and zero loser bytes, and preserves a completed GIF after an MP4 collision.
+
+The owner reports these checks passed under MSVC /W4 /WX on Maxis. Acceptance
+reviewed source and test assertions, but did not independently run codecs or
+visually inspect media. These results resolve the original source issues and
+strengthen codec evidence; full native capture remains pending.
+
+Two follow-up ownership questions were sent to the codec owner:
+MfVideo::Discard closes its stream before DeleteFileW(path), leaving a possible
+path-replacement interval unlike the handle-bound PNG rollback; Finish ignores
+the byte-stream Close HRESULT. The unique private runtime directory limits normal
+exposure, but the codec helper's same-directory contender contract needs explicit
+cleanup ownership. These questions remain open until the next source response.
