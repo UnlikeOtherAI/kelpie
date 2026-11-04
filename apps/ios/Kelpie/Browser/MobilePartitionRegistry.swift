@@ -104,8 +104,12 @@ final class MobilePartitionRegistry {
         let ids = tabStore.tabs.filter { $0.partition == id }.map(\.id)
         for tabID in ids { tabStore.closeBrowserTab(id: tabID) }
         stores.removeValue(forKey: id)
-        let error: Error? = await withCheckedContinuation { continuation in
-            WKWebsiteDataStore.remove(forIdentifier: identifier) { continuation.resume(returning: $0) }
+        var error = await removeStore(identifier)
+        if error != nil {
+            // SwiftUI releases the retired renderer after its view update. Give
+            // that teardown one turn before treating the store as still in use.
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            error = await removeStore(identifier)
         }
         if let error {
             return errorResponse(code: "PARTITION_IN_USE", message: error.localizedDescription)
@@ -119,6 +123,13 @@ final class MobilePartitionRegistry {
     private func existingIdentifiers() async -> [UUID] {
         await withCheckedContinuation { continuation in
             WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: $0) }
+        }
+    }
+
+    @available(iOS 17.0, *)
+    private func removeStore(_ identifier: UUID) async -> Error? {
+        await withCheckedContinuation { continuation in
+            WKWebsiteDataStore.remove(forIdentifier: identifier) { continuation.resume(returning: $0) }
         }
     }
 }

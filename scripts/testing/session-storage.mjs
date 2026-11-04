@@ -15,7 +15,7 @@ const { values } = parseArgs({ options: {
 assert(values.readiness && values.state, '--readiness and --state are required; use a disposable app profile');
 const readiness = JSON.parse(await readFile(values.readiness, 'utf8'));
 const endpoint = `http://127.0.0.1:${readiness.port}/v1/`;
-const state = values.phase === 'restore' ? JSON.parse(await readFile(values.state, 'utf8')) : {
+const state = values.phase !== 'seed' ? JSON.parse(await readFile(values.state, 'utf8')) : {
   prefix: `session-${randomUUID()}`, cookie: `kelpie_${randomUUID().replaceAll('-', '')}`,
 };
 const server = createServer((request, response) => {
@@ -107,6 +107,18 @@ try {
     state.names = Object.fromEntries((await call('get-tabs')).tabs.map(tab => [tab.id, tab.name]));
     await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
     console.log('PASS: ordinary siblings, isolated siblings, distinct partitions, HttpOnly cookies, localStorage and popup inheritance');
+  } else if (values.phase === 'cleanup') {
+    for (const id of [state.prefix, `${state.prefix}-other`]) {
+      await call('delete-partition', { id });
+      assert(!(await call('get-tabs')).tabs.some(tab => tab.partition === id));
+    }
+    const normal = (await call('get-tabs')).tabs.find(tab => tab.name === state.names[state.normal]);
+    assert(normal, 'Deleting a partition must keep ordinary tabs');
+    assert.equal((await cookie(normal.id)).value, 'shared');
+    const fresh = await call('new-tab', { url: origin + '/probe', partition: state.prefix });
+    assert.equal(await cookie(fresh.tabId), undefined);
+    await call('delete-partition', { id: state.prefix });
+    console.log('PASS: partition deletion closes its tabs, preserves shared identity and recreates an empty store');
   } else {
     const tabs = (await call('get-tabs')).tabs;
     for (const key of ['normal', 'normalSibling', 'isolated', 'isolatedSibling', 'other']) {
