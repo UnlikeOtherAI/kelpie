@@ -79,4 +79,17 @@ final class MobileSessionStorageTests: XCTestCase {
         store.appendDocumentNavigation(url: "https://fixture.invalid/next", statusCode: 200, contentType: "text/html", startedAt: Date())
         XCTAssertNil(store.selectedEntry)
     }
+
+    func testUnknownOrphanDeletionDoesNotReachWebKit() async throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Named stores require iOS 17") }
+        let initial = BrowserTab(webView: WKWebView(), recordsHistory: false)
+        let tabs = TabStore(isolatedTab: initial)
+        let registry = MobilePartitionRegistry()
+        for id in ["orphan:00000000-0000-0000-0000-000000000000", "orphan:\(UUID().uuidString)"] {
+            let result = await registry.delete(id, tabStore: tabs)
+            XCTAssertEqual(result["success"] as? Bool, true)
+            XCTAssertEqual(result["existed"] as? Bool, false)
+            XCTAssertEqual(tabs.tabs.count, 1)
+        }
+    }
 }

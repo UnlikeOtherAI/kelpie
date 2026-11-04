@@ -75,9 +75,7 @@ final class MobilePartitionRegistry {
             ["id": id, "persistent": true, "tabCount": tabs.filter { $0.partition == id }.count]
         }
         guard #available(iOS 17.0, *) else { return known }
-        let identifiers: [UUID] = await withCheckedContinuation { continuation in
-            WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: $0) }
-        }
+        let identifiers = await existingIdentifiers()
         return known + map.orphans(engineIdentifiers: Set(identifiers)).map {
             ["id": PartitionMap.orphanId(for: $0), "persistent": true, "tabCount": 0]
         }
@@ -90,8 +88,13 @@ final class MobilePartitionRegistry {
         guard !deleting.contains(id) else {
             return errorResponse(code: "PARTITION_DELETING", message: "Partition deletion is in progress")
         }
-        let orphan = PartitionMap.orphanIdentifier(from: id).flatMap { candidate in
-            map.identifiers.values.contains(candidate) ? nil : candidate
+        let candidate = PartitionMap.orphanIdentifier(from: id)
+        // Only engine-reported orphans are deletable. Arbitrary UUIDs (including
+        // WebKit's reserved zero UUID) must never reach the removal API.
+        var orphan: UUID?
+        if let candidate, !map.identifiers.values.contains(candidate),
+           await existingIdentifiers().contains(candidate) {
+            orphan = candidate
         }
         guard let identifier = map.identifier(for: id) ?? orphan else {
             return successResponse(["deleted": id, "existed": false, "tabsClosed": 0])
@@ -110,5 +113,12 @@ final class MobilePartitionRegistry {
         map.remove(id)
         defaults.set(map.encoded(), forKey: key)
         return successResponse(["deleted": id, "existed": true, "tabsClosed": ids.count])
+    }
+
+    @available(iOS 17.0, *)
+    private func existingIdentifiers() async -> [UUID] {
+        await withCheckedContinuation { continuation in
+            WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: $0) }
+        }
     }
 }
