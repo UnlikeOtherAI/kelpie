@@ -119,7 +119,10 @@ class SessionStorageTest {
                         assertNull(PartitionRegistry.cookies(fresh.webView).getCookie(url))
                     } finally {
                         // Expire just this test cookie; never clear the person's cookie jar.
-                        tabs.tabs.value.firstOrNull { it.partition == null }?.webView?.script("localStorage.removeItem('$cookieName')")
+                        tabs.tabs.value
+                            .firstOrNull { it.partition == null }
+                            ?.webView
+                            ?.script("localStorage.removeItem('$cookieName')")
                         android.webkit.CookieManager
                             .getInstance()
                             .setCookie(url, "$cookieName=; Max-Age=0; Path=/")
