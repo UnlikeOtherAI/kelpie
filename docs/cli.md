@@ -976,3 +976,7 @@ exclusive profile lock. The CLI reads the bearer capability locally and rejects
 `kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It reuses approved sockets and automatically authorizes existing same-account UOA sessions; callers without an account must pair explicitly. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
 
 `kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs; the CLI does not pair or retry automatically.
+
+## External worker MCP
+
+Use `kelpie worker mcp --config <operator-json>` for an explicitly configured external CDP worker with bounded, owned sessions. Native device commands continue over HTTP /v1. See [operator-managed workers](api/automation-workers.md) for configuration, session tools and backend limits.
