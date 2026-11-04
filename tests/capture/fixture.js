@@ -16,11 +16,12 @@
     document.addEventListener(type, event => {
       const target = event.target.closest("button,a");
       const rect = target?.getBoundingClientRect();
+      const clip = target?.id === "partial" ? document.querySelector("#partial-region").getBoundingClientRect() : null;
       const value = {
         type, target: target?.id ?? null, trusted: event.isTrusted,
         x: event.clientX, y: event.clientY, time: performance.now(),
-        visible: rect ? { left: Math.max(0, rect.left), top: Math.max(0, rect.top),
-          right: Math.min(innerWidth, rect.right), bottom: Math.min(innerHeight, rect.bottom) } : null,
+        visible: rect ? { left: Math.max(0, rect.left, clip?.left ?? 0), top: Math.max(0, rect.top),
+          right: Math.min(innerWidth, rect.right, clip?.right ?? innerWidth), bottom: Math.min(innerHeight, rect.bottom) } : null,
         dpr: devicePixelRatio, scrollX, scrollY,
         viewport: { width: innerWidth, height: innerHeight, scale: visualViewport?.scale ?? 1 },
         hit: document.elementFromPoint(event.clientX, event.clientY)?.closest("button,a")?.id ?? null,
@@ -39,6 +40,18 @@
   document.querySelector("#replace").onclick = () => {
     const button = document.querySelector("#unique"); button.replaceWith(button.cloneNode(true));
   };
+  document.querySelector("#child-replace").addEventListener("pointerdown", () => {
+    const old = document.querySelector("#replace-child");
+    const replacement = document.createElement("span");
+    replacement.id = "replacement-child"; replacement.textContent = "Replaced during press";
+    old?.replaceWith(replacement);
+  });
+  document.querySelector("#focus-readonly").addEventListener("focus", event => {
+    event.target.readOnly = true;
+  });
+  document.querySelector("#focus-navigate").addEventListener("focus", () => {
+    history.replaceState(null, "", "?focus-navigated=1");
+  });
   const startTask = failed => {
     const status = document.querySelector("#task-status");
     status.textContent = "loading"; status.dataset.ready = "false";
