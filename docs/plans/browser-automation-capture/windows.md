@@ -133,3 +133,6 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 
 ### Percent-escape redaction follow-up
 Raw sensitive text stays case-sensitive. Only hex digits inside encoded URI/form percent triplets compare case-insensitively. Mixed/lowercase hex, plain-text case differences and raw percent-literal regressions pass in native test_desktop_script_redaction on Maxis. The running8423 candidate is unchanged; app relink and public secret-path rerun remain pending.
+
+### Movie cadence follow-up
+Mandatory action PNGs may sample between nominal movie slots. Movie admission coalesces those milestones to at most the requested FPS; the nominal sampler deadline is not advanced for an early milestone wake. A1000-event burst cadence test passes at15FPS, and the affected sampler/service translation units compile on Maxis. Actual post-relink burst media evidence remains pending.

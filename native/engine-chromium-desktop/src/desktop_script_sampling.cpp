@@ -33,6 +33,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
     while (!stop_sampler.load() && !abort->load()) {
       if(!config.revalidate || !config.revalidate(owner)) { grant_revoked.store(true); abort->store(true); partial=true; break; }
       if (Elapsed() >= duration) throw std::runtime_error("CAPTURE_DURATION_EXCEEDED");
+      const auto acquisition=Clock::now();
       BrowserNavigationState before, after;
       auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
@@ -85,7 +86,8 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         if (requested_ticket == ticket) requested_step = -1;
         changed.notify_all();
       }
-      next += interval;
+      // An early milestone request does not consume a future cadence slot.
+      if(acquisition>=next) next += interval;
       const auto now=Clock::now();
       if(next<now) {
         const auto skipped=static_cast<std::size_t>((now-next)/interval)+1;

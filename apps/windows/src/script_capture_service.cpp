@@ -1,4 +1,5 @@
 #include "script_capture_service.h"
+#include "script_capture_cadence.h"
 #include "script_media_encoder.h"
 #include "script_frame_compositor.h"
 #include "script_native_overlay.h"
@@ -31,7 +32,10 @@ class Capture final : public DesktopScriptCapture {
     if(width_&& (frame.width!=width_||frame.height!=height_)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_=frame.width; height_=frame.height; last_elapsed_=elapsed_ms;
     DrawScriptOverlay(frame,presentation);
-    if(!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+    if(ScriptMovieFrameDue(last_movie_frame_,elapsed_ms,options_.value("fps",15))) {
+      if(!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      last_movie_frame_=elapsed_ms;
+    }
     if(step&&screenshots_) {
       const auto path=directory_/("step-"+std::to_string(index)+".png");
       if(!encoder_->WriteStepPNG(frame,path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
@@ -66,7 +70,7 @@ class Capture final : public DesktopScriptCapture {
   std::set<std::filesystem::path> retained_;
   bool screenshots_=false;
   int width_=0,height_=0;
-  double last_elapsed_=0;
+  double last_elapsed_=0,last_movie_frame_=-1;
 };
 }
 WindowsScriptService::WindowsScriptService(HWND viewport,HWND owner,Marshal marshal,DocumentGuard guard)

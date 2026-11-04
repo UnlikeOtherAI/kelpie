@@ -1,4 +1,5 @@
 #include "script_frame_compositor.h"
+#include "script_capture_cadence.h"
 #include <cassert>
 #include <algorithm>
 using kelpie::windows::ScriptMediaFrame;
@@ -9,6 +10,16 @@ ScriptMediaFrame White() {
   frame.bgra.assign(160000,255); return frame;
 }
 int main() {
+  double previous=-1; int count=0;
+  for(int elapsed=0;elapsed<=1000;++elapsed) {
+    if(kelpie::windows::ScriptMovieFrameDue(previous,elapsed,15)) {
+      if(previous>=0) assert(elapsed-previous>=1000.0/15);
+      previous=elapsed; ++count;
+    }
+  }
+  assert(count<=16 && count>=15);
+  assert(!kelpie::windows::ScriptMovieFrameDue(100,120,15));
+  assert(kelpie::windows::ScriptMovieFrameDue(100,167,15));
   const nlohmann::json shown={{"viewportWidth",100},{"viewportHeight",100},{"elapsedMs",100},
     {"marker",{{"x",25},{"y",25},{"radius",10},{"durationMs",700},{"startedMs",100},
       {"color","#FF0000"},{"wobble",false},{"fade",true}}}};
