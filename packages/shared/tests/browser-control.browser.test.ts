@@ -173,3 +173,84 @@ describe("Playwright semantic conformance", () => {
     await page.close();
   });
 });
+
+
+describe("bounded portable observations", () => {
+  for (const adapter of ["playwright", "native-transport"] as const) {
+    it(adapter + " prioritizes scoped action evidence without values", async () => {
+      const page = await engine.newPage();
+      try {
+        await page.setContent('<aside><button>Outside</button></aside><main>' +
+          '<p>Navigation prose</p>'.repeat(80) + '<h1>Report</h1><button>Export</button>' +
+          '<input value="PRIVATE_CANARY"><div contenteditable="true"><span id="private-name">EDITOR_CANARY</span></div>' +
+          '<button aria-labelledby="private-name">Public fallback</button></main>');
+        const pages = new Map([["a", page]]);
+        const backend = adapter === "playwright" ? createPlaywrightBrowserBackend({ listTabs: async () => [{ id: "a" }], getPage: async () => page }) : nativeBackend(pages);
+        const client = createBrowserClient(createBrowserControlProxy(backend));
+        const tab = await client.tabs.get("a");
+        const snapshot = await tab.snapshot({ scope: "main", maxElements: 3 });
+        expect(snapshot.elements?.[0]?.name).toBe("Export");
+        expect(snapshot.truncated).toBe(true);
+        expect(snapshot.text).not.toMatch(/Outside|PRIVATE_CANARY|EDITOR_CANARY/);
+        const ordered = await tab.snapshot({ scope: "main", maxElements: 1, prioritize: false });
+        expect(ordered.elements?.[0]?.name).toContain("Navigation prose");
+        await expect(tab.snapshot({ scope: "button" })).rejects.toThrow();
+      } finally { await page.close(); }
+    });
+    it(adapter + " extracts nested records with explicit ambiguity and publisher provenance", async () => {
+      const page = await engine.newPage();
+      try {
+        await page.setContent(`<meta property="og:site_name" content="Fixture Publisher">
+          <script type="application/ld+json">{"@graph":[{"@type":["Article","NewsArticle"],"headline":"Public headline","publisher":{"name":"Fixture Publisher"},"author":[{"name":"Writer"}],"password":"JSON_PRIVATE_CANARY","articleBody":"BODY_PRIVATE_CANARY"}]}</script>
+          <main><article><h2>Alpha</h2><a href="/alpha">Read</a><ul><li><span>A</span></li><li><span>B</span></li></ul><input value="INPUT_PRIVATE_CANARY"></article>
+          <article><h2>Beta</h2><a href="/beta">Read</a></article><p hidden>HIDDEN_PRIVATE_CANARY</p>
+          <div contenteditable="true"><p>EDITOR_PRIVATE_CANARY</p></div></main>`);
+        const backend = adapter === "playwright" ? createPlaywrightBrowserBackend({ listTabs: async () => [{ id: "a" }], getPage: async () => page }) : nativeBackend(new Map([["a", page]]));
+        const tab = await createBrowserClient(createBrowserControlProxy(backend)).tabs.get("a");
+        const result = await tab.extract({ scope: "main", metadata: true, fields: [
+          { name: "records", selector: "article", source: "text", multiple: true, fields: [
+            { name: "title", selector: "h2", source: "text" },
+            { name: "link", selector: "a", source: "href" },
+            { name: "items", selector: "li", source: "text", multiple: true, fields: [{ name: "label", selector: "span", source: "text" }] },
+          ] },
+          { name: "ambiguous", selector: "h2", source: "text" },
+          { name: "missing", selector: ".missing", source: "text" },
+          { name: "public", selector: "article", source: "text", multiple: true },
+        ] });
+        expect(result.fields[0]?.records?.[0]?.[0]?.values).toEqual(["Alpha"]);
+        expect(result.fields[0]?.records?.[0]?.[1]?.values).toEqual(["/alpha"]);
+        expect(result.fields[0]?.records?.[0]?.[2]?.records?.map((row) => row[0]?.values[0])).toEqual(["A", "B"]);
+        expect(result.fields[1]?.status).toBe("ambiguous");
+        expect(result.fields[1]?.values).toEqual([]);
+        expect(result.fields[2]?.status).toBe("missing");
+        expect(result.fields[0]?.provenance).toEqual({ selector: "article", source: "text", matches: 2 });
+        expect(result.metadata.some((entry) => entry.key === "publisher" && entry.value === "Fixture Publisher" && entry.authority === "publisher-claim")).toBe(true);
+        expect(result.metadata.some((entry) => entry.key === "headline" && entry.attribute.startsWith("json:"))).toBe(true);
+        expect(result.metadata.filter((entry) => entry.key === "@type").map((entry) => entry.value)).toEqual(["Article", "NewsArticle"]);
+        expect(JSON.stringify(result)).not.toContain("PRIVATE_CANARY");
+        const bounded = await tab.extract({ maxChars: 256, fields: [{ name: "all", selector: "main", source: "text" }] });
+        expect(bounded.fields[0]?.values.join("").length).toBeLessThanOrEqual(256);
+      } finally { await page.close(); }
+    });
+    it(adapter + " reports explicit readiness and unavailable diagnostics", async () => {
+      const page = await engine.newPage();
+      try {
+        await page.setContent('<dialog open>Confirm</dialog><div aria-busy="true">Loading</div><input aria-invalid="true" value="PRIVATE_CANARY"><button hidden>Ready</button>');
+        const backend = adapter === "playwright" ? createPlaywrightBrowserBackend({ listTabs: async () => [{ id: "a" }], getPage: async () => page }) : nativeBackend(new Map([["a", page]]));
+        const tab = await createBrowserClient(createBrowserControlProxy(backend)).tabs.get("a");
+        const status = await tab.status();
+        expect(status.dialogs).toBe(1);
+        expect(status.busyRegions).toBe(1);
+        expect(status.network).toEqual({ availability: "unavailable" });
+        expect(status.errors).toEqual({ availability: "unavailable" });
+        expect(JSON.stringify(status)).not.toContain("PRIVATE_CANARY");
+        expect((await tab.ready({ state: "complete", selector: "button" })).ready).toBe(false);
+        await page.locator("button").evaluate((el) => { el.removeAttribute("hidden"); });
+        expect((await tab.ready({ state: "complete", selector: "button" })).ready).toBe(true);
+        await page.evaluate(() => document.body.append(document.createElement("button")));
+        expect((await tab.ready({ state: "complete", selector: "button" })).matches).toBe(2);
+        expect((await tab.ready({ state: "complete", selector: "button" })).ready).toBe(false);
+      } finally { await page.close(); }
+    });
+  }
+});

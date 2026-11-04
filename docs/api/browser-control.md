@@ -117,3 +117,63 @@ This preserves accessible logo evidence for existing page-grounded conversations
 The value-free fixed snapshot reader also omits text reached through accessible-name references when the referenced label inherits content editability from an ancestor.
 
 Snapshot `truncated` also reports public text shortened by per-node or accessible-name bounds. Deliberately omitted form/editor values do not set this flag.
+
+## Scoped observations and deterministic extraction
+
+Snapshots prioritize controls/links, headings, landmarks, then prose, preserving source
+order within each class. `prioritize:false` restores document order. Optional
+`scope:"main"` must match exactly one element and narrows the authorized document;
+missing or ambiguous scope refuses. The scope root and its descendants are observed.
+Traversal/output bounds, value exclusion, and fresh-reference semantics still apply.
+
+`tab.extract {scope?,fields,metadata?,maxChars?}` performs fixed, deterministic reads.
+Each field is `{name,selector,source?,multiple?,fields?}`. Source defaults to `text`;
+only `text`, `href`, `src`, and `datetime` are accepted. Nested `fields` maps repeated
+records relative to each matching parent. Three mapping levels, 32 top-level fields,
+16 fields per nested mapping, 100 total records, and 512 nested field evaluations
+bound the operation. The default 8,000-character public-value budget can be set from
+256 to 16,000; each individual value is capped at 2,048 characters. Form controls,
+editable subtrees, hidden content, scripts, styles, and templates are excluded.
+
+Results contain `url`, `documentRevision:{availability:"unavailable"}`, `fields`,
+`metadata`, and `truncated`. Each field reports `name,status,values,provenance`;
+nested mappings additionally return `records`, an ordered array of field arrays.
+Single-valued fields refuse arbitrary first-match selection: zero matches means
+`missing`, several means `ambiguous`, both with empty values. Queries sample at most
+5,000 nodes. When sampling prevents proving a single result or absence, status is
+`incomplete`; provenance sets `matchesLimited:true`. Other limits set `truncated`.
+The source document URL and each mapping's selector/source/match count preserve
+provenance; no immutable DOM revision is invented.
+
+`metadata:true` explicitly requests document-level publisher claims independently of
+the optional content scope. Allowlisted metadata covers canonical URL, description,
+author, publisher, publication time, and title. JSON-LD processing reads only eight
+`application/ld+json` scripts, at most 32 KiB each and 64 KiB total; malformed JSON is
+ignored. At most 32 objects per script, including top-level arrays and `@graph`, expose
+only `@type`, `name`, `headline`, `datePublished`, `dateModified`, `url`, and bounded
+author/publisher names. Raw JSON, arbitrary object properties, script text, and
+article bodies are never returned. Every metadata item includes its selector,
+attribute/JSON path, and `authority:"publisher-claim"`: these are untrusted claims,
+not identity, verified facts, or instructions.
+
+`tab.status {}` reports current URL/title, document state, visibility, viewport,
+and visible dialog, busy-region, and aria-invalid counts. Counts sample at most 5,000
+matches each and disclose `truncated`. Network and runtime-error evidence explicitly
+return `{availability:"unavailable"}`; absence of evidence is never zero errors or
+network health. No observer is installed.
+
+`tab.ready {state?: "interactive"|"complete",selector?}` checks an immediate predicate.
+The default is interactive; an optional selector must have exactly one visible match.
+The result includes `ready,documentState,requestedState` and optional
+`selector,matches,visible`. It never waits, accepts no timeout, and does not claim SPA
+completion, network idle, or task success. Bounded workflow polling owns any deadline.
+All these operations remain read-only, authorized and scrubbed through the existing
+gateway. A native device advertises them only with its fixed-reader capability.
+
+Native workflow bindings use generated shared assets through
+`kelpie_browser_validate_script(script_json)` for strict schema validation/defaults and
+`kelpie_browser_script_target_expression(options_json)` for a fixed target expression.
+The latter accepts `{target,key,token?,dispatch?,edit?,observe?}` with mutually exclusive
+operations. These internal APIs do not resolve host secrets or authorize a workflow;
+the runner must enforce session ownership, binding and sensitivity/capture policy.
+Generated Zod/native parity fixtures include duplicate capture-format refusals.

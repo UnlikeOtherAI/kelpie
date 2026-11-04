@@ -71,3 +71,6 @@ early/middle/late animation frames, confirm overlay color/wobble/fade, compare
 document markers and viewport, and check frame delays/timestamps, dimensions,
 looping, duration and partial-state metadata. Verify authenticated chunk downloads
 from another client/process against independent file hashes.
+
+
+The first native gate is Windows CEF on Maxis. Mac verification follows only after that gate passes. Fixed-reader source regressions use Node 24: node --test --test-concurrency=1 tests/capture/target-regressions.test.mjs. The initial 7c597780 contract fails four of these checks; see the workflow review ledger. A source regression pass still requires the corresponding real-renderer flow.

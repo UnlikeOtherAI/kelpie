@@ -1,6 +1,6 @@
 # Resources, access and release audit
 
-Recorded 2026-11-04. This is a coordination snapshot, not a resource reservation.
+Recorded 2026-11-04. Current user gate: Windows on Maxis first; Mac only after Windows acceptance. Earlier Mac access notes below are historical. This is a coordination snapshot, not a resource reservation.
 Only the coordinator grants workload slots. ChatterBox tools were unavailable;
 directed coordinator messages carry resource changes. A later supported local MCP fallback was found, but registration failed; see below.
 
@@ -93,3 +93,17 @@ The coordinator has asked the user asynchronously about Mac availability because
 of heavy swap and the other owner's favorites-tree Kelpie process. Await that
 answer or explicit coordinator clearance before Mac builds, browser launches or
 process replacement. No Mac process has been changed by acceptance.
+
+## Windows-first gate
+
+The user changed the execution order: build and verify the Windows app remotely on Maxis first. Required evidence is actual CEF native UI, direct MCP, CLI forwarding, decoded GIF/MP4/PNG and manual media inspection. Mac drafts remain preserved; no Mac build, launch or process replacement until Windows completes and the coordinator grants the next slot. Shared Maxis heavy workloads remain serialized after host-load checks. The macOS worker is being reassigned a separate Windows worktree; desktop backend work retains session/Lightpanda/WebMCP ownership.
+
+## Windows GUI access inventory
+Read-only checks found TightVNC 2.8.89.0 installed on Maxis. Existing tvnserver PID 5724 at C:/Program Files/TightVNC/tvnserver.exe listens on 0.0.0.0:5900; a TCP connectivity check from Minis passed. Local CUA inventory includes installed TigerVNC, not yet launched. This supplies a supported existing remote-viewer route without starting a new service. Authentication has not been tested and no credentials were read. Maxis has an active ondre console session; RDP TermService is stopped. No AppReveal or remote-CUA MCP is configured in the inspected Maxis Codex configuration. Coordinate the shared desktop before GUI input, then use the installed viewer through CUA after the resource grant. No remote app was launched, stopped or changed during this inventory.
+
+## VNC connection attempt
+The coordinator authorized access setup only. Acceptance launched the existing TigerVNC through supported local CUA and connected to 192.168.1.90::5900. The server responded with a VNC authentication dialog (local window ID 29890784). No remote desktop appeared; saved authentication did not complete. The prompt was left open for the user to enter the existing password directly in the viewer. No credential was read or typed, no authentication setting changed, and no remote foreground app was touched. This is an authentication blocker for manual remote UI verification, not a failed Kelpie test. Do not request the password in chat.
+Windows codec ownership is now separate: the former mobile worker owns WIC/MediaFoundation modules in D:/Worktrees/kelpie/capture-windows-media-20261104 at assigned base ef9f8eda. The Windows runtime owner retains sampling/compositing/overlay/artifacts/auth/routes/CMake. One shared heavy-test slot remains; Apple/mobile drafts stay preserved. Codec evidence must include actual decoding, timing/duration, hash and partial-output recovery, plus displayed/exported-frame correspondence.
+
+## VNC authentication resolved
+The coordinator completed authentication and observed the actual Maxis desktop in the existing viewer, window ID 45946812 titled maxis - TigerVNC. No password was saved, and no remote click or process change was made. The earlier authentication blocker is resolved. The viewer currently shows unrelated remote work; acceptance must refresh its own CUA inventory before use and must not interact with that work. Actual Kelpie UI testing still waits for the exact candidate revision and resource grant. No credential material is stored in this ledger.

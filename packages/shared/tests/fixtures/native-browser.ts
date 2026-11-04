@@ -3,6 +3,7 @@ import { BrowserControlError, browserControlMutates } from "../../src/browser-co
 import type { BrowserControlBackend, BrowserControlRequest, BrowserTabInfo } from "../../src/browser-control/protocol.js";
 import { createBrowserBackend } from "../../src/browser-control/reference.js";
 import { collectBrowserSnapshot } from "../../src/browser-control/snapshot.js";
+import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from "../../src/browser-control/observations.js";
 import { rememberNativeSnapshot, resolveNativeReference } from "../../src/browser-control/native-reference.js";
 import type { BrowserSnapshot } from "../../src/browser-control/protocol.js";
 import type { BrowserOperations } from "../../src/browser-control/reference.js";
@@ -59,6 +60,9 @@ export function createKelpieBrowserBackend(binding: KelpieBrowserBinding): Brows
     operations["tab.title"] = async (request) => (await current(request.tabId ?? "")).title;
   }
   if (has("evaluate")) {
+    operations["tab.extract"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserExtraction.toString()})(${JSON.stringify(request.params)})`);
+    operations["tab.status"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserPageStatus.toString()})()`);
+    operations["tab.ready"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserReadiness.toString()})(${JSON.stringify(request.params)})`);
     operations["tab.snapshot"] = async (request) => {
       const id = request.tabId ?? "";
       refs.delete(id);

@@ -5,9 +5,16 @@ import { z } from '../../packages/shared/node_modules/zod/index.js';
 import { BrowserControlRequestSchema, browserControlInputSchema, BROWSER_CONTROL_METHODS, browserControlMutates } from '../../packages/shared/dist/browser-control/protocol.js';
 import { BROWSER_CONTROL_DESCRIPTION, BROWSER_CONTROL_DOCUMENTATION } from '../../packages/shared/dist/browser-control/proxy.js';
 import { collectBrowserSnapshot } from '../../packages/shared/dist/browser-control/snapshot.js';
+import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from '../../packages/shared/dist/browser-control/observations.js';
 import { rememberNativeSnapshot, resolveNativeReference, actOnNativeReference } from '../../packages/shared/dist/browser-control/native-reference.js';
 import { sharedBrowserTools } from '../../packages/shared/dist/extension-tools.js';
 import { sharedAiLoadTool, sharedAiAskTool, sharedAiEndpointTools } from '../../packages/shared/dist/extension-ai-tools.js';
+import { resolveScriptTarget } from '../../packages/shared/dist/script-target.js';
+import { scriptV1Schema, scriptTargetRequestSchema } from '../../packages/shared/dist/script-workflow.js';
+const scriptSchema = z.toJSONSchema(scriptV1Schema);
+// Zod refinements have no JSON Schema representation; preserve this declared capture invariant.
+scriptSchema.properties.capture.properties.formats.uniqueItems = true;
+const targetSchema = z.toJSONSchema(scriptTargetRequestSchema);
 const extensionTools = [...sharedBrowserTools, sharedAiLoadTool, sharedAiAskTool, ...sharedAiEndpointTools];
 const endpointOf = tool => tool.method.startsWith('ai-') ? tool.method : tool.name.slice(7).replaceAll('_', '-');
 const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
@@ -19,6 +26,7 @@ const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
   if (tool.method === 'ai-endpoint-save') {
     delete shape.apiKeyEnv; // A CLI-host environment variable cannot be resolved on a device.
   }
+  if (tool.name === 'kelpie_play_script') { delete shape.values; delete shape.secretEnv; }
   if (tool.method === 'ai-load') shape.contextSize = z.number().int().min(256).max(8192).optional();
   if (tool.method === 'ai-infer') shape.messages = z.array(z.record(z.string(), z.unknown())).optional();
   const schema = z.toJSONSchema(z.strictObject(shape), { unrepresentable: 'any' });
@@ -27,7 +35,7 @@ const extensionSchemas = Object.fromEntries(extensionTools.map(tool => {
 // Fail the native build if an authoritative schema requires validation we do not implement.
 const supported = new Set(['$schema', '$defs', '$ref', 'type', 'properties', 'required', 'additionalProperties',
   'description', 'enum', 'const', 'anyOf', 'oneOf', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum',
-  'minLength', 'maxLength', 'pattern', 'propertyNames', 'items', 'minItems', 'maxItems', 'default']);
+  'minLength', 'maxLength', 'pattern', 'propertyNames', 'items', 'minItems', 'maxItems', 'uniqueItems', 'default']);
 function auditSchema(schema) {
   if (typeof schema === 'boolean') return;
   for (const [key, value] of Object.entries(schema)) {
@@ -38,6 +46,7 @@ function auditSchema(schema) {
   }
 }
 Object.values(extensionSchemas).forEach(auditSchema);
+auditSchema(scriptSchema); auditSchema(targetSchema);
 const sample = schema => {
   if (schema.const !== undefined) return schema.const;
   if (schema.enum) return schema.enum[0];
@@ -54,6 +63,28 @@ const extensionCases = extensionTools.map(tool => {
   const body = tool.bodyFromArgs({device:'fixture', ...sample(schema)});
   return {endpoint:endpointOf(tool), body};
 });
+const parityCases = (schema, inputs) => inputs.map(input => {
+  const result = schema.safeParse(input);
+  return { input, accepted: result.success, ...(result.success ? { output: result.data } : {}) };
+});
+const scriptCases = parityCases(scriptV1Schema, [
+  { version: 1, tabId: 'a', actions: [{ action: 'screenshot' }] },
+  { version: 1, tabId: 'a', actions: [{ action: 'click', target: { role: 'button', name: 'Save' } }], capture: { formats: ['gif', 'video'] } },
+  { version: 1, tabId: 'a', actions: [{ action: 'wait-ready', selector: '#ready' }] },
+  { version: 1, tabId: 'a', actions: [{ action: 'screenshot' }], capture: { formats: ['gif', 'gif'] } },
+  { version: 1, tabId: 'a', actions: [{ action: 'click', target: { role: 'button', name: 'Save', exact: false } }] },
+  { version: 1, tabId: 'a', actions: [{ action: 'navigate', url: 'javascript:alert(1)' }] },
+  { version: 1, actions: [{ action: 'screenshot' }] },
+  { version: 1, tabId: 'a', actions: [{ action: 'screenshot', unexpected: true }] },
+]);
+const targetCases = parityCases(scriptTargetRequestSchema, [
+  { target: { role: 'button', name: 'Save' }, key: 'private' },
+  { target: { selector: '#save' }, key: 'private', dispatch: true, token: 't1' },
+  { target: { label: 'Email' }, key: 'private', edit: { action: 'fill', text: 'example' } },
+  { target: { selector: '#save' }, key: 'private', observe: true },
+  { target: { selector: '#save' }, key: 'private', observe: true, dispatch: true },
+  { target: { selector: '#save' }, key: 'private', dispatch: true, edit: { action: 'fill', text: 'example' } },
+]);
 const output = process.argv[2];
 if (!output) throw new Error('Expected generated header path');
 const inputs = [
@@ -75,6 +106,9 @@ const inputs = [
 ];
 const cases = inputs.map(input => { const result = BrowserControlRequestSchema.safeParse(input); return {input,accepted:result.success,...(result.success ? {output:result.data} : {})}; });
 const assets = {
+  script_cases: JSON.stringify(scriptCases), script_target_cases: JSON.stringify(targetCases),
+  script_v1_schema: JSON.stringify(scriptSchema), script_target_schema: JSON.stringify(targetSchema),
+  script_target: resolveScriptTarget.toString(),
   cases: JSON.stringify(cases),
   extension_schemas: JSON.stringify(extensionSchemas),
   extension_cases: JSON.stringify(extensionCases),
@@ -83,6 +117,7 @@ const assets = {
   methods: JSON.stringify(BROWSER_CONTROL_METHODS),
   mutations: JSON.stringify(BROWSER_CONTROL_METHODS.filter(browserControlMutates)),
   description: BROWSER_CONTROL_DESCRIPTION, documentation: BROWSER_CONTROL_DOCUMENTATION,
+  extractor: collectBrowserExtraction.toString(), status_reader: collectBrowserPageStatus.toString(), readiness_reader: collectBrowserReadiness.toString(),
   reader: collectBrowserSnapshot.toString(), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
 };
 await mkdir(dirname(output), { recursive: true });
