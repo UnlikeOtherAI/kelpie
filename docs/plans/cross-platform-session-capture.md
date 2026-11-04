@@ -185,3 +185,53 @@ remain intact.
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
 provider account-chooser reuse.
+
+## Installed-release follow-up
+
+The 0.1.20 iPhone restart check exposed another legacy dispatch race: TabStore
+had selected the next tab, but SwiftUI had not rebound HandlerContext.webView.
+Navigation reached the preceding view. iOS now snapshots the active WebView at
+legacy dispatch using a task-local value keyed to the HandlerContext instance.
+Suspension and UI rebinding cannot change that request's renderer; another
+context, canonical dispatch and pinned account jobs retain their own authority.
+The task-local target is weak, while the admitted request explicitly retains its
+view through completion. Child tasks cannot keep a closed renderer or its
+website store alive after their parent request ends.
+Missing active tabs fail explicitly. Android already uses the equivalent
+coroutine-local target under its gateway lease. iOS advances to 0.1.21.
+An unavailable page during restoration also made WebKit reset its URL to nil;
+the tab observer then overwrote its saved destination with an empty string.
+The observer now retains the destination until WebKit supplies a replacement.
+New tabs record their requested URL before loading, and a real failed provisional
+navigation regression checks that an offline isolated tab keeps its identity.
+
+The Ubuntu 22.04 release container's default GCC 11 cannot compile the existing
+C++20 atomic shared pointer in desktop connection code. Its build now selects
+the official Jammy GCC 12 package, retaining the Ubuntu 22.04 runtime baseline.
+The Debian package declares libstdc++6 >= 12. Linux advances to 0.1.15 because
+its build inputs changed; connection concurrency code stays unchanged.
+
+### Cross-provider review of the follow-up
+
+A read-only Claude review identified mutable-context races, main-actor access,
+missing active tabs, pinned/external contexts and the GCC runtime floor. The
+implementation adopts a request-local renderer instead of mutating the visible
+binding. Router.handle and its dispatch helper are MainActor-isolated. Cookie
+handlers capture the selected WebView and use its own websiteDataStore, with no
+separate shared cookie store. Tests cover stale UI binding, suspension, a second
+context, missing selection, canonical dispatch and pinned/external contexts.
+The compiler variables stay in the container shell running CMake, and Debian
+metadata includes the newer libstdc++ dependency. Installed checks and release
+results must be recorded separately from compilation.
+
+At revision b76a66c2, the iPhone 16 Pro Max simulator (iOS 26.5) passed the
+ordinary/named/other-store checks, HttpOnly visibility, localStorage and a native
+popup tap. Two consecutive restarts with the fixture server unavailable retained
+the tabs; bringing the server back and immediately switching/navigating each tab
+preserved all storage boundaries. Eight focused storage tests passed, including
+the unavailable-page regression, with no compiler warnings. Strict SwiftLint
+passed. The Ubuntu 22.04 container compiled and ran an atomic shared-pointer
+probe with stock g++-12/libstdc++6 12.3; the complete release build is separate.
+The downloaded signed Android 0.1.19 APK passed the same live storage, popup,
+restart and deletion checks on Maxis's API 35 emulator, including automatic
+purging of retired profiles after restart. Existing tabs were preserved.

@@ -60,8 +60,9 @@ final class BrowserTab: ObservableObject, Identifiable {
     private func setupObservations() {
         observations.append(webView.observe(\.url) { [weak self] wv, _ in
             Task { @MainActor in
-                guard let self else { return }
-                let nextURL = wv.url?.absoluteString ?? ""
+                // A failed provisional restore can reset WKWebView.url to nil.
+                // Keep the saved destination so an offline restart cannot erase the tab.
+                guard let self, let nextURL = wv.url?.absoluteString else { return }
                 if self.currentURL != nextURL { self.preview = nil; self.previewRequest = UUID() }
                 self.currentURL = nextURL
                 self.recordHistoryIfNeeded(url: nextURL)

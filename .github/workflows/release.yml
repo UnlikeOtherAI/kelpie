@@ -36,6 +36,7 @@ jobs:
                 dpkg-dev \
                 file \
                 git \
+                g++-12 \
                 libasound2-dev \
                 libatk-bridge2.0-dev \
                 libatk1.0-dev \
@@ -64,6 +65,7 @@ jobs:
                 tar \
                 xz-utils
               rm -rf /var/lib/apt/lists/*
+              export CC=gcc-12 CXX=g++-12
             package_kind: deb
             build_appimage: true
           - name: fedora-40
