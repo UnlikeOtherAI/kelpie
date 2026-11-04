@@ -80,6 +80,91 @@ final class MobileSessionStorageTests: XCTestCase {
         XCTAssertNil(store.selectedEntry)
     }
 
+    func testLegacyRequestUsesSelectedStoreBeforeSwiftUIRebinds() async throws {
+        let ordinary = WKWebView()
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        let isolated = WKWebView(frame: .zero, configuration: config)
+        let context = HandlerContext()
+        context.webView = ordinary
+        context.tabStore = TabStore(isolatedTab: BrowserTab(webView: isolated, recordsHistory: false))
+        let router = Router()
+        router.handlerContext = context
+        BrowserManagementHandler(context: context).register(on: router)
+        let name = "routing-\(UUID().uuidString)"
+        let result = await router.handle(method: "set-cookie", body: [
+            "name": name, "value": "isolated", "domain": "fixture.invalid", "path": "/"
+        ])
+        XCTAssertEqual(result.json["success"] as? Bool, true)
+        let isolatedCookies = await isolated.configuration.websiteDataStore.httpCookieStore.allCookies()
+        let ordinaryCookies = await ordinary.configuration.websiteDataStore.httpCookieStore.allCookies()
+        XCTAssertEqual(isolatedCookies.first { $0.name == name }?.value, "isolated")
+        XCTAssertNil(ordinaryCookies.first { $0.name == name })
+        for cookie in ordinaryCookies where cookie.name == name {
+            await ordinary.configuration.websiteDataStore.httpCookieStore.deleteCookie(cookie)
+        }
+    }
+
+    func testSuspendedLegacyRequestKeepsItsViewWithoutRebindingOtherContexts() async {
+        let selected = WKWebView()
+        let visible = WKWebView()
+        let context = HandlerContext()
+        context.webView = visible
+        context.tabStore = TabStore(isolatedTab: BrowserTab(webView: selected, recordsHistory: false))
+        let otherContext = HandlerContext()
+        otherContext.webView = visible
+        let router = Router()
+        router.handlerContext = context
+        router.register("fixture-target") { _ in
+            XCTAssertTrue(context.webView === selected)
+            context.webView = visible
+            await Task.yield()
+            XCTAssertTrue(context.webView === selected)
+            XCTAssertTrue(otherContext.webView === visible)
+            return successResponse()
+        }
+        _ = await router.handle(method: "fixture-target", body: [:])
+        XCTAssertTrue(context.webView === visible)
+        context.tabStore?.activeBrowserTabID = nil
+        let missing = await router.handle(method: "fixture-target", body: [:])
+        XCTAssertEqual((missing.json["error"] as? [String: Any])?["code"] as? String, "NO_WEBVIEW")
+    }
+
+    func testLegacyBindingPreservesPinnedAndExternalDisplayContexts() async {
+        let pinned = WKWebView()
+        let selected = WKWebView()
+        let context = HandlerContext()
+        context.webView = pinned
+        context.tabStore = TabStore(isolatedTab: BrowserTab(webView: selected, recordsHistory: false))
+        let router = Router()
+        router.handlerContext = context
+        router.register("fixture-target") { _ in
+            XCTAssertTrue(context.webView === pinned)
+            return successResponse()
+        }
+        context.remoteDocumentGuard = { true }
+        _ = await router.handle(method: "fixture-target", body: [:])
+        context.remoteDocumentGuard = nil
+        _ = await router.handle(method: "fixture-target", body: [:], browserGatewayDispatch: true)
+        context.tabStore = nil
+        _ = await router.handle(method: "fixture-target", body: [:])
+    }
+
+    func testUnavailableRestoredPageKeepsItsSavedDestination() async throws {
+        let view = WKWebView()
+        let tab = BrowserTab(webView: view, isStartPage: false, recordsHistory: false, partition: "offline")
+        let destination = "http://127.0.0.1:18529/unavailable"
+        tab.currentURL = destination
+        let failure = expectation(description: "Provisional load failed")
+        let delegate = FailedNavigationObserver(failure: failure)
+        view.navigationDelegate = delegate
+        view.load(URLRequest(url: try XCTUnwrap(URL(string: destination)), timeoutInterval: 2))
+        await fulfillment(of: [failure], timeout: 5)
+        await Task.yield()
+        XCTAssertEqual(tab.currentURL, destination)
+        XCTAssertEqual(tab.partition, "offline")
+    }
+
     func testUnknownOrphanDeletionDoesNotReachWebKit() async throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("Named stores require iOS 17") }
         let initial = BrowserTab(webView: WKWebView(), recordsHistory: false)
@@ -91,5 +176,13 @@ final class MobileSessionStorageTests: XCTestCase {
             XCTAssertEqual(result["existed"] as? Bool, false)
             XCTAssertEqual(tabs.tabs.count, 1)
         }
+    }
+}
+
+private final class FailedNavigationObserver: NSObject, WKNavigationDelegate {
+    let failure: XCTestExpectation
+    init(failure: XCTestExpectation) { self.failure = failure }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        failure.fulfill()
     }
 }

@@ -66,6 +66,7 @@ final class TabStore: ObservableObject {
         activeBrowserTabID = tab.id
         if let url, let parsed = URL(string: url) {
             tab.isStartPage = false
+            tab.currentURL = url
             tab.webView.load(URLRequest(url: parsed))
         }
         persistSession()

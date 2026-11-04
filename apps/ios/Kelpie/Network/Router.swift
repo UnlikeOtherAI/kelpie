@@ -58,7 +58,7 @@ final class Router: @unchecked Sendable {
         if !bypassRecordingGate, let gateError = scriptPlaybackState?.recordingError(for: method) {
             return (409, gateError)
         }
-        let result = await handler(body)
+        let result = await dispatch(handler, method: method, body: body, browserGatewayDispatch: browserGatewayDispatch)
         let success = result["success"] as? Bool ?? false
         let errorCode = (result["error"] as? [String: Any])?["code"] as? String
         let status: Int
@@ -78,6 +78,22 @@ final class Router: @unchecked Sendable {
         }
 
         return (status, result)
+    }
+
+    @MainActor
+    private func dispatch(
+        _ handler: RouteHandler, method: String, body: [String: Any], browserGatewayDispatch: Bool
+    ) async -> [String: Any] {
+        guard !browserGatewayDispatch, browserReferenceOwner == nil,
+              let context = handlerContext, context.remoteDocumentGuard == nil,
+              let store = context.tabStore,
+              !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method) else {
+            return await handler(body)
+        }
+        guard let view = store.activeBrowserTab?.webView else {
+            return errorResponse(code: "NO_WEBVIEW", message: "No active browser tab")
+        }
+        return await context.withBrowserTarget(view) { await handler(body) }
     }
 
     func registerFallbacks() {
