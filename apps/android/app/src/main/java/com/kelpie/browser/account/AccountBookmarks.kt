@@ -1,6 +1,8 @@
 package com.kelpie.browser.account
 
 import com.kelpie.browser.browser.Bookmark
+import com.kelpie.browser.browser.BookmarkMutation
+import com.kelpie.browser.browser.BookmarkTree
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -24,27 +26,37 @@ class AccountBookmarks(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
     private val request: suspend (String, String, String?, String?) -> UOATransport.Response = { path, method, body, version -> UOAAccount.request(path, method, body, version) },
 ) {
-    sealed class Mutation {
-        data class Add(
-            val bookmark: Bookmark,
-        ) : Mutation()
+    private var active = true
+    private var queued = 0
+    private var events: UOASettingsStream? = null
 
-        data class Remove(
-            val id: String,
-        ) : Mutation()
-
-        data object Clear : Mutation()
+    fun enableEvents() {
+        events =
+            UOASettingsStream(scope, "browser", "bookmarks", UOAAccount::settingsRequest) { value ->
+                if (active && queued == 0) {
+                    val raw =
+                        if (value == kotlinx.serialization.json.JsonNull) {
+                            JsonArray(emptyList())
+                        } else {
+                            value as? JsonArray
+                                ?: error("Invalid favourites snapshot")
+                        }
+                    publish(decode(raw))
+                }
+            }
     }
 
-    private var active = true
     private var pending: Deferred<Unit>? = null
 
     fun invalidate() {
         active = false
+        events?.stop()
         pending?.cancel()
     }
 
-    fun enqueue(mutation: Mutation? = null): Deferred<Unit> {
+    fun enqueue(mutation: BookmarkMutation? = null): Deferred<Unit> {
+        events?.stop()
+        queued += 1
         val previous = pending
         val operation =
             scope.async {
@@ -60,6 +72,9 @@ class AccountBookmarks(
                 } catch (error: Exception) {
                     if (active) status(false, error.message ?: "Favourites could not be synced.")
                     throw error
+                } finally {
+                    queued -= 1
+                    if (active && queued == 0) events?.start()
                 }
             }
         pending = operation
@@ -70,7 +85,7 @@ class AccountBookmarks(
         pending?.await()
     }
 
-    private suspend fun perform(mutation: Mutation?): List<Bookmark> {
+    private suspend fun perform(mutation: BookmarkMutation?): List<Bookmark> {
         repeat(3) { attempt ->
             val latest = request(PATH, "GET", null, null)
             if (!active) throw kotlinx.coroutines.CancellationException()
@@ -97,44 +112,69 @@ class AccountBookmarks(
 
         private const val PATH = "/oauth/me/settings/browser/bookmarks"
 
-        fun decode(raw: JsonArray): List<Bookmark> =
-            raw
-                .mapNotNull { value ->
-                    val item = value as? JsonObject ?: return@mapNotNull null
-                    val url = (item["url"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    Bookmark(
-                        id = identifier(item),
-                        title =
-                            (item["title"] as? JsonPrimitive)?.contentOrNull
-                                ?: (item["name"] as? JsonPrimitive)?.contentOrNull ?: url,
-                        url = url,
-                        createdAt = date(item["createdAt"] as? JsonPrimitive ?: item["created_at"] as? JsonPrimitive),
-                    )
-                }.distinctBy { it.id }
+        fun decode(raw: JsonArray): List<Bookmark> = BookmarkTree.normalized(raw.mapNotNull(::decodeNode))
+
+        private fun decodeNode(value: kotlinx.serialization.json.JsonElement): Bookmark? {
+            val item = value as? JsonObject ?: return null
+            val kind = (item["kind"] as? JsonPrimitive)?.contentOrNull ?: "bookmark"
+            val url = (item["url"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            if (kind !in setOf("bookmark", "folder") || (kind == "bookmark" && url.isEmpty())) return null
+            if (kind == "folder" && runCatching { UUID.fromString((item["id"] as? JsonPrimitive)?.contentOrNull) }.isFailure) return null
+            val parent = (item["parentId"] as? JsonPrimitive)?.contentOrNull?.let { runCatching { UUID.fromString(it).toString() }.getOrNull() }
+            return Bookmark(
+                id = identifier(item),
+                title =
+                    (item["title"] as? JsonPrimitive)?.contentOrNull
+                        ?: (item["name"] as? JsonPrimitive)?.contentOrNull ?: url,
+                url = url,
+                createdAt = date(item["createdAt"] as? JsonPrimitive ?: item["created_at"] as? JsonPrimitive),
+                kind = kind,
+                parentId = parent,
+            )
+        }
+
+        fun encode(nodes: List<Bookmark>): JsonArray =
+            JsonArray(
+                nodes.map { node ->
+                    buildJsonObject {
+                        put("id", node.id)
+                        put("title", node.title)
+                        put("url", node.url)
+                        put("createdAt", node.createdAt)
+                        put("kind", node.kind)
+                        put("parentId", node.parentId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+                    }
+                },
+            )
 
         fun apply(
             raw: JsonArray,
-            mutation: Mutation,
-        ): JsonArray =
-            when (mutation) {
-                is Mutation.Clear -> JsonArray(emptyList())
-                is Mutation.Remove -> JsonArray(raw.filterNot { it is JsonObject && identifier(it).equals(mutation.id, ignoreCase = true) })
-                is Mutation.Add -> {
-                    if (decode(raw).any { it.url == mutation.bookmark.url }) {
-                        raw
+            mutation: BookmarkMutation,
+        ): JsonArray {
+            val changed = BookmarkTree.apply(decode(raw), mutation)
+            val known = raw.mapNotNull { value -> decodeNode(value)?.let { it.id to (value as JsonObject) } }.toMap()
+            val encoded =
+                encode(changed).mapIndexed { index, value ->
+                    val node = value as JsonObject
+                    val original = known[(node["id"] as JsonPrimitive).content]
+                    if (original != null && decodeNode(original) == changed[index]) {
+                        original
                     } else {
-                        JsonArray(
-                            raw +
-                                buildJsonObject {
-                                    put("id", mutation.bookmark.id)
-                                    put("title", mutation.bookmark.title)
-                                    put("url", mutation.bookmark.url)
-                                    put("createdAt", mutation.bookmark.createdAt)
-                                },
-                        )
+                        JsonObject((original ?: emptyMap()) + node)
                     }
                 }
+            var position = 0
+            val result = mutableListOf<kotlinx.serialization.json.JsonElement>()
+            raw.forEach { value ->
+                if (decodeNode(value) == null) {
+                    result.add(value)
+                } else if (position < encoded.size) {
+                    result.add(encoded[position++])
+                }
             }
+            result.addAll(encoded.drop(position))
+            return JsonArray(result)
+        }
 
         private fun date(value: JsonPrimitive?): String {
             if (value == null) return ""

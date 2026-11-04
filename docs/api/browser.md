@@ -916,3 +916,15 @@ existing link observation. Optional `tabId`/`windowId` target the owning WebKit
 tab; Chromium uses its live renderer. The shared `kelpie_get_links` extension
 is read-only and remains admitted only by the local model profile, not the
 narrower remote inference profile.
+
+## Favourites tree (macOS, iOS and Android)
+
+`bookmarksList` returns every node in sibling order, including folders. Each node adds `kind: "bookmark" | "folder"` and `parentId: UUID | null`; legacy flat entries are root bookmarks. Folder URLs are empty. `bookmarksAdd` accepts optional `parentId`.
+
+| HTTP method | MCP tool | Body |
+| --- | --- | --- |
+| `POST /v1/bookmarks-create-folder` | `kelpie_bookmarks_create_folder` | `title`, optional `parentId` |
+| `POST /v1/bookmarks-update` | `kelpie_bookmarks_update` | `id`, `title` and/or `url` |
+| `POST /v1/bookmarks-move` | `kelpie_bookmarks_move` | `id`, required `parentId` (null for root), optional `beforeId` |
+
+`beforeId` names a sibling in the destination folder; omit it or send null to append. Moves reject cycles, missing folders and stale sibling anchors. Updating a folder URL is invalid. Page URLs must be HTTP(S) with a host. These mutations return `{bookmarks: [...]}` from the acknowledged store. `bookmarksRemove` removes an entire folder subtree and rejects a concurrent change to those contents; `bookmarksClear` retains its `cleared: true` response field and also returns the remaining tree. Neither operation removes the underlying web pages. All existing device pairing and authorization rules apply.
