@@ -124,3 +124,22 @@ denied live rename/delete, replacement preservation after abort and completed-fi
 preservation. The reviewer requested a second-close fault too. The real MF wrapper,
 full decode, budget and collision suite remain required under the coordinator's
 queued CODEC-3 slot. No test was run by acceptance.
+
+## Closed codec source findings
+Final re-review: 2b2dc1c2673541ddfe13f2ab970283f396c4c3fd, integrated by the
+coordinator before b217364a. The committed stream and video adapter match the
+reviewed exact-handle design. ExactHandleRollback now includes the requested
+second-close fault after the primary handle has closed successfully.
+The codec owner reports CODEC-3 /W4 /WX and the full native run-4 corpus passed
+on Maxis: real MF adapter decode, timing, color, frame counts, byte limits,
+constructor duplicate failure, flush/first-close/second-close failure, live
+rename/delete refusal, replacement preservation after rollback and completed-file
+preservation. The prior GIF/PNG/MP4 collision, sibling, stride, chroma and palette
+checks also passed. The recorded artifact root is
+D:/Worktrees/kelpie/capture-windows-media-20261104/.build-media/run-4;
+source and test assertions were independently read by acceptance.
+This closes the reviewed codec source defects and their owner-run codec regression
+gates. Acceptance did not rerun the suite or visually inspect decoded frames.
+The 38,309,888-byte reported peak working set belongs to this fixture run, not a
+production-resolution memory guarantee. Full-app capture, native display, MCP/CLI,
+remote retrieval and installed-release acceptance remain pending.
