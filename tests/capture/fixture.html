@@ -9,6 +9,7 @@ section{margin:20px 0;border:1px solid #8593a3;padding:16px}
 #covered-region{position:relative;width:240px}
 #cover{position:absolute;inset:0;z-index:10;background:#ccc;display:grid;place-items:center}
 #scroll-target{margin-top:700px}
+#partial-region{width:180px;overflow:hidden} #partial{width:240px;margin-left:-100px}
 #document-marker{position:fixed;right:8px;top:8px;background:#ffe881;padding:6px;z-index:20;pointer-events:none}
 [hidden]{display:none!important}
 </style></head><body>
@@ -32,6 +33,12 @@ section{margin:20px 0;border:1px solid #8593a3;padding:16px}
 <div contenteditable="true" aria-label="Private editor">CAPTURE_SECRET_EDITOR_8137</div>
 <input type="hidden" value="CAPTURE_SECRET_HIDDEN_8137"></section>
 <section aria-label="Task readiness"><button id="start-task">Start delayed task</button><button id="fail-task">Start failing task</button><output id="task-status" role="status">idle</output></section>
+<section aria-label="Target race regressions">
+<div id="partial-region"><button id="partial">Partially visible action</button></div>
+<button id="child-replace"><span id="replace-child">Replace child on press</span></button>
+<label>Becomes readonly on focus <input id="focus-readonly"></label>
+<label>Changes URL on focus <input id="focus-navigate"></label>
+</section>
 <a id="next" href="/next">Next document</a><button id="replace">Replace confirm button</button>
 <button id="scroll-target">Scrolled action</button><pre id="events" aria-label="Action result">No action yet</pre>
 </main><script src="/fixture.js"></script></body></html>

@@ -1,3 +1,4 @@
+import { registerWorker } from "./worker.js";
 import { registerCanonicalBrowserControl } from "./browser-control.js";
 import type { Command } from "commander";
 import { registerDiscover } from "./discover.js";
@@ -112,6 +113,7 @@ export function registerAllCommands(program: Command): void {
 
   // MCP Server
   registerMcp(program);
+  registerWorker(program);
 
   // AI
   registerAI(program);
