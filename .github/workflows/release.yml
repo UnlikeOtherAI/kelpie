@@ -450,7 +450,8 @@ jobs:
             dist/release/**/checksums-*.txt
 
   publish-package-repos:
-    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->') }}"
+    # Skipped, unchanged components must not suppress a successful Linux release.
+    if: "${{ !cancelled() && needs.attach-to-release.result == 'success' && (!startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->')) }}"
     name: Publish Linux package repositories
     runs-on: ubuntu-latest
     needs:
