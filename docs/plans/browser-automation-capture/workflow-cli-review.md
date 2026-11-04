@@ -76,3 +76,11 @@ native/core-automation/tests/test_script_presentation.cpp.
 Actual CLI/MCP script execution, native extraction order, remote chunk retrieval,
 secret handling, cancellation/recovery and decoded/displayed media remain pending.
 Canonical WFL-03, ART-01..04, SEC-01 and PTR-01/02 are not closed by source tests.
+
+## Landed native numeric checkpoint
+Source f6fb0aee3e61fe9bbccad501718386ef6ce0b379 contains only the shared/native
+presentation tranche and is integrated as 87cd6de7. The coordinator reports the
+parity fixture and native test both passed (2/2), covering 115 finite vectors
+plus NaN/infinity cases. That closes numeric cross-language parity evidence for
+this checkpoint. Displayed/exported media correspondence remains a native-runtime
+gate. CLI fixes and their tests remain a separate unlanded tranche.
