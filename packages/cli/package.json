@@ -31,7 +31,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/index.ts",
-    "test": "vitest run --exclude 'tests/e2e/**'",
+    "test": "vitest run --exclude \"tests/e2e/**\"",
     "test:e2e": "vitest run tests/e2e/",
     "lint": "eslint src/ tests/"
   },
