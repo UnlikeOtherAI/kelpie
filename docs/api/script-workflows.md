@@ -27,6 +27,17 @@ Capture continuously samples rendered frames and composites the same markers/poi
 
 Each artifact manifest contains `id,mimeType,byteLength,sha256,partial,width,height`, optionally duration, frame count, dropped frames, action index and viewport/document provenance. Video MIME is `video/mp4`; GIF and step PNGs use `image/gif` and `image/png`.
 
+## Native MCP discovery
+
+Windows Chromium registers `kelpie_play_script`, `kelpie_abort_script`,
+`kelpie_get_script_status`, and `kelpie_get_script_artifact` in the native catalogue.
+Their schemas come from the shared generated contract and work through direct tool
+calls or `kelpie_extension` with the same names. Playback and abort are mutations;
+status and artifact reads remain available to read-only sessions, subject to the
+existing authenticated run-owner and browser-grant checks. Discovery still filters
+out any endpoint the selected native router does not implement. Other native
+platforms and renderer bindings do not advertise this workflow surface yet.
+
 ## Artifact retrieval
 
 `POST /v1/get-script-artifact` and MCP `kelpie_get_script_artifact` accept `{runId,artifactId,offset?,length?}`. Offset is a nonnegative integer. Chunk length defaults to262144 and is at most1048576 bytes. The authenticated run owner and current browser grant must match on every status/cancel/download request.
