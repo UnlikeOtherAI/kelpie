@@ -41,6 +41,7 @@ class SessionStorageTest {
                             .setBody("<title>Session fixture</title><p>Ready</p>")
                 }
             server.start()
+            val url = server.url("/").toString()
             try {
                 withContext(Dispatchers.Main) {
                     assumeTrue(PartitionRegistry.supported())
@@ -56,7 +57,6 @@ class SessionStorageTest {
                     val handler = HandlerContext()
                     var tabs = TabStore(context, handler, BrowserState())
                     handler.tabStore = tabs
-                    val url = server.url("/").toString()
                     val cookieName = "session_${UUID.randomUUID().toString().replace("-", "")}"
                     try {
                         val first = tabs.addTab(url)
