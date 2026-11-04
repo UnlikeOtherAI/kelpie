@@ -4,8 +4,7 @@ import { dirname } from 'node:path';
 import { z } from '../../packages/shared/node_modules/zod/index.js';
 import { BrowserControlRequestSchema, browserControlInputSchema, BROWSER_CONTROL_METHODS, browserControlMutates } from '../../packages/shared/dist/browser-control/protocol.js';
 import { BROWSER_CONTROL_DESCRIPTION, BROWSER_CONTROL_DOCUMENTATION } from '../../packages/shared/dist/browser-control/proxy.js';
-import { collectBrowserSnapshot } from '../../packages/shared/dist/browser-control/snapshot.js';
-import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from '../../packages/shared/dist/browser-control/observations.js';
+import { fixedObservationReaderSource } from '../../packages/shared/dist/browser-control/observation-source.js';
 import { rememberNativeSnapshot, resolveNativeReference, actOnNativeReference } from '../../packages/shared/dist/browser-control/native-reference.js';
 import { sharedBrowserTools } from '../../packages/shared/dist/extension-tools.js';
 import { sharedAiLoadTool, sharedAiAskTool, sharedAiEndpointTools } from '../../packages/shared/dist/extension-ai-tools.js';
@@ -90,6 +89,17 @@ if (!output) throw new Error('Expected generated header path');
 const inputs = [
   {version:1,method:"tabs.list"},
   {version:1,method:"tab.snapshot",tabId:"stub"},
+  {version:1,method:"tab.snapshot",tabId:"stub",params:{scope:"main",prioritize:false}},
+  {version:1,method:"tab.snapshot",params:{scope:12}},
+  {version:1,method:"tab.extract",tabId:"stub",params:{fields:[{name:"records",selector:"article",multiple:true,fields:[{name:"title",selector:"h2"}]}]}},
+  {version:1,method:"tab.extract",params:{fields:[{name:"x",selector:"p",attribute:"value"}]}},
+  {version:1,method:"tab.ready",tabId:"stub"},
+  {version:1,method:"tab.ready",params:{selector:12}},
+  {version:1,method:"tab.ready",params:{scope:"main"}},
+  {version:1,method:"tab.webmcp.discover",tabId:"stub",params:{origin:"https://example.org"}},
+  {version:1,method:"tab.webmcp.call",tabId:"stub",params:{origin:"https://example.org",ref:"t1"}},
+  {version:1,method:"tab.webmcp.discover",params:{origin:"https://example.org",unexpected:true}},
+  {version:1,method:"tab.webmcp.call",params:{origin:"https://example.org",ref:"t1",timeoutMs:30001}},
   {version:1,method:"tabs.new"},
   {version:1,method:"tab.screenshot",tabId:"a"},
   {version:1,method:"page.scroll",tabId:"a",params:{deltaY:5}},
@@ -117,8 +127,8 @@ const assets = {
   methods: JSON.stringify(BROWSER_CONTROL_METHODS),
   mutations: JSON.stringify(BROWSER_CONTROL_METHODS.filter(browserControlMutates)),
   description: BROWSER_CONTROL_DESCRIPTION, documentation: BROWSER_CONTROL_DOCUMENTATION,
-  extractor: collectBrowserExtraction.toString(), status_reader: collectBrowserPageStatus.toString(), readiness_reader: collectBrowserReadiness.toString(),
-  reader: collectBrowserSnapshot.toString(), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
+  extractor: fixedObservationReaderSource("extract"), status_reader: fixedObservationReaderSource("status"), readiness_reader: fixedObservationReaderSource("ready"),
+  reader: fixedObservationReaderSource("snapshot"), remember: rememberNativeSnapshot.toString(), resolve: resolveNativeReference.toString(), action: actOnNativeReference.toString(),
 };
 await mkdir(dirname(output), { recursive: true });
 // MSVC limits individual and concatenated string literals. UTF-8 byte arrays

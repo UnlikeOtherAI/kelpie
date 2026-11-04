@@ -6,6 +6,8 @@ import {
   createBrowserClient, createBrowserControlProxy, createPlaywrightBrowserBackend,
 } from "../src/browser-control/index.js";
 import type { BrowserControlBackend, BrowserTabClient } from "../src/browser-control/index.js";
+import { fixedObservationExpression } from "../src/browser-control/observation-source.js";
+import type { BrowserExtraction, BrowserPageStatus, BrowserReadiness } from "../src/browser-control/observations.js";
 import { actOnNativeReference, rememberNativeSnapshot } from "../src/browser-control/native-reference.js";
 
 let engine: Browser;
@@ -253,4 +255,67 @@ describe("bounded portable observations", () => {
       } finally { await page.close(); }
     });
   }
+});
+
+
+describe("bounded observation work on real DOMs", () => {
+  it("returns incomplete evidence when large/deep DOMs prevent proving uniqueness", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<title>Large</title><meta name="description" content="Early publisher claim">' + "<p>x</p>".repeat(15_000) + '<button id="late">Late</button><dialog open>Late dialog</dialog>');
+      const ready = await page.evaluate<BrowserReadiness>(fixedObservationExpression("ready", { state: "complete", selector: "#late" }));
+      expect(ready.ready).toBe(false); expect(ready.incomplete).toBe(true);
+      const extraction = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { fields: [{ name: "late", selector: "#late", source: "text" }] }));
+      expect(extraction.fields[0]?.status).toBe("incomplete"); expect(extraction.truncated).toBe(true);
+      const metadata = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { metadata: true, fields: [{ name: "none", selector: ".absent", source: "text" }] }));
+      expect(metadata.truncated).toBe(true);
+      expect(metadata.metadata.some((item) => item.value === "Early publisher claim")).toBe(true);
+      for (const item of metadata.metadata) { expect(item.provenanceComplete).toBe(false); expect(item.index).toBeUndefined(); }
+      const status = await page.evaluate<BrowserPageStatus>(fixedObservationExpression("status"));
+      expect(status.dialogs).toBe(0); expect(status.truncated).toBe(true);
+      const snapshot = await page.evaluate<{ snapshot: { truncated: boolean } }>(fixedObservationExpression("snapshot", { prefix: "bounded", maxElements: 8 }));
+      expect(snapshot.snapshot.truncated).toBe(true);
+      await page.setContent("<div>".repeat(100) + '<button id="deep">Deep</button>' + "</div>".repeat(100));
+      const deep = await page.evaluate<BrowserReadiness>(fixedObservationExpression("ready", { state: "complete", selector: "#deep" }));
+      expect(deep.ready).toBe(false); expect(deep.incomplete).toBe(true);
+    } finally { await page.close(); }
+  });
+  it("does not copy oversized script text or materialize unbounded collections", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<script type="application/ld+json">{"name":"' + "x".repeat(1_000_000) + '"}</script><p>Public</p><input value="PRIVATE_BOUND_CANARY"><div contenteditable>PRIVATE_BOUND_CANARY</div>');
+      const expression = fixedObservationExpression("extract", { metadata: true, fields: [{ name: "public", selector: "p", source: "text" }] });
+      const result = await page.evaluate<{ result: BrowserExtraction; copied: number }>(`(() => {
+        const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
+        const from = Array.from, documentQuery = Document.prototype.querySelectorAll, elementQuery = Element.prototype.querySelectorAll;
+        const substring = CharacterData.prototype.substringData;
+        let copied = 0;
+        const refuse = () => { throw new Error("unbounded collection/text access"); };
+        Array.from = refuse; Document.prototype.querySelectorAll = refuse; Element.prototype.querySelectorAll = refuse;
+        Object.defineProperty(Node.prototype, "textContent", { configurable: true, get: refuse });
+        CharacterData.prototype.substringData = function(offset, count) { copied += count; if (copied > 65536) throw new Error("copy budget"); return substring.call(this, offset, count); };
+        try { return { result: ${expression}, copied }; }
+        finally { Array.from = from; Document.prototype.querySelectorAll = documentQuery; Element.prototype.querySelectorAll = elementQuery;
+          Object.defineProperty(Node.prototype, "textContent", descriptor); CharacterData.prototype.substringData = substring; }
+      })()`);
+      expect(result.result.fields[0]?.values).toEqual(["Public"]);
+      expect(result.result.metadata).toEqual([]); expect(result.result.truncated).toBe(true);
+      expect(result.copied).toBeLessThanOrEqual(65_536);
+      expect(JSON.stringify(result)).not.toContain("PRIVATE_BOUND_CANARY");
+    } finally { await page.close(); }
+  });
+  it("treats ancestor opacity/collapse consistently and checks readiness viewport", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<main><button id="normal">Visible</button><div style="opacity:0"><button id="transparent">Transparent</button><span aria-busy="true">Loading</span></div>' +
+        '<div style="visibility:collapse"><span aria-busy="true">Collapsed</span></div><button id="offscreen" style="position:absolute;top:3000px">Offscreen</button>' +
+        '<div style="width:20px;height:20px;overflow:hidden"><button id="clipped" style="transform:translateX(300px)">Clipped</button></div><article><h2>Scoped title</h2></article></main>');
+      for (const selector of ["#transparent", "#offscreen", "#clipped"]) expect((await page.evaluate<BrowserReadiness>(fixedObservationExpression("ready", { state: "complete", selector }))).ready).toBe(false);
+      expect((await page.evaluate<BrowserReadiness>(fixedObservationExpression("ready", { state: "complete", selector: "#normal" }))).ready).toBe(true);
+      expect((await page.evaluate<BrowserPageStatus>(fixedObservationExpression("status"))).busyRegions).toBe(0);
+      const records = await page.evaluate<BrowserExtraction>(fixedObservationExpression("extract", { scope: "main", fields: [{ name: "records", selector: "article", source: "text", multiple: true, fields: [{ name: "title", selector: ":scope > h2", source: "text" }] }] }));
+      expect(records.fields[0]?.records?.[0]?.[0]?.values).toEqual(["Scoped title"]);
+      await expect(page.evaluate(fixedObservationExpression("extract", { fields: [{ name: "unsupported", selector: ":scope > article > h2", source: "text" }] }))).rejects.toThrow("UNSUPPORTED_SCOPE_SELECTOR");
+    } finally { await page.close(); }
+  });
 });
