@@ -16,9 +16,12 @@ follow-up integration were still pending.
 | WIN-04 | Sample adds first_document as documentId to a multi-document movie artifact | Label it explicitly as initial document or retain bounded transition provenance. Do not imply that every movie frame belongs to that document |
 | WIN-05 | maxDurationMs is checked at the loop start, before screenshot/encode; Finish uses later elapsed time | Specify bounded in-flight/finalization grace separately from sampling duration and test the smallest duration. A retained-media cap does not establish a strict instantaneous time or scratch cap |
 | WIN-06 | Artifact Expire runs only during Publish/Read and shutdown removes registered artifacts | Document lazy expiry honestly or schedule owned cleanup. Test expiry without another download and cleanup after failed publication; no process-wide temp deletion |
+| WIN-07 | Play snapshots owner once; Cancelled checks abort/deadline/capture_error only, with no current grant callback | Fresh status/download auth does not prove active-run revocation. Re-admit grant before actions/sample boundaries or explicitly define accepted run lifetime authority |
+| WIN-08 | output title/url evaluates the full page string through the bridge, then outputs.dump checks the 256 KiB budget | Bound page-controlled output before bridge serialization and return an explicit limit result. A post-copy output cap is not a bounded observation |
 
-WIN-02 through WIN-04 were sent to the runtime owner. WIN-05/06 are acceptance
-boundary questions, not measured runtime failures.
+WIN-02 through WIN-08 were sent to the runtime owner. WIN-05/06 are acceptance
+boundary questions, not measured runtime failures. WIN-07/08 are source gaps;
+no native failure has been reproduced.
 
 ## Source invariants that look sound
 
@@ -28,7 +31,12 @@ Request bodies cannot choose the owner, and outbound account calls have no such
 scope. Run status/abort and artifact lookup compare that owner; native Stop holds
 the run's immutable cancellation token. Listener restart creates a new owner.
 The final test must distinguish this actual single-grant model from unsupported
-claims about multiple named clients or live token rotation.
+claims about multiple named clients or live token rotation. In this tree the
+accepted run retains authority until explicit abort, shutdown or deadline. There
+is no per-action/per-sample authorization callback. BeginShutdown requests local
+abort and drains HTTP work; denial of a subsequent status/download request alone
+does not stop an already admitted run. Immediate grant revocation is unverified
+and must not be inferred from immutable owner checks.
 
 The run remains active through sampler join, encoder finalization, ephemeral
 target cleanup and presentation cleanup. Shutdown requests abort and the existing
