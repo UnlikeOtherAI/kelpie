@@ -65,7 +65,7 @@ object PartitionRegistry {
         if (supported()) pending().forEach { purge(it) }
     }
 
-    fun supported(): Boolean = WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)
+    fun supported(): Boolean = runCatching { WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE) }.getOrDefault(false)
 
     fun resolve(
         id: String,
@@ -147,7 +147,7 @@ object PartitionRegistry {
             ProfileStore.getInstance().deleteProfile(profile)
             check(prefs.edit().putStringSet(PENDING, pending() - profile).commit())
             true
-        } catch (_: IllegalStateException) {
+        } catch (_: RuntimeException) {
             false
         }
     }

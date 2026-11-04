@@ -70,9 +70,16 @@ final class MobilePartitionRegistry {
         return store
     }
 
-    func listing(tabs: [BrowserTab]) -> [[String: Any]] {
-        map.identifiers.keys.sorted().map { id in
+    func listing(tabs: [BrowserTab]) async -> [[String: Any]] {
+        let known: [[String: Any]] = map.identifiers.keys.sorted().map { id in
             ["id": id, "persistent": true, "tabCount": tabs.filter { $0.partition == id }.count]
+        }
+        guard #available(iOS 17.0, *) else { return known }
+        let identifiers: [UUID] = await withCheckedContinuation { continuation in
+            WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: $0) }
+        }
+        return known + map.orphans(engineIdentifiers: Set(identifiers)).map {
+            ["id": PartitionMap.orphanId(for: $0), "persistent": true, "tabCount": 0]
         }
     }
 
@@ -83,7 +90,10 @@ final class MobilePartitionRegistry {
         guard !deleting.contains(id) else {
             return errorResponse(code: "PARTITION_DELETING", message: "Partition deletion is in progress")
         }
-        guard let identifier = map.identifier(for: id) else {
+        let orphan = PartitionMap.orphanIdentifier(from: id).flatMap { candidate in
+            map.identifiers.values.contains(candidate) ? nil : candidate
+        }
+        guard let identifier = map.identifier(for: id) ?? orphan else {
             return successResponse(["deleted": id, "existed": false, "tabsClosed": 0])
         }
         deleting.insert(id)

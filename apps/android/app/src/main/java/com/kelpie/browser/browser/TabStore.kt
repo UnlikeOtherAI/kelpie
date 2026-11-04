@@ -54,7 +54,7 @@ class TabStore(
             if (restoredTabs.isNotEmpty()) {
                 _tabs.value = restoredTabs
                 val activeRecord = session.tabs.getOrNull(session.activeIndex)
-                _activeTabId.value = restoredTabs.firstOrNull { it.currentUrl == activeRecord?.url && it.partition == activeRecord?.partition }?.id
+                _activeTabId.value = restoredTabs.firstOrNull { activeRecord != null && it.currentUrl == activeRecord.url && it.partition == activeRecord.partition }?.id
                     ?: restoredTabs.first().id
             }
         }

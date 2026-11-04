@@ -9,7 +9,7 @@ struct MobileTabHandler {
         router.register("switch-tab") { body in await switchTab(body) }
         router.register("close-tab") { body in await closeTab(body) }
         router.register("get-partitions") { _ in
-            successResponse(["partitions": MobilePartitionRegistry.shared.listing(tabs: context.tabStore?.tabs ?? [])])
+            successResponse(["partitions": await MobilePartitionRegistry.shared.listing(tabs: context.tabStore?.tabs ?? [])])
         }
         router.register("delete-partition") { body in
             guard let id = body["id"] as? String else { return errorResponse(code: "MISSING_PARAM", message: "id required") }

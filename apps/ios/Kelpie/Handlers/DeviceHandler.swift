@@ -286,7 +286,7 @@ struct DeviceHandler {
     }
 
     private func getCapabilities() -> [String: Any] {
-        let unsupported = Set([
+        var unsupported = Set([
             "set-geolocation",
             "clear-geolocation",
             "set-request-interception",
@@ -297,6 +297,7 @@ struct DeviceHandler {
             "set-renderer",
             "get-renderer"
         ])
+        if #unavailable(iOS 17.0) { unsupported.formUnion(["get-partitions", "delete-partition"]) }
         let partial = Set<String>()
         let supported = iosCapabilityMethods.filter { !unsupported.contains($0) && !partial.contains($0) }
         return successResponse([
@@ -342,7 +343,7 @@ private let iosCapabilityMethods = [
     "get-accessibility-tree", "screenshot-annotated", "click-annotation", "fill-annotation",
     "get-visible-elements", "get-page-text", "get-form-state",
     "get-dialog", "handle-dialog", "set-dialog-auto-handler",
-    "get-tabs", "new-tab", "switch-tab", "close-tab",
+    "get-tabs", "new-tab", "switch-tab", "close-tab", "get-partitions", "delete-partition",
     "get-iframes", "switch-to-iframe", "switch-to-main", "get-iframe-context",
     "get-cookies", "set-cookie", "delete-cookies",
     "get-storage", "set-storage", "clear-storage",
