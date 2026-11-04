@@ -27,7 +27,9 @@ const server = createServer((request, response) => {
     response.setHeader('Set-Cookie', `${state.cookie}=${url.pathname.slice(6)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`);
   }
   response.setHeader('Content-Type', 'text/html');
-  response.end('<title>Session storage fixture</title><h1>Session storage fixture</h1><a id="popup" href="/popup" target="_blank">Open another tab</a>');
+  response.end(`<meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Session storage fixture</title><h1>Session storage fixture</h1>
+    <a id="popup" style="display:inline-block;padding:20px;font-size:20px" href="/popup" target="_blank">Open another tab</a>`);
 });
 await new Promise(resolve => server.listen(Number(values.port), '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${values.port}`;
