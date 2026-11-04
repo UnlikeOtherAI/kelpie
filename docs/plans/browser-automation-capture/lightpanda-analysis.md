@@ -1,0 +1,216 @@
+# Lightpanda: applicability and restricted integration analysis
+
+Research date: 2026-11-04. Kelpie integration base inspected:
+`c01b2038bdb663cb9d5c7add134d587635da17ca`.
+No upstream implementation source is copied into Kelpie.
+
+## Decision
+
+Use Lightpanda as an optional, separately operated worker for a proven subset of
+navigation and public DOM/text tasks. Keep native Kelpie and Chromium for real
+rendering, semantic button-center geometry, pointer/tap presentation, screenshots,
+walkthrough GIF/video and native platform acceptance. These are different
+capabilities, not interchangeable evidence.
+
+Admit a worker method only after the exact installed binary passes its
+deterministic corpus. A CDP handshake proves transport connectivity, not page
+correctness, secrecy, storage isolation or complete Playwright compatibility.
+
+## Upstream revisions and provenance
+
+| Item | Verified reference | Meaning |
+| --- | --- | --- |
+| Repository | [lightpanda-io/browser](https://github.com/lightpanda-io/browser) | Upstream project; not a Chromium/WebKit fork |
+| Latest stable release returned by GitHub | [1.0.2](https://github.com/lightpanda-io/browser/releases/tag/1.0.2), published 2026-10-23 | The release API returned this tag during research |
+| Stable source commit | [c5f7bb29b127040c899d4e181b5709f76fc71a6f](https://github.com/lightpanda-io/browser/commit/c5f7bb29b127040c899d4e181b5709f76fc71a6f) | Commit directly referenced by tag 1.0.2 |
+| Main inspected | [576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db](https://github.com/lightpanda-io/browser/commit/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db), 2026-11-04 | Development source, not a claim about the stable binary |
+| Development manifest | [build.zig.zon at inspected main](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/build.zig.zon) | Declares 1.1.0-dev and pinned dependencies |
+| Linux x86_64 release asset | 76,408,136 bytes; GitHub digest `sha256:ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e` | Expected release metadata only; no downloaded binary was verified in this research step |
+
+The last row comes from the [GitHub release API](https://api.github.com/repos/lightpanda-io/browser/releases/tags/1.0.2).
+Acceptance must additionally hash the bytes actually run and record executable
+version, architecture, launch flags, operating system and test revision. A moving
+nightly download must never be silently called the inspected stable release.
+
+## Architecture and expected tradeoffs
+
+The project implements a headless browser in Zig around HTML/DOM, V8 JavaScript
+execution, networking and browser APIs. Its dependency manifest includes its V8
+fork, curl, BoringSSL and other pinned components. Removing a full graphical
+rendering pipeline can reduce work for DOM-oriented tasks; it also changes which
+browser facts exist. This is architectural reasoning, not a measured Kelpie speed
+or memory result.
+See [the inspected manifest](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/build.zig.zon).
+
+The [CDP implementation](https://github.com/lightpanda-io/browser/tree/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/server/cdp/domains)
+implements protocol domains individually. Kelpie must test the methods it uses,
+their asynchronous lifecycle and result semantics. A Playwright adapter starting
+with the entire Chromium method catalogue would overstate this partial backend.
+
+The [ToolSession implementation](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/ToolSession.zig)
+owns a separate browser/V8 environment, session, notification state and node
+registry; restart replaces page/storage/history state. This supports investigating
+explicit worker lifetimes, but does not independently prove that a particular
+CDP BrowserContext API isolates cookies/storage correctly. Our actual supported
+interface must establish that separately.
+
+The [Element implementation](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/browser/webapi/Element.zig)
+derives document position from DOM structure rather than a full visual layout.
+Successful getBoundingClientRect/getClientRects calls therefore cannot establish
+pixel-accurate centers, occlusion, clipping, responsive placement or native input
+parity. Never feed these coordinates into a native screenshot walkthrough.
+
+The [page CDP domain](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/server/cdp/domains/page.zig)
+exposes screenshot/PDF protocol entry points. Upstream's
+[README at this revision](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/README.md)
+describes text-only PNG/PDF output. Protocol naming is not a real rendered-pixel
+guarantee. Kelpie must refuse canonical tab.screenshot and capture artifacts for
+this backend even when the upstream protocol can return image bytes.
+
+The [structured-data collector](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/browser/structured_data.zig)
+demonstrates deterministic publisher metadata extraction and explicit expansion
+limits for recursive microdata. The transferable idea is bounded structured
+evidence with provenance; Kelpie implements its own policy-aware collector.
+Raw JSON-LD, OpenGraph or semantic-tree content remains publisher-controlled.
+Its presence does not establish truth, authority or safe values.
+
+The [SemanticTree implementation](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/SemanticTree.zig)
+is relevant to compact task context. Kelpie must preserve its own value-free
+contract rather than import a richer upstream dump that might contain form
+values, editor content or page-supplied instructions.
+
+## Applicable Kelpie flavors
+
+| Kelpie flavor | Useful application | Limits and acceptance target |
+| --- | --- | --- |
+| CLI / SDK / MCP host | Operator allocates a short-lived external worker and exposes an exact method profile to a caller | No model endpoint attach; no implicit fallback; real navigation/text/extraction corpus first |
+| macOS WKWebView | Can request a separate external worker for an independent DOM task | Does not replace WebKit cookies, visible UI, capture or private-world native checks |
+| macOS CEF | Compare identical DOM tasks with the external worker | CEF remains the rendering and native interaction baseline; worker results cannot prove CEF correctness |
+| Windows CEF | Windows client may use a separately operated worker | Upstream has no native Windows binary; Maxis currently has no WSL. Do not install WSL or port an engine implicitly |
+| Linux CEF | Optional external Linux worker for compatible DOM tasks | Keep CEF for pixels/UI/input; process/network boundaries remain operator obligations |
+| Linux no-CEF | May serve control metadata and reach a separately allocated worker through an explicit backend | No-CEF does not acquire a native DOM/rendering capability because a remote worker exists |
+| iOS / iPadOS | Foreground native app may explicitly delegate a separate task through an authorized service | No native Lightpanda engine, session-cookie transfer, Apple engine approval or mobile background execution is implied |
+| Android | Same explicit remote-worker distinction | Upstream Linux aarch64 is not an Android binary; Android Bionic is not the Linux glibc ABI |
+| Native local / remote inference | Consume bounded authorized results through existing policy | Worker content is untrusted evidence, never a second identity authority or tool-permission grant |
+
+The platform binary statements come from
+[the pinned README](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/README.md).
+The existing Kelpie renderer matrix and source paths are in
+[browser-engines.md](../../browser-engines.md). Availability upstream is distinct
+from our installed, tested or released support.
+
+## Security, resources and identity
+
+An external process is a boundary to operate and verify; it is not evidence of
+equivalence to Chromium's sandbox. This research did not perform a complete
+security audit. The [upstream security policy](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/SECURITY.md)
+states that security fixes land on latest main. Pinning a stable binary therefore
+also requires checking applicable upstream fixes before operational use.
+
+Keep the worker on an explicitly managed endpoint with enforced process CPU/RAM,
+lifetime, network egress and download limits. A top-level URL allowlist does not
+constrain redirects, subresources, WebSockets, private addresses or DNS rebinding.
+Do not disable CORS, TLS validation or a native sandbox to make the corpus pass.
+
+Kelpie's proposed managed allocator creates a fresh isolated context, or fresh
+owned tabs in an explicitly selected shared automation context. It never
+enumerates/imports human tabs, copies cookies from human sessions or closes the
+borrowed browser process. TTL, max-tabs and per-call authorization are separate
+from external process resource enforcement.
+
+UOA remains the sole identity authority. Store no duplicated human profile,
+password or membership records. The internal owner reference is an existing
+stable subject; model-facing session descriptors contain opaque session/tab
+identifiers, backend, isolation and expiry rather than identity attributes.
+
+## Licensing facts and integration boundary
+
+The inspected [LICENSING.md](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/LICENSING.md)
+identifies AGPL-3.0-only as the default project license and points to
+[LICENSE](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/LICENSE).
+Some individual source headers have their own wording; do not replace the
+repository's license statement with an assumption based on one header.
+
+Our implementation is independently authored protocol/client code. It does not
+copy, statically link, bundle or port upstream source/binaries. The operator
+installs the external worker. This describes the proposed technical boundary;
+it is not a legal conclusion that any use, distribution or modification is
+exempt from license obligations. A future bundling/distribution decision requires
+a separate review of the exact artifacts and their licenses.
+
+## Independently adopted ideas
+
+- Compact task-directed observation instead of dumping entire pages.
+- Deterministic extraction and publisher metadata with source/document provenance.
+- Explicit isolated sessions, owned references and bounded lifetimes.
+- Exact capability inventories instead of assuming protocol-level parity.
+- Reusable scripts whose replay does not require a language model for every step.
+- Differential task correctness and cost measurements with reproducible failures.
+
+Kelpie's shared collectors, script schemas and ownership policy are the source of
+truth for these features. The adoption is architectural, not source translation.
+Existing form/editor omission, native input semantics and uncertain-completion
+rules remain required.
+
+## WebMCP relationship
+
+Upstream main includes an explicit
+[WebMCP CDP domain](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/server/cdp/domains/webmcp.zig)
+and a [ModelContext implementation](https://github.com/lightpanda-io/browser/blob/576b6c512a5b768d4e3bdc3db18ac21c1d1ea3db/src/browser/webapi/ModelContext.zig).
+They expose registration/discovery/invocation and cancellation behavior. Their
+presence on development main is not proof of the 1.0.2 release API or Kelpie
+conformance. The real binary corpus must establish availability and behavior.
+
+The inspected [WebMCP specification](https://github.com/webmachinelearning/webmcp/blob/6cd745ac8a186122bd3f4aeaeb1d6cfa820251d2/index.bs)
+uses document.modelContext.getTools and executeTool with RegisteredTool objects.
+Kelpie's pinned [Playwright 1.62.1](https://github.com/microsoft/playwright/tree/26a9e470a7b3c7822084b09fb7f13902c5f37b51)
+predates the convenience API documented as added in
+[Playwright 1.64](https://playwright.dev/docs/api/class-webmcp).
+Use fixed functions against the actual enabled browser API rather than inventing
+support or silently polyfilling it.
+
+WebMCP tool names, descriptions, schemas, annotations and results are untrusted.
+Discovery and invocation require an explicit existing session/origin/document
+grant. Invocation is structurally mutating regardless of readOnlyHint. No page
+declaration can authorize endpoints, evaluation, identity changes or tool calls.
+
+## Measurable compatibility and cost plan
+
+Use the same frozen fixture/corpus revision for Chromium and Lightpanda, with no
+live public-site timing claims. Keep runtime versions, architecture, worker flags,
+egress policy and binary hashes alongside results.
+
+| Corpus area | Required result | Failure to preserve |
+| --- | --- | --- |
+| Navigation and metadata | Exact URL/title after initial load, redirect, reload and back/forward where admitted | Timeouts, unsupported methods, wrong document/title |
+| Public extraction | Expected public text/links/publisher metadata, deterministic bounds/provenance | Missing facts, wrong truncation, hidden-content exposure |
+| Value omission | No input, textarea, editable or referenced editable secrets | Any leaked fixture secret, even when task otherwise succeeds |
+| Ownership | Foreign/closed/expired tab refusal; isolated storage; shared explicit cookies only | Cross-session access or hidden browser.close ownership |
+| Readiness | Actual supported evidence; unavailable network/error data remains unavailable | False-ready or invented zero-error/network counts |
+| WebMCP | Actual API-enabled discover/call; grant/ref invalidation; bounded result; uncertain timeout | Polyfill-only pass, hint-based permission, replay or unbounded metadata |
+| Visual boundary | Canonical screenshot/geometry/pointer/capture refused for LP | Any text-layout image represented as real pixels |
+
+Record task success against independent fixture expectations before cost.
+Measure cold startup separately from warm tasks, wall time distribution
+(median/p95), process-tree peak RSS, CPU time, request/tool counts, response bytes
+and any model token/cost figures actually observed. Use repeated bounded runs,
+fixed concurrency and a documented timeout. Keep incompatibilities in the
+denominator; do not compare only successful or favorable tasks.
+
+A DOM task passing on LP does not establish responsive layout, trusted native
+activation, accessibility platform behavior, browser screenshots, video frame
+timing or OS/browser integration. Those require the real native/Chromium flow.
+
+## Evidence status
+
+| Evidence | Completed | Pending |
+| --- | --- | --- |
+| Source/release/API research | Commit-pinned sources and release metadata above | Downloaded executable hash/version |
+| Independent session/backend source | Draft in owned Maxis worktree | Focused checks and committed reviewed source |
+| Real Chromium session corpus | Durable harness drafted | Allocated browser run and artifact report |
+| Real LP CDP navigation/text/extraction | None claimed | Assigned Linux test checkout/resource slot |
+| Compatibility/performance comparison | None claimed | Correctness first, then bounded cost measurement |
+| Native Windows/Linux capture | Not evidence for LP | Separate native owner/rollout gate |
+
+Never convert a pending row into completed support because a unit mock or a
+protocol handshake passed.
