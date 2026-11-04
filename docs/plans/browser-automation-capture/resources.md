@@ -107,3 +107,11 @@ Windows codec ownership is now separate: the former mobile worker owns WIC/Media
 
 ## VNC authentication resolved
 The coordinator completed authentication and observed the actual Maxis desktop in the existing viewer, window ID 45946812 titled maxis - TigerVNC. No password was saved, and no remote click or process change was made. The earlier authentication blocker is resolved. The viewer currently shows unrelated remote work; acceptance must refresh its own CUA inventory before use and must not interact with that work. Actual Kelpie UI testing still waits for the exact candidate revision and resource grant. No credential material is stored in this ledger.
+
+## Source-review hold after Windows draft
+Computer Use remains off after the user's cursor-release request. No viewer,
+control helper or native interaction is authorized by this review. The coordinator
+reports another task's Kelpie PID47784 at
+D:/BuildArtifacts/kelpie/session-capture/windows-0.1.12/kelpie.exe; preserve that
+process while its owner is resolved. Acceptance has performed only source reads,
+docs edits and Git operations; it has not started a test/build/media process.

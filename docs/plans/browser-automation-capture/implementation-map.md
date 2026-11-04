@@ -10,7 +10,7 @@ overlay, direct MCP/CLI, remote artifact and installed-release evidence is
 
 | Key | Exact source checkpoint | What was reviewed |
 |---|---|---|
-| OBS | e52240e7fe127b4b43aac51fd4eb2db4e64dd574 | Canonical observations and generated native ABI |
+| OBS | 3a63ea7d696a7850e2798b2c235aca784104d9db | Bounded canonical observations and generated native ABI |
 | WFL | d6d7a36666e11db45e7e42cfe09a62d1f2a2fcd8 | Strict workflows, bindings, target safety and presentation |
 | CODEC | 8369571f6b821cc4bcfc853de2a78f5fc25e142d | Windows codecs, exclusive output opens, failure cleanup and decoded color checks |
 | BACKEND | 28a9f3c71c81f3df6e87ac77b69d49363391cb2d | Managed sessions, restricted LP and WebMCP helpers |
@@ -64,14 +64,14 @@ that every platform ran them.
 
 | Canonical IDs | Source symbols/files | Durable evals | Checkpoint and remaining work |
 |---|---|---|---|
-| OBS-01 | collectBrowserSnapshot in browser-control/snapshot.ts; collectBrowserExtraction in observations.ts | OBS-BROWSER private canaries; FIXTURE-EVIDENCE assertValueFree | OBS; native pending, bounded-reader follow-up open |
+| OBS-01 | collectBrowserSnapshot in browser-control/snapshot.ts; collectBrowserExtraction in observations.ts | OBS-BROWSER private canaries; FIXTURE-EVIDENCE assertValueFree | OBS; bounded reader reviewed; native pending |
 | OBS-02 | BrowserSnapshotOptionsSchema; collectBrowserSnapshot scope/priority | OBS-SCHEMA, OBS-BROWSER scoped actions | OBS; native pending |
-| OBS-03 | snapshot clean/content/visit; extraction bounded/publicText | OBS-BROWSER output limits | OBS; work-before-budget defect open |
+| OBS-03 | snapshot clean/content/visit; extraction bounded/publicText | OBS-BROWSER output limits | OBS; shared work/copy budgets reviewed; native pending |
 | EXT-01 | BrowserExtractionOptionsSchema; collectBrowserExtraction extract | OBS-SCHEMA, OBS-BROWSER missing/ambiguous/source cases | OBS; native pending |
-| EXT-02 | extractionField(depth); extract nested records with recordsRemaining/fieldsRemaining | OBS-BROWSER nested catalogue/list records | OBS; bounded traversal follow-up open |
-| EXT-03 | collectBrowserExtraction metadata/JSON-LD allowlists | OBS-BROWSER publisher/@graph/private canary cases | OBS; metadata-copy bounds follow-up open |
-| EXT-04 | BrowserExtractedField.provenance; metadata selector/attribute; documentRevision availability | OBS-BROWSER provenance assertions | OBS; incomplete provenance follow-up open |
-| RDY-01 | collectBrowserPageStatus; BrowserPageStatus | OBS-BROWSER unavailable network/errors and counts | OBS; visibility/bounded count follow-up open |
+| EXT-02 | extractionField(depth); extract nested records with recordsRemaining/fieldsRemaining | OBS-BROWSER nested catalogue/list records | OBS; bounded traversal reviewed; native pending |
+| EXT-03 | collectBrowserExtraction metadata/JSON-LD allowlists | OBS-BROWSER publisher/@graph/private canary cases | OBS; metadata-copy bounds reviewed; native pending |
+| EXT-04 | BrowserExtractedField.provenance; metadata selector/attribute; documentRevision availability | OBS-BROWSER provenance assertions | OBS; incomplete provenance fixed; filtered exact-index edge case open |
+| RDY-01 | collectBrowserPageStatus; BrowserPageStatus | OBS-BROWSER unavailable network/errors and counts | OBS; bounded counts/visibility reviewed; native pending |
 | RDY-02 | BrowserReadinessOptionsSchema; collectBrowserReadiness | OBS-SCHEMA immediate defaults; OBS-BROWSER hidden/visible/ambiguous selector | OBS; actual native wait loop pending |
 | OWN-01 | allocateManagedBrowserSession in browser-control/managed-session.ts; createManagedSessionRegistry in cli/browser/automation-sessions.ts | MANAGED isolation, foreign handles, expiry and cleanup | BACKEND; failed allocation cleanup ownership fix open; public stdio/native pending |
 | OWN-02 | Existing browser-control/proxy.ts authorization; native/core-mcp/src/browser_gateway.cpp dispatch; resolveScriptTarget token fence | OBS-SCHEMA authorization; ABI; TARGET | OBS/WFL; late callback, exact socket and durable Nessie pin native regression pending |
@@ -115,6 +115,8 @@ that every platform ran them.
 
 ## Open review ledgers
 
+- [Workflow CLI draft review](workflow-cli-review.md): pinned transport, transfer
+  integrity/cleanup, reusable extraction and native numeric parity source.
 - [Workflow review](workflow-review.md): reproduced defects, fixing revision,
   independent results and remaining bounded-name/runtime gaps.
 - [Observation review](observation-review.md): bounded work, visibility, metadata
