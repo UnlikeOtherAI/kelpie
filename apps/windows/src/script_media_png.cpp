@@ -50,21 +50,37 @@ std::vector<std::uint8_t> EncodePNG(const ScriptMediaFrame& frame) {
   return bytes;
 }
 
-void WritePNGBytes(const std::vector<std::uint8_t>& bytes, const std::filesystem::path& path) {
-  const auto file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+void WritePNGBytes(const std::vector<std::uint8_t>& bytes, const std::filesystem::path& path,
+                   const PngFileOps& io) {
+  const auto file = CreateFileW(path.c_str(), GENERIC_WRITE | DELETE, 0, nullptr, CREATE_NEW,
                                 FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE) {
     if (GetLastError() == ERROR_FILE_EXISTS)
       throw std::runtime_error("CAPTURE_OUTPUT_EXISTS");
     throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
   }
-  DWORD written = 0;
-  const auto success = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
-  const auto closed = CloseHandle(file);
-  if (!success || !closed || written != bytes.size())
+  // Keep a second handle to this exact newly-created file until close succeeds.
+  // Cleanup never follows a path that another producer could replace.
+  HANDLE guard = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(GetCurrentProcess(), file, GetCurrentProcess(), &guard,
+                       0, FALSE, DUPLICATE_SAME_ACCESS)) {
+    FILE_DISPOSITION_INFO discard{TRUE};
+    SetFileInformationByHandle(file, FileDispositionInfo, &discard, sizeof(discard));
+    CloseHandle(file);
     throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
-}
-}  // namespace kelpie::windows::media
+  }
+  DWORD written = 0;
+  const auto success = io.write(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
+  const auto closed = io.close(file);
+  if (!success || !closed || written != bytes.size()) {
+    FILE_DISPOSITION_INFO discard{TRUE};
+    SetFileInformationByHandle(guard, FileDispositionInfo, &discard, sizeof(discard));
+    if (!closed) CloseHandle(file);
+    CloseHandle(guard);
+    throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
+  }
+  CloseHandle(guard);
+}}  // namespace kelpie::windows::media
 
 namespace kelpie::windows {
 void ScriptMediaEncoder::WritePNG(

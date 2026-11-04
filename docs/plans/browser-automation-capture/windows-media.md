@@ -16,7 +16,7 @@ Files live under apps/windows/src:
 - script_media_png.cpp and script_media_internal.h: WIC PNG and internal helpers.
 
 Create(directory, formats, fps, maxBytes) accepts gif/mp4, 1..60 fps and a
-1..256 MiB retained-media budget (default 64 MiB). Empty formats support
+1024-byte..256 MiB retained-media budget (default 64 MiB). Empty formats support
 screenshots alone. The directory must exist and capture.gif/capture.mp4 must not
 already exist. The caller supplies a private per-capture directory.
 
@@ -112,3 +112,36 @@ Pending: runtime-owner CMake registration and full sandboxed native app build;
 real browser entry point, HTTP/MCP/CLI flows; continuous capture of actual overlays;
 manual viewing of user-produced media; published/installable release acceptance.
 These checks are not claimed by encoder-level decode tests.
+## Ownership and small-budget follow-up
+
+The authoritative minimum follows the shared scriptCaptureSchema: 1024 bytes,
+without upward clamping. When the first MP4 sample cannot reserve container
+headroom, the output is empty with budget_exceeded rather than an oversized or
+invalid file. GIF and PNG admit only outputs that fit their exact retained cost.
+
+Lazy GIF opens use Win32 CREATE_NEW and hold the handle through finalization.
+MP4 opens an MFCreateFile fail-if-exists byte stream and passes that stream to
+the sink; its URL is informational. Byte accounting includes only this encoder's
+owned files. PNG failure cleanup retains a duplicate handle to the exact newly
+created file, marks that file for deletion on partial write/close failure and
+never follows a potentially replaced path to perform rollback.
+
+Follow-up regression cases cover two encoders created in the same directory
+before either opens output, unchanged winning bytes, zero loser accounting,
+completed sibling preservation, injected partial writes/close failure, canonical
+1024-byte budgets, decoded MP4 chroma, padded stride and changing GIF palettes.
+All follow-up cases passed in the coordinator's CODEC-2 slot on Maxis, together
+with every earlier codec check. The same /W4 /WX compiler invocation passed with
+no warnings. Native decoders verified MP4 U/V chroma and padded input stride as
+well as changing GIF palettes. Both pre-created encoder collision cases preserved
+the first output byte for byte, reported zero bytes for the losing encoder and
+left the winning media decodable. A completed GIF survived an MP4 ownership error.
+Injected partial PNG writes and failed closes removed only newly owned files;
+a pre-existing PNG remained unchanged. Canonical 1024-byte budgets were honored
+without clamping or oversized output.
+
+The follow-up executable/artifacts are under .build-media/run-3. Preflight CPU
+was 19%, with 23.80 GiB free RAM. One compiler and one test ran sequentially.
+GetProcessMemoryInfo reported peak working set 37,859,328 bytes and peak committed
+memory 49,905,664 bytes for this run. Earlier verification above is for 2a0858f0;
+the follow-up has the same full-app/manual-verification limits.
