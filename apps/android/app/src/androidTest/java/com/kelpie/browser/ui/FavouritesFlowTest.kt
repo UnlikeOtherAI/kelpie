@@ -73,9 +73,9 @@ class FavouritesFlowTest {
                 .onNodeWithTag(destinationTag, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .boundsInRoot.center - origin
+        handle.performTouchInput { down(center) }
+        ui.mainClock.advanceTimeBy(700)
         handle.performTouchInput {
-            down(center)
-            moveTo(center, delayMillis = 700)
             moveTo(destination, delayMillis = 400)
             up()
         }
