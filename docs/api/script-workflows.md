@@ -31,6 +31,8 @@ Each artifact manifest contains `id,mimeType,byteLength,sha256,partial,width,hei
 
 Windows Chromium registers `kelpie_play_script`, `kelpie_abort_script`,
 `kelpie_get_script_status`, and `kelpie_get_script_artifact` in the native catalogue.
+Playback requires the native app renderer and presentation/Stop factory. A hidden
+normal app is supported; this does not advertise pure headless-backend playback.
 Their schemas come from the shared generated contract and work through direct tool
 calls or `kelpie_extension` with the same names. Playback and abort are mutations;
 status and artifact reads remain available to read-only sessions, subject to the

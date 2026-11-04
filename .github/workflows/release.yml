@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build-linux:
-    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components: macos -->') }}"
+    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->') }}"
     name: Build Linux (${{ matrix.distro.name }})
     runs-on: ubuntu-latest
     strategy:
@@ -36,6 +36,7 @@ jobs:
                 dpkg-dev \
                 file \
                 git \
+                g++-12 \
                 libasound2-dev \
                 libatk-bridge2.0-dev \
                 libatk1.0-dev \
@@ -64,6 +65,7 @@ jobs:
                 tar \
                 xz-utils
               rm -rf /var/lib/apt/lists/*
+              export CC=gcc-12 CXX=g++-12
             package_kind: deb
             build_appimage: true
           - name: fedora-40
@@ -212,7 +214,7 @@ jobs:
           if-no-files-found: error
 
   build-android:
-    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components: macos -->') }}"
+    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: android -->') }}"
     name: Build Android release artifacts
     runs-on: ubuntu-latest
     steps:
@@ -298,7 +300,7 @@ jobs:
           if-no-files-found: error
 
   publish-cli:
-    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components: macos -->') }}"
+    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: cli -->') }}"
     name: Build and publish CLI
     runs-on: ubuntu-latest
     permissions:
@@ -397,7 +399,10 @@ jobs:
             dist/release/cli/checksums.txt
           if-no-files-found: error
 
+  # Selected releases start with a components header and list one component
+  # marker per enabled job. Unmarked releases retain the full release workflow.
   attach-to-release:
+    if: ${{ !failure() && !cancelled() && contains(needs.*.result, 'success') }}
     name: Attach assets to GitHub release
     runs-on: ubuntu-latest
     needs:
@@ -406,17 +411,20 @@ jobs:
       - publish-cli
     steps:
       - uses: actions/download-artifact@v8.0.1
+        if: needs.build-linux.result == 'success'
         with:
           pattern: 'linux-release-*'
           merge-multiple: false
           path: dist/release
 
       - uses: actions/download-artifact@v8.0.1
+        if: needs.build-android.result == 'success'
         with:
           name: android-release
           path: dist/release/android
 
       - uses: actions/download-artifact@v8.0.1
+        if: needs.publish-cli.result == 'success'
         with:
           name: cli-release
           path: dist/release/cli
@@ -442,6 +450,8 @@ jobs:
             dist/release/**/checksums-*.txt
 
   publish-package-repos:
+    # Skipped, unchanged components must not suppress a successful Linux release.
+    if: "${{ !cancelled() && needs.attach-to-release.result == 'success' && (!startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: linux -->')) }}"
     name: Publish Linux package repositories
     runs-on: ubuntu-latest
     needs:

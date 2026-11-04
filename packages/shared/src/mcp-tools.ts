@@ -12,6 +12,9 @@ export const BrowserMcpTools = [
   "kelpie_close_browser",
   "kelpie_bookmarks_list",
   "kelpie_bookmarks_add",
+  "kelpie_bookmarks_create_folder",
+  "kelpie_bookmarks_update",
+  "kelpie_bookmarks_move",
   "kelpie_bookmarks_remove",
   "kelpie_bookmarks_clear",
   "kelpie_history_list",
@@ -147,6 +150,9 @@ export const BrowserMcpTools = [
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
 
 export const BrowserToolUnsupportedPlatforms = {
+  kelpie_bookmarks_create_folder: ["linux", "windows"],
+  kelpie_bookmarks_update: ["linux", "windows"],
+  kelpie_bookmarks_move: ["linux", "windows"],
   kelpie_get_links: ["ios", "android", "linux", "windows"],
   kelpie_ai_status: ["linux", "windows"],
   kelpie_ai_load: ["linux", "windows"],
@@ -193,10 +199,6 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_get_debug_overlay: ["android", "macos", "linux", "windows"],
   // is-element-obscured relies on the mobile keyboard/safe-area model
   kelpie_is_element_obscured: ["macos", "linux", "windows"],
-  // Storage partitions: macOS on WebKit and Windows on Chromium (CEF). The
-  // remaining platforms drop their entry here as they land the same contract.
-  kelpie_get_partitions: ["ios", "android"],
-  kelpie_delete_partition: ["ios", "android"],
 } satisfies Partial<Record<BrowserMcpTool, readonly Platform[]>>;
 
 /** CLI-level MCP tools (discovery + group commands) */
@@ -244,6 +246,9 @@ export const httpToMcp: Record<string, BrowserMcpTool> = {
   "close-browser": "kelpie_close_browser",
   "bookmarks-list": "kelpie_bookmarks_list",
   "bookmarks-add": "kelpie_bookmarks_add",
+  "bookmarks-create-folder": "kelpie_bookmarks_create_folder",
+  "bookmarks-update": "kelpie_bookmarks_update",
+  "bookmarks-move": "kelpie_bookmarks_move",
   "bookmarks-remove": "kelpie_bookmarks_remove",
   "bookmarks-clear": "kelpie_bookmarks_clear",
   "history-list": "kelpie_history_list",

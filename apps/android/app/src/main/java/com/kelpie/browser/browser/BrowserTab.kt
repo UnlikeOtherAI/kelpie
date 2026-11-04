@@ -11,6 +11,8 @@ import java.util.UUID
 class BrowserTab(
     val id: String = UUID.randomUUID().toString(),
     val webView: WebView,
+    val partition: String? = null,
+    val name: String? = null,
     var isStartPage: Boolean = true,
 ) {
     var currentUrl: String by mutableStateOf("")

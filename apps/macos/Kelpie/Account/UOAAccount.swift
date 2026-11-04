@@ -21,6 +21,8 @@ final class UOAAccount: ObservableObject {
     @Published private(set) var avatar: UOAAvatar?
     @Published private(set) var signingIn = false
     @Published var error: String?
+    private let settingsTransport = UOATransport()
+    let supportsSettingsStream: Bool
     private let transport: Transport
     private let storage: UOASessionStorage
     private let bookmarks: BookmarkStore
@@ -41,6 +43,7 @@ final class UOAAccount: ObservableObject {
         bookmarks: BookmarkStore? = nil,
         presentLogin: UOALoginPresenter? = nil
     ) {
+        supportsSettingsStream = transport == nil
         let client = UOATransport()
         self.transport = transport ?? { try await client.request($0, method: $1, token: $2, body: $3, version: $4) }
         self.storage = storage
@@ -93,6 +96,13 @@ final class UOAAccount: ObservableObject {
             if current == generation { expire() }
             throw failure
         }
+    }
+
+    func settingsSocket(namespace: String, key: String) async throws -> URLSessionWebSocketTask {
+        let current = generation
+        let token = try await validAccessToken(current)
+        guard generation == current, profile != nil else { throw CancellationError() }
+        return try settingsTransport.settingsSocket(namespace: namespace, key: key, token: token)
     }
 
     // MARK: - Session lifecycle

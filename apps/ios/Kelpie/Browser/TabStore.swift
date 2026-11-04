@@ -13,6 +13,7 @@ final class TabStore: ObservableObject {
     var activeBrowserTab: BrowserTab? { tabs.first { $0.id == activeBrowserTabID } }
 
     private weak var handlerContext: HandlerContext?
+    private var persistsSession = true
     private var previewTabs: [UUID] = []
     private var tabSinks: [UUID: AnyCancellable] = [:]
 
@@ -20,10 +21,12 @@ final class TabStore: ObservableObject {
         self.handlerContext = handlerContext
         let session = SessionStore.load()
         if let session {
-            let restoredTabs = restoredBrowserTabs(from: session.urls)
+            let restoredTabs = restoredBrowserTabs(from: session.tabs)
             if !restoredTabs.isEmpty {
                 tabs = restoredTabs
-                activeBrowserTabID = restoredTabs[min(session.activeIndex, restoredTabs.count - 1)].id
+                let activeRecord = session.tabs.indices.contains(session.activeIndex) ? session.tabs[session.activeIndex] : nil
+                activeBrowserTabID = restoredTabs.first { $0.currentURL == activeRecord?.url && $0.partition == activeRecord?.partition }?.id
+                    ?? restoredTabs.first?.id
                 return
             }
         }
@@ -42,6 +45,7 @@ final class TabStore: ObservableObject {
 
     /// Creates an isolated in-memory tab store for WebKit control tests.
     init(isolatedTab: BrowserTab) {
+        persistsSession = false
         handlerContext = nil
         tabs = [isolatedTab]
         activeBrowserTabID = isolatedTab.id
@@ -49,14 +53,20 @@ final class TabStore: ObservableObject {
 
     @discardableResult
     func addBrowserTab(url: String? = nil) -> BrowserTab {
+        addBrowserTab(url: url, dataStore: WebViewDefaults.sharedWebsiteDataStore)
+    }
+
+    @discardableResult
+    func addBrowserTab(url: String?, dataStore: WKWebsiteDataStore, partition: String? = nil, name: String? = nil) -> BrowserTab {
         NessieConnection.shared.personChangedTab()
         captureActivePreview()
-        let tab = createBrowserTab()
+        let tab = createBrowserTab(dataStore: dataStore, partition: partition, name: name)
         bind(tab)
         tabs.append(tab)
         activeBrowserTabID = tab.id
         if let url, let parsed = URL(string: url) {
             tab.isStartPage = false
+            tab.currentURL = url
             tab.webView.load(URLRequest(url: parsed))
         }
         persistSession()
@@ -106,10 +116,15 @@ final class TabStore: ObservableObject {
         tab.capturePreview()
     }
 
-    private func createBrowserTab(isStartPage: Bool = true) -> BrowserTab {
+    private func createBrowserTab(
+        isStartPage: Bool = true,
+        dataStore: WKWebsiteDataStore = WebViewDefaults.sharedWebsiteDataStore,
+        partition: String? = nil,
+        name: String? = nil
+    ) -> BrowserTab {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
-        config.websiteDataStore = WebViewDefaults.sharedWebsiteDataStore
+        config.websiteDataStore = dataStore
 
         if let handlerContext {
             let ucc = config.userContentController
@@ -126,14 +141,23 @@ final class TabStore: ObservableObject {
         webView.allowsBackForwardNavigationGestures = true
         webView.customUserAgent = WebViewDefaults.sharedUserAgent
 
-        return BrowserTab(webView: webView, isStartPage: isStartPage)
+        return BrowserTab(webView: webView, isStartPage: isStartPage, partition: partition, name: name)
     }
 
-    private func restoredBrowserTabs(from urls: [String]) -> [BrowserTab] {
-        urls.compactMap { value in
-            guard let url = URL(string: value) else { return nil }
-            let tab = createBrowserTab(isStartPage: false)
+    private func restoredBrowserTabs(from records: [SessionStore.TabRecord]) -> [BrowserTab] {
+        records.compactMap { record in
+            guard let url = URL(string: record.url) else { return nil }
+            let dataStore: WKWebsiteDataStore
+            do {
+                dataStore = try record.partition.map { try MobilePartitionRegistry.shared.resolve($0, restoring: true) }
+                    ?? WebViewDefaults.sharedWebsiteDataStore
+            } catch {
+                NSLog("[TabStore] Skipped unavailable isolated tab: %@", error.localizedDescription)
+                return nil
+            }
+            let tab = createBrowserTab(isStartPage: false, dataStore: dataStore, partition: record.partition, name: record.name)
             bind(tab)
+            tab.currentURL = record.url
             tab.webView.load(URLRequest(url: url))
             return tab
         }
@@ -153,6 +177,7 @@ final class TabStore: ObservableObject {
     }
 
     private func persistSession() {
+        guard persistsSession else { return }
         SessionStore.save(tabs: tabs, activeID: activeBrowserTabID)
     }
 }

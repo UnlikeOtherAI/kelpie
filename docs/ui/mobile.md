@@ -219,3 +219,7 @@ greys. The bottom toolbar follows UIKit's docked keyboard guide; floating and
 undocked keyboards leave it at the bottom of the browser window. Without a docked
 keyboard the toolbar sinks into the home-indicator safe area, keeping 11 points
 clear above the screen edge, and page content clearance shrinks by the same amount.
+
+## Favourites
+
+The bookmarks entry opens Favourites as a full-screen tree on narrow windows and a left drawer at 600 points/dp or wider. iOS and Android mirror the same actions and hierarchy. Expand folders, drag the handle to reorder/nest (row edges insert before/after; the middle of a folder nests), or use Move to choose a folder and sibling position. Top Level is an explicit root drop target. Edit changes the name and page URL. New Folder and Add Current Page are available globally and inside folders. Remove confirms folder contents; Undo Remove restores the removed subtree. Sync errors remain on this surface. A phone closes the screen when opening a page; a tablet leaves the drawer open.
