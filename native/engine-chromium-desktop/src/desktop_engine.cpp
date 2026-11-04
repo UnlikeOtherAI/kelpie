@@ -137,6 +137,22 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     return false;
   }
 
+  // Resolve every restored identity before creating any page. A failed store
+  // must not reopen the first isolated URL in the global profile or drop later
+  // isolated tabs from the next session snapshot.
+  for (const auto& restored : config.restored_tabs) {
+    if (!restored.partition) continue;
+    const auto validation = ValidatePartition(*restored.partition);
+    if (validation.ok && WaitForPartition(partitions.Acquire(*restored.partition, restored.persistent))) continue;
+    last_error = "Chromium could not restore storage partition: " + *restored.partition;
+    partitions.Clear();
+    app = nullptr;
+    client = nullptr;
+    CefShutdown();
+    initialized = false;
+    return false;
+  }
+
   CefWindowInfo window_info;
   if (config.mode == DesktopEngine::Mode::kOffscreen) {
     window_info.SetAsWindowless(0);
@@ -167,14 +183,9 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
     const DesktopEngine::RestoredTab& first = config.restored_tabs.front();
     first_name = first.name;
     if (first.partition) {
-      if (auto* entry = partitions.Acquire(*first.partition, first.persistent)) {
-        // Startup owns the UI thread outright and is not inside a CEF callback,
-        // so it is the one place that can pump the loop while a store loads.
-        if (WaitForPartition(entry)) {
-          first_context = entry->context;
-          first_partition = entry->id;
-        }
-      }
+      auto* entry = partitions.Find(*first.partition);
+      first_context = entry->context;
+      first_partition = entry->id;
     }
   }
   browser = CefBrowserHost::CreateBrowserSync(
@@ -200,11 +211,6 @@ bool DesktopEngine::Impl::Initialize(const DesktopEngine::Config& next_config) {
         : std::max<std::uint64_t>(config.restored_next_tab_id, 2);
     for (std::size_t index = 1; index < config.restored_tabs.size(); ++index) {
       const DesktopEngine::RestoredTab& restored = config.restored_tabs[index];
-      if (restored.partition) {
-        if (auto* entry = partitions.Acquire(*restored.partition, restored.persistent)) {
-          WaitForPartition(entry);
-        }
-      }
       NewTabRequest request;
       request.url = restored.url;
       request.name = restored.name;
