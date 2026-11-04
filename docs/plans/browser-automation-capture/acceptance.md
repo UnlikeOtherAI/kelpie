@@ -8,8 +8,8 @@ and [fixture instructions](../../../tests/capture/README.md).
 
 ## Gates and evidence
 
-macOS must pass the complete user flow before native rollout to iOS, Android,
-Windows and Linux. Each renderer must be named: macOS WebKit and Chromium are
+Windows on Maxis must pass the complete native CEF user flow before work resumes on macOS, iOS, Android,
+and Linux. Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
 separate cells. A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
@@ -105,7 +105,37 @@ and symbols exist. Every implementation owner must replace this with landed path
    Run another successful workflow without clearing state by hand.
 7. Try another session and revoked grant against status/cancel/download. Confirm
    stale refs, uncertain mutation and Nessie durable pins retain existing behavior.
-8. Repeat the exact corpus on each native renderer only after macOS passes.
+8. Repeat the exact corpus on each native renderer only after Windows passes.
    Restricted Lightpanda refusal evidence remains distinct from native support.
 
 No test or manual flow has been run for this ledger yet.
+
+## Canonical ID crosswalk
+This ledger is the sole definition of acceptance IDs. Earlier planning/checklist
+IDs below are historical aliases, not additional acceptance requirements. Update
+owner checklists to use canonical IDs; never mark a row complete using an older
+CAP identifier with a different meaning.
+| Earlier checklist ID | Canonical requirements |
+|---|---|
+| CAP-01 HTTP/CLI/MCP same script | WFL-01, DOC-01 |
+| CAP-02 semantic target | TGT-01 through TGT-05 |
+| CAP-03 tap marker | VIS-01, VIS-02 |
+| CAP-04 pointer | PTR-01, PTR-02 |
+| CAP-05 continuous GIF/video | CAP-01, CAP-02, CAP-03, CAP-05, CAP-06, CAP-07 |
+| CAP-06 remote step screenshots | CAP-04, ART-01, ART-04 |
+| CAP-07 abort/time/byte bounds | CAP-06, CAP-08, WFL-05 |
+| CAP-08 scoped artifact retrieval | ART-01 through ART-04 |
+| REPLAY-01 strict versioned actions | WFL-01, WFL-04 |
+| REPLAY-02 typed inputs/secrets | WFL-02, SEC-01 |
+| REPLAY-03 assertions/readiness | WFL-03, RDY-02 |
+| REPLAY-04 structured output | WFL-03, EXT-01 through EXT-04 |
+| REPLAY-05 unsupported/preflight | WFL-01, DOC-01 |
+| REPLAY-06 abort/uncertainty | WFL-05, OWN-02, CAP-08 |
+| OBS planning group | OBS-01 through OBS-03; extraction belongs to EXT-01 through EXT-04 |
+| DIA / READY planning groups | RDY-01, RDY-02 |
+| SESSION planning group | OWN-01, OWN-02, ART-02 |
+| BACKEND planning group | LP-01, LP-02, DIF-01 |
+| WEBMCP planning group | WEB-01, WEB-02 |
+See [workflow source review](workflow-review.md) for reproduced defects at the
+initial shared-contract checkpoint. Those findings remain open until fixing
+revision and focused/real-renderer results are recorded.
