@@ -14,7 +14,11 @@ export async function startCaptureFixture({ host = "127.0.0.1", port = 0 } = {})
       "x-content-type-options": "nosniff", "content-length": Buffer.byteLength(body) });
     response.end(body);
   };
-  const server = createServer(async (request, response) => {
+  const sockets = new Set();
+  let closing = false;
+  let closed;
+  const server = createServer((request, response) => {
+    void (async () => {
     const path = new URL(request.url ?? "/", "http://fixture.invalid").pathname;
     if (request.method === "POST" && path === "/events") {
       let length = 0;
@@ -40,13 +44,32 @@ export async function startCaptureFixture({ host = "127.0.0.1", port = 0 } = {})
     const asset = assets.get(path);
     if (asset) return write(response, 200, asset.type, asset.body);
     write(response, 404, "text/plain", "not found");
+    })().catch(() => {
+      // Teardown can abort an in-flight body read; never leak its rejection.
+      if (!response.destroyed) response.destroy();
+    });
+  });
+  server.on("connection", socket => {
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+    if (closing) socket.destroy();
   });
   await new Promise((resolve, reject) => {
     server.once("error", reject); server.listen(port, host, resolve);
   });
   return {
     url: `http://${host}:${server.address().port}`, events,
-    close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())),
+    close: () => {
+      if (closed) return closed;
+      closing = true;
+      closed = new Promise((resolve, reject) => {
+        // Stop admission first, then retire every socket owned by this fixture,
+        // including raw preconnects which closeAllConnections does not cover.
+        server.close(error => error ? reject(error) : resolve());
+        for (const socket of sockets) socket.destroy();
+      });
+      return closed;
+    },
   };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
