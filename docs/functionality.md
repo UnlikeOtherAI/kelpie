@@ -599,4 +599,14 @@ page-realm limitation and verification commands.
 
 Native `/v1/browser-control`, direct `/mcp`, `kelpie browser-control <request-json>` and CLI MCP expose one versioned browser core used by runtime consumers. Native owns the persistent reference registry. The default MCP catalog advertises the core and three extension discovery/invocation tools; rich functions remain reachable through the generic extension caller. Its owning surface is machine-facing control, reached through HTTP, existing `kelpie mcp`, or a pinned browser alias. Authentication and native capability inventory govern every device. Observed refs, bounded value-free snapshots, navigation and screenshots share one package contract; unsupported native methods are refused according to actual capabilities. The Linux no-CEF fallback supports the protocol with metadata-only core capabilities and legacy extensions. Existing tools remain extensions. See [the browser-control reference](api/browser-control.md).
 
+Shared observations prioritize controls and headings before prose and optionally narrow to
+one CSS scope. Deterministic extraction maps public text and allowlisted link/time
+attributes into nested repeated records, preserving missing/ambiguous distinctions and
+source provenance. Optional publisher metadata includes bounded allowlisted JSON-LD
+claims; raw scripts and form/editor values remain excluded. Compact page status
+distinguishes unavailable network/error evidence from zero. Immediate readiness checks
+document load state and an optional unique visible target; it does not infer application
+or task completion. These methods use the same authenticated HTTP/MCP/SDK contract and
+native fixed-reader capability gate. See [scoped observations](api/browser-control.md#scoped-observations-and-deterministic-extraction).
+
 The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).

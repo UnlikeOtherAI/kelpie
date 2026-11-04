@@ -60,6 +60,10 @@ bool Validate(const json& root, const json& schema, json* value, int depth) {
   if (value->is_array()) {
     if (schema.contains("minItems") && value->size() < schema["minItems"].get<std::size_t>()) return false;
     if (schema.contains("maxItems") && value->size() > schema["maxItems"].get<std::size_t>()) return false;
+    if (schema.value("uniqueItems", false)) {
+      for (std::size_t i = 0; i < value->size(); ++i)
+        for (std::size_t j = i + 1; j < value->size(); ++j) if ((*value)[i] == (*value)[j]) return false;
+    }
     if (schema.contains("items")) for (auto& item : *value) if (!Validate(root, schema["items"], &item, depth + 1)) return false;
   }
   if (value->is_object()) {

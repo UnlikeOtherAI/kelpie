@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BrowserSnapshotOptionsSchema, BrowserExtractionOptionsSchema, BrowserReadinessOptionsSchema } from "./observations.js";
 
 const text = z.string().max(65_536);
 const matcher = z.union([z.string().max(4096), z.object({ source: z.string().max(4096), flags: z.string().max(8) }).strict()]);
@@ -30,7 +31,9 @@ export const BrowserControlRequestSchema = z.discriminatedUnion("method", [
   request("tab.url", empty), request("tab.title", empty),
   request("tab.click", z.object({ ref: z.string().min(1).max(1024) }).strict()),
   request("tab.type", z.object({ ref: z.string().min(1).max(1024), text }).strict()),
-  request("tab.snapshot", z.object({ maxElements: z.number().int().min(1).max(1000).optional(), maxChars: z.number().int().min(256).max(100_000).optional() }).strict().default({})),
+  request("tab.snapshot", BrowserSnapshotOptionsSchema),
+  request("tab.extract", BrowserExtractionOptionsSchema), request("tab.status", empty),
+  request("tab.ready", BrowserReadinessOptionsSchema),
   request("tab.screenshot", z.object({ fullPage: z.boolean().optional(), format: z.enum(["png", "jpeg"]).optional(), quality: z.number().int().min(0).max(100).optional() }).strict().default({})),
   request("locator.click", z.object({ ...locator, button: z.enum(["left", "right", "middle"]).optional(), modifiers: z.array(z.enum(["Alt", "Control", "ControlOrMeta", "Meta", "Shift"])).max(5).optional() }).strict()),
   request("locator.dblclick", z.object(locator).strict()),
@@ -65,7 +68,7 @@ export class BrowserControlError extends Error {
   constructor(readonly code: string, message: string, readonly mayHaveCompleted = false) { super(message); this.name = "BrowserControlError"; }
 }
 export const BROWSER_CONTROL_METHODS: BrowserControlMethod[] = BrowserControlRequestSchema.options.map((option) => option.shape.method.value);
-const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "tabs.list", "tab.url", "tab.title", "tab.snapshot", "tab.screenshot", "locator.innerText", "locator.textContent", "locator.getAttribute", "locator.count", "locator.isVisible", "locator.isEnabled", "locator.waitFor"]);
+const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "tabs.list", "tab.url", "tab.title", "tab.snapshot", "tab.extract", "tab.status", "tab.ready", "tab.screenshot", "locator.innerText", "locator.textContent", "locator.getAttribute", "locator.count", "locator.isVisible", "locator.isEnabled", "locator.waitFor"]);
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();

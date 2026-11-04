@@ -11,6 +11,12 @@ KelpieBrowserGatewayRef kelpie_browser_gateway_create(const char* config_json);
 void kelpie_browser_gateway_destroy(KelpieBrowserGatewayRef gateway);
 // Pure fixed reader: returns {expression:string}, no transaction or reference registry.
 char* kelpie_browser_selector_snapshot_expression(const char* options_json);
+// Strict generated v1 script schema validation; returns {valid,script?} with defaults.
+// Host-only input/secret binding resolution is not performed by this function.
+char* kelpie_browser_validate_script(const char* script_json);
+// Validates {target,key,token?,dispatch?,edit?,observe?}; returns {expression} or null.
+// The fixed private-world reader supports resolution, preflight, observation, and synthetic activation.
+char* kelpie_browser_script_target_expression(const char* options_json);
 // Returned JSON: {kind:'authorize',request,mutates}, {kind:'dispatch',method,params,mutates},
 // or {kind:'complete',response}. Authorization completion is {success:true|false}.
 // Dispatch native result: existing {success:true,...} shape; fixed reader returns {success:true,result}.

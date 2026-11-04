@@ -55,7 +55,9 @@ struct BrowserGateway::Impl {
     for (const auto& method : json::parse(browser_assets::mutations)) mutations.insert(method.get<std::string>());
     methods = {"documentation", "capabilities"};
     for (const auto& route : kRoutes) if (config.value("browserAvailable", true) && native.count(route.second)) methods.insert(route.first);
-    if (config.value("fixedReader", false)) methods.insert("tab.snapshot");
+    if (config.value("fixedReader", false) && config.value("browserAvailable", true)) {
+      for (const auto* method : {"tab.snapshot", "tab.extract", "tab.status", "tab.ready"}) methods.insert(method);
+    }
     else { methods.erase("tab.click"); methods.erase("tab.type"); }
     if (!config.value("allowActions", true)) {
       for (const auto& method : mutations) methods.erase(method);
@@ -104,6 +106,12 @@ struct BrowserGateway::Impl {
         ? "(" + std::string(browser_assets::remember) + ")(" + collected + "," + json(key).dump() + ")"
         : "(" + collected + ").snapshot";
       Dispatch("browser-control-evaluate", {{"tabId", tab}, {"expression", expression}}, "observe"); return;
+    }
+    if (method == "tab.extract" || method == "tab.status" || method == "tab.ready") {
+      const char* reader = method == "tab.extract" ? browser_assets::extractor : method == "tab.status" ? browser_assets::status_reader : browser_assets::readiness_reader;
+      params.erase("tabId");
+      const std::string expression = "(" + std::string(reader) + ")(" + params.dump() + ")";
+      Dispatch("browser-control-evaluate", {{"tabId", tab}, {"expression", expression}}, "observe-fixed"); return;
     }
     if (method == "tab.click" || method == "tab.type") {
       const std::string ref = params["ref"];
@@ -195,6 +203,13 @@ json BrowserGateway::Advance(json result) {
         impl_->refs[tab].insert(ref);
       }
       impl_->Finish(Success({{"url", snapshot.at("url")}, {"title", snapshot.at("title")}, {"text", snapshot["text"]}, {"truncated", snapshot.value("truncated", false)}, {"elements", elements}}));
+    } else if (impl_->stage == "observe-fixed") {
+      const json value = result.at("result");
+      if (!value.is_object() || value.dump().size() > 2 * 1024 * 1024 ||
+          (method == "tab.extract" && (!value.contains("fields") || !value["fields"].is_array() || !value.contains("metadata") || !value["metadata"].is_array())) ||
+          (method == "tab.status" && (!value.contains("documentState") || !value["documentState"].is_string())) ||
+          (method == "tab.ready" && (!value.contains("ready") || !value["ready"].is_boolean()))) { fail(); return Next(); }
+      impl_->Finish(Success(value));
     } else if (impl_->stage == "action") {
       const json action = result.at("result");
       if (action.value("ok", false)) impl_->Finish(Success(nullptr));

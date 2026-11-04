@@ -1,6 +1,8 @@
 import { BrowserControlError } from "./protocol.js";
 import type { BrowserControlMethod, BrowserControlRequest, BrowserControlTransport, BrowserCapabilities, BrowserImage, BrowserLocator, BrowserSnapshot, BrowserTabInfo, BrowserTextMatcher } from "./protocol.js";
 
+import type { BrowserSnapshotOptions, BrowserExtractionOptions, BrowserReadinessOptions, BrowserExtraction, BrowserPageStatus, BrowserReadiness } from "./observations.js";
+
 type Match = string | RegExp;
 const match = (value: Match): BrowserTextMatcher => typeof value === "string" ? value : { source: value.source, flags: value.flags };
 interface Wait { timeoutMs?: number }
@@ -61,7 +63,10 @@ export class BrowserTabClient {
   close(): Promise<void> { return this.call("tabs.close"); }
   url(): Promise<string> { return this.call("tab.url"); }
   title(): Promise<string> { return this.call("tab.title"); }
-  snapshot(options: { maxElements?: number; maxChars?: number } = {}): Promise<BrowserSnapshot> { return this.call("tab.snapshot", options); }
+  snapshot(options: BrowserSnapshotOptions = {}): Promise<BrowserSnapshot> { return this.call("tab.snapshot", options); }
+  extract(options: BrowserExtractionOptions): Promise<BrowserExtraction> { return this.call("tab.extract", options); }
+  status(): Promise<BrowserPageStatus> { return this.call("tab.status"); }
+  ready(options: BrowserReadinessOptions = { state: "interactive" }): Promise<BrowserReadiness> { return this.call("tab.ready", options); }
   async getAXState(): Promise<string> { return (await this.snapshot()).text; }
   async screenshot(options: { fullPage?: boolean; format?: "png" | "jpeg"; quality?: number } = {}): Promise<Uint8Array> {
     const image = await this.call<BrowserImage>("tab.screenshot", options);

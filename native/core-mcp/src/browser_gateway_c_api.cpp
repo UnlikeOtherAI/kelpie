@@ -1,5 +1,7 @@
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/browser_gateway.h"
+#include "browser_schema.h"
+#include "browser_contract.h"
 #include <new>
 #include <cstring>
 #include <mutex>
@@ -26,6 +28,28 @@ template <typename Action> char* Invoke(KelpieBrowserGatewayRef gateway, Action 
 }
 }
 extern "C" {
+char* kelpie_browser_validate_script(const char* input) {
+  try {
+    auto value = Parse(input);
+    static const auto schema = nlohmann::json::parse(kelpie::browser_assets::script_v1_schema);
+    if (!value.is_object() || !kelpie::ValidateBrowserJson(schema, &value)) return Copy({{"valid", false}});
+    return Copy({{"valid", true}, {"script", value}});
+  } catch (...) { return Copy({{"valid", false}}); }
+}
+char* kelpie_browser_script_target_expression(const char* input) {
+  try {
+    auto value = Parse(input, 65536);
+    static const auto schema = nlohmann::json::parse(kelpie::browser_assets::script_target_schema);
+    if (!value.is_object() || !kelpie::ValidateBrowserJson(schema, &value)) return nullptr;
+    const std::string expression = "(" + std::string(kelpie::browser_assets::script_target) + ")(" +
+      value.at("target").dump() + "," + value.at("key").dump() + "," +
+      value.value("token", nlohmann::json(nullptr)).dump() + "," +
+      value.value("dispatch", nlohmann::json(false)).dump() + "," +
+      value.value("edit", nlohmann::json(nullptr)).dump() + "," +
+      value.value("observe", nlohmann::json(false)).dump() + ")";
+    return Copy({{"expression", expression}});
+  } catch (...) { return nullptr; }
+}
 char* kelpie_browser_selector_snapshot_expression(const char* options) {
   try {
     const auto value = Parse(options, 4096);

@@ -2,7 +2,7 @@ import type { BrowserSnapshot } from "./protocol.js";
 
 /** Fixed, self-contained page reader. It never reads form-control values. */
 export function collectBrowserSnapshot(options: {
-  maxElements?: number; maxChars?: number; prefix: string; includeShadow?: boolean;
+  maxElements?: number; maxChars?: number; prefix: string; includeShadow?: boolean; scope?: string; prioritize?: boolean;
 }): { snapshot: BrowserSnapshot; targets: Record<string, Element> } {
   const maxElements = options.maxElements ?? 200;
   const maxChars = options.maxChars ?? 16_000;
@@ -34,8 +34,20 @@ export function collectBrowserSnapshot(options: {
     }
     return value;
   };
-  const visit = (root: Document | ShadowRoot): void => {
-    for (const el of root.querySelectorAll(root instanceof Document ? "body *" : "*")) {
+  const visit = (root: Document | ShadowRoot | Element): void => {
+    const nodes = root.querySelectorAll(root instanceof Document ? "body *" : "*");
+    if (nodes.length > 5000) truncated = true;
+    const candidates = Array.from(nodes).slice(0, 5000);
+    if (root instanceof Element) candidates.unshift(root);
+    const priority = (el: Element): number => {
+      const tag = el.tagName.toLowerCase(), role = el.getAttribute("role") ?? "";
+      if (["button", "input", "select", "textarea", "a"].includes(tag) || ["button", "link", "textbox", "combobox", "checkbox", "radio"].includes(role)) return 0;
+      if (/^h[1-6]$/.test(tag) || role === "heading") return 1;
+      if (["main", "nav"].includes(tag) || ["main", "navigation"].includes(role)) return 2;
+      return 3;
+    };
+    if (options.prioritize !== false) candidates.sort((a, b) => priority(a) - priority(b));
+    for (const el of candidates) {
       if (++visited > 5000 || elements.length >= maxElements) { truncated = true; return; }
       const editor = el.closest("[contenteditable]:not([contenteditable='false'])");
       if (editor && editor !== el) continue;
@@ -47,10 +59,11 @@ export function collectBrowserSnapshot(options: {
       const type = el.getAttribute("type") ?? "text";
       const inputRole = type === "checkbox" ? "checkbox" : type === "radio" ? "radio" : ["submit", "reset", "button", "image"].includes(type) ? "button" : type === "hidden" ? undefined : "textbox";
       const labelled = (el.getAttribute("aria-labelledby")?.split(/\s+/) ?? []).map((id) => {
-        const label = root.getElementById(id); return label ? content(label) : "";
+        const label = root instanceof Element ? root.ownerDocument.getElementById(id) : root.getElementById(id);
+        return label && (!(root instanceof Element) || root.contains(label)) ? content(label) : "";
       }).join(" ").trim();
       const labels = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
-        ? Array.from(el.labels ?? []).map((label) => content(label)).join(" ") : "";
+        ? Array.from(el.labels ?? []).filter((label) => !(root instanceof Element) || root.contains(label)).map((label) => content(label)).join(" ") : "";
       const svgTitle = tag === "svg" ? el.querySelector(":scope > title")?.textContent : "";
       const namedSvg = tag === "svg" && [labelled, el.getAttribute("aria-label"), svgTitle].some((value) => value?.trim());
       const role = el.getAttribute("role") ?? (tag === "input" ? inputRole : namedSvg ? "img" : tag === "a" && el.hasAttribute("href") ? "link" : /^h[1-6]$/.test(tag) ? "heading" : roles[tag]);
@@ -66,6 +79,9 @@ export function collectBrowserSnapshot(options: {
       if (el.shadowRoot && !editor && options.includeShadow !== false) visit(el.shadowRoot);
     }
   };
-  visit(document);
+  const scopes = options.scope ? document.querySelectorAll(options.scope) : [document];
+  const scope = scopes[0];
+  if (scopes.length !== 1 || !scope) throw new Error("OBSERVATION_SCOPE");
+  visit(scope);
   return { targets, snapshot: { url, title, elements, text, truncated } };
 }
