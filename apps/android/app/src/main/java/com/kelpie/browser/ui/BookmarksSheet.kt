@@ -114,7 +114,6 @@ private fun FavouritesTreeContent(
     val canAddPage = runCatching { BookmarkTree.validate(Bookmark(title = currentTitle.ifEmpty { currentUrl }, url = currentUrl)) }.isSuccess
 
     fun finishDrag() {
-        android.util.Log.d("KelpieDrag", "finish dragged=$dragged point=$point targets=${bounds.entries.map { it.key to it.value }}")
         val id = dragged
         dragged = null
         if (id == null || sourceGeneration != BookmarkStore.generation) return
@@ -249,11 +248,10 @@ private fun FavouritesTreeContent(
                             .onGloballyPositioned { handleOrigin = it.boundsInRoot().topLeft }
                             .pointerInput(node.id, generation) {
                                 detectDragGesturesAfterLongPress(onDragStart = { start ->
-                                    android.util.Log.d("KelpieDrag", "start origin=$handleOrigin local=$start")
                                     dragged = node.id
                                     sourceGeneration = BookmarkStore.generation
                                     point = handleOrigin + start
-                                }, onDragCancel = { android.util.Log.d("KelpieDrag", "cancel"); dragged = null }, onDragEnd = { finishDrag() }) { change, delta ->
+                                }, onDragCancel = { dragged = null }, onDragEnd = { finishDrag() }) { change, delta ->
                                     change.consume()
                                     point += delta
                                     val scroll =

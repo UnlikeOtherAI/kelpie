@@ -1,5 +1,8 @@
 package com.kelpie.browser.ui
 
+import android.graphics.Bitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -52,6 +55,11 @@ class FavouritesFlowTest {
         ui.onNodeWithTag("browser.bookmarks.row.${page.id}").assertDoesNotExist()
         ui.onNodeWithTag("browser.bookmarks.row.${folder.id}").performClick()
         ui.onNodeWithTag("browser.bookmarks.row.${page.id}").assertIsDisplayed()
+        val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        File(ui.activity.externalCacheDir, "favourites-tree.png").outputStream().use {
+            screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        screenshot.recycle()
         ui.onNodeWithContentDescription("Actions for $title").performClick()
         ui.onNodeWithText("Remove").performClick()
         ui.onNodeWithText("Remove this favourite?").assertIsDisplayed()
