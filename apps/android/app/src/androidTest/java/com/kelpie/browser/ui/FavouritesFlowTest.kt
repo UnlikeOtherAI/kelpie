@@ -1,8 +1,6 @@
 package com.kelpie.browser.ui
 
 import android.graphics.Bitmap
-import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,10 +12,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.test.platform.app.InstrumentationRegistry
 import com.kelpie.browser.MainActivity
 import com.kelpie.browser.browser.BookmarkStore
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.util.UUID
 
 /** Exercises the real browser entry, editor, touch drag and recoverable removal. */
@@ -48,7 +48,11 @@ class FavouritesFlowTest {
         val page = BookmarkStore.children(folder.id).single()
         ui.onNodeWithTag("browser.bookmarks.row.${folder.id}").performClick()
         drag("Drag ${page.title}", "browser.bookmarks.root")
-        ui.waitUntil(5000) { BookmarkStore.nodes.value.single { it.id == page.id }.parentId == null }
+        ui.waitUntil(5000) {
+            BookmarkStore.nodes.value
+                .single { it.id == page.id }
+                .parentId == null
+        }
         ui.onNodeWithTag("browser.bookmarks.row.${folder.id}").performClick()
         ui.onNodeWithTag("browser.bookmarks.row.${page.id}").assertIsDisplayed()
         drag("Drag ${page.title}", "browser.bookmarks.row.${folder.id}")
