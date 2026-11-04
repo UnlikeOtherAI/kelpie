@@ -19,28 +19,34 @@ std::string Encoded(const std::string& value,bool form) {
   return result;
 }
 struct Scrubber {
-  std::vector<std::string> secrets;
+  struct Pattern { std::string text; bool encoded; };
+  std::vector<Pattern> secrets;
   std::size_t comparisons=8000000, text_bytes=262144;
   explicit Scrubber(const std::vector<std::string>& values) {
-    std::set<std::string> unique;
+    std::set<std::pair<std::string,bool>> unique;
     for(const auto& value:values) if(!value.empty()) {
-      unique.insert(value); unique.insert(Encoded(value,false)); unique.insert(Encoded(value,true));
+      unique.emplace(value,false); unique.emplace(Encoded(value,false),true); unique.emplace(Encoded(value,true),true);
     }
-    secrets.assign(unique.begin(),unique.end());
+    for(const auto& [text,encoded]:unique) secrets.push_back({text,encoded});
     std::sort(secrets.begin(),secrets.end(),[](const auto& a,const auto& b) {
-      return a.size()!=b.size()?a.size()>b.size():a<b;
+      return a.text.size()!=b.text.size()?a.text.size()>b.text.size():a.text<b.text;
     });
+  }
+  static char HexCase(char value) {
+    return value>='a'&&value<='f'?static_cast<char>(value-'a'+'A'):value;
   }
   std::string Text(const std::string& input) {
     std::string output;
     for(std::size_t at=0;at<input.size();) {
       std::size_t match=0;
-      for(const auto& secret:secrets) {
+      for(const auto& pattern:secrets) {
+        const auto& secret=pattern.text;
         if(secret.size()>input.size()-at) continue;
         std::size_t length=0;
         for(;length<secret.size();++length) {
           if(!comparisons--) throw std::runtime_error("OUTPUT_REDACTION_LIMIT");
-          if(input[at+length]!=secret[length]) break;
+          const bool hex=pattern.encoded && ((length>=1&&secret[length-1]=='%') || (length>=2&&secret[length-2]=='%'));
+          if(hex?HexCase(input[at+length])!=secret[length]:input[at+length]!=secret[length]) break;
         }
         if(length==secret.size()) { match=length; break; }
       }

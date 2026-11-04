@@ -31,4 +31,16 @@ int main() {
   outputs={{"result","redacted e"}};
   kelpie::RedactScriptOutputs(outputs,Json::array(),{"e","redacted"});
   assert(outputs.at("r[redacted]sult")=="[redacted] [redacted]");
+
+  const auto scrub=[](const std::string& input,const std::string& secret) {
+    Json value={{"value",input}}; kelpie::RedactScriptOutputs(value,Json::array(),{secret});
+    return value.at("value").get<std::string>();
+  };
+  for(const auto& encoded:{"Aa%20b%2b!","Aa+b%2b%21","Aa%20b%2B!"})
+    assert(scrub(encoded,"Aa b+!")=="[redacted]");
+  assert(scrub("aa b+!","Aa b+!")=="aa b+!");
+  assert(scrub("Aa%20B%2b!","Aa b+!")=="Aa%20B%2b!");
+  assert(scrub("token%2FValue","token%2FValue")=="[redacted]");
+  assert(scrub("token%252FValue","token%2FValue")=="[redacted]");
+  assert(scrub("token%2fValue","token%2FValue")=="token%2fValue");
 }

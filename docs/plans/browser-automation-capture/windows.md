@@ -130,3 +130,6 @@ Every canonical requirement is tracked here. Focused unit/source evidence does n
 | UI-01 | Blocked for native UI evidence: Computer Use paused; hidden API checks cannot close this row. |
 | REL-01 | Pending integrated release/sign/install by root. |
 | REL-02 | Pending integrated release/sign/install by root. |
+
+### Percent-escape redaction follow-up
+Raw sensitive text stays case-sensitive. Only hex digits inside encoded URI/form percent triplets compare case-insensitively. Mixed/lowercase hex, plain-text case differences and raw percent-literal regressions pass in native test_desktop_script_redaction on Maxis. The running8423 candidate is unchanged; app relink and public secret-path rerun remain pending.
