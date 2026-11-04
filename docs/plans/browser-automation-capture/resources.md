@@ -1,6 +1,6 @@
 # Resources, access and release audit
 
-Recorded 2026-11-04. This is a coordination snapshot, not a resource reservation.
+Recorded 2026-11-04. Current user gate: Windows on Maxis first; Mac only after Windows acceptance. Earlier Mac access notes below are historical. This is a coordination snapshot, not a resource reservation.
 Only the coordinator grants workload slots. ChatterBox tools were unavailable;
 directed coordinator messages carry resource changes. A later supported local MCP fallback was found, but registration failed; see below.
 
@@ -93,3 +93,7 @@ The coordinator has asked the user asynchronously about Mac availability because
 of heavy swap and the other owner's favorites-tree Kelpie process. Await that
 answer or explicit coordinator clearance before Mac builds, browser launches or
 process replacement. No Mac process has been changed by acceptance.
+
+## Windows-first gate
+
+The user changed the execution order: build and verify the Windows app remotely on Maxis first. Required evidence is actual CEF native UI, direct MCP, CLI forwarding, decoded GIF/MP4/PNG and manual media inspection. Mac drafts remain preserved; no Mac build, launch or process replacement until Windows completes and the coordinator grants the next slot. Shared Maxis heavy workloads remain serialized after host-load checks. The macOS worker is being reassigned a separate Windows worktree; desktop backend work retains session/Lightpanda/WebMCP ownership.
