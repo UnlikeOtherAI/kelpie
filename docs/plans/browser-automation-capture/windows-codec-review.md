@@ -106,3 +106,21 @@ path-replacement interval unlike the handle-bound PNG rollback; Finish ignores
 the byte-stream Close HRESULT. The unique private runtime directory limits normal
 exposure, but the codec helper's same-directory contender contract needs explicit
 cleanup ownership. These questions remain open until the next source response.
+
+## Exact-handle stream draft
+The codec owner replaced the identity/reopen proposal with OwnedMediaStream,
+an internal IStream owning a CREATE_NEW read/write/delete handle and duplicate
+cleanup handle. Reviewed draft blobs: script_media_owned_file.h
+cf6cc64b7ba4d40f1b07e245a5e97b2e11b00306 and script_media_video.cpp
+d1c3e9415c59f64f05f009b522fee5542c26445e. These are source blobs, not a tested commit.
+MFCreateMFByteStreamOnStream wraps the held object; the encoder no longer opens,
+reopens or deletes its pathname. Constructor duplicate-handle failure marks the
+original exact handle for deletion. Normal completion checks MF Close, flush and
+both native closes. Failure marks the surviving exact handle for deletion before
+closing. This addresses the prior path-replacement and constructor-identity
+failure holes without a pathname fallback. No new source blocker was found.
+ExactHandleRollback adds constructor duplicate failure, flush/close failures,
+denied live rename/delete, replacement preservation after abort and completed-file
+preservation. The reviewer requested a second-close fault too. The real MF wrapper,
+full decode, budget and collision suite remain required under the coordinator's
+queued CODEC-3 slot. No test was run by acceptance.

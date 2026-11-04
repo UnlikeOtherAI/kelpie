@@ -12,6 +12,7 @@ overlay, direct MCP/CLI, remote artifact and installed-release evidence is
 |---|---|---|
 | OBS | 3a63ea7d696a7850e2798b2c235aca784104d9db | Bounded canonical observations and generated native ABI |
 | WFL | d6d7a36666e11db45e7e42cfe09a62d1f2a2fcd8 | Strict workflows, bindings, target safety and presentation |
+| NUMERIC | f6fb0aee3e61fe9bbccad501718386ef6ce0b379 | Native C ABI presentation and TS-generated parity vectors; integrated 87cd6de7 |
 | CODEC | 8369571f6b821cc4bcfc853de2a78f5fc25e142d | Windows codecs, exclusive output opens, failure cleanup and decoded color checks |
 | BACKEND | 28a9f3c71c81f3df6e87ac77b69d49363391cb2d | Managed sessions, restricted LP and WebMCP helpers |
 | QA | d81d6283df63e2c26c1aebbca8afd8a09facc8ec | Independent target regressions and observation review |
@@ -51,6 +52,9 @@ that every platform ran them.
   Timing, AbortAndValidation, Budget(gif/mp4), StepBudget, GifRounding,
   SmallBudgets, ExclusiveOwnership, PngFailureCleanup and GifPaletteChanges.
   WIC decodes images and Media Foundation decodes MP4 samples.
+- **NUMERIC-PARITY**: native/core-automation/tests/test_script_presentation.cpp
+  with scripts/native/generate-script-presentation.mjs; coordinator reports both
+  CTest entries passed, 115 finite vectors plus NaN/infinity cases.
 - **MANAGED**: packages/shared/tests/managed-session.test.ts;
   packages/cli/tests/browser/automation-sessions.test.ts;
   tests/native/managed-worker-acceptance.mjs (actual Chromium, LP still pending).
@@ -85,8 +89,8 @@ that every platform ran them.
 | TGT-03 | visibleBox clipped rectangle; unchangedGeometry | TARGET-INDEPENDENT visible center/viewport | WFL; DPR/zoom/scroll real fixture pending |
 | TGT-04 | captured Entry, unchangedGeometry, unchanged and post-focus checks | TARGET, TARGET-INDEPENDENT; FIXTURE child/focus races | WFL; real renderer pending |
 | TGT-05 | ScriptTargetResult.inputGuarantee=synthetic-coordinate | FIXTURE event.isTrusted oracle | WFL declaration; Windows CDP actual guarantee still to be verified |
-| PTR-01 | scriptPointerPosition in script-presentation.ts | WORKFLOW endpoints/C/S/ease; assertions.mjs trajectory oracle | WFL; native display/decoded motion pending |
-| PTR-02 | shared numeric scriptPointerPosition and scriptTapPresentation | WORKFLOW deterministic numeric checks | WFL; compositor/native correspondence pending |
+| PTR-01 | scriptPointerPosition in script-presentation.ts; kelpie_script_pointer_position and kelpie_script_progress C ABI | WORKFLOW; NUMERIC-PARITY; assertions.mjs trajectory oracle | WFL/NUMERIC; numeric parity passed per coordinator, native display/decoded motion pending |
+| PTR-02 | shared numeric functions and native/core-automation/src/script_presentation.cpp | WORKFLOW; NUMERIC-PARITY | WFL/NUMERIC; numeric parity passed per coordinator; compositor/native timing correspondence pending |
 | VIS-01 | tapIndicatorSchema; codec BGRA input and NV12 conversion | CODEC-DECODE Y/UV and palette colors; future actual overlay pixels | WFL/CODEC partial; actual marker evidence pending |
 | VIS-02 | scriptTapPresentation scale/alpha timeline | WORKFLOW wobble/fade | WFL; decoded early/middle/late frames pending |
 | CAP-01 | ScriptMediaEncoder; WicGif; MfVideo; WriteStepPNG | CODEC-DECODE | CODEC only; actual script export pipeline pending |
