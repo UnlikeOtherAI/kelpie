@@ -155,6 +155,13 @@ the original page, and reopened successfully through the mirrored native UI.
 The activity's existing `FLAG_SECURE` prevents inspection of the login content
 through that mirror; it was left enabled.
 
+The additional live Android HTTP check exposed a legacy dispatch defect:
+`BrowserGatewayBinding.legacy` acquired the browser lease but invoked handlers
+on the server coroutine. Canonical dispatch already enters the main thread.
+Legacy dispatch now enters that same main-thread boundary before creating a
+WebView or accessing its profile. A native regression calls the router from
+`Dispatchers.Default` and creates and inspects a real partitioned WebView.
+
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
 provider account-chooser reuse.

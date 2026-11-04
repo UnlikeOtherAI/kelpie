@@ -145,7 +145,9 @@ class BrowserGatewayBinding(
         withBrowserGatewayLease(lock, ctx.browserRetirement) {
             // Methods outside the admitted read catalogue can mutate; invalidate conservatively before dispatch.
             if (method !in READ_METHODS) sessions.forEach { it.invalidateLocked() }
-            action()
+            // Legacy HTTP calls arrive on a server thread, unlike canonical
+            // dispatch. WebView creation and profile access require the UI thread.
+            withContext(Dispatchers.Main.immediate) { action() }
         }
 
     private suspend fun execute(

@@ -7,6 +7,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kelpie.browser.handlers.CookieHandlers
 import com.kelpie.browser.handlers.HandlerContext
+import com.kelpie.browser.handlers.MobileTabHandler
+import com.kelpie.browser.network.BrowserGatewayBinding
+import com.kelpie.browser.network.Router
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -31,6 +34,52 @@ import kotlin.coroutines.suspendCoroutine
 /** Real WebViews and the production TabStore/cookie handler, without touching existing app sessions. */
 @RunWith(AndroidJUnit4::class)
 class SessionStorageTest {
+    @Test
+    fun legacyRequestsCreateAndInspectPartitionedWebViewsFromServerThreads() =
+        runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext
+            val id = "dispatch-${UUID.randomUUID()}"
+            val context =
+                object : ContextWrapper(app) {
+                    override fun getSharedPreferences(
+                        name: String,
+                        mode: Int,
+                    ): SharedPreferences = app.getSharedPreferences("$id-$name", mode)
+                }
+            val handler = HandlerContext()
+            val router = Router()
+            val tabs =
+                withContext(Dispatchers.Main) {
+                    assumeTrue(PartitionRegistry.supported())
+                    HistoryStore.init(context)
+                    TabStore(context, handler, BrowserState()).also {
+                        handler.tabStore = it
+                        handler.webView = it.activeTab?.webView
+                        MobileTabHandler(handler).register(router)
+                        val cookies = CookieHandlers(handler)
+                        router.register("get-cookies") { params -> cookies.getCookies(params) }
+                        BrowserGatewayBinding(router, handler).register()
+                    }
+                }
+            try {
+                withContext(Dispatchers.Default) {
+                    val created = router.handle("new-tab", mapOf("url" to "about:blank", "partition" to id))
+                    assertEquals(200, created.first)
+                    assertEquals(id, (created.second["tab"] as Map<*, *>)["partition"])
+                    withContext(Dispatchers.Main) { handler.webView = tabs.activeTab?.webView }
+                    val inspected = router.handle("get-cookies", mapOf("url" to "https://fixture.invalid"))
+                    assertEquals(200, inspected.first)
+                    assertEquals(true, inspected.second["success"])
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    PartitionRegistry.delete(id, tabs)
+                    tabs.destroyAllTabs()
+                    SessionStore.clear(context)
+                }
+            }
+        }
+
     @Test
     fun ordinaryTabsShareHttpOnlySessionsWhileNamedStoresStaySeparate() =
         runBlocking {
