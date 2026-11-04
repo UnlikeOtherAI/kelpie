@@ -66,7 +66,7 @@ class FavouritesFlowTest {
         description: String,
         destinationTag: String,
     ) {
-        val handle = ui.onNodeWithContentDescription(description)
+        val handle = ui.onNodeWithContentDescription(description, useUnmergedTree = true)
         val origin = handle.fetchSemanticsNode().boundsInRoot.topLeft
         val destination =
             ui
