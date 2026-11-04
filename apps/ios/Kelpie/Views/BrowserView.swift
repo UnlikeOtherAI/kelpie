@@ -210,6 +210,7 @@ struct BrowserView: View {
                 }
             )
         }
+        .accessibilityHidden(showBookmarks)
         .overlay {
             if showBookmarks {
                 FavouritesPresentation(

@@ -83,21 +83,8 @@ final class AccountBookmarks {
             let existing = try Self.bookmarks(in: original)
             guard let mutation else { return existing }
             guard let version = response.version else { throw UOATransport.Failure(status: 428) }
-            // Other UOA clients may attach favicon/folder metadata. Preserve their
-            // opaque fields when changing a different item in the shared list.
             let changed = try mutation.apply(to: existing)
-            // Keep unknown records verbatim and merge only our fields on known nodes.
-            var rawByID: [UUID: [String: Any]] = [:]
-            var unknown: [Any] = []
-            for value in original {
-                if let node = Self.bookmark(value), let raw = value as? [String: Any] { rawByID[node.id] = raw } else { unknown.append(value) }
-            }
-            let values: [Any] = try changed.map { node in
-                var raw = rawByID[node.id] ?? [:]
-                let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(node)) as? [String: Any] ?? [:]
-                raw.merge(encoded) { _, new in new }
-                return raw
-            } + unknown
+            let values = try Self.merging(changed, into: original)
             let body = try JSONSerialization.data(withJSONObject: ["value": values])
             do {
                 let saved = try await request(path, "PUT", body, version)
@@ -108,6 +95,32 @@ final class AccountBookmarks {
             }
         }
         throw UOATransport.Failure(status: 409)
+    }
+
+    /// Preserve untouched records byte-for-value and keep foreign entries between
+    /// the same known-node slots while replaying the requested sibling order.
+    private static func merging(_ changed: [BookmarkStore.Bookmark], into original: [Any]) throws -> [Any] {
+        var rawByID: [UUID: [String: Any]] = [:]
+        for value in original {
+            if let node = bookmark(value), let raw = value as? [String: Any] { rawByID[node.id] = raw }
+        }
+        let encoded: [Any] = try changed.map { node in
+            if let raw = rawByID[node.id], bookmark(raw) == node { return raw }
+            var raw = rawByID[node.id] ?? [:]
+            let fields = try JSONSerialization.jsonObject(with: JSONEncoder().encode(node)) as? [String: Any] ?? [:]
+            raw.merge(fields) { _, new in new }
+            return raw
+        }
+        var position = 0
+        var result: [Any] = []
+        for value in original {
+            if bookmark(value) == nil { result.append(value) } else if position < encoded.count {
+                result.append(encoded[position])
+                position += 1
+            }
+        }
+        result.append(contentsOf: encoded.dropFirst(position))
+        return result
     }
 
     private static func values(from data: Data) throws -> [Any] {

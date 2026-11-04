@@ -50,6 +50,7 @@ struct FavouritesOutline: NSViewRepresentable {
         private var snapshot: [BookmarkStore.Bookmark] = []
         private var generation = UUID()
         private var dragGeneration: UUID?
+        private var reloading = false
         init(_ parent: FavouritesOutline) { self.parent = parent }
 
         func reload() {
@@ -59,9 +60,19 @@ struct FavouritesOutline: NSViewRepresentable {
             generation = parent.store.generation
             snapshot = parent.store.nodes
             items = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.id, items[$0.id] ?? Item($0.id)) })
+            let selectedID = parent.selection
+            reloading = true
+            defer { reloading = false }
             outline.reloadData()
             for id in expanded { if let item = items[id] { outline.expandItem(item) } }
-            if let id = parent.selection, let item = items[id] {
+            if let id = selectedID, let item = items[id] {
+                var ancestors: [UUID] = []
+                var parentID = snapshot.first { $0.id == id }?.parentId
+                while let ancestor = parentID {
+                    ancestors.append(ancestor)
+                    parentID = snapshot.first { $0.id == ancestor }?.parentId
+                }
+                for ancestor in ancestors.reversed() { if let parentItem = items[ancestor] { outline.expandItem(parentItem) } }
                 let row = outline.row(forItem: item)
                 if row >= 0 { outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
             }
@@ -93,7 +104,7 @@ struct FavouritesOutline: NSViewRepresentable {
             return row
         }
         func outlineViewSelectionDidChange(_ notification: Notification) {
-            guard let outline else { return }
+            guard let outline, !reloading else { return }
             parent.selection = (outline.item(atRow: outline.selectedRow) as? Item)?.id
         }
         @objc func openSelection(_ sender: NSOutlineView) {

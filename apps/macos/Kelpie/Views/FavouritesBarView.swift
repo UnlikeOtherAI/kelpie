@@ -86,7 +86,7 @@ final class FavouritesBar: NSScrollView {
         guard activeMenu == nil, store.nodes.contains(where: { $0.id == id && $0.isFolder }) else { return }
         let menu = folderMenu(id)
         activeMenu = menu
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: button)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -button.bounds.height - 8), in: button)
         activeMenu = nil
     }
 
@@ -130,7 +130,7 @@ final class FavouritesBar: NSScrollView {
     private func drop(_ id: UUID, at screenPoint: NSPoint, generation: UUID) {
         guard generation == store.generation else { return }
         if screenRect.contains(screenPoint) {
-            let point = stack.convert(window?.convertPoint(fromScreen: screenPoint) ?? .zero, from: nil)
+            let point = strip.convert(window?.convertPoint(fromScreen: screenPoint) ?? .zero, from: nil)
             let target = strip.subviews.compactMap { $0 as? FavouriteButton }.first { $0.frame.maxX > point.x }
             if let target, target.isFolder, target.nodeID != id, abs(point.x - target.frame.midX) < target.frame.width / 4 {
                 store.mutate(.move(id, parentId: target.nodeID, beforeId: nil))

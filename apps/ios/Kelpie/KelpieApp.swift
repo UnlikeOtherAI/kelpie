@@ -124,6 +124,7 @@ struct KelpieApp: App {
     private func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
+            BookmarkStore.shared.refreshAccountBookmarks()
             NessieConnection.shared.setForeground(true)
             serverState.ensureMDNSAdvertising()
         case .background:

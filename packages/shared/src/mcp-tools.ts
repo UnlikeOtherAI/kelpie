@@ -149,6 +149,9 @@ export const BrowserMcpTools = [
 export type BrowserMcpTool = (typeof BrowserMcpTools)[number];
 
 export const BrowserToolUnsupportedPlatforms = {
+  kelpie_bookmarks_create_folder: ["linux", "windows"],
+  kelpie_bookmarks_update: ["linux", "windows"],
+  kelpie_bookmarks_move: ["linux", "windows"],
   kelpie_get_links: ["ios", "android", "linux", "windows"],
   kelpie_ai_status: ["linux", "windows"],
   kelpie_ai_load: ["linux", "windows"],

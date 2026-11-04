@@ -133,10 +133,10 @@ class UOASettingsStream(
 
                                     override fun onFailure(
                                         webSocket: WebSocket,
-                                        error: Throwable,
+                                        t: Throwable,
                                         response: Response?,
                                     ) {
-                                        messages.close(error)
+                                        messages.close(t)
                                     }
                                 },
                             )

@@ -153,12 +153,20 @@ class AccountBookmarks(
         ): JsonArray {
             val changed = BookmarkTree.apply(decode(raw), mutation)
             val known = raw.mapNotNull { value -> decodeNode(value)?.let { it.id to (value as JsonObject) } }.toMap()
-            val merged =
-                encode(changed).map { encoded ->
-                    val node = encoded as JsonObject
-                    JsonObject((known[(node["id"] as JsonPrimitive).content] ?: emptyMap()) + node)
-                }
-            return JsonArray(merged + raw.filter { decodeNode(it) == null })
+            val encoded = encode(changed).mapIndexed { index, value ->
+                val node = value as JsonObject
+                val original = known[(node["id"] as JsonPrimitive).content]
+                if (original != null && decodeNode(original) == changed[index]) original
+                else JsonObject((original ?: emptyMap()) + node)
+            }
+            var position = 0
+            val result = mutableListOf<kotlinx.serialization.json.JsonElement>()
+            raw.forEach { value ->
+                if (decodeNode(value) == null) result.add(value)
+                else if (position < encoded.size) result.add(encoded[position++])
+            }
+            result.addAll(encoded.drop(position))
+            return JsonArray(result)
         }
 
         private fun date(value: JsonPrimitive?): String {
