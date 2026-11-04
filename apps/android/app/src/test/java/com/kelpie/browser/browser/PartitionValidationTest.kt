@@ -16,14 +16,18 @@ class PartitionValidationTest {
     @Test
     fun invalidOrUnsupportedIsolationNeverBecomesDefault() {
         for (body in listOf(
-            mapOf("partition" to "../escape"), mapOf("partition" to "default"), mapOf("partition" to "ephemeral-hidden"),
-            mapOf("partition" to 42), mapOf("partition" to "private", "persistent" to false),
+            mapOf("partition" to "../escape"),
+            mapOf("partition" to "default"),
+            mapOf("partition" to "ephemeral-hidden"),
+            mapOf("partition" to 42),
+            mapOf("partition" to "private", "persistent" to false),
             mapOf("partition" to "private", "persistent" to "false"),
         )) {
             try {
                 PartitionRegistry.validate(body)
                 fail("Accepted invalid isolation: $body")
-            } catch (_: PartitionRegistry.Failure) { }
+            } catch (_: PartitionRegistry.Failure) {
+            }
         }
     }
 }

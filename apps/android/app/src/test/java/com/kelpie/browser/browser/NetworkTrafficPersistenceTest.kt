@@ -18,10 +18,11 @@ class NetworkTrafficPersistenceTest {
         try {
             val writes = AtomicInteger()
             val file = directory.resolve("traffic.json")
-            val writer = NetworkTrafficPersistence(file, { entries ->
-                writes.incrementAndGet()
-                entries.joinToString { it.url }
-            }, {}, 3_600_000)
+            val writer =
+                NetworkTrafficPersistence(file, { entries ->
+                    writes.incrementAndGet()
+                    entries.joinToString { it.url }
+                }, {}, 3_600_000)
             repeat(2000) { writer.save(listOf(entry("url-$it"))) }
             assertFalse(file.exists())
             writer.flush()
@@ -30,7 +31,9 @@ class NetworkTrafficPersistenceTest {
             writer.save(emptyList())
             writer.flush()
             assertEquals("", file.readText())
-        } finally { directory.deleteRecursively() }
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test
@@ -40,13 +43,14 @@ class NetworkTrafficPersistenceTest {
             val started = CountDownLatch(1)
             val release = CountDownLatch(1)
             val file = directory.resolve("traffic.json")
-            val writer = NetworkTrafficPersistence(file, { entries ->
-                if (entries.firstOrNull()?.url == "old") {
-                    started.countDown()
-                    check(release.await(5, TimeUnit.SECONDS))
-                }
-                entries.joinToString { it.url }
-            }, {}, 3_600_000)
+            val writer =
+                NetworkTrafficPersistence(file, { entries ->
+                    if (entries.firstOrNull()?.url == "old") {
+                        started.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                    }
+                    entries.joinToString { it.url }
+                }, {}, 3_600_000)
             writer.save(listOf(entry("old")))
             val flush = Thread { writer.flush() }.apply { start() }
             assertTrue(started.await(5, TimeUnit.SECONDS))
@@ -55,7 +59,9 @@ class NetworkTrafficPersistenceTest {
             flush.join(5000)
             writer.flush()
             assertEquals("new-99", file.readText())
-        } finally { directory.deleteRecursively() }
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test
@@ -72,6 +78,8 @@ class NetworkTrafficPersistenceTest {
             assertTrue(migrated)
             assertEquals("replacement", file.readText())
             assertEquals("malformed", directory.listFiles()!!.single { it.name.contains("unreadable-") }.readText())
-        } finally { directory.deleteRecursively() }
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 }

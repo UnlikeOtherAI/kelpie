@@ -15,7 +15,8 @@ class KelpieApp : Application() {
     override fun onCreate() {
         super.onCreate()
         app = this
-        com.kelpie.browser.browser.PartitionRegistry.initialize(this)
+        com.kelpie.browser.browser.PartitionRegistry
+            .initialize(this)
         // Enable Chrome DevTools Protocol for WebView
         WebView.setWebContentsDebuggingEnabled(true)
         NetworkTrafficStore.init(this)

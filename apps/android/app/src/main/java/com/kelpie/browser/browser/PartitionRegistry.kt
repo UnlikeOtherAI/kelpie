@@ -18,11 +18,17 @@ object PartitionRegistry {
     private const val PENDING = "pendingDeletion"
     private val profileName = Regex("kelpie-[0-9a-f-]{36}")
 
-    class Failure(val code: String, override val message: String) : Exception(message) {
+    class Failure(
+        val code: String,
+        override val message: String,
+    ) : Exception(message) {
         fun response(): Map<String, Any?> = errorResponse(code, message)
     }
 
-    data class Options(val partition: String?, val name: String?)
+    data class Options(
+        val partition: String?,
+        val name: String?,
+    )
 
     fun validate(body: Map<String, Any?>): Options {
         if (body.containsKey("partition") && body["partition"] !is String) {
@@ -43,9 +49,13 @@ object PartitionRegistry {
     }
 
     fun validateId(id: String) {
-        if (!Regex("[A-Za-z0-9._-]{1,128}").matches(id) || id.none { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' } ||
-            id.lowercase() in setOf("default", ".", "..") || id.startsWith("ephemeral-")
-        ) throw Failure("INVALID_PARTITION", "Invalid partition identifier")
+        if (!Regex("[A-Za-z0-9._-]{1,128}").matches(id) ||
+            id.none { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' } ||
+            id.lowercase() in setOf("default", ".", "..") ||
+            id.startsWith("ephemeral-")
+        ) {
+            throw Failure("INVALID_PARTITION", "Invalid partition identifier")
+        }
     }
 
     /** Called from Application, before a login or tab can load a WebView profile. */
@@ -57,7 +67,10 @@ object PartitionRegistry {
 
     fun supported(): Boolean = WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)
 
-    fun resolve(id: String, restoring: Boolean = false): String {
+    fun resolve(
+        id: String,
+        restoring: Boolean = false,
+    ): String {
         validateId(id)
         if (!supported()) throw Failure("PARTITION_UNSUPPORTED", "Update Android System WebView: multiple profiles are unavailable")
         val stored = prefs.getString(PREFIX + id, null)
@@ -74,32 +87,49 @@ object PartitionRegistry {
         return created
     }
 
-    fun bind(view: WebView, profile: String?) {
+    fun bind(
+        view: WebView,
+        profile: String?,
+    ) {
         if (profile != null) WebViewCompat.setProfile(view, profile)
     }
 
-    fun cookies(view: WebView): CookieManager =
-        if (supported()) WebViewCompat.getProfile(view).cookieManager else CookieManager.getInstance()
+    fun cookies(view: WebView): CookieManager = if (supported()) WebViewCompat.getProfile(view).cookieManager else CookieManager.getInstance()
 
     fun listing(tabs: List<BrowserTab>): List<Map<String, Any?>> {
-        val active = prefs.all.keys.filter { it.startsWith(PREFIX) }.sorted().map { key ->
-            val id = key.removePrefix(PREFIX)
-            mapOf<String, Any?>("id" to id, "persistent" to true, "tabCount" to tabs.count { it.partition == id })
-        }
-        return active + pending().sorted().map {
-            mapOf("id" to "orphan:$it", "persistent" to true, "tabCount" to 0)
-        }
+        val active =
+            prefs.all.keys.filter { it.startsWith(PREFIX) }.sorted().map { key ->
+                val id = key.removePrefix(PREFIX)
+                mapOf<String, Any?>("id" to id, "persistent" to true, "tabCount" to tabs.count { it.partition == id })
+            }
+        return active +
+            pending().sorted().map {
+                mapOf("id" to "orphan:$it", "persistent" to true, "tabCount" to 0)
+            }
     }
 
-    fun delete(id: String, tabs: TabStore): Map<String, Any?> {
+    fun delete(
+        id: String,
+        tabs: TabStore,
+    ): Map<String, Any?> {
         if (!supported()) return errorResponse("PARTITION_UNSUPPORTED", "Multiple WebView profiles are unavailable")
         val orphan = id.removePrefix("orphan:").takeIf { id.startsWith("orphan:") && it in pending() }
-        val profile = orphan ?: prefs.getString(PREFIX + id, null)
-            ?: return successResponse(mapOf("deleted" to id, "existed" to false, "tabsClosed" to 0))
+        val profile =
+            orphan ?: prefs.getString(PREFIX + id, null)
+                ?: return successResponse(mapOf("deleted" to id, "existed" to false, "tabsClosed" to 0))
         if (!profileName.matches(profile)) return errorResponse("INVALID_PARTITION", "Unusable partition mapping")
         // Commit retirement before closing views; a crash cannot restore this identity under the old name.
-        check(prefs.edit().remove(PREFIX + id).putStringSet(PENDING, pending() + profile).commit())
-        val closing = tabs.tabs.value.filter { it.partition == id }.map { it.id }
+        check(
+            prefs
+                .edit()
+                .remove(PREFIX + id)
+                .putStringSet(PENDING, pending() + profile)
+                .commit(),
+        )
+        val closing =
+            tabs.tabs.value
+                .filter { it.partition == id }
+                .map { it.id }
         closing.forEach(tabs::closeTab)
         return if (purge(profile)) {
             successResponse(mapOf("deleted" to id, "existed" to true, "tabsClosed" to closing.size))

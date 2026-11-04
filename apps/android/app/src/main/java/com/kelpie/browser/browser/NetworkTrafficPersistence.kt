@@ -14,31 +14,34 @@ class NetworkTrafficPersistence(
     private val migrated: () -> Unit,
     private val intervalMillis: Long = 1000,
 ) {
-    private val executor = Executors.newSingleThreadScheduledExecutor { task ->
-        Thread(task, "kelpie-network-persistence").apply { isDaemon = true }
-    }
+    private val executor =
+        Executors.newSingleThreadScheduledExecutor { task ->
+            Thread(task, "kelpie-network-persistence").apply { isDaemon = true }
+        }
     private val lock = Any()
     private var pending: List<TrafficEntry>? = null
     private var scheduled = false
     private var recoveryNeeded = false
     private var retryMillis = 1000L
 
-    fun load(): String? = try {
-        if (file.exists()) file.readText() else null
-    } catch (_: Exception) {
-        preserveUnreadableFile()
-        null
-    }
+    fun load(): String? =
+        try {
+            if (file.exists()) file.readText() else null
+        } catch (_: Exception) {
+            preserveUnreadableFile()
+            null
+        }
 
     fun preserveUnreadableFile() {
         recoveryNeeded = true
     }
 
     fun save(entries: List<TrafficEntry>) {
-        val schedule = synchronized(lock) {
-            pending = entries
-            (!scheduled).also { scheduled = true }
-        }
+        val schedule =
+            synchronized(lock) {
+                pending = entries
+                (!scheduled).also { scheduled = true }
+            }
         if (schedule) schedule(intervalMillis)
     }
 

@@ -72,7 +72,11 @@ class TabStore(
         }
     }
 
-    fun addTab(url: String? = null, partition: String? = null, name: String? = null): BrowserTab {
+    fun addTab(
+        url: String? = null,
+        partition: String? = null,
+        name: String? = null,
+    ): BrowserTab {
         val profile = partition?.let { PartitionRegistry.resolve(it) }
         com.kelpie.browser.connect.NessieConnection
             .personChangedTab()

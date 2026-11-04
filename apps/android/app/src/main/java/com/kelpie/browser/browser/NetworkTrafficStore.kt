@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 import java.util.TimeZone
-import java.io.File
+import java.util.UUID
 
 data class TrafficEntry(
     val id: String = UUID.randomUUID().toString(),
@@ -70,16 +70,20 @@ object NetworkTrafficStore {
         synchronized(lock) {
             if (::persistence.isInitialized) return
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            persistence = NetworkTrafficPersistence(
-                File(context.noBackupFilesDir, "network/traffic.json"),
-                encode = { entries -> "[" + entries.joinToString(",", transform = ::trafficEntryToJson) + "]" },
-                migrated = { check(prefs.edit().remove(DATA_KEY).commit()) { "Legacy migration could not be saved" } },
-            )
+            persistence =
+                NetworkTrafficPersistence(
+                    File(context.noBackupFilesDir, "network/traffic.json"),
+                    encode = { entries -> "[" + entries.joinToString(",", transform = ::trafficEntryToJson) + "]" },
+                    migrated = { check(prefs.edit().remove(DATA_KEY).commit()) { "Legacy migration could not be saved" } },
+                )
             val saved = persistence.load()
-            val json = if (saved != null && runCatching { parseTrafficEntries(saved) }.isSuccess) saved else {
-                if (saved != null) persistence.preserveUnreadableFile()
-                prefs.getString(DATA_KEY, null)?.takeIf { runCatching { parseTrafficEntries(it) }.isSuccess }
-            }
+            val json =
+                if (saved != null && runCatching { parseTrafficEntries(saved) }.isSuccess) {
+                    saved
+                } else {
+                    if (saved != null) persistence.preserveUnreadableFile()
+                    prefs.getString(DATA_KEY, null)?.takeIf { runCatching { parseTrafficEntries(it) }.isSuccess }
+                }
             NativeCore.networkTrafficStoreLoadJson(nativeHandle, json)
             _entries.value = parseTrafficEntries(NativeCore.networkTrafficStoreToJson(nativeHandle))
             synchronizeSelection()
@@ -90,21 +94,23 @@ object NetworkTrafficStore {
     fun append(entry: TrafficEntry) {
         synchronized(lock) {
             ensureInitialized()
-            val accepted = entry.copy(
-                id = entry.id.ifEmpty { UUID.randomUUID().toString() },
-                startTime = entry.startTime.ifEmpty { TrafficEntry(method = "GET", url = "", statusCode = 0, contentType = "").startTime },
-            )
+            val accepted =
+                entry.copy(
+                    id = entry.id.ifEmpty { UUID.randomUUID().toString() },
+                    startTime = entry.startTime.ifEmpty { TrafficEntry(method = "GET", url = "", statusCode = 0, contentType = "").startTime },
+                )
             if (!NativeCore.networkTrafficStoreAppendJson(nativeHandle, trafficEntryToJson(accepted))) return
-            val normalized = accepted.copy(
-                method = entry.method.map { if (it in 'a'..'z') it.uppercaseChar() else it }.joinToString(""),
-                requestHeaders = entry.requestHeaders.toMap(),
-                responseHeaders = entry.responseHeaders.toMap(),
-                requestBody = entry.requestBody?.takeIf { it.isNotEmpty() },
-                responseBody = entry.responseBody?.takeIf { it.isNotEmpty() },
-                duration = entry.duration.coerceAtLeast(0),
-                size = entry.size.coerceAtLeast(0),
-                initiator = "browser",
-            )
+            val normalized =
+                accepted.copy(
+                    method = entry.method.map { if (it in 'a'..'z') it.uppercaseChar() else it }.joinToString(""),
+                    requestHeaders = entry.requestHeaders.toMap(),
+                    responseHeaders = entry.responseHeaders.toMap(),
+                    requestBody = entry.requestBody?.takeIf { it.isNotEmpty() },
+                    responseBody = entry.responseBody?.takeIf { it.isNotEmpty() },
+                    duration = entry.duration.coerceAtLeast(0),
+                    size = entry.size.coerceAtLeast(0),
+                    initiator = "browser",
+                )
             _entries.value = (_entries.value + normalized).takeLast(NativeCore.networkTrafficStoreCount(nativeHandle))
             synchronizeSelection()
             persistence.save(_entries.value)
@@ -118,10 +124,16 @@ object NetworkTrafficStore {
         responseHeaders: Map<String, String> = emptyMap(),
         size: Int = 0,
     ) {
-        append(TrafficEntry(
-            method = "GET", url = url, statusCode = statusCode, contentType = contentType,
-            responseHeaders = responseHeaders, size = size,
-        ))
+        append(
+            TrafficEntry(
+                method = "GET",
+                url = url,
+                statusCode = statusCode,
+                contentType = contentType,
+                responseHeaders = responseHeaders,
+                size = size,
+            ),
+        )
     }
 
     fun clear() {

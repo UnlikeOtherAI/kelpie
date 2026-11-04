@@ -101,8 +101,7 @@ class CookieHandlers(
         return successResponse(mapOf("deleted" to removed.size))
     }
 
-    private fun cookieManager(): CookieManager =
-        PartitionRegistry.cookies(requireNotNull(ctx.webView) { "No target WebView" })
+    private fun cookieManager(): CookieManager = PartitionRegistry.cookies(requireNotNull(ctx.webView) { "No target WebView" })
 
     private fun currentPageUrl(): String? = ctx.webView?.url
 

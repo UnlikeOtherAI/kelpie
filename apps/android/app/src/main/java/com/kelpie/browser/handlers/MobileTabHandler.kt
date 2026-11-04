@@ -5,14 +5,26 @@ import com.kelpie.browser.network.Router
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 
-class MobileTabHandler(private val ctx: HandlerContext) {
+class MobileTabHandler(
+    private val ctx: HandlerContext,
+) {
     fun register(router: Router) {
         router.register("get-tabs") { getTabs() }
         router.register("new-tab") { newTab(it) }
         router.register("switch-tab") { switchTab(it) }
         router.register("close-tab") { closeTab(it) }
         router.register("get-partitions") {
-            successResponse(mapOf("partitions" to PartitionRegistry.listing(ctx.tabStore?.tabs?.value.orEmpty())))
+            successResponse(
+                mapOf(
+                    "partitions" to
+                        PartitionRegistry.listing(
+                            ctx.tabStore
+                                ?.tabs
+                                ?.value
+                                .orEmpty(),
+                        ),
+                ),
+            )
         }
         router.register("delete-partition") { body ->
             val id = body["id"] as? String
@@ -60,10 +72,13 @@ class MobileTabHandler(private val ctx: HandlerContext) {
     private fun newTab(body: Map<String, Any?>): Map<String, Any?> {
         val tabStore = ctx.tabStore ?: return errorResponse("NO_TAB_STORE", "Tab store not available")
         val url = body["url"] as? String
-        val tab = try {
-            val options = PartitionRegistry.validate(body)
-            tabStore.addTab(url, options.partition, options.name)
-        } catch (failure: PartitionRegistry.Failure) { return failure.response() }
+        val tab =
+            try {
+                val options = PartitionRegistry.validate(body)
+                tabStore.addTab(url, options.partition, options.name)
+            } catch (failure: PartitionRegistry.Failure) {
+                return failure.response()
+            }
         return successResponse(
             mapOf(
                 "tabId" to tab.id,
@@ -123,8 +138,12 @@ class MobileTabHandler(private val ctx: HandlerContext) {
             "title" to tab.pageTitle,
             "active" to (tab.id == activeTabId),
             "isLoading" to tab.isLoading,
-        ) + buildMap {
-            tab.name?.let { put("name", it) }
-            tab.partition?.let { put("partition", it); put("persistent", true) }
-        }
+        ) +
+            buildMap {
+                tab.name?.let { put("name", it) }
+                tab.partition?.let {
+                    put("partition", it)
+                    put("persistent", true)
+                }
+            }
 }

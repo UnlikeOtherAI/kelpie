@@ -245,7 +245,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        com.kelpie.browser.browser.NetworkTrafficStore.flush()
+        com.kelpie.browser.browser.NetworkTrafficStore
+            .flush()
         super.onStop()
     }
 

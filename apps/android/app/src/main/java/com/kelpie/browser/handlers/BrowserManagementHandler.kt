@@ -372,5 +372,4 @@ class BrowserManagementHandler(
         ctx.dialogState.autoPromptText = body["promptText"] as? String ?: ""
         return successResponse(mapOf("enabled" to enabled))
     }
-
 }
