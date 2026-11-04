@@ -45,6 +45,7 @@ class FavouritesFlowTest {
         val page = BookmarkStore.children(folder.id).single()
         ui.onNodeWithTag("browser.bookmarks.row.${folder.id}").performClick()
         drag("Drag ${page.title}", "browser.bookmarks.root")
+        ui.waitUntil(5000) { BookmarkStore.nodes.value.single { it.id == page.id }.parentId == null }
         ui.onNodeWithTag("browser.bookmarks.row.${folder.id}").performClick()
         ui.onNodeWithTag("browser.bookmarks.row.${page.id}").assertIsDisplayed()
         drag("Drag ${page.title}", "browser.bookmarks.row.${folder.id}")
@@ -74,7 +75,7 @@ class FavouritesFlowTest {
                 .boundsInRoot.center - origin
         handle.performTouchInput {
             down(center)
-            advanceEventTime(700)
+            moveTo(center, delayMillis = 700)
             moveTo(destination, delayMillis = 400)
             up()
         }
