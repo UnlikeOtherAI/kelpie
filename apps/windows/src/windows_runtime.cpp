@@ -1,4 +1,5 @@
 #include "windows_app.h"
+#include "script_capture_service.h"
 
 #include "cef_pump_schedule.h"
 #include "kelpie/desktop_http_server.h"
@@ -143,6 +144,17 @@ bool WindowsApp::InitializeDesktopRuntime() {
 
   DesktopApp::Config runtime;
   runtime.platform = Platform::kWindows;
+  script_capture_=std::make_shared<WindowsScriptService>(browser_view_->hwnd(),shell_->hwnd(),
+      [this](std::function<bool()> task) { return native_control_.Invoke(std::move(task),std::chrono::seconds(2)); },
+      [this](const json& shown) {
+        if(!shown.value("playing",false) || !shown.contains("documentVersion")) return true;
+        if(!desktop_app_ || !shown.contains("tabId") || !shown.contains("generation")) return false;
+        TabLease lease; lease.id=shown.at("tabId"); lease.generation=shown.at("generation");
+        lease.document_version=shown.at("documentVersion"); lease.require_active=true;
+        BrowserNavigationState state;
+        return desktop_app_->engine().GetNavigationState(lease,&state,std::chrono::milliseconds(1)).ok;
+      });
+  script_capture_->Configure(runtime);
   inference_ = std::make_unique<InferenceService>(config_.profile_dir);
   runtime.register_handlers = [this](DesktopRouter& router) { inference_->Register(router); };
   runtime.engine_name = "chromium";
@@ -343,6 +355,7 @@ bool WindowsApp::ShutdownDesktopRuntime() {
     account_.reset();
     desktop_app_.reset();
   }
+  script_capture_.reset();
   native_control_.Shutdown();
 #if defined(HAS_CEF)
   SetDesktopCefMessagePumpScheduler({});

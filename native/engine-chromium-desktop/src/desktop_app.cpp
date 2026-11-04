@@ -137,6 +137,7 @@ class DesktopApp::Impl {
   std::unique_ptr<ShellHandler> shell_handler;
   std::unique_ptr<DialogHandler> dialog_handler;
   std::unique_ptr<InspectionHandler> inspection_handler;
+  std::unique_ptr<DesktopScriptHandler> script_handler;
 
   DesktopHandlerRuntime BuildRuntime() {
     DesktopHandlerRuntime runtime;
@@ -237,6 +238,12 @@ class DesktopApp::Impl {
     dialog_handler = std::make_unique<DialogHandler>(runtime);
     inspection_handler = std::make_unique<InspectionHandler>(runtime);
 
+    auto scripts=config.scripts;
+    scripts.admission=[this] { return mcp_server.TryScriptAdmission(); };
+    scripts.invalidate=[this] { mcp_server.NotifyDocumentChanged(); };
+    scripts.revalidate=[this](const std::string& owner) { return http_server.IsScriptOwnerActive(owner); };
+    script_handler = std::make_unique<DesktopScriptHandler>(engine, router, std::move(scripts));
+    script_handler->Register();
     navigation_handler->Register(router);
     interaction_handler->Register(router);
     dom_handler->Register(router);
@@ -321,6 +328,7 @@ bool DesktopApp::Start(const Config& config) {
   });
   impl_->engine.SetNavigationSink([this](const std::string& url, const std::string& title) {
     impl_->mcp_server.NotifyDocumentChanged();
+    if(impl_->script_handler) impl_->script_handler->NotifyNavigation();
     impl_->history_store.Record(url, title);
     impl_->history_store.UpdateLatestTitle(url, title);
   });
@@ -351,6 +359,8 @@ bool DesktopApp::Start(const Config& config) {
   impl_->mcp_server.SetRegistry(&impl_->mcp_registry);
   impl_->mcp_server.SetRouter(&impl_->router);
   impl_->mcp_server.SetFixedReader([this](const nlohmann::json& params) {
+    if(impl_->script_handler && !impl_->script_handler->Allows("browser-control-evaluate"))
+      return ErrorResponse("BUSY","A script owns the browser");
     return EvaluateBrowserFixed(impl_->engine, params);
   });
   impl_->mcp_server.SetPendingCheck([this] { return impl_->engine.HasPendingBrowserControl(); });
@@ -359,7 +369,10 @@ bool DesktopApp::Start(const Config& config) {
     return impl_->mcp_server.HandleBrowserRequest(request, gateway_config);
   });
   impl_->router.BeforeDispatch([this](std::string_view method, const nlohmann::json& params) {
-    return impl_->mcp_server.GuardDispatch(method, params);
+    const auto guard=impl_->mcp_server.GuardDispatch(method,params);
+    if (impl_->script_handler && !impl_->script_handler->Allows(method))
+      throw DesktopRouteRefusal("BUSY", "A script owns the browser");
+    return guard;
   });
   impl_->http_server.SetMcpServer(&impl_->mcp_server);
   DesktopHttpServer::Config server_config;
@@ -391,6 +404,7 @@ bool DesktopApp::Start(const Config& config) {
 }
 
 void DesktopApp::BeginShutdown() {
+  if(impl_->script_handler) impl_->script_handler->RequestLocalAbort();
   if (!impl_->running) return;
   if (impl_->config.mdns != nullptr) {
     impl_->config.mdns->Stop();

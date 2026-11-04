@@ -10,6 +10,7 @@
 #include "kelpie/history_store.h"
 #include "kelpie/network_traffic_store.h"
 #include "kelpie/desktop_engine.h"
+#include "kelpie/desktop_script_handler.h"
 #include "kelpie/platform.h"
 
 namespace kelpie {
@@ -57,6 +58,7 @@ class DesktopApp {
     DesktopEngine::Config engine;
     DesktopMdns* mdns = nullptr;
     DeviceInfoProvider* device_info_provider = nullptr;
+    DesktopScriptHandler::Config scripts;
     // Shell-specific services register before HTTP/MCP can dispatch requests.
     std::function<void(DesktopRouter&)> register_handlers;
   };

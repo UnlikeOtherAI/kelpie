@@ -1,0 +1,127 @@
+#include "desktop_script_runtime.h"
+#include <stdexcept>
+
+namespace kelpie {
+void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document) {
+  std::unique_lock lock(mutex);
+  requested_step = index; requested_step_png=png; requested_step_document=document;
+  const auto ticket=++requested_ticket;
+  changed.notify_all();
+  changed.wait_for(lock, std::chrono::seconds(10), [this, ticket] {
+    return completed_ticket >= ticket || sampler_done || !capture_error.empty() || abort->load();
+  });
+  if (completed_ticket < ticket && !abort->load()) throw std::runtime_error("CAPTURE_STEP_FAILED");
+}
+void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
+  std::unique_ptr<DesktopScriptCapture> encoder;
+  const auto cancellation=abort;
+  int initial_width = 0, initial_height = 0;
+  std::string first_document;
+  std::size_t dropped = 0;
+  bool partial = false;
+  std::string reason;
+  try {
+    if(!config.revalidate || !config.revalidate(owner)) {
+      grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+    }
+    encoder = config.capture(options, run_id, owner);
+    if (!encoder) throw std::runtime_error("CAPTURE_UNAVAILABLE");
+    const int fps = options.value("fps", 15);
+    const int duration = options.value("maxDurationMs", 60000);
+    auto next = Clock::now();
+    const auto interval=std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0/fps));
+    while (!stop_sampler.load() && !abort->load()) {
+      if(!config.revalidate || !config.revalidate(owner)) { grant_revoked.store(true); abort->store(true); partial=true; break; }
+      if (Elapsed() >= duration) throw std::runtime_error("CAPTURE_DURATION_EXCEEDED");
+      BrowserNavigationState before, after;
+      auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
+      if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
+      Json viewport;
+      result = engine.EvaluateBrowserControl(lease, "({width:innerWidth,height:innerHeight})", &viewport, std::chrono::seconds(2));
+      if (!result.ok || !viewport.is_object()) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
+      const int width = viewport.value("width", 0), height = viewport.value("height", 0);
+      if (width <= 0 || height <= 0) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
+      if (initial_width == 0) { initial_width = width; initial_height = height; first_document = before.tab.document_version; }
+      if (width != initial_width || height != initial_height) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      Json shown;
+      int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
+      {
+        std::lock_guard lock(mutex);
+        if (presentation.value("documentVersion", std::string()) != before.tab.document_version) {
+          presentation.erase("marker"); presentation.erase("pointer"); presentation.erase("commentary");
+        }
+        presentation_latched=true;
+        shown = presentation; shown["elapsedMs"] = Elapsed(); shown["playing"]=true; shown["captureLatched"]=true;
+        shown["viewportWidth"] = width; shown["viewportHeight"] = height;
+        step = requested_step; index = action_index; png=requested_step_png; expected_document=requested_step_document; ticket=requested_ticket;
+      }
+      if(step>=0 && !expected_document.empty() && expected_document!=before.tab.document_version)
+        throw std::runtime_error("CAPTURE_TARGET_DOCUMENT_CHANGED");
+      shown["tabId"]=lease.id; shown["generation"]=lease.generation;
+      shown["documentVersion"]=before.tab.document_version;
+      const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
+      if(config.present) config.present(shown,[this,cancellation] { cancellation->store(true); changed.notify_all(); });
+      BrowserScreenshot image;
+      result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
+      result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
+      if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
+      if (before.tab.document_version != after.tab.document_version) {
+        { std::lock_guard lock(mutex); presentation.erase("marker"); presentation.erase("pointer"); presentation_latched=false; }
+        ++dropped;
+        Present();
+        continue;
+      }
+      Json after_viewport;
+      result = engine.EvaluateBrowserControl(lease, "({width:innerWidth,height:innerHeight})", &after_viewport, std::chrono::seconds(2));
+      if (!result.ok || after_viewport != viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      { std::lock_guard lock(mutex); presentation_latched=false; }
+      Present();
+      { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
+      if (step >= 0) {
+        std::lock_guard lock(mutex);
+        completed_step = step; completed_ticket=std::max(completed_ticket,ticket);
+        if (requested_ticket == ticket) requested_step = -1;
+        changed.notify_all();
+      }
+      next += interval;
+      const auto now=Clock::now();
+      if(next<now) {
+        const auto skipped=static_cast<std::size_t>((now-next)/interval)+1;
+        dropped+=skipped; next+=interval*skipped;
+      }
+      std::unique_lock lock(mutex);
+      changed.wait_until(lock, next, [this] { return requested_step >= 0 || stop_sampler.load() || abort->load(); });
+    }
+  } catch (const std::exception& error) {
+    // Only fixed native codes cross this boundary. Never return codec exception text or page data.
+    const std::string value = error.what();
+    reason = value.rfind("CAPTURE_", 0) == 0 && value.size() < 80 ? value : "CAPTURE_FAILED";
+    { std::lock_guard lock(mutex); if(!abort->load()) capture_error = reason; }
+    partial = true;
+  } catch (...) {
+    reason = "CAPTURE_FAILED";
+    { std::lock_guard lock(mutex); if(!abort->load()) capture_error = reason; }
+    partial = true;
+  }
+  { std::lock_guard lock(mutex); presentation_latched=false; }
+  try { Present(); } catch(...) { std::lock_guard lock(mutex); capture_error="CAPTURE_NATIVE_PRESENTATION_FAILED"; partial=true; }
+  partial = partial || abort->load();
+  if (encoder) {
+    try {
+      Json finalized = encoder->Finish(partial, reason, Elapsed());
+      Json completed=finalized.value("artifacts",Json::array());
+      if(finalized.contains("error")) { std::lock_guard lock(mutex); capture_error=finalized["error"]; }
+      std::lock_guard lock(mutex);
+      for (auto& artifact : completed) {
+        artifact["viewport"] = {{"width", initial_width}, {"height", initial_height}};
+        if (!first_document.empty() && !artifact.contains("documentId")) artifact["documentId"] = first_document;
+        artifact["droppedFrames"] = artifact.value("droppedFrames", 0) + dropped;
+      }
+      artifacts = std::move(completed);
+    } catch (...) { std::lock_guard lock(mutex); capture_error = "CAPTURE_FINALIZE_FAILED"; }
+  }
+  { std::lock_guard lock(mutex); sampler_done = true; changed.notify_all(); }
+}
+}

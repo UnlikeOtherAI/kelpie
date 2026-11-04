@@ -35,6 +35,7 @@ class DesktopEngine::Impl : public std::enable_shared_from_this<DesktopEngine::I
   void DoMessageLoopWork();
   std::string EvaluateJs(const std::string& script);
 
+  std::atomic<unsigned> script_input_cleanup{0};
   DesktopEngine::ViewportState viewport;
   DesktopEngine::Config config;
   CefRenderer* renderer = nullptr;

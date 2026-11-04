@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <stdexcept>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -10,6 +11,12 @@
 #include <nlohmann/json.hpp>
 
 namespace kelpie {
+
+class DesktopRouteRefusal : public std::runtime_error {
+ public:
+  DesktopRouteRefusal(std::string code, std::string message) : std::runtime_error(std::move(message)), code(std::move(code)) {}
+  std::string code;
+};
 
 class DesktopRouter {
  public:

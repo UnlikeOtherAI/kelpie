@@ -38,6 +38,7 @@ class DesktopHttpServer {
   void Stop();
 
   bool IsRunning() const;
+  bool IsScriptOwnerActive(const std::string& owner) const;
   int bound_port() const;
 
   // NOTE: The Swift HTTPServer (ServerState) implements port fallback logic

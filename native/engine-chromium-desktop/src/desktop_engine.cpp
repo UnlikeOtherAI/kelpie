@@ -343,7 +343,7 @@ bool DesktopEngine::Initialize(const Config& config) {
   return impl_->Initialize(config);
 }
 
-bool DesktopEngine::HasPendingBrowserControl() const { return impl_->unknown_operations->load() != 0; }
+bool DesktopEngine::HasPendingBrowserControl() const { return impl_->unknown_operations->load() != 0 || impl_->script_input_cleanup.load() != 0; }
 
 bool DesktopEngine::Shutdown() {
   return impl_->Shutdown();

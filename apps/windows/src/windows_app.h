@@ -38,6 +38,7 @@
 #include "inference_service.h"
 
 namespace kelpie::windows {
+class WindowsScriptService;
 
 struct AppConfig {
   int port = 8420;
@@ -131,6 +132,7 @@ class WindowsApp final : public ShellDelegate, public BrowserStateObserver {
   std::unique_ptr<Win32BrowserView> browser_view_;
   std::unique_ptr<SettingsView> settings_view_;
   std::unique_ptr<DesktopApp> desktop_app_;
+  std::shared_ptr<WindowsScriptService> script_capture_;
   PageColorSampler page_color_sampler_;
   std::unique_ptr<account::AccountService> account_;
   std::unique_ptr<connect::Client> connection_;

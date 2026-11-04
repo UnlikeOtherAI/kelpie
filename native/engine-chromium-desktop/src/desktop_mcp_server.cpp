@@ -28,17 +28,42 @@ class DesktopMcpServer::Impl {
   mutable bool internal_dispatch = false;
   mutable std::atomic<bool> document_changed{false};
   void DrainDocuments() const { if (gateway && document_changed.exchange(false)) gateway->InvalidateReferences(); }
-  void Ensure(const Config& config) const {
-    if (gateway) return;
-    json methods = json::array(), extensions = json::array();
-    if (router) for (const auto& method : router->RegisteredMethods()) if (router->IsCallable(method)) methods.push_back(method);
-    if (registry && router) for (const auto& tool : registry->all_tools()) {
-      if (!SupportsPlatform(tool.availability, config.platform) || !SupportsEngine(tool.availability, config.engine) || !router->IsCallable(tool.http_endpoint)) continue;
-      extensions.push_back({{"name", tool.name}, {"method", tool.http_endpoint}, {"description", tool.description},
-        {"inputSchema", NativeExtensionInputSchema(tool.http_endpoint)}, {"mutates", NativeExtensionMutates(tool.http_endpoint)}});
+  // Routes, registry and reader are installed before listener admission and stay immutable.
+  json Configuration(const Config& config) const {
+    json methods=json::array(),extensions=json::array();
+    if(router) for(const auto& method:router->RegisteredMethods()) if(router->IsCallable(method)) methods.push_back(method);
+    if(registry && router) for(const auto& tool:registry->all_tools()) {
+      if(!SupportsPlatform(tool.availability,config.platform) || !SupportsEngine(tool.availability,config.engine) || !router->IsCallable(tool.http_endpoint)) continue;
+      extensions.push_back({{"name",tool.name},{"method",tool.http_endpoint},{"description",tool.description},
+        {"inputSchema",NativeExtensionInputSchema(tool.http_endpoint)},{"mutates",NativeExtensionMutates(tool.http_endpoint)}});
     }
-    gateway_config = {{"nativeMethods", methods}, {"fixedReader", static_cast<bool>(reader)}, {"requireAuthorization", false}, {"extensions", extensions}};
-    gateway = std::make_unique<BrowserGateway>(gateway_config);
+    return {{"nativeMethods",methods},{"fixedReader",static_cast<bool>(reader)},{"requireAuthorization",false},{"extensions",extensions}};
+  }
+  void Ensure(const Config& config) const {
+    if(gateway) return;
+    gateway_config=Configuration(config);
+    gateway=std::make_unique<BrowserGateway>(gateway_config);
+  }
+  std::optional<json> ScriptRequest(const json& request,const Config& config) const {
+    if(!request.is_object() || !request.contains("method") || request["method"]!="tools/call" ||
+       !request.contains("params") || !request["params"].is_object()) return std::nullopt;
+    const auto& params=request["params"];
+    if(!params.contains("name") || !params["name"].is_string()) return std::nullopt;
+    std::string name=params["name"];
+    if(name=="kelpie_extension") {
+      if(!params.contains("arguments") || !params["arguments"].is_object() || !params["arguments"].contains("name") ||
+         !params["arguments"]["name"].is_string()) return std::nullopt;
+      name=params["arguments"]["name"];
+    }
+    if(name!="kelpie_play_script" && name!="kelpie_abort_script" && name!="kelpie_get_script_status" && name!="kelpie_get_script_artifact") return std::nullopt;
+    BrowserGateway outer(Configuration(config));
+    auto step=outer.BeginMcp(request);
+    if(step.value("kind",std::string())=="complete") return step["response"];
+    if(step.value("kind",std::string())!="dispatch" || !router) return RpcError(-32600,request);
+    const std::string method=step.at("method");
+    if(method!="play-script" && method!="abort-script" && method!="get-script-status" && method!="get-script-artifact") return RpcError(-32600,request);
+    step=outer.Advance(router->Dispatch(method,step.at("params")).body);
+    return step.value("kind",std::string())=="complete" ? step["response"] : outer.Cancel()["response"];
   }
   // Retakes an oversized capture as JPEG through the same router route, job
   // lease scope and step authorization as the first capture. Returns a final
@@ -99,10 +124,16 @@ void DesktopMcpServer::SetRouter(const DesktopRouter* router) { impl_->router = 
 void DesktopMcpServer::SetRegistry(const McpRegistry* registry) { impl_->registry = registry; impl_->gateway.reset(); }
 void DesktopMcpServer::SetFixedReader(FixedReader reader) { impl_->reader = std::move(reader); impl_->gateway.reset(); }
 void DesktopMcpServer::SetPendingCheck(std::function<bool()> pending) { impl_->pending = std::move(pending); }
+std::shared_ptr<void> DesktopMcpServer::TryScriptAdmission() const {
+  auto lock=std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex,std::try_to_lock);
+  if(!lock->owns_lock() || (impl_->pending && impl_->pending())) return nullptr;
+  return lock;
+}
 void DesktopMcpServer::NotifyDocumentChanged() const { impl_->document_changed.store(true); }
 std::shared_ptr<void> DesktopMcpServer::GuardDispatch(std::string_view method, const json& params) const {
   // Cancellation must stay reachable while a serialized inference extension awaits its provider.
-  if (method == "ai-cancel" || method == "ai-infer" || method == "ai-record") return nullptr;
+  if (method == "ai-cancel" || method == "ai-infer" || method == "ai-record" || method == "play-script" ||
+      method == "abort-script" || method == "get-script-status" || method == "get-script-artifact") return nullptr;
   auto lock = std::make_shared<std::unique_lock<std::recursive_mutex>>(impl_->mutex);
   if (impl_->pending && impl_->pending() && method != "browser-control" && method != "close-tab" && method != "close-browser" && method != "get-device-info" && method != "get-dialog" && method != "handle-dialog")
     throw std::runtime_error("A prior renderer command is still pending");
@@ -127,6 +158,8 @@ bool DesktopMcpServer::Run(const Config& config) {
   return true;
 }
 DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request, const Config& config) const {
+  try { if(auto script=impl_->ScriptRequest(request,config)) return *script; }
+  catch(...) { return RpcError(-32600,request); }
   std::unique_lock<std::recursive_mutex> lock(impl_->mutex);
   impl_->Ensure(config);
   impl_->DrainDocuments();
@@ -140,7 +173,8 @@ DesktopMcpServer::json DesktopMcpServer::HandleRequest(const json& request, cons
         if (arguments.is_object() && arguments.contains("name") && arguments["name"].is_string()) name = arguments["name"];
       }
     }
-    if (name == "kelpie_ai_ask" || name == "kelpie_ai_record" || name == "kelpie_ai_cancel" || name == "kelpie_close_tab" || name == "kelpie_close_browser" || name == "kelpie_get_dialog" || name == "kelpie_handle_dialog") {
+    if (name == "kelpie_play_script" || name == "kelpie_abort_script" || name == "kelpie_get_script_status" ||
+        name == "kelpie_get_script_artifact" || name == "kelpie_ai_ask" || name == "kelpie_ai_record" || name == "kelpie_ai_cancel" || name == "kelpie_close_tab" || name == "kelpie_close_browser" || name == "kelpie_get_dialog" || name == "kelpie_handle_dialog") {
       // Inference owns its own request. Only its nested browser commands take
       // the persistent gateway lease; cancellation/teardown and native modal
       // recovery remain reachable so a pending dialog can retire its renderer call.

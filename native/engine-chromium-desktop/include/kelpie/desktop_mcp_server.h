@@ -44,6 +44,7 @@ class DesktopMcpServer {
   void SetFixedReader(FixedReader reader);
   void SetPendingCheck(std::function<bool()> pending);
   void NotifyDocumentChanged() const;
+  std::shared_ptr<void> TryScriptAdmission() const;
   std::shared_ptr<void> GuardDispatch(std::string_view method, const json& params) const;
   void InvalidateReferences(std::string_view method, const json& params) const;
   json HandleBrowserRequest(const json& request, const Config& config) const;

@@ -11,6 +11,7 @@
 
 #include "kelpie/desktop_mcp_server.h"
 #include "kelpie/desktop_router.h"
+#include "kelpie/desktop_script_owner.h"
 #include "kelpie/platform.h"
 
 namespace kelpie {
@@ -66,6 +67,7 @@ class DesktopHttpServer::Impl {
   httplib::Server server;
   std::thread server_thread;
   Config config;
+  std::string script_owner;
   int bound_port = 0;
   bool running = false;
   mutable std::mutex admission_mutex;
@@ -163,6 +165,7 @@ bool DesktopHttpServer::Start(const Config& config) {
   impl_->config = config;
   {
     std::lock_guard<std::mutex> lock(impl_->admission_mutex);
+    impl_->script_owner = NewDesktopScriptId();
     impl_->accepting_requests = true;
     impl_->active_requests = 0;
   }
@@ -208,6 +211,7 @@ bool DesktopHttpServer::Start(const Config& config) {
           {"error", {{"code", -32700}, {"message", "Invalid JSON"}}}});
       return;
     }
+    ScopedDesktopScriptOwner admitted(impl_->script_owner);
     const nlohmann::json result = impl_->mcp_server->HandleRequest(body, impl_->McpConfig());
     if (result.is_null()) { response.status = 202; return; }
     Json(response, 200, result);
@@ -235,6 +239,7 @@ bool DesktopHttpServer::Start(const Config& config) {
           {"message", "Request body must be a JSON object"}}}});
       return;
     }
+    ScopedDesktopScriptOwner admitted(impl_->script_owner);
     const DesktopRouter::Result result = impl_->router->Dispatch(request.matches[1].str(), body);
     Json(response, result.status_code, result.body);
   });
@@ -282,6 +287,10 @@ void DesktopHttpServer::Stop() {
   if (impl_->server_thread.joinable()) impl_->server_thread.join();
   impl_->running = false;
   impl_->bound_port = 0;
+}
+bool DesktopHttpServer::IsScriptOwnerActive(const std::string& owner) const {
+  std::lock_guard lock(impl_->admission_mutex);
+  return impl_->accepting_requests && !owner.empty() && owner==impl_->script_owner;
 }
 bool DesktopHttpServer::IsRunning() const { return impl_->running; }
 int DesktopHttpServer::bound_port() const { return impl_->bound_port; }

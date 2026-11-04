@@ -30,6 +30,7 @@ BrowserControlResult RunDevTools(const std::shared_ptr<DesktopEngine::Impl>& imp
                                  const std::function<bool()>& interrupted = {}, bool fences_actions = true);
 
 BrowserControlResult DeadlineExceeded();
+bool IsDialogOpen(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease);
 
 BrowserControlResult PlannerError(const std::string& code, const std::string& message);
 

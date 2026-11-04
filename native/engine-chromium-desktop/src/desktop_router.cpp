@@ -15,6 +15,7 @@ int StatusForResponse(const nlohmann::json& response) {
   }
   const nlohmann::json error = response.value("error", nlohmann::json::object());
   const std::string code = error.value("code", std::string());
+  if (code == "BUSY" || code == "RECORDING_IN_PROGRESS") return 409;
   if (code == "NOT_FOUND") {
     return 404;
   }
@@ -51,6 +52,9 @@ DesktopRouter::Result DesktopRouter::Dispatch(std::string_view method, const jso
   try {
     const auto guard = observer_ ? observer_(method, params) : nullptr;
     const json body = it->second.handler(params);
+    return {StatusForResponse(body), body};
+  } catch (const DesktopRouteRefusal& exception) {
+    const json body = ErrorResponse(exception.code, exception.what());
     return {StatusForResponse(body), body};
   } catch (const std::invalid_argument& exception) {
     const json body = ErrorResponse(ErrorCode::kInvalidParams, exception.what());

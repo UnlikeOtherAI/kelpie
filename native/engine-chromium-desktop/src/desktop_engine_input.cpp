@@ -12,6 +12,17 @@ namespace kelpie {
 
 using namespace engine_control;
 
+namespace engine_control {
+bool IsDialogOpen(const std::shared_ptr<DesktopEngine::Impl>& impl, TabLease lease) {
+  auto showing=std::make_shared<bool>(false);
+  impl->RunOnUi([impl,lease,showing] {
+    if(auto* tab=impl->FindTab(lease)) *showing=tab->dialogs.Current(tab->browser).value("showing",false);
+    return BrowserControlResult::Success();
+  },std::chrono::seconds(1));
+  return *showing;
+}
+}
+
 BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const Json& input, Json* output, Timeout timeout) {
   if (!input.is_object()) return BrowserControlResult::Failure("INVALID_PARAMS", "Input must be an object");
   const auto type = input.find("type");
@@ -52,14 +63,7 @@ BrowserControlResult DesktopEngine::DispatchTrustedInput(TabLease lease, const J
   // the caller can only do once this request returns. The open dialog is the
   // proof the input landed.
   const auto impl = impl_;
-  const auto dialog_opened = [impl, lease] {
-    auto showing = std::make_shared<bool>(false);
-    impl->RunOnUi([impl, lease, showing] {
-      if (auto* tab = impl->FindTab(lease)) *showing = tab->dialogs.Current(tab->browser).value("showing", false);
-      return BrowserControlResult::Success();
-    }, std::chrono::seconds(1));
-    return *showing;
-  };
+  const auto dialog_opened = [impl,lease] { return IsDialogOpen(impl,lease); };
   bool opened_dialog = false;
   for (const auto& command : plan.commands) {
     const auto method = command.find("method");

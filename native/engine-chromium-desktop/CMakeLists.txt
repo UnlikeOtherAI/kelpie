@@ -44,6 +44,10 @@ set(MOLOTOV_DESKTOP_ENGINE_SOURCES
   src/desktop_mcp_server.cpp
   src/desktop_core_browser.cpp
   src/desktop_router.cpp
+  src/desktop_script_handler.cpp
+  src/desktop_script_actions.cpp
+  src/desktop_script_sampling.cpp
+  src/desktop_script_redaction.cpp
   src/cef_renderer.cpp
   src/handlers/navigation_handler.cpp
   src/handlers/navigation_wait.cpp
@@ -121,6 +125,7 @@ if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
     src/desktop_engine_control.cpp
     src/desktop_engine_control_support.cpp
     src/desktop_engine_input.cpp
+    src/desktop_engine_script_input.cpp
     src/desktop_engine_page_control.cpp
     src/desktop_engine_partitions.cpp
     src/desktop_partition_registry.cpp

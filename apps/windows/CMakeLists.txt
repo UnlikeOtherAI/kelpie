@@ -193,7 +193,7 @@ target_compile_definitions(kelpie
   PRIVATE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
-    _WIN32_WINNT=0x0600
+    _WIN32_WINNT=0x0601
     UNICODE
     _UNICODE
 )
@@ -205,6 +205,7 @@ target_include_directories(kelpie
 )
 
 target_link_libraries(kelpie PRIVATE kelpie_desktop_account kelpie_desktop_connect shlwapi)
+include(script_capture.cmake)
 
 target_link_libraries(kelpie
   PRIVATE

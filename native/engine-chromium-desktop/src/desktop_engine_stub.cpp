@@ -1,6 +1,10 @@
 #include "kelpie/desktop_engine.h"
 
 namespace kelpie {
+BrowserControlResult DesktopEngine::DispatchScriptTarget(TabLease, const Json&, const Json&, Json*, Timeout) {
+  return BrowserControlResult::Failure("UNSUPPORTED", "Trusted script input requires Chromium");
+}
+
 
 class DesktopEngine::Impl {
  public:
