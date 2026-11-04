@@ -26,38 +26,6 @@ enum BrowserChromeStyle {
     }
 }
 
-/// Saved favourites use the same persistent records as bookmark management and the API.
-struct FavouritesBarView: View {
-    @ObservedObject var appearance: BrowserChromeAppearance
-    let bookmarks: [BookmarkStore.Bookmark]
-    let onNavigate: (String) -> Void
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 24) {
-                ForEach(bookmarks) { bookmark in
-                    HStack(spacing: 10) {
-                        Image(systemName: "bookmark").font(.system(size: 15))
-                        Text(bookmark.title.isEmpty ? bookmark.url : bookmark.title)
-                            .font(.system(size: 12)).lineLimit(1)
-                    }
-                    .foregroundStyle(Color(nsColor: appearance.palette.foreground.color))
-                    .frame(maxWidth: 220)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .frame(height: 28)
-                    .overlay(AppKitInvisibleButton(
-                        accessibilityID: "browser.favourite.\(bookmark.id.uuidString)",
-                        accessibilityLabel: bookmark.title.isEmpty ? bookmark.url : bookmark.title
-                    ) { onNavigate(bookmark.url) })
-                    .help(bookmark.url)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .frame(height: BrowserChromeLayout.favouritesHeight)
-    }
-}
-
 /// Keep the native underlap and the visible rows in agreement when bookmarks change.
 enum BrowserChromeLayout {
     static let navigationHeight: CGFloat = 44

@@ -976,3 +976,7 @@ exclusive profile lock. The CLI reads the bearer capability locally and rejects
 `kelpie mcp` and `kelpie --browser <alias> mcp` expose `kelpie_browser_control`. Call its `documentation` and `capabilities` methods before controlling the chosen device. It reuses approved sockets and automatically authorizes existing same-account UOA sessions; callers without an account must pair explicitly. The default catalog advertises four tools: core controls, extension names, extension schemas, and a generic extension caller. Existing rich commands and legacy MCP names remain callable. The [shared browser-control reference](api/browser-control.md) documents requests, observed refs, SDK methods and limits.
 
 `kelpie browser-control <request-json>` sends one strict versioned request to the selected device using existing `--device` or `--browser` routing. For example: `kelpie --device <id> browser-control '{"version":1,"method":"tabs.list"}'`. Native owns all observed refs; the CLI does not pair or retry automatically.
+
+### Favourites tree through MCP
+
+The MCP server exposes `kelpie_bookmarks_create_folder`, `kelpie_bookmarks_update` and `kelpie_bookmarks_move` on macOS, iOS and Android, alongside list/add/remove/clear. List includes folders and their parent IDs. Add accepts `parentId`; move requires `parentId` (null means top level) and accepts `beforeId` for sibling order. All operations use the same validated, account-synchronized tree as the native UI. See [browser API](api/browser.md#favourites-tree-macos-ios-and-android) for the body and response contract.

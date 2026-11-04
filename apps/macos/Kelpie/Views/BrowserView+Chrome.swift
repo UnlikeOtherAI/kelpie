@@ -5,7 +5,7 @@ extension BrowserView {
         guard #available(macOS 26.0, *), rendererState.activeEngine == .webkit,
               viewportState.mode == .full, !serverState.isScriptRecording,
               tabStore.activeTab?.isStartPage != true else { return 0 }
-        return BrowserChromeLayout.underlap(collapsed: isChromeCollapsed, hasBookmarks: !bookmarkStore.bookmarks.isEmpty)
+        return BrowserChromeLayout.underlap(collapsed: isChromeCollapsed, hasBookmarks: !bookmarkStore.nodes.isEmpty)
     }
 
     var browserTabs: some View {

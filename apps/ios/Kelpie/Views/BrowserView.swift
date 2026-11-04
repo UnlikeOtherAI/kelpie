@@ -210,12 +210,15 @@ struct BrowserView: View {
                 }
             )
         }
-        .sheet(isPresented: $showBookmarks) {
-            BookmarksView(
-                currentTitle: browserState.pageTitle,
-                currentURL: browserState.currentURL,
-                onNavigate: navigate
-            )
+        .overlay {
+            if showBookmarks {
+                FavouritesPresentation(
+                    currentTitle: browserState.pageTitle,
+                    currentURL: browserState.currentURL,
+                    onNavigate: navigate,
+                    onDismiss: { showBookmarks = false }
+                )
+            }
         }
         .sheet(isPresented: $showHistory) {
             HistoryView(onNavigate: navigate)
