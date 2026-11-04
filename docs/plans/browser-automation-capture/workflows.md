@@ -1,0 +1,22 @@
+# Workflow and capture acceptance
+
+- [ ] REPLAY-01 Strict versioned actions extend existing play-script.
+- [ ] REPLAY-02 Declared typed inputs and explicit secret references.
+- [ ] REPLAY-03 Typed assertions/readiness with bounded timeouts.
+- [ ] REPLAY-04 Structured named outputs with provenance.
+- [ ] REPLAY-05 Unsupported actions rejected; no implicit evaluation/model loop.
+- [ ] REPLAY-06 Abort/failure/uncertainty retain execution ownership.
+- [ ] CAP-01 HTTP, CLI and MCP accept the same script.
+- [ ] CAP-02 Semantic unique visible center; ambiguity, occlusion, movement and detachment refuse safely.
+- [ ] CAP-03 Configurable tap color, radius, wobble, fade and duration appear in media.
+- [ ] CAP-04 Optional eased S/C pointer between resolved targets.
+- [ ] CAP-05 Continuous bounded overlay-inclusive capture; playable GIF and video.
+- [ ] CAP-06 Step screenshots retrievable remotely.
+- [ ] CAP-07 Abort/time/byte bounds finalize partial outputs and release ownership.
+- [ ] CAP-08 Authenticated scoped bounded artifact retrieval and integrity checks.
+- [ ] Mac real user flow, direct MCP, CLI MCP and recovery paths.
+- [ ] iOS/Android parity with real flows and media inspection.
+- [ ] Windows/Linux native and MCP/CLI verification.
+- [ ] Durable semantic safety, readiness and media evals.
+- [ ] Feature/API/CLI docs and discovery match supported behavior.
+- [ ] QA evidence names host, revision, flows, results and concrete limitations.
