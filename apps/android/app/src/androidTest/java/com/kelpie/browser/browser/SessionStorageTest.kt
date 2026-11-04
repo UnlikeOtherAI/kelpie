@@ -55,6 +55,8 @@ class SessionStorageTest {
                             ): SharedPreferences = app.getSharedPreferences("$id-$name", mode)
                         }
                     val handler = HandlerContext()
+                    // Production initializes history in MainActivity before creating tabs.
+                    HistoryStore.init(context)
                     var tabs = TabStore(context, handler, BrowserState())
                     handler.tabStore = tabs
                     val cookieName = "session_${UUID.randomUUID().toString().replace("-", "")}"

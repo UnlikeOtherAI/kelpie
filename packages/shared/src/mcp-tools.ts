@@ -200,8 +200,6 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_is_element_obscured: ["macos", "linux", "windows"],
   // Storage partitions: macOS on WebKit and Windows on Chromium (CEF). The
   // remaining platforms drop their entry here as they land the same contract.
-  kelpie_get_partitions: ["ios", "android"],
-  kelpie_delete_partition: ["ios", "android"],
 } satisfies Partial<Record<BrowserMcpTool, readonly Platform[]>>;
 
 /** CLI-level MCP tools (discovery + group commands) */
