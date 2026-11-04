@@ -409,10 +409,15 @@ Use `--duration 0` if you want the highlight to stay visible while you capture a
 ## Scripted Recording
 
 ### `kelpie script run <file>`
+Typed workflows support `--inputs <file>`, explicit `--secret reference=ENVIRONMENT_VARIABLE`, and `--output <directory>` for integrity-checked media downloads. See [script workflows](cli/script-workflows.md). Status and abort accept `--run-id <id>`; `--pinned` also supports recovery before the run ID is known without pairing/fallback.
+
 
 ```bash
 kelpie script run ./demo-script.json --device "My iPhone"
 ```
+
+### `kelpie script download <runId> <artifactId> <file>`
+Download one retained artifact through the pinned authenticated socket and verify its SHA-256. See [script workflows](cli/script-workflows.md).
 
 ### `kelpie script status`
 

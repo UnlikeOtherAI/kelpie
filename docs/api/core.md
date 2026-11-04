@@ -140,6 +140,8 @@ POST /v1/hide-highlight
 LLM workflow note: when you already know a selector but want to reason about it visually, set `durationMs` to `0`, take a `screenshot` or `screenshot-annotated`, and use the visible highlight box/ring as the anchor in the image. Hide it afterwards with `hide-highlight`.
 
 ### `play-script`
+The opt-in version1 workflow, capture and authenticated `get-script-artifact` contract is documented in [typed workflows](script-workflows.md). Device capabilities determine supported actions and encoders.
+
 Run a timed walkthrough script. While it is active, every request except `abort-script` and `get-script-status` is rejected with `RECORDING_IN_PROGRESS`.
 
 ```json

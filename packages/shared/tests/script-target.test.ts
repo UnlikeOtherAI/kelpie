@@ -17,7 +17,7 @@ function fixture(count = 1, element = new ElementStub()) {
   let hit: ElementStub | null = element;
   const doc = { documentElement: element, createTreeWalker: (_root: unknown, mask: number) => {
     let index = 0;
-    return { currentNode: element, nextNode: () => mask === 4 || ++index >= count ? null : element };
+    return { currentNode: element, nextNode: () => mask !== 1 || ++index >= count ? null : element };
   }, elementFromPoint: () => hit };
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", doc);
@@ -121,5 +121,35 @@ describe("target safety regressions", () => {
     const f = fixture(6000);
     f.element.matches = () => false;
     expect(resolveScriptTarget({ selector: "missing" }, "private").error).toBe("TARGET_QUERY_LIMIT");
+  });
+});
+
+describe("bounded accessible names", () => {
+  it("refuses more than32 labelled-by references instead of matching a truncated prefix", () => {
+    class Button extends ElementStub {
+      tagName = "BUTTON";
+      getAttribute(name: string) { return name === "aria-labelledby" ? Array.from({ length: 33 }, (_, i) => "id" + String(i)).join(" ") : null; }
+      hasAttribute() { return false; }
+    }
+    fixture(1, new Button());
+    expect(resolveScriptTarget({ role: "button", name: "prefix", exact: true }, "private").error).toBe("TARGET_QUERY_LIMIT");
+  });
+  it("counts empty descendants in the accessible-name traversal budget", () => {
+    class Button extends ElementStub {
+      tagName = "BUTTON";
+      getAttribute() { return null; }
+      hasAttribute() { return false; }
+    }
+    const button = new Button();
+    fixture(1, button);
+    vi.stubGlobal("document", {
+      documentElement: button,
+      elementFromPoint: () => button,
+      createTreeWalker: (_root: unknown, mask: number) => {
+        let visits = 0;
+        return { currentNode: button, nextNode: () => mask === 1 ? null : ++visits < 300 ? { nodeType: 1, textContent: "" } : null };
+      },
+    });
+    expect(resolveScriptTarget({ role: "button", name: "missing", exact: true }, "private").error).toBe("TARGET_QUERY_LIMIT");
   });
 });
