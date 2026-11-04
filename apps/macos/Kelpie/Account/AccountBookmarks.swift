@@ -3,31 +3,35 @@ import Foundation
 /// Applies intentions to the latest server list, with compare-and-set protection.
 @MainActor
 final class AccountBookmarks {
-    enum Mutation {
-        case add(BookmarkStore.Bookmark)
-        case remove(UUID)
-        case clear
-
-        func apply(to bookmarks: [BookmarkStore.Bookmark]) -> [BookmarkStore.Bookmark] {
-            switch self {
-            case .add(let bookmark):
-                return bookmarks.contains(where: { $0.url == bookmark.url }) ? bookmarks : bookmarks + [bookmark]
-            case .remove(let id): return bookmarks.filter { $0.id != id }
-            case .clear: return []
-            }
-        }
-    }
+    typealias Mutation = BookmarkTree.Mutation
 
     typealias Request = (String, String, Data?, String?) async throws -> UOATransport.Response
     private let request: Request
     private weak var store: BookmarkStore?
     private var pending: Task<Void, Error>?
     private var active = true
+    private var queued = 0
+    private var events: UOASettingsStream?
     private let path = "/oauth/me/settings/browser/bookmarks"
 
     init(account: UOAAccount, store: BookmarkStore) {
         self.request = { try await account.request($0, method: $1, body: $2, version: $3) }
         self.store = store
+        if account.supportsSettingsStream {
+            events = UOASettingsStream(
+                namespace: "browser",
+                key: "bookmarks",
+                socket: {
+                    try await account.settingsSocket(namespace: "browser", key: "bookmarks")
+                },
+                receive: { [weak self] value in
+                    guard let self, self.active, self.queued == 0 else { return }
+                    let raw = value is NSNull ? [] : value as? [Any]
+                    guard let raw else { throw UOASettingsValue.InvalidFrame() }
+                    self.store?.setAccountBookmarks(try Self.bookmarks(in: raw))
+                }
+            )
+        }
     }
 
     init(store: BookmarkStore, request: @escaping Request) {
@@ -37,15 +41,22 @@ final class AccountBookmarks {
 
     func invalidate() {
         active = false
+        events?.stop()
         pending?.cancel()
     }
 
     @discardableResult
     func enqueue(_ mutation: Mutation? = nil) -> Task<Void, Error> {
+        events?.stop()
+        queued += 1
         let previous = pending
         let operation = Task { [weak self] in
             _ = try? await previous?.value
             guard let self, self.active, !Task.isCancelled else { throw CancellationError() }
+            defer {
+                self.queued -= 1
+                if self.active && self.queued == 0 { self.events?.start() }
+            }
             self.store?.setSyncState(busy: true, error: nil)
             do {
                 let bookmarks = try await self.perform(mutation)
@@ -69,30 +80,47 @@ final class AccountBookmarks {
             let response = try await request(path, "GET", nil, nil)
             guard active, !Task.isCancelled else { throw CancellationError() }
             let original = try Self.values(from: response.data)
-            let existing = Self.bookmarks(in: original)
+            let existing = try Self.bookmarks(in: original)
             guard let mutation else { return existing }
             guard let version = response.version else { throw UOATransport.Failure(status: 428) }
-            // Other UOA clients may attach favicon/folder metadata. Preserve their
-            // opaque fields when changing a different item in the shared list.
-            let values: [Any]
-            switch mutation {
-            case .add(let bookmark):
-                values = existing.contains(where: { $0.url == bookmark.url }) ? original
-                    : original + [try JSONSerialization.jsonObject(with: JSONEncoder().encode(bookmark))]
-            case .remove(let id):
-                values = original.filter { Self.bookmark($0)?.id != id }
-            case .clear: values = []
-            }
+            let changed = try mutation.apply(to: existing)
+            let values = try Self.merging(changed, into: original)
             let body = try JSONSerialization.data(withJSONObject: ["value": values])
             do {
                 let saved = try await request(path, "PUT", body, version)
                 guard active else { throw CancellationError() }
-                return Self.bookmarks(in: try Self.values(from: saved.data))
+                return try Self.bookmarks(in: Self.values(from: saved.data))
             } catch let failure as UOATransport.Failure where failure.status == 409 && attempt < 2 {
                 continue
             }
         }
         throw UOATransport.Failure(status: 409)
+    }
+
+    /// Preserve untouched records byte-for-value and keep foreign entries between
+    /// the same known-node slots while replaying the requested sibling order.
+    private static func merging(_ changed: [BookmarkStore.Bookmark], into original: [Any]) throws -> [Any] {
+        var rawByID: [UUID: [String: Any]] = [:]
+        for value in original {
+            if let node = bookmark(value), let raw = value as? [String: Any] { rawByID[node.id] = raw }
+        }
+        let encoded: [Any] = try changed.map { node in
+            if let raw = rawByID[node.id], bookmark(raw) == node { return raw }
+            var raw = rawByID[node.id] ?? [:]
+            let fields = try JSONSerialization.jsonObject(with: JSONEncoder().encode(node)) as? [String: Any] ?? [:]
+            raw.merge(fields) { _, new in new }
+            return raw
+        }
+        var position = 0
+        var result: [Any] = []
+        for value in original {
+            if bookmark(value) == nil { result.append(value) } else if position < encoded.count {
+                result.append(encoded[position])
+                position += 1
+            }
+        }
+        result.append(contentsOf: encoded.dropFirst(position))
+        return result
     }
 
     private static func values(from data: Data) throws -> [Any] {
@@ -106,12 +134,11 @@ final class AccountBookmarks {
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value),
               let bookmark = try? JSONDecoder().decode(BookmarkStore.Bookmark.self, from: data),
-              !bookmark.url.isEmpty else { return nil }
+              bookmark.isFolder || !bookmark.url.isEmpty else { return nil }
         return bookmark
     }
 
-    private static func bookmarks(in values: [Any]) -> [BookmarkStore.Bookmark] {
-        var seen = Set<UUID>()
-        return values.compactMap(bookmark).filter { seen.insert($0.id).inserted }
+    private static func bookmarks(in values: [Any]) throws -> [BookmarkStore.Bookmark] {
+        try BookmarkTree.normalized(values.compactMap(bookmark))
     }
 }

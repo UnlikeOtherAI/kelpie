@@ -43,6 +43,16 @@ struct BrowserView: View {
                 TouchpadOverlayView(onClose: { exitTouchpadMode() })
             } else {
                 browserContent
+                    .accessibilityHidden(showBookmarks)
+                if showBookmarks {
+                    FavouritesPresentation(
+                        currentTitle: browserState.pageTitle,
+                        currentURL: browserState.currentURL,
+                        onNavigate: navigate,
+                        onDismiss: { showBookmarks = false }
+                    )
+                    .accessibilityAddTraits(.isModal)
+                }
             }
         }
         .onChange(of: externalDisplayManager.isConnected) { connected in
@@ -208,13 +218,6 @@ struct BrowserView: View {
                 onNavigate: { url in
                     navigate(url)
                 }
-            )
-        }
-        .sheet(isPresented: $showBookmarks) {
-            BookmarksView(
-                currentTitle: browserState.pageTitle,
-                currentURL: browserState.currentURL,
-                onNavigate: navigate
             )
         }
         .sheet(isPresented: $showHistory) {

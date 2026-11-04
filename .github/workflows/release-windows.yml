@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build-windows:
-    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components: macos -->') }}"
+    if: "${{ !startsWith(github.event.release.body, '<!-- kelpie-release-components:') || contains(github.event.release.body, '<!-- kelpie-release-component: windows -->') }}"
     name: Build Windows release artifact
     runs-on: windows-2022
     # The same build and package as the Windows CEF job: ~9.5 minutes green.

@@ -105,8 +105,9 @@ struct URLBarView: View {
             }
             .padding(.horizontal, 12)
             .frame(height: BrowserChromeLayout.navigationHeight)
-            if !bookmarkStore.bookmarks.isEmpty {
-                FavouritesBarView(appearance: appearance, bookmarks: bookmarkStore.bookmarks, onNavigate: onNavigate)
+            if !bookmarkStore.nodes.isEmpty {
+                FavouritesBarView(appearance: appearance, onNavigate: onNavigate, onEdit: onBookmarks)
+                    .frame(height: BrowserChromeLayout.favouritesHeight)
             }
         }
         .background(BrowserGlassBackground(appearance: appearance))

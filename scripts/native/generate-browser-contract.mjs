@@ -47,11 +47,16 @@ const sample = schema => {
   if (schema.type === 'number' || schema.type === 'integer') return schema.minimum ?? 1;
   if (schema.type === 'boolean') return true;
   if (schema.type === 'null') return null;
-  return 'sample1';
+  const value = ['sample1', '00000000-0000-4000-8000-000000000001']
+    .find(candidate => !schema.pattern || new RegExp(schema.pattern).test(candidate));
+  if (value === undefined) throw new Error(`No fixture value for pattern: ${schema.pattern}`);
+  return value;
 };
 const extensionCases = extensionTools.map(tool => {
   const schema = extensionSchemas[endpointOf(tool)];
-  const body = tool.bodyFromArgs({device:'fixture', ...sample(schema)});
+  // Validate fixtures against the authoritative schema before embedding them.
+  const args = z.strictObject(tool.schema).parse({device:'fixture', ...sample(schema)});
+  const body = tool.bodyFromArgs(args);
   return {endpoint:endpointOf(tool), body};
 });
 const output = process.argv[2];

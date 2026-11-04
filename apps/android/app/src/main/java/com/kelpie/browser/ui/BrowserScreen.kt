@@ -424,20 +424,15 @@ fun BrowserScreen(
     }
 
     if (showBookmarks) {
-        ModalBottomSheet(
-            onDismissRequest = { showBookmarks = false },
-            sheetState = rememberModalBottomSheetState(),
-        ) {
-            BookmarksSheet(
-                currentTitle = pageTitle,
-                currentUrl = currentUrl,
-                onNavigate = { url ->
-                    NessieConnection.personInteracted()
-                    webView?.loadUrl(url)
-                },
-                onDismiss = { showBookmarks = false },
-            )
-        }
+        BookmarksSheet(
+            currentTitle = pageTitle,
+            currentUrl = currentUrl,
+            onNavigate = { url ->
+                NessieConnection.personInteracted()
+                webView?.loadUrl(url)
+            },
+            onDismiss = { showBookmarks = false },
+        )
     }
 
     if (showHistory) {
