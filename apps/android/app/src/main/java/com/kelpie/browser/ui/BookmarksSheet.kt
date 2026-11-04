@@ -111,6 +111,7 @@ private fun FavouritesTreeContent(
     var listBounds by remember { mutableStateOf(Rect.Zero) }
     val bounds = remember { mutableStateMapOf<String, Rect>() }
     val rows = remember(nodes, expanded) { visibleFavourites(nodes, expanded) }
+    val canAddPage = runCatching { BookmarkTree.validate(Bookmark(title = currentTitle.ifEmpty { currentUrl }, url = currentUrl)) }.isSuccess
 
     fun finishDrag() {
         val id = dragged
@@ -151,7 +152,7 @@ private fun FavouritesTreeContent(
                             addMenu = false
                             BookmarkStore.add(currentTitle, currentUrl)
                         },
-                        enabled = runCatching { BookmarkTree.validate(Bookmark(title = currentTitle.ifEmpty { currentUrl }, url = currentUrl)) }.isSuccess,
+                        enabled = canAddPage,
                     )
                 }
             }
@@ -227,7 +228,7 @@ private fun FavouritesTreeContent(
                                     menu = false
                                     editing = Bookmark(title = "New Folder", kind = "folder", parentId = node.id)
                                 })
-                                DropdownMenuItem(text = { Text("Add Current Page Here") }, onClick = {
+                                DropdownMenuItem(text = { Text("Add Current Page Here") }, enabled = canAddPage, onClick = {
                                     menu = false
                                     BookmarkStore.add(currentTitle, currentUrl, node.id)
                                 })

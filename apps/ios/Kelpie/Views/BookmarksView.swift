@@ -13,6 +13,9 @@ struct BookmarksView: View {
     @State private var moving: BookmarkStore.Bookmark?
     @State private var removing: BookmarkStore.Bookmark?
     @State private var drag: String?
+    private var canAddPage: Bool {
+        (try? BookmarkTree.validate(.init(title: currentTitle.isEmpty ? currentURL : currentTitle, url: currentURL))) != nil
+    }
 
     private var rows: [(node: BookmarkStore.Bookmark, depth: Int)] {
         var result: [(BookmarkStore.Bookmark, Int)] = []
@@ -31,11 +34,15 @@ struct BookmarksView: View {
                     .background(.quaternary)
                     .onDrop(of: [.plainText], delegate: FavouriteDrop(store: store, target: nil, drag: $drag))
                     .accessibilityIdentifier("browser.bookmarks.root")
-                List {
-                    if store.nodes.isEmpty { Text("No favourites yet. Add a page or create a folder.").foregroundStyle(.secondary) }
-                    ForEach(rows, id: \.node.id) { row in favouriteRow(row.node, depth: row.depth) }
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if store.nodes.isEmpty { Text("No favourites yet. Add a page or create a folder.").foregroundStyle(.secondary).padding() }
+                        ForEach(rows, id: \.node.id) { row in
+                            favouriteRow(row.node, depth: row.depth).padding(.horizontal, 16).padding(.vertical, 8)
+                            Divider().padding(.leading, 16)
+                        }
+                    }
                 }
-                .listStyle(.plain)
                 if let error = store.syncError { Text(error).font(.caption).foregroundStyle(.red).padding(8) }
                 if store.isSyncing { ProgressView("Saving favourites…").padding(8) }
                 if store.canUndoRemoval {
@@ -51,7 +58,7 @@ struct BookmarksView: View {
                     Menu {
                         Button("New Folder") { editing = BookmarkStore.Bookmark(title: "New Folder", kind: .folder) }
                         Button("Add Current Page") { store.add(title: currentTitle, url: currentURL) }
-                            .disabled((try? BookmarkTree.validate(.init(title: currentTitle.isEmpty ? currentURL : currentTitle, url: currentURL))) == nil)
+                            .disabled(!canAddPage)
                     } label: { Image(systemName: "plus") }
                     .accessibilityLabel("Add favourite or folder").accessibilityIdentifier("browser.bookmarks.add")
                 }
@@ -97,12 +104,15 @@ struct BookmarksView: View {
                 if node.isFolder {
                     Button("New Folder Inside") { editing = BookmarkStore.Bookmark(title: "New Folder", kind: .folder, parentId: node.id) }
                     Button("Add Current Page Here") { store.add(title: currentTitle, url: currentURL, parentId: node.id) }
+                        .disabled(!canAddPage)
                 }
                 Button("Remove", role: .destructive) { removing = node }
             } label: { Image(systemName: "ellipsis").padding(8) }
             .accessibilityLabel("Actions for \(node.title)")
+            .accessibilityIdentifier("browser.bookmarks.actions.\(node.id.uuidString)")
             Image(systemName: "line.3.horizontal").foregroundStyle(.secondary).padding(8)
                 .accessibilityLabel("Drag \(node.title)")
+                .accessibilityIdentifier("browser.bookmarks.drag.\(node.id.uuidString)")
                 .onDrag {
                     let payload = "kelpie:\(store.generation.uuidString):\(node.id.uuidString)"
                     drag = payload
@@ -111,6 +121,7 @@ struct BookmarksView: View {
         }
         .padding(.leading, CGFloat(min(depth, 8)) * 16)
         .frame(minHeight: 48)
+        .contentShape(Rectangle())
         .onDrop(of: [.plainText], delegate: FavouriteDrop(store: store, target: node, drag: $drag))
     }
 }

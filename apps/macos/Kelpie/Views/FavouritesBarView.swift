@@ -86,7 +86,8 @@ final class FavouritesBar: NSScrollView {
         guard activeMenu == nil, store.nodes.contains(where: { $0.id == id && $0.isFolder }) else { return }
         let menu = folderMenu(id)
         activeMenu = menu
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -button.bounds.height - 8), in: button)
+        let bottom = button.isFlipped ? button.bounds.maxY + 4 : button.bounds.minY - 4
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: bottom), in: button)
         activeMenu = nil
     }
 

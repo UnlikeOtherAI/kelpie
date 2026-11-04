@@ -8,10 +8,11 @@ enum FavouriteRemoval {
             do {
                 try await store.removeWithUndo(id: id)
                 guard generation == store.generation else { return }
+                undo?.removeAllActions(withTarget: store)
                 undo?.registerUndo(withTarget: store) { target in
                     Task { @MainActor in
                         guard target.generation == generation else { return }
-                        try? await target.undoLastRemoval()
+                        try? await target.undoLastRemoval(expectedRoot: id)
                     }
                 }
                 undo?.setActionName("Remove Favourite")

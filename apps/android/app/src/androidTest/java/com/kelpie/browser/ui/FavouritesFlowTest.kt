@@ -1,12 +1,14 @@
 package com.kelpie.browser.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import com.kelpie.browser.MainActivity
@@ -26,6 +28,8 @@ class FavouritesFlowTest {
         if (ui.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty()) {
             ui.onNodeWithText("Get Started").performClick()
         }
+        ui.onNode(hasSetTextAction()).performTextReplacement("https://example.com/")
+        ui.onNode(hasSetTextAction()).performImeAction()
         ui.onNodeWithContentDescription("More").performClick()
         ui.onNodeWithText("Bookmarks").performClick()
         ui.onNodeWithContentDescription("Add favourite or folder").performClick()

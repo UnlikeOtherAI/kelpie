@@ -104,8 +104,11 @@ final class BookmarkStore: ObservableObject {
         canUndoRemoval = true
     }
 
-    func undoLastRemoval() async throws {
+    func undoLastRemoval(expectedRoot: UUID? = nil) async throws {
         guard let (mutation, session) = undoRemoval, generation == session else { return }
+        if let expectedRoot {
+            guard case let .restore(removed, _) = mutation, removed.first?.id == expectedRoot else { return }
+        }
         try await mutate(mutation)?.value
         guard generation == session else { throw CancellationError() }
         undoRemoval = nil

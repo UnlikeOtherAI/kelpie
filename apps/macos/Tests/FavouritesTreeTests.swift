@@ -83,4 +83,22 @@ final class FavouritesTreeTests: XCTestCase {
         valid["protocolVersion"] = true
         XCTAssertThrowsError(try state.receive(frame(valid), namespace: "browser", key: "bookmarks"))
     }
+
+    func testStaleNativeUndoCannotRestoreADifferentRemoval() async throws {
+        let suite = "FavouritesUndoTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = BookmarkStore(defaults: defaults)
+        let first = Node(title: "First", kind: .folder)
+        let second = Node(title: "Second", kind: .folder)
+        try await store.mutate(.add(first))?.value
+        try await store.mutate(.add(second))?.value
+        try await store.removeWithUndo(id: first.id)
+        try await store.removeWithUndo(id: second.id)
+        try await store.undoLastRemoval(expectedRoot: first.id)
+        XCTAssertTrue(store.nodes.isEmpty)
+        XCTAssertTrue(store.canUndoRemoval)
+        try await store.undoLastRemoval(expectedRoot: second.id)
+        XCTAssertEqual(store.nodes, [second])
+    }
 }
