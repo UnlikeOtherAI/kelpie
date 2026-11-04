@@ -8,6 +8,12 @@ export function bindScriptInputs(
 ): ScriptV1 {
   const script = scriptV1Schema.parse(raw);
   const declarations = script.inputs ?? {};
+  const outputNames = new Set<string>();
+  for (const step of script.actions) {
+    if (step.action !== "output" && step.action !== "extract") continue;
+    if (outputNames.has(step.name)) throw new Error("Duplicate workflow output name");
+    outputNames.add(step.name);
+  }
   for (const key of Object.keys(values)) {
     if (!Object.hasOwn(declarations, key)) throw new Error("Undeclared workflow input");
   }

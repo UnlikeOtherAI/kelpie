@@ -33,7 +33,7 @@ struct ScriptMediaOutput {
 class ScriptMediaEncoder {
  public:
   // Formats: "gif", "mp4"; empty allows PNG-only callers. fps: 1..60.
-  // Total GIF+MP4+WriteStepPNG budget: 1..256 MiB, including finalization headroom.
+  // Total GIF+MP4+WriteStepPNG budget: 1024 bytes..256 MiB, including finalization headroom.
   // Frames: at most 4096 per dimension and 8,388,608 pixels; MP4 needs even
   // dimensions. Raw buffers are bounded independently from the output budget.
   static std::unique_ptr<ScriptMediaEncoder> Create(

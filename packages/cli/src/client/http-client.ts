@@ -71,6 +71,8 @@ async function rawFetch<T>(
   body: Record<string, unknown> | undefined,
   token: string | undefined,
   timeout: number,
+  redirect: "follow" | "error" = "follow",
+  maxResponseBytes?: number,
 ): Promise<RawFetchResult<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -86,9 +88,26 @@ async function rawFetch<T>(
       headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
+      redirect,
     });
 
-    const data = (await response.json()) as T;
+    let data: T;
+    if (maxResponseBytes !== undefined) {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Browser response body missing");
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      try {
+        for (;;) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          size += chunk.value.byteLength;
+          if (size > maxResponseBytes) { await reader.cancel(); throw new Error("Browser response exceeds limit"); }
+          chunks.push(chunk.value);
+        }
+      } finally { reader.releaseLock(); }
+      data = JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
+    } else data = (await response.json()) as T;
     return { ok: response.ok, status: response.status, data };
   } catch (error) {
     if (isAbortError(error)) {
@@ -108,7 +127,7 @@ async function rawFetch<T>(
         success: false,
         error: {
           code: "NETWORK_ERROR",
-          message: error instanceof Error ? error.message : "Network error",
+          message: maxResponseBytes !== undefined ? "Pinned browser request failed" : error instanceof Error ? error.message : "Network error",
         },
       } as T,
     };
@@ -225,3 +244,21 @@ export async function sendCommand<T = unknown>(
  * without re-implementing it.
  */
 export { fingerprintFor };
+
+export type PinnedCommandTransport = <T = unknown>(method: string, body: Record<string, unknown>, timeout: number) => Promise<HttpResponse<T>>;
+
+/** Capture one exact approved socket and grant. Never pair, fallback, rotate, or follow redirects. */
+export async function createPinnedCommandTransport(device: DiscoveredDevice): Promise<PinnedCommandTransport> {
+  const socket = { ...device };
+  const token = await tokenFor(socket);
+  return async <T>(method: string, body: Record<string, unknown>, timeout: number): Promise<HttpResponse<T>> => {
+    if (socket.localReadinessFile) {
+      const current = await readLocalReadiness(socket.localReadinessFile);
+      if (!current || current.launchId !== socket.localLaunchId || current.deviceId !== socket.id ||
+          current.port !== socket.port || current.token !== token) {
+        return { ok: false, status: 409, data: { success: false, error: { code: "LOCAL_BROWSER_STALE", message: "The pinned browser grant changed" } } as T };
+      }
+    }
+    return rawFetch<T>(urlFor(socket, method), body, token, timeout, "error", method === "getScriptArtifact" ? 2_097_152 : 16_777_216);
+  };
+}

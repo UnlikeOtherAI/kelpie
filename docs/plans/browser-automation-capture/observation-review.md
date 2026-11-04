@@ -66,3 +66,28 @@ as follows; the owner is updating its checklist to avoid false completion:
 | OBS-5 diagnostics | RDY-01 |
 | OBS-6 immediate readiness | RDY-02 |
 | OBS-7 shared ABI/schema | DOC-01, DIF-01, OWN-02 |
+
+## Bounded-reader follow-up review
+Reviewed source: 3a63ea7d696a7850e2798b2c235aca784104d9db.
+The new shared dom-reader.ts uses bounded manual traversal, ancestor/style work,
+Text.substringData copy budgets, conservative incomplete readiness and explicit
+unsupported scope-selector errors. Readiness now includes ancestor overflow
+clipping. observation-source.ts injects the fixed factory explicitly into each
+collector, avoiding bundler-renamed import closures in serialized native readers.
+The owner reports lint/build, shared121/CLI632, real Chromium27 and native-core2
+checks passed, including 15k/deep DOM, 1 MiB JSON-LD, throwing old APIs, copied-text
+budget, privacy/opacity/collapse/clipping, scope and incomplete metadata cases.
+The manual built-SDK bounded fixture records late-target incompleteness, absent
+exact index on incomplete metadata and clipped/transparent readiness=false.
+Acceptance reviewed source; no headed/native app result is claimed.
+Two source edge cases were sent for follow-up:
+- Complete metadata scans count index only after filtering editor/private/unknown
+  candidates. A skipped earlier matching meta/script shifts the exact CSS-selector
+  index of later public metadata. Count raw matching positions or omit exact index.
+- The direct-child :scope pattern permits another nested :scope, then evaluates
+  it with Element.matches against each child, changing its anchor. Reject that
+  unsupported form explicitly. Also define whether extraction field :scope may
+  select its root: the current scan excludes root unless includeRoot is set.
+The earlier bounded-work, copied-text and ancestor-clip findings are addressed at
+source level. Exact provenance/selector edge cases and integrated native evidence
+remain open.

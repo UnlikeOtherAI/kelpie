@@ -1,15 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { runScriptFile, downloadRunArtifact, controlScriptRun, type ScriptRunOptions } from "./script-run.js";
 import type { Command } from "commander";
 import { deviceCommand } from "./helpers.js";
-
-async function readScriptFile(path: string): Promise<Record<string, unknown>> {
-  const raw = await readFile(path, "utf8");
-  const parsed = JSON.parse(raw) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Script file must contain a JSON object");
-  }
-  return parsed as Record<string, unknown>;
-}
 
 export function registerScript(program: Command): void {
   program
@@ -87,26 +78,23 @@ export function registerScript(program: Command): void {
     });
 
   const script = program.command("script").description("Run and manage scripted recording sessions");
-
-  script
-    .command("run <file>")
+  script.command("run <file>")
     .description("Run a recording script from a JSON file")
-    .action(async (file: string) => {
-      const body = await readScriptFile(file);
-      await deviceCommand(program, "playScript", body);
-    });
-
-  script
-    .command("abort")
+    .option("--inputs <file>", "JSON object binding declared workflow inputs")
+    .option("--secret <reference=ENV...>", "Explicit secret reference to host environment variable")
+    .option("--output <directory>", "Download and integrity-check run artifacts")
+    .action(async (file: string, options: ScriptRunOptions) => { await runScriptFile(program, file, options); });
+  script.command("download <runId> <artifactId> <file>")
+    .description("Download one run-owned artifact and verify its bytes")
+    .action(async (runId: string, artifactId: string, file: string) => { await downloadRunArtifact(program, runId, artifactId, file); });
+  script.command("abort")
     .description("Abort the active recording script")
-    .action(async () => {
-      await deviceCommand(program, "abortScript");
-    });
-
-  script
-    .command("status")
+    .option("--run-id <id>", "Run owned by the current authenticated session")
+    .option("--pinned", "Use the current exact socket/grant without pairing or fallback")
+    .action(async (options: { runId?: string; pinned?: boolean }) => { await controlScriptRun(program, "abortScript", options.runId, options.pinned); });
+  script.command("status")
     .description("Get recording script playback status")
-    .action(async () => {
-      await deviceCommand(program, "getScriptStatus");
-    });
+    .option("--run-id <id>", "Run owned by the current authenticated session")
+    .option("--pinned", "Use the current exact socket/grant without pairing or fallback")
+    .action(async (options: { runId?: string; pinned?: boolean }) => { await controlScriptRun(program, "getScriptStatus", options.runId, options.pinned); });
 }

@@ -99,6 +99,8 @@ Kelpie can run a whole walkthrough as one timed script instead of one command at
 
 The main use case is support and presentation work: record a few clean steps that show a customer exactly where to click, how to reach a setting, or how to complete a workflow, then hand over the resulting walkthrough video instead of writing a long email.
 
+The opt-in [typed workflow contract](api/script-workflows.md) adds reusable inputs, explicit secret references, strict semantic targets, bounded readiness/assertions and named outputs. Where native capabilities advertise capture, walkthroughs export playable GIF/MP4 and step PNG artifacts with colored wobbling/fading tap circles and optional eased S/C visual pointer motion. CLI downloads retrieve and verify actual remote bytes; unsupported actions and encoders refuse before input. Native acceptance is tracked separately per platform.
+
 The feature is exposed through `play-script`, `abort-script`, and `get-script-status`, with matching CLI commands (`kelpie script run`, `kelpie script status`, `kelpie script abort`) and MCP tools. Commentary and highlight overlays are also available as standalone commands and tools, so an LLM can narrate or spotlight a page without running a full script.
 
 ## Scrolling

@@ -49,7 +49,7 @@ struct ScriptMediaEncoder::Impl {
   Impl(const std::filesystem::path& dir, const std::vector<std::string>& requested,
        int rate, std::size_t max_bytes)
       : budget{max_bytes}, directory(dir), formats(requested.begin(), requested.end()), fps(rate) {
-    if (fps < 1 || fps > 60 || max_bytes < 1024 * 1024 ||
+    if (fps < 1 || fps > 60 || max_bytes < 1024 ||
         max_bytes > 256ULL * 1024 * 1024 ||
         formats.size() != requested.size() ||
         std::any_of(formats.begin(), formats.end(),
@@ -174,11 +174,8 @@ std::vector<ScriptMediaOutput> ScriptMediaEncoder::Finish(double terminal_elapse
 std::size_t ScriptMediaEncoder::bytes_written() const {
   impl_->CheckOwner();
   std::size_t total = 0;
-  for (const auto& format : impl_->formats) {
-    std::error_code error;
-    const auto bytes = std::filesystem::file_size(impl_->directory / ("capture." + format), error);
-    if (!error) total += static_cast<std::size_t>(bytes);
-  }
+  if (impl_->gif) total += impl_->gif->BytesWritten();
+  if (impl_->video) total += impl_->video->BytesWritten();
   for (const auto& path : impl_->pngs) {
     std::error_code error;
     const auto bytes = std::filesystem::file_size(path, error);
