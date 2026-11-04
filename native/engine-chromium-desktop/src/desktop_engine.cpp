@@ -21,6 +21,7 @@
 #include "kelpie/cef_app_factory.h"
 #include "kelpie/desktop_bridge.h"
 #include "kelpie/internal_scheme.h"
+#include "kelpie/partition.h"
 #include "desktop_cef_client.h"
 #include "desktop_engine_impl.h"
 #include "start_page_scheme.h"
