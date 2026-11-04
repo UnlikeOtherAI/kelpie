@@ -99,6 +99,7 @@ validation. Availability must be proven by an actual supported browser API.
 - Verify optional backend and WebMCP capabilities against running implementations.
 - Verify no additional product screens or settings beyond the requested behavior.
 ## Run ownership and asynchronous finalization
+
 Ownership must remain held through encoder finalization and cleanup, including
 off-main-thread GIF encoding. A new run cannot replace mutable presentation or
 artifact state while the prior run finalizes. Local Stop must remain responsive

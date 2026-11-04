@@ -65,6 +65,7 @@ signing secrets and verified APK/AAB signatures. macOS must replace and relaunch
 the installed app after publication. No publishing action is authorized to this
 acceptance worker.
 ## Lightweight acceptance check
+
 QA-LIGHT-1 was granted for at most 10 seconds, one worker, no dependency install,
 browser, media encoder or native process. Maxis passed Node syntax checks for the
 fixture server/page script, assertions and evidence validator. All six
@@ -72,6 +73,7 @@ harness-only tests passed in 1.03 seconds. These checks validate the acceptance
 harness, not any product capability. The temporary loopback fixture HTTP server
 was created and closed by the harness test. No persistent service was launched.
 ## ChatterBox fallback audit
+
 The local Codex configuration names the existing
 C:/Users/ondre/.chaterbox/codex-mcp.cmd shim. The supported
 C:/Users/ondre/.chaterbox/board-client.mjs can invoke named MCP tools.
@@ -79,7 +81,10 @@ board_help returned the worker/setup guidance. board_register and directed
 board_messages (pending=true, limit=10) both returned: hub unavailable or
 registration rejected. No registration, message delivery or inbox read is
 confirmed. No general feed, sibling transcript, token or connection-file contents
-were printed. No hub restart or configuration change was attempted.## Coordination update
+were printed. No hub restart or configuration change was attempted.
+
+## Coordination update
+
 The coordinator attempted its own registration once as
 kelpie-capture-root-20261104. Registration and the directed inbox returned the
 same hub unavailable or registration rejected response. No delivery or inbox
