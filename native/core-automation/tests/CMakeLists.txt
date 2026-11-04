@@ -7,6 +7,7 @@ endfunction()
 
 add_automation_test(test_response_helpers test_response_helpers.cpp)
 add_automation_test(test_handler_context test_handler_context.cpp)
+add_automation_test(test_script_redaction test_script_redaction.cpp)
 
 
 # Parity vectors are test-only. Reuse the existing shared build; never install/bootstrap here.

@@ -3,6 +3,8 @@ add_library(kelpie_core_automation STATIC
   src/handler_context.cpp
   src/response_helpers.cpp
   src/script_presentation.cpp
+  src/script_redaction.cpp
+  src/script_redaction_c_api.cpp
 )
 
 target_include_directories(kelpie_core_automation

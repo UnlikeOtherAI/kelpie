@@ -141,7 +141,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     return ErrorResponse("SENSITIVE_CAPTURE_REFUSED", "Secret-bearing workflows cannot capture media");
   if ((script.contains("capture") || screenshot) && !config.capture) return ErrorResponse("UNSUPPORTED", "Native capture is unavailable");
   const std::set<std::string> supported={"navigate","click","tap","fill","type","press-key","scroll","wait","wait-ready","assert","screenshot","commentary","output","extract"};
-  for(const auto& action:actions) if(!supported.contains(action.at("action").get<std::string>()))
+  for(const auto& action:actions) if(supported.count(action.at("action").get<std::string>())==0)
     return ErrorResponse("UNSUPPORTED_SCRIPT_ACTION","Workflow contains an action this native adapter does not implement");
   auto admission=config.admission?config.admission():nullptr;
   if(!admission) return ErrorResponse("BUSY","A prior browser operation still owns admission");
