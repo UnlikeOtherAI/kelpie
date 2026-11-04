@@ -8,3 +8,9 @@ export * from "./partition.js";
 export * from "./mcp-tools.js";
 export * from "./extension-tools.js";
 export * from "./extension-ai-tools.js";
+
+export * from "./script-workflow.js";
+export * from "./script-bindings.js";
+export * from "./script-target.js";
+export * from "./script-presentation.js";
+export * from "./automation-session.js";

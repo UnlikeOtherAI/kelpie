@@ -1,0 +1,19 @@
+# Strict script v1 contract
+
+This is the shared contract checkpoint for native implementation. Platform discovery determines actual support; this document does not claim completed native acceptance.
+
+The existing `play-script` endpoint accepts an opt-in `version:1` script. Unversioned legacy scripts keep their existing admission path. A v1 script requires `tabId` and ordered typed `actions`; optional fields are `name`, `sessionId`, declared `inputs`, `capture`, `tapIndicator`, `pointer`, and `defaultWaitBetweenActions`. Unknown fields, arbitrary evaluation and continue-on-error are rejected before execution.
+
+Actions are navigate, click/tap, fill/type, press-key, scroll, wait, wait-ready, assert, screenshot, commentary and output. Unsupported platform actions must fail in preflight before any input. Wait-ready polls the immediate page readiness predicate within a bounded timeout. Assertions distinguish missing/hidden from ambiguity and evaluation failures. Output sources are URL, title and status.
+
+Targets are exactly one of role/name/exact, label/exact, selector or x/y fallback. Semantic matching is exact after whitespace normalization. The fixed resolver returns CSS-pixel center, viewport size, document identity and an ephemeral target token. Rechecking requires the same element object, document/URL, viewport, geometry and unobscured hit point. No selector re-query can substitute a replacement element.
+
+Native renderers with no trusted input route may use the fixed atomic synthetic-coordinate sequence and must report that guarantee. A synchronous handler changing the target during dispatch stops the sequence and reports uncertain completion. Never retry uncertain mutations. Fill/type use the native value setter on the same editable input or textarea after focus and identity recheck; unsupported editables refuse explicitly.
+
+Capture formats are GIF, video (MP4), and screenshots. Defaults: 15 FPS, maximum width 1280, duration 60000ms, retained bytes 67108864. Hard bounds: 30 FPS, width1920, duration300000ms, bytes268435456. Capture uses actual continuous frames with overlay composition and monotonic timestamps. Encoder backpressure drops frames rather than accumulating an unbounded queue; report dropped frames. A viewport resize stops and finalizes partial output. Abort/failure/bounds preserve valid partial artifacts.
+
+Tap defaults: color #3B82F6, radius20 CSS pixels, duration700ms, wobble and fade enabled. Visual pointer is disabled by default; enabled motion uses a deterministic S/C cubic curve, duration500ms and smoothstep ease in/out. Pointer presentation dispatches no hover or input.
+
+Artifacts return IDs, MIME type, byte length, SHA-256, dimensions and partial status, with optional duration/frame count/dropped frames/viewport/document provenance. Authenticated `get-script-artifact` uses runId/artifactId/offset/length, default chunk262144 and maximum1048576 bytes. Returned base64 chunks include offset/nextOffset/eof/type/size/hash. Never expose a device path, URL or credential as an artifact locator. The native store binds every run/status/cancel/download to the current authenticated owner and exact browser grant.
+
+Declared inputs bind once on the authorized host. Secret values resolve through explicit host references, stay out of result/progress/errors, and cannot be combined with capture. Binding compiles to the existing play-script actions rather than introducing a second runtime.
