@@ -66,7 +66,64 @@ void ScriptRegistryForwarding() {
   auto oversized = calls[3].second; oversized["length"] = 1048577;
   assert(gateway.BeginMcp(rpc(calls[3].first, oversized))["response"]["error"]["code"] == -32602);
 }
+void ScriptSessionPreflightErrors() {
+  const json script = {{"version", 1}, {"tabId", "a"}, {"sessionId", "foreign"},
+    {"actions", {{{"action", "wait"}, {"ms", 0}}}}};
+  const json extensions = json::array({
+    {{"name", "kelpie_play_script"}, {"method", "play-script"}, {"mutates", true},
+      {"inputSchema", kelpie::NativeExtensionInputSchema("play-script")}},
+    {{"name", "kelpie_abort_script"}, {"method", "abort-script"}, {"mutates", true},
+      {"inputSchema", kelpie::NativeExtensionInputSchema("abort-script")}}
+  });
+  const json config = {{"nativeMethods", {"play-script", "abort-script"}},
+    {"extensions", extensions}, {"requireAuthorization", false}};
+  auto rpc = [](std::string name, json body, bool generic) {
+    if (generic) { body = {{"name", name}, {"arguments", body}}; name = "kelpie_extension"; }
+    return json{{"jsonrpc", "2.0"}, {"id", 7}, {"method", "tools/call"},
+      {"params", {{"name", name}, {"arguments", body}}}};
+  };
+  const json refused = {{"success", false}, {"error", {{"code", "SESSION_UNSUPPORTED"},
+    {"message", "PRIVATE_NATIVE_MESSAGE"}}}};
+  for (bool generic : {false, true}) {
+    kelpie::BrowserGateway gateway(config);
+    auto begin = [&](json body) {
+      auto step = gateway.BeginMcp(rpc("kelpie_play_script", body, generic));
+      assert(step["kind"] == "dispatch"); assert(step["method"] == "play-script");
+    };
+    auto error = [](const json& step) {
+      assert(step["response"]["result"]["isError"] == true);
+      assert(step.dump().find("PRIVATE_NATIVE_MESSAGE") == std::string::npos);
+      return json::parse(step["response"]["result"]["content"][0]["text"].get<std::string>())["error"];
+    };
+    begin(script);
+    auto result = error(gateway.Advance(refused));
+    assert(result["code"] == "SESSION_UNSUPPORTED");
+    assert(result["mayHaveCompleted"] == false);
+    for (bool nested : {false, true}) {
+      begin(script); auto uncertain = refused;
+      if (nested) uncertain["error"]["mayHaveCompleted"] = true;
+      else uncertain["mayHaveCompleted"] = true;
+      result = error(gateway.Advance(uncertain));
+      assert(result["code"] == "SESSION_UNSUPPORTED"); assert(result["mayHaveCompleted"] == true);
+    }
+    auto absent = script; absent.erase("sessionId"); begin(absent);
+    result = error(gateway.Advance(refused));
+    assert(result["code"] == "COMMAND_FAILED"); assert(result["mayHaveCompleted"] == true);
+    begin(script);
+    result = error(gateway.Advance({{"success", false}, {"error", {{"code", "TIMEOUT"}}}}));
+    assert(result["code"] == "COMMAND_FAILED"); assert(result["mayHaveCompleted"] == true);
+    begin(script);
+    const auto cancelled = gateway.Cancel();
+    assert(error(cancelled)["mayHaveCompleted"] == true);
+    assert(gateway.Advance(refused) == cancelled);
+    auto step = gateway.BeginMcp(rpc("kelpie_abort_script", {{"runId", "r"}}, generic));
+    assert(step["kind"] == "dispatch");
+    result = error(gateway.Advance(refused));
+    assert(result["code"] == "COMMAND_FAILED"); assert(result["mayHaveCompleted"] == true);
+  }
+}
 int main() {
+  ScriptSessionPreflightErrors();
   ScriptRegistryForwarding();
   const kelpie::McpRegistry registry;
   for (const auto& tool : registry.all_tools()) {
