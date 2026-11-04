@@ -87,8 +87,9 @@ struct BookmarksView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: node.isFolder ? (expanded.contains(node.id) ? "chevron.down" : "chevron.right") : "bookmark").frame(width: 16)
-                    if node.isFolder { Image(systemName: "folder") }
+                    Image(systemName: expanded.contains(node.id) ? "chevron.down" : "chevron.right")
+                        .frame(width: 16).opacity(node.isFolder ? 1 : 0).accessibilityHidden(true)
+                    Image(systemName: node.isFolder ? "folder" : "bookmark").frame(width: 16)
                     VStack(alignment: .leading) {
                         Text(node.title).foregroundStyle(.primary)
                         if !node.isFolder { Text(node.url).font(.caption).foregroundStyle(.secondary).lineLimit(1) }

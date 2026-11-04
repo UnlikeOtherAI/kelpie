@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -198,15 +199,11 @@ private fun FavouritesTreeContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            if (node.isFolder) {
-                                if (node.id in expanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight
-                            } else {
-                                Icons.Default.Bookmark
-                            },
+                            if (node.id in expanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
                             null,
-                            Modifier.size(20.dp),
+                            Modifier.size(20.dp).alpha(if (node.isFolder) 1f else 0f),
                         )
-                        if (node.isFolder) Icon(Icons.Default.Folder, null, Modifier.padding(end = 8.dp).size(20.dp))
+                        Icon(if (node.isFolder) Icons.Default.Folder else Icons.Default.Bookmark, null, Modifier.padding(end = 8.dp).size(20.dp))
                         Column {
                             Text(node.title, maxLines = 1)
                             if (!node.isFolder) Text(node.url, maxLines = 1, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
