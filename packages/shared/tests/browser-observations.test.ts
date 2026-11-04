@@ -4,6 +4,22 @@ import { createBrowserControlProxy } from "../src/browser-control/proxy.js";
 import { createPlaywrightBrowserBackend } from "../src/browser-control/playwright.js";
 
 describe("observation contracts", () => {
+  it("types WebMCP without granting generic browser authority", async () => {
+    const input = { version: 1, method: "tab.webmcp.discover", tabId: "a", params: { origin: "https://example.org" } };
+    expect(BrowserControlRequestSchema.parse(input).params).toEqual({ origin: "https://example.org", maxTools: 20, maxChars: 16384 });
+    expect(BrowserControlRequestSchema.safeParse({ ...input, params: { ...input.params, unexpected: true } }).success).toBe(false);
+    expect(BrowserControlRequestSchema.safeParse({ ...input, params: { origin: "https://example.org/path" } }).success).toBe(false);
+    expect(browserControlMutates("tab.webmcp.discover")).toBe(false);
+    expect(browserControlMutates("tab.webmcp.call")).toBe(true);
+    let reached = false;
+    const backend = createPlaywrightBrowserBackend({ listTabs: async () => [], getPage: async () => { reached = true; throw new Error("page must not resolve"); } });
+    expect(backend.capabilities.methods).not.toContain("tab.webmcp.discover");
+    expect(backend.capabilities.methods).not.toContain("tab.webmcp.call");
+    const answer = await createBrowserControlProxy(backend).call(BrowserControlRequestSchema.parse(input));
+    expect(answer.ok).toBe(false);
+    if (!answer.ok) expect(answer.error).toMatchObject({ code: "UNSUPPORTED", mayHaveCompleted: false });
+    expect(reached).toBe(false);
+  });
   it("bounds nested extraction and rejects arbitrary value/attribute/code sources", () => {
     const field = { name: "title", selector: "h1" };
     const request = (fields: unknown[]) => ({ version: 1, method: "tab.extract", tabId: "a", params: { fields } });

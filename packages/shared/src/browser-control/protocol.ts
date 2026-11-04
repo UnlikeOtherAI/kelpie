@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { webMcpDiscoverParamsSchema, webMcpCallParamsSchema } from "./webmcp-schema.js";
 import { BrowserSnapshotOptionsSchema, BrowserExtractionOptionsSchema, BrowserReadinessOptionsSchema } from "./observations.js";
 
 const text = z.string().max(65_536);
@@ -34,6 +35,7 @@ export const BrowserControlRequestSchema = z.discriminatedUnion("method", [
   request("tab.snapshot", BrowserSnapshotOptionsSchema),
   request("tab.extract", BrowserExtractionOptionsSchema), request("tab.status", empty),
   request("tab.ready", BrowserReadinessOptionsSchema),
+  request("tab.webmcp.discover", webMcpDiscoverParamsSchema), request("tab.webmcp.call", webMcpCallParamsSchema),
   request("tab.screenshot", z.object({ fullPage: z.boolean().optional(), format: z.enum(["png", "jpeg"]).optional(), quality: z.number().int().min(0).max(100).optional() }).strict().default({})),
   request("locator.click", z.object({ ...locator, button: z.enum(["left", "right", "middle"]).optional(), modifiers: z.array(z.enum(["Alt", "Control", "ControlOrMeta", "Meta", "Shift"])).max(5).optional() }).strict()),
   request("locator.dblclick", z.object(locator).strict()),
@@ -68,7 +70,7 @@ export class BrowserControlError extends Error {
   constructor(readonly code: string, message: string, readonly mayHaveCompleted = false) { super(message); this.name = "BrowserControlError"; }
 }
 export const BROWSER_CONTROL_METHODS: BrowserControlMethod[] = BrowserControlRequestSchema.options.map((option) => option.shape.method.value);
-const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "tabs.list", "tab.url", "tab.title", "tab.snapshot", "tab.extract", "tab.status", "tab.ready", "tab.screenshot", "locator.innerText", "locator.textContent", "locator.getAttribute", "locator.count", "locator.isVisible", "locator.isEnabled", "locator.waitFor"]);
+const reads = new Set<BrowserControlMethod>(["capabilities", "documentation", "tabs.list", "tab.url", "tab.title", "tab.snapshot", "tab.extract", "tab.status", "tab.ready", "tab.webmcp.discover", "tab.screenshot", "locator.innerText", "locator.textContent", "locator.getAttribute", "locator.count", "locator.isVisible", "locator.isEnabled", "locator.waitFor"]);
 export const browserControlMutates = (method: BrowserControlMethod): boolean => !reads.has(method);
 /** Same JSON schema is used by every MCP/model wrapper; no product-maintained copy. */
 export const BrowserControlEnvelopeSchema = z.object({ request: BrowserControlRequestSchema }).strict();

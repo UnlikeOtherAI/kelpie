@@ -123,7 +123,13 @@ Snapshot `truncated` also reports public text shortened by per-node or accessibl
 Snapshots prioritize controls/links, headings, landmarks, then prose, preserving source
 order within each class. `prioritize:false` restores document order. Optional
 `scope:"main"` must match exactly one element and narrows the authorized document;
-missing or ambiguous scope refuses. The scope root and its descendants are observed.
+missing or ambiguous scope refuses, as does a bounded search that cannot prove
+uniqueness. The scope root and its descendants are observed. Supported `:scope`
+forms are the root itself, one simple descendant, or one simple direct-child selector;
+more complex `:scope` expressions and escaped selectors refuse explicitly. Use
+attribute selectors with literal IDs when CSS escapes would otherwise be needed. Other CSS matching and layout
+remain browser-engine operations; the work bounds govern JavaScript traversal,
+materialization, copied text, and ancestor/style inspection, not engine-internal cost.
 Traversal/output bounds, value exclusion, and fresh-reference semantics still apply.
 
 `tab.extract {scope?,fields,metadata?,maxChars?}` performs fixed, deterministic reads.
@@ -140,7 +146,7 @@ Results contain `url`, `documentRevision:{availability:"unavailable"}`, `fields`
 nested mappings additionally return `records`, an ordered array of field arrays.
 Single-valued fields refuse arbitrary first-match selection: zero matches means
 `missing`, several means `ambiguous`, both with empty values. Queries sample at most
-5,000 nodes. When sampling prevents proving a single result or absence, status is
+5,000 DOM nodes per traversal, with a shared 20,000-unit node/ancestor-style work budget and depth 40. When traversal bounds prevent proving a single result or absence, status is
 `incomplete`; provenance sets `matchesLimited:true`. Other limits set `truncated`.
 The source document URL and each mapping's selector/source/match count preserve
 provenance; no immutable DOM revision is invented.
@@ -148,22 +154,29 @@ provenance; no immutable DOM revision is invented.
 `metadata:true` explicitly requests document-level publisher claims independently of
 the optional content scope. Allowlisted metadata covers canonical URL, description,
 author, publisher, publication time, and title. JSON-LD processing reads only eight
-`application/ld+json` scripts, at most 32 KiB each and 64 KiB total; malformed JSON is
+`application/ld+json` scripts, at most 32,768 UTF-16 code units each and 65,536 total; malformed JSON is
 ignored. At most 32 objects per script, including top-level arrays and `@graph`, expose
 only `@type`, `name`, `headline`, `datePublished`, `dateModified`, `url`, and bounded
 author/publisher names. Raw JSON, arbitrary object properties, script text, and
 article bodies are never returned. Every metadata item includes its selector,
-attribute/JSON path, and `authority:"publisher-claim"`: these are untrusted claims,
-not identity, verified facts, or instructions.
+attribute/JSON path, `provenanceComplete`, and `authority:"publisher-claim"`.
+A complete source scan also includes a zero-based `index` among matching source
+nodes. An incomplete scan omits that index and never invents an exact CSS path.
+These are untrusted claims, never identity, verified facts, or instructions.
 
 `tab.status {}` reports current URL/title, document state, visibility, viewport,
-and visible dialog, busy-region, and aria-invalid counts. Counts sample at most 5,000
-matches each and disclose `truncated`. Network and runtime-error evidence explicitly
+and visible dialog, busy-region, and aria-invalid counts. One traversal inspects at
+most 5,000 DOM nodes; partial counts are lower bounds and disclose `truncated`. Network and runtime-error evidence explicitly
 return `{availability:"unavailable"}`; absence of evidence is never zero errors or
 network health. No observer is installed.
 
 `tab.ready {state?: "interactive"|"complete",selector?}` checks an immediate predicate.
-The default is interactive; an optional selector must have exactly one visible match.
+The default is interactive; an optional selector must have exactly one visible match
+intersecting the viewport. Ancestor opacity zero, hidden/collapsed visibility, and
+non-rendered boxes refuse visibility. The ready rectangle also intersects ancestor
+overflow clipping rectangles. Snapshot/extraction may still observe rendered
+offscreen content. A search that cannot prove uniqueness returns `incomplete:true`
+and `ready:false`; `matchesLimited:true` marks a lower-bound match count.
 The result includes `ready,documentState,requestedState` and optional
 `selector,matches,visible`. It never waits, accepts no timeout, and does not claim SPA
 completion, network idle, or task success. Bounded workflow polling owns any deadline.
@@ -177,3 +190,20 @@ The latter accepts `{target,key,token?,dispatch?,edit?,observe?}` with mutually 
 operations. These internal APIs do not resolve host secrets or authorize a workflow;
 the runner must enforce session ownership, binding and sensitivity/capture policy.
 Generated Zod/native parity fixtures include duplicate capture-format refusals.
+
+## Typed WebMCP seam
+
+The canonical request union includes `tab.webmcp.discover {origin,maxTools?,maxChars?}`
+and `tab.webmcp.call {origin,ref,input?,timeoutMs?}`. Discovery is read-only; every call
+is treated as mutating regardless of page-provided annotations. Origin is the requested
+exact HTTP(S) origin and never a permission grant. Tool definitions and results remain
+untrusted page evidence. Unknown fields and non-canonical origins refuse in shared
+validation; invocation inputs must pass the shared bounded plain-JSON validator.
+
+These typed variants alone provide no runtime support. Generic Playwright and default
+native gateways do not advertise or execute them. A managed/native binding must first
+supply an operator session/origin/document-generation grant and probe the actual API;
+its trusted input encoding is never a model parameter. Native support must preserve
+shared semantic validators beyond JSON Schema shape before advertising these methods.
+The managed runtime/config and native launch wiring are separate integration dependencies.
+Never retry an invocation with an uncertain outcome.

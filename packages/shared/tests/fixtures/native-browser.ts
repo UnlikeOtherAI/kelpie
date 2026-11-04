@@ -2,8 +2,7 @@ import { z } from "zod";
 import { BrowserControlError, browserControlMutates } from "../../src/browser-control/protocol.js";
 import type { BrowserControlBackend, BrowserControlRequest, BrowserTabInfo } from "../../src/browser-control/protocol.js";
 import { createBrowserBackend } from "../../src/browser-control/reference.js";
-import { collectBrowserSnapshot } from "../../src/browser-control/snapshot.js";
-import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from "../../src/browser-control/observations.js";
+import { fixedObservationExpression } from "../../src/browser-control/observation-source.js";
 import { rememberNativeSnapshot, resolveNativeReference } from "../../src/browser-control/native-reference.js";
 import type { BrowserSnapshot } from "../../src/browser-control/protocol.js";
 import type { BrowserOperations } from "../../src/browser-control/reference.js";
@@ -60,14 +59,14 @@ export function createKelpieBrowserBackend(binding: KelpieBrowserBinding): Brows
     operations["tab.title"] = async (request) => (await current(request.tabId ?? "")).title;
   }
   if (has("evaluate")) {
-    operations["tab.extract"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserExtraction.toString()})(${JSON.stringify(request.params)})`);
-    operations["tab.status"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserPageStatus.toString()})()`);
-    operations["tab.ready"] = (request) => evaluate(request.tabId ?? "", `(${collectBrowserReadiness.toString()})(${JSON.stringify(request.params)})`);
+    operations["tab.extract"] = (request) => evaluate(request.tabId ?? "", fixedObservationExpression("extract", request.params));
+    operations["tab.status"] = (request) => evaluate(request.tabId ?? "", fixedObservationExpression("status"));
+    operations["tab.ready"] = (request) => evaluate(request.tabId ?? "", fixedObservationExpression("ready", request.params));
     operations["tab.snapshot"] = async (request) => {
       const id = request.tabId ?? "";
       refs.delete(id);
       const options = { ...request.params, prefix: `${session}s${String(++generation)}e`, includeShadow: false };
-      const value = await evaluate(id, `(${rememberNativeSnapshot.toString()})((${collectBrowserSnapshot.toString()})(${JSON.stringify(options)}))`);
+      const value = await evaluate(id, `(${rememberNativeSnapshot.toString()})(${fixedObservationExpression("snapshot", options)})`);
       const snapshot = z.object({
         url: z.string(), title: z.string(), text: z.string(), truncated: z.boolean(),
         elements: z.array(z.object({ ref: z.string(), role: z.string(), name: z.string() })),

@@ -1,6 +1,7 @@
 # Acceptance ledger
 
 Status: implementation and real-device evidence pending. This ledger does not certify a release.
+The [landed implementation map](implementation-map.md) links canonical IDs to exact source symbols, durable evals, reviewed source checkpoints and remaining native evidence.
 Base reviewed: `b6784ff723b27da4096fdd8d9227f2a00dfc9084`.
 Owner: acceptance. Source worktree: Maxis `D:/Worktrees/kelpie/capture-evals-20261104`.
 See [architecture review](architecture-review.md), [resource ledger](resources.md),
