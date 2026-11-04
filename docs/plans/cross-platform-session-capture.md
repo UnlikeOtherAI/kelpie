@@ -166,6 +166,22 @@ running a handler. Compose updates its visible-view binding later; using that
 binding could otherwise read the previous tab's profile immediately after a
 switch. The regression deliberately leaves that visible binding stale.
 
+The final Android build passed 158 unit tests and ktlint on Maxis, plus both
+instrumented storage/dispatch tests on emulator-5554. The paired HTTP fixture
+passed default/named HttpOnly cookies, JavaScript invisibility, localStorage,
+restart, retirement and empty identity after reusing a name. A native keyboard
+activation opened the popup in its existing isolated view and kept its cookie.
+The mirror's mouse input delivered pointer-down and pointer-up at different
+positions, so that input failure was not treated as an app popup failure.
+Android also requires a user gesture for popups by default, as documented in
+[WebSettings](https://developer.android.com/reference/android/webkit/WebSettings#setJavaScriptCanOpenWindowsAutomatically(boolean));
+the fixture supports `--android --manual-popup` for this native flow.
+After cleanup, the original tab remained and the next startup automatically
+purged all five retired fixture stores. The persistence ordering test's latch
+wait is 30 seconds: slow temporary-file creation on D: exceeded its previous
+five-second coordination timeout; its ordering and final-content assertions
+remain intact.
+
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
 provider account-chooser reuse.
