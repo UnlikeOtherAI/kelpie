@@ -133,6 +133,28 @@ the session intact, and recovered after removal of the injected fault.
 Portable checks on Maxis passed lint, build, 629 CLI tests (one skipped), the
 shared tests and three focused native MCP/gateway tests.
 
+Windows 0.1.15, built from `975655fd` on Maxis, passed 53 native tests over SSH;
+the visibility test passed in the interactive desktop session (54 total).
+The signed installed build passed the storage fixture, popup inheritance,
+restart, partition deletion and empty identity after reuse. The test used the
+normal Windows user profile and a forward-slash profile argument. Existing
+tabs and storage were preserved. The separate D: test profile hit renderer and
+tab-operation timeouts while the drive's average disk queue reached 95;
+those failed runs and debugger traces remain separate from the passing run.
+Remote desktop UI inspection required an unavailable VNC password, so this
+Windows evidence is from the real native browser's supported HTTP interface.
+
+The executable, client DLL and adjacent `chrome_elf.dll` were signed on Minis
+using the existing Azure Artifact Signing profile. All three passed Authenticode,
+publisher-specific EKU, timestamp and SignTool checks with the same certificate,
+as required by the pinned CEF bootstrap. The interactive signing session worked;
+SSH could not access the existing Azure broker credential.
+
+Android's account control opened the secure login activity, cancelled back to
+the original page, and reopened successfully through the mirrored native UI.
+The activity's existing `FLAG_SECURE` prevents inspection of the login content
+through that mirror; it was left enabled.
+
 The user explicitly chose to continue without real Google sign-in. These results
 verify native website storage, not a completed Google account authentication or
 provider account-chooser reuse.

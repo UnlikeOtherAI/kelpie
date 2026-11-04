@@ -198,8 +198,6 @@ export const BrowserToolUnsupportedPlatforms = {
   kelpie_get_debug_overlay: ["android", "macos", "linux", "windows"],
   // is-element-obscured relies on the mobile keyboard/safe-area model
   kelpie_is_element_obscured: ["macos", "linux", "windows"],
-  // Storage partitions: macOS on WebKit and Windows on Chromium (CEF). The
-  // remaining platforms drop their entry here as they land the same contract.
 } satisfies Partial<Record<BrowserMcpTool, readonly Platform[]>>;
 
 /** CLI-level MCP tools (discovery + group commands) */

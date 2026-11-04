@@ -33,7 +33,9 @@ async function call(method, body = {}) {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${readiness.token}` },
     body: JSON.stringify(body), signal: AbortSignal.timeout(35000),
   });
-  const result = await response.json();
+  const bodyText = await response.text();
+  assert(bodyText.length > 0, `${method}: empty HTTP ${response.status} response`);
+  const result = JSON.parse(bodyText);
   assert.equal(result.success, true, `${method}: ${result.error?.code ?? response.status} ${result.error?.message ?? ''}`);
   return result;
 }
