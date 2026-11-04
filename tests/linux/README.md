@@ -14,3 +14,9 @@ require the desktop: verify typing, IME, tab focus, select popups, conditional
 favorites, and active-only animated page colors.
 
 Use the CLI alias lifecycle separately to verify its local stdio bridge.
+
+Run `node tests/linux/session-restore-failure.mjs /absolute/path/kelpie-linux`
+in the same desktop environment to verify failed isolated-store restoration.
+It injects a file at a profile-directory path in its own temporary profiles,
+checks that no restored page opens and the saved session stays unchanged, then
+removes that injected fault and verifies recovery without rewriting the session.

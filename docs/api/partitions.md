@@ -56,6 +56,7 @@ without guessing. A single error code with a `reason` discriminator:
 |---|---|---|
 | `chromium-engine` | macOS running CEF | `set-renderer` with `{"engine": "webkit"}`, then retry. |
 | `webview-multi-profile-missing` | Android | Update Android System WebView to M114 or later. |
+
 Mobile errors explain unavailable OS/WebView support or the memory-only request
 in `message`; the legacy `platform-single-tab` reason no longer describes iOS.
 
