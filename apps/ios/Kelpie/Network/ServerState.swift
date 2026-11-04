@@ -175,7 +175,7 @@ final class ServerState: ObservableObject {
             guard valid.contains(panel) else {
                 return errorResponse(code: "INVALID_PARAM", message: "panel must be one of: \(valid.joined(separator: ", "))")
             }
-            await setActivePanel(panel)
+            setActivePanel(panel)
             return successResponse(["panel": panel])
         }
     }

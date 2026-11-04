@@ -1,11 +1,10 @@
 import Foundation
 
-/// Captures HTTP traffic via the shared native core-state library.
-/// Xcode still needs the bridge and static libs configured manually; see apps/ios/NATIVE_INTEGRATION.md.
+/// Captures HTTP request/response traffic via JS injection for the network inspector.
 final class NetworkTrafficStore: ObservableObject {
     static let shared = NetworkTrafficStore()
 
-    struct TrafficEntry: Identifiable {
+    struct TrafficEntry: Identifiable, Codable, Sendable {
         let id: UUID
         let method: String
         let url: String
@@ -16,8 +15,8 @@ final class NetworkTrafficStore: ObservableObject {
         let requestBody: String?
         let responseBody: String?
         let startTime: Date
-        let duration: Int
-        let size: Int
+        let duration: Int // ms
+        let size: Int // bytes
         let initiator: String  // "browser" or "js"
 
         /// Simplified content type category for filtering.
@@ -37,8 +36,7 @@ final class NetworkTrafficStore: ObservableObject {
     /// Index of the entry currently being inspected in the UI (LLM can read this).
     @Published var selectedIndex: Int? {
         didSet {
-            guard !isSyncingSelectedIndex else { return }
-            applySelectedIndex()
+            syncSelectionToCore()
         }
     }
 
@@ -47,35 +45,66 @@ final class NetworkTrafficStore: ObservableObject {
         return entries[idx]
     }
 
-    private let key = "kelpie_network_traffic"
-    private let handle: KelpieNetworkTrafficStoreRef
-    private var isSyncingSelectedIndex = false
+    private let persistence: NetworkTrafficPersistence
+    private let storeHandle = kelpie_network_traffic_store_create()
+    private var isSynchronizingSelection = false
 
-    private init() {
-        guard let handle = kelpie_network_traffic_store_create() else {
-            fatalError("Failed to create Kelpie network traffic store")
-        }
+    fileprivate static let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
 
-        self.handle = handle
-        bootstrapFromPersistence()
-        refreshPublishedState()
+    init(persistence: NetworkTrafficPersistence = NetworkTrafficPersistence()) {
+        self.persistence = persistence
+        let directory = persistence.fileURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileProtection.setComplete(at: directory)
+            if FileManager.default.fileExists(atPath: persistence.fileURL.path) {
+                try FileProtection.setComplete(at: persistence.fileURL)
+            }
+        } catch { NSLog("[NetworkTrafficStore] File protection failed: %@", error.localizedDescription) }
+        load()
     }
 
     deinit {
-        kelpie_network_traffic_store_destroy(handle)
+        kelpie_network_traffic_store_destroy(storeHandle)
     }
 
     func append(_ entry: TrafficEntry) {
-        guard let json = encodeEntryForNative(entry) else {
-            return
-        }
+        guard let storeHandle else { return }
+        guard let entryJSON = Self.makeJSONString(from: entryPayload(for: entry)) else { return }
 
-        let appended = json.withCString { jsonPointer in
-            kelpie_network_traffic_store_append_json(handle, jsonPointer)
+        let appended = entryJSON.withCString { jsonPointer in
+            kelpie_network_traffic_store_append_json(storeHandle, jsonPointer)
         }
         guard appended == 1 else { return }
 
-        persistAndRefresh()
+        // The core normalizes only this entry and evicts from the front. Avoid
+        // exporting and decoding every retained response body for each request.
+        let normalized = TrafficEntry(
+            id: entry.id,
+            method: String(bytes: entry.method.utf8.map { (97...122).contains($0) ? $0 - 32 : $0 }, encoding: .utf8) ?? entry.method,
+            url: entry.url,
+            statusCode: Int(Int32(truncatingIfNeeded: entry.statusCode)),
+            contentType: entry.contentType,
+            requestHeaders: entry.requestHeaders,
+            responseHeaders: entry.responseHeaders,
+            requestBody: entry.requestBody.flatMap { $0.isEmpty ? nil : $0 },
+            responseBody: entry.responseBody.flatMap { $0.isEmpty ? nil : $0 },
+            startTime: Self.iso8601Formatter.date(from: Self.iso8601Formatter.string(from: entry.startTime)) ?? entry.startTime,
+            duration: max(0, Int(Int32(truncatingIfNeeded: entry.duration))),
+            size: max(0, entry.size),
+            // The existing append_json bridge defaults this field to browser.
+            initiator: "browser"
+        )
+        entries.append(normalized)
+        let removed = entries.count - Int(kelpie_network_traffic_store_count(storeHandle))
+        if removed > 0 { entries.removeFirst(removed) }
+        synchronizeSelectionFromCore()
+        persistence.save(entries)
     }
 
     func appendDocumentNavigation(
@@ -86,35 +115,45 @@ final class NetworkTrafficStore: ObservableObject {
         size: Int = 0,
         startedAt: Date
     ) {
-        let headersJSON = encodeHeaders(responseHeaders) ?? "{}"
-        let startTime = Self.iso8601Formatter.string(from: startedAt)
-        let duration = max(0, Int(Date().timeIntervalSince(startedAt) * 1000))
-
-        url.withCString { urlPointer in
-            contentType.withCString { contentTypePointer in
-                headersJSON.withCString { headersPointer in
-                    startTime.withCString { startTimePointer in
-                        kelpie_network_traffic_store_append_document_navigation(
-                            handle,
-                            urlPointer,
-                            Int32(statusCode),
-                            contentTypePointer,
-                            headersPointer,
-                            Int64(max(0, size)),
-                            startTimePointer,
-                            Int32(duration)
-                        )
-                    }
-                }
-            }
-        }
-
-        persistAndRefresh()
+        append(TrafficEntry(
+            id: UUID(),
+            method: "GET",
+            url: url,
+            statusCode: statusCode,
+            contentType: contentType,
+            requestHeaders: [:],
+            responseHeaders: responseHeaders,
+            requestBody: nil,
+            responseBody: nil,
+            startTime: startedAt,
+            duration: max(0, Int(Date().timeIntervalSince(startedAt) * 1000)),
+            size: max(0, size),
+            initiator: "browser"
+        ))
     }
 
     func clear() {
-        kelpie_network_traffic_store_clear(handle)
-        persistAndRefresh()
+        guard let storeHandle else { return }
+        kelpie_network_traffic_store_clear(storeHandle)
+        entries = []
+        updateSelectedIndex(nil)
+        persistence.save(entries)
+        persistence.flush()
+    }
+
+    /// Finish the last coalesced write before normal application termination.
+    func flush() { persistence.flush() }
+
+    /// Real HTTP status codes captured from `WKNavigationResponse` for main-frame
+    /// document navigations, keyed by absolute URL (most recent navigation wins).
+    /// The Performance API does not expose `responseStatus` for document
+    /// navigations, so the network log must source document status from here.
+    func documentNavigationStatuses() -> [String: Int] {
+        var statuses: [String: Int] = [:]
+        for entry in entries where entry.initiator == "browser" && entry.statusCode > 0 {
+            statuses[entry.url] = entry.statusCode
+        }
+        return statuses
     }
 
     func entryToJSON(_ entry: TrafficEntry) -> [String: Any] {
@@ -142,255 +181,272 @@ final class NetworkTrafficStore: ObservableObject {
         statusRange: String? = nil,
         urlPattern: String? = nil
     ) -> [[String: Any]] {
-        let json = withOptionalCString(method) { methodPointer in
-            withOptionalCString(category) { categoryPointer in
-                withOptionalCString(statusRange) { statusRangePointer in
-                    withOptionalCString(urlPattern) { urlPatternPointer in
-                        copyNativeString {
-                            kelpie_network_traffic_store_to_summary_json(
-                                handle,
-                                methodPointer,
-                                categoryPointer,
-                                statusRangePointer,
-                                urlPatternPointer
-                            )
+        guard let storeHandle else { return [] }
+
+        var summaryJSON: String?
+        Self.withOptionalCString(method) { methodPointer in
+            Self.withOptionalCString(category) { categoryPointer in
+                Self.withOptionalCString(statusRange) { statusRangePointer in
+                    Self.withOptionalCString(urlPattern) { urlPatternPointer in
+                        guard let rawPointer = kelpie_network_traffic_store_to_summary_json(
+                            storeHandle,
+                            methodPointer,
+                            categoryPointer,
+                            statusRangePointer,
+                            urlPatternPointer
+                        ) else {
+                            return
                         }
+                        defer { kelpie_free_string(rawPointer) }
+                        summaryJSON = String(cString: rawPointer)
                     }
                 }
             }
         }
 
-        guard let json,
-              let data = json.data(using: .utf8),
-              let entries = try? Self.iso8601Decoder().decode([PersistedSummaryEntry].self, from: data) else {
+        return Self.decodeSummary(from: summaryJSON)
+    }
+
+    private func load() {
+        guard let storeHandle else { return }
+
+        guard let persistedJSON = loadPersistedJSON() else { return }
+        persistedJSON.withCString { jsonPointer in
+            kelpie_network_traffic_store_load_json(storeHandle, jsonPointer)
+        }
+        refreshFromCore()
+        if persistence.hasLegacyData { persistence.save(entries) }
+    }
+
+    private func refreshFromCore() {
+        guard let json = exportedJSON() else {
+            entries = []
+            updateSelectedIndex(nil)
+            return
+        }
+
+        entries = Self.decodeEntries(from: json) ?? []
+        synchronizeSelectionFromCore()
+    }
+
+    private func syncSelectionToCore() {
+        guard !isSynchronizingSelection else { return }
+        guard let storeHandle else { return }
+        guard let index = selectedIndex else {
+            // The C API clears selection when loading a snapshot. This happens
+            // only on explicit deselection, never on the capture hot path.
+            if let json = Self.makeJSONString(from: entries.map(Self.persistedJSONObject)) {
+                json.withCString { kelpie_network_traffic_store_load_json(storeHandle, $0) }
+            }
+            return
+        }
+        guard entries.indices.contains(index) else { return }
+
+        let selected = kelpie_network_traffic_store_select(storeHandle, Int32(index))
+        if selected == 1 {
+            synchronizeSelectionFromCore()
+        }
+    }
+
+    private func synchronizeSelectionFromCore() {
+        guard let storeHandle else {
+            updateSelectedIndex(nil)
+            return
+        }
+
+        let index = kelpie_network_traffic_store_selected_index(storeHandle)
+        updateSelectedIndex(index >= 0 ? Int(index) : nil)
+    }
+
+    private func updateSelectedIndex(_ index: Int?) {
+        isSynchronizingSelection = true
+        selectedIndex = index
+        isSynchronizingSelection = false
+    }
+
+    private func exportedJSON() -> String? {
+        guard let storeHandle else { return nil }
+        guard let rawPointer = kelpie_network_traffic_store_to_json(storeHandle) else { return nil }
+        defer { kelpie_free_string(rawPointer) }
+        return String(cString: rawPointer)
+    }
+
+    private func loadPersistedJSON() -> String? {
+        if let data = persistence.load() {
+            if let json = normalizedPersistedJSON(from: data) { return json }
+            persistence.preserveUnreadableFile()
+        }
+        if let legacy = persistence.legacyData { return normalizedPersistedJSON(from: legacy) }
+        return nil
+    }
+
+    private func normalizedPersistedJSON(from data: Data) -> String? {
+        guard let decoded = Self.decodeEntries(from: data) else { return nil }
+        return Self.makeJSONString(from: decoded.map(Self.persistedJSONObject))
+    }
+
+    private func entryPayload(for entry: TrafficEntry) -> [String: Any] {
+        var payload = entryToJSON(entry)
+        if entry.requestBody == nil {
+            payload["requestBody"] = NSNull()
+        }
+        if entry.responseBody == nil {
+            payload["responseBody"] = NSNull()
+        }
+        return payload
+    }
+
+    private static func decodeEntries(from json: String?) -> [TrafficEntry]? {
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        return decodeEntries(from: data)
+    }
+
+    private static func decodeEntries(from data: Data) -> [TrafficEntry]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let array = object as? [[String: Any]] else {
+            return nil
+        }
+
+        return array.compactMap(Self.decodeEntry)
+    }
+
+    private static func decodeEntry(from object: [String: Any]) -> TrafficEntry? {
+        let method = stringValue(in: object, keys: ["method"])
+        let url = stringValue(in: object, keys: ["url"])
+        guard let method, !method.isEmpty, let url, !url.isEmpty else { return nil }
+
+        let identifier = stringValue(in: object, keys: ["id"]).flatMap(UUID.init(uuidString:)) ?? UUID()
+        let startTime = dateValue(in: object, keys: ["start_time", "startTime"]) ?? Date()
+
+        return TrafficEntry(
+            id: identifier,
+            method: method,
+            url: url,
+            statusCode: intValue(in: object, keys: ["status_code", "statusCode"]),
+            contentType: stringValue(in: object, keys: ["content_type", "contentType"]) ?? "",
+            requestHeaders: dictionaryValue(in: object, keys: ["request_headers", "requestHeaders"]),
+            responseHeaders: dictionaryValue(in: object, keys: ["response_headers", "responseHeaders"]),
+            requestBody: optionalStringValue(in: object, keys: ["request_body", "requestBody"]),
+            responseBody: optionalStringValue(in: object, keys: ["response_body", "responseBody"]),
+            startTime: startTime,
+            duration: max(0, intValue(in: object, keys: ["duration"])),
+            size: max(0, intValue(in: object, keys: ["size"])),
+            initiator: stringValue(in: object, keys: ["initiator"]) ?? "browser"
+        )
+    }
+
+    private static func decodeSummary(from json: String?) -> [[String: Any]] {
+        guard let json, let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let array = object as? [[String: Any]] else {
             return []
         }
 
-        return entries.map { entry in
+        return array.map { item in
             [
-                "index": entry.index,
-                "method": entry.method,
-                "url": entry.url,
-                "statusCode": entry.statusCode,
-                "contentType": entry.contentType,
-                "category": entry.category,
-                "duration": entry.duration,
-                "size": entry.size
+                "index": intValue(in: item, keys: ["index"]),
+                "method": stringValue(in: item, keys: ["method"]) ?? "",
+                "url": stringValue(in: item, keys: ["url"]) ?? "",
+                "statusCode": intValue(in: item, keys: ["status_code", "statusCode"]),
+                "contentType": stringValue(in: item, keys: ["content_type", "contentType"]) ?? "",
+                "category": stringValue(in: item, keys: ["category"]) ?? "",
+                "duration": intValue(in: item, keys: ["duration"]),
+                "size": intValue(in: item, keys: ["size"])
             ]
         }
     }
 
-    private func bootstrapFromPersistence() {
-        guard let data = persistedData(),
-              let persistedEntries = decodeEntries(from: data),
-              let json = encodeEntriesForNative(persistedEntries) else {
-            return
-        }
-
-        json.withCString { jsonPointer in
-            kelpie_network_traffic_store_load_json(handle, jsonPointer)
-        }
-        persistEntries(persistedEntries)
+    private static func persistedJSONObject(for entry: TrafficEntry) -> [String: Any] {
+        [
+            "id": entry.id.uuidString,
+            "method": entry.method,
+            "url": entry.url,
+            "statusCode": entry.statusCode,
+            "contentType": entry.contentType,
+            "initiator": entry.initiator,
+            "requestHeaders": entry.requestHeaders,
+            "responseHeaders": entry.responseHeaders,
+            "requestBody": entry.requestBody ?? NSNull(),
+            "responseBody": entry.responseBody ?? NSNull(),
+            "startTime": iso8601Formatter.string(from: entry.startTime),
+            "duration": entry.duration,
+            "size": entry.size
+        ]
     }
 
-    private func persistAndRefresh() {
-        guard let nativeJSON = copyNativeEntriesJSON() else {
-            return
-        }
-
-        refreshPublishedState(from: nativeJSON)
-        persistEntries(entries)
+    private static func makeJSONString(from object: Any) -> String? {
+        guard let data = jsonData(from: object) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
-    private func refreshPublishedState() {
-        refreshPublishedState(from: copyNativeEntriesJSON())
+    private static func jsonData(from object: Any) -> Data? {
+        guard JSONSerialization.isValidJSONObject(object) else { return nil }
+        return try? JSONSerialization.data(withJSONObject: object)
     }
 
-    private func refreshPublishedState(from json: String?) {
-        guard let json,
-              let data = json.data(using: .utf8),
-              let decoded = decodeEntries(from: data) else {
-            entries = []
-            syncSelectedIndexFromNative()
-            return
-        }
-
-        entries = decoded
-        syncSelectedIndexFromNative()
+    private static func withOptionalCString<Result>(
+        _ value: String?,
+        _ body: (UnsafePointer<CChar>?) -> Result
+    ) -> Result {
+        guard let value else { return body(nil) }
+        return value.withCString(body)
     }
 
-    private func applySelectedIndex() {
-        if let selectedIndex {
-            let selected = kelpie_network_traffic_store_select(handle, Int32(selectedIndex))
-            if selected == 1 {
-                syncSelectedIndexFromNative()
-                return
+    private static func stringValue(in object: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = object[key] as? String {
+                return value
             }
-        } else {
-            clearNativeSelection()
-        }
-
-        syncSelectedIndexFromNative()
-    }
-
-    private func clearNativeSelection() {
-        guard let json = encodeEntriesForNative(entries) else {
-            return
-        }
-
-        // Reloading the same entries is the only exposed C API path that clears selection without
-        // changing the entry list.
-        json.withCString { jsonPointer in
-            kelpie_network_traffic_store_load_json(handle, jsonPointer)
-        }
-    }
-
-    private func syncSelectedIndexFromNative() {
-        isSyncingSelectedIndex = true
-        let nativeIndex = kelpie_network_traffic_store_selected_index(handle)
-        selectedIndex = nativeIndex >= 0 ? Int(nativeIndex) : nil
-        isSyncingSelectedIndex = false
-    }
-
-    private func copyNativeEntriesJSON() -> String? {
-        copyNativeString { kelpie_network_traffic_store_to_json(handle) }
-    }
-
-    private func copyNativeString(_ producer: () -> UnsafeMutablePointer<CChar>?) -> String? {
-        guard let pointer = producer() else {
-            return nil
-        }
-
-        defer { kelpie_free_string(pointer) }
-        return String(cString: pointer)
-    }
-
-    private func persistEntries(_ entries: [TrafficEntry]) {
-        guard let json = encodeEntriesForNative(entries) else {
-            return
-        }
-        UserDefaults.standard.set(Data(json.utf8), forKey: key)
-    }
-
-    private func persistedData() -> Data? {
-        if let data = UserDefaults.standard.data(forKey: key) {
-            return data
-        }
-        if let string = UserDefaults.standard.string(forKey: key) {
-            return Data(string.utf8)
         }
         return nil
     }
 
-    private func decodeEntries(from data: Data) -> [TrafficEntry]? {
-        let decoder = Self.iso8601Decoder()
-        return try? decoder.decode([PersistedTrafficEntry].self, from: data).map(\.trafficEntry)
-    }
-
-    private func encodeEntryForNative(_ entry: TrafficEntry) -> String? {
-        let encoder = Self.iso8601Encoder()
-        guard let data = try? encoder.encode(PersistedTrafficEntry(entry)) else {
-            return nil
+    private static func optionalStringValue(in object: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if object[key] is NSNull {
+                return nil
+            }
+            if let value = object[key] as? String {
+                return value.isEmpty ? nil : value
+            }
         }
-        return String(data: data, encoding: .utf8)
+        return nil
     }
 
-    private func encodeEntriesForNative(_ entries: [TrafficEntry]) -> String? {
-        let encoder = Self.iso8601Encoder()
-        let persisted = entries.map(PersistedTrafficEntry.init)
-        guard let data = try? encoder.encode(persisted) else {
-            return nil
+    private static func intValue(in object: [String: Any], keys: [String]) -> Int {
+        for key in keys {
+            if let value = object[key] as? Int {
+                return value
+            }
+            if let value = object[key] as? NSNumber {
+                return value.intValue
+            }
         }
-        return String(data: data, encoding: .utf8)
+        return 0
     }
 
-    private func encodeHeaders(_ headers: [String: String]) -> String? {
-        guard let data = try? JSONSerialization.data(withJSONObject: headers, options: []) else {
-            return nil
+    private static func dictionaryValue(in object: [String: Any], keys: [String]) -> [String: String] {
+        for key in keys {
+            guard let raw = object[key] as? [String: Any] else { continue }
+            return raw.reduce(into: [:]) { result, element in
+                if let value = element.value as? String {
+                    result[element.key] = value
+                }
+            }
         }
-        return String(data: data, encoding: .utf8)
+        return [:]
     }
 
-    private func withOptionalCString<T>(_ value: String?, _ body: (UnsafePointer<CChar>?) -> T) -> T {
-        guard let value else {
-            return body(nil)
+    private static func dateValue(in object: [String: Any], keys: [String]) -> Date? {
+        for key in keys {
+            if let value = object[key] as? String,
+               let date = iso8601Formatter.date(from: value) {
+                return date
+            }
+            if let value = object[key] as? NSNumber {
+                return Date(timeIntervalSinceReferenceDate: value.doubleValue)
+            }
         }
-        return value.withCString(body)
-    }
-
-    private struct PersistedTrafficEntry: Codable {
-        let id: UUID
-        let method: String
-        let url: String
-        let statusCode: Int
-        let contentType: String
-        let requestHeaders: [String: String]
-        let responseHeaders: [String: String]
-        let requestBody: String?
-        let responseBody: String?
-        let startTime: Date
-        let duration: Int
-        let size: Int
-        let initiator: String?
-
-        init(_ entry: TrafficEntry) {
-            id = entry.id
-            method = entry.method
-            url = entry.url
-            statusCode = entry.statusCode
-            contentType = entry.contentType
-            requestHeaders = entry.requestHeaders
-            responseHeaders = entry.responseHeaders
-            requestBody = entry.requestBody
-            responseBody = entry.responseBody
-            startTime = entry.startTime
-            duration = entry.duration
-            size = entry.size
-            initiator = entry.initiator
-        }
-
-        var trafficEntry: TrafficEntry {
-            TrafficEntry(
-                id: id,
-                method: method,
-                url: url,
-                statusCode: statusCode,
-                contentType: contentType,
-                requestHeaders: requestHeaders,
-                responseHeaders: responseHeaders,
-                requestBody: requestBody,
-                responseBody: responseBody,
-                startTime: startTime,
-                duration: duration,
-                size: size,
-                initiator: initiator ?? "browser"
-            )
-        }
-    }
-
-    private struct PersistedSummaryEntry: Codable {
-        let index: Int
-        let method: String
-        let url: String
-        let statusCode: Int
-        let contentType: String
-        let category: String
-        let duration: Int
-        let size: Int
-    }
-
-    private static let iso8601Formatter = ISO8601DateFormatter()
-
-    private static func iso8601Decoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }
-
-    private static func iso8601Encoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
+        return nil
     }
 }

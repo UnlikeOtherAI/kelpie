@@ -9,7 +9,7 @@ object BrowserGatewayTabPolicy {
         active: String,
     ): Boolean {
         if (pinned != null && active != pinned) return false
-        if (method in setOf("switch-tab", "close-tab", "new-tab")) return true
+        if (method in setOf("switch-tab", "close-tab", "new-tab", "delete-partition")) return true
         val target = params["tabId"] as? String
         return target == null || target == active
     }

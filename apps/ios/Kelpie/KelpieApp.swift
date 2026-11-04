@@ -127,6 +127,7 @@ struct KelpieApp: App {
             NessieConnection.shared.setForeground(true)
             serverState.ensureMDNSAdvertising()
         case .background:
+            NetworkTrafficStore.shared.flush()
             NessieConnection.shared.setForeground(false)
             serverState.stopMDNS()
             SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeBrowserTabID)

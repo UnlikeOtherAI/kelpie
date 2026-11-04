@@ -194,7 +194,7 @@ extension Router {
                     return errorResponse(code: "TAB_CHANGED", message: "The pinned tab is no longer visible")
                 }
                 #if os(iOS)
-                if !["new-tab", "switch-tab", "close-tab"].contains(method), selectedView !== self.handlerContext?.webView {
+                if !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method), selectedView !== self.handlerContext?.webView {
                     return errorResponse(code: "TAB_CHANGED", message: "The selected renderer changed")
                 }
                 #endif

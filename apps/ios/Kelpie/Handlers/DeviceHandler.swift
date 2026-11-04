@@ -16,8 +16,8 @@ struct DeviceHandler {
         router.register("debug-screens") { _ in await debugScreens() }
         router.register("debug-attach-local-tv") { _ in await debugAttachLocalTV() }
         router.register("debug-detach-tv") { _ in await debugDetachTV() }
-        router.register("set-tv-sync") { body in await setTVSync(body) }
-        router.register("get-tv-sync") { _ in await getTVSync() }
+        router.register("set-tv-sync") { body in setTVSync(body) }
+        router.register("get-tv-sync") { _ in getTVSync() }
         router.register("set-debug-overlay") { body in setDebugOverlay(body) }
         router.register("get-debug-overlay") { _ in getDebugOverlay() }
     }

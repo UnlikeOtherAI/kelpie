@@ -1,32 +1,47 @@
 import Foundation
 
-/// Persists and restores the set of open tab URLs across app launches.
+/// Versioned tab identity. Downgrades see only ordinary URLs in the legacy keys.
 enum SessionStore {
+    struct TabRecord: Codable {
+        let url: String
+        let partition: String?
+        let name: String?
+    }
+    struct Snapshot: Codable {
+        let version: Int
+        let tabs: [TabRecord]
+        let activeIndex: Int
+    }
+    private static let key = "sessionTabsV2"
     private static let urlsKey = "sessionTabURLs"
     private static let activeIndexKey = "sessionActiveIndex"
 
     @MainActor
     static func save(tabs: [BrowserTab], activeID: UUID?) {
         let valid = tabs.filter { !$0.currentURL.isEmpty && !$0.isStartPage }
-        guard !valid.isEmpty else {
-            clear()
-            return
-        }
-        let urls = valid.map { $0.currentURL }
-        let activeIndex = valid.firstIndex(where: { $0.id == activeID }) ?? 0
-        UserDefaults.standard.set(urls, forKey: urlsKey)
-        UserDefaults.standard.set(activeIndex, forKey: activeIndexKey)
+        let records = valid.map { TabRecord(url: $0.currentURL, partition: $0.partition, name: $0.name) }
+        let snapshot = Snapshot(version: 2, tabs: records, activeIndex: valid.firstIndex(where: { $0.id == activeID }) ?? 0)
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+        // An older app must never reopen an isolated URL in its default profile.
+        UserDefaults.standard.set(valid.filter { $0.partition == nil }.map(\.currentURL), forKey: urlsKey)
+        UserDefaults.standard.set(0, forKey: activeIndexKey)
     }
 
-    static func load() -> (urls: [String], activeIndex: Int)? {
-        guard let urls = UserDefaults.standard.stringArray(forKey: urlsKey),
-              !urls.isEmpty else { return nil }
-        let activeIndex = UserDefaults.standard.integer(forKey: activeIndexKey)
-        return (urls, activeIndex)
+    static func load() -> Snapshot? {
+        if let data = UserDefaults.standard.data(forKey: key) {
+            guard let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data), snapshot.version == 2 else { return nil }
+            return snapshot
+        }
+        guard let urls = UserDefaults.standard.stringArray(forKey: urlsKey), !urls.isEmpty else { return nil }
+        return Snapshot(
+            version: 2,
+            tabs: urls.map { TabRecord(url: $0, partition: nil, name: nil) },
+            activeIndex: max(0, UserDefaults.standard.integer(forKey: activeIndexKey))
+        )
     }
 
     static func clear() {
-        UserDefaults.standard.removeObject(forKey: urlsKey)
-        UserDefaults.standard.removeObject(forKey: activeIndexKey)
+        for key in [key, urlsKey, activeIndexKey] { UserDefaults.standard.removeObject(forKey: key) }
     }
 }

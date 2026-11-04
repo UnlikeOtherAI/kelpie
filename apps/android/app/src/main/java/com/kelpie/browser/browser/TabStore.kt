@@ -50,10 +50,12 @@ class TabStore(
     init {
         val session = SessionStore.load(context)
         if (session != null) {
-            val restoredTabs = restoredTabs(session.first)
+            val restoredTabs = restoredTabs(session.tabs)
             if (restoredTabs.isNotEmpty()) {
                 _tabs.value = restoredTabs
-                _activeTabId.value = restoredTabs[minOf(session.second, restoredTabs.size - 1)].id
+                val activeRecord = session.tabs.getOrNull(session.activeIndex)
+                _activeTabId.value = restoredTabs.firstOrNull { it.currentUrl == activeRecord?.url && it.partition == activeRecord?.partition }?.id
+                    ?: restoredTabs.first().id
             }
         }
         if (_tabs.value.isEmpty()) {
@@ -70,11 +72,12 @@ class TabStore(
         }
     }
 
-    fun addTab(url: String? = null): BrowserTab {
+    fun addTab(url: String? = null, partition: String? = null, name: String? = null): BrowserTab {
+        val profile = partition?.let { PartitionRegistry.resolve(it) }
         com.kelpie.browser.connect.NessieConnection
             .personChangedTab()
         captureActivePreview()
-        val tab = createTab()
+        val tab = createTab(partition = partition, profile = profile, name = name)
         _tabs.value = _tabs.value + tab
         _activeTabId.value = tab.id
         if (url != null) {
@@ -140,9 +143,15 @@ class TabStore(
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createTab(isStartPage: Boolean = true): BrowserTab {
+    private fun createTab(
+        isStartPage: Boolean = true,
+        partition: String? = null,
+        profile: String? = null,
+        name: String? = null,
+    ): BrowserTab {
         val webView =
             WebView(context).apply {
+                PartitionRegistry.bind(this, profile)
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.loadWithOverviewMode = true
@@ -153,7 +162,7 @@ class TabStore(
                 addJavascriptInterface(JsBridge(handlerContext), JS_BRIDGE_NAME)
                 WebSocketHandler.installBridge(this)
             }
-        val tab = BrowserTab(webView = webView, isStartPage = isStartPage)
+        val tab = BrowserTab(webView = webView, isStartPage = isStartPage, partition = partition, name = name)
         installTabWebViewClients(webView, tab, this, browserState, handlerContext)
         return tab
     }
@@ -167,11 +176,17 @@ class TabStore(
         handlerContext.browserRetirement.retireTarget(webView)
     }
 
-    private fun restoredTabs(urls: List<String>): List<BrowserTab> =
-        urls.map { url ->
-            createTab(isStartPage = false).also {
-                it.currentUrl = url
-                it.webView.loadUrl(url)
+    private fun restoredTabs(records: List<SessionStore.TabRecord>): List<BrowserTab> =
+        records.mapNotNull { record ->
+            try {
+                val profile = record.partition?.let { PartitionRegistry.resolve(it, restoring = true) }
+                createTab(isStartPage = false, partition = record.partition, profile = profile, name = record.name).also {
+                    it.currentUrl = record.url
+                    it.webView.loadUrl(record.url)
+                }
+            } catch (failure: PartitionRegistry.Failure) {
+                android.util.Log.w("TabStore", "Skipped unavailable isolated tab: ${failure.code}")
+                null
             }
         }
 

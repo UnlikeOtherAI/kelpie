@@ -244,6 +244,11 @@ class MainActivity : ComponentActivity() {
         handlerContext.tabStore?.discardPreviews()
     }
 
+    override fun onStop() {
+        com.kelpie.browser.browser.NetworkTrafficStore.flush()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         com.kelpie.browser.connect.NessieConnection
             .detach(handlerContext)

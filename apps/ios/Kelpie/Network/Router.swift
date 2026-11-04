@@ -115,11 +115,11 @@ private func statusCode(forErrorCode code: String?) -> Int {
         return 408
     case "NAVIGATION_ERROR":
         return 502
-    case "PLATFORM_NOT_SUPPORTED":
+    case "PLATFORM_NOT_SUPPORTED", "PARTITION_UNSUPPORTED":
         return 501
     case "IFRAME_ACCESS_DENIED", "PERMISSION_REQUIRED", "SHADOW_ROOT_CLOSED":
         return 403
-    case "RECORDING_IN_PROGRESS":
+    case "RECORDING_IN_PROGRESS", "PARTITION_IN_USE", "PARTITION_DELETING":
         return 409
     case "WEBVIEW_ERROR":
         return 500

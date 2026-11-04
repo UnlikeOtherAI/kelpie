@@ -21,8 +21,10 @@ still serialise on each platform's main thread, so an orchestrator drives each
 partition in turn.
 
 **Platform support:** macOS on the WebKit engine, and Windows and Linux on the Chromium
-(CEF) engine. macOS on the Chromium engine and iOS return
-`PARTITION_UNSUPPORTED`.
+(CEF) engine, plus named persistent partitions on iOS 17+ and Android WebViews
+with `MULTI_PROFILE`. macOS on the Chromium engine, older mobile runtimes, and
+mobile `persistent:false` requests return `PARTITION_UNSUPPORTED` before a tab is
+created. Ordinary tabs and native UOA/Google login share the default profile.
 
 ### Partition errors
 
@@ -54,7 +56,8 @@ without guessing. A single error code with a `reason` discriminator:
 |---|---|---|
 | `chromium-engine` | macOS running CEF | `set-renderer` with `{"engine": "webkit"}`, then retry. |
 | `webview-multi-profile-missing` | Android | Update Android System WebView to M114 or later. |
-| `platform-single-tab` | iOS | Not available; use a desktop device for partitioned work. |
+Mobile errors explain unavailable OS/WebView support or the memory-only request
+in `message`; the legacy `platform-single-tab` reason no longer describes iOS.
 
 ### `getPartitions`
 List live partitions.
@@ -172,6 +175,33 @@ data in place. The id is freed either way, and the response carries the honest
 
 Deleting the partition that owns every open tab leaves a fresh `about:blank`
 tab in the default store, the same rule `close-tab` follows.
+
+### iOS and Android
+
+Named mobile partitions are persistent. The name maps to a durable UUID: an iOS
+website-data-store identifier or a generation-specific Android WebView profile.
+The first view receives that store before it loads any page. Popups continue in
+the opener's view. Cookie endpoints use the selected view's store, including
+HttpOnly cookies. The native account login always uses the default profile, even
+when an isolated browser tab is active.
+
+A versioned session snapshot stores each tab's partition and name. Restoring an
+invalid or missing mapping skips that isolated tab; it never restores the URL in
+the default profile. Legacy URL snapshots remain default tabs. The legacy snapshot
+written for older app versions contains ordinary tabs only.
+
+`persistent:false` is rejected on both mobile apps. Android's profile API does not
+provide memory-only stores, and deleting a disk profile later would not honour
+that guarantee. Desktop memory-only behavior is unchanged.
+
+Android cannot physically delete a profile already loaded in the current process.
+Deletion closes its tabs, durably retires its mapping, and attempts removal. If the
+engine retains it, the response is `PARTITION_IN_USE`; `get-partitions` lists the
+pending profile as `orphan:kelpie-<uuid>`. Deleting that orphan retries removal.
+Startup retries pending purges before login or tab views load a profile. Reusing
+the original public name creates a fresh UUID and cannot recover the retired
+cookies. iOS removal errors retain the mapping for retry and report
+`PARTITION_IN_USE`.
 
 ### Cookie endpoints and partitioned tabs
 
