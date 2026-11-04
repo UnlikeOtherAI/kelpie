@@ -12,7 +12,7 @@ directed coordinator messages carry resource changes. A later supported local MC
 | FedoraMaxis | bounded Linux-only verification target | no general development jobs |
 | Minis | local CUA available | UI access inventory only so far |
 
-Coordinator reports Mac load 27ÔÇô49 on 10 CPUs, 31 GB used and 32 GB swap.
+Coordinator reports Mac load 27-49 on 10 CPUs, 31 GB used and 32 GB swap.
 Read-only inventory found one DeviceHub PID 545, Kelpie PID 12718 in the
 `favorites-tree` worktree, and existing Android scrcpy/emulator work. These are
 other owners' processes; coordinate before replacing any Kelpie instance or
@@ -79,4 +79,12 @@ board_help returned the worker/setup guidance. board_register and directed
 board_messages (pending=true, limit=10) both returned: hub unavailable or
 registration rejected. No registration, message delivery or inbox read is
 confirmed. No general feed, sibling transcript, token or connection-file contents
-were printed. No hub restart or configuration change was attempted.
+were printed. No hub restart or configuration change was attempted.## Coordination update
+The coordinator attempted its own registration once as
+kelpie-capture-root-20261104. Registration and the directed inbox returned the
+same hub unavailable or registration rejected response. No delivery or inbox
+access is confirmed; do not retry registration without a supported recovery.
+The coordinator has asked the user asynchronously about Mac availability because
+of heavy swap and the other owner's favorites-tree Kelpie process. Await that
+answer or explicit coordinator clearance before Mac builds, browser launches or
+process replacement. No Mac process has been changed by acceptance.

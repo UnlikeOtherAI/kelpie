@@ -32,7 +32,7 @@ reports. Store only a stable non-secret session label.
 
 Platform key: N = every native platform/renderer above; B = Playwright browser;
 L = restricted Lightpanda; T = transport/CLI; P = published installed artifacts.
-ÔÇ£Code ownerÔÇØ maps the requirement to the implementation tranche until exact paths
+"Code owner" maps the requirement to the implementation tranche until exact paths
 and symbols exist. Every implementation owner must replace this with landed paths.
 
 | ID | Requirement and invariant | Code owner | Durable eval / fixture | Real user flow and expected result | Scope |
