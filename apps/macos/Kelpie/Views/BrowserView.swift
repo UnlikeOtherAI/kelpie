@@ -288,6 +288,7 @@ struct BrowserView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             SessionStore.save(tabs: tabStore.tabs, activeID: tabStore.activeTabID)
+            NetworkTrafficStore.shared.flush()
         }
         .onChange(of: rendererState.activeEngine) { _, _ in
             Task { @MainActor in
