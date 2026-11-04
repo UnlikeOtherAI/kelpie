@@ -54,4 +54,3 @@ jobs:
             dist/release/windows/*.zip
             dist/release/windows/*.sha256
             dist/release/windows/*.provenance.txt
-

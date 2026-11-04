@@ -128,3 +128,8 @@ base revision (the package source and dependency graph are unchanged in this fix
 64 CLI tests were skipped by platform/test configuration. Release workflows pass
 Actionlint 1.7.12; an object-level comparison confirms all seven original jobs and
 dependencies are preserved except the four explicit root-job guards.
+
+The pre-existing Android and iOS PR workflows also built unconditionally. They now
+filter to each app's own source and shared build inputs, with manual dispatch
+retained. Windows already has source-path filtering. This prevents the Mac-only
+PR itself from starting unrelated mobile builds; workflow edits alone are linted.
