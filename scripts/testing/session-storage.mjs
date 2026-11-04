@@ -108,5 +108,6 @@ try {
     console.log('PASS: persistent default and isolated identities after app restart');
   }
 } finally {
+  server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
 }
