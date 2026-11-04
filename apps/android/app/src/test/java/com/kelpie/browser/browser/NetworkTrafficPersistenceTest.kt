@@ -39,27 +39,33 @@ class NetworkTrafficPersistenceTest {
     @Test
     fun concurrentWriteKeepsOnlyTheNewestPendingSnapshot() {
         val directory = Files.createTempDirectory("kelpie-network").toFile()
+        val release = CountDownLatch(1)
+        var flush: Thread? = null
         try {
             val started = CountDownLatch(1)
-            val release = CountDownLatch(1)
             val file = directory.resolve("traffic.json")
             val writer =
                 NetworkTrafficPersistence(file, { entries ->
                     if (entries.firstOrNull()?.url == "old") {
                         started.countDown()
-                        check(release.await(5, TimeUnit.SECONDS))
+                        check(release.await(30, TimeUnit.SECONDS))
                     }
                     entries.joinToString { it.url }
                 }, {}, 3_600_000)
             writer.save(listOf(entry("old")))
-            val flush = Thread { writer.flush() }.apply { start() }
-            assertTrue(started.await(5, TimeUnit.SECONDS))
+            flush = Thread { writer.flush() }.apply { start() }
+            // This barrier establishes write ordering, not a disk-latency SLA.
+            // The worker creates its temporary file before entering the encoder.
+            assertTrue(started.await(30, TimeUnit.SECONDS))
             repeat(100) { writer.save(listOf(entry("new-$it"))) }
             release.countDown()
-            flush.join(5000)
+            flush.join(30_000)
+            assertFalse(flush.isAlive)
             writer.flush()
             assertEquals("new-99", file.readText())
         } finally {
+            release.countDown()
+            flush?.join(30_000)
             directory.deleteRecursively()
         }
     }
