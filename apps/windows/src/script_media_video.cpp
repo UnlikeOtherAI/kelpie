@@ -1,4 +1,5 @@
 #include "script_media_internal.h"
+#include "script_media_owned_file.h"
 
 #include <codecapi.h>
 #include <mfapi.h>
@@ -143,9 +144,11 @@ class MfVideo final : public VideoWriter {
       if (writer_) {
         Check(writer_->Finalize());
         writer_.Reset();
-        file_->Close();
+        Check(file_->Close(), "CAPTURE_OUTPUT_UNAVAILABLE");
         file_.Reset();
+        Check(owned_stream_->Complete(), "CAPTURE_OUTPUT_UNAVAILABLE");
       }
+      completed_ = true;
       return output_;
     } catch (...) {
       Discard();
@@ -159,25 +162,23 @@ class MfVideo final : public VideoWriter {
 
  private:
   void Discard() noexcept {
-    if (!file_) return;  // Completed output and other owners remain untouched.
     writer_.Reset();
-    file_->Close();
-    file_.Reset();
-    if (owns_file_) DeleteFileW(output_.path.c_str());
-    owns_file_ = false;
+    if (file_) {
+      // Failure cleanup still attempts identity-bound rollback if Close fails.
+      const auto result = file_->Close();
+      file_.Reset();
+      if (FAILED(result)) owns_file_ = false;
+    }
+    if (owned_stream_ && !completed_) owned_stream_->Abort();
+    if (!completed_) owns_file_ = false;
   }
 
   void OpenWriter() {
-    const auto opened = MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_FAIL_IF_EXIST,
-                                     MF_FILEFLAGS_NONE, output_.path.c_str(), &file_);
-    if (FAILED(opened)) {
-      if (GetFileAttributesW(output_.path.c_str()) != INVALID_FILE_ATTRIBUTES)
-        throw std::runtime_error("CAPTURE_OUTPUT_EXISTS");
-      throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE");
-    }
+    owned_stream_.Attach(new OwnedMediaStream(output_.path));
     owns_file_ = true;
     try {
-      // The sink receives an already exclusive stream, never an overwriting URL.
+      // Wrap the exact exclusive file handle; MF never opens its path.
+      Check(MFCreateMFByteStreamOnStream(owned_stream_.Get(), &file_));
       Check(MFCreateSinkWriterFromURL(output_.path.c_str(), file_.Get(), nullptr, &writer_));
       Check(writer_->AddStream(encoded_type_.Get(), &stream_));
       // Same compressed subtype means remux only; no implicit transcoding or
@@ -238,6 +239,8 @@ class MfVideo final : public VideoWriter {
   ComPtr<IMFSinkWriter> writer_;
   ComPtr<IMFByteStream> file_;
   bool owns_file_ = false;
+  bool completed_ = false;
+  ComPtr<OwnedMediaStream> owned_stream_;
   MFT_OUTPUT_STREAM_INFO stream_info_{};
   DWORD stream_ = 0;
   std::deque<Timing> timings_;

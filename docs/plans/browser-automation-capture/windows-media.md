@@ -120,8 +120,9 @@ headroom, the output is empty with budget_exceeded rather than an oversized or
 invalid file. GIF and PNG admit only outputs that fit their exact retained cost.
 
 Lazy GIF opens use Win32 CREATE_NEW and hold the handle through finalization.
-MP4 opens an MFCreateFile fail-if-exists byte stream and passes that stream to
-the sink; its URL is informational. Byte accounting includes only this encoder's
+MP4 atomically creates its exact owned Win32 file and passes a native IStream
+adapter to MF; the sink URL is informational. The handle denies delete/rename
+until completion or exact-handle rollback. Byte accounting includes only this encoder's
 owned files. PNG failure cleanup retains a duplicate handle to the exact newly
 created file, marks that file for deletion on partial write/close failure and
 never follows a potentially replaced path to perform rollback.
@@ -145,3 +146,33 @@ was 19%, with 23.80 GiB free RAM. One compiler and one test ran sequentially.
 GetProcessMemoryInfo reported peak working set 37,859,328 bytes and peak committed
 memory 49,905,664 bytes for this run. Earlier verification above is for 2a0858f0;
 the follow-up has the same full-app/manual-verification limits.
+## MP4 exact-handle failure cleanup
+
+MP4 now opens a Win32 CREATE_NEW object with read/write/delete rights and retains
+a duplicate cleanup handle. The internal OwnedMediaStream implements IStream;
+MFCreateMFByteStreamOnStream wraps it, so MF never opens an output filename.
+Finalization checks the MF Close HRESULT, native flush and both handle closes.
+Failure cleanup marks the exact retained handle for deletion before releasing
+handles. No filesystem identity query, path reopen or DeleteFileW(path) is needed.
+
+Constructor failure after CREATE_NEW cleans through the original delete-capable
+handle. A live stream denies rename/delete. After rollback, a newly created file
+under the old name survives destructor cleanup. A completed stream releases both
+handles without deleting output. Internal fault regressions cover constructor
+duplicate failure, flush failure, close failure and replacement preservation,
+alongside the full native codec corpus.
+
+The CODEC-3 /W4 /WX compile and full native codec run passed on Maxis. The new
+MF IStream adapter produced fully decodable output with the same colors, timing,
+frame counts and budget results as before. Fault tests passed for constructor
+duplication failure after CREATE_NEW, flush failure, first-handle close failure
+and second-handle close failure after the first close succeeded. Rollback removed
+only the held original object, a later replacement survived destructor cleanup,
+and completed output remained intact. All prior decode, Stop/recovery, 1024-byte
+budget, PNG cleanup, collision, sibling, stride, chroma and palette checks passed.
+
+Artifacts are under .build-media/run-4. Sustained preflight CPU samples were
+10%, 14%, 5%, with 23.95 GiB free RAM. One compiler then one native test ran under
+the granted bounded-parallel slot. Test-process peak working set was 38,309,888
+bytes and peak committed memory 49,696,768 bytes. Full native app/UI acceptance
+remains outside this encoder test checkpoint.
