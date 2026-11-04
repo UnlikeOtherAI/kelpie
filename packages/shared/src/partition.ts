@@ -19,9 +19,7 @@ export const MAX_PARTITION_LENGTH = 128;
 export const MAX_TAB_NAME_LENGTH = 200;
 
 /**
- * Reserved internal prefix. Android's non-persistent emulation creates
- * profiles named `ephemeral-<partition>-<uuid>`; a user-supplied string
- * starting with the same prefix could collide with one of those.
+ * Reserved internal prefix for engine-owned ephemeral stores.
  */
 export const RESERVED_PARTITION_PREFIX = "ephemeral-";
 
@@ -66,6 +64,13 @@ export function validatePartition(value: string): PartitionValidation {
 /** Convenience predicate for callers that do not need the failure reason. */
 export function isValidPartition(value: string): boolean {
   return validatePartition(value).ok;
+}
+
+/** Only deletion accepts orphan IDs returned by the native registry. */
+export function validatePartitionDeletion(value: string): PartitionValidation {
+  const orphan = /^orphan:(?:kelpie-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (orphan.test(value) && !value.endsWith("\n")) return { ok: true };
+  return validatePartition(value);
 }
 
 /** Human-readable explanation for a rejection, reused by CLI and MCP errors. */

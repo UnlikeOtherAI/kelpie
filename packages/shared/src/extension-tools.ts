@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidPartition } from "./partition.js";
+import { isValidPartition, validatePartitionDeletion } from "./partition.js";
 
 const platforms = ["ios", "android", "macos", "linux", "windows"] as const;
 type ToolPlatform = (typeof platforms)[number];
@@ -10,8 +10,7 @@ const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
 const fullscreenPlatforms = ["macos", "linux", "windows"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
-// Per-tab storage isolation: macOS on WebKit, Windows on Chromium (CEF).
-const partitionPlatforms = ["macos", "windows", "linux"] as const;
+const partitionPlatforms = allPlatforms;
 
 /**
  * Partition identifier, validated with the shared rules so the MCP layer, the
@@ -20,6 +19,7 @@ const partitionPlatforms = ["macos", "windows", "linux"] as const;
 const partitionId = z
   .string()
   .refine(isValidPartition, "Must be 1-128 chars from [A-Za-z0-9._-], contain a letter or digit, and not be \".\", \"..\", \"default\" or start with \"ephemeral-\"");
+const deletablePartitionId = z.string().refine(value => validatePartitionDeletion(value).ok, "Must be a partition ID or a listed orphan ID");
 const orientationPlatforms = ["ios", "android", "macos"] as const;
 // Geolocation and request-interception have no working native implementation today —
 // every platform's handler returns PLATFORM_NOT_SUPPORTED.
@@ -246,11 +246,11 @@ export const sharedBrowserTools: BrowserToolDef[] = [
 
   // Tabs
   { name: "kelpie_get_tabs", description: "Get all open tabs", method: "getTabs", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_new_tab", description: "Open a new tab. Pass a partition to give the tab its own isolated cookie/localStorage container - tabs sharing a partition string share storage, different strings are fully isolated.", method: "newTab", schema: { device, url: url.optional().describe("URL to open in new tab"), name: z.string().max(200).optional().describe("Display label for the tab, shown in the tab bar and returned by kelpie_get_tabs"), partition: partitionId.optional().describe("Storage container id. Omit for the shared default container."), persistent: z.boolean().optional().describe("Defaults to true. False keeps the partition in memory only; only meaningful with partition.") }, bodyFromArgs: passthrough },
+  { name: "kelpie_new_tab", description: "Open a new tab. Pass a partition to give the tab its own isolated cookie/localStorage container - tabs sharing a partition string share storage, different strings are fully isolated.", method: "newTab", schema: { device, url: url.optional().describe("URL to open in new tab"), name: z.string().max(200).optional().describe("Display label for the tab, shown in the tab bar and returned by kelpie_get_tabs"), partition: partitionId.optional().describe("Storage container id. Omit for the shared default container."), persistent: z.boolean().optional().describe("Defaults to true. False requests memory-only storage on desktop; mobile rejects false. Only meaningful with partition.") }, bodyFromArgs: passthrough },
   { name: "kelpie_switch_tab", description: "Switch to a specific tab", method: "switchTab", schema: { device, tabId: z.string().describe("Tab UUID to switch to") }, bodyFromArgs: passthrough },
   { name: "kelpie_close_tab", description: "Close a tab", method: "closeTab", schema: { device, tabId: z.string().describe("Tab UUID to close") }, bodyFromArgs: passthrough },
   { name: "kelpie_get_partitions", description: "List storage partitions with their live tab counts", method: "getPartitions", platforms: partitionPlatforms, schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: partitionPlatforms, schema: { device, id: partitionId.describe("Partition id to delete") }, bodyFromArgs: passthrough },
+  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: partitionPlatforms, schema: { device, id: deletablePartitionId.describe("Partition or orphan id returned by kelpie_get_partitions") }, bodyFromArgs: passthrough },
 
   // Iframes
   { name: "kelpie_get_iframes", description: "Get all iframes on the page", method: "getIframes", schema: { device, tabId }, bodyFromArgs: passthrough },

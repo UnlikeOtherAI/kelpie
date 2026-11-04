@@ -12,9 +12,6 @@ const StringList kAllEngines = {"webkit", "chromium", "gecko"};
 const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
-// Per-tab storage isolation. macOS has it on the WebKit path and Windows on
-// the CEF path; iOS, Android and Linux drop their exclusion as they land it.
-const std::vector<P> kPartitionPlatforms = {P::kMacos, P::kWindows, P::kLinux};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
@@ -162,10 +159,10 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_close_tab", "close-tab", "Close a tab"),
       Tool("kelpie_get_partitions", "get-partitions",
            "List storage partitions and how many tabs each holds",
-           ToolAvailability{kPartitionPlatforms, kAllEngines, false, true, {}}),
+           ToolAvailability{kAllPlatforms, kAllEngines, false, true, {}}),
       Tool("kelpie_delete_partition", "delete-partition",
            "Delete a storage partition, closing every tab bound to it",
-           ToolAvailability{kPartitionPlatforms, kAllEngines, false, true, {}}),
+           ToolAvailability{kAllPlatforms, kAllEngines, false, true, {}}),
       Tool("kelpie_get_iframes", "get-iframes", "Get all iframes on the page"),
       Tool("kelpie_switch_to_iframe", "switch-to-iframe", "Switch context to an iframe"),
       Tool("kelpie_switch_to_main", "switch-to-main", "Switch back to the main frame"),
