@@ -83,3 +83,25 @@ model. This is not a simultaneous OS screenshot; slow capture can reduce visible
 pointer cadence. The owner also plans fractional steady-clock cadence with
 skipped-slot accounting and explicit initial-document semantics for movie
 metadata. These are follow-up plans, not changes verified in the reviewed tree.
+
+## Frozen overlay foreground review
+Reviewed overlay source in tree 6ca7d1205a8eb758a74d90156e3c44b48b7ea633.
+This follow-up reviews script_native_overlay.cpp only, not the entire newer tree.
+Canvas and Stop are owned WS_POPUP windows. Show checks viewport visibility and
+owner minimization, then repeatedly calls SetWindowPos(HWND_TOP) with
+SWP_NOACTIVATE. It has no current foreground/owner activation policy.
+WIN-09: the source does not guarantee that presentation stays behind another
+foreground app. SWP_NOACTIVATE prevents activation; it is separate from the flags
+that preserve window/owner Z order. See Microsoft's
+[SetWindowPos reference](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos).
+This is a source/API inference, not a reproduced desktop failure.
+The runtime owner received a scoped post-compile requirement: check the foreground
+and owner-window policy on the UI thread for every show/latch/timer callback, hide
+when another app or a covering owner modal is foreground, preserve the owner's
+Z order, and restore only the current valid model on owner activation. The latch
+pauses the animation timer, so foreground loss must not depend on that timer.
+Keep the separate interactive Stop HWND.
+Required real native cases are switching foreground during fade and an in-flight
+snapshot latch, owner minimize/restore, a modal over the renderer, and returning
+to Kelpie without activation or Z-order theft. Preserve the frozen first compile;
+apply and test the fix afterward. No CUA, UI action or test was performed here.
