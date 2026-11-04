@@ -17,6 +17,7 @@ export interface ScriptTargetResult {
   enabled?: boolean;
   sensitive?: boolean;
   editable?: boolean;
+  focused?: boolean;
 }
 
 /**
@@ -66,10 +67,12 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   };
   const visible = (el: Element): boolean => visibleBox(el) !== null;
   const boundedText = (el: Element): string => {
-    const reader = document.createTreeWalker(el, 4);
+    const reader = document.createTreeWalker(el, 0xFFFFFFFF);
     let text = "", count = 0;
     for (let node = reader.nextNode(); node; node = reader.nextNode()) {
-      if (++count > 256 || text.length + (node.textContent?.length ?? 0) > 2048) { budget.limited = true; return ""; }
+      if (++count > 256) { budget.limited = true; return ""; }
+      if (node.nodeType !== 3) continue;
+      if (text.length + (node.textContent?.length ?? 0) > 2048) { budget.limited = true; return ""; }
       text += node.textContent ?? "";
     }
     return text;
@@ -80,7 +83,11 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   const accessibleName = (el: Element): string => {
     const labelledBy = el.getAttribute("aria-labelledby");
     if (labelledBy && labelledBy.length > 2048) { budget.limited = true; return ""; }
-    if (labelledBy) return normalized(labelledBy.split(/\s+/).slice(0, 32).map(id => (() => { const label = document.getElementById(id); return label ? boundedText(label) : ""; })()).join(" "));
+    if (labelledBy) {
+      const references = labelledBy.split(/\s+/);
+      if (references.length > 32) { budget.limited = true; return ""; }
+      return normalized(references.map(id => { const label = document.getElementById(id); return label ? boundedText(label) : ""; }).join(" "));
+    }
     const aria = el.getAttribute("aria-label");
     if (aria !== null) { if (aria.length > 2048) { budget.limited = true; return ""; } return normalized(aria); }
     if (el instanceof HTMLInputElement && ["button", "submit", "reset"].includes(el.type)) return normalized(el.value.length ? el.value : (el.type === "submit" ? "Submit" : el.type === "reset" ? "Reset" : ""));
@@ -199,5 +206,5 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
     } catch { return { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true }; }
   }
-  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
+  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: entry.element instanceof HTMLInputElement && (entry.element.type === "password" || /^(current|new)-password$/.test(entry.element.autocomplete)), viewportWidth: innerWidth, viewportHeight: innerHeight, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
 }

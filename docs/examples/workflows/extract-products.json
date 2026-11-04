@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "name": "Extract product cards",
+  "tabId": "replace-with-owned-tab-id",
+  "actions": [
+    {
+      "action": "wait-ready",
+      "selector": "#products",
+      "state": "interactive",
+      "timeoutMs": 10000
+    },
+    {
+      "action": "extract",
+      "name": "products",
+      "params": {
+        "scope": "#products",
+        "fields": [
+          {
+            "name": "cards",
+            "selector": ".product",
+            "source": "text",
+            "multiple": true,
+            "fields": [
+              {
+                "name": "title",
+                "selector": "h2",
+                "source": "text"
+              },
+              {
+                "name": "price",
+                "selector": ".price",
+                "source": "text"
+              },
+              {
+                "name": "link",
+                "selector": "a",
+                "source": "href"
+              }
+            ]
+          }
+        ],
+        "metadata": true,
+        "maxChars": 8000
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BrowserExtractionOptionsSchema } from "./browser-control/observations.js";
 
 /** Strict authored workflows are opt-in; unversioned legacy scripts retain their own admission. */
 export const scriptTargetSchema = z.union([
@@ -52,6 +53,7 @@ export const scriptActionSchema = z.discriminatedUnion("action", [
   action({ action: z.literal("assert"), target, state: z.enum(["visible", "hidden", "enabled"]), timeoutMs }),
   action({ action: z.literal("screenshot"), name: z.string().min(1).max(64).optional() }),
   action({ action: z.literal("commentary"), text: z.string().max(1024), durationMs: z.number().int().min(0).max(30_000).default(3000), position: z.enum(["top", "center", "bottom"]).default("bottom") }),
+  action({ action: z.literal("extract"), name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/), params: BrowserExtractionOptionsSchema }),
   action({ action: z.literal("output"), name: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/), source: z.enum(["url", "title", "status"]) }),
 ]);
 export const workflowInputSchema = z.object({
@@ -85,7 +87,7 @@ export const scriptArtifactRequestSchema = z.object({
 export const scriptArtifactSchema = z.object({
   id: z.string().min(1).max(128),
   mimeType: z.enum(["image/png", "image/gif", "video/mp4"]),
-  byteLength: z.number().int().nonnegative(),
+  byteLength: z.number().int().positive(),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   partial: z.boolean(),
   width: z.number().int().positive(),
@@ -110,3 +112,15 @@ export const scriptTargetRequestSchema = z.union([
     edit: z.object({ action: z.enum(["fill", "type"]), text: z.string().max(16_000) }).strict() }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
 ]);
+export const scriptArtifactChunkSchema = z.object({
+  success: z.literal(true).optional(),
+  runId: z.string().min(1).max(128),
+  artifactId: z.string().min(1).max(128),
+  data: z.string().max(1_398_104).regex(/^[A-Za-z0-9+/]*={0,2}$/),
+  offset: z.number().int().nonnegative(),
+  nextOffset: z.number().int().nonnegative(),
+  eof: z.boolean(),
+  mimeType: z.enum(["image/png", "image/gif", "video/mp4"]),
+  byteLength: z.number().int().positive(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();

@@ -1,3 +1,4 @@
+import { redactScriptResult, sendScriptPlayback, createScriptMcpBody } from "./script-tools.js";
 import { z } from "zod";
 import { registerExtensions } from "./extensions.js";
 import type { ExtensionEntry } from "./extensions.js";
@@ -8,7 +9,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { sendCommand } from "../client/http-client.js";
+import { sendCommand, createPinnedCommandTransport } from "../client/http-client.js";
 import { getDevice, getAllDevices, addDevices } from "../discovery/registry.js";
 import { scanForDevices } from "../discovery/scanner.js";
 import { filterDevices } from "../group/filter.js";
@@ -62,11 +63,12 @@ export function createMcpServer(pinned?: DiscoveredDevice, callableTools?: Reado
     { capabilities: { tools: {} } },
   );
 
+  const scriptBody = createScriptMcpBody(process.env.KELPIE_WORKFLOW_SECRET_REFS);
   const core = registerBrowserControl(server, pinned);
   const extensions = new Map<string, ExtensionEntry>();
   for (const tool of browserTools) {
     if (!isCallableOnPinnedDevice(tool, pinned, callableTools)) continue;
-    extensions.set(tool.name, registerBrowserTool(server, tool, pinned));
+    extensions.set(tool.name, registerBrowserTool(server, tool.method === "playScript" ? { ...tool, bodyFromArgs: scriptBody } : tool, pinned));
   }
   for (const tool of cliTools) {
     extensions.set(tool.name, registerCliTool(server, tool, pinned));
@@ -126,8 +128,11 @@ function registerBrowserTool(
       if (!(error instanceof ToolInputError)) throw error;
       return errorToolResult({ success: false, error: { code: error.code, message: error.message } });
     }
-    const sent = await sendCommand(device, tool.method, body, tool.timeoutMs);
-    const result = handlesEndpointSecrets(tool.method) ? { ...sent, data: redactSecrets(sent.data, secretsIn(body)) } : sent;
+    const runOwnedRead = tool.method === "getScriptArtifact" || ((tool.method === "getScriptStatus" || tool.method === "abortScript") && typeof body.runId === "string");
+    const sent = tool.method === "playScript" && body.version === 1 ? await sendScriptPlayback(device, body, tool.timeoutMs ?? 360000) : runOwnedRead ? await (await createPinnedCommandTransport(device))(tool.method, body, tool.timeoutMs ?? 10000) :
+      await sendCommand(device, tool.method, body, tool.timeoutMs);
+    const result = tool.method === "playScript" ? { ...sent, data: redactScriptResult(sent.data, body) } :
+      handlesEndpointSecrets(tool.method) ? { ...sent, data: redactSecrets(sent.data, secretsIn(body)) } : sent;
     if (tool.method === "reportIssue" && result.ok && (result.data as { success?: boolean }).success === true) {
       const remote = result.data as {
         reportId?: string;

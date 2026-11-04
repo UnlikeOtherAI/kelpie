@@ -1,7 +1,8 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { scriptV1Schema, scriptArtifactRequestSchema, scriptTargetRequestSchema } from "../src/script-workflow.js";
 import { bindScriptInputs } from "../src/script-bindings.js";
-import { scriptPointerPosition, scriptTapPresentation } from "../src/script-presentation.js";
+import { scriptPointerPosition, scriptTapPresentation, scriptTimelineProgress } from "../src/script-presentation.js";
 
 const script = { version: 1, tabId: "owned-tab", actions: [{ action: "click", target: { role: "button", name: "Submit" } }] };
 describe("strict authored workflows", () => {
@@ -44,10 +45,39 @@ describe("deterministic presentation", () => {
     expect(scriptPointerPosition(motion, 0.001).x).toBeLessThan(0.01);
     expect(scriptPointerPosition(motion, -1)).toEqual(motion.from);
   });
+  it("handles zero-duration and invalid timeline progress safely", () => {
+    expect(scriptTimelineProgress(0, 0)).toBe(1);
+    expect(scriptTimelineProgress(-10, 100)).toBe(0);
+    expect(scriptTimelineProgress(50, 100)).toBe(0.5);
+    expect(scriptTimelineProgress(200, 100)).toBe(1);
+    expect(scriptTimelineProgress(Number.NaN, 100)).toBe(0);
+    expect(scriptTimelineProgress(1, Number.NaN)).toBe(0);
+    expect(scriptTapPresentation(Number.NaN)).toEqual({ scale: 1, alpha: 1 });
+  });
+  it("accepts extraction through the canonical bounded schema", () => {
+    expect(scriptV1Schema.parse({ ...script, actions: [{ action: "extract", name: "cards", params: { fields: [{ name: "title", selector: "h2", source: "text" }], metadata: true } }] }).actions[0]).toMatchObject({ action: "extract", name: "cards" });
+    expect(scriptV1Schema.safeParse({ ...script, actions: [{ action: "extract", name: "bad", params: { fields: [{ name: "value", selector: "input", source: "value" }] } }] }).success).toBe(false);
+  });
   it("wobbles then fades to zero on the common numeric timeline", () => {
     expect(scriptTapPresentation(0)).toEqual({ scale: 1, alpha: 1 });
     expect(scriptTapPresentation(1)).toEqual({ scale: 1, alpha: 0 });
     expect(scriptTapPresentation(0.1).scale).not.toBe(1);
     expect(scriptTapPresentation(0.5, false, false)).toEqual({ scale: 1, alpha: 1 });
+  });
+});
+
+describe("reusable workflow authoring", () => {
+  it("refuses duplicate named outputs before executing any actions", () => {
+    expect(() => bindScriptInputs({ ...script, actions: [
+      { action: "output", name: "same", source: "url" },
+      { action: "extract", name: "same", params: { fields: [{ name: "title", selector: "h1", source: "text" }] } },
+    ] })).toThrow("Duplicate workflow output name");
+  });
+  it("validates the shipped walkthrough and nested-extraction recipes", async () => {
+    for (const name of ["submit-walkthrough", "extract-products"]) {
+      const raw: unknown = JSON.parse(await readFile(new URL("../../../docs/examples/workflows/" + name + ".json", import.meta.url), "utf8"));
+      const parsed = scriptV1Schema.parse(raw);
+      expect(bindScriptInputs(parsed, parsed.inputs ? { name: "Ada" } : {}).version).toBe(1);
+    }
   });
 });

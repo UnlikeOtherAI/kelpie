@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "name": "Submit a form walkthrough",
+  "tabId": "replace-with-owned-tab-id",
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "actions": [
+    {
+      "action": "fill",
+      "target": {
+        "label": "Name",
+        "exact": true
+      },
+      "text": {
+        "input": "name"
+      }
+    },
+    {
+      "action": "click",
+      "target": {
+        "role": "button",
+        "name": "Submit",
+        "exact": true
+      }
+    },
+    {
+      "action": "wait-ready",
+      "selector": "#success",
+      "state": "interactive",
+      "timeoutMs": 10000
+    },
+    {
+      "action": "screenshot",
+      "name": "submitted"
+    },
+    {
+      "action": "output",
+      "name": "destination",
+      "source": "url"
+    }
+  ],
+  "capture": {
+    "formats": [
+      "gif",
+      "video",
+      "screenshots"
+    ],
+    "fps": 15,
+    "maxWidth": 1280,
+    "maxDurationMs": 60000,
+    "maxBytes": 67108864
+  },
+  "tapIndicator": {
+    "color": "#3B82F6",
+    "radius": 20,
+    "durationMs": 700,
+    "wobble": true,
+    "fade": true
+  },
+  "pointer": {
+    "enabled": true,
+    "curve": "s",
+    "durationMs": 500,
+    "easing": "ease-in-out"
+  }
+}
