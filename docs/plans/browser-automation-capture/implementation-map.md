@@ -10,9 +10,10 @@ overlay, direct MCP/CLI, remote artifact and installed-release evidence is
 
 | Key | Exact source checkpoint | What was reviewed |
 |---|---|---|
-| OBS | e52240e7fe127b4b43aac51fd4eb2db4e64dd574 | Canonical observations and generated native ABI |
+| OBS | 3a63ea7d696a7850e2798b2c235aca784104d9db | Bounded canonical observations and generated native ABI |
 | WFL | d6d7a36666e11db45e7e42cfe09a62d1f2a2fcd8 | Strict workflows, bindings, target safety and presentation |
-| CODEC | 8369571f6b821cc4bcfc853de2a78f5fc25e142d | Windows codecs, exclusive output opens, failure cleanup and decoded color checks |
+| NUMERIC | f6fb0aee3e61fe9bbccad501718386ef6ce0b379 | Native C ABI presentation and TS-generated parity vectors; integrated 87cd6de7 |
+| CODEC | 2b2dc1c2673541ddfe13f2ab970283f396c4c3fd | Windows codecs, exact-handle MP4 ownership, failure cleanup and decoded color checks |
 | BACKEND | 28a9f3c71c81f3df6e87ac77b69d49363391cb2d | Managed sessions, restricted LP and WebMCP helpers |
 | QA | d81d6283df63e2c26c1aebbca8afd8a09facc8ec | Independent target regressions and observation review |
 | FIXTURE | 4fbd5e4ed4d0c2873eb632c4d12f96c91267c03a | Real DOM race triggers for future native runs |
@@ -49,8 +50,12 @@ that every platform ran them.
   Maxis Node 24.19; these are source-level stubs.
 - **CODEC-DECODE**: apps/windows/tests/script_media_encoder_test.cpp:
   Timing, AbortAndValidation, Budget(gif/mp4), StepBudget, GifRounding,
-  SmallBudgets, ExclusiveOwnership, PngFailureCleanup and GifPaletteChanges.
+  SmallBudgets, ExclusiveOwnership, PngFailureCleanup, GifPaletteChanges and
+  ExactHandleRollback (constructor/flush/both closes/replacement preservation).
   WIC decodes images and Media Foundation decodes MP4 samples.
+- **NUMERIC-PARITY**: native/core-automation/tests/test_script_presentation.cpp
+  with scripts/native/generate-script-presentation.mjs; coordinator reports both
+  CTest entries passed, 115 finite vectors plus NaN/infinity cases.
 - **MANAGED**: packages/shared/tests/managed-session.test.ts;
   packages/cli/tests/browser/automation-sessions.test.ts;
   tests/native/managed-worker-acceptance.mjs (actual Chromium, LP still pending).
@@ -64,14 +69,14 @@ that every platform ran them.
 
 | Canonical IDs | Source symbols/files | Durable evals | Checkpoint and remaining work |
 |---|---|---|---|
-| OBS-01 | collectBrowserSnapshot in browser-control/snapshot.ts; collectBrowserExtraction in observations.ts | OBS-BROWSER private canaries; FIXTURE-EVIDENCE assertValueFree | OBS; native pending, bounded-reader follow-up open |
+| OBS-01 | collectBrowserSnapshot in browser-control/snapshot.ts; collectBrowserExtraction in observations.ts | OBS-BROWSER private canaries; FIXTURE-EVIDENCE assertValueFree | OBS; bounded reader reviewed; native pending |
 | OBS-02 | BrowserSnapshotOptionsSchema; collectBrowserSnapshot scope/priority | OBS-SCHEMA, OBS-BROWSER scoped actions | OBS; native pending |
-| OBS-03 | snapshot clean/content/visit; extraction bounded/publicText | OBS-BROWSER output limits | OBS; work-before-budget defect open |
+| OBS-03 | snapshot clean/content/visit; extraction bounded/publicText | OBS-BROWSER output limits | OBS; shared work/copy budgets reviewed; native pending |
 | EXT-01 | BrowserExtractionOptionsSchema; collectBrowserExtraction extract | OBS-SCHEMA, OBS-BROWSER missing/ambiguous/source cases | OBS; native pending |
-| EXT-02 | extractionField(depth); extract nested records with recordsRemaining/fieldsRemaining | OBS-BROWSER nested catalogue/list records | OBS; bounded traversal follow-up open |
-| EXT-03 | collectBrowserExtraction metadata/JSON-LD allowlists | OBS-BROWSER publisher/@graph/private canary cases | OBS; metadata-copy bounds follow-up open |
-| EXT-04 | BrowserExtractedField.provenance; metadata selector/attribute; documentRevision availability | OBS-BROWSER provenance assertions | OBS; incomplete provenance follow-up open |
-| RDY-01 | collectBrowserPageStatus; BrowserPageStatus | OBS-BROWSER unavailable network/errors and counts | OBS; visibility/bounded count follow-up open |
+| EXT-02 | extractionField(depth); extract nested records with recordsRemaining/fieldsRemaining | OBS-BROWSER nested catalogue/list records | OBS; bounded traversal reviewed; native pending |
+| EXT-03 | collectBrowserExtraction metadata/JSON-LD allowlists | OBS-BROWSER publisher/@graph/private canary cases | OBS; metadata-copy bounds reviewed; native pending |
+| EXT-04 | BrowserExtractedField.provenance; metadata selector/attribute; documentRevision availability | OBS-BROWSER provenance assertions | OBS; incomplete provenance fixed; filtered exact-index edge case open |
+| RDY-01 | collectBrowserPageStatus; BrowserPageStatus | OBS-BROWSER unavailable network/errors and counts | OBS; bounded counts/visibility reviewed; native pending |
 | RDY-02 | BrowserReadinessOptionsSchema; collectBrowserReadiness | OBS-SCHEMA immediate defaults; OBS-BROWSER hidden/visible/ambiguous selector | OBS; actual native wait loop pending |
 | OWN-01 | allocateManagedBrowserSession in browser-control/managed-session.ts; createManagedSessionRegistry in cli/browser/automation-sessions.ts | MANAGED isolation, foreign handles, expiry and cleanup | BACKEND; failed allocation cleanup ownership fix open; public stdio/native pending |
 | OWN-02 | Existing browser-control/proxy.ts authorization; native/core-mcp/src/browser_gateway.cpp dispatch; resolveScriptTarget token fence | OBS-SCHEMA authorization; ABI; TARGET | OBS/WFL; late callback, exact socket and durable Nessie pin native regression pending |
@@ -85,8 +90,8 @@ that every platform ran them.
 | TGT-03 | visibleBox clipped rectangle; unchangedGeometry | TARGET-INDEPENDENT visible center/viewport | WFL; DPR/zoom/scroll real fixture pending |
 | TGT-04 | captured Entry, unchangedGeometry, unchanged and post-focus checks | TARGET, TARGET-INDEPENDENT; FIXTURE child/focus races | WFL; real renderer pending |
 | TGT-05 | ScriptTargetResult.inputGuarantee=synthetic-coordinate | FIXTURE event.isTrusted oracle | WFL declaration; Windows CDP actual guarantee still to be verified |
-| PTR-01 | scriptPointerPosition in script-presentation.ts | WORKFLOW endpoints/C/S/ease; assertions.mjs trajectory oracle | WFL; native display/decoded motion pending |
-| PTR-02 | shared numeric scriptPointerPosition and scriptTapPresentation | WORKFLOW deterministic numeric checks | WFL; compositor/native correspondence pending |
+| PTR-01 | scriptPointerPosition in script-presentation.ts; kelpie_script_pointer_position and kelpie_script_progress C ABI | WORKFLOW; NUMERIC-PARITY; assertions.mjs trajectory oracle | WFL/NUMERIC; numeric parity passed per coordinator, native display/decoded motion pending |
+| PTR-02 | shared numeric functions and native/core-automation/src/script_presentation.cpp | WORKFLOW; NUMERIC-PARITY | WFL/NUMERIC; numeric parity passed per coordinator; compositor/native timing correspondence pending |
 | VIS-01 | tapIndicatorSchema; codec BGRA input and NV12 conversion | CODEC-DECODE Y/UV and palette colors; future actual overlay pixels | WFL/CODEC partial; actual marker evidence pending |
 | VIS-02 | scriptTapPresentation scale/alpha timeline | WORKFLOW wobble/fade | WFL; decoded early/middle/late frames pending |
 | CAP-01 | ScriptMediaEncoder; WicGif; MfVideo; WriteStepPNG | CODEC-DECODE | CODEC only; actual script export pipeline pending |
@@ -99,7 +104,7 @@ that every platform ran them.
 | CAP-08 | ScriptMediaEncoder::Finish and successful output retention | CODEC-DECODE AbortAndValidation/next capture | CODEC partial; sibling-format recovery reported; native cancellation pending |
 | ART-01 | scriptArtifactRequestSchema defines opaque chunk request only | WORKFLOW length bounds | WFL shape only; authenticated remote bytes/CLI retrieval pending |
 | ART-02 | No artifact-owner runtime reviewed in these checkpoints | Two-owner/revocation native eval pending | Pending |
-| ART-03 | scriptArtifactRequestSchema; WriteStepPNG lexical directory guard | WORKFLOW chunk bounds; CODEC-DECODE invalid path | WFL/CODEC partial; exclusive open fixed; failure-cleanup ownership question and transport tests pending |
+| ART-03 | scriptArtifactRequestSchema; WriteStepPNG lexical directory guard | WORKFLOW chunk bounds; CODEC-DECODE invalid path | WFL/CODEC partial; exact-handle ownership fixes and codec regressions closed; transport tests pending |
 | ART-04 | scriptArtifactSchema; ScriptMediaOutput codec metadata | CODEC-DECODE manifest timing/counts | WFL/CODEC partial; SHA-256, document provenance and partial state service pending |
 | SEC-01 | value-free observations; bindScriptInputs safe errors/sensitive/capture checks | OBS-BROWSER private canaries; WORKFLOW secrets | OBS/WFL; runtime logs/progress/output scrubbing pending |
 | SEC-02 | Fixed observation source; typed workflow excludes evaluate | OBS-SCHEMA; WORKFLOW arbitrary-code rejection | OBS/WFL; hostile-page real flow and WebMCP authority pending |
@@ -115,6 +120,8 @@ that every platform ran them.
 
 ## Open review ledgers
 
+- [Workflow CLI draft review](workflow-cli-review.md): pinned transport, transfer
+  integrity/cleanup, reusable extraction and native numeric parity source.
 - [Workflow review](workflow-review.md): reproduced defects, fixing revision,
   independent results and remaining bounded-name/runtime gaps.
 - [Observation review](observation-review.md): bounded work, visibility, metadata

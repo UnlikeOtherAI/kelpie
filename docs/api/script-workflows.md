@@ -1,0 +1,70 @@
+# Typed workflows and walkthrough exports
+
+Where the selected browser advertises script v1, HTTP `POST /v1/play-script`, CLI `script run`, and MCP `kelpie_play_script` accept the same strict workflow. Check device capabilities before recording; unsupported actions and encoders must be refused before input. Unversioned legacy scripts keep their separate behavior.
+
+```json
+{
+  "version": 1,
+  "tabId": "chosen-tab",
+  "actions": [
+    {"action": "click", "target": {"role": "button", "name": "Submit", "exact": true}},
+    {"action": "wait-ready", "state": "complete", "timeoutMs": 10000},
+    {"action": "screenshot", "name": "submitted"}
+  ],
+  "capture": {"formats": ["gif", "video", "screenshots"], "fps": 15},
+  "tapIndicator": {"color": "#3B82F6", "radius": 20, "wobble": true, "fade": true, "durationMs": 700},
+  "pointer": {"enabled": true, "curve": "s", "durationMs": 500, "easing": "ease-in-out"}
+}
+```
+
+Targets are exactly one of role/name/exact, label/exact, CSS selector or explicit viewport x/y. The target must be unique, visible, eligible and unobscured. A partially clipped target uses the center of its viewport/overflow-clipped visible rectangle. The same element object, document, URL, viewport and geometry are rechecked after visual motion. A moved/replaced/obscured target refuses input. Semantic traversal is bounded; `TARGET_QUERY_LIMIT` requests a narrower target rather than silently choosing a match.
+
+The pointer is presentation only and does not cause hover. Native platforms report actual input guarantees; synthetic coordinate events are never described as trusted input. A mutation with uncertain completion is never retried. A synchronous page handler changing the target during a pointer sequence stops it with `mayHaveCompleted:true`.
+
+Typed actions include navigation, click/tap, fill/type, press-key, scroll, timed wait, bounded wait-ready, assertions, screenshots, commentary, named output and bounded extraction. The platform may support only a subset. Version1 rejects unknown actions, arbitrary JavaScript and continue-on-error.
+
+Capture continuously samples rendered frames and composites the same markers/pointer used in the live presentation. Defaults are15 FPS, width1280, duration60000ms and retained bytes67108864; maxima are30 FPS, width1920, duration300000ms and bytes268435456. Encoder backpressure drops frames, preserves elapsed timing and reports counts. Resize stops recording with partial output. Abort, failure and resource limits finalize valid partial artifacts.
+
+Each artifact manifest contains `id,mimeType,byteLength,sha256,partial,width,height`, optionally duration, frame count, dropped frames, action index and viewport/document provenance. Video MIME is `video/mp4`; GIF and step PNGs use `image/gif` and `image/png`.
+
+## Native MCP discovery
+
+Windows Chromium registers `kelpie_play_script`, `kelpie_abort_script`,
+`kelpie_get_script_status`, and `kelpie_get_script_artifact` in the native catalogue.
+Playback requires the native app renderer and presentation/Stop factory. A hidden
+normal app is supported; this does not advertise pure headless-backend playback.
+Their schemas come from the shared generated contract and work through direct tool
+calls or `kelpie_extension` with the same names. Playback and abort are mutations;
+status and artifact reads remain available to read-only sessions, subject to the
+existing authenticated run-owner and browser-grant checks. Discovery still filters
+out any endpoint the selected native router does not implement. Other native
+platforms and renderer bindings do not advertise this workflow surface yet.
+
+## Artifact retrieval
+
+`POST /v1/get-script-artifact` and MCP `kelpie_get_script_artifact` accept `{runId,artifactId,offset?,length?}`. Offset is a nonnegative integer. Chunk length defaults to262144 and is at most1048576 bytes. The authenticated run owner and current browser grant must match on every status/cancel/download request.
+
+The response echoes `runId,artifactId` and contains base64 `data`, `offset,nextOffset,eof,mimeType,byteLength,sha256`. Verify offsets, decoded size and final SHA-256. No device filesystem path or arbitrary URL is an artifact locator. Status and abort accept an optional runId; runs belong to the authenticated owner.
+
+## Reusable inputs and secrets
+
+A workflow can declare `inputs:{name:{type:"string"|"number"|"boolean",required:true}}` and use `text:{input:"name"}` in fill/type. CLI/MCP host bindings validate declarations and compile values into the same play-script runtime.
+
+A secret uses `text:{secret:"reference"}`. Trusted CLI argv supplies an explicit reference-to-environment-variable mapping. MCP uses only an operator-startup allowlist configured through `KELPIE_WORKFLOW_SECRET_REFS`; mapping and values are captured per launch and no model/HTTP setter exists. Model requests cannot name ENV variables. The host resolves authorized references before transmission and redacts echoed values from results. Values are never argv arguments or MCP secret literals. Secret-bearing workflows cannot request capture or screenshot actions. Native direct callers must provide already bound literals or an explicitly supported native binding mechanism; unresolved references refuse safely.
+
+## Structured extraction and recipes
+
+An extraction step uses the canonical bounded page extraction schema and reader:
+
+```json
+{"action":"extract","name":"products","params":{"scope":"#products","fields":[{"name":"title","selector":"h2","source":"text","multiple":true}],"metadata":true,"maxChars":8000}}
+```
+
+The named output retains canonical field status, bounds, metadata authority and selector/source provenance. Form-control values, arbitrary attributes and caller JavaScript are unavailable. A duplicate output name is refused during workflow preflight.
+
+See the [walkthrough recipe](../examples/workflows/submit-walkthrough.json) and [extraction recipe](../examples/workflows/extract-products.json); adapt tab IDs and page selectors explicitly before running.
+
+Resolved secret steps carry `sensitive:true` as non-secret provenance on the wire. Native and host result handling redact actual marked values, including reflected URL/title/output strings. Password/current-password/new-password DOM targets are sensitive even if the caller omitted the marker. The marker never grants access or changes authentication.
+
+Downloads pin the exact authenticated socket and credential for all chunks, refuse redirects/re-pairing/alternate sockets, bound streamed responses and aggregate retained bytes, and compare every chunk with the original run/artifact identity and manifest. Failed or interrupted transfers delete only the exclusive temporary file this transfer created; existing files and symlinks are never replaced. A transport failure during playback has uncertain completion: inspect status before starting another run.
+Strict version 1 playback first reads `get-script-status` on the pinned authenticated socket and requires `success: true` with an explicit `supportedVersions: [1]`. Older browsers must be updated: missing, invalid, or refused support returns `UNSUPPORTED_SCRIPT_VERSION` before any playback, with no legacy fallback. Unversioned scripts retain legacy behavior.

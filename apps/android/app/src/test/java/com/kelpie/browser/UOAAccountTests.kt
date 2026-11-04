@@ -32,15 +32,35 @@ class UOAAccountTests {
     @Test fun mutationsPreserveUnknownMetadataAndForeignEntries() {
         val existing = Json.parseToJsonElement("""[{"url":"https://one.example","name":"Other client","folder":{"id":"foreign"}},null,{"unknown":true}]""").jsonArray
         val bookmark = Bookmark(title = "New", url = "https://two.example")
-        val updated = AccountBookmarks.apply(existing, AccountBookmarks.Mutation.Add(bookmark))
+        val updated =
+            AccountBookmarks.apply(
+                existing,
+                com.kelpie.browser.browser.BookmarkMutation
+                    .Add(bookmark),
+            )
         assertEquals(existing[0], updated[0])
         assertEquals(existing[1], updated[1])
         assertEquals(existing[2], updated[2])
         assertEquals(2, AccountBookmarks.decode(updated).size)
-        assertEquals(updated, AccountBookmarks.apply(updated, AccountBookmarks.Mutation.Add(bookmark)))
+        assertEquals(
+            updated,
+            AccountBookmarks.apply(
+                updated,
+                com.kelpie.browser.browser.BookmarkMutation
+                    .Add(bookmark),
+            ),
+        )
         val id = AccountBookmarks.decode(existing).single().id
         assertEquals(id, AccountBookmarks.decode(existing).single().id)
-        assertEquals(3, AccountBookmarks.apply(updated, AccountBookmarks.Mutation.Remove(id)).size)
+        assertEquals(
+            3,
+            AccountBookmarks
+                .apply(
+                    updated,
+                    com.kelpie.browser.browser.BookmarkMutation
+                        .Remove(id),
+                ).size,
+        )
     }
 
     @Test fun conflictsRetryTheIntentAndRetainRemoteChanges() =
@@ -65,7 +85,10 @@ class UOAAccountTests {
                             .Response("{\"value\":$value}".toByteArray(), "v2")
                     }
                 }
-            sync.enqueue(AccountBookmarks.Mutation.Add(Bookmark(title = "Added", url = "https://added.example")))
+            sync.enqueue(
+                com.kelpie.browser.browser.BookmarkMutation
+                    .Add(Bookmark(title = "Added", url = "https://added.example")),
+            )
             sync.flush()
             assertEquals(2, puts)
             assertEquals(listOf("https://remote.example", "https://added.example"), published.map { it.url })
@@ -111,8 +134,12 @@ class UOAAccountTests {
                                 .Response("{\"value\":[]}".toByteArray(), "v1")
                         }
                     }
-                val first = sync.enqueue(AccountBookmarks.Mutation.Clear)
-                val second = sync.enqueue(AccountBookmarks.Mutation.Add(Bookmark(title = "Later", url = "https://later.example")))
+                val first = sync.enqueue(com.kelpie.browser.browser.BookmarkMutation.Clear)
+                val second =
+                    sync.enqueue(
+                        com.kelpie.browser.browser.BookmarkMutation
+                            .Add(Bookmark(title = "Later", url = "https://later.example")),
+                    )
                 assertEquals(true, runCatching { first.await() }.isFailure)
                 second.await()
                 assertEquals(true, runCatching { first.await() }.isFailure)

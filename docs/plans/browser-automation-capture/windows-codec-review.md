@@ -106,3 +106,40 @@ path-replacement interval unlike the handle-bound PNG rollback; Finish ignores
 the byte-stream Close HRESULT. The unique private runtime directory limits normal
 exposure, but the codec helper's same-directory contender contract needs explicit
 cleanup ownership. These questions remain open until the next source response.
+
+## Exact-handle stream draft
+The codec owner replaced the identity/reopen proposal with OwnedMediaStream,
+an internal IStream owning a CREATE_NEW read/write/delete handle and duplicate
+cleanup handle. Reviewed draft blobs: script_media_owned_file.h
+cf6cc64b7ba4d40f1b07e245a5e97b2e11b00306 and script_media_video.cpp
+d1c3e9415c59f64f05f009b522fee5542c26445e. These are source blobs, not a tested commit.
+MFCreateMFByteStreamOnStream wraps the held object; the encoder no longer opens,
+reopens or deletes its pathname. Constructor duplicate-handle failure marks the
+original exact handle for deletion. Normal completion checks MF Close, flush and
+both native closes. Failure marks the surviving exact handle for deletion before
+closing. This addresses the prior path-replacement and constructor-identity
+failure holes without a pathname fallback. No new source blocker was found.
+ExactHandleRollback adds constructor duplicate failure, flush/close failures,
+denied live rename/delete, replacement preservation after abort and completed-file
+preservation. The reviewer requested a second-close fault too. The real MF wrapper,
+full decode, budget and collision suite remain required under the coordinator's
+queued CODEC-3 slot. No test was run by acceptance.
+
+## Closed codec source findings
+Final re-review: 2b2dc1c2673541ddfe13f2ab970283f396c4c3fd, integrated by the
+coordinator before b217364a. The committed stream and video adapter match the
+reviewed exact-handle design. ExactHandleRollback now includes the requested
+second-close fault after the primary handle has closed successfully.
+The codec owner reports CODEC-3 /W4 /WX and the full native run-4 corpus passed
+on Maxis: real MF adapter decode, timing, color, frame counts, byte limits,
+constructor duplicate failure, flush/first-close/second-close failure, live
+rename/delete refusal, replacement preservation after rollback and completed-file
+preservation. The prior GIF/PNG/MP4 collision, sibling, stride, chroma and palette
+checks also passed. The recorded artifact root is
+D:/Worktrees/kelpie/capture-windows-media-20261104/.build-media/run-4;
+source and test assertions were independently read by acceptance.
+This closes the reviewed codec source defects and their owner-run codec regression
+gates. Acceptance did not rerun the suite or visually inspect decoded frames.
+The 38,309,888-byte reported peak working set belongs to this fixture run, not a
+production-resolution memory guarantee. Full-app capture, native display, MCP/CLI,
+remote retrieval and installed-release acceptance remain pending.

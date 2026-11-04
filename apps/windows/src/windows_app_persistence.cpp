@@ -83,6 +83,10 @@ void WindowsApp::ResolveProfileDirectory() {
   if (config_.profile_dir.empty()) {
     config_.profile_dir = RoamingAppDataPath();
   }
+  // CEF compares profile parents with its normalized user-data path. Mixed
+  // separators or relative paths otherwise turn persistent partitions into
+  // off-the-record stores without failing browser creation.
+  config_.profile_dir = std::filesystem::absolute(config_.profile_dir).lexically_normal().make_preferred();
   std::filesystem::create_directories(config_.profile_dir);
   device_info_provider_.SetProfileDir(config_.profile_dir);
 }

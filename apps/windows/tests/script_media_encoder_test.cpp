@@ -1,5 +1,6 @@
 #include "script_media_encoder.h"
 #include "script_media_internal.h"
+#include "script_media_owned_file.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -375,6 +376,60 @@ void GifPaletteChanges(const fs::path& root) {
           "later GIF frame inherited an earlier palette");
   std::cout << "frame-varying GIF palettes decoded correctly" << std::endl;
 }
+BOOL WINAPI FailDuplicate(HANDLE, HANDLE, HANDLE, LPHANDLE, DWORD, BOOL, DWORD) {
+  SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+  return FALSE;
+}
+BOOL WINAPI FailFlush(HANDLE) { SetLastError(ERROR_WRITE_FAULT); return FALSE; }
+thread_local int close_calls = 0;
+BOOL WINAPI FailSecondClose(HANDLE file) {
+  if (++close_calls == 2) { SetLastError(ERROR_WRITE_FAULT); return FALSE; }
+  return CloseHandle(file);
+}
+void ExactHandleRollback(const fs::path& root) {
+  using kelpie::windows::media::MediaFileOps;
+  using kelpie::windows::media::OwnedMediaStream;
+  const auto directory = Child(root, "handle-cleanup");
+  const auto failed = directory / "constructor-failure.mp4";
+  MediaFileOps duplicate_failure;
+  duplicate_failure.duplicate = &FailDuplicate;
+  Throws([&] { ComPtr<OwnedMediaStream> stream; stream.Attach(new OwnedMediaStream(failed, duplicate_failure)); },
+         "CAPTURE_OUTPUT_UNAVAILABLE");
+  Require(!fs::exists(failed), "failed stream constructor left newly created file");
+  const auto replaced = directory / "replaced.mp4";
+  ComPtr<OwnedMediaStream> stream;
+  stream.Attach(new OwnedMediaStream(replaced));
+  Require(!DeleteFileW(replaced.c_str()), "stream allowed delete during MF lifetime");
+  Require(!MoveFileW(replaced.c_str(), (directory / "moved.mp4").c_str()),
+          "stream allowed replacement during MF lifetime");
+  stream->Abort();
+  Require(!fs::exists(replaced), "failed owned output not removed");
+  { std::ofstream replacement(replaced); replacement << "replacement must survive"; }
+  stream.Reset();
+  Require(FileContents(replaced) == "replacement must survive", "destructor removed replacement");
+  for (const auto* failure : {"flush", "close", "second-close"}) {
+    const auto path = directory / (std::string(failure) + ".mp4");
+    MediaFileOps io;
+    if (failure == std::string("flush")) io.flush = &FailFlush;
+    else if (failure == std::string("close")) io.close = &FailedClose;
+    else { close_calls = 0; io.close = &FailSecondClose; }
+    ComPtr<OwnedMediaStream> broken;
+    broken.Attach(new OwnedMediaStream(path, io));
+    Require(FAILED(broken->Complete()), "completion ignored native flush/close failure");
+    broken->Abort();
+    Require(!fs::exists(path), "failed completion left owned invalid file");
+  }
+  const auto complete = directory / "complete.mp4";
+  ComPtr<OwnedMediaStream> completed;
+  completed.Attach(new OwnedMediaStream(complete));
+  const char bytes[] = "complete";
+  ULONG written = 0;
+  Check(completed->Write(bytes, 8, &written));
+  Check(completed->Complete());
+  completed.Reset();
+  Require(FileContents(complete) == "complete", "completed output removed or changed");
+  std::cout << "exact-handle constructor/flush/close rollback and replacement preservation passed" << std::endl;
+}
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -395,6 +450,7 @@ int wmain(int argc, wchar_t** argv) {
     ExclusiveOwnership(root);
     PngFailureCleanup(root);
     GifPaletteChanges(root);
+    ExactHandleRollback(root);
     PROCESS_MEMORY_COUNTERS memory{};
     Check(GetProcessMemoryInfo(GetCurrentProcess(), &memory, sizeof(memory)) ? S_OK : E_FAIL);
     std::cout << "Peak working set bytes: " << memory.PeakWorkingSetSize

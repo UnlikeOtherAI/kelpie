@@ -315,6 +315,18 @@ object UOAAccount {
         }
     }
 
+    suspend fun settingsRequest(): okhttp3.Request {
+        val tokens = credentials?.takeIf { it.active } ?: throw UOATransport.Failure(401)
+        val current = generation
+        val token = tokens.validToken(tokens.generation)
+        if (current != generation || state.value.profile == null) throw kotlinx.coroutines.CancellationException()
+        return okhttp3.Request
+            .Builder()
+            .url("wss://authentication.unlikeotherai.com/oauth/me/settings/browser/bookmarks/events")
+            .header("Authorization", "Bearer $token")
+            .build()
+    }
+
     private suspend fun send(
         path: String,
         method: String,

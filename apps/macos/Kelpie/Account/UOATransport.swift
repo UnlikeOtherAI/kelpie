@@ -45,6 +45,15 @@ final class UOATransport: NSObject, URLSessionTaskDelegate {
         return Response(data: data, version: response.value(forHTTPHeaderField: "ETag"))
     }
 
+    func settingsSocket(namespace: String, key: String, token: String) throws -> URLSessionWebSocketTask {
+        guard namespace.range(of: "^[a-z0-9][a-z0-9_.-]{0,63}$", options: .regularExpression) != nil,
+              key.range(of: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$", options: .regularExpression) != nil,
+              let url = URL(string: "wss://authentication.unlikeotherai.com/oauth/me/settings/\(namespace)/\(key)/events") else { throw Failure(status: 400) }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return session.webSocketTask(with: request)
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,

@@ -122,6 +122,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.kelpie.browser.browser.BookmarkStore
+            .refreshAccountBookmarks()
         com.kelpie.browser.connect.NessieConnection
             .setForeground(true)
     }
@@ -242,6 +244,12 @@ class MainActivity : ComponentActivity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         handlerContext.tabStore?.discardPreviews()
+    }
+
+    override fun onStop() {
+        com.kelpie.browser.browser.NetworkTrafficStore
+            .flush()
+        super.onStop()
     }
 
     override fun onDestroy() {

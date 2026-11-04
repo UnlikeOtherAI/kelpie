@@ -46,27 +46,49 @@ void TestRegistryFiltering() {
   const auto macos_tools = registry.tools_for_platform(kelpie::Platform::kMacos);
   const auto windows_tools = registry.tools_for_platform(kelpie::Platform::kWindows);
   const auto linux_tools = registry.tools_for_platform(kelpie::Platform::kLinux);
-  assert(linux_tools.size() == windows_tools.size());
-  for (const auto& tool : windows_tools) assert(ContainsTool(linux_tools, tool.name));
+  assert(linux_tools.size() == 114);
+  for (const auto& tool : linux_tools) assert(ContainsTool(windows_tools, tool.name));
+  for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
+    assert(ContainsTool(windows_tools, name));
+    assert(!ContainsTool(linux_tools, name));
+    assert(!ContainsTool(ios_tools, name));
+    assert(!ContainsTool(android_tools, name));
+    assert(!ContainsTool(macos_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "gecko"));
+  }
+  const auto play = std::find_if(windows_tools.begin(), windows_tools.end(), [](const auto& tool) { return tool.name == "kelpie_play_script"; });
+  assert(play != windows_tools.end());
+  assert(play->availability.requires_ui);
+  assert(!play->availability.allowed_headless);
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 121);
-  assert(ios_tools.size() == 116);
-  assert(android_tools.size() == 116);
-  assert(macos_tools.size() == 115);
-  assert(windows_tools.size() == 114);
-  assert(webkit_tools.size() == 121);
-  assert(chromium_tools.size() == 121);
+  assert(all_tools.size() == 128);
+  assert(ios_tools.size() == 121);
+  assert(android_tools.size() == 121);
+  assert(macos_tools.size() == 118);
+  assert(windows_tools.size() == 118);
+  assert(webkit_tools.size() == 124);
+  assert(chromium_tools.size() == 128);
 
-  // Storage partitions: macOS and Windows only until the others land them.
+  for (const auto* name : {"kelpie_bookmarks_create_folder", "kelpie_bookmarks_update", "kelpie_bookmarks_move"}) {
+    assert(ContainsTool(ios_tools, name));
+    assert(ContainsTool(android_tools, name));
+    assert(ContainsTool(macos_tools, name));
+    assert(!ContainsTool(windows_tools, name));
+    assert(!ContainsTool(linux_tools, name));
+  }
+
+  // All platforms expose named storage; unsupported mobile engines fail closed.
   assert(ContainsTool(windows_tools, "kelpie_get_partitions"));
   assert(ContainsTool(macos_tools, "kelpie_delete_partition"));
-  assert(!ContainsTool(ios_tools, "kelpie_get_partitions"));
-  assert(!ContainsTool(android_tools, "kelpie_delete_partition"));
+  assert(ContainsTool(ios_tools, "kelpie_get_partitions"));
+  assert(ContainsTool(android_tools, "kelpie_delete_partition"));
 
   // Windows-only in the shared catalogue, so Windows-only here too.
   assert(ContainsTool(windows_tools, "kelpie_close_browser"));
@@ -103,6 +125,9 @@ void TestCapabilitiesClassification() {
   assert(ContainsString(ios_webkit.partial, "set-renderer"));
   assert(!ContainsString(ios_webkit.unsupported, "show-keyboard"));
 
+  const auto windows_chromium = registry.get_capabilities(kelpie::Platform::kWindows, "chromium");
+  assert(ContainsString(windows_chromium.partial, "play-script"));
+  assert(!ContainsString(windows_chromium.supported, "play-script"));
   const auto macos_chromium = registry.get_capabilities(kelpie::Platform::kMacos, "chromium");
   assert(ContainsString(macos_chromium.supported, "navigate"));
   assert(ContainsString(macos_chromium.partial, "set-renderer"));

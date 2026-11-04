@@ -12,9 +12,9 @@ const StringList kAllEngines = {"webkit", "chromium", "gecko"};
 const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
-// Per-tab storage isolation. macOS has it on the WebKit path and Windows on
-// the CEF path; iOS, Android and Linux drop their exclusion as they land it.
-const std::vector<P> kPartitionPlatforms = {P::kMacos, P::kWindows, P::kLinux};
+// Script routes are currently bound by the Windows CEF runtime; other bindings advertise no workflow support.
+const ToolAvailability kWindowsScriptAvailability{{P::kWindows}, {"chromium"}, false, true, {}};
+const ToolAvailability kWindowsScriptPlaybackAvailability{{P::kWindows}, {"chromium"}, true, false, {}};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
@@ -93,6 +93,9 @@ std::vector<McpTool> CreateDefaultMcpTools() {
            CapabilityAvailability(kLocalDesktop, kAllEngines, {"local-browser-shutdown"})),
       Tool("kelpie_bookmarks_list", "bookmarks-list", "List saved bookmarks"),
       Tool("kelpie_bookmarks_add", "bookmarks-add", "Add a saved bookmark"),
+      Tool("kelpie_bookmarks_create_folder", "bookmarks-create-folder", "Create a favourites folder", ToolAvailability{{P::kIos, P::kAndroid, P::kMacos}, kAllEngines, false, true, {}}),
+      Tool("kelpie_bookmarks_update", "bookmarks-update", "Edit a favourite or folder", ToolAvailability{{P::kIos, P::kAndroid, P::kMacos}, kAllEngines, false, true, {}}),
+      Tool("kelpie_bookmarks_move", "bookmarks-move", "Move or reorder a favourite", ToolAvailability{{P::kIos, P::kAndroid, P::kMacos}, kAllEngines, false, true, {}}),
       Tool("kelpie_bookmarks_remove", "bookmarks-remove", "Remove a saved bookmark"),
       Tool("kelpie_bookmarks_clear", "bookmarks-clear", "Remove all saved bookmarks"),
       Tool("kelpie_history_list", "history-list", "List browser history"),
@@ -159,10 +162,10 @@ std::vector<McpTool> CreateDefaultMcpTools() {
       Tool("kelpie_close_tab", "close-tab", "Close a tab"),
       Tool("kelpie_get_partitions", "get-partitions",
            "List storage partitions and how many tabs each holds",
-           ToolAvailability{kPartitionPlatforms, kAllEngines, false, true, {}}),
+           ToolAvailability{kAllPlatforms, kAllEngines, false, true, {}}),
       Tool("kelpie_delete_partition", "delete-partition",
            "Delete a storage partition, closing every tab bound to it",
-           ToolAvailability{kPartitionPlatforms, kAllEngines, false, true, {}}),
+           ToolAvailability{kAllPlatforms, kAllEngines, false, true, {}}),
       Tool("kelpie_get_iframes", "get-iframes", "Get all iframes on the page"),
       Tool("kelpie_switch_to_iframe", "switch-to-iframe", "Switch context to an iframe"),
       Tool("kelpie_switch_to_main", "switch-to-main", "Switch back to the main frame"),
@@ -194,6 +197,10 @@ std::vector<McpTool> CreateDefaultMcpTools() {
            UiAvailability(kMobilePlatforms, kAllEngines, {"soft-keyboard"})),
       Tool("kelpie_resize_viewport", "resize-viewport", "Resize the browser viewport"),
       Tool("kelpie_reset_viewport", "reset-viewport", "Reset viewport to device default"),
+      Tool("kelpie_play_script", "play-script", "Run a bounded workflow in the authenticated owner session", kWindowsScriptPlaybackAvailability),
+      Tool("kelpie_abort_script", "abort-script", "Abort the authenticated owner's active workflow", kWindowsScriptAvailability),
+      Tool("kelpie_get_script_status", "get-script-status", "Read the authenticated owner's workflow status", kWindowsScriptAvailability),
+      Tool("kelpie_get_script_artifact", "get-script-artifact", "Read a bounded chunk of the authenticated owner's workflow artifact", kWindowsScriptAvailability),
       Tool("kelpie_ai_status", "ai-status", "Get inference backend readiness"),
       Tool("kelpie_ai_load", "ai-load", "Load a local GGUF or explicitly select a saved inference endpoint"),
       Tool("kelpie_ai_record", "ai-record", "Control existing device audio recording"),

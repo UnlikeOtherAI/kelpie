@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { isValidPartition } from "./partition.js";
+import { scriptV1Schema, scriptArtifactRequestSchema } from "./script-workflow.js";
+import { isValidPartition, validatePartitionDeletion } from "./partition.js";
 
 const platforms = ["ios", "android", "macos", "linux", "windows"] as const;
 type ToolPlatform = (typeof platforms)[number];
@@ -10,8 +11,7 @@ const coordinateDiagnosticsPlatforms = ["ios", "android", "macos"] as const;
 const fullscreenPlatforms = ["macos", "linux", "windows"] as const;
 const iosOnlyPlatforms = ["ios"] as const;
 const macosOnlyPlatforms = ["macos"] as const;
-// Per-tab storage isolation: macOS on WebKit, Windows on Chromium (CEF).
-const partitionPlatforms = ["macos", "windows", "linux"] as const;
+const partitionPlatforms = allPlatforms;
 
 /**
  * Partition identifier, validated with the shared rules so the MCP layer, the
@@ -20,6 +20,7 @@ const partitionPlatforms = ["macos", "windows", "linux"] as const;
 const partitionId = z
   .string()
   .refine(isValidPartition, "Must be 1-128 chars from [A-Za-z0-9._-], contain a letter or digit, and not be \".\", \"..\", \"default\" or start with \"ephemeral-\"");
+const deletablePartitionId = z.string().refine(value => validatePartitionDeletion(value).ok, "Must be a partition ID or a listed orphan ID");
 const orientationPlatforms = ["ios", "android", "macos"] as const;
 // Geolocation and request-interception have no working native implementation today —
 // every platform's handler returns PLATFORM_NOT_SUPPORTED.
@@ -127,7 +128,10 @@ export const sharedBrowserTools: BrowserToolDef[] = [
   { name: "kelpie_get_home", description: "Get the device home page URL", method: "getHome", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_close_browser", description: "Request an orderly local browser shutdown", method: "closeBrowser", platforms: ["windows", "linux"] as const, schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_bookmarks_list", description: "List saved bookmarks", method: "bookmarksList", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_bookmarks_add", description: "Add a saved bookmark", method: "bookmarksAdd", schema: { device, url, title: z.string().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_add", description: "Add a saved bookmark", method: "bookmarksAdd", schema: { device, url, title: z.string().optional(), parentId: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/).nullable().optional().describe("Folder UUID; supported on iOS, Android and macOS") }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_create_folder", description: "Create a favourites folder", method: "bookmarksCreateFolder", platforms: ["ios", "android", "macos"], schema: { device, title: z.string().min(1), parentId: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/).nullable().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_update", description: "Rename a favourite or folder, or edit a bookmark URL", method: "bookmarksUpdate", platforms: ["ios", "android", "macos"], schema: { device, id: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/), title: z.string().min(1).optional(), url: z.string().optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_bookmarks_move", description: "Move or reorder a favourite. parentId null means root; beforeId names a destination sibling, omitted/null appends.", method: "bookmarksMove", platforms: ["ios", "android", "macos"], schema: { device, id: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/), parentId: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/).nullable(), beforeId: z.string().regex(/^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$/).nullable().optional() }, bodyFromArgs: passthrough },
   { name: "kelpie_bookmarks_remove", description: "Remove a saved bookmark", method: "bookmarksRemove", schema: { device, id: z.string() }, bodyFromArgs: passthrough },
   { name: "kelpie_bookmarks_clear", description: "Remove all saved bookmarks", method: "bookmarksClear", schema: { device }, bodyFromArgs: passthrough },
   { name: "kelpie_history_list", description: "List browser history", method: "historyList", schema: { device, limit: z.number().int().positive().optional() }, bodyFromArgs: passthrough },
@@ -163,9 +167,10 @@ export const sharedBrowserTools: BrowserToolDef[] = [
   { name: "kelpie_hide_commentary", description: "Hide the active commentary overlay", method: "hideCommentary", schema: { device, tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_highlight", description: "Draw a colored highlight ring/box around an element. Use this when you already know the selector and want to visually anchor that element in a screenshot before asking an LLM to reason over the image. Set durationMs=0 to keep it visible until hidden.", method: "highlight", schema: { device, selector, color: z.string().optional().describe("Highlight color, e.g. #EF4444"), thickness: z.number().optional().describe("Highlight stroke width in pixels"), padding: z.number().optional().describe("Padding around the highlighted element in pixels"), animation: z.enum(["appear", "draw"]).optional().describe("Highlight animation style"), durationMs: z.number().optional().describe("How long to keep the highlight visible. Use 0 to keep it until hidden."), tabId }, bodyFromArgs: passthrough },
   { name: "kelpie_hide_highlight", description: "Hide the active highlight overlay", method: "hideHighlight", schema: { device, tabId }, bodyFromArgs: passthrough },
-  { name: "kelpie_play_script", description: "Run a timed recording script made of navigation, interaction, overlay, and wait actions", method: "playScript", schema: { device, actions: z.array(z.record(z.string(), z.any())).describe("Ordered list of script action objects"), overlayColor: z.string().optional().describe("Default overlay color for taps, typing, and swipes"), defaultWaitBetweenActions: z.number().optional().describe("Implicit wait inserted between actions in milliseconds"), continueOnError: z.boolean().optional().describe("Continue script playback after non-fatal action failures") }, bodyFromArgs: passthrough },
-  { name: "kelpie_abort_script", description: "Abort the currently running recording script", method: "abortScript", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_get_script_status", description: "Get the current recording script playback status", method: "getScriptStatus", schema: { device }, bodyFromArgs: passthrough },
+  { name: "kelpie_play_script", description: "Run a legacy script or strict version 1 workflow with semantic targets and bounded overlay-inclusive capture. Check device capabilities for supported actions and encoders.", method: "playScript", schema: { device, ...Object.fromEntries(Object.entries(scriptV1Schema.shape).map(([key, value]) => [key, value.optional()])), actions: z.array(z.record(z.string(), z.unknown())), defaultWaitBetweenActions: z.number().optional(), overlayColor: z.string().optional(), continueOnError: z.boolean().optional(), values: z.record(z.string(), z.unknown()).optional().describe("CLI host workflow input values") }, bodyFromArgs: passthrough },
+  { name: "kelpie_abort_script", description: "Abort the currently running recording script", method: "abortScript", schema: { device, runId: z.string().min(1).max(128).optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_script_status", description: "Get script playback status for the current authenticated owner", method: "getScriptStatus", schema: { device, runId: z.string().min(1).max(128).optional() }, bodyFromArgs: passthrough },
+  { name: "kelpie_get_script_artifact", description: "Read a bounded authenticated run-owned artifact chunk. Verify offset, size, MIME type and SHA-256 when assembling bytes.", method: "getScriptArtifact", schema: { device, ...scriptArtifactRequestSchema.shape }, bodyFromArgs: passthrough },
 
   // Scrolling
   { name: "kelpie_scroll", description: "Scroll by pixel delta", method: "scroll", schema: { device, deltaX: z.number().describe("Horizontal pixels"), deltaY: z.number().describe("Vertical pixels"), tabId, message }, bodyFromArgs: passthrough },
@@ -243,11 +248,11 @@ export const sharedBrowserTools: BrowserToolDef[] = [
 
   // Tabs
   { name: "kelpie_get_tabs", description: "Get all open tabs", method: "getTabs", schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_new_tab", description: "Open a new tab. Pass a partition to give the tab its own isolated cookie/localStorage container - tabs sharing a partition string share storage, different strings are fully isolated.", method: "newTab", schema: { device, url: url.optional().describe("URL to open in new tab"), name: z.string().max(200).optional().describe("Display label for the tab, shown in the tab bar and returned by kelpie_get_tabs"), partition: partitionId.optional().describe("Storage container id. Omit for the shared default container."), persistent: z.boolean().optional().describe("Defaults to true. False keeps the partition in memory only; only meaningful with partition.") }, bodyFromArgs: passthrough },
+  { name: "kelpie_new_tab", description: "Open a new tab. Pass a partition to give the tab its own isolated cookie/localStorage container - tabs sharing a partition string share storage, different strings are fully isolated.", method: "newTab", schema: { device, url: url.optional().describe("URL to open in new tab"), name: z.string().max(200).optional().describe("Display label for the tab, shown in the tab bar and returned by kelpie_get_tabs"), partition: partitionId.optional().describe("Storage container id. Omit for the shared default container."), persistent: z.boolean().optional().describe("Defaults to true. False requests memory-only storage on desktop; mobile rejects false. Only meaningful with partition.") }, bodyFromArgs: passthrough },
   { name: "kelpie_switch_tab", description: "Switch to a specific tab", method: "switchTab", schema: { device, tabId: z.string().describe("Tab UUID to switch to") }, bodyFromArgs: passthrough },
   { name: "kelpie_close_tab", description: "Close a tab", method: "closeTab", schema: { device, tabId: z.string().describe("Tab UUID to close") }, bodyFromArgs: passthrough },
   { name: "kelpie_get_partitions", description: "List storage partitions with their live tab counts", method: "getPartitions", platforms: partitionPlatforms, schema: { device }, bodyFromArgs: passthrough },
-  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: partitionPlatforms, schema: { device, id: partitionId.describe("Partition id to delete") }, bodyFromArgs: passthrough },
+  { name: "kelpie_delete_partition", description: "Delete a storage partition, closing every tab bound to it. Idempotent: an unknown id returns existed:false.", method: "deletePartition", platforms: partitionPlatforms, schema: { device, id: deletablePartitionId.describe("Partition or orphan id returned by kelpie_get_partitions") }, bodyFromArgs: passthrough },
 
   // Iframes
   { name: "kelpie_get_iframes", description: "Get all iframes on the page", method: "getIframes", schema: { device, tabId }, bodyFromArgs: passthrough },

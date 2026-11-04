@@ -6,6 +6,8 @@ import WebKit
 final class BrowserTab: ObservableObject, Identifiable {
     let id = UUID()
     let webView: WKWebView
+    let partition: String?
+    let name: String?
     private let recordsHistory: Bool
 
     @Published var currentURL: String = ""
@@ -45,7 +47,9 @@ final class BrowserTab: ObservableObject, Identifiable {
     private var lastHistoryTitle: String = ""
     private var lastObservedHistoryClearGeneration: Int
 
-    init(webView: WKWebView, isStartPage: Bool = true, recordsHistory: Bool = true) {
+    init(webView: WKWebView, isStartPage: Bool = true, recordsHistory: Bool = true, partition: String? = nil, name: String? = nil) {
+        self.partition = partition
+        self.name = name
         self.webView = webView
         self.isStartPage = isStartPage
         self.recordsHistory = recordsHistory
@@ -56,8 +60,9 @@ final class BrowserTab: ObservableObject, Identifiable {
     private func setupObservations() {
         observations.append(webView.observe(\.url) { [weak self] wv, _ in
             Task { @MainActor in
-                guard let self else { return }
-                let nextURL = wv.url?.absoluteString ?? ""
+                // A failed provisional restore can reset WKWebView.url to nil.
+                // Keep the saved destination so an offline restart cannot erase the tab.
+                guard let self, let nextURL = wv.url?.absoluteString else { return }
                 if self.currentURL != nextURL { self.preview = nil; self.previewRequest = UUID() }
                 self.currentURL = nextURL
                 self.recordHistoryIfNeeded(url: nextURL)
