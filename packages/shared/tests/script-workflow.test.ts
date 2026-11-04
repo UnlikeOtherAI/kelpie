@@ -23,8 +23,10 @@ describe("strict authored workflows", () => {
   it("resolves secrets only through the host callback and refuses secret capture", () => {
     const raw = { ...script, actions: [{ action: "fill", target: { label: "Password" }, text: { secret: "account-password" } }] };
     expect(() => bindScriptInputs(raw)).toThrow("Workflow secret unavailable");
+    expect(() => bindScriptInputs(raw, {}, () => { throw new Error("private provider diagnostic"); })).toThrow("Workflow secret unavailable");
     expect(bindScriptInputs(raw, {}, () => "private").actions[0]).toMatchObject({ text: "private" });
     expect(() => bindScriptInputs({ ...raw, capture: { formats: ["video"] } }, {}, () => "private")).toThrow("Capture is unavailable");
+    expect(() => bindScriptInputs({ ...raw, actions: [...raw.actions, { action: "screenshot" }] }, {}, () => "private")).toThrow("Capture is unavailable");
   });
   it("bounds artifact reads and requires explicit identity for preflight", () => {
     expect(scriptArtifactRequestSchema.parse({ runId: "run", artifactId: "gif" })).toMatchObject({ offset: 0, length: 262144 });

@@ -9,24 +9,26 @@ class ElementStub {
   onEvent?: () => void;
   getBoundingClientRect() { return this.rect; }
   closest() { return null; }
-  matches() { return false; }
+  matches(selector: string) { return selector !== ":disabled"; }
   contains(el: unknown) { return el === this; }
   dispatchEvent(event: Event) { this.events.push(event.type); this.onEvent?.(); return true; }
 }
-function fixture(count = 1) {
-  const element = new ElementStub();
+function fixture(count = 1, element = new ElementStub()) {
   let hit: ElementStub | null = element;
-  const doc = { querySelectorAll: () => Array.from({ length: count }, () => element), elementFromPoint: () => hit };
+  const doc = { documentElement: element, createTreeWalker: (_root: unknown, mask: number) => {
+    let index = 0;
+    return { currentNode: element, nextNode: () => mask === 4 || ++index >= count ? null : element };
+  }, elementFromPoint: () => hit };
   vi.stubGlobal("window", {});
   vi.stubGlobal("document", doc);
   vi.stubGlobal("location", { href: "http://fixture/" });
   vi.stubGlobal("innerWidth", 800);
   vi.stubGlobal("innerHeight", 600);
-  vi.stubGlobal("getComputedStyle", () => ({ display: "block", visibility: "visible", opacity: "1" }));
+  vi.stubGlobal("getComputedStyle", () => ({ display: "block", visibility: "visible", opacity: "1", overflowX: "visible", overflowY: "visible" }));
   for (const name of ["HTMLButtonElement", "HTMLInputElement", "HTMLTextAreaElement", "HTMLSelectElement"]) vi.stubGlobal(name, class { readonly kind = "non-control"; });
   vi.stubGlobal("PointerEvent", Event);
   vi.stubGlobal("MouseEvent", Event);
-  return { element, obscure: () => { hit = new ElementStub(); } };
+  return { element, setHit: (next: ElementStub) => { hit = next; }, obscure: () => { hit = new ElementStub(); } };
 }
 afterEach(() => vi.unstubAllGlobals());
 describe("script target identity fencing", () => {
@@ -59,5 +61,65 @@ describe("script target identity fencing", () => {
     f.element.onEvent = () => { f.element.isConnected = false; };
     expect(resolveScriptTarget(target, "private", first.token, true)).toMatchObject({ error: "INPUT_UNCERTAIN", mayHaveCompleted: true });
     expect(f.element.events).toEqual(["pointerdown"]);
+  });
+});
+
+describe("target safety regressions", () => {
+  it("uses the center of the viewport-clipped visible rectangle", () => {
+    const f = fixture();
+    f.element.rect = { x: -80, y: 30, width: 100, height: 40 };
+    expect(resolveScriptTarget({ selector: "button" }, "private")).toMatchObject({ ok: true, x: 10, y: 50, width: 20 });
+  });
+  it("stops after the exact hit descendant is replaced", () => {
+    class Button extends ElementStub {
+      child = new ElementStub();
+      contains(el: unknown) { return el === this || el === this.child; }
+    }
+    const button = new Button();
+    const f = fixture(1, button);
+    const oldHit = button.child;
+    f.setHit(oldHit);
+    const first = resolveScriptTarget({ selector: "button" }, "private");
+    oldHit.onEvent = () => { oldHit.isConnected = false; button.child = new ElementStub(); f.setHit(button.child); };
+    expect(resolveScriptTarget({ selector: "button" }, "private", first.token, true)).toMatchObject({ error: "INPUT_UNCERTAIN", mayHaveCompleted: true });
+    expect(oldHit.events).toEqual(["pointerdown"]);
+  });
+  it.each(["url", "readonly", "viewport", "size", "type"])("rechecks %s after focus before editing", mutation => {
+    class Input extends ElementStub {
+      readOnly = false;
+      disabled = false;
+      type = "text";
+      autocomplete = "";
+      private stored = "before";
+      get value() { return this.stored; }
+      set value(value: string) { this.stored = value; }
+      focus() {
+        if (mutation === "url") vi.stubGlobal("location", { href: "http://changed/" });
+        if (mutation === "readonly") this.readOnly = true;
+        if (mutation === "viewport") vi.stubGlobal("innerWidth", 900);
+        if (mutation === "size") this.rect.width += 5;
+        if (mutation === "type") this.type = "password";
+      }
+    }
+    const input = new Input();
+    fixture(1, input);
+    vi.stubGlobal("HTMLInputElement", Input);
+    const first = resolveScriptTarget({ selector: "input" }, "private");
+    expect(resolveScriptTarget({ selector: "input" }, "private", first.token, false, { action: "fill", text: "after" })).toMatchObject({ error: "INPUT_UNCERTAIN", mayHaveCompleted: true });
+    expect(input.value).toBe("before");
+  });
+  it("namespaces tokens across document replacement and fresh resolution", () => {
+    const f = fixture();
+    const old = resolveScriptTarget({ selector: "button" }, "private");
+    vi.stubGlobal("document", { documentElement: f.element, createTreeWalker: () => ({ currentNode: f.element, nextNode: () => null }), elementFromPoint: () => f.element });
+    const fresh = resolveScriptTarget({ selector: "button" }, "private");
+    expect(fresh.token).not.toBe(old.token);
+    expect(resolveScriptTarget({ selector: "button" }, "private", old.token, true).error).toBe("STALE_TARGET");
+    expect(f.element.events).toEqual([]);
+  });
+  it("refuses a traversal budget overflow without materializing all candidates", () => {
+    const f = fixture(6000);
+    f.element.matches = () => false;
+    expect(resolveScriptTarget({ selector: "missing" }, "private").error).toBe("TARGET_QUERY_LIMIT");
   });
 });

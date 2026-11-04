@@ -19,9 +19,12 @@ export function bindScriptInputs(
       throw new Error("Workflow input type mismatch");
     }
   }
+  const hasCapture = script.capture !== undefined || script.actions.some(action => action.action === "screenshot");
+  if (hasCapture && script.actions.some(action => "sensitive" in action && action.sensitive)) throw new Error("Capture is unavailable for secret-bearing workflows");
   const actions = script.actions.map(step => {
     if (!("text" in step) || typeof step.text === "string") return step;
     let text: string;
+    let sensitive = "sensitive" in step ? step.sensitive : undefined;
     if ("input" in step.text) {
       const key = step.text.input;
       if (!Object.hasOwn(declarations, key) || values[key] === undefined) throw new Error("Workflow input unavailable");
@@ -30,13 +33,15 @@ export function bindScriptInputs(
       text = String(value);
     } else {
       // Media and on-screen typing could disclose secrets. No implicit recording opt-in.
-      if (script.capture) throw new Error("Capture is unavailable for secret-bearing workflows");
-      const value = resolveSecret?.(step.text.secret);
+      if (hasCapture) throw new Error("Capture is unavailable for secret-bearing workflows");
+      let value: string | undefined;
+      try { value = resolveSecret?.(step.text.secret); } catch { throw new Error("Workflow secret unavailable"); }
       if (value === undefined) throw new Error("Workflow secret unavailable");
       text = value;
+      sensitive = true;
     }
     if (text.length > 16_000) throw new Error("Workflow value exceeds limit");
-    return { ...step, text };
+    return { ...step, text, ...(sensitive ? { sensitive: true } : {}) };
   });
   return { ...script, inputs: undefined, actions };
 }
