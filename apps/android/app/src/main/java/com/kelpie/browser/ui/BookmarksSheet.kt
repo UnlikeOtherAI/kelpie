@@ -277,7 +277,7 @@ private fun FavouritesTreeContent(
         AlertDialog(
             onDismissRequest = { removing = null },
             title = { Text("Remove this favourite?") },
-            text = { Text(if (node.isFolder) "This removes the folder and its ${BookmarkTree.subtree(node.id, nodes).size - 1} contents. You can undo it." else "You can undo this removal.") },
+            text = { Text(if (node.isFolder) "This removes the folder and everything inside it. You can undo it." else "You can undo this removal.") },
             confirmButton = {
                 TextButton(onClick = {
                     removing = null

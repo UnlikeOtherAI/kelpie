@@ -71,7 +71,7 @@ struct BookmarksView: View {
                 Button("Remove", role: .destructive) { Task { try? await store.removeWithUndo(id: removing.id) }; self.removing = nil }
             }
         } message: {
-            if let removing, removing.isFolder { Text("This removes the folder and its \(max(0, BookmarkTree.subtree(removing.id, in: store.nodes).count - 1)) contents. You can undo it.") }
+            if let removing, removing.isFolder { Text("This removes the folder and everything inside it. You can undo it.") }
         }
         .onChange(of: store.generation) { _ in editing = nil; moving = nil; removing = nil; drag = nil; expanded = [] }
     }
