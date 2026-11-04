@@ -6,7 +6,7 @@ export interface ScriptMotion {
 }
 /** Presentation only: never dispatches pointer movement or hover events. */
 export function scriptPointerPosition(motion: ScriptMotion, progress: number): ScriptPoint {
-  const t0 = Math.min(1, Math.max(0, progress));
+  const t0 = Number.isNaN(progress) ? 0 : Math.min(1, Math.max(0, progress));
   const t = t0 * t0 * (3 - 2 * t0);
   const dx = motion.to.x - motion.from.x;
   const dy = motion.to.y - motion.from.y;
@@ -25,6 +25,14 @@ export function scriptPointerPosition(motion: ScriptMotion, progress: number): S
 }
 /** Native display and frame compositor use the same numeric timeline. */
 export function scriptTapPresentation(progress: number, wobble = true, fade = true): { scale: number; alpha: number } {
-  const t = Math.min(1, Math.max(0, progress));
+  const t = Number.isNaN(progress) ? 0 : Math.min(1, Math.max(0, progress));
   return { scale: wobble ? 1 + 0.12 * Math.sin(6 * Math.PI * t) * (1 - t) : 1, alpha: fade ? 1 - t : t < 1 ? 1 : 0 };
+}
+
+/** Zero/non-positive duration finishes immediately; NaN is a safe initial state. */
+export function scriptTimelineProgress(elapsedMs: number, durationMs: number): number {
+  if (Number.isNaN(durationMs)) return 0;
+  if (durationMs <= 0) return 1;
+  const progress = elapsedMs / durationMs;
+  return Number.isNaN(progress) ? 0 : Math.min(1, Math.max(0, progress));
 }
