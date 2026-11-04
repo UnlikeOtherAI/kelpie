@@ -201,4 +201,65 @@ void Notifications() {
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "notifications/unknown"}})["response"].is_null());
   assert(gateway.BeginMcp({{"jsonrpc", "2.0"}, {"method", "tools/call"}, {"params", {{"name", 123}}}})["response"].is_null());
 }
-int main() { ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }
+void ScriptAssets() {
+  for (const auto& fixture : json::parse(kelpie::browser_assets::script_cases)) {
+    const std::string input = fixture["input"].dump();
+    auto* answer = kelpie_browser_validate_script(input.c_str());
+    assert(answer);
+    const auto value = json::parse(answer);
+    kelpie_mcp_free_string(answer);
+    assert(value["valid"] == fixture["accepted"]);
+    if (fixture["accepted"]) assert(value["script"] == fixture["output"]);
+  }
+  for (const auto& fixture : json::parse(kelpie::browser_assets::script_target_cases)) {
+    const std::string input = fixture["input"].dump();
+    auto* answer = kelpie_browser_script_target_expression(input.c_str());
+    assert((answer != nullptr) == fixture["accepted"].get<bool>());
+    kelpie_mcp_free_string(answer);
+  }
+  json script = {{"version", 1}, {"tabId", "a"}, {"actions", {{{"action", "screenshot"}}}}};
+  auto* encoded = kelpie_browser_validate_script(script.dump().c_str());
+  assert(encoded);
+  auto result = json::parse(encoded);
+  kelpie_mcp_free_string(encoded);
+  assert(result["valid"] == true);
+  assert(result["script"]["defaultWaitBetweenActions"] == 0);
+  script["capture"] = {{"formats", {"gif", "gif"}}};
+  encoded = kelpie_browser_validate_script(script.dump().c_str());
+  assert(json::parse(encoded)["valid"] == false);
+  kelpie_mcp_free_string(encoded);
+  json target = {{"target", {{"role", "button"}, {"name", "Save"}}}, {"key", "__owned"}};
+  encoded = kelpie_browser_script_target_expression(target.dump().c_str());
+  assert(encoded && json::parse(encoded)["expression"].is_string());
+  const std::string expression = json::parse(encoded)["expression"];
+  assert(expression.find(R"json("exact":true)json") != std::string::npos);
+  kelpie_mcp_free_string(encoded);
+  target["observe"] = true; target["dispatch"] = true;
+  assert(kelpie_browser_script_target_expression(target.dump().c_str()) == nullptr);
+  encoded = kelpie_browser_validate_script(nullptr);
+  assert(encoded && json::parse(encoded)["valid"] == false);
+  kelpie_mcp_free_string(encoded);
+}
+void FixedObservations() {
+  kelpie::BrowserGateway unsupported({{"nativeMethods", json::array()}, {"fixedReader", false}, {"requireAuthorization", false}});
+  assert(unsupported.Begin(Request("tab.status"))["response"]["error"]["code"] == "UNSUPPORTED");
+  kelpie::BrowserGateway gateway({{"nativeMethods", json::array()}, {"fixedReader", true}, {"requireAuthorization", false}, {"allowActions", false}});
+  for (const auto* method : {"tab.status", "tab.ready", "tab.extract"}) {
+    const json params = std::string(method) == "tab.extract"
+      ? json{{"fields", {{{"name", "heading"}, {"selector", "h1"}}}}} : json::object();
+    auto step = gateway.Begin(Request(method, params));
+    assert(step["method"] == "browser-control-evaluate");
+    assert(step["mutates"] == false);
+    const std::string script = step["params"]["expression"];
+    assert(script.find("eval(") == std::string::npos);
+    step = gateway.Advance({{"success", true}, {"result", {{"ready", true}, {"documentState", "complete"}, {"fields", json::array()}, {"metadata", json::array()}}}});
+    assert(step["response"]["ok"] == true);
+  }
+  auto step = gateway.Begin(Request("tab.ready"));
+  step = gateway.Advance({{"success", true}, {"result", {{"ready", "PRIVATE"}}}});
+  assert(step["response"]["ok"] == false);
+  assert(step.dump().find("PRIVATE") == std::string::npos);
+  step = gateway.Begin(Request("tab.ready", {{"timeoutMs", 1000}}));
+  assert(step["response"]["error"]["code"] == "INVALID_ARGUMENTS");
+}
+int main() { ScriptAssets(); FixedObservations(); ReadOnlySnapshotLifetime(); Notifications(); Contracts(); Sequencing(); References(); Mcp(); ExtensionReachability(); SelectedAndMapping(); CAbi(); std::cout << "Browser gateway contracts passed\n"; }

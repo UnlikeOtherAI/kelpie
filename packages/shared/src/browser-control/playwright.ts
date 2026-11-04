@@ -3,6 +3,7 @@ import { BrowserControlError, browserControlMutates } from "./protocol.js";
 import type { BrowserControlBackend, BrowserControlRequest, BrowserLocator, BrowserTextMatcher, BrowserTabInfo } from "./protocol.js";
 import { browserControlCapabilities } from "./proxy.js";
 import { collectBrowserSnapshot } from "./snapshot.js";
+import { collectBrowserExtraction, collectBrowserPageStatus, collectBrowserReadiness } from "./observations.js";
 
 const matcher = (value: BrowserTextMatcher): string | RegExp => typeof value === "string" ? value : new RegExp(value.source, value.flags);
 const selector = (value: BrowserTextMatcher): string => {
@@ -142,6 +143,9 @@ export async function executePlaywrightPage(page: Page, request: BrowserControlR
     case "tab.reload": await page.reload({ waitUntil: "domcontentloaded", timeout }); return null;
     case "tab.url": return page.url();
     case "tab.title": return page.title();
+    case "tab.extract": return page.evaluate(collectBrowserExtraction, request.params);
+    case "tab.status": return page.evaluate(collectBrowserPageStatus);
+    case "tab.ready": return page.evaluate(collectBrowserReadiness, request.params);
     case "tab.snapshot": return (await page.evaluate(collectBrowserSnapshot, { ...request.params, prefix: "e" })).snapshot;
     case "tab.screenshot": {
       const type = request.params.format ?? "png";
