@@ -112,6 +112,11 @@ try {
     await call('click', { tabId: state.isolated, selector: '#popup' });
     if (mobile) {
       // Mobile opens target=_blank in its existing view; identity must remain intact.
+      const deadline = Date.now() + 15000;
+      while ((await call('get-tabs')).tabs.find(tab => tab.id === state.isolated)?.url !== origin + '/popup') {
+        assert(Date.now() < deadline, 'Mobile popup must navigate its opener');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       await selected(state.isolated);
       assert.equal((await cookie(state.isolated)).value, 'isolated');
       assert.equal((await call('get-tabs')).tabs.length, before.length);

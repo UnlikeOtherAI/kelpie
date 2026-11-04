@@ -33,7 +33,7 @@ created. Ordinary tabs and native UOA/Google login share the default profile.
 | `INVALID_PARTITION` | 400 | The partition string fails the shared validator. |
 | `PARTITION_UNSUPPORTED` | 501 | The platform or engine cannot honour partitions. |
 | `PARTITION_DELETING` | 409 | `new-tab` named a partition that is mid-teardown. Retry. |
-| `PARTITION_IN_USE` | 409 | The engine refused deletion even after every tab was closed. The id is freed anyway and the abandoned store is relisted as `orphan:<uuid>`. |
+| `PARTITION_IN_USE` | 409 | The engine retained the store after its tabs closed. Desktop and Android retire its public id; iOS retains the mapping for retry. See platform details below. |
 | `ENGINE_SWITCH_BLOCKED_BY_PARTITION` | 409 | `set-renderer` to `chromium` was called while partitioned tabs are open. |
 
 `PARTITION_UNSUPPORTED` carries diagnostic context so a caller can recover
@@ -117,7 +117,7 @@ The teardown sequence is: mark the partition `deleting`, close its tabs, await
 the engine's storage removal, then drop the registry entry. While the flag is
 set, a `new-tab` naming the same partition fails with `PARTITION_DELETING`
 rather than binding to a store that is about to disappear. Once the delete
-returns, a retry creates a fresh store under a fresh engine handle.
+successfully returns, a retry creates a fresh store under a fresh engine handle.
 
 ### Windows and Linux (Chromium/CEF)
 
