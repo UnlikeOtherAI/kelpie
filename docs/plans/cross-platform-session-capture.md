@@ -220,3 +220,15 @@ context, missing selection, canonical dispatch and pinned/external contexts.
 The compiler variables stay in the container shell running CMake, and Debian
 metadata includes the newer libstdc++ dependency. Installed checks and release
 results must be recorded separately from compilation.
+
+At revision b76a66c2, the iPhone 16 Pro Max simulator (iOS 26.5) passed the
+ordinary/named/other-store checks, HttpOnly visibility, localStorage and a native
+popup tap. Two consecutive restarts with the fixture server unavailable retained
+the tabs; bringing the server back and immediately switching/navigating each tab
+preserved all storage boundaries. Eight focused storage tests passed, including
+the unavailable-page regression, with no compiler warnings. Strict SwiftLint
+passed. The Ubuntu 22.04 container compiled and ran an atomic shared-pointer
+probe with stock g++-12/libstdc++6 12.3; the complete release build is separate.
+The downloaded signed Android 0.1.19 APK passed the same live storage, popup,
+restart and deletion checks on Maxis's API 35 emulator, including automatic
+purging of retired profiles after restart. Existing tabs were preserved.
