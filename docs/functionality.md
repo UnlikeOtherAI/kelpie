@@ -640,3 +640,5 @@ Signed-in clients subscribe to UOA's reusable settings WebSocket. The initial sn
 ## Explicit external automation sessions
 
 The CLI can expose an operator-managed external worker through `kelpie worker mcp --config <operator-json>`. It creates short-lived isolated contexts or fresh tabs in its own explicitly shared automation context, never imports human tabs/profiles/cookies, and refuses foreign or expired session handles. The restricted Lightpanda profile admits only explicitly verified methods and cannot supply canonical pixel capture. See [worker configuration and limitations](api/automation-workers.md).
+
+Apple script capture uses [shared bounded media helpers](api/apple-script-media.md) for GIF/PNG/H.264, sRGB overlays, byte caps and authenticated chunk retrieval. Native adapter and installed-app acceptance are tracked separately from the standalone codec checks.

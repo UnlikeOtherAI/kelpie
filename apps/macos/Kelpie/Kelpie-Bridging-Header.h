@@ -10,6 +10,7 @@
 #import "kelpie/ai_c_api.h"
 #import "kelpie/viewport_presets_c_api.h"
 
+#include "kelpie/script_presentation.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 
