@@ -121,13 +121,16 @@ describe("partition tools", () => {
   it("exposes get-partitions and delete-partition on the platforms that isolate storage", () => {
     expect(byName("kelpie_get_partitions")?.method).toBe("getPartitions");
     expect(byName("kelpie_delete_partition")?.method).toBe("deletePartition");
-    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["macos", "windows", "linux"]);
-    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["macos", "windows", "linux"]);
+    expect(byName("kelpie_get_partitions")?.platforms).toEqual(["ios", "android", "macos", "linux", "windows"]);
+    expect(byName("kelpie_delete_partition")?.platforms).toEqual(["ios", "android", "macos", "linux", "windows"]);
   });
 
   it("validates the delete-partition id with the shared partition rules", () => {
     const schema = byName("kelpie_delete_partition")?.schema.id;
     expect(schema?.safeParse("sam.eng-lead").success).toBe(true);
+    expect(schema?.safeParse("orphan:kelpie-00000000-0000-4000-8000-000000000001").success).toBe(true);
+    expect(schema?.safeParse("orphan:00000000-0000-4000-8000-000000000001").success).toBe(true);
+    expect(schema?.safeParse("orphan:../default").success).toBe(false);
     expect(schema?.safeParse("default").success).toBe(false);
     expect(schema?.safeParse("ephemeral-sam").success).toBe(false);
     expect(schema?.safeParse("has space").success).toBe(false);

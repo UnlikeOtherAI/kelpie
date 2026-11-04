@@ -6,6 +6,7 @@ import {
   isValidPartition,
   partitionErrorMessage,
   validatePartition,
+  validatePartitionDeletion,
   type PartitionInvalidReason,
 } from "../src/partition.js";
 
@@ -162,5 +163,19 @@ describe("partition constants", () => {
     expect(MAX_PARTITION_LENGTH).toBe(128);
     expect(MAX_TAB_NAME_LENGTH).toBe(200);
     expect(RESERVED_PARTITION_PREFIX).toBe("ephemeral-");
+  });
+});
+
+
+describe("partition deletion", () => {
+  it("accepts engine orphans only for deletion", () => {
+    for (const prefix of ["orphan:", "orphan:kelpie-"]) {
+      const id = `${prefix}00000000-0000-4000-8000-000000000001`;
+      expect(validatePartitionDeletion(id).ok).toBe(true);
+      expect(validatePartition(id).ok).toBe(false);
+      expect(validatePartitionDeletion(id + "\n").ok).toBe(false);
+    }
+    expect(validatePartitionDeletion("orphan:../default").ok).toBe(false);
+    expect(validatePartitionDeletion("default").ok).toBe(false);
   });
 });

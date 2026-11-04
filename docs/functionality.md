@@ -129,6 +129,14 @@ Two levels of network visibility:
 
 ## Network Inspector
 
+On macOS, iOS and Android, request capture updates retained entries incrementally.
+A single background writer coalesces private network-history file writes, capped
+at the native store's 2,000 entries. Existing preference-based history migrates only
+after a successful write. Mobile apps flush pending history when backgrounded;
+a failed write retries without clearing the previous history. The inspector is an
+app-wide developer log, including requests from isolated tabs; deleting a website
+partition does not clear that log.
+
 A built-in network traffic viewer accessible from the floating menu. Captures all HTTP/HTTPS requests and responses flowing through the loaded website.
 
 **List view:** every request shows its HTTP method (GET, POST, PUT, DELETE, OPTIONS, etc.), URL, status code, content type, category, duration, and size. The app records the top-level page document alongside fetch/XHR traffic, so a normal page load always appears in the inspector. Three filter dropdowns: **Method** (All Methods, GET, POST, PUT, DELETE), **Type** (All Types, HTML, JSON, JS, CSS, Image, Font, XML, Other), and **Source** (All Sources, Browser, JS (fetch/XHR)). The Source filter distinguishes browser-initiated requests (page loads, subresources) from JavaScript-initiated requests (fetch, XHR). URL search is also available. All three platforms (iOS, Android, macOS) have identical filter sets.
@@ -307,7 +315,7 @@ Tabs can carry an optional display **name** and an optional storage **partition*
 
 This delivers isolated identities, **not** parallel execution: commands still serialise on each app's main thread, so an orchestrator drives twelve partitions in turn rather than all at once.
 
-Storage partitioning is available on **macOS with the WebKit engine** and on **Windows and Linux with the Chromium (CEF) engine**. macOS on the Chromium engine, iOS and Android reject `partition` with `PARTITION_UNSUPPORTED` and a `reason` field saying why. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows and Linux each partition is a separate `CefRequestContext` — persistent ones stored as a Chromium profile directory `<profile>/cache/partition-<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart.
+Storage partitioning is available on **macOS with the WebKit engine**, **Windows and Linux with the Chromium (CEF) engine**, **iOS 17+**, and **Android WebViews supporting multiple profiles**. Mobile supports persistent named partitions; `persistent:false` and unsupported runtime requests fail with `PARTITION_UNSUPPORTED` before creating a tab. macOS on the Chromium engine also rejects isolation. On macOS, partitioned tabs are excluded from the shared cookie jar, and switching to the Chromium engine is blocked while any partitioned tab is open because partitioned storage cannot be migrated into CEF. On Windows and Linux each partition is a separate `CefRequestContext` — persistent ones stored as a Chromium profile directory `<profile>/cache/partition-<id>`, non-persistent ones in memory — `window.open` inherits the opener's partition, and each tab's partition is recorded in the session snapshot and rebound on restart. Windows normalizes profile paths before creating CEF stores, so forward-slash launch paths preserve persistent isolation. Both desktop engines stop restoration if a named store cannot load, preserving the saved session without reopening isolated URLs in the shared store.
 
 The Windows shell exposes the same feature without the API: the top-left `+` creates a tab, and its context menu offers "New tab" and "New isolated tab" (`Ctrl+Shift+N`), an isolated pill carries a 2-DIP accent stripe and shows its `name` in place of the page title, its tooltip spells out the partition id, and Settings has an **Isolate every new tab** toggle that is off by default.
 
@@ -530,8 +538,12 @@ On every platform the UOA login screen uses the same cookie and website-data sto
 the browser's default (unpartitioned) tabs, with the tabs' user agent. Signing in to
 UOA with Google therefore also signs every default tab in to Google, so a site's
 "Sign in with Google" offers the existing account instead of asking again; an existing
-Google session in the tabs likewise makes the UOA login a single choice. Partitioned
-tabs stay isolated. On macOS with the Chromium engine active, cookies are copied
+Google session in the tabs likewise makes the UOA login a single choice, subject to
+Google's own consent and reauthentication requirements. Partitioned tabs stay
+isolated. iOS 17+ and Android WebViews supporting multiple profiles accept named
+persistent partitions; unsupported isolation requests fail before creating a tab.
+Mobile session restoration preserves each tab's partition. Memory-only partitions
+are unsupported on mobile; they never silently become shared or disk-backed tabs. On macOS with the Chromium engine active, cookies are copied
 between the engine and the login screen around the sign-in. Signing out of UOA does
 not sign the tabs out of Google; use the provider's own sign-out or clear cookies.
 These cookies sit in the same store that paired automation can read with the cookie

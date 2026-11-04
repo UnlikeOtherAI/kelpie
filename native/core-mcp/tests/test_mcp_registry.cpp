@@ -55,8 +55,8 @@ void TestRegistryFiltering() {
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
   assert(all_tools.size() == 124);
-  assert(ios_tools.size() == 119);
-  assert(android_tools.size() == 119);
+  assert(ios_tools.size() == 121);
+  assert(android_tools.size() == 121);
   assert(macos_tools.size() == 118);
   assert(windows_tools.size() == 114);
   assert(webkit_tools.size() == 124);
@@ -70,11 +70,11 @@ void TestRegistryFiltering() {
     assert(!ContainsTool(linux_tools, name));
   }
 
-  // Storage partitions: macOS and Windows only until the others land them.
+  // All platforms expose named storage; unsupported mobile engines fail closed.
   assert(ContainsTool(windows_tools, "kelpie_get_partitions"));
   assert(ContainsTool(macos_tools, "kelpie_delete_partition"));
-  assert(!ContainsTool(ios_tools, "kelpie_get_partitions"));
-  assert(!ContainsTool(android_tools, "kelpie_delete_partition"));
+  assert(ContainsTool(ios_tools, "kelpie_get_partitions"));
+  assert(ContainsTool(android_tools, "kelpie_delete_partition"));
 
   // Windows-only in the shared catalogue, so Windows-only here too.
   assert(ContainsTool(windows_tools, "kelpie_close_browser"));

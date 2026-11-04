@@ -317,7 +317,7 @@ Response:
 | `windowId` | string | no | Target window (macOS, multi-window only) |
 | `name` | string, max 200 chars | no | Free-form display label, shown in the tab bar and echoed by `get-tabs` |
 | `partition` | string, 1-128 chars | no | Storage container id. Tabs sharing a string share storage; different strings are isolated. Omit for the default container. |
-| `persistent` | boolean, default `true` | no | `false` makes the partition's storage in-memory only. Only meaningful alongside `partition`. |
+| `persistent` | boolean, default `true` | no | `false` makes the partition's storage in-memory only on supported desktop engines; mobile rejects it. Only meaningful alongside `partition`. |
 
 ```json
 POST /v1/new-tab

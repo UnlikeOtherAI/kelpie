@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 
 data class TrafficEntry(
@@ -24,7 +26,7 @@ data class TrafficEntry(
     val responseHeaders: Map<String, String> = emptyMap(),
     val requestBody: String? = null,
     val responseBody: String? = null,
-    val startTime: String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()),
+    val startTime: String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date()),
     val duration: Int = 0,
     val size: Int = 0,
     val initiator: String = "browser", // "browser" or "js"
@@ -48,6 +50,7 @@ object NetworkTrafficStore {
     private const val DATA_KEY = "data"
 
     private lateinit var prefs: SharedPreferences
+    private lateinit var persistence: NetworkTrafficPersistence
     private val nativeHandle = NativeCore.networkTrafficStoreCreate()
     private val lock = Any()
     private val _entries = MutableStateFlow<List<TrafficEntry>>(emptyList())
@@ -65,17 +68,52 @@ object NetworkTrafficStore {
 
     internal fun init(context: Context) {
         synchronized(lock) {
+            if (::persistence.isInitialized) return
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            NativeCore.networkTrafficStoreLoadJson(nativeHandle, prefs.getString(DATA_KEY, null))
-            refreshFromNative(save = false)
+            persistence =
+                NetworkTrafficPersistence(
+                    File(context.noBackupFilesDir, "network/traffic.json"),
+                    encode = { entries -> "[" + entries.joinToString(",", transform = ::trafficEntryToJson) + "]" },
+                    migrated = { check(prefs.edit().remove(DATA_KEY).commit()) { "Legacy migration could not be saved" } },
+                )
+            val saved = persistence.load()
+            val json =
+                if (saved != null && runCatching { parseTrafficEntries(saved) }.isSuccess) {
+                    saved
+                } else {
+                    if (saved != null) persistence.preserveUnreadableFile()
+                    prefs.getString(DATA_KEY, null)?.takeIf { runCatching { parseTrafficEntries(it) }.isSuccess }
+                }
+            NativeCore.networkTrafficStoreLoadJson(nativeHandle, json)
+            _entries.value = parseTrafficEntries(NativeCore.networkTrafficStoreToJson(nativeHandle))
+            synchronizeSelection()
+            if (prefs.contains(DATA_KEY) && json != null) persistence.save(_entries.value)
         }
     }
 
     fun append(entry: TrafficEntry) {
         synchronized(lock) {
             ensureInitialized()
-            NativeCore.networkTrafficStoreAppendJson(nativeHandle, trafficEntryToJson(entry))
-            refreshFromNative(save = true)
+            val accepted =
+                entry.copy(
+                    id = entry.id.ifEmpty { UUID.randomUUID().toString() },
+                    startTime = entry.startTime.ifEmpty { TrafficEntry(method = "GET", url = "", statusCode = 0, contentType = "").startTime },
+                )
+            if (!NativeCore.networkTrafficStoreAppendJson(nativeHandle, trafficEntryToJson(accepted))) return
+            val normalized =
+                accepted.copy(
+                    method = entry.method.map { if (it in 'a'..'z') it.uppercaseChar() else it }.joinToString(""),
+                    requestHeaders = entry.requestHeaders.toMap(),
+                    responseHeaders = entry.responseHeaders.toMap(),
+                    requestBody = entry.requestBody?.takeIf { it.isNotEmpty() },
+                    responseBody = entry.responseBody?.takeIf { it.isNotEmpty() },
+                    duration = entry.duration.coerceAtLeast(0),
+                    size = entry.size.coerceAtLeast(0),
+                    initiator = "browser",
+                )
+            _entries.value = (_entries.value + normalized).takeLast(NativeCore.networkTrafficStoreCount(nativeHandle))
+            synchronizeSelection()
+            persistence.save(_entries.value)
         }
     }
 
@@ -86,27 +124,26 @@ object NetworkTrafficStore {
         responseHeaders: Map<String, String> = emptyMap(),
         size: Int = 0,
     ) {
-        synchronized(lock) {
-            ensureInitialized()
-            NativeCore.networkTrafficStoreAppendDocumentNavigation(
-                handle = nativeHandle,
+        append(
+            TrafficEntry(
+                method = "GET",
                 url = url,
                 statusCode = statusCode,
                 contentType = contentType,
-                responseHeadersJson = JSONObject(responseHeaders).toString(),
-                size = size.toLong(),
-                startTime = null,
-                duration = 0,
-            )
-            refreshFromNative(save = true)
-        }
+                responseHeaders = responseHeaders,
+                size = size,
+            ),
+        )
     }
 
     fun clear() {
         synchronized(lock) {
             ensureInitialized()
             NativeCore.networkTrafficStoreClear(nativeHandle)
-            refreshFromNative(save = true)
+            _entries.value = emptyList()
+            synchronizeSelection()
+            persistence.save(emptyList())
+            persistence.flush()
         }
     }
 
@@ -114,7 +151,7 @@ object NetworkTrafficStore {
         synchronized(lock) {
             ensureInitialized()
             NativeCore.networkTrafficStoreSelect(nativeHandle, index)
-            refreshFromNative(save = false)
+            synchronizeSelection()
         }
     }
 
@@ -161,13 +198,12 @@ object NetworkTrafficStore {
         }
     }
 
-    private fun refreshFromNative(save: Boolean) {
-        val json = NativeCore.networkTrafficStoreToJson(nativeHandle)
-        _entries.value = parseTrafficEntries(json)
+    fun flush() {
+        synchronized(lock) { if (::persistence.isInitialized) persistence.flush() }
+    }
+
+    private fun synchronizeSelection() {
         _selectedIndex.value = NativeCore.networkTrafficStoreSelectedIndex(nativeHandle).takeIf { it >= 0 }
-        if (save) {
-            prefs.edit().putString(DATA_KEY, json ?: "[]").apply()
-        }
     }
 
     private fun parseTrafficEntries(json: String?): List<TrafficEntry> {

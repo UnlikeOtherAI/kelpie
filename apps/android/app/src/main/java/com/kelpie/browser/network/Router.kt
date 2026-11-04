@@ -139,12 +139,12 @@ private fun statusForErrorCode(code: String?): Int =
         -> 404
         "TIMEOUT" -> 408
         "NAVIGATION_ERROR" -> 502
-        "PLATFORM_NOT_SUPPORTED" -> 501
+        "PLATFORM_NOT_SUPPORTED", "PARTITION_UNSUPPORTED" -> 501
         "IFRAME_ACCESS_DENIED",
         "PERMISSION_REQUIRED",
         "SHADOW_ROOT_CLOSED",
         -> 403
-        "RECORDING_IN_PROGRESS" -> 409
+        "RECORDING_IN_PROGRESS", "PARTITION_IN_USE", "PARTITION_DELETING" -> 409
         "WEBVIEW_ERROR" -> 500
         else -> 400
     }

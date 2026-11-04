@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { partitionErrorMessage, validatePartition } from "@unlikeotherai/kelpie-shared";
+import { partitionErrorMessage, validatePartitionDeletion } from "@unlikeotherai/kelpie-shared";
 import { deviceCommand } from "./helpers.js";
 import { printValidationError } from "./partition-options.js";
 
@@ -26,7 +26,7 @@ export function registerPartitions(program: Command): void {
     .command("delete <id>")
     .description("Delete a storage partition, closing every tab bound to it")
     .action(async (id: string) => {
-      const result = validatePartition(id);
+      const result = validatePartitionDeletion(id);
       if (!result.ok) {
         printValidationError(program, `invalid partition id: ${partitionErrorMessage(result.reason)}`);
         return;

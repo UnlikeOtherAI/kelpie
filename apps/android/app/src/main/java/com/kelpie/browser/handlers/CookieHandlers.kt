@@ -1,6 +1,7 @@
 package com.kelpie.browser.handlers
 
 import android.webkit.CookieManager
+import com.kelpie.browser.browser.PartitionRegistry
 import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import java.net.URI
@@ -21,7 +22,7 @@ class CookieHandlers(
     fun getCookies(body: Map<String, Any?>): Map<String, Any?> {
         val nameFilter = body["name"] as? String
         val url = body["url"] as? String ?: defaultCookieUrl()
-        val raw = CookieManager.getInstance().getCookie(url).orEmpty()
+        val raw = cookieManager().getCookie(url).orEmpty()
         val host = hostFromUrl(url) ?: ""
         val parsed = parseCookieHeader(raw, defaultDomain = host)
         val filtered = if (nameFilter != null) parsed.filter { it["name"] == nameFilter } else parsed
@@ -49,7 +50,7 @@ class CookieHandlers(
             }
         val header = (listOf("$name=$value") + attrs).joinToString("; ")
         val url = body["url"] as? String ?: currentPageUrl() ?: domain?.let { "http://$it/" } ?: "http://localhost/"
-        val cm = CookieManager.getInstance()
+        val cm = cookieManager()
         cm.setCookie(url, header)
         cm.flush()
         return successResponse()
@@ -59,7 +60,7 @@ class CookieHandlers(
         val deleteAll = body["deleteAll"] as? Boolean ?: false
         val nameFilter = body["name"] as? String
         val domainFilter = body["domain"] as? String
-        val cm = CookieManager.getInstance()
+        val cm = cookieManager()
         val url = body["url"] as? String ?: defaultCookieUrl()
         val host = hostFromUrl(url) ?: ""
         val existing = parseCookieHeader(cm.getCookie(url).orEmpty(), defaultDomain = host)
@@ -99,6 +100,8 @@ class CookieHandlers(
         cm.flush()
         return successResponse(mapOf("deleted" to removed.size))
     }
+
+    private fun cookieManager(): CookieManager = PartitionRegistry.cookies(requireNotNull(ctx.webView) { "No target WebView" })
 
     private fun currentPageUrl(): String? = ctx.webView?.url
 
