@@ -163,3 +163,44 @@ until real navigation/text/extraction corpus results support the admitted profil
 Maxis has no WSL installation; a separately assigned bounded Linux test checkout is
 needed for the native Linux binary, without developing or hosting normal services
 in Fedora.
+
+## Portable checkpoint evidence, Maxis, 2026-11-04
+
+Candidate source: integration 5db4e2d6 plus this owner's uncommitted worker/WebMCP
+tranche, later committed without changing runtime source. Frozen install used
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/pnpm-store; no shared writable
+cache, WSL install, native build or Computer Use was used.
+
+- Required pnpm lint/build/test passed after corrections. Full test counts:
+  shared 120 passed, CLI 632 passed / 64 skipped. Vitest thread/fork maxima were 2.
+- Focused managed-session/WebMCP and CLI registry tests passed in the full suite.
+- Real sandbox-enabled headless Chromium 151.0.7922.34 ownership corpus passed:
+  isolated cookie/localStorage separation; foreign-tab refusal; explicit shared
+  cookies while preexisting tabs remain hidden/preserved; expiration denies
+  metadata while the borrowed browser remains connected.
+- Actual API-enabled WebMCP corpus passed with
+  --enable-features=WebMCP,WebMCPTesting. document.modelContext/getTools/executeTool/
+  registerTool were present. Discovery/call, hint-independent operator denial,
+  toolchange and document invalidation, result bound and timeout uncertainty passed.
+  A late invocation retained BUSY until actual reply retired; it was not retried.
+- Existing executable read only:
+  C:/Users/ondre/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe;
+  SHA-256 409805A16D6416087E6B2F778DF1CF8F7BBB267D6B99F6B5BB0A618EACE234F2.
+- Safe artifacts: D:/BuildArtifacts/kelpie/capture-desktop-20261104/acceptance/
+  managed-playwright.json and webmcp-actual-api.json. Required logs: lint.log,
+  build.log, test.log in the same task artifacts directory.
+- The optional broad CLI tsc --noEmit check exposed existing registry/test typing
+  errors outside this tranche. New registry-test literal typings were corrected;
+  no unrelated files were changed. Required package build/lint/test are green.
+
+The first real invocation diagnosed an API-version difference, not a failed tool
+implementation: Chromium151 takes serialized JSON as its DOMString second
+argument. The trusted binding now requires an audited json-string or object
+encoding and refuses other choices before invocation. No page/model choice,
+automatic call probe or mutation retry is used.
+[Exact Chromium151 IDL](https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.34/third_party/blink/renderer/core/script_tools/model_context.idl)
+is the runtime authority; the current WebMCP spec's object argument is a separate
+revision.
+
+CLI stdio end-to-end with borrowed endpoint survival, real Lightpanda Linux
+navigation/text/extraction/cost and native WebMCP exposure remain pending.

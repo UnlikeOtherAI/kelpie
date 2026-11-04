@@ -610,3 +610,7 @@ or task completion. These methods use the same authenticated HTTP/MCP/SDK contra
 native fixed-reader capability gate. See [scoped observations](api/browser-control.md#scoped-observations-and-deterministic-extraction).
 
 The shared browser gateway preserves rich native extension argument schemas through the shared CLI catalogue projection. macOS `get-links` exposes bounded href/text pairs to existing local agent tools; other platforms do not advertise it. See [shared control](api/browser-control.md).
+
+## Explicit external automation sessions
+
+The CLI can expose an operator-managed external worker through `kelpie worker mcp --config <operator-json>`. It creates short-lived isolated contexts or fresh tabs in its own explicitly shared automation context, never imports human tabs/profiles/cookies, and refuses foreign or expired session handles. The restricted Lightpanda profile admits only explicitly verified methods and cannot supply canonical pixel capture. See [worker configuration and limitations](api/automation-workers.md).

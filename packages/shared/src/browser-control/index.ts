@@ -6,3 +6,8 @@ export * from "./observations.js";
 export * from "./playwright.js";
 export * from "./reference.js";
 export * from "./native.js";
+export * from "./lightpanda.js";
+export * from "./managed-session.js";
+export * from "./webmcp-schema.js";
+export * from "./webmcp-reader.js";
+export * from "./webmcp.js";
