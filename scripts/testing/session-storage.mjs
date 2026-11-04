@@ -11,7 +11,9 @@ const { values } = parseArgs({ options: {
   readiness: { type: 'string' }, state: { type: 'string' },
   phase: { type: 'string', default: 'seed' }, port: { type: 'string', default: '18527' },
   mobile: { type: 'boolean', default: false },
+  android: { type: 'boolean', default: false },
 } });
+const mobile = values.mobile || values.android;
 assert(values.readiness && values.state, '--readiness and --state are required; use a disposable app profile');
 const readiness = JSON.parse(await readFile(values.readiness, 'utf8'));
 const endpoint = `http://127.0.0.1:${readiness.port}/v1/`;
@@ -28,7 +30,7 @@ const server = createServer((request, response) => {
 });
 await new Promise(resolve => server.listen(Number(values.port), '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${values.port}`;
-async function call(method, body = {}) {
+async function call(method, body = {}, expectedError) {
   const response = await fetch(endpoint + method, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${readiness.token}` },
     body: JSON.stringify(body), signal: AbortSignal.timeout(35000),
@@ -36,8 +38,20 @@ async function call(method, body = {}) {
   const bodyText = await response.text();
   assert(bodyText.length > 0, `${method}: empty HTTP ${response.status} response`);
   const result = JSON.parse(bodyText);
-  assert.equal(result.success, true, `${method}: ${result.error?.code ?? response.status} ${result.error?.message ?? ''}`);
+  if (expectedError) assert.equal(result.error?.code, expectedError, `${method}: expected ${expectedError}`);
+  else assert.equal(result.success, true, `${method}: ${result.error?.code ?? response.status} ${result.error?.message ?? ''}`);
   return result;
+}
+async function retire(id) {
+  const before = new Set((await call('get-partitions')).partitions.map(item => item.id));
+  await call('delete-partition', { id }, values.android ? 'PARTITION_IN_USE' : undefined);
+  const after = (await call('get-partitions')).partitions.map(item => item.id);
+  assert(!after.includes(id), 'A retired public name must no longer reference its old store');
+  if (values.android) {
+    const pending = after.filter(item => item.startsWith('orphan:') && !before.has(item));
+    assert.equal(pending.length, 1, 'Android must expose its durable pending deletion');
+    state.pending = [...(state.pending ?? []), ...pending];
+  }
 }
 async function selected(tabId) {
   await call('switch-tab', { tabId });
@@ -86,12 +100,17 @@ try {
     await call('set-storage', { tabId: state.normal, type: 'local', key: state.cookie, value: 'shared' });
     await selected(state.isolated);
     await call('set-storage', { tabId: state.isolated, type: 'local', key: state.cookie, value: 'isolated' });
-    assert.equal((await cookie(state.normal)).httpOnly, true);
+    const sharedCookie = await cookie(state.normal);
+    // Android's native CookieManager exposes values but not cookie attributes.
+    if (!values.android) assert.equal(sharedCookie.httpOnly, true);
+    assert.equal((await call('evaluate', {
+      tabId: state.normal, expression: `document.cookie.includes(${JSON.stringify(state.cookie)})`,
+    })).result, false, 'The server-set HttpOnly cookie must be hidden from page scripts');
     await verify();
     const before = (await call('get-tabs')).tabs.map(item => item.id);
     await selected(state.isolated);
     await call('click', { tabId: state.isolated, selector: '#popup' });
-    if (values.mobile) {
+    if (mobile) {
       // Mobile opens target=_blank in its existing view; identity must remain intact.
       await selected(state.isolated);
       assert.equal((await cookie(state.isolated)).value, 'isolated');
@@ -112,7 +131,7 @@ try {
     console.log('PASS: ordinary siblings, isolated siblings, distinct partitions, HttpOnly cookies, localStorage and popup inheritance');
   } else if (values.phase === 'cleanup') {
     for (const id of [state.prefix, `${state.prefix}-other`]) {
-      await call('delete-partition', { id });
+      await retire(id);
       assert(!(await call('get-tabs')).tabs.some(tab => tab.partition === id));
     }
     const normal = (await call('get-tabs')).tabs.find(tab => tab.name === state.names[state.normal]);
@@ -120,17 +139,25 @@ try {
     assert.equal((await cookie(normal.id)).value, 'shared');
     const fresh = await call('new-tab', { url: origin + '/probe', partition: state.prefix });
     assert.equal(await cookie(fresh.tabId), undefined);
-    await call('delete-partition', { id: state.prefix });
+    await retire(state.prefix);
+    await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
     console.log('PASS: partition deletion closes its tabs, preserves shared identity and recreates an empty store');
+  } else if (values.phase === 'purged') {
+    assert(values.android && state.pending?.length, 'Run Android cleanup before checking startup purge');
+    const ids = (await call('get-partitions')).partitions.map(item => item.id);
+    assert(state.pending.every(id => !ids.includes(id)), 'Startup must purge every retired fixture profile');
+    console.log('PASS: Android startup purged every retired fixture profile');
   } else {
     const tabs = (await call('get-tabs')).tabs;
     for (const key of ['normal', 'normalSibling', 'isolated', 'isolatedSibling', 'other']) {
-      if (values.mobile) state[key] = tabs.find(tab => tab.name === state.names[state[key]])?.id;
+      if (mobile) state[key] = tabs.find(tab => tab.name === state.names[state[key]])?.id;
       assert(tabs.some(tab => tab.id === state[key]), `Missing restored ${key} tab`);
       await call('switch-tab', { tabId: state[key] });
       await call('navigate', { tabId: state[key], url: origin + '/probe' });
     }
     await verify();
+    state.names = Object.fromEntries(tabs.map(tab => [tab.id, tab.name]));
+    await writeFile(values.state, JSON.stringify(state), { mode: 0o600 });
     console.log('PASS: persistent default and isolated identities after app restart');
   }
 } finally {
