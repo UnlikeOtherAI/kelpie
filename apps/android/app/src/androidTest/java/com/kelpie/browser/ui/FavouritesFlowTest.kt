@@ -1,6 +1,7 @@
 package com.kelpie.browser.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -8,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.kelpie.browser.MainActivity
 import com.kelpie.browser.browser.BookmarkStore
 import org.junit.Rule
@@ -57,10 +57,17 @@ class FavouritesFlowTest {
         ui.onNodeWithTag("browser.bookmarks.row.${page.id}").assertIsDisplayed()
     }
 
-    private fun drag(description: String, destinationTag: String) {
+    private fun drag(
+        description: String,
+        destinationTag: String,
+    ) {
         val handle = ui.onNodeWithContentDescription(description)
         val origin = handle.fetchSemanticsNode().boundsInRoot.topLeft
-        val destination = ui.onNodeWithTag(destinationTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center - origin
+        val destination =
+            ui
+                .onNodeWithTag(destinationTag, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.center - origin
         handle.performTouchInput {
             down(center)
             advanceEventTime(700)
