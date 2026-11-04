@@ -14,6 +14,7 @@ bool NativeExtensionMutates(std::string_view endpoint) {
     "get-links", "get-current-url", "get-home", "bookmarks-list", "history-list", "screenshot", "screenshot-annotated",
     "get-dom", "query-selector", "query-selector-all", "get-element-text", "get-attributes",
     "get-device-info", "get-capabilities", "get-tabs", "get-network-log", "get-console-messages", "get-js-errors",
+    "get-script-status", "get-script-artifact",
     "get-dialog", "get-storage", "get-cookies", "get-fullscreen", "get-renderer", "get-viewport-preset", "get-viewport",
     "get-debug-overlay", "get-tap-calibration", "get-ai-status", "ai-status", "ai-models", "ai-endpoints", "ai-endpoint-health",
     "get-partitions", "find-element", "find-button", "find-link", "find-input", "get-page-text", "get-visible-elements",

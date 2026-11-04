@@ -46,21 +46,31 @@ void TestRegistryFiltering() {
   const auto macos_tools = registry.tools_for_platform(kelpie::Platform::kMacos);
   const auto windows_tools = registry.tools_for_platform(kelpie::Platform::kWindows);
   const auto linux_tools = registry.tools_for_platform(kelpie::Platform::kLinux);
-  assert(linux_tools.size() == windows_tools.size());
-  for (const auto& tool : windows_tools) assert(ContainsTool(linux_tools, tool.name));
+  assert(linux_tools.size() == 114);
+  for (const auto& tool : linux_tools) assert(ContainsTool(windows_tools, tool.name));
+  for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
+    assert(ContainsTool(windows_tools, name));
+    assert(!ContainsTool(linux_tools, name));
+    assert(!ContainsTool(ios_tools, name));
+    assert(!ContainsTool(android_tools, name));
+    assert(!ContainsTool(macos_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "gecko"));
+  }
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
   // Exact counts: a tool that quietly appears on or disappears from a platform
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
-  assert(all_tools.size() == 121);
+  assert(all_tools.size() == 125);
   assert(ios_tools.size() == 116);
   assert(android_tools.size() == 116);
   assert(macos_tools.size() == 115);
-  assert(windows_tools.size() == 114);
+  assert(windows_tools.size() == 118);
   assert(webkit_tools.size() == 121);
-  assert(chromium_tools.size() == 121);
+  assert(chromium_tools.size() == 125);
 
   // Storage partitions: macOS and Windows only until the others land them.
   assert(ContainsTool(windows_tools, "kelpie_get_partitions"));
