@@ -1,9 +1,12 @@
 # Mobile automation and capture rollout
 
-Source audit only, 4 November 2026, revision b6784ff723b27da4096fdd8d9227f2a00dfc9084.
-Implementation waits for the integrated, manually verified macOS base. iOS/iPadOS and Android ship together.
+Historical source audit,4 November2026,revision b6784ff723b27da4096fdd8d9227f2a00dfc9084.
+The earlier Mac-first gate is superseded by authorized parallel platform work.
+Current source/evidence lives in [ios.md](ios.md),[android.md](android.md) and
+[implementation-map.md](implementation-map.md); iOS/iPadOS and Android remain
+required parity targets within the same integrated PR.
 
-## Current source and feasibility
+## Initial source and feasibility (historical)
 
 | Surface | iOS/iPadOS | Android | Gap |
 | --- | --- | --- | --- |

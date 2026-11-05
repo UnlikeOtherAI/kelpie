@@ -15,7 +15,10 @@ and [fixture instructions](../../../tests/capture/README.md).
 The latest user direction authorizes parallel implementation by per-platform owners;
 the earlier Windows-first execution gate is historical and no longer blocks other
 platform source work. Resource slots still come from the coordinator. Computer Use,
-VNC, custom desktop-input helpers and native UI driving remain explicitly off.
+VNC, CUA and custom OS/desktop-input helpers remain explicitly off. Root-authorized
+standard XCUITest/Compose instrumentation may exercise native app controls and
+capture app screenshots under its assigned simulator/emulator handoff and resource
+slot; that authorization does not grant arbitrary desktop control.
 Machine-interface evidence and native UI evidence must remain distinct.
 Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
@@ -72,7 +75,7 @@ and symbols exist. Every implementation owner must replace this with landed path
 | TGT-05 | Advertised input guarantee matches event trust | native | fixture event.isTrusted | Record synthetic vs trusted honestly for each renderer | N |
 | PTR-01 | Optional C and S paths are nonlinear with exact endpoints and ease-in/out | workflows/native | sampled pointer positions/timestamps | Play both curves; smooth visible travel arrives at target | N |
 | PTR-02 | Deterministic numeric motion model matches native display and composited media | workflows/native | same seed/options + frame timestamps | Compare displayed pointer to exported frames | N |
-| VIS-01 | Color/radius/opacity settings produce requested marker pixels | workflows/native | contrasting palette and white fixture | Inspect PNG/GIF/MP4; correct center and color | N |
+| VIS-01 | Configured color/radius and fade alpha timeline produce requested marker pixels | workflows/native | contrasting palette and white fixture | Inspect PNG/GIF/MP4; correct center and color | N |
 | VIS-02 | Wobble and fade change over time and end cleanly | workflows/native | early/middle/late decoded frames | Observe wobble then fade; no stuck overlay | N |
 | CAP-01 | Script emits real animated GIF, playable MP4 and per-step PNGs | native/workflows | header + decode + playback | Download exports and open all; animation and every step visible | N T |
 | CAP-02 | GIF has valid loop count, frame count/delays and fixed dimensions | native | decoded GIF metadata | Play repeated loop; elapsed duration matches timeline tolerance | N |
