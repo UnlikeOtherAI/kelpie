@@ -227,3 +227,12 @@ GIF5 frames/500ms/1691 bytes; H.264 MP4 5 frames/500ms/1487 bytes, matching
 red overlay centers and100ms timestamps. The2200-byte GIF budget retained a
 fully decodable10-frame/2171-byte prefix. These codec tests do not prove native
 capture, marker ACK, UI Stop, cancellation or final-container recovery.
+
+The c1e13a7c app rebuild passed. The same preserved profile reached authenticated
+HTTP readiness with headless Ozone and namespace sandbox enabled. Initial
+attestation timed out because Chromium rewrites /proc/cmdline into a single
+space-delimited argument. A bounded owned-process probe found two actual
+renderers: NoNewPrivs1, Seccomp2, nested NSpid counts3. The smoke now recognizes
+that real process shape and waits for loaded fixture text plus actual PNG bytes,
+rather than treating a configured tab URL as navigation proof. Full namespace
+comparison, MCP/shutdown and script capture remain pending the revised corpus.

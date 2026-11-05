@@ -9,8 +9,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
-import { control, waitFor } from "../windows/lib/http.mjs";
-import { fileExists, startBrowser, stopBrowser, waitForReadiness } from "../windows/lib/process.mjs";
+import { bearerHeaders, control, rawRequest, waitFor } from "../windows/lib/http.mjs";
+import { fileExists, startBrowser, stopBrowser } from "../windows/lib/process.mjs";
 
 assert.equal(process.platform, "linux");
 const executable = resolve(process.argv[2]);
@@ -59,22 +59,41 @@ async function namespace(pid, name) {
   }
 }
 try {
-  readiness = await Promise.race([
-    waitForReadiness(readinessPath, 30000),
-    browser.exited.then(({ code, signal, error }) => {
-      throw new Error("Native app exited before readiness: " + (error?.message ?? signal ?? code));
-    }),
-  ]);
-  await waitFor(async () => (await control(readiness, "get-current-url")).url?.startsWith(fixture.url), "fixture navigation", 15000);
-  const tabs = (await control(readiness, "get-tabs")).tabs;
+  readiness = await waitFor(async () => {
+    if (browser.child.exitCode !== null || browser.child.signalCode !== null)
+      throw new Error("Native app exited before readiness: " + (browser.child.signalCode ?? browser.child.exitCode));
+    try {
+      const value = JSON.parse(await readFile(readinessPath, "utf8"));
+      return typeof value.port === "number" && typeof value.token === "string" && value.token.length ? value : false;
+    } catch (error) { if (error?.code === "ENOENT") return false; throw error; }
+  }, "owned native readiness", 30000);
+  const canonical = async (method, params = {}) => {
+    const response = await rawRequest({ port: readiness.port, path: "/v1/browser-control",
+      headers: bearerHeaders(readiness.token), body: JSON.stringify({ version: 1, method, params }) });
+    assert.equal(response.status, 200); return response.json;
+  };
+  const snapshot = await waitFor(async () => {
+    const response = await canonical("tab.snapshot");
+    return response.ok && response.value.text.includes("Confirm order") ? response.value : false;
+  }, "actual loaded capture fixture", 15000);
+  report.snapshot = { title: snapshot.title, bytes: Buffer.byteLength(JSON.stringify(snapshot)) };
+  const image = await canonical("tab.screenshot");
+  assert.equal(image.ok, true); assert.equal(image.value.mimeType, "image/png");
+  const png = Buffer.from(image.value.data, "base64");
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  report.screenshot = { bytes: png.length, sha256: createHash("sha256").update(png).digest("hex") };
+  if (process.env.KELPIE_TEST_ARTIFACT_DIR) {
+    await mkdir(process.env.KELPIE_TEST_ARTIFACT_DIR, { recursive: true });
+    await writeFile(join(process.env.KELPIE_TEST_ARTIFACT_DIR, "headless-native.png"), png);
+  }  const tabs = (await control(readiness, "get-tabs")).tabs;
   assert.ok(tabs.length > 0);
   report.device = await control(readiness, "get-device-info");
-  report.checks.push("Real headless CEF navigation and authenticated native HTTP");
+  report.checks.push("Real loaded fixture snapshot, native PNG pixels and authenticated HTTP");
   const renderers = await waitFor(async () => {
     const result = [];
     for (const pid of await descendants(browser.child.pid)) {
       try {
-        const args = (await readFile("/proc/" + pid + "/cmdline", "utf8")).split("\0");
+        const args = (await readFile("/proc/" + pid + "/cmdline", "utf8")).split(/\0|\s+/).filter(Boolean);
         if (!args.includes("--type=renderer")) continue;
         const forbidden = args.filter(value => /^--(?:no-sandbox|disable-(?:namespace|seccomp-filter|setuid)-sandbox)(?:=|$)/.test(value));
         assert.deepEqual(forbidden, []);
