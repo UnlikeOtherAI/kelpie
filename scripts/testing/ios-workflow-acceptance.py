@@ -11,6 +11,7 @@ import time
 import uuid
 from pathlib import Path
 from ios_workflow_cli import run_fixture
+from ios_workflow_rendezvous import HostedCLIRendezvous
 
 PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
@@ -52,14 +53,14 @@ def select_devices(devices, sdk):
     raise RuntimeError("No existing compatible iPhone and iPad pair on one installed iOS runtime")
 
 
-def runner_config(nonce):
+def runner_config(nonce, port):
     original, = PRODUCTS.glob("Kelpie_*.xctestrun")
     data = plistlib.loads(original.read_bytes())
     targets = [t for c in data.get("TestConfigurations", []) for t in c["TestTargets"]]
     if not targets:
         targets = [data.get("KelpieUITests", {})]
     ui, = [t for t in targets if str(t.get("TestHostBundleIdentifier", "")).endswith(".uitests.xctrunner")]
-    ui.setdefault("EnvironmentVariables", {})["KELPIE_WORKFLOW_CLI_PROBE"] = nonce
+    ui.setdefault("EnvironmentVariables", {}).update({"KELPIE_WORKFLOW_CLI_PROBE": nonce, "KELPIE_WORKFLOW_CLI_PORT": str(port)})
     config = PRODUCTS / ("Hosted-" + nonce + ".xctestrun")
     config.write_bytes(plistlib.dumps(data))
     return config, ui["TestHostBundleIdentifier"]
@@ -79,6 +80,21 @@ def terminate_owned(udid, bundle, pins):
     if "nothing to terminate" in result.stderr.lower() or "not running" in result.stderr.lower():
         return "already stopped"
     raise RuntimeError("Could not confirm termination of the pinned bundle")
+
+
+def shutdown_owned(udid):
+    # Only a simulator booted by this invocation may be shut down. Confirm actual state, not command admission.
+    try:
+        subprocess.run(["xcrun", "simctl", "shutdown", udid], capture_output=True, check=True, timeout=100)
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            inventory = json.loads(command("xcrun", "simctl", "list", "devices", "-j", timeout=30))["devices"]
+            if any(d["udid"] == udid and d["state"] == "Shutdown" for items in inventory.values() for d in items):
+                return "verified shutdown"
+            time.sleep(2)
+    except (ValueError, OSError, subprocess.SubprocessError):
+        pass
+    return "unconfirmed: simulator shutdown"
 
 
 def failure_diagnostics(log_path, destination):
@@ -103,7 +119,8 @@ def run_device(device, product_hashes):
     folder = EVIDENCE / device["family"]
     folder.mkdir()
     nonce = str(uuid.uuid4())
-    config, runner = runner_config(nonce)
+    handoff = HostedCLIRendezvous(nonce)
+    config, runner = runner_config(nonce, handoff.port)
     result = folder / "workflow.xcresult"
     started_here = device["state"] != "Booted"
     process = None
@@ -111,6 +128,7 @@ def run_device(device, product_hashes):
     runner_product = PRODUCTS / "Debug-iphonesimulator/KelpieUITests-Runner.app"
     test_binary = "PlugIns/KelpieUITests.xctest/KelpieUITests"
     runner_pins = {test_binary: digest(runner_product / test_binary)}
+    handoff.start()
     try:
         if started_here:
             command("xcrun", "simctl", "boot", udid, timeout=120)
@@ -127,17 +145,15 @@ def run_device(device, product_hashes):
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 24 * 60
             while process.poll() is None and time.monotonic() < deadline:
-                if not cli_started:
-                    container = subprocess.run(["xcrun", "simctl", "get_app_container", udid, runner, "data"],
-                                               text=True, capture_output=True, timeout=15)
-                    if container.returncode == 0:
-                        inbox = Path(container.stdout.strip()) / "Documents" / ("kelpie-cli-" + nonce)
-                        if inbox.joinpath("ready").is_file():
-                            cli_started = True
-                            try:
-                                run_fixture(inbox, folder / "cli")
-                            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
-                                cli_error = type(error).__name__
+                tab = handoff.current_tab()
+                if tab and not cli_started:
+                    cli_started = True
+                    try:
+                        run_fixture(tab, folder / "cli")
+                    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+                        cli_error = type(error).__name__ + ": " + str(error)[:160]
+                    finally:
+                        handoff.finish(cli_error is None)
                 time.sleep(1)
             if process.poll() is None:
                 raise RuntimeError("XCTest exceeded the per-device runtime budget")
@@ -156,7 +172,11 @@ def run_device(device, product_hashes):
         if process.returncode or not cli_started or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         return True
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+        (folder / "primary-failure.txt").write_text(type(error).__name__ + ": " + str(error)[:500] + "\n")
+        raise
     finally:
+        handoff.close()
         if process and process.poll() is None:
             process.terminate()
             try:
@@ -171,16 +191,17 @@ def run_device(device, product_hashes):
             except (OSError, RuntimeError, subprocess.SubprocessError) as error:
                 cleanup[bundle] = "unconfirmed: " + str(error)[:150]
         if started_here:
-            stopped = subprocess.run(["xcrun", "simctl", "shutdown", udid], capture_output=True, timeout=90)
-            cleanup["simulator"] = "shutdown requested" if stopped.returncode == 0 else "unconfirmed: shutdown refused"
+            cleanup["simulator"] = shutdown_owned(udid)
         else:
             cleanup["simulator"] = "preserved initial boot state"
+        individually_retired = all(not cleanup[b].startswith("unconfirmed") for b in (runner, BUNDLE))
+        cleanup["nextDeviceAllowed"] = cleanup["simulator"] == "verified shutdown" or (not started_here and individually_retired)
         (folder / "cleanup.json").write_text(json.dumps(cleanup, indent=2))
         failure_diagnostics(log_path, folder / "diagnostics.txt")
         if result.is_dir():
             subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
                             "--output-path", str(folder / "attachments")], check=False, timeout=120)
-        if any(value.startswith("unconfirmed") for value in cleanup.values()):
+        if not cleanup["nextDeviceAllowed"] and sys.exc_info()[0] is None:
             raise RuntimeError("Device app cleanup could not be confirmed; see cleanup report")
 
 
@@ -214,7 +235,7 @@ def main():
         print(device["family"], json.dumps(report["outcomes"][device["family"]]), flush=True)
         cleanup_file = EVIDENCE / device["family"] / "cleanup.json"
         cleanup = json.loads(cleanup_file.read_text()) if cleanup_file.is_file() else {}
-        if not cleanup or any(value.startswith("unconfirmed") for value in cleanup.values()):
+        if not cleanup.get("nextDeviceAllowed", False):
             for other in devices:
                 report["outcomes"].setdefault(other["family"], {"passed": False, "error": "Prior device cleanup unconfirmed"})
             path.write_text(json.dumps(report, indent=2))
