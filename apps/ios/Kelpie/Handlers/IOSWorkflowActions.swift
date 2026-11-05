@@ -264,8 +264,10 @@ final class IOSWorkflowActions {
             try await inspectPacedPrivacy(context: context, final: final)
             try await check()
         } catch let failure as IOSWorkflowFailure {
+            if tab.document != context.document { context.missing() }
             throw IOSWorkflowFailure(failure.code, mayHaveCompleted: true)
         } catch {
+            if tab.document != context.document { context.missing() }
             throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
         }
     }
