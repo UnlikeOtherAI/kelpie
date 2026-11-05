@@ -328,3 +328,30 @@ The 6,367,760-byte raw BGRA frame is
 This single transition does not establish expiry, no-capture behavior,
 resize/revocation recovery, or full Windows acceptance. The earlier c89
 fixture-ready HTTP 400 reports and their successful cleanups remain retained.
+
+
+A separate no-capture ceec Session 1 workflow completed two trusted clicks and
+three actions in 3,063.6 ms with zero artifacts. A fresh post-response WGC
+capture of the exact owned presentation HWND found 29,147 red pixels in the
+target region (maximum alpha 168), and UIA found no visible Stop control.
+After a further 5.5 seconds the presentation was absent and Stop remained
+absent while the listener and active tab still responded. Foreground ownership
+at that later instant was not independently measured, so this establishes
+absence after the requested lifetime, not the cause of the hide. Public
+cleanup passed and the owned PID, listener, task and Job processes retired.
+The report SHA-256 is
+`3f7b26f9cc4a3b40f21d7254f63b7649ec0f375036e2365772c554bab273f850`;
+the retained WGC PNG is
+`975e88d1feea54301949964d6468af30844aad4c79d0d121fc1ff5e43fca9290`.
+
+A separate omitted-duration S workflow on the same ceec binary passed the
+native fast-profile fitter: 350 ms RMS 4.917 CSS px versus 500 ms RMS
+87.276 px, four intermediate positions, a 350.0 ms observed bracket and
+220 actual owned-HWND WGC frames. Eight actions and four trusted events passed;
+GIF and MP4 artifacts were retained and probed. This is short-profile native
+motion evidence, not dense export correspondence. Public cleanup and exact
+owned-process retirement passed. The report SHA-256 is
+`f4867d20784da43e3ec1aed837e95837ae909a20461699367b5aa32b4e306ae2`;
+the fast-profile input and result SHA-256 is
+`63facb3535652e8dcfc3bfbc345dbd9ac3d33f7aae8f7ac09f2baa24cf541651`.
+Both runs used test revision `cc303fe271e6e1abda3c0b9c1d1f9600e0669907`.

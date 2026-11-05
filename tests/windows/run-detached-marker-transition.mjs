@@ -13,9 +13,9 @@ import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
-const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
+const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,expectedUiaHash,expectedWgcHash,expectedRevision,mode="screenshots-only"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast","default"].includes(motionProfile));
+assert.ok(["screenshots-only","no-capture"].includes(mode));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -28,8 +28,8 @@ const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:
 const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:true,timeout,maxBuffer:2097152});
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
-const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
-const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
+const alias="capture-detached-marker-"+manifest.source.slice(0,8);
+const report={source:manifest.source,profile:mode,phase:"session",checks:[],cleanup:"not-started"};
 let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,capturePromise;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
@@ -91,12 +91,12 @@ try{
  report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:motionProfile==="dense"?2400:350,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
  const workflow={version:1,tabId,pointer:{enabled:false},tapIndicator:{color:"#ff0000",radius:48,durationMs:5000,wobble:false,fade:true},
   capture:{formats:["screenshots"],fps:15,maxWidth:640,maxDurationMs:30000,maxBytes:16777216},
   actions:[{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
    {action:"wait",ms:3000},{action:"click",target:{role:"button",name:"G08 Finish",exact:true}}]};
+ if(mode==="no-capture") delete workflow.capture;
  scriptV1Schema.parse(workflow);
  pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
@@ -121,11 +121,19 @@ try{
  void capturePromise.then(()=>{report.captureEndedTick=Math.floor(uptime()*1000);},
   error=>{report.captureEndedTick=Math.floor(uptime()*1000);report.captureFailure=safeWgcDiagnostic(String(error.stderr??""));});
  const stopPromise=uiaRun(["inspect",String(running.pid),exe,identity.startTime]).catch(()=>null);
- const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
+ let fixtureFacts;
+ for(let attempt=0;attempt<20;attempt++){
+  fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
+  if(fixtureFacts.events.length>=2) break;
+  await new Promise(done=>setTimeout(done,50));
+ }
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
+ assert.equal(fixtureFacts.events[0].documentId,fixtureFacts.events[1].documentId);
  report.fixture={trustedClicks:fixtureFacts.events.length,pageRequests:fixture.pageRequests};
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));
+ if(mode==="no-capture") assert.equal(items.length,0);
+ else {
  assert.ok(items.some(item=>item.mimeType==="image/png" && item.actionIndex===2),"PNG_ARTIFACT_MISSING");
  const png=items.find(item=>item.mimeType==="image/png" && item.actionIndex===2),chunks=[];let offset=0;
  assert.ok(png.byteLength<=16777216,"OUTPUT_BUDGET");
@@ -136,6 +144,7 @@ try{
  }
  const pngBytes=Buffer.concat(chunks);assert.equal(createHash("sha256").update(pngBytes).digest("hex"),png.sha256);
  await writeFile(join(outputRoot,"terminal.png"),pngBytes,{flag:"wx"});
+ }
  const stopState=await stopPromise;
  report.stopState={visibleInvokableButtons:stopState?.visibleInvokableButtons??null};
  assert.equal(stopState?.visibleInvokableButtons,0);
@@ -155,6 +164,21 @@ try{
  report.native={width:captured.width,height:captured.height,redPixels,maxAlpha,rawSha256:captured.raw.sha256,pngSha256:captured.png.sha256};
  report.checks.push({name:"post-response owned marker",passed:redPixels>0,redPixels});
  assert.ok(redPixels>0,"POST_RESPONSE_MARKER_NOT_OBSERVED");
+ if(mode==="no-capture"){
+  // This delay starts after the response; it exceeds the requested 5 s marker lifetime.
+  await new Promise(done=>setTimeout(done,5500));
+  let hidden=false;
+  try{await uiaRun(["presentation",String(running.pid),exe,identity.startTime]);}
+  catch(error){if(!presentationNotVisible(error))throw error;hidden=true;}
+  const expiredStop=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
+  assert.equal((await api("get-device-info")).success,true);
+  const afterExpiry=await tabFact(tabId);
+  assert.deepEqual(afterExpiry,before);
+  report.expiry={presentationHidden:hidden,visibleInvokableButtons:expiredStop.visibleInvokableButtons,
+    listenerAndTabStillActive:true};
+  assert.ok(hidden,"MARKER_DID_NOT_EXPIRE");
+  assert.equal(expiredStop.visibleInvokableButtons,0);
+ }
  report.phase="complete";
  }
 }catch(error){
