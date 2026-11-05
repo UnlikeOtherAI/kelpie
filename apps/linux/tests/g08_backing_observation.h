@@ -28,7 +28,7 @@ inline nlohmann::json ObserveG08Backing(const ScriptFrame& frame, const ScriptFr
   std::string bytes((roi.size()+2)/3*4,'\0');
   if (EVP_EncodeBlock(reinterpret_cast<unsigned char*>(bytes.data()),roi.data(),int(roi.size())) != int(bytes.size()))
     throw std::runtime_error("CAPTURE_TEST_OBSERVATION_FAILED");
-  return {{"run",run},{"sequence",sequence},{"elapsedMs",frame.elapsed_ms},
+  return {{"pid",getpid()},{"run",run},{"sequence",sequence},{"elapsedMs",frame.elapsed_ms},
     {"frameWidth",frame.width},{"frameHeight",frame.height},{"stride",frame.stride},
     {"sourceWidth",source.width},{"sourceHeight",source.height},
     {"viewportWidth",shown.at("viewportWidth")},{"viewportHeight",shown.at("viewportHeight")},
