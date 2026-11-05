@@ -58,7 +58,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     if (!observed.ok) return ErrorResponse(observed.error_code, "Owned document is unavailable");
     const double x = resolved.at("x"), y = resolved.at("y");
     Json pointer = script.value("pointer", Json::object());
-    const double duration = pointer.value("enabled", false) ? pointer.value("durationMs", 500) : 0;
+    const double duration = pointer.value("enabled", false) ? pointer.value("durationMs", 350) : 0;
     double start_x = std::max(0.0, x - 100), start_y = std::max(0.0, y - 70);
     {
       std::lock_guard lock(mutex);
