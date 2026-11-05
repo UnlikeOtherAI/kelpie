@@ -63,7 +63,7 @@ on:
       native_workflow_scope:
         description: Select the full corpus or a focused diagnostic
         type: choice
-        options: [full, navigation, diagnostics, geometry]
+        options: [full, navigation, diagnostics, geometry, postedit]
         default: full
 
 permissions:
@@ -191,19 +191,19 @@ jobs:
             DEVELOPMENT_TEAM=""
 
       - name: Build matching CLI
-        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'geometry'
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'geometry' && (inputs.native_workflow_scope || 'full') != 'postedit'
         env:
           GOMAXPROCS: 1
         run: pnpm --filter @unlikeotherai/kelpie build
 
       - name: Use Node 24 for capture evidence
-        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation' && (inputs.native_workflow_scope || 'full') != 'geometry'
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation' && (inputs.native_workflow_scope || 'full') != 'geometry' && (inputs.native_workflow_scope || 'full') != 'postedit'
         uses: actions/setup-node@v6.4.0
         with:
           node-version: 24
 
       - name: Install media verification tools
-        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation' && (inputs.native_workflow_scope || 'full') != 'geometry'
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation' && (inputs.native_workflow_scope || 'full') != 'geometry' && (inputs.native_workflow_scope || 'full') != 'postedit'
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             brew install ffmpeg
@@ -218,7 +218,7 @@ jobs:
           KELPIE_IOS_TEST_SCOPE: ${{ inputs.native_workflow_scope || 'full' }}
         run: |
           python3 -m unittest discover -s scripts/testing -p test_ios_workflow_driver.py
-          if [[ "$KELPIE_IOS_TEST_SCOPE" != navigation && "$KELPIE_IOS_TEST_SCOPE" != geometry ]]; then
+          if [[ "$KELPIE_IOS_TEST_SCOPE" != navigation && "$KELPIE_IOS_TEST_SCOPE" != geometry && "$KELPIE_IOS_TEST_SCOPE" != postedit ]]; then
             node --test scripts/testing/ios_g08_scene.test.mjs
           fi
           python3 scripts/testing/ios-workflow-acceptance.py

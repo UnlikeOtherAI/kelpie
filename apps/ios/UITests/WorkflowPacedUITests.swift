@@ -37,6 +37,12 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testPostEvaluationCallbackKeepsKeyboardClosed() async throws {
+        testLaunchArguments = ["--test-post-evaluation"]
+        try await pacedCaptureKeyboardCheck()
+    }
+
+    @MainActor
     private func pacedCaptureKeyboardCheck() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }

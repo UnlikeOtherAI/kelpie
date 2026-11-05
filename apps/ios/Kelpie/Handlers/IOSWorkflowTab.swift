@@ -131,6 +131,7 @@ final class IOSWorkflowTab {
     private func fixed(
         _ expression: String,
         mutates: Bool = false,
+        postEvaluationProbe: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
     ) async throws -> Any? {
@@ -151,7 +152,20 @@ final class IOSWorkflowTab {
                 guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
                 evaluationStarted = true
                 do {
+                    #if DEBUG
+                    let result: Any?
+                    if postEvaluationProbe && ProcessInfo.processInfo.arguments.contains("--test-post-evaluation") {
+                        let probe = IOSPostEvaluationProbe(view: view) { [self] in
+                            try await requireMutationAuthority()
+                            guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
+                        }
+                        result = try await probe.evaluate(expression)
+                    } else {
+                        result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    }
+                    #else
                     let result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    #endif
                     resultReceived = true
                     // Consume privacy metadata before guards and even after the caller's deadline.
                     consume?(result)
@@ -267,6 +281,7 @@ final class IOSWorkflowTab {
             value = try await fixed(
                 expression,
                 mutates: dispatch || edit != nil,
+                postEvaluationProbe: edit != nil,
                 consume: { result in
                     acknowledgement = IOSPacedTypingExecutor.consumeCallback(
                         result,
