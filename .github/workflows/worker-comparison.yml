@@ -3,6 +3,9 @@ name: Opt-in same-host worker comparison
 on:
   workflow_dispatch:
     inputs:
+      isolation_only:
+        type: boolean
+        default: false
       prepare_only:
         description: Record official Chromium identity without starting benchmark units
         type: boolean
@@ -17,6 +20,9 @@ on:
         default: ""
   workflow_call:
     inputs:
+      isolation_only:
+        type: boolean
+        default: false
       prepare_only:
         type: boolean
         default: true
@@ -48,13 +54,15 @@ jobs:
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@v6.0.8
+        if: inputs.isolation_only == false
         with:
           version: 10
       - uses: actions/setup-node@v6.4.0
         with:
           node-version: 22.14.0
-          cache: pnpm
+
       - name: Prepare pinned test inputs outside measured units
+        if: inputs.isolation_only == false
         shell: bash
         run: |
           set -euo pipefail
@@ -101,14 +109,19 @@ jobs:
             [[ "$binary_sha" == "$CHROMIUM_BINARY_SHA256" ]]
           fi
       - name: Build comparison CLI and shared packages
-        if: inputs.prepare_only == false
+        if: inputs.isolation_only == false && inputs.prepare_only == false
         shell: bash
         run: |
           pnpm --filter @unlikeotherai/kelpie-shared build
           pnpm --filter @unlikeotherai/kelpie build
       - name: Compare in separately bounded loopback-only units
-        if: inputs.prepare_only == false
+        if: inputs.isolation_only == false && inputs.prepare_only == false
         shell: bash
+        run: bash scripts/testing/run-worker-comparison-hosted.sh
+      - name: Probe isolation without a browser
+        if: inputs.isolation_only == true
+        env:
+          KELPIE_AB_ISOLATION_ONLY: "true"
         run: bash scripts/testing/run-worker-comparison-hosted.sh
       - name: Retain scoped evidence and failures
         if: always()

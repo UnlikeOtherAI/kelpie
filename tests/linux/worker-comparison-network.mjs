@@ -9,6 +9,9 @@ export function validateProbe(mode,local,nonlocal){
  else assert.ok(["EACCES","EPERM"].includes(nonlocal),"NONLOOPBACK_NOT_DENIED");
  return {local:"connected",nonlocal:mode==="inside"?"denied":"connected"};
 }
+const classifiedErrors=new Set(["EACCES","EPERM","ECONNREFUSED","ECONNRESET",
+ "ENETUNREACH","EHOSTUNREACH","EADDRNOTAVAIL","ETIMEDOUT"]);
+export function classifySocketError(code){return classifiedErrors.has(code)?code:"OTHER";}
 function connection(host,port){
  return new Promise(resolve=>{
   const socket=createConnection({host,port});
@@ -17,14 +20,19 @@ function connection(host,port){
   socket.setTimeout(1500);
   socket.once("connect",()=>finish("connected"));
   socket.once("timeout",()=>finish("timeout"));
-  socket.once("error",error=>finish(error.code??"ERROR"));
+  socket.once("error",error=>finish(classifySocketError(error.code)));
  });
 }
-export async function probeWorkerBoundary(host,port,mode){
+export async function observeWorkerBoundary(host,port){
  assert.equal(isIP(host),4);
  assert.ok(!host.startsWith("127.")&&host!=="0.0.0.0","Require non-loopback host address");
  assert.ok(Object.values(networkInterfaces()).flat().some(item=>item&&!item.internal&&item.address===host),
   "Canary must target this host");
  assert.ok(Number.isSafeInteger(port)&&port>0&&port<=65535);
- return validateProbe(mode,await connection("127.0.0.1",port),await connection(host,port));
+ return {local:await connection("127.0.0.1",port),nonlocal:await connection(host,port)};
+}
+
+export async function probeWorkerBoundary(host,port,mode){
+ const observed=await observeWorkerBoundary(host,port);
+ return validateProbe(mode,observed.local,observed.nonlocal);
 }
