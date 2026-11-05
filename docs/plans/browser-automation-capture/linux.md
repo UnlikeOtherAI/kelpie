@@ -782,3 +782,25 @@ The isolated screenshot SHA-256 is
 d1570861b080e8bfd34e68bde1d9eb05f053f525d1a794aec98fe4a85441aa90, and the
 GTK action receipt SHA-256 is
 da5a8ace2f0df4d15b42c6c3dd1b506c8b7b2705e2cf395a191cd8ba317e0ab0.
+
+## Ubuntu installed-package replay
+
+Hosted Ubuntu 22.04 run 42102220654 built and installed source
+1a148927ad081fab54a71ba8ada95bf038c7c9ef. Its original installed-media
+step failed because FFmpeg 4.4.2 rejected the newer `-fps_mode` option; the
+failure is retained. Test-only source 45d841a5535123a6b3ff176e57aeded6cd014b43
+replayed that exact package in run 42107002688 with passthrough decoding via
+`-vsync 0`. Package and installed identity receipts matched the original;
+the installed ELF SHA-256 was
+f25aa6850ed8e789d44023e3cb62c70d48ffd418f76b8e6322d0cb9370ea5c30,
+and the installed identity receipt SHA-256 was
+4152dbf6c1960a2169023a9dc7e86024718e71d08d74a9b09cbfbf01b10fefb0.
+The replay passed all 54 native cases, decoded all 44 retained artifacts,
+passed continuous marker center and clear verification, passed the five CLI
+checks with ten observations, and cleaned up. The continuous-marker receipt
+SHA-256 was 642b7ae0217637d6f58bddeb08e55075e4cf03947057d832aef5fa89e5f5a69b.
+
+This is an installed, headless container result, not physical Ubuntu desktop
+or published-release verification. The Fedora row of 42107002688 failed
+before testing while its source artifact was unavailable; it does not establish
+a Fedora runtime result.
