@@ -163,6 +163,36 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testCanonicalMutationReceiptAndPrivacyFixture() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("tests/capture/ack-receipt-cases.json"))
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? Body)
+        let expectedToken = try XCTUnwrap(fixture["expectedToken"] as? String)
+        let cases = try XCTUnwrap(fixture["cases"] as? [Body])
+        XCTAssertEqual(cases.count, 52)
+        for item in cases {
+            let name = try XCTUnwrap(item["name"] as? String)
+            let result = item["result"]
+            let body = result as? Body
+            let valid = body.map { ScriptWorkflowTab.hasValidMutationReceipt($0) } ?? false
+            let acknowledged = ScriptWorkflowTab.isAcknowledgedMutation(result, token: expectedToken)
+            let refused = valid && ScriptWorkflowBoolean.value(body?["ok"]) == false
+            let receipt = acknowledged ? "ack" : refused ? "refusal" : "malformed"
+            XCTAssertEqual(receipt, item["expectedReceipt"] as? String, name)
+            let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+            ScriptWorkflowTab.consumeTargetResult(
+                result, mutates: true, expectedToken: expectedToken,
+                consume: { privacy.consume($0, text: "literal") },
+                uncertain: { privacy.uncertain(text: "literal") }
+            )
+            let protected = item["expectedPrivacy"] as? String != "known-negative"
+            XCTAssertEqual(privacy.discardMedia, protected, name)
+            XCTAssertEqual(privacy.secrets, protected ? ["literal"] : [], name)
+        }
+    }
+
+    @MainActor
     func testJSONReceiptBooleansRejectNumbersStringsAndNull() throws {
         func decoded(_ json: String) throws -> Body {
             try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? Body)
