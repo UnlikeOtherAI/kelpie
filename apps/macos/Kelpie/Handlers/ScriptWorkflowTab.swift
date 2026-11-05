@@ -248,7 +248,7 @@ final class ScriptWorkflowTab {
 
     static func isAcknowledgedMutation(_ value: Any?, token: String) -> Bool {
         guard let body = value as? Body else { return false }
-        return body["token"] as? String == token && body["ok"] as? Bool == true && body["error"] == nil &&
+        return !token.isEmpty && body["token"] as? String == token && body["ok"] as? Bool == true && body["error"] == nil &&
             body["mayHaveCompleted"] as? Bool == true && body["inputGuarantee"] as? String == "synthetic-coordinate" &&
             body["sensitive"] is Bool && body["sensitivityKnown"] is Bool
     }
@@ -263,7 +263,7 @@ final class ScriptWorkflowTab {
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
-        if mutates, body["ok"] as? Bool == true, let expectedToken, body["token"] as? String != expectedToken {
+        if mutates, body["ok"] as? Bool == true, let expectedToken, expectedToken.isEmpty || body["token"] as? String != expectedToken {
             uncertain?()
         }
         let invalidStatus = body["ok"] as? Bool == true

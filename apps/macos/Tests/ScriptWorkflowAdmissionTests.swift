@@ -151,6 +151,9 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         let unknown: Body = ["token": "expected", "inputGuarantee": "synthetic-coordinate", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(known, token: "expected"))
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown, token: "expected"))
+        var emptyToken = known
+        emptyToken["token"] = ""
+        XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(emptyToken, token: ""))
         for guarantee: Any? in [nil, "other"] {
             var invalid = known
             invalid["inputGuarantee"] = guarantee
