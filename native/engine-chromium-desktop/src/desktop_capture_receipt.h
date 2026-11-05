@@ -4,8 +4,7 @@
 
 namespace kelpie {
 template<typename Callback>
-bool CaptureCompletionApproved(bool protocolSuccess,Callback&& callback) {
-  if(!protocolSuccess) return true;
+bool CaptureCompletionApproved(Callback&& callback) {
   try { return callback(); } catch(...) { return false; }
 }
 inline bool CaptureReceiptEligible(std::chrono::steady_clock::time_point now,

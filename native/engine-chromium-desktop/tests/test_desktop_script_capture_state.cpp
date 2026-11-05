@@ -18,11 +18,10 @@ int main() {
   assert(!kelpie::CaptureReceiptEligible(now,deadline,false,false,true));
   assert(!kelpie::CaptureReceiptEligible(now,deadline,false,true,false));
   int calls=0;
-  assert(kelpie::CaptureCompletionApproved(false,[&] { ++calls; return false; }));
-  assert(calls==0); // Protocol failure remains the original failure.
-  assert(kelpie::CaptureCompletionApproved(true,[&] { ++calls; return true; }));
-  assert(!kelpie::CaptureCompletionApproved(true,[] { return false; }));
-  assert(!kelpie::CaptureCompletionApproved(true,[]()->bool { throw std::runtime_error("failure"); }));
+  assert(kelpie::CaptureCompletionApproved([&] { ++calls; return true; }));
+  assert(calls==1);
+  assert(!kelpie::CaptureCompletionApproved([] { return false; }));
+  assert(!kelpie::CaptureCompletionApproved([]()->bool { throw std::runtime_error("failure"); }));
   using Failure=kelpie::CaptureViewportFailure;
   assert(kelpie::ClassifyCaptureViewportFailure(false,"old","new")==Failure::DocumentUnavailable);
   assert(kelpie::ClassifyCaptureViewportFailure(true,"old","new")==Failure::TornFrame);
