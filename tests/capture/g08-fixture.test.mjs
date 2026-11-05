@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {request} from "node:http";
 import {setImmediate} from "node:timers";
-import {startG08Fixture,g08Workflow,mapG08Scene} from "./g08-fixture.mjs";
+import {startG08Fixture,g08Workflow,mapG08Scene,hasG08Warmup} from "./g08-fixture.mjs";
 test("neutral fixture serves blank named controls and bounded facts through actual HTTP",async()=>{
  const fixture=await startG08Fixture();
  try{
@@ -49,6 +49,9 @@ test("four observed clicks bind warmup and calibration to one ordered scene",()=
    viewport:{width:640,height:480},center:target==="finish"?{x:480,y:240}:{x:160,y:240}});
  const events=[make("finish",1),make("finish",6000),make("start",12000),make("finish",18000)];
  const scene=mapG08Scene(events);
+ assert.equal(hasG08Warmup(scene),true);
+ assert.equal(hasG08Warmup({calibration:events[1],start:events[2],finish:events[3]}),false);
+ assert.throws(()=>hasG08Warmup({...scene,warmup:null}));
  assert.equal(scene.warmup,events[0]);assert.equal(scene.calibration,events[1]);
  assert.equal(scene.start,events[2]);assert.equal(scene.finish,events[3]);
  for(const mutate of [

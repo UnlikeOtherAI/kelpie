@@ -9,7 +9,7 @@ import {measureG08Frame} from "./g08-pixels.mjs";
 import {evaluateG08} from "./g08-timeline.mjs";
 import {validateG08PTS} from "./g08-pts.mjs";
 import {loadG08ModelReference} from "./g08-model-reference.mjs";
-import {mapG08Scene} from "./g08-fixture.mjs";
+import {hasG08Warmup} from "./g08-fixture.mjs";
 import {createG08Retention} from "./g08-retention.mjs";
 const [inputPath,outputPath,modelPath,backingDir,evidencePath]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
@@ -29,8 +29,8 @@ const output={version:1,source:input.source,binarySHA256:input.binarySHA256,runt
 const seen=new Set();
 for(const item of input.cases){
   assert.ok(["c","s"].includes(item.curve)&&!seen.has(item.curve));seen.add(item.curve);
-  const {warmup,calibration,start,finish}=item.scene;
-  if(warmup)mapG08Scene([warmup,calibration,start,finish]);
+  const {calibration,start,finish}=item.scene;
+  const warmupCalibration=hasG08Warmup(item.scene);
   assert.equal(calibration.target,"finish");
   assert.equal(calibration.documentId,start.documentId);
   assert.deepEqual(calibration.viewport,start.viewport);
@@ -65,7 +65,7 @@ for(const item of input.cases){
       const metadata=JSON.parse(probe.stdout.toString());
       const actualPTS=validateG08PTS(metadata,artifact);
       const config={from:start.center,to:finish.center,curve:item.curve,pointerMs:2400,markerMs:3000,radius:48,
-        color:item.curve==="c"?"#ff0000":"#0000ff",warmupCalibration:Boolean(warmup),
+        color:item.curve==="c"?"#ff0000":"#0000ff",warmupCalibration,
         scale:{x:artifact.width/start.viewport.width,y:artifact.height/start.viewport.height}};
       const marker={center:{x:finish.center.x*config.scale.x,y:finish.center.y*config.scale.y},
         radius:48*config.scale.x,color:config.color};

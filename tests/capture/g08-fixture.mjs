@@ -67,3 +67,9 @@ export function mapG08Scene(events){
   assert.deepEqual(calibration.center,finish.center);
   return {warmup,calibration,start,finish};
 }
+/** Legacy scenes have no warmup key; a present key must be a complete scene. */
+export function hasG08Warmup(scene){
+  if(!Object.hasOwn(scene,"warmup"))return false;
+  mapG08Scene([scene.warmup,scene.calibration,scene.start,scene.finish]);
+  return true;
+}
