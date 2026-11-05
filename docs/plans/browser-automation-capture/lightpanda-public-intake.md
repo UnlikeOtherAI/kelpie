@@ -34,3 +34,38 @@ This closes the restricted public navigation/lifecycle proof stage,not the
 whole optional-backend brief or any native acceptance cell. Corrected fixed
 snapshot/readiness/extraction diagnostics and broader task/cost differences
 remain separately reviewable.
+
+
+## Corrected fixed-reader diagnostic
+
+On 5 November 2026 the common owner ran the pinned Lightpanda 1.0.2 binary,
+SHA-256 `ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e`,
+inside an owned Fedora test worktree at diagnostic source
+`c1495174f56d950a128c40eab3b05aa7c9e50d47`. The copied compiled fixed-reader
+files matched the corresponding Maxis build hashes. The report SHA-256 is
+`35c151254eb464a41a4b6dcd4efe1237dcbef54899fff19fcc54a8ad5337c996`.
+It is retained under the owner's ignored Fedora scratch at
+`capture-common-resume-20261105/scratch/reader-c149/report.json`.
+
+The corrected direct fixed-reader checks passed for snapshot, extract, status
+and ready: priority/scope/budget and hidden/private omission; bounded nested,
+missing and ambiguous fields, publisher metadata and provenance; explicit
+unavailable network/error status; unique, hidden, opacity, collapse, missing
+and duplicate readiness. Scoped and bounded snapshots used explicit unique
+host prefixes and did not require a heading beyond the 20-element priority
+budget. The observed second-page and concurrent-context attempts refused;
+shared managed allocation also refused before allocation, while a single
+isolated managed session passed its bounded refusal/cleanup subset.
+
+The systemd unit enforced one CPU, 2 GiB memory, 64 tasks, 120 seconds,
+NoNewPrivileges and loopback-only IP egress. It exited successfully in 1.036 s,
+with 1.001 s CPU and 200.6 MiB peak; its unit was collected, MainPID zero,
+cgroup empty and the owned Lightpanda process exited. These are absolute
+measurements on the loaded host, not a browser speed comparison. Earlier
+diagnostic and public receipts, including failed attempts, remain unchanged.
+
+This run invoked the fixed readers directly and **did not run a public CLI
+reader corpus**. Its report's historical hard-coded `cliBundleSource` field
+does not identify a CLI used by this run; no CLI was invoked. Public candidate
+admission and real stdio proof remain separate, as do native capabilities,
+geometry, input, pixels and WebMCP.

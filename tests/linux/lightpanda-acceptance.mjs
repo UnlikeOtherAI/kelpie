@@ -27,7 +27,7 @@ const home = join(output, "empty-home"); await mkdir(home, { recursive: true });
 process.env.HOME = home; process.env.KELPIE_HOME = join(home, "kelpie");
 const environment = { ...process.env, LIGHTPANDA_DISABLE_TELEMETRY: "true", LIGHTPANDA_DISABLE_CORE_DUMP: "1" };
 const report = { source: process.env.KELPIE_TEST_REVISION, binarySHA256: expected,
-  cliBundleSource: "eee84a266ad0b3613de71eb930e1bf0c9ede8cb3",
+  cliBundleSource: null,
   hostContention: "Maxis busy; one-CPU quota/CPUWeight1; no unloaded speed comparison",
   tests: [], timingsMs: {}, verifiedMethods: [], observations: {}, evaluationRequests: 0, evaluationResponseBytes: 0, publicToolRequests: 0 };
 const start = performance.now(), exec = promisify(execFile);
