@@ -18,6 +18,7 @@ PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
 BUNDLE = "com.unlikeotherai.kelpie"
 NAVIGATION_UI_TEST = "testInitialOwnedHTTPNavigationLoadsFixture"
+COLD_NAVIGATION_TEST = "testColdPriorHTTPEitherNavigatesOrRefusesBeforeLoadThenRecovers"
 NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 
 
@@ -30,10 +31,10 @@ def selection(scope):
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
-        targets.append("KelpieUITests/WorkflowCaptureUITests/" + NAVIGATION_UI_TEST)
+        targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST])
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
     if scope == "navigation":
-        required.add(NAVIGATION_UI_TEST)
+        required.update([NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST])
     return targets, required
 
 

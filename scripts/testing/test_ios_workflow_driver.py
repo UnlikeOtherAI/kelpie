@@ -31,7 +31,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
 
     def test_navigation_selection_has_only_real_native_and_public_navigation_cases(self):
         targets, names = DRIVER.selection("navigation")
-        self.assertEqual(len(targets), 2)
+        self.assertEqual(len(targets), 3)
         self.assertEqual(names, {
             "testRealWebKitHTTPNavigationUsesIssuedToken",
             "testRealWebKitHTTPNavigationAfterPriorBlankUsesIssuedToken",
@@ -40,6 +40,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testRealWebKitPriorLoadCancellationDoesNotIssueAnotherLoad",
             "testRealWebKitForeignCallbackAfterReservationStillRefuses",
             "testInitialOwnedHTTPNavigationLoadsFixture",
+            "testColdPriorHTTPEitherNavigatesOrRefusesBeforeLoadThenRecovers",
         })
         _, full_names = DRIVER.selection("full")
         self.assertTrue(names < full_names)
