@@ -59,6 +59,7 @@ let kelpieApp = Target.target(
         .glob("../macos/Kelpie/AI/OpenAICompatible/**/*.swift"),
         .glob("../macos/Kelpie/Network/BrowserControlGateway.swift"),
         .glob("../macos/Kelpie/Network/Router+BrowserControl.swift"),
+        .glob("../macos/Kelpie/Network/ScriptGatewayPolicy.swift"),
         .glob("../macos/Kelpie/Network/AccountPairingAuthorization.swift"),
     ],
     resources: [
@@ -110,7 +111,8 @@ let kelpieTests = Target.target(
     destinations: [.iPhone, .iPad],
     product: .unitTests,
     bundleId: "com.unlikeotherai.kelpie.tests",
-    deploymentTargets: .iOS("16.0"),
+    // XCTest supplied with the build SDK requires iOS 17 in its test runner.
+    deploymentTargets: .iOS("17.0"),
     infoPlist: .default,
     sources: [
         .glob("Tests/**/*.swift"),
@@ -141,7 +143,7 @@ let kelpieUITests = Target.target(
     destinations: [.iPhone, .iPad],
     product: .uiTests,
     bundleId: "com.unlikeotherai.kelpie.uitests",
-    deploymentTargets: .iOS("16.0"),
+    deploymentTargets: .iOS("17.0"),
     infoPlist: .default,
     sources: [.glob("UITests/**/*.swift")],
     dependencies: [.target(name: "Kelpie")],

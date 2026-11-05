@@ -132,7 +132,9 @@ final class IOSWorkflowRunner {
             }
             if let end = scene.markerEnd {
                 try await executor.wait(milliseconds: Int(max(0, end - ProcessInfo.processInfo.systemUptime) * 1000))
-                try await sampler?.step(nil)
+            }
+            if let sampler, sampler.recordsMotion {
+                while !(try await sampler.step(nil)) { try sampler.checkTime() }
             }
         } catch { issue = error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
