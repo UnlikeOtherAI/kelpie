@@ -4,14 +4,14 @@ import assert from "node:assert/strict";
 export async function startG08Fixture({host="127.0.0.1",port=0}={}){
   assert.ok(Number.isInteger(port)&&port>=0&&port<=65535);
   const html=await readFile(new URL("./g08-fixture.html",import.meta.url));
-  const events=[],sockets=new Set();let dropped=0;
+  const events=[],sockets=new Set();let dropped=0,pageRequests=0;
   const send=(response,status,body,type="application/json")=>{
     response.writeHead(status,{"content-type":type,"cache-control":"no-store","content-length":Buffer.byteLength(body)});
     response.end(body);
   };
   const server=createServer((request,response)=>{void(async()=>{
     const path=new URL(request.url??"/","http://fixture.invalid").pathname;
-    if(request.method==="GET"&&(path==="/"||path==="/g08"))return send(response,200,html,"text/html; charset=utf-8");
+    if(request.method==="GET"&&(path==="/"||path==="/g08")){pageRequests++;return send(response,200,html,"text/html; charset=utf-8");}
     if(request.method==="POST"&&path==="/events"){
       const chunks=[];let bytes=0;
       for await(const chunk of request){bytes+=chunk.length;if(bytes>8192)return send(response,413,"{}");chunks.push(chunk);}
@@ -31,7 +31,7 @@ export async function startG08Fixture({host="127.0.0.1",port=0}={}){
   server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
   await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,host,resolve);});
   const address=server.address();
-  return {url:"http://"+host+":"+address.port+"/g08",events,
+  return {url:"http://"+host+":"+address.port+"/g08",events,get pageRequests(){return pageRequests;},
     close:()=>new Promise(resolve=>{server.close(resolve);for(const socket of sockets)socket.destroy();})};
 }
 export function g08Workflow(tabId,curve="c"){

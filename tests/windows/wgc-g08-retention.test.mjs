@@ -1,0 +1,2 @@
+import test from "node:test";import assert from "node:assert/strict";import {createG08Retention} from "./wgc-g08-retention.mjs";
+test("retains endpoint calibration until first marker and bounds later ROI",()=>{const r=createG08Retention();for(let i=0;i<200;i++)r.push({timeMs:i*50,pointer:{x:1,y:1},marker:{alpha:i===60?.5:0,roi:Buffer.from([i%256])}});assert.ok(Buffer.isBuffer(r.samples[59].marker.roi));assert.equal(r.samples[60].calibrationCandidate,true);assert.equal(r.samples[61].marker.roi,undefined);assert.ok(Buffer.isBuffer(r.samples[199].marker.roi));});
