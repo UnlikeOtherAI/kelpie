@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import { scriptPointerPosition, scriptTapPresentation } from "../../packages/shared/dist/index.js";
 import { median } from "./g08-pixels.mjs";
+import { sameG08Pixels } from "./g08-calibration.mjs";
 const rms=values=>Math.sqrt(values.reduce((sum,value)=>sum+value*value,0)/values.length);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function demand(value,message){assert.ok(value,message);}
@@ -21,11 +23,27 @@ export function evaluateG08(samples,config){
   demand(length>=120,"INSUFFICIENT_EVIDENCE path span");
   const project=p=>((p.x-from.x)*dx+(p.y-from.y)*dy)/(length*length);
   const pointers=samples.filter(s=>s.pointer);
+  demand(pointers.length>=3,"INSUFFICIENT_EVIDENCE calibration pointer");
+  const initial=pointers[0];
+  demand(distance(initial.pointer,to)<=8,"INSUFFICIENT_EVIDENCE pre-dispatch pointer position");
+  const calibration=pointers.filter(s=>s.timeMs>=initial.timeMs&&s.timeMs<=initial.timeMs+300);
+  demand(calibration.length>=3&&calibration.every(s=>distance(s.pointer,initial.pointer)<=1&&
+    s.marker.alpha<=.03&&Buffer.isBuffer(s.marker.roi)),
+    "INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline");
+  const reference=calibration[0].marker.roi;
+  demand(calibration.every(s=>sameG08Pixels(reference,s.marker.roi)),
+    "INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline");
   const settled=pointers.filter(s=>distance(s.pointer,to)<=10).slice(-8);
   demand(settled.length>=3,"INSUFFICIENT_EVIDENCE endpoint pixels");
   const offset={x:to.x-median(settled.map(s=>s.pointer.x)),y:to.y-median(settled.map(s=>s.pointer.y))};
   demand(Math.hypot(offset.x,offset.y)<=8,"Pointer anchor differs by more than8pixels");
-  const path=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}))
+  const corrected=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}));
+  const lastStart=corrected.filter(s=>s.timeMs<settled.at(-1).timeMs&&distance(s.p,from)<=2).at(-1);
+  demand(lastStart,"INSUFFICIENT_EVIDENCE final motion start");
+  demand(samples.some(s=>s.timeMs>initial.timeMs+300&&s.timeMs<lastStart.timeMs&&s.marker.alpha>.2),
+    "INSUFFICIENT_EVIDENCE calibration dispatch marker");
+  const finalSamples=samples.filter(s=>s.timeMs>=lastStart.timeMs);
+  const path=corrected.filter(s=>s.timeMs>=lastStart.timeMs)
     .filter(s=>project(s.p)>.025&&project(s.p)<.975);
   demand(path.length>=18,"INSUFFICIENT_EVIDENCE dense motion samples");
   const pointerDark=path.map(s=>s.pointer.dark);
@@ -58,7 +76,7 @@ export function evaluateG08(samples,config){
   if(curve==="c")demand(Math.max(...normals)>12&&Math.min(...normals)>-5,"G08_C_CURVE_MISSING");
   else demand(Math.max(...normals)>6&&Math.min(...normals)<-6,"G08_S_CURVE_MISSING");
   const baseAlpha=0.7;
-  const normalized=samples.map(s=>({...s,marker:{...s.marker,alpha:s.marker.alpha/baseAlpha}}));
+  const normalized=finalSamples.map(s=>({...s,marker:{...s.marker,alpha:s.marker.alpha/baseAlpha}}));
   const marker=normalized.filter(s=>s.marker.count>=20&&s.marker.alpha>.12);
   demand(marker.length>=25,"INSUFFICIENT_EVIDENCE marker phases");
   const peakAlpha=Math.max(...marker.map(s=>s.marker.alpha));
@@ -86,13 +104,15 @@ export function evaluateG08(samples,config){
   demand(full.length>=2,"INSUFFICIENT_EVIDENCE configured color");
   const expected=color.match(/[a-f0-9]{2}/gi).map(value=>parseInt(value,16));
   demand(full.some(s=>s.marker.channels.every((v,i)=>Math.abs(v-(255*(1-baseAlpha)+expected[i]*baseAlpha))<=40)),"G08_MARKER_COLOR_MISMATCH");
-  const tail=samples.filter(s=>s.timeMs>=markerStart+markerMs+150);
+  const tail=finalSamples.filter(s=>s.timeMs>=markerStart+markerMs+150);
   demand(tail.length>=3,"INSUFFICIENT_EVIDENCE clean end");
-  demand(tail.every(s=>s.marker.chromaticCount===0),"G08_MARKER_STUCK");
+  demand(tail.every(s=>s.pointer&&distance(s.pointer,initial.pointer)<=1&&Buffer.isBuffer(s.marker.roi)&&sameG08Pixels(reference,s.marker.roi)),
+    "INSUFFICIENT_EVIDENCE tail differs from calibrated pointer-only baseline");
   return {passed:true,confidence:"dense decoded pixels with bounded onset fit",baseAlpha,pointerStartMs:best.start,
     pointerRmsPx:best.error,uneasedRmsPx:noEaseError,endpointOffset:offset,motionSamples:path.length,
     maxMotionGapMs:Math.max(...gaps),markerStartMs:markerStart,
     dwellAfterMotionMs:markerStart-(best.start+pointerMs),alphaRms:alphaError,
     radiusBiasPx:bias,wobbleRmsPx:wobbleError,staticRadiusRmsPx:staticError,markerSamples:marker.length,
-    finalClearFrames:tail.length};
+    calibrationFrames:calibration.length,calibrationStartMs:initial.timeMs,
+    baselineRGBSha256:createHash("sha256").update(reference).digest("hex"),finalClearFrames:tail.length};
 }
