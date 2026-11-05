@@ -22,7 +22,7 @@ export const tapIndicatorSchema = z.object({
 export const scriptPointerSchema = z.object({
   enabled: z.boolean().default(false),
   curve: z.enum(["s", "c"]).default("s"),
-  durationMs: z.number().int().min(0).max(5000).default(500),
+  durationMs: z.number().int().min(0).max(5000).default(350),
   easing: z.literal("ease-in-out").default("ease-in-out"),
 }).strict();
 export const scriptCaptureSchema = z.object({

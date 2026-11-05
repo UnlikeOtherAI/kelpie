@@ -14,6 +14,18 @@ describe("strict authored workflows", () => {
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif"], fps: 31 } }).success).toBe(false);
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif", "gif"] } }).success).toBe(false);
   });
+  it("uses a faster pointer default while preserving explicit durations", () => {
+    const pointer = scriptV1Schema.parse({ ...script, pointer: { enabled: true } }).pointer!;
+    expect(pointer).toEqual({ enabled: true, curve: "s", durationMs: 350, easing: "ease-in-out" });
+    for (const durationMs of [0, 500, 2400]) {
+      expect(scriptV1Schema.parse({ ...script, pointer: { enabled: true, curve: "c", durationMs } }).pointer)
+        .toMatchObject({ curve: "c", durationMs });
+    }
+    const motion = { from: { x: 0, y: 0 }, to: { x: 300, y: 0 }, curve: pointer.curve };
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(0, pointer.durationMs))).toEqual(motion.from);
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(350, pointer.durationMs))).toEqual(motion.to);
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(175, pointer.durationMs)).x).toBeCloseTo(150);
+  });
   it("binds declared values once and rejects missing, undeclared and incorrectly typed inputs", () => {
     const raw = { ...script, inputs: { user: { type: "string" } }, actions: [{ action: "fill", target: { label: "Name" }, text: { input: "user" } }] };
     expect(bindScriptInputs(raw, { user: "Ada" }).actions[0]).toMatchObject({ text: "Ada" });

@@ -13,13 +13,13 @@ Where the selected browser advertises script v1, HTTP `POST /v1/play-script`, CL
   ],
   "capture": {"formats": ["gif", "video", "screenshots"], "fps": 15},
   "tapIndicator": {"color": "#3B82F6", "radius": 20, "wobble": true, "fade": true, "durationMs": 700},
-  "pointer": {"enabled": true, "curve": "s", "durationMs": 500, "easing": "ease-in-out"}
+  "pointer": {"enabled": true, "curve": "s", "durationMs": 350, "easing": "ease-in-out"}
 }
 ```
 
 Targets are exactly one of role/name/exact, label/exact, CSS selector or explicit viewport x/y. The target must be unique, visible, eligible and unobscured. Label text excludes input, textarea, select/options and contenteditable/textbox subtrees, so default form values and editor contents cannot become a control name. Implicit and external labels retain their public text. A partially clipped target uses the center of its visual-viewport/ancestor-overflow-clipped visible rectangle. Coordinates remain layout CSS client pixels; visual viewport offsets, size and scale are fenced in the target token, so pinch/pan changes refuse before input. The same element object, document, URL, viewport and geometry are rechecked after visual motion. A moved/replaced/obscured target refuses input. Semantic traversal is bounded; `TARGET_QUERY_LIMIT` requests a narrower target rather than silently choosing a match.
 
-The tap indicator uses 70% base opacity, multiplied by its animation fade. The pointer is presentation only and does not cause hover. Native platforms report actual input guarantees; synthetic coordinate events are never described as trusted input. A mutation with uncertain completion is never retried. Synchronous page handlers are fenced through the final click or input event: if they replace the target or change the document or URL, the completed mutation is reported uncertain with `mayHaveCompleted:true` and is never retried. Sensitivity discovered by the handler remains latched for redaction and capture disposal.
+When enabled, pointer motion defaults to 350 ms; set pointer.durationMs to choose another duration, including zero for immediate positioning. The tap indicator uses 70% base opacity, multiplied by its animation fade. The pointer is presentation only and does not cause hover. Native platforms report actual input guarantees; synthetic coordinate events are never described as trusted input. A mutation with uncertain completion is never retried. Synchronous page handlers are fenced through the final click or input event: if they replace the target or change the document or URL, the completed mutation is reported uncertain with `mayHaveCompleted:true` and is never retried. Sensitivity discovered by the handler remains latched for redaction and capture disposal.
 
 Typed actions include navigation, click/tap, fill/type, press-key, scroll, timed wait, bounded wait-ready, assertions, screenshots, commentary, named output and bounded extraction. The platform may support only a subset. Version1 rejects unknown actions, arbitrary JavaScript and continue-on-error.
 
