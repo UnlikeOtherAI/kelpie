@@ -101,13 +101,19 @@ final class ScriptHostedStreamDiagnostic {
                     }
                 }
             )
-            guard stopped, allowed else { print("[WorkflowHostedStream] event=discarded"); return }
-            try await tab.check()
-            let state = try await tab.hostedFixtureCaptureState(origin: fixtureOrigin)
-            try await tab.check()
-            guard isCurrent(), state.document == documentID, state.viewport == viewport,
-                  let samples = probe.seal(afterAudit: true) as? [[String: NSNumber]], samples.count <= 64 else {
-                print("[WorkflowHostedStream] event=discarded")
+            guard stopped else { discard("stop"); return }
+            guard allowed else { discard("authority"); return }
+            do { try await tab.check() } catch { discard("authority"); return }
+            let state: (viewport: ScriptCaptureViewport, document: String)
+            do { state = try await tab.hostedFixtureCaptureState(origin: fixtureOrigin) } catch {
+                discard("fixture"); return
+            }
+            do { try await tab.check() } catch { discard("authority"); return }
+            guard isCurrent() else { discard("identity"); return }
+            guard state.document == documentID else { discard("document"); return }
+            guard state.viewport == viewport else { discard("viewport"); return }
+            guard let samples = probe.seal(afterAudit: true) as? [[String: NSNumber]], samples.count <= 64 else {
+                discard("seal")
                 return
             }
             var validated: [(receipt: Int, protocolTime: Int, x: Int, y: Int)] = []
@@ -116,7 +122,7 @@ final class ScriptHostedStreamDiagnostic {
                       let x = sample["x"]?.intValue, let y = sample["y"]?.intValue,
                       receipt.isFinite, protocolTime.isFinite, receipt >= 0, receipt <= 5000,
                       protocolTime >= 0, protocolTime <= 5000, (0...1920).contains(x), (0...1920).contains(y) else {
-                    print("[WorkflowHostedStream] event=discarded")
+                    discard("sample")
                     return
                 }
                 validated.append((Int(receipt), Int(protocolTime), x, y))
@@ -128,8 +134,13 @@ final class ScriptHostedStreamDiagnostic {
             print("[WorkflowHostedStream] event=complete count=\(samples.count)")
         } catch {
             Task { _ = await probe.stop() }
-            print("[WorkflowHostedStream] event=discarded")
+            discard("audit")
         }
+    }
+
+    private func discard(_ reason: String) {
+        print("[WorkflowHostedStream] event=refusal reason=\(reason)")
+        print("[WorkflowHostedStream] event=discarded")
     }
 }
 #endif

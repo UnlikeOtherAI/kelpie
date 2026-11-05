@@ -14,11 +14,14 @@
 #include <mutex>
 #include <cmath>
 #include <climits>
+#include <algorithm>
+#include <cstdio>
 
 @class CEFHostedStreamProbe;
 struct HostedStreamObserver {
     cef_dev_tools_message_observer_t api{};
     std::atomic<int> references{1};
+    std::atomic<unsigned> received{0};
     std::mutex ingressLock;
     dispatch_group_t ingressGroup = dispatch_group_create();
     unsigned ingress = 0;
@@ -46,6 +49,8 @@ struct HostedStreamObserver {
     BOOL _stopping;
     BOOL _stopped;
     BOOL _stopSucceeded;
+    unsigned _consumed, _malformed, _metadataMask, _rejected, _ackDrop, _ackDecode, _ackStop;
+    unsigned _ackFailed, _decodeFailed, _overflow, _detached, _identityFailed, _badProtocol;
 }
 - (void)consumeBrowser:(int)browser payload:(NSData *)payload;
 - (void)agentDetached;
@@ -91,6 +96,7 @@ static void StreamEvent(cef_dev_tools_message_observer_t *base, cef_browser_t *b
         CEFBridgeBrowserIdentifier(browser) != observer->browserID) { return; }
     NSString *name = [[NSString alloc] initWithCharacters:(const unichar *)method->str length:method->length];
     if (![name isEqualToString:@"Page.screencastFrame"]) { return; }
+    observer->received.fetch_add(1, std::memory_order_relaxed);
     CEFHostedStreamProbe *owner = observer->owner;
     if (owner == nil) { return; }
     if (payload == nullptr || length == 0 || length > 2 * 1024 * 1024 + 4096) {
@@ -212,8 +218,9 @@ static BOOL StreamJSONNumber(id value) {
 
 - (void)consumeBrowser:(int)browser payload:(NSData *)payload {
     if (!_started || _stopping || _stopped || !_fence || browser != _browserID) { return; }
+    ++_consumed;
     NSDictionary *event = payload.length > 0 ? [NSJSONSerialization JSONObjectWithData:payload options:0 error:nil] : nil;
-    if (![event isKindOfClass:NSDictionary.class]) { _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return; }
+    if (![event isKindOfClass:NSDictionary.class]) { ++_malformed; _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return; }
     id number = event[@"sessionId"];
     id data = event[@"data"];
     NSDictionary *metadata = [event[@"metadata"] isKindOfClass:NSDictionary.class] ? event[@"metadata"] : nil;
@@ -222,7 +229,7 @@ static BOOL StreamJSONNumber(id value) {
     const double protocolMs = StreamJSONNumber(timestamp) ? [timestamp doubleValue] * 1000 : NAN;
     if (!std::isfinite(session) || session < 1 || session > INT_MAX || floor(session) != session ||
         ![data isKindOfClass:NSString.class]) {
-        _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return;
+        ++_malformed; _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return;
     }
     BOOL coherentMetadata = YES;
     const NSArray<NSString *> *fields = @[@"deviceWidth", @"deviceHeight", @"pageScaleFactor",
@@ -233,17 +240,23 @@ static BOOL StreamJSONNumber(id value) {
         if (!StreamJSONNumber(value) || !std::isfinite([value doubleValue]) ||
             std::abs([value doubleValue] - expected[index]) > 0.01) {
             coherentMetadata = NO;
-            break;
+            _metadataMask |= 1u << index;
         }
     }
+    const BOOL identityCurrent = _identity();
+    if (!identityCurrent) { ++_identityFailed; }
+    if (!std::isfinite(protocolMs)) { ++_badProtocol; }
     uint64_t token = 0;
     const auto decision = _fence->admit(browser, _epoch, static_cast<int>(session),
-        NSProcessInfo.processInfo.systemUptime * 1000, protocolMs, [data length], _identity() && coherentMetadata, &token);
-    if (decision == CEFHostedStreamFence::Decision::reject) { return; }
+        NSProcessInfo.processInfo.systemUptime * 1000, protocolMs, [data length], identityCurrent && coherentMetadata, &token);
+    if (decision == CEFHostedStreamFence::Decision::reject) { ++_rejected; return; }
+    if (decision == CEFHostedStreamFence::Decision::ackDrop) { ++_ackDrop; }
+    if (decision == CEFHostedStreamFence::Decision::ackDecode) { ++_ackDecode; }
+    if (decision == CEFHostedStreamFence::Decision::ackStop) { ++_ackStop; }
     dispatch_group_enter(_pending);
     CEFBridgeSendBrowserControlCommand(_host, @"Page.screencastFrameAck", @{@"sessionId": number},
         ^(BOOL success, NSDictionary *) {
-            if (!success && self->_fence) { self->_fence->invalidate(); }
+            if (!success) { ++self->_ackFailed; if (self->_fence) { self->_fence->invalidate(); } }
             dispatch_group_leave(self->_pending);
         });
     if (decision == CEFHostedStreamFence::Decision::ackStop) { [self stopWithCompletion:^(BOOL) {}]; return; }
@@ -255,6 +268,7 @@ static BOOL StreamJSONNumber(id value) {
         int x = 0, y = 0;
         const BOOL decoded = image != nil && CEFHostedStreamLocateRed(image, &x, &y);
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (!decoded) { ++self->_decodeFailed; }
             if (self->_fence) { self->_fence->complete(self->_epoch, token, self->_identity(), decoded, x, y); }
             dispatch_group_leave(self->_pending);
         });
@@ -262,11 +276,13 @@ static BOOL StreamJSONNumber(id value) {
 }
 
 - (void)ingressOverflow {
+    ++_overflow;
     if (_fence) { _fence->invalidate(); }
     [self stopWithCompletion:^(BOOL) {}];
 }
 
 - (void)agentDetached {
+    ++_detached;
     if (_fence) { _fence->invalidate(); }
     [self stopWithCompletion:^(BOOL) {}];
 }
@@ -295,6 +311,14 @@ static BOOL StreamJSONNumber(id value) {
     if (_stopped) { return; }
     _stopped = YES;
     _stopSucceeded = success;
+    const unsigned received = _observer ? _observer->received.load(std::memory_order_relaxed) : 0;
+    // Fixed numeric diagnostic only; emitted after ACK/decode and pre-close ingress have joined.
+    fprintf(stdout, "[WorkflowHostedStream] event=probe received=%u consumed=%u malformed=%u metadata=%u rejected=%u drop=%u decode=%u stop=%u ackfail=%u decodefail=%u overflow=%u detached=%u identity=%u protocol=%u stopped=%u\n",
+        std::min(received, 999u), std::min(_consumed, 999u), std::min(_malformed, 999u), _metadataMask,
+        std::min(_rejected, 999u), std::min(_ackDrop, 999u), std::min(_ackDecode, 999u), std::min(_ackStop, 999u),
+        std::min(_ackFailed, 999u), std::min(_decodeFailed, 999u), std::min(_overflow, 999u),
+        std::min(_detached, 999u), std::min(_identityFailed, 999u), std::min(_badProtocol, 999u), success ? 1u : 0u);
+    fflush(stdout);
     [self releaseHandles];
     NSArray<void (^)(BOOL)> *waiters = [_waiters copy];
     [_waiters removeAllObjects];

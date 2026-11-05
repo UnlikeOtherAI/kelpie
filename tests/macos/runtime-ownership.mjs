@@ -107,6 +107,12 @@ export function cefPumpSignal(line){
 export function hostedStreamSignal(line){
  if(line==="[WorkflowHostedStream] event=started")return {event:"started"};
  if(line==="[WorkflowHostedStream] event=discarded")return {event:"discarded"};
+ const refusal=/^\[WorkflowHostedStream\] event=refusal reason=(stop|authority|fixture|identity|document|viewport|seal|sample|audit)$/.exec(line);
+ if(refusal)return {event:"refusal",reason:refusal[1]};
+ const probe=/^\[WorkflowHostedStream\] event=probe received=(\d{1,3}) consumed=(\d{1,3}) malformed=(\d{1,3}) metadata=(\d{1,2}) rejected=(\d{1,3}) drop=(\d{1,3}) decode=(\d{1,3}) stop=(\d{1,3}) ackfail=(\d{1,3}) decodefail=(\d{1,3}) overflow=(\d{1,3}) detached=(\d{1,3}) identity=(\d{1,3}) protocol=(\d{1,3}) stopped=([01])$/.exec(line);
+ if(probe){const values=probe.slice(1).map(Number); if(values[3]>63)return null;
+  const [received,consumed,malformed,metadata,rejected,drop,decode,stop,ackfail,decodefail,overflow,detached,identity,protocol,stopped]=values;
+  return {event:"probe",received,consumed,malformed,metadata,rejected,drop,decode,stop,ackfail,decodefail,overflow,detached,identity,protocol,stopped};}
  const complete=/^\[WorkflowHostedStream\] event=complete count=(\d{1,2})$/.exec(line);
  if(complete&&Number(complete[1])<=64)return {event:"complete",count:Number(complete[1])};
  const sample=/^\[WorkflowHostedStream\] event=sample index=(\d{1,2}) receipt=(\d{1,4}) protocol=(\d{1,4}) x=(\d{1,4}) y=(\d{1,4})$/.exec(line);
