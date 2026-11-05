@@ -6,6 +6,11 @@ on:
     branches: [main]
     paths: [apps/windows/**, native/**, packages/shared/**, pnpm-lock.yaml, scripts/native/**, scripts/*windows.ps1, tests/windows/**, .github/workflows/windows.yml]
   workflow_dispatch:
+    inputs:
+      hosted_g08:
+        description: Run the owned public CEF capture diagnostic
+        type: boolean
+        default: false
 permissions: {contents: read}
 jobs:
   build:
@@ -22,10 +27,32 @@ jobs:
       - name: Build CEF wrapper and Windows release
         shell: pwsh
         run: ./scripts/build-windows.ps1
+      - name: Prepare hosted public capture dependencies
+        if: ${{ inputs.hosted_g08 }}
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --filter '@unlikeotherai/kelpie-shared' build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test tests/windows/g08-hosted-options.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run hosted public capture diagnostic
+        if: ${{ inputs.hosted_g08 }}
+        shell: pwsh
+        run: ./scripts/run-hosted-windows-g08.ps1
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && inputs.hosted_g08 }}
+        with:
+          name: kelpie-windows-hosted-public-g08
+          path: ${{ runner.temp }}/kelpie-hosted-g08-evidence
+          if-no-files-found: warn
       - name: Package release candidate
+        if: ${{ !inputs.hosted_g08 }}
         shell: pwsh
         run: ./scripts/package-windows.ps1
       - uses: actions/upload-artifact@v7
+        if: ${{ !inputs.hosted_g08 }}
         with:
           name: kelpie-windows-x64
           path: |

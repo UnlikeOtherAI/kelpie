@@ -1,5 +1,15 @@
 # Windows release acceptance
 
+The `Windows CEF` workflow also has an opt-in `hosted_g08` dispatch input. It
+builds the normal sandboxed app, then runs one C-curve public capture against an
+owned loopback fixture and independently decodes the downloaded GIF and MP4.
+The uploaded diagnostic contains the exact source and binary/tool hashes,
+fixture scene, PTS, results and cleanup report; the private profile, readiness
+file and bearer stay outside the artifact. Native WGC, visible overlay and Stop
+are not tested by this hosted diagnostic. A native-presentation failure is
+reported as unavailable with its cause unproven; it is not a compositor pass.
+The default workflow still performs its existing package build.
+
 `run-release-acceptance.mjs` is the release gate for a built Windows Kelpie
 artifact. It starts a local fixture, starts only the supplied `kelpie.exe` with
 an isolated profile, waits for the ACL-protected readiness file, and drives the
