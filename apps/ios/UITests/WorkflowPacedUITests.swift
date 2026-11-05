@@ -71,6 +71,46 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testPacedAcknowledgedFinalNavigationCompletesAndRedacts() async throws {
+        try await pacedFinalNavigation(capture: false)
+    }
+
+    @MainActor
+    func testPacedAcknowledgedFinalNavigationDiscardsCapture() async throws {
+        try await pacedFinalNavigation(capture: true)
+    }
+
+    @MainActor
+    private func pacedFinalNavigation(capture: Bool) async throws {
+        let fixture = try WorkflowLoopbackPage()
+        _ = try await fixture.start()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let origin = "http://127.0.0.1:\(port)"
+        testLaunchArguments = ["--test-paced-final-navigation", origin + "/paced-ack"]
+        let tab = try await openOwnedTab(url: "about:blank")
+        let canary = "\u{1F9EA}"
+        var workflow: Body = [
+            "version": 1, "tabId": tab, "actions": [
+                ["action": "navigate", "url": origin + "/paced-final-ack"],
+                ["action": "output", "source": "title", "name": "before"],
+                ["action": "type", "target": ["selector": "#entry"], "text": canary, "typingDelayMs": 1]
+            ]
+        ]
+        if capture { workflow["capture"] = ["formats": ["screenshots"]] }
+        let result = try await probe.request("/v1/play-script", workflow)
+        XCTAssertEqual(result["success"] as? Bool, !capture, WorkflowCaptureProbe.errorCode(result))
+        if capture {
+            XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
+            XCTAssertEqual(result["mayHaveCompleted"] as? Bool, true)
+            XCTAssertTrue((result["artifacts"] as? [Body])?.isEmpty == true)
+        }
+        XCTAssertGreaterThan(fixture.requestCount(path: "/paced-ack"), 0)
+        let prior = try XCTUnwrap((result["outputs"] as? Body)?["before"] as? String)
+        XCTAssertFalse(prior.contains(canary))
+    }
+
+    @MainActor
     func testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }

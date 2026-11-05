@@ -74,6 +74,16 @@ final class WorkflowLoopbackPage {
           };
           button.onclick=()=>{events.push({data:'LATER'});report()};
         }
+        if(location.pathname==='/paced-final-ack'){
+          document.title='Final '+String.fromCodePoint(0x1F9EA);
+          document.querySelector('#entry').oninput=()=>{
+            const timer=setInterval(async()=>{
+              if(await (await fetch('/paced-signal')).text()==='go'){
+                clearInterval(timer);location.href='/landed';
+              }
+            },25);
+          };
+        }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
           document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'
@@ -127,7 +137,14 @@ final class WorkflowLoopbackPage {
             Self.readPath(connection, buffered: Data()) { path in
                 requestCounter.record(path)
                 queue.asyncAfter(deadline: .now() + responseDelay) {
-                    connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                    let reply: Data
+                    if path == "/paced-signal" {
+                        let body = requestCounter.count("/paced-ack") > 0 ? "go" : "wait"
+                        reply = Data("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)".utf8)
+                    } else {
+                        reply = data
+                    }
+                    connection.send(content: reply, completion: .contentProcessed { _ in connection.cancel() })
                 }
             }
         }

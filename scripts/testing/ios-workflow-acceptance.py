@@ -61,6 +61,8 @@ def selection(scope):
                 "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
+                "testPacedAcknowledgedFinalNavigationCompletesAndRedacts",
+                "testPacedAcknowledgedFinalNavigationDiscardsCapture",
                 "testPacedLostFinalCallbackProtectsLiteralWithoutCapture",
                 "testPacedLostFinalCallbackDiscardsCapture",
                 "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",

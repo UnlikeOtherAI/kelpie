@@ -230,15 +230,23 @@ final class IOSWorkflowActions {
         guard tab.document == context.document, context.viewport == (try await tab.viewport()) else {
             throw IOSWorkflowFailure("STALE_TARGET")
         }
-        let result = try await tab.target(
-            context.target,
-            token: context.token,
-            edit: ["action": action, "text": text, "requireFocused": requireFocused],
-            acceptFinalAcknowledgement: final,
-            refuseSensitive: workflow.capture != nil,
-            consume: context.consume,
-            missingResult: context.missing
-        )
+        let result: Body
+        do {
+            result = try await tab.target(
+                context.target,
+                token: context.token,
+                edit: ["action": action, "text": text, "requireFocused": requireFocused],
+                acceptFinalAcknowledgement: final,
+                refuseSensitive: workflow.capture != nil,
+                consume: context.consume,
+                missingResult: context.missing
+            )
+        } catch let failure as IOSWorkflowFailure {
+            if failure.mayHaveCompleted && ["TIMEOUT", "WEBVIEW_ERROR", "DOCUMENT_CHANGED", "TARGET_FAILED"].contains(failure.code) {
+                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
+            throw failure
+        }
         try requireOK(result)
         guard IOSPacedTypingExecutor.isAcknowledgement(result, token: context.token) else {
             context.missing()
@@ -247,6 +255,9 @@ final class IOSWorkflowActions {
         do {
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
             try await check()
+            #if DEBUG
+            if final { try await waitForTestFinalNavigation(context: context) }
+            #endif
             try await inspectPacedPrivacy(context: context, final: final)
             try await check()
         } catch let failure as IOSWorkflowFailure {
@@ -255,6 +266,24 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
         }
     }
+
+    #if DEBUG
+    private func waitForTestFinalNavigation(context: PacedTarget) async throws {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "--test-paced-final-navigation"), args.indices.contains(index + 1),
+              let url = URL(string: args[index + 1]) else { return }
+        _ = try await URLSession.shared.data(from: url)
+        let deadline = ProcessInfo.processInfo.systemUptime + 3
+        let priorCommit = context.document.split(separator: ":").last
+        while tab.document.split(separator: ":").last == priorCommit, ProcessInfo.processInfo.systemUptime < deadline {
+            try await check()
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        guard tab.document.split(separator: ":").last != priorCommit else {
+            throw IOSWorkflowFailure("TEST_NAVIGATION_TIMEOUT")
+        }
+    }
+    #endif
 
     private func inspectPacedPrivacy(context: PacedTarget, final: Bool) async throws {
         let classification: Body

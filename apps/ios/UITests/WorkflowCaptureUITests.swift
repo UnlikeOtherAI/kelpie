@@ -8,6 +8,7 @@ final class WorkflowCaptureUITests: XCTestCase {
     let probe = WorkflowCaptureProbe(port: 28429)
     var cleanupProbe: WorkflowCaptureProbe?
     private let app = XCUIApplication()
+    var testLaunchArguments: [String] = []
 
     @MainActor
     func ready() async throws -> (WorkflowLoopbackPage, String) {
@@ -28,7 +29,7 @@ final class WorkflowCaptureUITests: XCTestCase {
     @MainActor
     func openOwnedTab(url: String) async throws -> String {
         continueAfterFailure = false
-        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
+        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"] + testLaunchArguments
         app.launch()
         XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
         try await probe.pair(app: app)

@@ -77,7 +77,8 @@ extension WorkflowCaptureUITests {
         // The missing-result path must protect this edit before final output/media publication.
         let failed = try await probe.request("/v1/play-script", workflow)
         XCTAssertEqual(failed["success"] as? Bool, false)
-        XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, "TIMEOUT")
+        let expectedCode = paced ? "INPUT_UNCERTAIN" : "TIMEOUT"
+        XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, expectedCode)
         XCTAssertEqual(failed["mayHaveCompleted"] as? Bool, true)
         XCTAssertTrue((failed["artifacts"] as? [Body])?.isEmpty == true)
         let prior = try XCTUnwrap((failed["outputs"] as? Body)?["before"] as? String)
@@ -86,7 +87,7 @@ extension WorkflowCaptureUITests {
         let status = try await probe.call("kelpie_get_script_status", ["runId": run])
         XCTAssertEqual(status["playing"] as? Bool, false)
         XCTAssertEqual(status["runSuccess"] as? Bool, false)
-        XCTAssertEqual((status["runError"] as? Body)?["code"] as? String, "TIMEOUT")
+        XCTAssertEqual((status["runError"] as? Body)?["code"] as? String, expectedCode)
         XCTAssertTrue((status["artifacts"] as? [Body])?.isEmpty == true)
         XCTAssertNil(status["outputs"])
         let serialized = String(decoding: try JSONSerialization.data(withJSONObject: [failed, status]), as: UTF8.self)
