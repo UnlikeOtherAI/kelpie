@@ -11,7 +11,12 @@ export async function runAdversaryDiagnostics(readiness, output, signal) {
       method: "POST", headers: { authorization: "Bearer " + readiness.token, "content-type": "application/json" },
       body: JSON.stringify(body), signal: AbortSignal.any([signal, AbortSignal.timeout(40000)]),
     });
-    assert.equal(response.status, 200); return response.json();
+    const value = await response.json();
+    if (response.status === 400) {
+      assert.equal(value.success, false);
+      assert.ok(typeof value.error?.code === "string" && value.error.code.length);
+    } else assert.equal(response.status, 200);
+    return value;
   };
   const tabId = (await api("get-tabs")).tabs.find(tab => tab.active)?.id;
   const script = actions => ({ version: 1, tabId, actions });

@@ -436,3 +436,17 @@ failure. An optional four-case diagnostic records actual result codes, uncertain
 read-only/input state, moving-target hit/recovery, encoded byte sizes and page
 replacement timing. It does not replace acceptance or enable a capability.
 Node syntax and whitespace checks passed; that diagnostic replay is pending.
+
+The first independent supplement replay verified an 802,134-byte native PNG over
+HTTP, direct MCP and generic MCP: four chunks per transport, identical SHA-256
+f4898af43ab2b72f788179b484855839fa740b8e0102792a64a4b6324f430ef7.
+Its finalization/readonly/moving probes exposed a harness assumption: semantic
+native refusals use HTTP 400 (DesktopRouter::StatusForResponse), while these
+helpers required every response to be HTTP 200. They now parse an HTTP 400 only
+when it contains success:false and a structured error code; other non-200
+statuses still fail. No production response or acceptance assertion changed.
+The byte-budget probe returned a complete 64,751-byte, ten-frame GIF below its
+150,000-byte limit, so that particular fixture did not exercise overflow.
+Replacement/click times were observed, but initial target-resolution timing was
+not; no unsafe identity conclusion follows yet. The replay's failing status,
+227.6 MiB peak and clean app/readiness teardown remain in its evidence.
