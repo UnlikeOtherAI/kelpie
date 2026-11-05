@@ -27,6 +27,18 @@ class ScriptTargetClassificationTest {
     }
 
     @Test
+    fun clickResolutionAndNonDispatchRecheckCannotCertifyMissingClassification() {
+        for (stage in listOf("initial click resolution", "intermediate click recheck")) {
+            val state = ScriptTargetClassification()
+            state.started()
+            state.received(null)
+            assertTrue(stage, state.unknown())
+            state.received(false)
+            assertFalse(stage, state.unknown())
+        }
+    }
+
+    @Test
     fun explicitTrueIsClassifiedRatherThanMissingMetadata() {
         val state = ScriptTargetClassification()
         state.started()
