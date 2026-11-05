@@ -13,7 +13,7 @@ import {loadG08ModelReference} from "./g08-model-reference.mjs";
 import {hasG08Warmup} from "./g08-fixture.mjs";
 import {createG08Retention} from "./g08-retention.mjs";
 import {g08NativeGeometry} from "./g08-native-geometry.mjs";
-const [inputPath,outputPath,modelPath,backingDir,evidencePath]=process.argv.slice(2);
+const [inputPath,outputPath,modelPath,backingDir,evidencePath,mode]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
 assert.ok((await stat(inputPath)).size<=524288,"Input report exceeds bound");
 const inputBytes=await readFile(inputPath);
@@ -26,8 +26,10 @@ const runtimes=["windows-cef","linux-gtk-cef","linux-osr-cef","macos-webkit","ma
   "ios-iphone-webkit","ios-ipad-webkit","android-phone-chromium","android-tablet-chromium"];
 assert.ok(runtimes.includes(input.runtime),"Choose an exact native renderer/runtime profile");
 assert.equal(input.eventsDropped,0,"Dropped fixture facts invalidate scene evidence");
-assert.equal(input.cases.length,2);
-const output={version:1,source:input.source,binarySHA256:input.binarySHA256,runtime:input.runtime,results:[]};
+assert.ok(mode===undefined||mode==="--single-case","Unknown verification mode");
+assert.equal(input.cases.length,mode==="--single-case"?1:2);
+const output={version:1,source:input.source,binarySHA256:input.binarySHA256,runtime:input.runtime,
+  ...(mode==="--single-case"?{scope:"single-case"}:{}),results:[]};
 const seen=new Set();
 for(const item of input.cases){
   assert.ok(["c","s"].includes(item.curve)&&!seen.has(item.curve));seen.add(item.curve);

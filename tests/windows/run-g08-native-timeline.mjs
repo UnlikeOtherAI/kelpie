@@ -14,6 +14,7 @@ import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
 import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable,safeUiaFailure} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
+import {observeG08Native,retainG08Exports} from "./g08-export-retention.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
@@ -121,30 +122,39 @@ try{
  helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
  helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
  helperTimer=setTimeout(()=>helper.kill(),42000);
- const nativePromise=evaluateWgcFrames(helper.stdout,config,{onProgress:state=>{nativeProgress={config,...state};}});void nativePromise.catch(()=>{});
+ const nativeOutcome=observeG08Native(evaluateWgcFrames(helper.stdout,config,{onProgress:state=>{nativeProgress={config,...state};}}));
  const activeSamples=[];monitor=(async()=>{while(!monitorStop&&!pendingDone){
   const status=await api("get-script-status");if(status.playing){assert.equal(status.runId,active.runId);assert.ok(activeSamples.length<140,"STATUS_SAMPLE_BOUND");activeSamples.push({runId:status.runId,playing:true});}
   await new Promise(done=>setTimeout(done,300));
  }return activeSamples.length;})();void monitor.catch(()=>{});
  report.phase="capture-play-wait";const terminal=await pending;monitorStop=true;report.terminalFacts={success:terminal.success===true,runIdPresent:typeof terminal.runId==="string"&&terminal.runId.length>0,actionsExecuted:Number.isInteger(terminal.actionsExecuted)?terminal.actionsExecuted:null,errorCode:typeof terminal.error?.code==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(terminal.error.code)?terminal.error.code:null,captureErrorPresent:terminal.captureError!=null,artifactCount:Array.isArray(terminal.artifacts)?terminal.artifacts.length:null};report.phase="capture-monitor";const statusPolls=await monitor;assert.ok(statusPolls>0,"NO_ACTIVE_STATUS_POLL");
- report.phase="capture-evaluate";let native;
- try{native=await nativePromise;}catch(error){helper.kill();report.helperExit=await helperExit.catch(()=>({code:null,signal:null}));report.helperDiagnostic=safeWgcDiagnostic(helperError);throw error;}
- const exit=await helperExit;clearTimeout(helperTimer);helperTimer=null;report.helperDiagnostic=safeWgcDiagnostic(helperError);report.helperExit=exit;assert.equal(exit.code,0,"WGC_HELPER_FAILED");
- assert.equal(terminal.success,true);assert.equal(terminal.runId,active.runId);
+ // Preserve completed public exports independently of the WGC outcome.
+ report.phase="export-retention";
  const after=await tabFact(tabId);const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(10000)})).json();
  const sceneFacts=mapG08Scene(fixtureFacts.events);
+ assert.equal(fixtureFacts.dropped,0);assert.ok(fixtureFacts.events.every(event=>event.trusted===true));
  assert.deepEqual(sceneFacts.start.center,scene.from);assert.deepEqual(sceneFacts.finish.center,scene.to);
  assert.deepEqual(sceneFacts.warmup.viewport,scene.viewport);
+ const exportBudget={remaining:33554432};
+ const artifacts=await retainG08Exports({terminal,activeRunId:active.runId,budget:exportBudget,
+  parse:item=>scriptArtifactSchema.parse(item),download:(item,budget)=>download(terminal,item,budget)});
+ const exportFacts=Buffer.from(JSON.stringify({source:manifest.source,curve,scene:sceneFacts,fixture:fixtureFacts,before,after,artifacts}));
+ assert.ok(exportFacts.length<=65536,"OUTPUT_BUDGET");
+ await writeFile(join(outputRoot,"exports-observation.json"),exportFacts,{flag:"wx"});
+ report.phase="capture-evaluate";const observedNative=await nativeOutcome;
+ if(!observedNative.ok){helper.kill();report.helperExit=await helperExit.catch(()=>({code:null,signal:null}));report.helperDiagnostic=safeWgcDiagnostic(helperError);throw observedNative.error;}
+ const native=observedNative.value;
+ const exit=await helperExit;clearTimeout(helperTimer);helperTimer=null;report.helperDiagnostic=safeWgcDiagnostic(helperError);report.helperExit=exit;assert.equal(exit.code,0,"WGC_HELPER_FAILED");
  const summary=JSON.parse(await readFile(join(outputRoot,"native","summary.json"),"utf8"));
  let used=await verifyTimelineSnapshots(summary,join(outputRoot,"native"));
- used+=(await stat(join(outputRoot,"native","summary.json"))).size;assert.ok(used<=67108864);
- const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));assert.equal(items.length,2);
+ used+=(await stat(join(outputRoot,"native","summary.json"))).size;
+ used+=33554432-exportBudget.remaining;
  const budget={remaining:67108864-used-65536};assert.ok(budget.remaining>=0,"OUTPUT_BUDGET");
  const serialSamples=native.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
  const nativeEvidence=Buffer.from(JSON.stringify({config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount}}));
  assert.ok(nativeEvidence.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=nativeEvidence.length;
  await writeFile(join(outputRoot,"native-observation.json"),nativeEvidence,{flag:"wx"});
- report.phase="artifact-download";const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
+
  const trustedFacts={source:manifest.source,curve,frameCount:native.frameCount,
   identity:{pid:running.pid,sessionId:identity.sessionId,executable:identity.executable,startFileTime:identity.startFileTime,launchId:readiness.launchId,port:28420},
   window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success,inputGuarantee:terminal.inputGuarantee,totalDurationMs:terminal.totalDurationMs},
