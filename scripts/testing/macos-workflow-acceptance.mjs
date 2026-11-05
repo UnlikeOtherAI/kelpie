@@ -2,7 +2,7 @@
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {StringDecoder} from "node:string_decoder";
-import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal} from "../../tests/macos/runtime-ownership.mjs";
+import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal} from "../../tests/macos/runtime-ownership.mjs";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
@@ -39,7 +39,7 @@ const report={source,platform:process.platform,
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
-const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[];
+const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[];
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
@@ -54,6 +54,7 @@ for(const stream of [child.stdout,child.stderr]){
    const viewport=viewportSignal(line);if(viewport&&viewportSignals.length<32)viewportSignals.push(viewport);
    const visibility=workflowVisibilitySignal(line);if(visibility&&workflowVisibilitySignals.length<32)workflowVisibilitySignals.push(visibility);
    const server=serverLifecycleSignal(line);if(server&&serverLifecycleSignals.length<32)serverLifecycleSignals.push({phase,...server});
+   const transition=listenerTransitionSignal(line);if(transition&&listenerTransitionSignals.length<32)listenerTransitionSignals.push({phase,...transition});
   }
  });
 }
@@ -125,7 +126,7 @@ finally{
  child.stdout?.destroy();child.stderr?.destroy();child.unref();
  report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
- report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;report.workflowVisibilitySignals=workflowVisibilitySignals;report.serverLifecycleSignals=serverLifecycleSignals;
+ report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;report.workflowVisibilitySignals=workflowVisibilitySignals;report.serverLifecycleSignals=serverLifecycleSignals;report.listenerTransitionSignals=listenerTransitionSignals;
  report.artifacts=client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }

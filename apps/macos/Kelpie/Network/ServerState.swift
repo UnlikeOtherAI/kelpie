@@ -227,10 +227,16 @@ final class ServerState: ObservableObject {
         guard engine != rendererState.activeEngine else { return }
 
         rendererState.isSwitching = true
+        #if DEBUG
+        print("[WorkflowRenderer] event=begin engine=\(engine.rawValue)")
+        #endif
 
         // swiftlint:disable:next force_unwrapping
         let source = handlerContext.renderer!
         let target = renderer(for: engine)
+        #if DEBUG
+        print("[WorkflowRenderer] event=created engine=\(engine.rawValue)")
+        #endif
 
         // Stop any background activity on the outgoing renderer before async work
         // so its tasks don't interleave with CEF's main-thread RunLoop source.
@@ -250,6 +256,9 @@ final class ServerState: ObservableObject {
         }
 
         rendererState.activeEngine = engine
+        #if DEBUG
+        print("[WorkflowRenderer] event=active engine=\(engine.rawValue)")
+        #endif
         await waitForRendererAttachment(target)
         target.didActivate()
         if engine == .webkit {
@@ -265,6 +274,9 @@ final class ServerState: ObservableObject {
         }
 
         // Update the advertised TXT record with the active engine.
+        #if DEBUG
+        print("[WorkflowRenderer] event=service-update engine=\(engine.rawValue)")
+        #endif
         startMDNS()
     }
 

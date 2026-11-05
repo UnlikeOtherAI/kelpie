@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -156,4 +156,11 @@ test("server lifecycle diagnostics retain only fixed states and requested/defaul
  assert.deepEqual(serverLifecycleSignal("[HTTPServer] Listener failed: private"),{state:"failed"});
  assert.ok(!JSON.stringify(serverLifecycleSignal("[HTTPServer] Listener failed: private")).includes("private"));
  assert.equal(serverLifecycleSignal("[HTTPServer] Listening on port 28420 private"),null);
+});
+
+test("listener transition diagnostics retain only fixed labels and bounded error codes",()=>{
+ assert.deepEqual(listenerTransitionSignal("[WorkflowListener] event=failed domain=posix code=48"),{event:"failed",domain:"posix",code:48});
+ assert.deepEqual(listenerTransitionSignal("[WorkflowRenderer] event=service-update engine=chromium"),{event:"service-update",engine:"chromium"});
+ assert.equal(listenerTransitionSignal("[WorkflowListener] event=failed domain=private code=48"),null);
+ assert.equal(listenerTransitionSignal("[WorkflowListener] event=failed domain=dns code=1234567890"),null);
 });

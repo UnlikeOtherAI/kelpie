@@ -136,9 +136,28 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath apps/macos/.build \
             -only-testing:KelpieTests/ScriptWorkflowAdmissionTests \
+            -skip-testing:KelpieTests/ScriptWorkflowAdmissionTests/testBonjourTXTReplacementKeepsSameHTTPListenerReachable \
             -resultBundlePath .cache/macos-ci/workflow-admission.xcresult \
             test-without-building CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee .cache/macos-ci/workflow-admission.log
+
+      - name: Run hosted listener TXT control
+        id: txt_control
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace apps/macos/Kelpie.xcworkspace \
+            -scheme Kelpie \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath apps/macos/.build \
+            -only-testing:KelpieTests/ScriptWorkflowAdmissionTests/testBonjourTXTReplacementKeepsSameHTTPListenerReachable \
+            -resultBundlePath .cache/macos-ci/listener-txt-control.xcresult \
+            test-without-building CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee .cache/macos-ci/listener-txt-control.log
 
       - name: Prepare explicitly requested hosted runtime
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
@@ -166,6 +185,10 @@ jobs:
           KELPIE_HOSTED_RUNTIME: '1'
         run: node scripts/testing/macos-workflow-acceptance.mjs
 
+      - name: Enforce listener TXT control
+        if: always() && steps.txt_control.outcome == 'failure'
+        run: exit 1
+
       - name: Retain sanitized native runtime evidence
         if: always() && github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
         uses: actions/upload-artifact@v7.0.1
@@ -185,5 +208,7 @@ jobs:
             .cache/macos-ci/runtime-build.log
             .cache/macos-ci/workflow-admission.log
             .cache/macos-ci/workflow-admission.xcresult
+            .cache/macos-ci/listener-txt-control.log
+            .cache/macos-ci/listener-txt-control.xcresult
           if-no-files-found: ignore
           retention-days: 7
