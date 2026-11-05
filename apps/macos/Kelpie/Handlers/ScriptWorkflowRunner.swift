@@ -149,18 +149,25 @@ final class ScriptWorkflowRunner {
         if host.playbackState.isAbortRequested(), issue == nil {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
         }
+        let retiringMarker: ScriptMarkerRetiree?
         if let presentation, issue == nil, capture?.hasMovies != true,
            let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
            let window = tab.view.window {
             presentation.keepMarkerOnly()
-            markerRetiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end)
+            let retiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end)
+            markerRetiree = retiree
+            retiringMarker = retiree
         } else {
             presentation?.stop()
+            retiringMarker = nil
         }
         if issue != nil { artifacts = artifacts.map { $0.merging(["partial": true]) { _, new in new } } }
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
         host.playbackState.releaseHeldSession()
-        guard await grant.isCurrent() else { return denied() }
+        guard await grant.isCurrent() else {
+            retiringMarker?.stop()
+            return denied()
+        }
         return response
     }
 

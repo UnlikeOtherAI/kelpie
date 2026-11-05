@@ -17,9 +17,11 @@ final class ScriptMarkerRetiree {
         self.window = window
         self.document = tab.document
         self.end = end
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.checkLocal() }
         }
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
         authorityTask = Task { [weak self, grant = tab.grant] in
             while !Task.isCancelled {
                 guard await grant.isCurrent() else { self?.stop(); return }
@@ -33,7 +35,8 @@ final class ScriptMarkerRetiree {
     private func checkLocal() {
         guard presentation != nil else { return }
         guard ProcessInfo.processInfo.systemUptime < end, let window, let tab,
-              tab.view.window === window, window.isVisible, !tab.view.isHiddenOrHasHiddenAncestor,
+              tab.view.window === window, window.isVisible, window.isKeyWindow,
+              !tab.view.isHiddenOrHasHiddenAncestor,
               tab.document == document, (try? tab.requireCurrent()) != nil else {
             stop()
             return
