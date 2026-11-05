@@ -195,6 +195,7 @@ class Video final : public Writer {
     return copied;
   }
   MuxResult Mux(std::size_t limit) {
+    MuxScratch scratch(output_.path.parent_path());
     MuxState state(limit);
     auto pipeline = std::make_unique<GstPipeline>(
         "appsrc name=input format=time is-live=false block=false max-bytes=268435456 ! "
@@ -216,11 +217,13 @@ class Video final : public Writer {
       completed = pipeline->Complete();
     } catch (...) {
       pipeline.reset();
+      if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
       std::lock_guard lock(state.mutex);
       if (state.overflow) return {std::move(state.bytes), true};
       throw;
     }
     pipeline.reset(); // Join streaming callbacks before consuming their result.
+    if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
     std::lock_guard lock(state.mutex);
     if (state.failed || (!completed && !state.overflow)) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     return {std::move(state.bytes), state.overflow};
