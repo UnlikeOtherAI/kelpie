@@ -42,7 +42,6 @@ final class HTTPServer: @unchecked Sendable {
     private var listener: NWListener?
     private var bonjourService: NWListener.Service?
     private var bonjourSuppressed = false
-    private var bonjourRecoveryAttempted = false
     private var stopped = false
     var onBonjourStateChange: ((Bool) -> Void)? {
         get { lock.withLock { _onBonjourStateChange } }
@@ -121,10 +120,9 @@ final class HTTPServer: @unchecked Sendable {
             return
         }
         listener = newListener
-        let svc = bonjourSuppressed ? nil : bonjourService
+        newListener.service = bonjourSuppressed ? nil : bonjourService
         let incarnation = scriptListener.start()
         lock.unlock()
-        newListener.service = svc
         newListener.serviceRegistrationUpdateHandler = { [weak self] change in
             guard let self, self.scriptListener.incarnation == incarnation else { return }
             switch change {
@@ -176,8 +174,7 @@ final class HTTPServer: @unchecked Sendable {
     private func recoverBonjourFailure(_ error: NWError, failedListener: NWListener) {
         guard HTTPListenerFailure.isRecoverableBonjour(error) else { return }
         lock.lock()
-        guard !stopped, !bonjourRecoveryAttempted, listener === failedListener else { lock.unlock(); return }
-        bonjourRecoveryAttempted = true
+        guard !stopped, !bonjourSuppressed, listener === failedListener else { lock.unlock(); return }
         bonjourSuppressed = true
         listener = nil
         bonjourService = nil

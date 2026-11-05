@@ -24,13 +24,17 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         server.start()
         defer { server.stop() }
         await fulfillment(of: [ready], timeout: 10)
-        let serviceName = "Kelpie CI " + UUID().uuidString
-        server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
         let firstIncarnation = try XCTUnwrap(server.scriptListener.incarnation)
         let first = try await Self.probeHTTP(port: port, token: token)
+        XCTAssertEqual(first, 200)
+        let serviceName = "Kelpie CI " + UUID().uuidString
+        server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let afterInitial = try await Self.awaitControlHTTP(port: port, token: token)
+        XCTAssertEqual(afterInitial, 200)
         server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "chromium"]))
         try await Task.sleep(nanoseconds: 500_000_000)
-        let second = try await Self.probeHTTP(port: port, token: token)
+        let second = try await Self.awaitControlHTTP(port: port, token: token)
         let secondIncarnation = try XCTUnwrap(server.scriptListener.incarnation)
         print("[ListenerControl] recovered=\(firstIncarnation != secondIncarnation ? 1 : 0)")
         XCTAssertEqual(first, 200)
@@ -40,8 +44,19 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
             server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
             try await Task.sleep(nanoseconds: 200_000_000)
             XCTAssertEqual(server.scriptListener.incarnation, secondIncarnation)
-            let third = try await Self.probeHTTP(port: port, token: token)
+            let third = try await Self.awaitControlHTTP(port: port, token: token)
             XCTAssertEqual(third, 200)
+        }
+    }
+
+    private static func awaitControlHTTP(port: UInt16, token: String) async throws -> Int {
+        let deadline = ProcessInfo.processInfo.systemUptime + 4
+        while true {
+            do { return try await probeHTTP(port: port, token: token) }
+            catch let error as URLError where [.cannotConnectToHost, .networkConnectionLost].contains(error.code) {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { throw error }
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
         }
     }
 
