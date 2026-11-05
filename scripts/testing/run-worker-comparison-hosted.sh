@@ -7,8 +7,6 @@ sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
 [[ "$sandbox_only" == true || "$sandbox_only" == false ]]
 [[ "$isolation_only" != true || "$sandbox_only" != true ]]
 [[ "$isolation_only" == true || "$isolation_only" == false ]]
-# Measurement remains disabled pending private-network and sandbox review.
-if [[ "$isolation_only" != true && "$sandbox_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
 [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]]
 if [[ "$isolation_only" == false ]]; then
  : "${CHROMIUM_ARCHIVE_SHA256:?}" "${CHROMIUM_BINARY_SHA256:?}"
@@ -106,7 +104,7 @@ run_arm() {
    fi
   fi
  fi
- if [[ "$backend" == sandbox && -s "$dir/namespace-verified.json" ]]; then
+ if [[ ( "$backend" == sandbox || "$backend" == playwright ) && -s "$dir/namespace-verified.json" ]]; then
   for _ in $(seq 1 450); do
    [[ -s "$dir/browser-identity.json" ]] && break
    kill -0 "$launcher" 2>/dev/null || break

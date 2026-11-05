@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {open} from "node:fs/promises";
 import {join} from "node:path";
+import {get} from "node:http";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 
 export function parseDevToolsActivePort(text){
@@ -60,4 +61,31 @@ export async function performProcessQuery(socket,browserPid){
    try{finish(null,extractRendererPids(response,browserPid));}catch(error){finish(error);}
   });
  });
+}
+
+export function parseBrowserWebSocket(value,port){
+ assert.ok(typeof value==="string"&&value.length<=512,"DEVTOOLS_VERSION_INVALID");
+ const url=new URL(value);
+ assert.ok(url.protocol==="ws:"&&url.hostname==="127.0.0.1"&&url.port===String(port)&&!url.username&&!url.password&&!url.search&&!url.hash,"DEVTOOLS_VERSION_INVALID");
+ return parseDevToolsActivePort(String(port)+"\n"+url.pathname);
+}
+export async function queryRendererPidsAtOwnedPort(port,browserPid,startTicks,{WebSocketClass=globalThis.WebSocket}={}){
+ await verifyOwnedListener(browserPid,port,startTicks);
+ const version=await new Promise((resolve,reject)=>{
+  let total=0,data="",done=false;
+  const finish=(error,value)=>{if(done)return;done=true;clearTimeout(timer);error?reject(error):resolve(value);};
+  const timer=setTimeout(()=>req.destroy(Error("DEVTOOLS_TIMEOUT")),5000);
+  const req=get({host:"127.0.0.1",port,path:"/json/version",timeout:5000},res=>{
+   if(res.statusCode!==200){res.resume();return finish(Error("DEVTOOLS_VERSION_INVALID"));}
+   res.setEncoding("utf8");res.on("data",chunk=>{total+=Buffer.byteLength(chunk);if(total>8192){req.destroy();finish(Error("DEVTOOLS_VERSION_INVALID"));}else data+=chunk;});
+   res.on("error",()=>finish(Error("DEVTOOLS_VERSION_INVALID")));
+   res.on("end",()=>{try{finish(null,JSON.parse(data));}catch{finish(Error("DEVTOOLS_VERSION_INVALID"));}});
+  });
+  req.on("timeout",()=>req.destroy(Error("DEVTOOLS_TIMEOUT")));
+  req.on("error",()=>finish(Error("DEVTOOLS_CONNECTION_FAILED")));
+ });
+ const endpoint=parseBrowserWebSocket(version?.webSocketDebuggerUrl,port);
+ const socket=new WebSocketClass("ws://127.0.0.1:"+port+endpoint.path);
+ const pids=await performProcessQuery(socket,browserPid);
+ await verifyOwnedListener(browserPid,port,startTicks);return pids;
 }

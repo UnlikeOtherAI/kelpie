@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {parseDevToolsActivePort,extractRendererPids,performProcessQuery} from "./worker-comparison-cdp-process.mjs";
+import {parseDevToolsActivePort,extractRendererPids,performProcessQuery,parseBrowserWebSocket} from "./worker-comparison-cdp-process.mjs";
 test("DevTools endpoint is bounded and constrained to the browser target",()=>{
  assert.equal(parseDevToolsActivePort("1234\n/devtools/browser/01234567-89ab-cdef-0123-456789abcdef\n").port,1234);
  for(const bad of ["0\n/devtools/browser/01234567-89ab-cdef-0123-456789abcdef","1234\n/devtools/page/anything","1234\nhttp://external"])
@@ -21,4 +21,9 @@ test("browser protocol query sends only process-info and accepts its matching re
   close(){closed=true;}};
  const result=performProcessQuery(socket,2);handlers.open();
  assert.deepEqual(await result,[3]);assert.deepEqual(sent,{id:1,method:"SystemInfo.getProcessInfo"});assert.equal(closed,true);
+});
+test("version endpoint must refer to the same owned loopback listener",()=>{
+ const path="/devtools/browser/01234567-89ab-cdef-0123-456789abcdef";
+ assert.equal(parseBrowserWebSocket("ws://127.0.0.1:1234"+path,1234).path,path);
+ for(const url of ["ws://example.com:1234"+path,"ws://127.0.0.1:1235"+path,"ws://127.0.0.1:1234"+path+"?x=1"])assert.throws(()=>parseBrowserWebSocket(url,1234));
 });

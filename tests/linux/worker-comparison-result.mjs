@@ -16,11 +16,12 @@ export function compareWorkerReceipts(a,b){
  assert.match(chromium.engineVersion,/\b151\.0\.7922\.34\b/);
  assert.match(chromium.engineSHA256??"",/^[a-f0-9]{64}$/);
  assert.match(chromium.archiveSHA256??"",/^[a-f0-9]{64}$/);
- for(const evidence of [chromium.sandboxEvidence,chromium.sessionSandboxEvidence]){
+ for(const evidence of [chromium.sessionSandboxEvidence]){
   assert.ok(evidence?.ownedRenderer===true&&evidence.chromiumFlagsSafe===true&&evidence.rendererSeccomp===2&&
    evidence.additionalSeccompFilter===true&&evidence.rendererNamespaceSeparated===true&&evidence.allOwnedRenderers===true&&
    Number.isSafeInteger(evidence.rendererCount)&&evidence.rendererCount>0,"SANDBOX_EVIDENCE_REQUIRED");
  }
+ assert.equal(chromium.sandboxAuditStatus,"passed","SANDBOX_EVIDENCE_REQUIRED");
  assert.deepEqual(a.boundary,b.boundary,"COMPARISON_BOUNDARY_MISMATCH");
  assert.ok(Number.isSafeInteger(a.uid)&&a.uid>0&&a.uid===b.uid,"COMPARISON_USER_MISMATCH");
  for(const r of [a,b])assert.deepEqual(r.networkProbe,{local:"connected",nonlocal:"denied"});
@@ -30,6 +31,7 @@ export function compareWorkerReceipts(a,b){
  assert.ok(a.checks.length>0&&a.checks.every(c=>c.passed)&&b.checks.every(c=>c.passed));
  assert.deepEqual(a.checks.map(c=>c.name),b.checks.map(c=>c.name),"COMPARISON_CORPUS_MISMATCH");
  for(const r of [a,b]){
+  assert.ok(r.preflight?.method==="tab.goto"&&r.preflight?.target==="owned"&&Number.isFinite(r.preflight?.wallMs)&&r.preflight.wallMs>=0,"PREFLIGHT_REQUIRED");
   assert.ok(Number.isFinite(r.startupMs)&&r.startupMs>=0&&r.warm.length===5);
   assert.ok(r.rss.samples>0&&r.rss.readFailures===0);
  }

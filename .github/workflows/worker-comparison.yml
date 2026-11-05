@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       runner_label:
-        description: Hosted runner (22.04 allowed only for sandbox smoke)
+        description: Allowlisted hosted runner for smoke or reviewed comparison
         type: choice
         options:
           - ubuntu-24.04
@@ -73,8 +73,8 @@ jobs:
         shell: bash
         run: |
           case "$REQUESTED_RUNNER" in
-            ubuntu-24.04) ;;
-            ubuntu-22.04) [[ "$SANDBOX_ONLY" == true && "$ISOLATION_ONLY" == false ]] || exit 1 ;;
+            ubuntu-24.04) [[ "$PREPARE_ONLY" == true || "$SANDBOX_ONLY" == true || "$ISOLATION_ONLY" == true ]] || exit 1 ;;
+            ubuntu-22.04) [[ "$ISOLATION_ONLY" == false && ( "$SANDBOX_ONLY" == true || "$PREPARE_ONLY" == false ) ]] || exit 1 ;;
             *) exit 1 ;;
           esac
       - uses: actions/checkout@v6.0.3
