@@ -58,6 +58,9 @@ export function evaluateG08(samples,config){
   const normalized=samples.map(s=>({...s,marker:{...s.marker,alpha:s.marker.alpha/baseAlpha}}));
   const marker=normalized.filter(s=>s.marker.count>=20&&s.marker.alpha>.12);
   demand(marker.length>=25,"INSUFFICIENT_EVIDENCE marker phases");
+  const peakAlpha=Math.max(...marker.map(s=>s.marker.alpha));
+  demand(peakAlpha>=.9,"INSUFFICIENT_EVIDENCE marker onset opacity");
+  demand(peakAlpha<=1.1,"G08_MARKER_BASE_OPACITY_MISMATCH");
   const fading=marker.filter(s=>s.marker.alpha>.15&&s.marker.alpha<.9);
   demand(fading.length>=12,"G08_FADE_MISSING");
   const markerStart=median(fading.map(s=>s.timeMs-markerMs*(1-s.marker.alpha)));
