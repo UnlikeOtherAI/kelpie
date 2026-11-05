@@ -91,7 +91,7 @@ final class ScriptCapture {
         while sampling { try await tab.check(); try await Task.sleep(nanoseconds: 5_000_000) }
         sampling = true
         defer { sampling = false }
-        let (image, viewport, document) = try await frame()
+        let (image, viewport, document) = try await frame(sample: "screenshot")
         let url = directory.appendingPathComponent("step-" + String(index) + ".png")
         try ScriptImageEncoder.png(image, to: url, budget: budget)
         screenshots.append((url, ["actionIndex": index, "width": image.width, "height": image.height,
@@ -203,7 +203,7 @@ final class ScriptCapture {
         let slot = max(nextSlot, Int(floor(now * Double(fps))))
         droppedFrames += max(0, slot - nextSlot)
         nextSlot = slot + 1
-        let (image, _, _) = try await frame()
+        let (image, _, _) = try await frame(sample: critical ? "critical" : "movie")
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let timestamp = now
         guard timestamp <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
@@ -224,7 +224,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         if critical, !accepted { throw ScriptWorkflowFailure("CAPTURE_ADMISSION_FAILED") }
     }
 
-    private func frame() async throws -> (CGImage, ScriptWorkflowTab.Viewport, String) {
+    private func frame(sample: String) async throws -> (CGImage, ScriptWorkflowTab.Viewport, String) {
         try await tab.check()
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
@@ -247,7 +247,18 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         let maximumWidth = options["maxWidth"] as? Int ?? 1280
         let source = try await tab.snapshot(maximumPixels: CGSize(width: maximumWidth, height: 1920), viewport: viewport)
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
-        guard try await tab.documentIdentity() == document, try await tab.viewport() == viewport else {
+        let finalDocument = try await tab.documentIdentity()
+        guard finalDocument == document else {
+            #if DEBUG
+            print("[WorkflowCaptureCoherence] sample=\(sample) change=document")
+            #endif
+            throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
+        }
+        let finalViewport = try await tab.viewport()
+        guard finalViewport == viewport else {
+            #if DEBUG
+            print("[WorkflowCaptureCoherence] sample=\(sample) change=viewport")
+            #endif
             throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
         }
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }

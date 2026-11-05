@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -205,4 +205,10 @@ test("only a clean listener loss during a read-only confirmation is retried",asy
   noteFailure:()=>{},lastFailure:()=>null,recordEngine:()=>{},delay:async ms=>{time+=ms;},now:()=>time};
  await waitForRendererTransition(deps,"chromium",1000);
  assert.equal(reads,2);assert.equal(verified,1);
+});
+
+test("capture coherence diagnostics accept only fixed sample and change labels",()=>{
+ assert.deepEqual(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=movie change=document"),{sample:"movie",change:"document"});
+ assert.equal(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=private change=document"),null);
+ assert.equal(captureCoherenceSignal("[WorkflowCaptureCoherence] sample=movie change=private"),null);
 });
