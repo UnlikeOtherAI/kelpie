@@ -44,6 +44,13 @@ for (const [timing,expected] of pts.entries()) {
    const baselineVideo=await readFile(join(baseline,"capture.mp4"));
    row[name].baselineVideoBytes=baselineVideo.length;
    row[name].videoByteDelta=videoBytes.length-baselineVideo.length;
+   const streams=JSON.parse(exec("ffprobe",["-v","error","-select_streams","v:0",
+    "-show_entries","stream=extradata","-show_data","-of","json",video]).toString()).streams;
+   assert.equal(streams.length,1);
+   const hex=streams[0].extradata.trim().split("\n").map(line=>line.split(":")[1].split("  ")[0].replace(/\s/g,"")).join("");
+   assert.match(hex,/^(?:[0-9a-fA-F]{2})+$/);
+   const avcc=Buffer.from(hex,"hex");assert.ok(avcc.length>=5&&avcc[0]===1);
+   const nalLengthSize=(avcc[4]&3)+1;
    const packets=JSON.parse(exec("ffprobe",["-v","error","-select_streams","v:0","-show_packets",
     "-show_entries","packet=pos,size,flags","-of","json",video]).toString()).packets;
    assert.equal(packets.length,15);
@@ -52,15 +59,15 @@ for (const [timing,expected] of pts.entries()) {
    assert.ok(last.flags.includes("K"),"final packet lacks key flag");
    const data=videoBytes.subarray(pos,pos+length);let offset=0,idr=false;
    while(offset<data.length) {
-    assert.ok(offset+4<=data.length,"truncated AVC NAL length");
-    const n=data.readUInt32BE(offset);offset+=4;
+    assert.ok(offset+nalLengthSize<=data.length,"truncated AVC NAL length");
+    const n=data.readUIntBE(offset,nalLengthSize);offset+=nalLengthSize;
     assert.ok(n>0&&offset+n<=data.length,"invalid AVC NAL length");
     if ((data[offset]&31)===5) idr=true;
     offset+=n;
    }
    assert.ok(idr,"final packet lacks an AVC IDR access unit");
    assert.equal(counts.at(-1).count,0,"forced final frame retains red pixels");
-   row[name].finalKeyFrame=true;row[name].finalIDR=true;
+   row[name].finalKeyFrame=true;row[name].finalIDR=true;row[name].nalLengthSize=nalLengthSize;
   }
  }
  assert.equal(row.clear.rawSHA256,row.history.rawSHA256,"final full raw frames differ");
