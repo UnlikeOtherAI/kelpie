@@ -2,6 +2,12 @@
 #import <objc/runtime.h>
 #include <atomic>
 
+static BOOL gCEFInitialized = NO;
+
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+#include "CEFHostedPumpExperiment.h"
+#endif
+
 namespace {
 template <typename Owner>
 void AddReference(cef_base_ref_counted_t* base) {
@@ -44,7 +50,13 @@ cef_app_t* MessagePumpApplication() {
         };
         // CEF requires a handler to choose MessagePumpExternal. The existing
         // owner-thread 60Hz timer supplies bounded polling, including delayed work.
-        handler.api.on_schedule_message_pump_work = [](cef_browser_process_handler_t*, int64_t) {};
+        handler.api.on_schedule_message_pump_work = [](cef_browser_process_handler_t*, int64_t delay) {
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+            SchedulePump(delay);
+#else
+            (void)delay;
+#endif
+        };
         return true;
     }();
     (void)configured;
@@ -52,7 +64,6 @@ cef_app_t* MessagePumpApplication() {
 }
 }
 
-static BOOL gCEFInitialized = NO;
 static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 
 @protocol CrAppProtocol
@@ -132,12 +143,18 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     cef_string_t cachePathCEF = CEFBridgeStringCreate(cachePath);
     settings.cache_path = cachePathCEF;
 
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+    StartPumpExperiment();
+#endif
     const int ok = cef_initialize(&mainArgs, &settings, MessagePumpApplication(), nullptr);
     CEFBridgeStringClear(&settings.browser_subprocess_path);
     CEFBridgeStringClear(&settings.framework_dir_path);
     CEFBridgeStringClear(&settings.main_bundle_path);
     CEFBridgeStringClear(&settings.cache_path);
     gCEFInitialized = ok != 0;
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+    if (!gCEFInitialized) { StopPumpExperiment(); }
+#endif
     return gCEFInitialized;
 }
 
@@ -145,12 +162,18 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
     if (!gCEFInitialized) {
         return;
     }
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+    StopPumpExperiment();
+#endif
     cef_shutdown();
     gCEFInitialized = NO;
 }
 
 + (void)doMessageLoopWork {
     if (gCEFInitialized) {
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+        if (PumpExperimentEnabled()) { RunPump(); return; }
+#endif
         cef_do_message_loop_work();
     }
 }

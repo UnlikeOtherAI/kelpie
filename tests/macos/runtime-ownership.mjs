@@ -96,3 +96,9 @@ export function retireeSignal(line){
  const match=/^\[WorkflowRetiree\] event=(start|retire|skipped) reason=(none|expired|missing|inactive|identity|visibility|document|target|geometry|issue|movie|marker)$/.exec(line);
  return match?{event:match[1],reason:match[2]}:null;
 }
+
+// Only the compiled hosted experiment emits this fixed mode.
+export function cefPumpSignal(line){
+ const match=/^\[WorkflowCEFPump\] mode=(legacy|scheduled)$/.exec(line);
+ return match?.[1]??null;
+}

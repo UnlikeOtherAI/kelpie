@@ -7,6 +7,7 @@ import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
 import {runPaced} from "./runtime-paced.mjs";
 import {runRetiree} from "./runtime-retiree.mjs";
+import {runPumpControls} from "./runtime-pump-control.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {Failure,delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
@@ -45,7 +46,7 @@ async function runEdge({client,fixture,engine,base,capture,check,load,continueOn
  },{continueOnFailure});
 }
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
-export async function runEngine(client,fixture,engine,report,scope="full") {
+export async function runEngine(client,fixture,engine,report,scope="full",pumpComparison=false) {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run,{continueOnFailure=false}={}){try{const detail=await run();checks.push({name,passed:true,detail});}
@@ -107,6 +108,7 @@ export async function runEngine(client,fixture,engine,report,scope="full") {
   await runRetiree({client,engine,base,capture,check,load,report});
   await runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure:true});
   await runDefaultMotion({client,fixture,engine,base,capture,check,load});
+  if(pumpComparison)await runPumpControls({client,fixture,base,capture,check,load,play});
   const failed=checks.find(item=>!item.passed);
   if(failed)throw new Failure(failed.code);
   return;

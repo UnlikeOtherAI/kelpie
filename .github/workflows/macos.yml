@@ -17,6 +17,7 @@ on:
         options:
           - full
           - cef-timing
+          - cef-pump-compare
         default: full
 
 permissions:
@@ -122,7 +123,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .cache/macos-ci
-          xcodebuild \
+          pump_flags=()
+          if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
+            pump_flags=('GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1')
+          fi
+          xcodebuild "${pump_flags[@]}" \
             -workspace apps/macos/Kelpie.xcworkspace \
             -scheme Kelpie \
             -configuration Debug \
@@ -130,6 +135,14 @@ jobs:
             -jobs 1 \
             build-for-testing CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee .cache/macos-ci/build.log
+
+      - name: Test hosted CEF pump scheduler
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance && inputs.runtime_scope == 'cef-pump-compare'
+        timeout-minutes: 2
+        run: |
+          xcrun clang++ -std=c++17 -fobjc-arc -fblocks -framework Foundation \
+            tests/macos/cef-pump-scheduler.test.mm -o .cache/macos-ci/cef-pump-scheduler-test
+          .cache/macos-ci/cef-pump-scheduler-test
 
       - name: Run hosted workflow admission XCTest
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
@@ -172,7 +185,11 @@ jobs:
           set -euo pipefail
           node scripts/testing/macos-workflow-acceptance.mjs --preparation started 0
           trap 'prepare_exit=$?; node scripts/testing/macos-workflow-acceptance.mjs --preparation failed "$prepare_exit"; exit "$prepare_exit"' ERR
-          xcodebuild \
+          pump_flags=()
+          if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
+            pump_flags=('GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1')
+          fi
+          xcodebuild "${pump_flags[@]}" \
             -workspace apps/macos/Kelpie.xcworkspace \
             -scheme Kelpie \
             -configuration Debug \
@@ -191,7 +208,12 @@ jobs:
         env:
           KELPIE_HOSTED_RUNTIME: '1'
           KELPIE_RUNTIME_SCOPE: ${{ inputs.runtime_scope || 'full' }}
-        run: node scripts/testing/macos-workflow-acceptance.mjs
+        run: |
+          if [[ "$KELPIE_RUNTIME_SCOPE" == "cef-pump-compare" ]]; then
+            node scripts/testing/macos-pump-comparison.mjs
+          else
+            node scripts/testing/macos-workflow-acceptance.mjs
+          fi
 
       - name: Enforce listener TXT control
         if: always() && steps.txt_control.outcome == 'failure'

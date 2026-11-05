@@ -107,7 +107,11 @@ static const NSTimeInterval kEvalTimeoutSeconds = 30.0;
     // Drain CEF's message queue so the close events are processed before
     // the caller releases this object.
     for (int i = 0; i < 30; i++) {
+#if defined(KELPIE_HOSTED_PUMP_TEST)
+        [CEFBridge doMessageLoopWork];
+#else
         cef_do_message_loop_work();
+#endif
     }
 }
 

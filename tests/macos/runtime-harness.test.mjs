@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal,cefPumpSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -229,4 +229,10 @@ test("retiree diagnostics accept only fixed safe labels",()=>{
  assert.deepEqual(retireeSignal("[WorkflowRetiree] event=start reason=none"),{event:"start",reason:"none"});
  assert.equal(retireeSignal("[WorkflowRetiree] event=retire reason=https://private"),null);
  assert.equal(retireeSignal("[WorkflowRetiree] event=retire reason=geometry extra"),null);
+});
+
+test("pump experiment signal accepts only fixed modes",()=>{
+ assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=scheduled"),"scheduled");
+ assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=legacy"),"legacy");
+ assert.equal(cefPumpSignal("[WorkflowCEFPump] mode=private"),null);
 });
