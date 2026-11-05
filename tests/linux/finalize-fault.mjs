@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import { readdir, lstat, open, writeFile } from "node:fs/promises";
+import { readdir, lstat, open, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { waitFor } from "../windows/lib/http.mjs";
+import { observeInFlight, awaitBounded } from "../windows/interactive-stop-lifecycle.mjs";
 
 // Inject a collision only inside this launch's private synthetic output directory.
 // This preserves an already-ACKed GIF prefix while MP4 publication must fail.
@@ -23,11 +24,11 @@ export async function runFinalizeFault(readiness, runtime, output) {
     const tabId = tabs.find(tab => tab.active)?.id;
     assert.ok(tabId);
     const before = new Set(await readdir(runtime));
-    pending = api("play-script", { version: 1, tabId, actions: [
+    pending = observeInFlight(api("play-script", { version: 1, tabId, actions: [
       { action: "navigate", url: fixture.url }, { action: "wait-ready", state: "complete" },
       { action: "click", target: { role: "button", name: "Confirm order", exact: true } },
       { action: "wait", ms: 2000 },
-    ], capture: { formats: ["gif", "video"], fps: 5, maxWidth: 320, maxDurationMs: 20000, maxBytes: 4194304 } });
+    ], capture: { formats: ["gif", "video"], fps: 5, maxWidth: 320, maxDurationMs: 20000, maxBytes: 4194304 } }));
     const event = await waitFor(() => fixture.events.find(event => event.type === "click" && event.target === "unique"),
       "trusted activation after movie ACK", 20000);
     assert.equal(event.trusted, true); assert.equal(event.hit, "unique");
@@ -38,9 +39,12 @@ export async function runFinalizeFault(readiness, runtime, output) {
     assert.equal(identity.uid, process.getuid()); assert.equal(identity.mode & 0o777, 0o700);
     const collision = await open(join(directory, "capture.mp4"),
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    const collisionIdentity = await collision.stat();
     try { await collision.writeFile("synthetic finalization collision"); await collision.sync(); }
     finally { await collision.close(); }
     const result = await pending;
+    assert.equal((await lstat(join(directory, "capture.mp4"))).ino, collisionIdentity.ino);
+    assert.equal(await readFile(join(directory, "capture.mp4"), "utf8"), "synthetic finalization collision");
     assert.equal(result.success, false); assert.equal(result.error.code, "CAPTURE_FINALIZE_FAILED");
     assert.ok(result.artifacts.length > 0 && result.artifacts.every(item => item.partial));
     assert.ok(result.artifacts.some(item => item.mimeType === "image/gif"));
@@ -73,7 +77,7 @@ export async function runFinalizeFault(readiness, runtime, output) {
     await writeFile(join(output, "finalize-fault.json"), JSON.stringify(evidence, null, 2));
     return { runId: result.runId, code: result.error.code, partialArtifacts: files.length, recovered: true };
   } finally {
-    if (pending) await pending.catch(() => {});
+    if (pending) await awaitBounded(pending, 5000).catch(() => {});
     await fixture.close();
   }
 }

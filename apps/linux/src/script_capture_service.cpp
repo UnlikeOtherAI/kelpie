@@ -5,6 +5,7 @@
 #include <deque>
 #include <algorithm>
 #include <set>
+#include <map>
 #include <stdexcept>
 
 namespace kelpie::linuxapp {
@@ -26,10 +27,11 @@ class Capture final : public DesktopScriptCapture {
     catch (...) { std::error_code ignored; std::filesystem::remove(directory_, ignored); throw; }
   }
   ~Capture() override {
+    encoder_.reset();
+    for (const auto& [path, identity] : owned_)
+      if (!retained_.contains(path)) RemoveCaptureFile(path, identity);
     std::error_code ignored;
-    for (const auto& entry : std::filesystem::directory_iterator(directory_, ignored))
-      if (!retained_.contains(entry.path())) std::filesystem::remove(entry.path(), ignored);
-    std::filesystem::remove(directory_, ignored);
+    std::filesystem::remove(directory_, ignored); // Preserve unrelated collision files.
   }
   DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
     auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed);
@@ -64,6 +66,7 @@ class Capture final : public DesktopScriptCapture {
     if (step && screenshots_) {
       const auto path = directory_ / ("step-" + std::to_string(index) + ".png");
       if (!encoder_->WriteStepPNG(frame, path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      owned_.emplace(path, InspectCaptureFile(path));
       manifests_.push_back(service_->artifacts().Publish(path, "image/png",
           {{"width", frame.width}, {"height", frame.height}, {"actionIndex", index},
            {"documentId", shown.value("documentVersion", std::string())}}, run_, owner_));
@@ -79,6 +82,7 @@ class Capture final : public DesktopScriptCapture {
     catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
     for (const auto& output : outputs) {
       try {
+        owned_.emplace(output.path, InspectCaptureFile(output.path));
         manifests_.push_back(service_->artifacts().Publish(output.path, output.mime_type,
             {{"width", output.width}, {"height", output.height}, {"durationMs", output.duration_ms},
              {"frameCount", output.frame_count}, {"droppedFrames", output.dropped_frames}, {"partial", partial}}, run_, owner_));
@@ -108,6 +112,7 @@ class Capture final : public DesktopScriptCapture {
   std::filesystem::path directory_;
   std::unique_ptr<ScriptMediaEncoder> encoder_;
   std::set<std::filesystem::path> retained_;
+  std::map<std::filesystem::path, CaptureFileIdentity> owned_;
   int width_ = 0, height_ = 0;
   double last_elapsed_ = 0, last_movie_frame_ = -1;
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
@@ -121,6 +126,7 @@ void LinuxScriptService::Configure(DesktopApp::Config& config) {
   config.scripts.capture = [self](const Json& options, const std::string& run, const std::string& owner) {
     return std::make_unique<Capture>(self, options, run, owner);
   };
+  config.scripts.discard = [self](const std::string& run, const std::string& owner) { self->artifacts_.Discard(run, owner); };
   config.scripts.artifact = [self](const Json& request, const std::string& owner) { return self->artifacts_.Read(request, owner); };
   config.scripts.present = [self](const Json& presentation, std::function<void()> stop) { self->Show(presentation, std::move(stop)); };
 }

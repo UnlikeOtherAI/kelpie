@@ -22,6 +22,65 @@ std::vector<std::uint8_t> PNG() {
   ScriptFrame frame{32, 32, 128, 0, std::vector<std::uint8_t>(32 * 32 * 4, 255)};
   return EncodeScriptPNG(frame);
 }
+
+void DiscardScope() {
+  const auto directory = CreatePrivateCaptureDirectory();
+  const auto bytes = PNG();
+  const auto own = directory / "own.png", foreign_owner = directory / "foreign-owner.png";
+  const auto foreign_run = directory / "foreign-run.png", replaced = directory / "replaced.png";
+  const auto linked = directory / "linked.png", target = directory / "unrelated.png";
+  {
+    ScriptArtifactStore store;
+    auto publish = [&](const std::filesystem::path& path, const char* run, const char* owner) {
+      WriteCaptureFile(path, bytes);
+      return store.Publish(path, "image/png", {}, run, owner);
+    };
+    const auto manifest = publish(own, "run", "owner");
+    const auto other_owner = publish(foreign_owner, "run", "other");
+    const auto other_run = publish(foreign_run, "other", "owner");
+    const auto replacement_grant = publish(replaced, "run", "owner");
+    const auto symlink_grant = publish(linked, "run", "owner");
+    auto request = [](const nlohmann::json& item, const char* run) {
+      return nlohmann::json{{"runId", run}, {"artifactId", item.at("id")}};
+    };
+    const auto swap = directory / "swap.png";
+    WriteCaptureFile(swap, bytes); std::filesystem::rename(swap, replaced);
+    WriteCaptureFile(target, bytes);
+    std::filesystem::remove(linked); std::filesystem::create_symlink(target, linked);
+    store.Discard("run", "owner");
+    assert(!std::filesystem::exists(own));
+    assert(std::filesystem::exists(replaced) && std::filesystem::is_symlink(linked));
+    assert(std::filesystem::exists(target));
+    for (const auto& item : {manifest, replacement_grant, symlink_grant})
+      assert(store.Read(request(item, "run"), "owner")["error"]["code"] == "ARTIFACT_NOT_FOUND");
+    assert(store.Read(request(other_owner, "run"), "other")["success"] == true);
+    assert(store.Read(request(other_run, "other"), "owner")["success"] == true);
+    store.Discard("run", "unrelated");
+    assert(std::filesystem::exists(foreign_owner) && std::filesystem::exists(foreign_run));
+  }
+  assert(!std::filesystem::exists(foreign_owner) && !std::filesystem::exists(foreign_run));
+  assert(std::filesystem::exists(replaced) && std::filesystem::is_symlink(linked));
+  std::filesystem::remove(replaced); std::filesystem::remove(linked);
+  std::filesystem::remove(target); std::filesystem::remove(directory);
+}
+void DiscardRetry() {
+  if (geteuid() == 0) return; // Root bypasses the deliberately denied unlink.
+  const auto directory = CreatePrivateCaptureDirectory(), path = directory / "retry.png";
+  ScriptArtifactStore store;
+  WriteCaptureFile(path, PNG());
+  const auto manifest = store.Publish(path, "image/png", {}, "run", "owner");
+  const auto request = nlohmann::json{{"runId", "run"}, {"artifactId", manifest.at("id")}};
+  assert(chmod(directory.c_str(), 0500) == 0);
+  bool failed = false;
+  try { store.Discard("run", "owner"); }
+  catch (const std::runtime_error& error) { failed = std::string(error.what()) == "CAPTURE_DISCARD_FAILED"; }
+  assert(failed && std::filesystem::exists(path));
+  assert(store.Read(request, "owner")["error"]["code"] == "ARTIFACT_NOT_FOUND");
+  assert(chmod(directory.c_str(), 0700) == 0);
+  assert(store.Read(request, "owner")["error"]["code"] == "ARTIFACT_NOT_FOUND");
+  assert(!std::filesystem::exists(path)); // Ordinary cleanup retries the revoked entry.
+  std::filesystem::remove(directory);
+}
 }
 int main() {
   const auto directory = CreatePrivateCaptureDirectory();
@@ -29,6 +88,8 @@ int main() {
   const auto bytes = PNG();
   const auto path = directory / "step.png";
   WriteCaptureFile(path, bytes);
+  const auto original_identity = InspectCaptureFile(path);
+  assert(original_identity.inode != 0);
   assert(stat(path.c_str(), &mode) == 0 && (mode.st_mode & 0777) == 0600);
   bool exists = false;
   try { WriteCaptureFile(path, {1, 2, 3}); }
@@ -65,9 +126,12 @@ int main() {
     // A replaced inode cannot reuse an existing opaque artifact grant.
     const auto replacement = directory / "replacement.png";
     WriteCaptureFile(replacement, bytes); std::filesystem::rename(replacement, path);
+    assert(RemoveCaptureFile(path, original_identity) && std::filesystem::exists(path));
     assert(store.Read(request, "owner")["error"]["code"] == "ARTIFACT_READ_FAILED");
   }
-  assert(!std::filesystem::exists(path)); std::filesystem::remove(directory);
+  assert(std::filesystem::exists(path)); // Replaced inode is not owned cleanup.
+  std::filesystem::remove(path); std::filesystem::remove(directory);
+  DiscardScope(); DiscardRetry();
 
   const auto budget_dir = CreatePrivateCaptureDirectory();
   auto encoder = ScriptMediaEncoder::Create(budget_dir, {}, 10, 1024);
@@ -84,6 +148,6 @@ int main() {
   assert(encoder->Finish(0).empty() && !encoder->finalization_failed());
   for (const auto& output : kept) std::filesystem::remove(output);
   std::filesystem::remove(budget_dir);
-  std::cout << nlohmann::json{{"mode", "0700/0600"}, {"ownerChunks", true}, {"inodeFence", true},
+  std::cout << nlohmann::json{{"mode", "0700/0600"}, {"ownerChunks", true}, {"inodeFence", true}, {"discardScope", true}, {"discardCleanupRetry", geteuid() != 0},
       {"pngBudgetBytes", 1024}, {"actualPNGBytes", total}, {"retainedPNGs", kept.size()}}.dump(2) << std::endl;
 }
