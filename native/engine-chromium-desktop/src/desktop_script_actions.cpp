@@ -129,7 +129,19 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     Json native_action = action;
     if (typing_plan.is_object()) native_action["_typingPlan"] = typing_plan;
     const auto timeout = typing_plan.is_object() ? std::chrono::seconds(300) : std::chrono::seconds(10);
-    const auto result = engine.DispatchScriptTarget(lease, options, native_action, &output, timeout, [this] { return Cancelled(); });
+    BrowserControlResult result;
+    try {
+      result = engine.DispatchScriptTarget(lease, options, native_action, &output, timeout, [this] { return Cancelled(); });
+    } catch (...) {
+      // An exception after a paced dispatch leaves privacy unclassified. The
+      // full literal remains in the immutable action until this point.
+      if (typing_plan.is_object()) {
+        const auto literal = action.at("text").get<std::string>();
+        if (!literal.empty()) redactions->push_back(literal);
+        if (capturing) privacy_discard.store(true);
+      }
+      throw;
+    }
     if(!result.ok && result.operation_may_have_completed) output["mayHaveCompleted"]=true;
     ingest_sensitive(output);
     if(config.invalidate) config.invalidate();

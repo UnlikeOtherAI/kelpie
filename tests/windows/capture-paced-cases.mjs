@@ -36,6 +36,16 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
     assert.ok(observed.events[1].time-observed.events[0].time>=90);
     assert.equal(observed.clears.length,1);
   });
+  await check("ordinary paced text remains available in named output", async () => {
+    await navigate();
+    const setup="(()=>{document.title='ordinary-visible-42';document.body.innerHTML='<input id=ordinary-paced>';return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
+    const result=await api("play-script",workflow([
+      {action:"type",target:{selector:"#ordinary-paced"},text:"ordinary-visible-42",typingDelayMs:2},
+      {action:"output",name:"title",source:"title"}]));
+    assert.equal(result.success,true,JSON.stringify(result));
+    assert.equal(result.outputs.title,"ordinary-visible-42");
+  });
   await check("empty paced type validates without focus or input", async () => {
     await navigate();
     const setup="(()=>{document.body.innerHTML='<input id=empty-paced>';window.__emptyFocus=0;window.__emptyInput=0;" +
@@ -62,17 +72,28 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
   });
   await check("paced edit sensitivity change discards capture", async () => {
     await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=paced-secret>';window.__pacedSecret=0;" +
+    const setup="(()=>{document.title='ABC';document.body.innerHTML='<input id=paced-secret>';window.__pacedSecret=0;" +
       "document.querySelector('#paced-secret').oninput=e=>{window.__pacedSecret++;e.currentTarget.type='password'};return true})()";
     assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",{...workflow([{action:"type",target:{selector:"#paced-secret"},text:"ABC",typingDelayMs:100}]),
+    const result=await api("play-script",{...workflow([{action:"output",name:"prior",source:"title"},{action:"type",target:{selector:"#paced-secret"},text:"ABC",typingDelayMs:100}]),
       capture:{formats:["gif","screenshots"],fps:15,maxWidth:640,maxDurationMs:12000,maxBytes:8388608}});
     assert.equal(result.success,false);assert.equal(result.mayHaveCompleted,true);
     assert.equal(result.error?.code,"SENSITIVE_CAPTURE_REFUSED");
     assert.deepEqual(result.artifacts,[]);
+    assert.ok(!JSON.stringify(result).includes("ABC"),"inferred sensitive literal leaked");
     assert.equal((await api("evaluate",{tabId,expression:"window.__pacedSecret"})).result,1);
   });
-  await check("paced typing abort stops without replay and keeps partial capture", async () => {
+  await check("paced navigation uncertainty scrubs the full literal", async () => {
+    await navigate();
+    const setup="(()=>{document.title='AB';document.body.innerHTML='<input id=paced-navigate>';" +
+      "document.querySelector('#paced-navigate').oninput=()=>{location.href='/next'};return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
+    const result=await api("play-script",workflow([{action:"output",name:"prior",source:"title"},
+      {action:"type",target:{selector:"#paced-navigate"},text:"AB",typingDelayMs:100}]));
+    assert.equal(result.success,false);assert.equal(result.mayHaveCompleted,true);
+    assert.ok(!JSON.stringify(result).includes("AB"),"unknown edit leaked its full literal");
+  });
+  await check("paced typing abort stops without replay and safely handles capture", async () => {
     await navigate();
     const baseline=fixture.events.length;
     const setup="(()=>{document.body.innerHTML='<input id=abort-paced>';" +
@@ -94,8 +115,8 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
     assert.equal((await api("abort-script",{runId:status.runId})).success,true);
     const result=await pending;
     assert.equal(result.success,false);assert.equal(result.aborted,true);assert.equal(result.mayHaveCompleted,true);
-    assert.ok(result.artifacts.length>0 && result.artifacts.every(item=>item.partial));
-    await download(result);
+    assert.ok(result.artifacts.every(item=>item.partial));
+    if(result.artifacts.length) await download(result);
     const value=(await api("evaluate",{tabId,expression:"document.querySelector('#abort-paced').value"})).result;
     assert.ok(value.length>=1 && value.length<10);
     assert.equal("ABCDEFGHIJ".startsWith(value),true);

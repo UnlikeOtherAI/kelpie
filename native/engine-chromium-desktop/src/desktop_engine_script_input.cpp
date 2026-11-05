@@ -46,7 +46,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     const std::function<bool()>& cancelled) {
   if(output) *output=Json::object();
   const auto began = std::chrono::steady_clock::now();
-  bool dispatched = false, native_pressed=false, native_keys=false;
+  bool dispatched = false, unclassified_mutation = false, native_pressed=false, native_keys=false;
   struct CleanupOnExit {
     std::shared_ptr<Impl> impl; TabLease lease; bool& mouse; bool& keys;
     ~CleanupOnExit() { if(mouse || keys) QueueRelease(impl,lease); }
@@ -105,6 +105,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     if (remaining <= Timeout::zero()) return DeadlineExceeded();
     Json ignored;
     dispatched = true;
+    unclassified_mutation = true;
     auto result=RunDevTools(impl_,lease,method,params,&ignored,remaining,[impl=impl_,lease,cancelled] {
       return IsDialogOpen(impl,lease) || (cancelled && cancelled());
     });
@@ -119,6 +120,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   const auto fail = [&](BrowserControlResult result) {
     if(native_pressed || native_keys) { QueueRelease(impl_,lease); native_pressed=false; native_keys=false; }
     result.operation_may_have_completed = result.operation_may_have_completed || dispatched;
+    if (unclassified_mutation && output) (*output)["inspectionUncertain"] = true;
     return result;
   };
   auto result = inspect();
@@ -142,6 +144,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   native_pressed=false;
   result = inspect(true);
   if (!result.ok) return fail(result);
+  unclassified_mutation = false;
   if (type == "fill" || type == "type") {
     result = inspect();
     if (!result.ok) return fail(result);
@@ -185,6 +188,9 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       if (type == "fill") {
         result = inspect(true);
         if (!result.ok) return fail(result);
+        unclassified_mutation = false;
+        if (output && output->value("inspectionUncertain", false) && !scalars.empty())
+          return fail(BrowserControlResult::Failure("INPUT_UNCERTAIN", "Privacy is unknown before paced continuation"));
       }
       for (std::size_t index = 0; index < scalars.size(); ++index) {
         if (index) {
@@ -205,6 +211,9 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
         if (!result.ok) return fail(result);
         result = inspect(true);
         if (!result.ok) return fail(result);
+        unclassified_mutation = false;
+        if (output && output->value("inspectionUncertain", false) && index + 1 < scalars.size())
+          return fail(BrowserControlResult::Failure("INPUT_UNCERTAIN", "Privacy is unknown before paced continuation"));
       }
     } else {
       result = send("Input.insertText", {{"text", action.at("text")}});
@@ -212,6 +221,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       // The trusted input handler may change sensitivity before returning.
       result=inspect(true);
       if(!result.ok) return fail(result);
+      unclassified_mutation = false;
     }
   }
   if (output) { const bool sensitive=output->value("sensitive",false), uncertain=output->value("inspectionUncertain",false); *output = {{"sensitive",sensitive},{"inspectionUncertain",uncertain},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},

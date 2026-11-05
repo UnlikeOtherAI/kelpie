@@ -170,8 +170,6 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
             !plan.contains("typingDelayMs") || !plan["typingDelayMs"].is_number_integer())
           return ErrorResponse("INVALID_PACED_TYPING", "Paced typing preflight failed");
         typing_plans[plan_index] = std::move(plan);
-        const auto literal = action.at("text").get<std::string>();
-        if (!literal.empty()) redactions.push_back(literal);
       }
       if (action.value("sensitive", false)) { sensitive = true; redactions.push_back(action.at("text")); }
     }
