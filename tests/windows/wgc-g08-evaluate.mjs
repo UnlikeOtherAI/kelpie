@@ -7,7 +7,7 @@ import {evaluateG08} from "../capture/g08-timeline.mjs";
 // orchestration layer before any cross-stream comparison.
 export async function evaluateWgcFrames(stream,config){
  assert.ok(config&&["c","s"].includes(config.curve));
- const samples=[];let origin,calibrationStart,shape;
+ const samples=[];let origin,calibrationStart,calibrationMarkerSeen=false,shape;
  const count=await consumeWgcFrames(stream,(bgra,meta)=>{
   if(origin===undefined)origin=meta.tick100ns;
   const dimensions=meta.width+":"+meta.height;
@@ -18,7 +18,8 @@ export async function evaluateWgcFrames(stream,config){
   const rgb=whiteBackedRGB(bgra,meta.width,meta.height,meta.alphaMode);
   const sample={timeMs:(meta.tick100ns-origin)/10000,...measureG08Frame(rgb,meta.width,meta.height,marker)};
   if(calibrationStart===undefined&&sample.pointer)calibrationStart=sample.timeMs;
-  sample.calibrationCandidate=calibrationStart!==undefined&&sample.timeMs<=calibrationStart+300;
+  sample.calibrationCandidate=calibrationStart!==undefined&&!calibrationMarkerSeen&&sample.timeMs<=calibrationStart+8000;
+  if(sample.marker.alpha>.2)calibrationMarkerSeen=true;
   samples.push(sample);
   const old=samples[samples.length-101];if(old&&!old.calibrationCandidate)delete old.marker.roi;
  });
