@@ -10,10 +10,13 @@ import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
- let authorityRun,foreignToken;
+ let authorityRun,foreignToken,semanticStage="not-started";
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
- catch(error){checks.push({name,passed:false,code:error.code??"CHECK_FAILED"});throw error;}}
+ catch(error){
+  const types=new Set(["TypeError","SyntaxError","ZodError","Error"]);
+  const diagnostic=name==="semantic-label-export"?{stage:semanticStage,type:types.has(error?.name)?error.name:"OTHER"}:undefined;
+  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
   await client.tap("browser.action.more",more);
@@ -49,20 +52,25 @@ export async function runEngine(client,fixture,engine,report) {
  await load();
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
+  semanticStage="direct-play";
   const result=await client.direct("kelpie_play_script",{...base,capture,actions:[
    {action:"fill",target:{label:"Draft message"},text:"Synthetic written"},
    {action:"type",target:{label:"Draft message"},text:" more"},
    {action:"click",target:{role:"button",name:"Submit"}},
    {action:"output",name:"title",source:"title"},
    {action:"extract",name:"catalogue",params:{scope:"#catalogue",fields:[{name:"tea",selector:"h3",source:"text",multiple:true}],metadata:true}}]});
+  semanticStage="validate-output";
   requireTrue(result.success,"SEMANTIC_WORKFLOW");
   const field=result.outputs?.catalogue?.fields?.[0];
   requireTrue(field?.status==="ok"&&field.values.join("|")==="Green tea|Black tea"&&field.provenance.selector==="h3","STRUCTURED_EXTRACTION_PROVENANCE");
+  semanticStage="fixture-event";
   const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="submit"));
   requireTrue(event.hit==="submit"&&!event.trusted&&Math.abs(event.x-(event.rect.left+event.rect.right)/2)<2&&Math.abs(event.y-(event.rect.top+event.rect.bottom)/2)<2,"SEMANTIC_CENTER");
   authorityRun=result;
+  semanticStage="artifact-download";
   const artifacts=await client.download(result,engine+"-main");
   requireTrue(new Set(artifacts.map(a=>a.mimeType)).size===3,"ALL_FORMATS");
+  semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
  await check("observation-and-readiness-public-entry",async()=>{
