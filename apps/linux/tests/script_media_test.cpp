@@ -1,4 +1,5 @@
 #include "script_frame_compositor.h"
+#include "script_capture_cadence.h"
 #include "script_media_encoder.h"
 #include "script_artifact_store.h"
 #include "script_gstreamer.h"
@@ -128,6 +129,46 @@ void VisualViewportPixels() {
   assert(refused);
 }
 
+// Exercise the real pending-frame encoder with a skipped request. A request
+// before expiry + one interval can leave a pre-expiry frame as the tail;
+// once that deadline has passed, a skipped request implies a later admission.
+void CadenceAndPendingEndpoint() {
+  for (const bool safe : {false,true}) {
+    const auto dir=CreatePrivateCaptureDirectory();
+    auto encoder=ScriptMediaEncoder::Create(dir,{"gif","mp4"},10,1048576);
+    auto first=Frame(0); first.elapsed_ms=0;
+    auto active=Frame(1); active.elapsed_ms=650;
+    assert(encoder->AddFrame(first) && encoder->AddFrame(active));
+    assert(encoder->committed_movie_frames()==1);
+    double last=650;
+    if (safe) {
+      auto clear=Frame(2); clear.elapsed_ms=750; std::fill(clear.bgra.begin(),clear.bgra.end(),255);
+      assert(ScriptMovieFrameDue(last,clear.elapsed_ms,10));
+      assert(encoder->AddFrame(clear)); last=clear.elapsed_ms;
+      assert(encoder->committed_movie_frames()==2);
+    }
+    const double request=safe?810:710;
+    assert(!ScriptMovieFrameDue(last,request,10));
+    assert((last>=700)==safe);
+    const auto outputs=encoder->Finish(850);
+    assert(!encoder->budget_exceeded() && !encoder->finalization_failed() && outputs.size()==2);
+    for (const auto& output : outputs) {
+      assert(output.frame_count==(safe?3u:2u));
+      if (output.mime_type=="image/gif") {
+        int error=0; auto* gif=DGifOpenFileName(output.path.c_str(),&error);
+        assert(gif && DGifSlurp(gif)==GIF_OK);
+        const auto& image=gif->SavedImages[gif->ImageCount-1];
+        const auto* palette=image.ImageDesc.ColorMap?image.ImageDesc.ColorMap:gif->SColorMap;
+        const auto color=palette->Colors[image.RasterBits[(output.height/2)*output.width+output.width/2]];
+        if (safe) assert(color.Red==255 && color.Green==255 && color.Blue==255);
+        else assert(color.Red>200 && color.Green<120);
+        assert(DGifCloseFile(gif,&error)==GIF_OK);
+      }
+      std::filesystem::remove(output.path);
+    }
+    std::filesystem::remove(dir);
+  }
+}
 void PNG() {
   auto frame = Frame(0);
   const auto png = EncodeScriptPNG(frame);
@@ -149,7 +190,7 @@ void PNG() {
 }
 }
 int main() {
-  PNG(); HeldMarker(); VisualViewportPixels();
+  PNG(); HeldMarker(); VisualViewportPixels(); CadenceAndPendingEndpoint();
   const auto directory = CreatePrivateCaptureDirectory();
   const auto info = media::ScriptGstRuntimeInfo();
   auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 10, 1048576);
