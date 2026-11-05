@@ -71,7 +71,12 @@ ln -s /opt/kelpie/kelpie-linux "${BUILDROOT}/usr/bin/kelpie-linux"
 chmod 755 "${BUILDROOT}/opt/kelpie/kelpie-linux"
 chmod 755 "${BUILDROOT}/opt/kelpie/chrome-sandbox"
 
+# Preserve the exact tested CEF bundle; RPM strip hooks rewrite its binaries.
 cat > "${TOPDIR}/SPECS/kelpie.spec" <<EOF
+%undefine __brp_strip
+%undefine __brp_strip_comment_note
+%undefine __brp_strip_lto
+%undefine __brp_strip_static_archive
 Name:           kelpie
 Version:        ${VERSION}
 Release:        ${RELEASE}%{?dist}

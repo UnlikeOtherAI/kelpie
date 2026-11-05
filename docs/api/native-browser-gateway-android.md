@@ -179,3 +179,15 @@ renderer retirement, final output redaction, and capture privacy classification.
 Active owned runs return empty artifact lists and ARTIFACT_NOT_READY on valid
 chunk requests; unknown or foreign runs return ARTIFACT_NOT_FOUND. Safe terminal
 artifacts from earlier runs remain downloadable during a later active run.
+
+Android capture samples the owned window's committed WebView rectangle with
+PixelCopy. The native marker is part of that committed scene and is not drawn a
+second time. The existing Stop control is in a separate non-focusable window.
+Capture checks scene generation, focus, full visibility, geometry, document and
+authority around a WebView visual-state and compositor-frame fence. A timed-out
+or cancelled PixelCopy cannot publish; its one bounded bitmap
+remains quarantined until the native callback recycles it. Subsequent copies
+fail closed until that callback retires. API28 fails closed because it does not
+have this verified frame fence.
+A staged tablet viewport temporarily removes its rounded clipping during capture
+to provide the complete rectangular WebView scene. Native device replay is pending.

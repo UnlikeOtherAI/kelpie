@@ -10,24 +10,9 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     func ready() async throws -> (WorkflowLoopbackPage, String) {
-        continueAfterFailure = false
-        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
-        app.launch()
-        XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
-        try await probe.pair(app: app)
         let fixture = try WorkflowLoopbackPage()
         let url = try await fixture.start()
-        let listing = try await probe.request("/v1/get-tabs", [:])
-        let prior = try XCTUnwrap(listing["activeTab"] as? String)
-        let created = try await probe.request("/v1/new-tab", ["url": "about:blank", "name": "Workflow UI test"])
-        let tab = try XCTUnwrap(created["tabId"] as? String)
-        addTeardownBlock { [self] in
-            let client = cleanupProbe ?? probe
-            let closed = try await client.request("/v1/close-tab", ["tabId": tab])
-            XCTAssertEqual(closed["success"] as? Bool, true)
-            if !prior.isEmpty { _ = try await client.request("/v1/switch-tab", ["tabId": prior]) }
-            _ = try await client.request("/v1/pair", method: "DELETE")
-        }
+        let tab = try await openOwnedTab(url: "about:blank")
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,
                                                                    "actions": [["action": "navigate", "url": url]]])
         guard navigated["success"] as? Bool == true else {
@@ -37,6 +22,27 @@ final class WorkflowCaptureUITests: XCTestCase {
             ])
         }
         return (fixture, tab)
+    }
+
+    @MainActor
+    func openOwnedTab(url: String) async throws -> String {
+        continueAfterFailure = false
+        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
+        app.launch()
+        XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
+        try await probe.pair(app: app)
+        let listing = try await probe.request("/v1/get-tabs", [:])
+        let prior = try XCTUnwrap(listing["activeTab"] as? String)
+        let created = try await probe.request("/v1/new-tab", ["url": url, "name": "Workflow UI test"])
+        let tab = try XCTUnwrap(created["tabId"] as? String)
+        addTeardownBlock { [self] in
+            let client = cleanupProbe ?? probe
+            let closed = try await client.request("/v1/close-tab", ["tabId": tab])
+            XCTAssertEqual(closed["success"] as? Bool, true)
+            if !prior.isEmpty { _ = try await client.request("/v1/switch-tab", ["tabId": prior]) }
+            _ = try await client.request("/v1/pair", method: "DELETE")
+        }
+        return tab
     }
 
     @MainActor

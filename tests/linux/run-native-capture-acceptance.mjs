@@ -49,6 +49,10 @@ assert.ok(process.env.KELPIE_CAPTURE_SOURCE, "Provide exact compiled source revi
 const executable = resolve(binaryArg), output = resolve(outputArg);
 await mkdir(output, { recursive: false });
 const runtime = await mkdtemp("/tmp/kelpie-capture-");
+// Offscreen CEF must not inherit the host desktop or its session bus.
+for (const name of ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS",
+  "AT_SPI_BUS_ADDRESS", "GNOME_SETUP_DISPLAY"]) delete process.env[name];
+process.env.XDG_RUNTIME_DIR = runtime;
 process.env.TMPDIR = runtime;
 const profile = await mkdtemp(join(runtime, "profile-"));
 const readinessPath = join(profile, "readiness.json");

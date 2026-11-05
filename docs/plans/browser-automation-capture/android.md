@@ -483,3 +483,60 @@ scrubs earlier outputs, and executes no later action. Without capture the edit
 may finish and earlier outputs are still scrubbed. Existing concrete helper
 failures retain priority. Four authored oninput autocomplete/password ×
 capture/no-capture cases cover this boundary; native execution remains pending.
+## G08 hosted adapter (source only)
+
+The hosted authenticated CLI bridge now runs the shared white fixture separately
+for C and S on each profile, retaining ordered fixture facts, full GIF/MP4
+downloads, hashes, frame timestamps and the shared streaming verifier result.
+The fixture binds host loopback and the emulator reaches it through 10.0.2.2.
+The native bridge remains active through both runs. This is authored integration,
+not a device, decoded-pixel or native-overlay acceptance result. Failure reports
+and partial evidence remain retained; the shared verifier determines pass/fail.
+
+## Hosted b927 evidence intake
+
+Run41977011583 froze b927cb999509e25e3c85f3012620713b736dc73a.
+The retained archive SHA-256 is
+ac21e8b780352a36858cb0fd4d3d42b493741fdcb70ddb6318f23415130169fc.
+Both phone and tablet ran27 cases with6 failures; both separate CLI runs failed
+the PNG size assertion. Old c71 denominators and this failure remain preserved.
+The b927 artifact MCP error and focus-time privacy cases predate integrated
+follow-up fixes and need final-source replay, not a retrospective pass.
+
+The noisy page's retained DOM state confirms drawn random canvas data; the phone
+native screenshot is 5165243 bytes while the exported640x1304 PNG is a blank
+6146-byte white image. The pinch export independently failed its red page
+underlay check. ScriptCapture draws the WebView into a software bitmap; the
+evidence points to missing hardware-composited WebView content. This remains
+a production capture blocker pending a fenced compositor capture and replay.
+
+Both native marker tests failed while their retained five-action play reply
+succeeded. The rejected phone screenshot shows the finished browser without
+recording chrome. The test waits for Compose idle both before and inside its live animation
+sampling loop. Those waits can defer screenshots until the marker disappears.
+The source removes both waits for this probe; bounded native
+screenshots and main-thread geometry sampling remain. It requires replay.
+The separate native Stop test completed with partial GIF/MP4 and SCRIPT_ABORTED
+in this run; this is b927-only evidence, not a final-source acceptance claim.
+
+## Compositor replacement (source only)
+
+Strict capture now requests the exact certified visible WebView rectangle from
+the parent Window after a WebView visual-state callback and committed-frame
+callback. It rechecks current grant, document, scene generation, dimensions,
+scale, window focus and bounds before and after the copy. Timeout or cancellation
+quarantines one private bitmap until the late PixelCopy callback recycles it;
+no later copy is admitted while it remains outstanding. The live
+marker already belongs to the sampled frame and is never painted a second time.
+The existing Stop control uses a separate non-focusable Popup, and recording
+hides other browser sheets. Rounded staged viewports remove clipping while recording so the complete page
+rectangle can be certified; API28 fails closed pending a verified frame fence. New native tests
+cover uncertified-scene refusal and Stop exclusion, alongside the existing
+noise PNG and pinched underlay cases. Compilation and device replay are pending.
+
+Focused Maxis source check: after one formatting-only preliminary failure,
+ktlintFormat, ktlintCheck, compileDebugKotlin, compileDebugAndroidTestKotlin
+and ScriptPixelCopyGateTest3/3 passed in4m40s. It used a fresh writable Gradle
+home, separately copied read-only modules-2 seed, one CPU and2GiB heap. Existing
+unrelated warnings remain. No emulator, native screenshot, media replay, API28,
+or signed release was exercised by this check.

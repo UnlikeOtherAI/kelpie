@@ -31,7 +31,7 @@ class ScriptCliBridgeTest : ScriptPublicFixture() {
                 ui.waitUntil(60_000) { ui.onAllNodesWithText("Always allow").fetchSemanticsNodes().isNotEmpty() }
                 ui.onNodeWithText("Always allow").performClick()
                 ui.waitForIdle()
-                ui.waitUntil(180_000) { finish.exists() }
+                ui.waitUntil(840_000) { finish.exists() }
                 assertTrue(finish.readText().trim() == "complete:0")
             }
         }

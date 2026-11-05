@@ -74,6 +74,12 @@ final class IOSWorkflowActions {
         try tab.requireCurrent()
         guard document == tab.document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
         guard result["ok"] as? Bool == true, let value = result["value"] as? Body else {
+            #if DEBUG
+            let code = (result["error"] as? Body)?["code"] as? String ?? "INVALID_VALUE"
+            let known = ["BUSY", "TAB_CHANGED", "WEBVIEW_ERROR", "UNAUTHORIZED", "RECORDING_IN_PROGRESS",
+                         "TIMEOUT", "INVALID_PARAM", "INVALID_VALUE"]
+            IOSFrameSampler.diagnostic("observation-" + (known.contains(code) ? code : "OTHER"))
+            #endif
             throw IOSWorkflowFailure("OBSERVATION_FAILED")
         }
         return value

@@ -20,6 +20,7 @@ internal fun BrowserViewport(
     browserState: BrowserState,
     handlerContext: HandlerContext,
     tabletMobileStagePresetId: String?,
+    isScriptRecording: Boolean,
     onAvailablePresets: (List<TabletViewportPreset>) -> Unit,
     onScrollDirectionChange: (ScrollDirection) -> Unit,
     onScrolled: () -> Unit,
@@ -75,6 +76,7 @@ internal fun BrowserViewport(
                 TabletViewportStage(
                     preset = selectedPreset,
                     stageSize = stageSize,
+                    isScriptRecording = isScriptRecording,
                     onClose = { TabletViewportPresetStore.setSelectedPresetId(null) },
                 ) {
                     tabWebView(Modifier.fillMaxSize())

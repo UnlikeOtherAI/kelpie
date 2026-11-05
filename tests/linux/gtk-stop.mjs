@@ -11,11 +11,12 @@ import { readNativeIdentity } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
 
 /** Standard AT-SPI Stop on one pinned native GTK process; never focus or inject input. */
-export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal }) {
+export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown }) {
   assert.equal(env.GDK_BACKEND, "wayland");
+  const isolated = Boolean(captureShown);
   const fixture = await startCaptureFixture();
-  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: "standard AT-SPI Action.DoAction",
-    display: "existing GNOME Wayland session; no compositor pixel claim", artifacts: [] };
+  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
+    display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim", artifacts: [] };
   let pending;
   const api = async (method, body = {}) => {
     const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
@@ -43,7 +44,7 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     throw Error(name + ": " + (last?.message ?? "not observed"));
   };
   try {
-    report.window = await wait(() => automate("window"), "Owned GTK window showing");
+    if (!isolated) report.window = await wait(() => automate("window"), "Owned GTK window showing");
     const tabId = (await api("get-tabs")).tabs.find(tab => tab.active)?.id;
     assert.equal((await api("navigate", { tabId, url: fixture.url })).success, true);
     assert.equal((await api("play-script", { version: 1, tabId, actions: [{ action: "wait-ready", state: "complete" }] })).success, true);
@@ -57,11 +58,17 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     report.event = await wait(() => fixture.events.find(event => event.type === "click" && event.target === "unique"),
       "Trusted native click after encoded marker admission", 20000);
     assert.equal(report.event.trusted, true);
-    report.button = await wait(() => automate("inspect"), "Native Stop button showing");
+    if (!isolated) report.button = await wait(() => automate("inspect"), "Native Stop button showing");
+    if (captureShown) report.nativeImage = await captureShown();
     const current = await readNativeIdentity(identity.pid); assert.equal(current?.startTicks, identity.startTicks);
     const running = await api("get-script-status");
     assert.equal(running.playing, true); assert.equal(running.state, "running");
-    report.action = await automate("invoke"); assert.equal(report.action.invoked, true);
+    if (isolated) {
+      const aborted = await api("abort-script", { runId: running.runId }); assert.equal(aborted.success, true);
+      report.action = { interface: "public HTTP abort-script", success: true };
+    } else {
+      report.action = await automate("invoke"); assert.equal(report.action.invoked, true);
+    }
     const result = await awaitBounded(pending, 10000);
     assert.equal(result.runId, running.runId); assert.equal(result.success, false);
     const status = await api("get-script-status", { runId: result.runId });

@@ -34,6 +34,7 @@ extension WorkflowCaptureUITests {
             ["action": "extract", "name": "length", "params": ["fields": [["name": "length", "source": "text", "selector": "#length"]]]]
         ]
         let result = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab, "actions": edit])
+        XCTAssertEqual(result["success"] as? Bool, true, "Workflow error: " + WorkflowCaptureProbe.errorCode(result))
         let length = try XCTUnwrap((result["outputs"] as? Body)?["length"] as? Body)
         XCTAssertEqual((length["fields"] as? [Body])?.first?["values"] as? [String], ["2"])
         let canary = "iOS-Fixture+Private!"

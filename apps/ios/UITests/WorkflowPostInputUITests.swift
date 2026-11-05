@@ -56,7 +56,8 @@ extension WorkflowCaptureUITests {
         let result = capture ? try await probe.request("/v1/play-script", workflow) :
             try await probe.call("kelpie_play_script", workflow)
         XCTAssertEqual(result["success"] as? Bool, !capture)
-        XCTAssertEqual(result["actionsExecuted"] as? Int, capture ? 2 : 5)
+        let code = WorkflowCaptureProbe.errorCode(result)
+        XCTAssertEqual(result["actionsExecuted"] as? Int, capture ? 2 : 5, "Workflow error: " + code)
         XCTAssertTrue((result["artifacts"] as? [Body])?.isEmpty == true)
         if capture {
             XCTAssertEqual((result["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")

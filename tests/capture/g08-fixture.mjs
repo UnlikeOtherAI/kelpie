@@ -39,8 +39,9 @@ export function g08Workflow(tabId,curve="c"){
   assert.ok(["c","s"].includes(curve));
   return {version:1,tabId,pointer:{enabled:true,curve,durationMs:2400,easing:"ease-in-out"},
     tapIndicator:{color:curve==="c"?"#ff0000":"#0000ff",radius:48,durationMs:3000,wobble:true,fade:true},
-    capture:{formats:["gif","video"],fps:20,maxWidth:640,maxDurationMs:18000,maxBytes:33554432},
-    actions:[{action:"click",target:{role:"button",name:"G08 Start",exact:true}},
+    capture:{formats:["gif","video"],fps:20,maxWidth:640,maxDurationMs:26000,maxBytes:33554432},
+    actions:[{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
+      {action:"wait",ms:3500},{action:"click",target:{role:"button",name:"G08 Start",exact:true}},
       {action:"wait",ms:3500},{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
       {action:"wait",ms:3500}]};
 }

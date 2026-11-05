@@ -18,11 +18,12 @@ PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
 BUNDLE = "com.unlikeotherai.kelpie"
 NAVIGATION_UI_TEST = "testInitialOwnedHTTPNavigationLoadsFixture"
+COLD_NAVIGATION_TEST = "testColdPriorHTTPEitherNavigatesOrRefusesBeforeLoadThenRecovers"
 NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 
 
 def selection(scope):
-    if scope not in ("full", "navigation"):
+    if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
     targets = ["KelpieTests/IOSWorkflowNavigationTests"]
     files = [NAVIGATION_TESTS]
@@ -30,10 +31,22 @@ def selection(scope):
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
-        targets.append("KelpieUITests/WorkflowCaptureUITests/" + NAVIGATION_UI_TEST)
+        methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
+        if scope == "diagnostics":
+            methods.extend([
+                "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
+                "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
+                "testNativePinchClipsTapCenterAndExportedMarker",
+                "testLabelFillTypeAndReflectedPasswordRedaction",
+                "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
+                "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+                "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
+                "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
+            ])
+        targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
-    if scope == "navigation":
-        required.add(NAVIGATION_UI_TEST)
+    if scope != "full":
+        required.update(methods)
     return targets, required
 
 
@@ -135,6 +148,12 @@ def failure_diagnostics(log_path, destination):
     lines = []
     with log_path.open(errors="replace") as log:
         for line in log:
+            capture = re.search(r"\[WorkflowCapture\] reason=(native-bounds|pixel-ratio|layout-size|visible-size|scale|snapshot-viewport|presentation-parent|observation-(?:BUSY|TAB_CHANGED|WEBVIEW_ERROR|UNAUTHORIZED|RECORDING_IN_PROGRESS|TIMEOUT|INVALID_PARAM|INVALID_VALUE|OTHER))\b", line)
+            if capture:
+                lines.append("[WorkflowCapture] reason=" + capture.group(1))
+                if len(lines) >= 100:
+                    break
+                continue
             if not re.search(r"\berror:|Test Case .*failed|Test Suite .*failed|\*\* TEST .*FAILED|timed out", line, re.I):
                 continue
             line = re.sub(r"(?i)(bearer\s+)\S+", r"\1[redacted]", line)
@@ -174,8 +193,8 @@ def run_device(device, product_hashes, scope):
             raise RuntimeError("Installed simulator app differs from the generic build")
         args = ["xcodebuild", "test-without-building", "-xctestrun", str(config), "-destination", "id=" + udid,
                 "-parallel-testing-enabled", "NO", "-maximum-concurrent-test-simulator-destinations", "1",
-                "-test-timeouts-enabled", "YES", "-default-test-execution-time-allowance", "210",
-                "-maximum-test-execution-time-allowance", "240", "-resultBundlePath", str(result)]
+                "-test-timeouts-enabled", "YES", "-default-test-execution-time-allowance", "750",
+                "-maximum-test-execution-time-allowance", "780", "-resultBundlePath", str(result)]
         targets, required = selection(scope)
         args.extend("-only-testing:" + target for target in targets)
         cli_error = None
@@ -183,15 +202,37 @@ def run_device(device, product_hashes, scope):
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + (10 if scope == "navigation" else 24) * 60
+            deadline = time.monotonic() + (10 if scope == "navigation" else 40) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:
                     cli_started = True
                     try:
                         run_fixture(tab, folder / "cli")
+                        handoff.standard_passed()
+                        acknowledgment_deadline = time.monotonic() + 60
+                        while not handoff.standard_verified() and time.monotonic() < acknowledgment_deadline:
+                            if process.poll() is not None:
+                                raise RuntimeError("XCTest exited before original CLI verification")
+                            time.sleep(0.2)
+                        if not handoff.standard_verified():
+                            raise RuntimeError("Original CLI verification was not acknowledged")
+                        stage = folder / "g08-stage.json"
+                        stage.write_text(json.dumps({"state": "running"}))
+                        completed = subprocess.run(
+                            ["node", "scripts/testing/ios-g08.mjs", tab, str(folder / "g08"),
+                             device["family"], product_hashes["Kelpie"], command("git", "rev-parse", "HEAD")],
+                            capture_output=True, text=True, timeout=600)
+                        stage.write_text(json.dumps({"state": "passed" if completed.returncode == 0 else "failed",
+                                                     "exitCode": completed.returncode}, indent=2))
+                        if completed.returncode:
+                            raise RuntimeError("G08 fixture or decoder failed; see retained evidence")
                     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
                         cli_error = type(error).__name__ + ": " + str(error)[:160]
+                        (folder / "cli-stage-failure.txt").write_text(cli_error + "\n")
+                        stage = folder / "g08-stage.json"
+                        if stage.exists() and json.loads(stage.read_text()).get("state") == "running":
+                            stage.write_text(json.dumps({"state": "failed", "error": type(error).__name__}, indent=2))
                     finally:
                         handoff.finish(cli_error is None)
                 time.sleep(1)
@@ -215,7 +256,7 @@ def run_device(device, product_hashes, scope):
             install_report["afterError"] = type(error).__name__
         (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
         missing = sorted(method for method in required if method not in tests)
-        cli_required = scope == "full"
+        cli_required = scope != "navigation"
         if process.returncode or (cli_required and not cli_started) or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         if not install_verified:

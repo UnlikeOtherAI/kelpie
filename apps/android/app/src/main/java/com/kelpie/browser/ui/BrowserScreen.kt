@@ -21,6 +21,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.kelpie.browser.FeatureFlags
@@ -91,6 +94,8 @@ fun BrowserScreen(
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
     val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
     RecordingOrientationEffect(activity, isScriptRecording)
+    SideEffect { handlerContext.scriptCaptureScene = isScriptRecording }
+    DisposableEffect(handlerContext) { onDispose { handlerContext.scriptCaptureScene = false } }
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
     var showTabOverview by remember { mutableStateOf(false) }
@@ -215,6 +220,7 @@ fun BrowserScreen(
                 browserState,
                 handlerContext,
                 tabletMobileStagePresetId,
+                isScriptRecording,
                 onAvailablePresets = { availableTabletViewportPresets = it },
                 onScrollDirectionChange = { bottomBarCollapsed = it == ScrollDirection.DOWN },
                 onScrolled = { activeTab?.let(sampler::request) },
@@ -330,17 +336,11 @@ fun BrowserScreen(
         }
 
         if (isScriptRecording) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .padding(top = 12.dp, end = 12.dp),
-                contentAlignment = Alignment.TopEnd,
-            ) {
-                RecordingStopButton(
-                    onClick = { scriptPlaybackState.requestAbort() },
-                )
+            // Keep the existing Stop control out of the captured parent window.
+            Popup(alignment = Alignment.TopEnd, properties = PopupProperties(focusable = false)) {
+                Box(Modifier.statusBarsPadding().padding(top = 12.dp, end = 12.dp)) {
+                    RecordingStopButton(onClick = { scriptPlaybackState.requestAbort() })
+                }
             }
         }
     }
@@ -377,7 +377,7 @@ fun BrowserScreen(
         }
     }
 
-    if (showSettings) {
+    if (showSettings && !isScriptRecording) {
         ModalBottomSheet(
             onDismissRequest = { showSettings = false },
             sheetState = rememberModalBottomSheetState(),
@@ -402,7 +402,7 @@ fun BrowserScreen(
         }
     }
 
-    if (showPairedClients) {
+    if (showPairedClients && !isScriptRecording) {
         ModalBottomSheet(
             onDismissRequest = { showPairedClients = false },
             sheetState = rememberModalBottomSheetState(),
@@ -424,7 +424,7 @@ fun BrowserScreen(
         }
     }
 
-    if (showBookmarks) {
+    if (showBookmarks && !isScriptRecording) {
         BookmarksSheet(
             currentTitle = pageTitle,
             currentUrl = currentUrl,
@@ -436,7 +436,7 @@ fun BrowserScreen(
         )
     }
 
-    if (showHistory) {
+    if (showHistory && !isScriptRecording) {
         ModalBottomSheet(
             onDismissRequest = { showHistory = false },
             sheetState = rememberModalBottomSheetState(),
@@ -451,7 +451,7 @@ fun BrowserScreen(
         }
     }
 
-    if (showNetworkInspector) {
+    if (showNetworkInspector && !isScriptRecording) {
         ModalBottomSheet(
             onDismissRequest = { showNetworkInspector = false },
             sheetState = rememberModalBottomSheetState(),
@@ -460,7 +460,7 @@ fun BrowserScreen(
         }
     }
 
-    if (showAI) {
+    if (showAI && !isScriptRecording) {
         ModalBottomSheet(
             onDismissRequest = { showAI = false },
             sheetState = rememberModalBottomSheetState(),
@@ -471,7 +471,8 @@ fun BrowserScreen(
 
     // Observe programmatic panel requests from the HTTP API
     val activePanel by handlerContext.activePanel.collectAsState()
-    LaunchedEffect(activePanel) {
+    LaunchedEffect(activePanel, isScriptRecording) {
+        if (isScriptRecording) return@LaunchedEffect
         val panel = activePanel ?: return@LaunchedEffect
         handlerContext.clearPanel()
         // Dismiss any open sheet first

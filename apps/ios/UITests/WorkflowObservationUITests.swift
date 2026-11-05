@@ -200,7 +200,7 @@ extension WorkflowCaptureUITests {
                              ["action": "wait-ready", "state": "complete", "selector": "button"],
                              ["action": "extract", "name": "products", "params": params]]
         let run = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab, "actions": steps])
-        XCTAssertEqual(run["success"] as? Bool, true)
+        XCTAssertEqual(run["success"] as? Bool, true, "Workflow error: " + WorkflowCaptureProbe.errorCode(run))
         let products = try XCTUnwrap((run["outputs"] as? Body)?["products"] as? Body)
         XCTAssertTrue((products as NSDictionary).isEqual(to: direct))
         let rows = try XCTUnwrap((products["fields"] as? [Body])?.first?["records"] as? [[Body]])
