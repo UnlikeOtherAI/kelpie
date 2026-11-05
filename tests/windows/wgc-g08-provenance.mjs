@@ -19,7 +19,7 @@ export function verifyWgcProvenance(facts){
  assert.ok(Number.isInteger(summary.written)&&summary.written>=0&&summary.written<=summary.accepted);
  assert.equal(facts.frameCount,summary.written,"WGC_STREAM_COUNT_MISMATCH");
  for(const key of ["writerReplaced","poolReplaced","rateSkipped"])assert.ok(Number.isInteger(summary[key])&&summary[key]>=0);
- assert.ok(["item-closed","frame-limit","capture-deadline"].includes(summary.endReason));
+ assert.ok(["item-closed","window-hidden","frame-limit","capture-deadline"].includes(summary.endReason));
  assert.equal(typeof summary.naturalItemClosure,"boolean");assert.equal(summary.naturalItemClosure,summary.endReason==="item-closed");
  assert.equal(summary.accepted,summary.written+summary.writerReplaced,"WGC_FRAME_ACCOUNTING");
  assert.match(active.runId,/^[a-f0-9]{48}$/);assert.equal(active.playing,true);
