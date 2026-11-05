@@ -68,3 +68,36 @@ Raw identity/task JSON with UTF-16 BOM was preserved and decoded explicitly,
 rather than rewritten. Reports/artifacts are ignored outputs, not committed
 generated files. No app launch, browser build, CUA or desktop input was used
 during intake.
+
+## 5877 Session1 replay and remaining boundaries
+
+On Maxis the exact unsigned 0.1.16 candidate at source
+`5877e6fa438385cab6ae44de0343a748d2251053`, DLL SHA-256
+`231683fbb5f6025caf71d0c32eaaedba1594c09711ea24ebf75fa34478a9c0b3`,
+was exercised with test revision `d16a71d9384f3c6b900b1fe8ff3dcf21aaabfabb`.
+The initial task failed before launch because the fresh worktree lacked built
+shared output. The retry used a copy of 152 matching shared dist files from
+`66a0f0bc`; shared sources and lockfile matched, and every dist file hash was
+checked. Both attempts and task definitions remain in
+`D:/BuildArtifacts/kelpie/capture-windows-20261104/uia-wgc-5877-resume*`.
+
+The retry used one CPU, Normal priority, a 2 GiB Job limit and Session1. The
+standard UIA InvokePattern on the exact owned Stop button passed abort, partial
+artifact retrieval and next-run recovery. The native viewport measured DPR2.
+The WGC helper failed after 17.5 seconds; no presentation marker image is
+claimed. The separate Stop image was captured. Public CLI stop failed; the Job
+ended and the exact owned PID and listener were subsequently absent. Therefore
+supported graceful cleanup is not claimed. The matching task was unregistered.
+The prior f188 successful WGC image remains evidence only for that older build.
+
+The prior 5877 geometry/motion API report passed seven checks, while the legacy
+pixel verifier failed its fade-disabled opacity assertion. Its single fixed
+sample can include pointer or background, so this failure alone does not identify
+a product opacity defect. Preserve it and measure actual pixels with the shared
+G08 oracle before drawing a conclusion.
+
+Windows exposes one immutable desktop HTTP control token per listener and no
+native pairing dialog or second valid grant on that listener. Invalid bearer,
+unknown-run and distinct-grant unit checks do not establish a foreign valid
+grant in the same app. Two independently owned listeners can provide a separate
+cross-listener test, without describing them as two grants on one listener.

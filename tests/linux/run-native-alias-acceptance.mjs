@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { runGtkStop } from "./gtk-stop.mjs";
+import { captureIsolatedWayland } from "./wayland-capture.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
 const [binaryArg, cliArg, outputArg, mode = "offscreen"] = process.argv.slice(2);
@@ -79,8 +80,13 @@ try {
   report.nativeMcpServerInfo = initialized.result.serverInfo;
   report.checks.push({ name: "public Linux " + mode + " alias launch and exact native identity", passed: true });
   if (!headless) {
-    report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal });
-    report.checks.push({ name: "native GTK Stop via exact-process AT-SPI Action", passed: true, runId: report.gtkStop.result.runId });
+    const captureShown = env.KELPIE_ISOLATED_WAYLAND === "1"
+      ? () => captureIsolatedWayland({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
+      : undefined;
+    report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256,
+      output, env, signal: deadline.signal, captureShown });
+    report.checks.push({ name: captureShown ? "isolated GTK recording image and public HTTP abort"
+      : "native GTK Stop via exact-process AT-SPI Action", passed: true, runId: report.gtkStop.result.runId });
   }
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const observed = join(output, "observations.json");

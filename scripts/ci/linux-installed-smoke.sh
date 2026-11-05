@@ -35,10 +35,14 @@ case "$distro" in
     ;;
   *) echo "Unsupported installed test distro" >&2; exit 1 ;;
 esac
+stage=verify-installed-hashes
 sha256sum "$candidate" /usr/bin/kelpie-linux /opt/kelpie/libcef.so > "$output/installed-sha256.txt"
 expected="$(awk '$2 == "apps/linux/build/kelpie-linux" { print $1 }' "$package_root/binary-sha256.txt")"
 [[ "$expected" =~ ^[a-f0-9]{64}$ ]]
-[[ "$(sha256sum /usr/bin/kelpie-linux | cut -d ' ' -f1)" == "$expected" ]]
+[[ "$(sha256sum /usr/bin/kelpie-linux | cut -d ' ' -f1)" == "$expected" ]] || { echo "Installed executable differs from tested build" >&2; exit 1; }
+expected_cef="$(awk '$2 == "apps/linux/build/libcef.so" { print $1 }' "$package_root/binary-sha256.txt")"
+[[ "$expected_cef" =~ ^[a-f0-9]{64}$ ]]
+[[ "$(sha256sum /opt/kelpie/libcef.so | cut -d ' ' -f1)" == "$expected_cef" ]] || { echo "Installed CEF differs from tested build" >&2; exit 1; }
 stat -c '%a %U %G %n' /opt/kelpie/chrome-sandbox > "$output/sandbox-helper.txt"
 # Never install a new privileged helper as a test workaround.
 [[ "$(stat -c %a /opt/kelpie/chrome-sandbox)" == 755 ]]
@@ -50,6 +54,8 @@ cp /etc/os-release "$output/os-release.txt"
 source_revision="$(cat "$package_root/source-revision.txt")"
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ ]]
 printf '%s\n' "$source_revision" > "$output/source-revision.txt"
+[[ "$(cat /opt/kelpie/source-revision.txt)" == "$source_revision" ]]
+sha256sum /opt/kelpie/source-revision.txt > "$output/embedded-source-sha256.txt"
 
 stage=client
 # A test runtime, never part of the native package. Verify the upstream archive.

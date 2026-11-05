@@ -127,7 +127,7 @@ try {
      {signal:deadline.signal,timeout:10000})).stdout);
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
    assert.equal(report.wgc.windowHandle,window.windowHandle);
-   }catch(error){report.wgcFailure={error:error.message,stderr:String(error.stderr??"").slice(0,8192)};}
+   }catch(error){report.wgcFailure={error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false,stderr:String(error.stderr??"").slice(0,8192)};}
    finally{report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;}
    await save();
  }
@@ -192,7 +192,7 @@ try {
      const closed=await publicCli(["browser","stop",alias]);assert.equal(closed.success,true);
      if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
      report.cleanup="supported-cli-closed";
-   }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message});process.exitCode=1;}
+   }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;}
  }
  clearTimeout(timer);await save();
 }

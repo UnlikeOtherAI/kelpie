@@ -70,7 +70,7 @@ enum ScriptOverlayDrawing {
         let state = kelpie_script_tap_presentation(fraction, marker.wobble ? 1 : 0, marker.fade ? 1 : 0)
         guard state.alpha > 0 else { return }
         let radius = marker.radius * CGFloat(state.scale)
-        graphics.setFillColor(marker.color.copy(alpha: CGFloat(state.alpha)) ?? marker.color)
+        graphics.setFillColor(marker.color.copy(alpha: 0.7 * CGFloat(state.alpha)) ?? marker.color)
         graphics.fillEllipse(in: CGRect(
             x: marker.point.x - radius,
             y: marker.point.y - radius,

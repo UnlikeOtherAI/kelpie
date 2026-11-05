@@ -4,6 +4,8 @@ import XCTest
 @testable import Kelpie
 
 final class IOSWorkflowNavigationTests: XCTestCase {
+    private var phase = "setup"
+    private var diagnosticLease: ConnectNavigationLease?
     @MainActor
     private func withView(_ operation: (WKWebView) async throws -> Void) async throws {
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
@@ -14,17 +16,34 @@ final class IOSWorkflowNavigationTests: XCTestCase {
             onScrollDirectionChange: { _ in }, onWebViewReady: { _ in }
         )
         coordinator.install(webView: view, in: container)
+        let began = ProcessInfo.processInfo.systemUptime
+        var primary = "none"
         defer {
+            let report: [String: Any] = [
+                "phase": phase, "primary": primary, "loading": view.isLoading,
+                "elapsedMs": Int((ProcessInfo.processInfo.systemUptime - began) * 1000)
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]) {
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+                attachment.name = "Navigation fixture state before teardown"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+            if let diagnosticLease { attach(diagnosticLease, name: "Last lease before fixture teardown") }
             view.stopLoading()
             ConnectDocument.reserve(view, lease: nil)
-            withExtendedLifetime(coordinator) {}
+            withExtendedLifetime((container, coordinator)) {}
         }
-        try await operation(view)
+        do { try await operation(view) } catch {
+            primary = (error as? IOSWorkflowFailure)?.code ?? String(reflecting: type(of: error))
+            throw error
+        }
     }
 
     @MainActor
     private func startPrior(_ address: String, view: WKWebView) throws -> ConnectNavigationLease {
         let prior = ConnectNavigationLease(initial: ConnectDocument.version(view))
+        diagnosticLease = prior
         ConnectDocument.reserve(view, lease: prior)
         let token = try XCTUnwrap(view.load(URLRequest(url: try XCTUnwrap(URL(string: address)))))
         ConnectDocument.issued(view, navigation: token)
@@ -46,18 +65,35 @@ final class IOSWorkflowNavigationTests: XCTestCase {
         let previous = try WorkflowLoopbackPage(responseDelay: 0.4)
         let address = try await previous.start()
         defer { previous.listener.cancel() }
-        try await navigate(priorURL: address)
+        try await navigate(priorURL: address, warmup: true)
     }
 
     @MainActor
-    private func navigate(priorURL: String?) async throws {
+    private func navigate(priorURL: String?, warmup: Bool = false) async throws {
         let fixture = try WorkflowLoopbackPage()
         let address = try await fixture.start()
         defer { fixture.listener.cancel() }
         try await withView { view in
+            if warmup {
+                phase = "warmup"
+                let warm = try startPrior(address + "?warmup=1", view: view)
+                let end = ContinuousClock.now.advanced(by: .seconds(20))
+                while warm.allowsWait(version: ConnectDocument.version(view), authorized: true),
+                      !warm.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: true),
+                      ContinuousClock.now < end {
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                }
+                guard warm.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: true) else {
+                    throw IOSWorkflowFailure("FIXTURE_WARMUP_FAILED")
+                }
+                attach(warm, name: "Warmup exact callback retired")
+            }
+            phase = "prior-load"
             let prior = try priorURL.map { try startPrior($0, view: view) }
             let url = try XCTUnwrap(URL(string: address))
+            phase = "admission"
             let lease = try await IOSWorkflowNavigation.issue(on: view, authorize: {}, isLoading: { view.isLoading }) {
+                phase = "load-issued"
                 if let prior {
                     // The old lease can read only after its exact WKNavigation callback was consumed.
                     XCTAssertTrue(prior.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: true))
@@ -65,6 +101,8 @@ final class IOSWorkflowNavigationTests: XCTestCase {
                 }
                 return view.load(URLRequest(url: url))
             }
+            diagnosticLease = lease
+            phase = "waiting-own-load"
             let deadline = Date().addingTimeInterval(12)
             while lease.allowsWait(version: ConnectDocument.version(view), authorized: true),
                   !lease.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: true),
@@ -75,6 +113,7 @@ final class IOSWorkflowNavigationTests: XCTestCase {
             XCTAssertTrue(lease.allowsWait(version: ConnectDocument.version(view), authorized: true))
             XCTAssertTrue(lease.allowsRead(version: ConnectDocument.version(view), loading: view.isLoading, authorized: true))
             XCTAssertEqual(view.title, "Count 0")
+            phase = "completed"
         }
     }
 

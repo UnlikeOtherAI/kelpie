@@ -4,6 +4,7 @@ import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture
 import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
+import {runG08} from "./runtime-g08.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
@@ -38,6 +39,12 @@ export async function runEngine(client,fixture,engine,report) {
   const generic=await client.direct("kelpie_get_script_status",{},true);
   requireTrue(direct.supportedVersions?.includes(1)&&generic.supportedVersions?.includes(1),"STRICT_CAPABILITY_MISSING");
   return {direct:true,generic:true};
+ });
+ await check("public-navigation-from-start-page",async()=>{
+  const result=await client.api("navigate",{tabId,url:fixture.url+"/"});
+  requireTrue(result.success,"PUBLIC_NAVIGATION");
+  await waitFor(()=>fixture.events.find(e=>e.type==="document"&&e.path==="/"));
+  return {success:true};
  });
  await load();
  await check("semantic-label-export",async()=>{
@@ -179,5 +186,6 @@ export async function runEngine(client,fixture,engine,report) {
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
  });
  await runSafety({client,fixture,engine,base,capture,check,play,load});
+ await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
 }

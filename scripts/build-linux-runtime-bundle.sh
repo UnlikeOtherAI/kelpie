@@ -62,6 +62,11 @@ done < "${MANIFEST}"
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/kelpie-linux"
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/chrome-sandbox"
 
+# Packaging provenance, paired with the compiled ELF hash in CI receipts.
+SOURCE_REVISION="$(git -c safe.directory="${PWD}" rev-parse --verify HEAD)"
+[[ "${SOURCE_REVISION}" =~ ^[a-f0-9]{40}$ ]]
+printf "%s\n" "${SOURCE_REVISION}" > "${OUTPUT_DIR}/kelpie-linux/source-revision.txt"
+
 readelf -d "${BUILD_DIR}/kelpie-linux" > "${OUTPUT_DIR}/kelpie-linux/elf-dependencies.txt"
 bash scripts/check-linux-script-codecs.sh > "${OUTPUT_DIR}/kelpie-linux/capture-codecs.txt"
 
@@ -69,6 +74,7 @@ cat > "${OUTPUT_DIR}/kelpie-linux/README.txt" <<EOF
 Kelpie Linux release bundle
 Version: ${VERSION}
 Build: ${BUILD_LABEL:-generic}
+Package source: ${SOURCE_REVISION}
 
 Run:
   ./kelpie-linux
