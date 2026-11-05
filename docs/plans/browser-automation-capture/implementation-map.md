@@ -1,12 +1,37 @@
 # Landed implementation and evidence map
 
-Current reviewed integration base:49c3b914612648bf4b5fee340ec85b9d725b4d60.
+Current reviewed integration snapshot:6f10b31bb724db74042ae7a40841ce4762ffe089.
+Later owner-reported outcomes are labelled and never overwrite historical failures.
 This maps all48 canonical IDs to landed source and durable checks. A source,
 codec or compiled app is not a native semantic/UI pass. Actual reports remain
 runtime-specific; all432 native cells require review. See acceptance.md,
 evidence-intake.md and outstanding-gates.md.
 
-## Current checkpoints
+## Current evidence supplement
+
+The rows below retain original checkpoints. They are not the latest binary for
+every runtime. Current stage outcomes at root6f10 and later owner reports:
+
+- Portable shared/CLI allocation guards passed full required checks: shared140,
+  CLI697 passed with one existing skip. Exact noCEF registry/profile/gateway/
+  extension/desktop MCP checks passed4/4 on the authorized Minis test mirror.
+- Android shipping JNI x86_64 link115/115,APK/test APK assembly and instrumentation
+  compilation passed. Actual phone6/11 and replay10/12 failures remain historical;
+  corrected hosted phone/tablet corpus and privacy fix runtime remain pending.
+- iOS hosted41957712925 built app/tests/CLI at2e08956f,selected iPhone17/iPadAir,
+  but iPhone container/scheduling cleanup failed and iPad was withheld. Authorized
+  hosted rendezvous correction supersedes the old local-handoff blocker.
+- Mac hosted41950256231 build succeeded; WK/CEF profile relink and3 native core
+  checks passed. New hosted runtime corpusb027/91ff has not supplied accepted
+  renderer runtime results here.
+- Lightpanda actual diagnostic reports and operator boundary are audited in
+  lightpanda-independent-review.md. Later owner-reported public stdio9a301405
+  passed7/7 with41 calls; exact report intake remains a separately tracked step.
+- Current privacy/source and actual protocol call gaps are finite in
+  privacy-protocol-readiness.md. Source registration/discard fixes are not
+  blanket native privacy acceptance.
+
+## Historical checkpoints and still-current source anchors
 
 | Key | Exact source | Scope / limits |
 |---|---|---|
@@ -16,8 +41,8 @@ evidence-intake.md and outstanding-gates.md.
 | REDACT | 9f752a56335a15e1662016dc6db934a79adba7b5 | Bounded shared native C ABI; encoded hex-case matching and dynamic-key collision refusal. |
 | HOST | e71364364db94a6212f556aa7b5ca9efb09ac003 | Host percent-hex fix, hidden Windows launch, status admission recovery tests; verified private CLI bundle. |
 | BACKEND | eee84a266ad0b3613de71eb930e1bf0c9ede8cb3 | Managed cleanup/ownership, public stdio version, actual managed/WebMCP worker flows; actual Lightpanda remains separate. |
-| WIN | 9333ff507ec91d06d86e338b1d2d9378daca2ac5 | Corrected held-marker compositor and native workflow runtime; owner reports actual HTTP/MCP/alias/full decode. Raw intake pending. |
-| IOS | 503a553688815e4e46487263d480d47c71a7b1cf | Compiled iOS workflow/critical-frame adapters and tests; actual simulator handoff pending. |
+| WIN | 9333ff507ec91d06d86e338b1d2d9378daca2ac5 | Corrected held-marker compositor and native workflow runtime; owner reports actual HTTP/MCP/alias/full decode. Raw intake completed:22 curated records/432 unreviewed rows; see windows-evidence-intake.md. |
+| IOS | 503a553688815e4e46487263d480d47c71a7b1cf | Compiled iOS workflow/critical-frame adapters and tests; authorized hosted fallback now builds app/CLI and starts iPhone scheduling; rendezvous/cleanup failure preserved,completed iPhone/iPad runtime evidence pending. |
 | ANDROID | ca498e21eb1897918d1bf7a5b0b167bdecb1fc8b | Native/JNI/public-flow tests; initial actual phone failures retained. |
 | ANDROID-FIX | 80e7f7cd204142f7ca90ccbfe69d7411b3fc0d5e | Initial video admission and screenshots-only capture deadline; corrected runtime replay still required. |
 | MAC | 217f29b69bd5d709d7587f97ea0441307303f1e4 | WK+CEF app/test compile and strict owner-bound adapters; no actual launch/MCP pass. |
@@ -25,7 +50,7 @@ evidence-intake.md and outstanding-gates.md.
 | LINUX | 90eb6830eab0e92ca224123f55748e97ed44dce1 | Actual sandboxed CEF OSR HTTP capture/extraction;8 artifacts, GIF/MP4 each13 decoded frames per owner. |
 | LINUX-INTEGRATED | 33d0a80f2c4a2bf064f00c2535aaea39b6e3439b | Landed Linux media/store/sandbox/corpus source and evidence documentation. |
 | QA | 4d97292f6165066fcece7d8fdee9e36a9f4c0d9d | Strict DIF normalization,9-runtime ingestion, independent artifact hashes; never automatic acceptance. |
-| REGISTRY | 2078d03ee1a8b7703c56023d3a505f2df69843fb /8b7f80a87dc296b53e6f30f3fc96ec80cd3bfabf | Exact iOS/Android profiles; Mac/Linux trusted runtime-mode follow-up is not yet claimed landed here. |
+| REGISTRY | 2078d03ee1a8b7703c56023d3a505f2df69843fb /8b7f80a87dc296b53e6f30f3fc96ec80cd3bfabf | Exact iOS/Android profiles;086d6070 trusted Mac/Linux runtime-mode projection landed and portable noCEF/noLLM four native checks passed. Mac app/profile relink also passed; actual runtime remains separate. |
 
 Historical source checkpoints remain documented in observations.md,workflows.md,
 workflow-review.md,backend-review.md,windows-codec-review.md and
@@ -96,16 +121,16 @@ outstanding-gates.md; a listed actual subset does not close an entire platform.
 | ART-01 | Native opaque-ID artifact services + pinned CLI download | Windows alias/public chunks reported; other public transports still per-runtime evidence. |
 | ART-02 | Existing owner/grant/listener checks in each artifact/status route | Foreign owner/revocation tests exist; actual results must be ingested. |
 | ART-03 | Bounded chunks/exact socket,private exclusive files,path/handle checks | Host transfer tests and native stores landed; no device path becomes transport locator. |
-| ART-04 | SHA-256,dimensions,timing,document/partial manifests | Windows39 and Linux8 hashed artifacts reported; raw decode/media lineage intake pending. |
+| ART-04 | SHA-256,dimensions,timing,document/partial manifests | Windows39 copied/hash/decode lineage ingested without acceptance; Linux8 hashed/decoded artifacts reported. Full direct/generic chunk parity still requires the new large-PNG helper. |
 | SEC-01 | Value-free reader + host/native structural secret scrubbers | REDACT/HOST closed matcher defects; actual encoded/Unicode/dynamic-key tests remain per native build. |
 | SEC-02 | Fixed generated readers/targets,no arbitrary v1 eval; private grants | Native hostile-page/authority cases and WebMCP uncertainty remain separately scoped. |
 | DIF-01 | Strict normalization.mjs/assertions + native-coverage.mjs | All48×9 cells unreviewed; source/unit never promoted; public ingestion command verified. |
-| LP-01 | Restricted lightpanda.ts capability profile and fixed readers | Actual pinned LP1.0.2 Linux corpus/cost remains pending. |
+| LP-01 | Restricted lightpanda.ts capability profile and fixed readers | Four actual pinned1.0.2 diagnostic stages ran under bounded unit/egress; corrected snapshot assertion still needed. Owner now reports7/7 public stdio at9a301405 with8 navigation/lifecycle methods,41 calls; report intake pending. No reader/visual/input admission. |
 | LP-02 | Operator-only worker config,owned sessions,cleanup and egress policy | Managed Chromium production proof exists; restricted actual LP lifecycle/egress proof does not. |
 | WEB-01 | Managed canonical discover/call,private world,actual API probe | BACKEND actual Chromium151 API/public stdio passed; native defaults remain off. |
 | WEB-02 | Session/origin/document grants,bounded JSON,uncertainty fence | BACKEND fixes reviewed/tested; no native grant/API/timeout support inferred. |
 | DOC-01 | Common API/CLI/platform docs,recipes,generated schemas | Current mapping replaces initial schema-only claims; final docs must match actual enabled capabilities. |
-| UI-01 | Native presentation/Stop controls and standard app instrumentation | Android phone Stop reported actual; other UI/runtime cells need authorized tests/handoffs. CUA/OS input remains off. |
+| UI-01 | Native presentation/Stop controls and standard app instrumentation | Android phone Stop and Windows Session1 UIA Stop reported actual; hosted XCUITest/Compose/accessibility are authorized. Other UI/runtime cells still need their own executed outcomes. CUA/OS input remains off. |
 | REL-01 | One integrated PR,required checks,component manifests/releases | Coordinator-owned; private candidates are not releases. |
 | REL-02 | Published artifacts/signatures/download hashes/installed flows | Pending every affected component,including npm and platform packages. |
 
