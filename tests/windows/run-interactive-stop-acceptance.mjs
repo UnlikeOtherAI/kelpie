@@ -3,6 +3,8 @@ import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
+import {fileURLToPath} from "node:url";
+import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 import {dirname,join,resolve,isAbsolute} from "node:path";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 const [exe,cli,uia,outputRoot,privateRoot]=process.argv.slice(2);
@@ -14,12 +16,12 @@ const timer=setTimeout(()=>deadline.abort(),120000);timer.unref();
 const report={source:"9333ff507ec91d06d86e338b1d2d9378daca2ac5",checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
 let launched=false,readiness,pending,outputCreated=false;
 const child=async(command,args,extra={})=>execute(command,args,{windowsHide:true,timeout:15000,maxBuffer:2097152,...extra});
-const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{env:{...process.env,KELPIE_HOME:cliHome}})).stdout);
+const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,KELPIE_HOME:cliHome}})).stdout);
 const automation=async args=>JSON.parse((await child(uia,args,{signal:deadline.signal,timeout:10000})).stdout);
 const api=async(method,body={},cleanup=false)=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
   headers:{authorization:"Bearer "+readiness.token,"content-type":"application/json"},body:JSON.stringify(body),
-  signal:cleanup?AbortSignal.timeout(10000):AbortSignal.any([deadline.signal,AbortSignal.timeout(method==="play-script"?60000:10000)])});
+  signal:cleanup?AbortSignal.timeout(5000):AbortSignal.any([deadline.signal,AbortSignal.timeout(method==="play-script"?60000:10000)])});
  return {status:response.status,value:await response.json()};
 };
 const save=()=>outputCreated?writeFile(join(output,"report.json"),JSON.stringify(report,null,2)):Promise.resolve();
@@ -29,6 +31,12 @@ try {
  assert.equal(session.user.toLowerCase(),"maxis\\ondre");report.testSession=session;
  await child(join(process.env.WINDIR,"System32","icacls.exe"),[home,"/inheritance:r","/grant:r","*"+session.userSid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"]);
  const hash=async file=>createHash("sha256").update(await readFile(file)).digest("hex");
+ const testFile=fileURLToPath(import.meta.url),repo=fileURLToPath(new URL("../../",import.meta.url));
+ report.testSourceRevision=(await child("git.exe",["-C",repo,"rev-parse","HEAD"])).stdout.trim();
+ assert.match(report.testSourceRevision,/^[a-f0-9]{40}$/);
+ report.hashes={exe:await hash(exe),dll:await hash(join(dirname(exe),"kelpie.dll")),cliEntry:await hash(cli),uiaClient:await hash(uia),testAction:await hash(testFile),uiaSource:await hash(join(dirname(testFile),"ScriptStopAutomation.cs"))};
+ report.cliSource="e71364364db94a6212f556aa7b5ca9efb09ac003";
+ assert.equal(report.hashes.cliEntry,"831dd89b45aa3186efb8978d3da6ff7e9d8ec7f832ca7519bc152c0dc58e71dd");
  assert.equal(await hash(exe),"54c8be31e003853947182c9461755bf4e7be5f91a2c64fcfb97ed5da1a32d755");
  assert.equal(await hash(join(dirname(exe),"kelpie.dll")),"27a474291206310a64e17cce27f6f9c50836af55b997b275d5f31e0fc71bca8c");
  await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
@@ -45,9 +53,9 @@ try {
  report.identity={...identity,launchId:readiness.launchId,port:28420};
  assert.equal((await api("navigate",{url:"about:blank"})).value.success,true);
  const tabs=(await api("get-tabs")).value;const tabId=tabs.tabs.find(tab=>tab.active).id;
- pending=api("play-script",{version:1,tabId,actions:[
+ pending=observeInFlight(api("play-script",{version:1,tabId,actions:[
    {action:"commentary",text:"Stop accessibility acceptance",durationMs:30000},{action:"wait",ms:30000}],
-   capture:{formats:["gif","video","screenshots"],fps:10,maxWidth:640,maxBytes:8388608,maxDurationMs:60000}});
+   capture:{formats:["gif","video","screenshots"],fps:10,maxWidth:640,maxBytes:8388608,maxDurationMs:60000}}));
  let status,provider;
  for(let attempt=0;attempt<50;attempt++){
    status=scriptStatusV1Schema.parse((await api("get-script-status")).value);
@@ -88,13 +96,12 @@ try {
 } catch(error) {
  report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.message});process.exitCode=1;
 } finally {
- clearTimeout(timer);
  if(launched){
-   if(pending&&readiness){try{await api("abort-script",{},true);await pending;}catch{}}
+   if(pending&&readiness){try{await api("abort-script",{},true);await awaitBounded(pending,5000);}catch(error){report.pendingCleanup=error.message;}}
    try{
      const closed=await publicCli(["browser","stop",alias]);assert.equal(closed.success,true);report.cleanup="supported-cli-closed";
    }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message});process.exitCode=1;}
  }
- await save();
+ clearTimeout(timer);await save();
 }
 console.log(JSON.stringify({passed:report.checks.filter(c=>c.passed).length,failed:report.checks.filter(c=>!c.passed).map(c=>c.error),cleanup:report.cleanup}));

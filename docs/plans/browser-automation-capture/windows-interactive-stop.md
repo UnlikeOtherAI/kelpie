@@ -37,7 +37,7 @@ The five positional action arguments are candidate EXE, CLI entry, UIA executabl
 7. Inspect aborted terminal status, retrieve partial artifacts by authenticated IDs/chunks and verify hashes. Run a new workflow to verify recovery.
 8. Persist the report before cleanup. Finally use public browser stop on that exact private alias. Do not terminate or alter PID52960 or any other task.
 
-The Node action has a120-second test deadline, bounded child/API calls and public cleanup. The task hard bound is180 seconds, leaving teardown time. If the provider is absent/offscreen, session identity differs, the task cannot register or any operation needs focus/input, fail safely and retain the UI gate.
+The Node action has a 120-second test deadline, bounded child/API calls and public cleanup. The task hard bound is180 seconds, leaving teardown time. If the provider is absent/offscreen, session identity differs, the task cannot register or any operation needs focus/input, fail safely and retain the UI gate.
 
 ## Registration and teardown after root review
 
@@ -46,3 +46,6 @@ Registration uses New-ScheduledTaskAction for the Node executable, New-Scheduled
 Root reviews the pushed source and frozen action arguments before registration/run. Record only this task's exported definition, state and result. Do not enumerate other task actions. The monitor is bounded and preserves failures; if needed, planned teardown uses the same public private-alias stop path. After the action exits and owned browser/readiness/socket cleanup is verified, unregister only the exact task whose principal and action still match this plan. No persistent task or service remains.
 
 Matching base195eb/final native UI screenshots still require a task-owned base binary and capture restricted to its own windows. No screenshot of another task or renderer-only export may substitute for native window evidence.
+
+### Promise ownership and report provenance
+The play Promise receives an immediate rejection observer while its original rejecting identity is retained for the later await. Controlled real HTTP fixtures prove early malformed-JSON and disconnected responses still reach cleanup, and subprocess checks verify cleanup timers retire on early resolve/reject. Public CLI launch permits 30 seconds; stop permits 20 seconds, within a120-second run and 30-second cleanup budget beneath the 180-second task bound. Reports record actual EXE, DLL, CLI entry, UIA-client and test-source hashes plus the test Git revision. The Task has still not been registered/run.
