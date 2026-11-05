@@ -176,6 +176,9 @@ struct DeviceHandler {
                 "minimumScale": sv.minimumZoomScale,
                 "maximumScale": sv.maximumZoomScale
             ]
+            if ProcessInfo.processInfo.arguments.contains("--test-pinch-observer") {
+                inspectScrollInfo["pinchObservation"] = IOSPinchObservation.sample(view: wv)
+            }
             let effectiveScrollInfo = inspectScrollInfo
             #else
             let effectiveScrollInfo = scrollInfo

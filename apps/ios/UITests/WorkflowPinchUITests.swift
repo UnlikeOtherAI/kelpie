@@ -153,6 +153,7 @@ extension WorkflowCaptureUITests {
 
     @MainActor
     func testNativePinchScrollableControl() async throws {
+        testLaunchArguments.append("--test-pinch-observer")
         let initialOrientation = XCUIDevice.shared.orientation
         XCUIDevice.shared.orientation = .portrait
         defer { XCUIDevice.shared.orientation = initialOrientation }
@@ -167,6 +168,8 @@ extension WorkflowCaptureUITests {
         XCTAssertTrue(viewport.waitForExistence(timeout: 5))
         let initial = try await pinchMetrics(tab, selector: "#zoom")
         let initialNative = await nativeZoomEvidence()
+        let initialObservation = try XCTUnwrap(initialNative["observation"] as? Body)
+        XCTAssertEqual(initialObservation["armed"] as? Bool, true)
         viewport.pinch(withScale: 2, velocity: 1)
         let deadline = Date().addingTimeInterval(5)
         var zoomed = try await pinchMetrics(tab, selector: "#zoom")
@@ -175,6 +178,8 @@ extension WorkflowCaptureUITests {
             zoomed = try await pinchMetrics(tab, selector: "#zoom")
         }
         let zoomedNative = await nativeZoomEvidence()
+        let finalObservation = try XCTUnwrap(zoomedNative["observation"] as? Body)
+        XCTAssertEqual(finalObservation["sameView"] as? Bool, true)
         let evidence = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
             "initial": initial, "zoomed": zoomed, "nativeBefore": initialNative, "nativeAfter": zoomedNative
         ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
@@ -192,6 +197,7 @@ extension WorkflowCaptureUITests {
         guard let value = try? await probe.request("/v1/debug-screens", [:]),
               let webView = value["webView"] as? Body, let scroll = webView["scrollView"] as? Body else { return [:] }
         var result: Body = [:]
+        if let observation = scroll["pinchObservation"] as? Body { result["observation"] = observation }
         if let zoom = scroll["zoomScale"] as? Double, zoom.isFinite { result["scrollZoomScale"] = zoom }
         if let zoom = webView["pageZoom"] as? Double, zoom.isFinite { result["pageZoom"] = zoom }
         if let pinch = scroll["pinch"] as? Body {
