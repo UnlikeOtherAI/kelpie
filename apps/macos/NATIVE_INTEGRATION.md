@@ -6,7 +6,7 @@ The app uses Tuist and the repository's native CMake bootstrap. Do not edit or c
 
 Use an Apple Silicon Mac, Xcode with a macOS26 SDK or newer, CMake, Ninja, Node20+, pnpm, mise and SwiftLint. The app deployment target remains macOS14. Tuist is pinned by the root .mise.toml.
 
-The CI job uses the stable [GitHub macos-26 ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md), whose documented default is Xcode26.6. The pinned CEF bootstrap is ARM64-only. The job prints its actual toolchain and refuses a different architecture.
+The CI job uses the stable [GitHub macos-26 ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md), whose documented default is Xcode 26.6. The pinned CEF bootstrap is ARM64-only. The job prints its actual toolchain and refuses a different architecture.
 
 ## Bootstrap and build
 
@@ -40,7 +40,7 @@ Project.swift links the core libraries and llama/ggml outputs under native/.buil
 
 ## Scope and known diagnostics
 
-The local macOS27 candidate passed full Swift lint, native core/inference compilation, Tuist generation and app/XCTest build-for-testing. The [hosted run41950256231](https://github.com/UnlikeOtherAI/kelpie/actions/runs/41950256231) also passed at revision28426edc2fe9faffefea4a3df508786d5107bc15 using Xcode26.6 (17F113), macOSSDK26.5, CEF149.0.6 and native Metal/BLAS ON. The scope job took6seconds and the native job8minutes10seconds. This compiles XCTest without executing tests or launching Kelpie.
+The local macOS27 candidate passed full Swift lint, native core/inference compilation, Tuist generation and app/XCTest build-for-testing. The [hosted run 41950256231](https://github.com/UnlikeOtherAI/kelpie/actions/runs/41950256231) also passed at revision 28426edc2fe9faffefea4a3df508786d5107bc15 using Xcode 26.6 (17F113), macOS SDK 26.5, CEF 149.0.6 and native Metal/BLAS ON. The scope job took 6 seconds and the native job 8 minutes 10 seconds. This compiles XCTest without executing tests or launching Kelpie.
 
 The build emits known warnings in existing AppReveal concurrency declarations, native categories/callbacks, deprecated UI calls and script phases without output declarations. An absent optional Gecko helper also produces a warning; the checked renderer paths are WebKit and Chromium. The workflow retains build diagnostics and does not claim zero warnings or turn off diagnostics.
 
