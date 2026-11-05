@@ -731,3 +731,40 @@ HEADLESS_ONLY and no-CEF/LLM-off runtime flavors, physical GNOME visual proof,
 Ubuntu installed-package verification, final published package installation, or
 the pending CI zygote diagnosis. The production GIF reference remains
 insufficient until its loader-binding provenance and controls are verified.
+
+## Fedora flavor and isolated-Wayland follow-up
+
+On Fedora 44, integrated revision 43f0de2b179212a5ed689b8e0c3fbe7348ca1330
+built both headless CEF and no-CEF headless flavors with local LLM OFF and G08
+observation OFF. The CEF headless app executed strict navigation through HTTP
+and direct MCP; ai-status returned NOT_FOUND. The no-CEF app refused play-script
+through HTTP (501) and MCP (-32601), returned 501 for ai-status, kept its URL
+unchanged and made zero fixture requests. Both owned processes exited cleanly.
+The CEF ELF SHA-256 was f880a0ab97b8e6a01dd52e764218ddb7342d04965e415ade562b503ae1c3ca73;
+the no-CEF ELF was 3ce790cf247af3a9277f4c56d6feece20b25ceb4bfac19b0bd74d8cadc68410f.
+These checks do not establish an LLM-enabled Linux build. Linux defaults local
+LLM OFF; the earlier 0c GTK test also explicitly configured it OFF.
+
+Revision e36af0097efa8dbfc3b1a89f03af8d38bac8f2e9 was relinked with GTK and
+CEF enabled, LLM OFF and G08 observation OFF. ELF SHA-256 was
+636caa160c812e8274b479379cf1ce3a50b85220dd9142ac40606bdddf62ecd8, with
+CEF SHA-256 d6bee514adcc2ea2d6e8a450939f7a09da746f1e9b7c8275b9be61b60cd26d99.
+A private Weston/Wayland run captured the real recording overlay, then used
+public HTTP abort and obtained SCRIPT_STOPPED with mayHaveCompleted. Public
+alias MCP/recipe checks and supported cleanup passed. This is isolated Wayland,
+not a physical GNOME image or an AT-SPI activation. The screenshot SHA-256 is
+e8401f8dd1f71faaf9a5d17af699f6996b84384c637f823dcc8a7d8f576324d0; the
+screenshot receipt SHA-256 is d6ef49a60da119c0c95f90291bde44eaf3c9ad428ee3f6c71e259b7ca6e4cd5b.
+The CLI package came from 4b925a98a8c30d9c38c8c3bac386dd6b952874a2; CLI, shared
+and lockfile inputs match e36. The root package differs only in lint scripts.
+
+The separate 4cc334acc60e405151d4fbbcd9433059d177d345 instrumented GTK/CEF
+build used LLM OFF and test-only G08 observation ON. A per-frame pre-overlay
+backing proof and same-build production GIF model supported e36 oracle passes
+for C/GIF and S/GIF with encoded-visible confidence only. C/MP4 and S/MP4
+remain insufficient because their pre-dispatch baselines were missing or
+unstable. The actual C/S capture reports retain 211/214 dropped frames. Oracle
+report SHA-256: c6c68f7ad9192b653d61c966b316258419a1b470623c348065163e423e1b9d73.
+Neither this GIF result nor the isolated screenshot proves physical GNOME
+equivalence or an overall G08 pass. Final installed packages and their own
+build options still require independent verification.
