@@ -123,4 +123,8 @@ test("validated model reference substitutes only exact tail pixels",()=>{
   assert.throws(()=>evaluateG08(noMarker,config,reference),/calibration dispatch marker/);
   assert.throws(()=>evaluateG08(clean,config,Buffer.alloc(0)),/invalid model reference/);
   assert.throws(()=>evaluateG08(clean,config,Buffer.alloc(reference.length)),/tail differs/);
+  for(const mode of ["straight","noease","nowobble","nofade","wrongcolor"]){
+    assert.throws(()=>evaluateG08(render(config,mode),config,reference),/INSUFFICIENT|G08_/);
+  }
+  assert.throws(()=>evaluateG08(clean.filter((_,i)=>i%8===0),config,reference),/INSUFFICIENT/);
 });
