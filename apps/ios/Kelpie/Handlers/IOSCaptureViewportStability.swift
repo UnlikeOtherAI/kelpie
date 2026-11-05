@@ -17,11 +17,12 @@ struct IOSCaptureViewportStability {
         repeat {
             try await check()
             guard now() < deadline else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE") }
-            guard let viewport = try await read() else { return nil }
+            let candidate = try await read()
             try await check()
             guard now() < deadline else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE") }
+            guard let viewport = candidate else { return nil }
             if stability.observe(viewport, at: now()) { return viewport }
-            try await pause()
+            do { try await pause() } catch { try await check(); throw error }
         } while now() < deadline
         throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
     }

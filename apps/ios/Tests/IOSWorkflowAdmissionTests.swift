@@ -102,11 +102,14 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         }
 
         var reads = 0
+        var replacementChecks = 0
         let replaced = try await IOSCaptureViewportStability.wait(
-            deadline: 1, check: {}, read: { reads += 1; return nil }, now: { time }, pause: { XCTFail("No retry after replacement") }
+            deadline: 1, check: { replacementChecks += 1 }, read: { reads += 1; return nil },
+            now: { time }, pause: { XCTFail("No retry after replacement") }
         )
         XCTAssertNil(replaced)
         XCTAssertEqual(reads, 1)
+        XCTAssertEqual(replacementChecks, 2)
     }
 
     @MainActor
