@@ -5,11 +5,17 @@ import AppKit
 struct ScriptMarkerGeometry: Equatable {
     let viewport: CGRect
     let windowRect: CGRect
+    let windowOrigin: CGPoint
+    let windowUnitX: CGPoint
+    let windowUnitY: CGPoint
     let backingScale: CGFloat
 
     init(tab: ScriptWorkflowTab, window: NSWindow) {
         viewport = tab.renderer.scriptViewportRect
         windowRect = tab.view.convert(tab.view.bounds, to: nil)
+        windowOrigin = tab.view.convert(.zero as CGPoint, to: nil)
+        windowUnitX = tab.view.convert(CGPoint(x: 1, y: 0), to: nil)
+        windowUnitY = tab.view.convert(CGPoint(x: 0, y: 1), to: nil)
         backingScale = window.backingScaleFactor
     }
 }
@@ -20,6 +26,7 @@ final class ScriptMarkerRetiree {
     private var presentation: ScriptPresentation?
     private var tab: ScriptWorkflowTab?
     private weak var window: NSWindow?
+    private weak var view: NSView?
     private let document: String
     private let end: TimeInterval
     private let geometry: ScriptMarkerGeometry
@@ -37,6 +44,7 @@ final class ScriptMarkerRetiree {
         self.presentation = presentation
         self.tab = tab
         self.window = window
+        self.view = tab.view
         self.document = document
         self.end = end
         self.geometry = geometry
@@ -57,8 +65,9 @@ final class ScriptMarkerRetiree {
 
     private func checkLocal() {
         guard presentation != nil else { return }
-        guard ProcessInfo.processInfo.systemUptime < end, let window, let tab,
-              tab.view.window === window, window.isVisible, window.isKeyWindow,
+        guard ProcessInfo.processInfo.systemUptime < end, let window, let view, let tab,
+              NSApplication.shared.isActive, tab.view === view, tab.renderer.makeView() === view,
+              view.window === window, window.isVisible, window.isKeyWindow,
               !tab.view.isHiddenOrHasHiddenAncestor,
               tab.document == document, (try? tab.requireCurrent()) != nil,
               ScriptMarkerGeometry(tab: tab, window: window) == geometry else {
