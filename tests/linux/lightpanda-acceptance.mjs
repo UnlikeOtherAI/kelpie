@@ -130,6 +130,10 @@ try {
     const value = await evaluate(other, "({cookie:document.cookie,storage:localStorage.getItem('lp_owned')})");
     assert.ok(value.cookie.includes("lp_owned=one")); assert.equal(value.storage, "one"); return { shared: true };
   });
+  await check("install frozen hidden/private DOM adversaries", async () => {
+    assert.equal(await evaluate(page, "(()=>{const box=document.createElement('div');box.innerHTML='<div hidden><h3>HIDDEN_ATTRIBUTE_LP</h3></div><div style=\"display:none\"><h3>HIDDEN_DISPLAY_LP</h3></div><div style=\"visibility:hidden\"><h3>HIDDEN_INHERITED_LP</h3></div><div contenteditable=\"true\"><h3>CAPTURE_SECRET_EDITABLE_LP</h3></div><input value=\"CAPTURE_SECRET_VALUE_LP\"><textarea>CAPTURE_SECRET_TEXTAREA_LP</textarea><span id=\"lp-hidden-ready\" hidden>hidden readiness</span>';document.querySelector('#catalogue').append(box);return true})()"), true);
+    report.hiddenAdversariesInstalled = true; return { installed: true };
+  });
   for (const [kind, options] of [
     ["snapshot", { maxChars: 1024, maxElements: 20, prioritize: true }],
     ["extract", { scope: "#catalogue", fields: [{ name: "titles", selector: "h3", source: "text", multiple: true }], metadata: true, maxChars: 8000 }],
@@ -137,15 +141,27 @@ try {
   ]) await check("fixed canonical " + kind + " correctness", async () => {
     const expression = fixedObservationExpression(kind, options);
     const value = await evaluate(page, kind === "snapshot" ? "(" + expression + ").snapshot" : expression);
-    assert.ok(!JSON.stringify(value).includes("CAPTURE_SECRET_"));
+    const serialized = JSON.stringify(value), privateCanaryDetected = serialized.includes("CAPTURE_SECRET_");
+    report.observations[kind] = { correct: false, bytes: Buffer.byteLength(serialized), privateCanaryDetected };
+    if (kind === "snapshot") Object.assign(report.observations[kind], {
+      textChars: value.text?.length, title: value.title,
+      safePublicPrefix: privateCanaryDetected ? undefined : value.text?.slice(0, 160),
+      controlNames: privateCanaryDetected ? undefined : value.elements?.slice(0, 10).map(el => el.name),
+    });
+    assert.equal(report.hiddenAdversariesInstalled, true);
+    assert.equal(privateCanaryDetected, false);
     if (kind === "snapshot") {
       assert.ok(value.text.includes("Capture acceptance fixture")); assert.ok(value.elements.some(el => el.name === "Confirm order"));
       assert.ok(value.text.length <= 1024);
-    } else if (kind === "extract") assert.deepEqual(value.fields[0].values, ["Green tea", "Black tea"]);
+    } else if (kind === "extract") assert.ok(JSON.stringify(value.fields[0].values) === JSON.stringify(["Green tea", "Black tea"]), "Extraction included hidden/private or unexpected records");
     else if (kind === "status") assert.ok(value.viewport.width > 0 && value.documentState === "complete");
     else assert.ok(value.ready && value.visible && value.matches === 1);
     report.observations[kind] = { correct: true, bytes: Buffer.byteLength(JSON.stringify(value)) };
     return report.observations[kind];
+  });
+  await check("hidden selector readiness refuses", async () => {
+    const value = await evaluate(page, fixedObservationExpression("ready", { state: "complete", selector: "#lp-hidden-ready" }));
+    assert.equal(value.ready, false); assert.equal(value.visible, false); return { refused: true };
   });
   report.domSupport = await evaluate(page, "({rects:typeof document.body.getClientRects,style:typeof getComputedStyle,webmcp:typeof document.modelContext})");
   await check("history back/forward", async () => {
@@ -155,7 +171,7 @@ try {
     await page.goForward({ timeout: 3000 }); assert.equal(page.url(), next);
     report.verifiedMethods.push("tab.back", "tab.forward"); return { history: true };
   });
-  await check("reload", async () => { const target = other ?? page; await target.reload({ timeout: 3000 }); assert.equal(await target.title(), "Kelpie capture acceptance"); report.verifiedMethods.push("tab.reload"); });
+  await check("reload", async () => { await page.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 }); await page.reload({ timeout: 3000 }); assert.equal(await page.title(), "Kelpie capture acceptance"); report.verifiedMethods.push("tab.reload"); });
   await a.close();
   const automation = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false }); contexts.push(automation);
   const borrowed = await automation.newPage();
@@ -188,6 +204,31 @@ try {
     assert.equal(await borrowed.title(), "Kelpie capture acceptance");
     const owned = await second.transport.call({ version: 1, method: "tabs.list", params: {} }); assert.equal(owned.value.length, 1);
     await second.close(); return { methods, screenshot: "refused", foreign: "refused", sibling: "preserved" };
+  });
+  await automation.close();
+  await check("single managed isolated session with explicit one-tab ceiling", async () => {
+    const single = await allocateManagedBrowserSession({ browser, backend: "lightpanda", owner: "fixture-single-operator",
+      authorize() {}, options: { isolation: "isolated", ttlMs: 60000 }, maxTabs: 1,
+      verifiedLightpandaMethods: methods.filter(method => method !== "tabs.new"),
+      network: { boundary: "operator-enforced", allowNavigation: url => url.origin === origin } });
+    sessions.push(single);
+    const tabId = single.describe().ownedTabIds[0];
+    const call = (method, params = {}, id = tabId) => single.transport.call({ version: 1, method, params, tabId: id });
+    assert.equal((await call("tab.goto", { url: fixture.url })).ok, true);
+    assert.equal((await call("tab.title")).value, "Kelpie capture acceptance");
+    assert.equal((await call("tabs.list")).value.length, 1);
+    for (const method of ["tabs.new", "tab.screenshot", "tab.snapshot", "tab.extract", "page.scroll"]) {
+      const params = method === "tab.extract" ? { fields: [{ name: "title", selector: "h1", source: "text" }] } :
+        method === "page.scroll" ? { deltaY: 10 } : {};
+      const refused = await call(method, params); assert.equal(refused.ok, false); assert.equal(refused.error.code, "UNSUPPORTED");
+    }
+    const foreign = await call("tab.title", {}, "foreign-tab"); assert.equal(foreign.ok, false); assert.equal(foreign.error.code, "TAB_NOT_FOUND");
+    await single.close();
+    assert.equal((await call("tab.title")).ok, false);
+    const after = await browser.newContext(); contexts.push(after);
+    const afterPage = await after.newPage(); await afterPage.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
+    assert.equal(await afterPage.title(), "Kelpie capture acceptance"); await after.close();
+    return { oneOwnedTab: true, unsupportedMethodsRefused: true, foreignRefused: true, freshContextAfterClose: true };
   });
   if (managed && process.env.KELPIE_LP_ALLOW_PUBLIC_VERIFIED === "1") await check("production CLI stdio reachable restricted profile", async () => {
     await automation.close();
