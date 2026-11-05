@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFile,writeFile} from "node:fs/promises";
 import {spawnSync} from "node:child_process";
+import {dirname,resolve} from "node:path";
 const [downloadPath,nativePath,outPath]=process.argv.slice(2);
 if(!outPath)throw Error("Provide downloaded report, native motion report and output JSON");
 const downloaded=JSON.parse(await readFile(downloadPath,"utf8"));
@@ -14,7 +15,7 @@ for(const check of native.checks.filter(c=>c.passed&&c.detail?.curve)){
   assert.equal(raw.status,0,raw.stderr?.toString());
   const size=item.width*item.height*3,count=raw.stdout.length/size;
   assert.equal(count,item.decodedFrames);
-  const tracks=[],markers=[],sx=scene.width/item.width,sy=scene.height/item.height;
+  const tracks=[],markers=[],opacities=[],sx=scene.width/item.width,sy=scene.height/item.height;
   for(let frame=0;frame<count;frame++){
    let minX=item.width,minY=item.height,maxX=-1,maxY=-1,black=0,color=0;
    let cminX=item.width,cminY=item.height,cmaxX=-1,cmaxY=-1;
@@ -27,6 +28,8 @@ for(const check of native.checks.filter(c=>c.passed&&c.detail?.curve)){
    if(black>=3&&maxX-minX<24&&maxY-minY<24)
     tracks.push({frame,time:item.timestamps[frame],x:minX*sx,y:minY*sy,black});
    markers.push({frame,time:item.timestamps[frame],pixels:color,bounds:color?{minX:cminX,minY:cminY,maxX:cmaxX,maxY:cmaxY}:null});
+   const alpha=[scene.first,scene.second].map(point=>{const x=Math.round((point.x-(curve==="s"?30:12)*.35)/sx),y=Math.round(point.y/sy);const i=frame*size+(y*item.width+x)*3;return 1-raw.stdout[i+(curve==="s"?1:0)]/255;});
+   opacities.push({frame,time:item.timestamps[frame],alpha});
   }
   assert.ok(tracks.length>8,"Too few independently decoded pointer positions");
   const last=tracks.at(-1),offset={x:scene.second.x-last.x,y:scene.second.y-last.y};
@@ -40,7 +43,24 @@ for(const check of native.checks.filter(c=>c.passed&&c.detail?.curve)){
   else {assert.ok(maximum>8&&minimum< -8,"S curve did not cross its chord");}
   assert.ok(markers.some(p=>p.pixels>20),"Configured marker color absent");
   assert.equal(markers.at(-1).pixels,0,"Marker did not end cleanly");
-  results.push({curve,runId,id:item.id,mimeType:item.mimeType,tracks,path,normalRange:{minimum,maximum},endpointOffset:offset,markers});
+
+  const indices=[...new Set(curve==="c"?[path[0].frame,path.reduce((a,b)=>a.normal>b.normal?a:b).frame,path.at(-1).frame]:
+    [path.reduce((a,b)=>a.normal>b.normal?a:b).frame,path.reduce((a,b)=>Math.abs(a.normal)<Math.abs(b.normal)?a:b).frame,path.reduce((a,b)=>a.normal<b.normal?a:b).frame])].sort((a,b)=>a-b);
+  const representativeFrames=[];
+  for(const frame of indices){
+   const file=resolve(dirname(outPath),item.id+"-motion-frame-"+frame+".png");
+   const result=spawnSync(process.env.FFMPEG??"ffmpeg",["-v","error","-y","-threads","1","-i",item.file,"-vf","select=eq(n\\,"+frame+")","-frames:v","1","-threads","1",file],{windowsHide:true});
+   assert.equal(result.status,0,result.stderr?.toString());representativeFrames.push({frame,time:item.timestamps[frame],file});
+  }
+  const contactSheet=resolve(dirname(outPath),item.id+"-motion-contact.png");
+  const filter="select="+indices.map(frame=>"eq(n\\,"+frame+")").join("+")+",tile="+indices.length+"x1";
+  const contact=spawnSync(process.env.FFMPEG??"ffmpeg",["-v","error","-y","-threads","1","-i",item.file,"-vf",filter,"-frames:v","1","-threads","1",contactSheet],{windowsHide:true});
+  assert.equal(contact.status,0,contact.stderr?.toString());
+  const visibleAlpha=opacities.flatMap(frame=>frame.alpha).filter(alpha=>alpha>.1);
+  assert.ok(visibleAlpha.length>4,"Marker opacity samples absent");
+  if(curve==="c")assert.ok(Math.max(...visibleAlpha)-Math.min(...visibleAlpha)<.08,"Fade-disabled marker changed opacity");
+  else assert.ok(visibleAlpha.some(alpha=>alpha>.15&&alpha<.6),"Fade-enabled marker has no intermediate opacity");
+  results.push({opacities,representativeFrames,contactSheet,curve,runId,id:item.id,mimeType:item.mimeType,tracks,path,normalRange:{minimum,maximum},endpointOffset:offset,markers});
  }
 }
 assert.equal(results.length,4,"Both GIF/MP4 curves required");
