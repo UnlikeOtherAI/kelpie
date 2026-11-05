@@ -282,6 +282,8 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
         XCTAssertTrue(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": true, "sensitivityKnown": false]))
         XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": false, "sensitivityKnown": false]))
+        XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitivityKnown": true]))
+        XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": "false", "sensitivityKnown": true]))
         var wrongGuarantee = valid
         wrongGuarantee["inputGuarantee"] = "trusted"
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(wrongGuarantee, token: "t1"))

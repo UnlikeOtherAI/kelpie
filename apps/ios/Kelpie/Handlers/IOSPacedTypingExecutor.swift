@@ -12,7 +12,8 @@ enum IOSPacedTypingExecutor {
     }
 
     static func hasKnownSensitivity(_ body: [String: Any]) -> Bool {
-        body["sensitive"] as? Bool == true || body["sensitivityKnown"] as? Bool == true
+        body["sensitive"] as? Bool == true ||
+            (body["sensitive"] as? Bool == false && body["sensitivityKnown"] as? Bool == true)
     }
 
     static func requireKnownSensitivity(_ known: Bool?, hasContinuation: Bool) throws {
