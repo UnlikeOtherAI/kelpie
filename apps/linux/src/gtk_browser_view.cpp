@@ -12,6 +12,20 @@
 #endif
 
 namespace kelpie::linuxapp {
+namespace {
+#if KELPIE_LINUX_HAS_GTK && KELPIE_LINUX_HAS_CEF
+void CompositeScriptFrame(LinuxApp& app, OffscreenFrame& frame) {
+  ScriptFrame composed{frame.width, frame.height, frame.width * 4, 0, std::move(frame.pixels)};
+  auto shown = app.ScriptPresentation();
+  if (frame.tab_id != shown.value("tabId", std::string()) || frame.generation != shown.value("generation", std::uint64_t(0))) {
+    shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
+  }
+  try { DrawScriptOverlay(composed, shown); }
+  catch (...) { app.StopScript(); }
+  frame.pixels = std::move(composed.bgra);
+}
+#endif
+}
 
 GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 #if KELPIE_LINUX_HAS_GTK
@@ -81,14 +95,7 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 #if KELPIE_LINUX_HAS_CEF
                      auto* top = gtk_widget_get_toplevel(widget);
                      if (frame.valid() && GTK_IS_WINDOW(top) && gtk_window_is_active(GTK_WINDOW(top))) {
-                       ScriptFrame composed{frame.width, frame.height, frame.width * 4, 0, std::move(frame.pixels)};
-                       auto shown = self->app_.ScriptPresentation();
-                       if (frame.tab_id != shown.value("tabId", std::string()) || frame.generation != shown.value("generation", std::uint64_t(0))) {
-                         shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
-                       }
-                       try { DrawScriptOverlay(composed, shown); }
-                       catch (...) { self->app_.StopScript(); }
-                       frame.pixels = std::move(composed.bgra);
+                       CompositeScriptFrame(self->app_, frame);
                      }
 #endif
                      const auto& snapshot = frame.pixels;

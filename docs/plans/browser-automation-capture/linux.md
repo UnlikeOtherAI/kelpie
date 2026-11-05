@@ -149,3 +149,27 @@ Linux test phase; codec selection is not yet complete.
 8. Root owns the integrated PR/release; platform owner supplies exact source,
    package/binary hashes and installed published native flow evidence. No
    independent PR or release is opened by this owner.
+
+## Initial native build, 5 November2026
+
+Source2f5db3c2 was transferred through a SHA-256-verified Git bundle to the
+assigned owned Fedora checkout (GitHub SSH credentials were absent; none copied).
+Native configuration passed with pinned CEF120.2.7 and GCC16.2.1, GTK3.24.52,
+Cairo1.18.6, giflib6.1.3 and GStreamer1.28.8. The existing native frozen
+pnpm/shared/generator bootstrap was retained.
+
+The first environment-only npm_config_store_dir was ignored by pnpm12 and used
+the existing global store (261 reused,0 downloaded). The corrected explicit
+--store-dir wrapper was verified under this task's .native-cache/pnpm-store/v11,
+then a supported frozen force install relinked only this checkout's dependencies.
+Subsequent configuration uses the private wrapper; no integrity check was bypassed.
+
+The first native build compiled the shared engine and Linux codec sources, then
+failed at GTK draw registration: a comma-bearing frame initializer inside a
+G_CALLBACK macro argument was split by the preprocessor. Composition now has its
+own helper outside the callback. This fixes the cause and separates native
+presentation from GTK event registration. Full app/link/tests remain pending.
+
+Official signed dev dependency installation pulled matching Mesa GBM/EGL/GL
+updates transitively. DNF reported an existing offline transaction invalidated
+by its online transaction. No update queue was manually edited or rescheduled.
