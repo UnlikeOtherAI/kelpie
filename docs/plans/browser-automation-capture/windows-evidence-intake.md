@@ -243,3 +243,25 @@ The d849 full native verification, the final warmup C/S and same-run native/expo
 comparison, current parent-window and Stop imagery, signing, package and
 installed-release checks remain open. The single-listener foreign-grant limit
 recorded above is unchanged.
+
+The later a44f6a50 candidate contains the monotonic wait correction. Its real
+four-click warmup C workflow completed with four trusted events, two movie
+exports, 409 actual WGC frames and 640x276 native/export dimensions; public
+cleanup passed. The native dense oracle failed with
+`G08_PATH_OR_EASING_MISMATCH`. Analysis of 29 in-path samples spanning
+1,850 ms found timed RMS 6.26 px and maximum 14.56 px, while the nearest
+geometric-curve RMS was 0.324 px. This is a retained failure, not a dense pass.
+
+A separate direct-owned diagnostic build at eceb6d4c used the same four-click
+C workflow and an opt-in bounded numeric trace. Its DLL SHA-256 was
+`574c5251c7d38f576452a7e4cb937cae142592cb3e02ebaa916d64e8320a3af0`.
+The workflow, four trusted events, public close and owned-process cleanup
+passed. Across 223 completed sampler latch observations, the median was
+83.635 ms, p90 106.709 ms and maximum 164.146 ms. Across 225 recorded
+owner-thread queue observations, p99 was 7.676 ms and maximum 11.299 ms.
+Neither stream truncated; non-latched queue waits below 10 ms were deliberately
+not logged. The latch measurement includes mutex acquisition, and tracing
+may perturb timing. It supports investigation of the sampler latch; it does
+not prove actual paint time or replace the earlier same-run WGC evidence.
+The sanitized report SHA-256 is
+`7d4a4f861361244abbd09fd9046261a071d92f4f85a23bc5211b6459b2952799`.
