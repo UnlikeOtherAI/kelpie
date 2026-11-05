@@ -1,6 +1,7 @@
 #include "desktop_script_runtime.h"
 #include "desktop_script_coordinates.h"
 #include "desktop_script_capture_state.h"
+#include "desktop_capture_stage_timing.h"
 #include <stdexcept>
 #include <algorithm>
 #include <cstdio>
@@ -31,6 +32,7 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
   }
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
+  DesktopCaptureStageTiming stage_timing;
   std::unique_ptr<DesktopScriptCapture> encoder;
   int initial_width = 0, initial_height = 0;
   Json previous_viewport;
@@ -55,6 +57,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       if(!config.revalidate || !config.revalidate(owner)) { grant_revoked.store(true); abort->store(true); partial=true; break; }
       if (Elapsed() >= duration) throw std::runtime_error("CAPTURE_DURATION_EXCEEDED");
       const auto acquisition=Clock::now();
+      const auto timing_start=stage_timing.Now();
       BrowserNavigationState before, after;
       auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
@@ -94,8 +97,10 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       shown["documentVersion"]=before.tab.document_version;
       shown["visualViewport"]=viewport.at("visualViewport");
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
+      const auto timing_pre=stage_timing.Now();
       BrowserScreenshot image;
       result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      const auto timing_screenshot=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
@@ -112,7 +117,9 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         ViewportDiagnostic(result.ok ? "before-after" : "after-read-failed",viewport,after_viewport);
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       }
+      const auto timing_post=stage_timing.Now();
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      stage_timing.Add(frame_time,timing_start,timing_pre,timing_screenshot,timing_post,stage_timing.Now());
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
       Present();
