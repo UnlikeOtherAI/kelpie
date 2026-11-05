@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -26,10 +27,7 @@ import com.kelpie.browser.network.PairApprovalCoordinator
 /**
  * Sub-screen listing paired clients with revoke actions.
  *
- * Three sections mirror the design doc:
- *  - Persistent ("Always allow") approvals.
- *  - Active sessions ("Yes, once") approvals.
- *  - Recently denied sources (informational; cleared after 10 min).
+ * Computer permissions, legacy grants, temporary sessions and recent denials.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,12 +36,12 @@ fun PairedClientsScreen(
     onBack: () -> Unit,
 ) {
     var refreshTick by remember { mutableIntStateOf(0) }
-    // `refreshTick` is read inside `remember(refreshTick)` to force a recomputation
-    // after any revoke action — the underlying store is not Observable.
-    val computers = remember(refreshTick) { coordinator.store.trustedComputers.list() }
-    val persistent = remember(refreshTick) { coordinator.store.listPersistent() }
-    val sessions = remember(refreshTick) { coordinator.store.listSessions() }
-    val denied = remember(refreshTick) { coordinator.store.listDeniedSources() }
+    val prompt by coordinator.currentPrompt.collectAsState()
+    // Recompute after a dialog decision or revoke; the store is not Observable.
+    val computers = remember(refreshTick, prompt) { coordinator.store.trustedComputers.list() }
+    val persistent = remember(refreshTick, prompt) { coordinator.store.listPersistent() }
+    val sessions = remember(refreshTick, prompt) { coordinator.store.listSessions() }
+    val denied = remember(refreshTick, prompt) { coordinator.store.listDeniedSources() }
 
     Scaffold(
         topBar = {
