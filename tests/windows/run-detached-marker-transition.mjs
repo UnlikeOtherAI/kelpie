@@ -121,7 +121,12 @@ try{
  void capturePromise.then(()=>{report.captureEndedTick=Math.floor(uptime()*1000);},
   error=>{report.captureEndedTick=Math.floor(uptime()*1000);report.captureFailure=safeWgcDiagnostic(String(error.stderr??""));});
  const stopPromise=uiaRun(["inspect",String(running.pid),exe,identity.startTime]).catch(()=>null);
- const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
+ let fixtureFacts;
+ for(let attempt=0;attempt<20;attempt++){
+  fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
+  if(fixtureFacts.events.length>=2) break;
+  await new Promise(done=>setTimeout(done,50));
+ }
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
  assert.equal(fixtureFacts.events[0].documentId,fixtureFacts.events[1].documentId);
