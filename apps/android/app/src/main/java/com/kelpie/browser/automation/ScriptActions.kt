@@ -22,7 +22,10 @@ class ScriptActions(
 ) {
     private val gateway = checkNotNull(ctx.browserGateway)
     private val overlay = ctx.scriptOverlay
-    private val key = "__kelpie_script_" + run.id.replace("-", "")
+
+    // One page registry; every action resolves without a token first. The
+    // existing retirement lease prevents overlap with an earlier run.
+    private val key = "__kelpie_script_android_v1"
     private var pointerX = 20.0
     private var pointerY = 20.0
     var mutationInFlight = false

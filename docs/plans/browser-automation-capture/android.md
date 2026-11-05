@@ -284,3 +284,33 @@ queued-before-start cancellation, already-cancelled scope and worker cleanup.
 The run used one worker, in-process Kotlin,2GiB heap/two logical processors,
 without native/package/emulator jobs. Public device cancellation/recovery remains
 pending; this result does not replace the failed hosted CI or final full checks.
+Hosted build-only fixing run41956455688 passed on635d88ace7f2a7c3f722b4c572fa1e2d3f285945:
+lint, ktlintCheck, Debug/Release unit tests and shipping ARM64/x86_64 native builds;
+Gradle reported6m48s. Previous failed41950362604 evidence remains preserved.
+
+## Opt-in hosted native verification
+
+Android workflow_dispatch accepts native_test (boolean, defaultfalse). Its
+dedicated Ubuntu24.04 job requires accessible KVM, builds the same revision's CLI,
+shipping x86_64 debug app and AndroidTest APK, then cold-boots API35 google_apis
+Pixel7 phone and Pixel Tablet sequentially. Source/APK/packaged-native/installed
+APK hashes, image fingerprint, profile/display and version accompany the results.
+Only one compiler or emulator runs at a time in this job. AVDs use two cores/3GiB;
+Gradle uses one worker, two logical processors and a2GiB heap. No local Maxis AVD,
+physical device, signing, publication or desktop input is involved.
+
+The existing Compose pairing/Stop tests and real loopback HTTP, direct/generic
+MCP, chunk/hash, native media decode, observer/target, JNI UTF8 and controlled
+inference-cancel/recovery corpus run through AndroidX instrumentation. CLI is
+built and hashed but authenticated host CLI replay is not claimed by this job.
+An adb zero exit cannot establish success: the driver requires an explicit JUnit
+OK count and rejects failure/crash markers. KVM absence/boot failure is a blocker.
+Each profile shuts down before the next starts, including failure cleanup.
+
+Seven-day artifacts contain curated fixture media/decoded frames/native screenshots,
+instrumentation/boot/install logs, hash manifests, report.json and unit test reports.
+They exclude AVD images, unrestricted logcat, pairing stores, endpoint secrets and
+application databases. bash syntax, Node syntax and the report's false-pass/
+missing-profile regression pass on Maxis. New Kotlin tests and hosted emulator
+execution are compile/runtime-unverified at this source checkpoint; root dispatch
+and actual per-profile results must close those gates.

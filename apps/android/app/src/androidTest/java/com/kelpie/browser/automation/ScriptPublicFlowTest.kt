@@ -53,6 +53,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                 val result: JSONObject
                 try {
                     val pending = executor.submit<JSONObject> { client.call("play-script", script) }
+                    awaitRecordingUi(pending)
                     val deadline = System.nanoTime() + 5_000_000_000L
                     while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(30)
                     Thread.sleep(550)
@@ -136,7 +137,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                             client.action("wait").put("ms", 1200),
                         ).put("capture", JSONObject().put("formats", JSONArray(listOf("gif", "video"))).put("fps", 1).put("maxWidth", 320))
                         .put("tapIndicator", JSONObject().put("color", "#3B82F6").put("durationMs", 100))
-                val result = client.call("play-script", script)
+                val result = playRecorded(client, script)
                 assertTrue("Low-FPS navigation failed", result.getBoolean("success"))
                 val artifacts = result.getJSONArray("artifacts")
                 assertEquals(2, artifacts.length())

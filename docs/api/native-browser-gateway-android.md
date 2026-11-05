@@ -141,3 +141,10 @@ ai-cancel acknowledges the number of requests whose cancellation it requested,
 including queued workers. The original ai-infer response reports
 INFERENCE_CANCELLED after that worker's provider cleanup has retired; the
 cancellation acknowledgement alone is not a terminal inference result.
+For supported-interface acceptance without local desktop control, the Android
+workflow has an explicit manual native_test input (defaultfalse). It builds matching
+debug app/test APKs and CLI, then runs the authored AndroidX Compose/public HTTP
+and direct/generic MCP corpus on sequential API35 x86_64 phone/tablet emulators
+using hosted KVM. Curated hashes, reports and media are retained for seven days.
+Missing KVM is reported as a blocker. These are emulator results, not physical
+device, signed-release or authenticated host CLI acceptance.

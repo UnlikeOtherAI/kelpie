@@ -2,6 +2,7 @@ package com.kelpie.browser.automation
 
 import android.graphics.Bitmap
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -30,6 +31,8 @@ abstract class ScriptPublicFixture {
         val id = client.beginPair()
         ui.waitUntil(10_000) { ui.onAllNodesWithText("Yes, once").fetchSemanticsNodes().isNotEmpty() }
         ui.onNodeWithText("Yes, once").performClick()
+        ui.waitForIdle()
+        ui.waitUntil(10_000) { ui.onAllNodesWithText("Yes, once").fetchSemanticsNodes().isEmpty() }
         client.finishPair(id)
     }
 
@@ -63,16 +66,20 @@ abstract class ScriptPublicFixture {
     ): File {
         val bytes = ByteArrayOutputStream()
         var offset = 0L
+        var chunkIndex = 0
         do {
+            val request =
+                JSONObject()
+                    .put("runId", runId)
+                    .put("artifactId", artifact.getString("id"))
+                    .put("offset", offset)
+                    .put("length", 4093)
             val chunk =
-                client.call(
-                    "get-script-artifact",
-                    JSONObject()
-                        .put("runId", runId)
-                        .put("artifactId", artifact.getString("id"))
-                        .put("offset", offset)
-                        .put("length", 4093),
-                )
+                when (chunkIndex++ % 3) {
+                    0 -> client.call("get-script-artifact", request)
+                    1 -> client.mcpValue("kelpie_get_script_artifact", request)
+                    else -> client.mcpValue("kelpie_extension", JSONObject().put("name", "kelpie_get_script_artifact").put("arguments", request))
+                }
             assertEquals(offset, chunk.getLong("offset"))
             val data = Base64.getDecoder().decode(chunk.getString("data"))
             bytes.write(data)
@@ -92,9 +99,35 @@ abstract class ScriptPublicFixture {
         return File(evidence, artifact.getString("id") + "." + extension).apply { writeBytes(all) }
     }
 
+    protected fun awaitRecordingUi(pending: java.util.concurrent.Future<*>? = null) {
+        ui.waitUntil(10_000) {
+            ui.onAllNodesWithContentDescription("Stop recording").fetchSemanticsNodes().isNotEmpty() || pending?.isDone == true
+        }
+        ui.waitForIdle()
+    }
+
+    protected fun playRecorded(
+        client: ScriptHttpFixture,
+        script: JSONObject,
+    ): JSONObject {
+        val executor =
+            java.util.concurrent.Executors
+                .newSingleThreadExecutor()
+        try {
+            val pending = executor.submit<JSONObject> { client.request("/v1/play-script", script).second }
+            awaitRecordingUi(pending)
+            val result = pending.get(60, java.util.concurrent.TimeUnit.SECONDS)
+            ui.waitForIdle()
+            return result
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     protected fun captureBlueMarker(): Bitmap {
         val deadline = System.nanoTime() + 10_000_000_000L
         while (System.nanoTime() < deadline) {
+            ui.waitForIdle()
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             var blue = 0
             for (y in 0 until bitmap.height step 16) {
