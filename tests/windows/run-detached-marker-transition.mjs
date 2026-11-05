@@ -85,6 +85,9 @@ try{
  report.phase="tabs";const tabs=await api("get-tabs"),tabId=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(tabId);
  report.phase="navigate";assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);
  report.phase="fixture-ready";assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
+ if(process.env.KELPIE_MARKER_READY_ONLY==="1"){
+  report.phase="ready-only-complete";report.checks.push({name:"public fixture readiness",passed:true});
+ }else{
  report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
@@ -153,6 +156,7 @@ try{
  report.checks.push({name:"post-response owned marker",passed:redPixels>0,redPixels});
  assert.ok(redPixels>0,"POST_RESPONSE_MARKER_NOT_OBSERVED");
  report.phase="complete";
+ }
 }catch(error){
  if(fixture){try{
   const partial=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(3000)})).json();
