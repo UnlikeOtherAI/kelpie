@@ -227,6 +227,13 @@ int wmain(int argc,wchar_t** argv) {
   try {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     if(argc==2&&std::wstring(argv[1])==L"self-test-buffer"){std::cout<<BufferSelfTest().dump()<<std::endl;return 0;}
+    if(argc==2&&std::wstring(argv[1])==L"self-test-analysis-size"){
+      const auto a=TimelineAnalysisSize(1918,830),b=TimelineAnalysisSize(959,415),c=TimelineAnalysisSize(639,399);
+      if(a.width!=640||a.height!=276||b.width!=640||b.height!=276||c.width!=638||c.height!=398)throw std::runtime_error("WGC_SELFTEST_SIZE");
+      bool refused=false;try{TimelineAnalysisSize(1,1);}catch(std::runtime_error const&){refused=true;}
+      if(!refused)throw std::runtime_error("WGC_SELFTEST_SIZE");
+      std::cout<<Json({{"evenCanvas",true},{"invalidRefused",true}}).dump()<<std::endl;return 0;
+    }
     if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-stream"){std::cout<<TimelineStreamSelfTest().dump()<<std::endl;return 0;}
     if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-writer"){std::cout<<TimelineWriterSelfTest().dump()<<std::endl;return 0;}
     if(argc==2&&std::wstring(argv[1])==L"self-test-window-state"){
