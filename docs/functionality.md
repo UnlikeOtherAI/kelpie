@@ -374,7 +374,7 @@ On macOS this applies to the staged viewport only, not the native window. A name
 
 ## Device Info
 
-Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., on-screen keyboard control is mobile-only; renderer switching is macOS-only).
+Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., on-screen keyboard control is mobile-only; renderer switching is macOS-only). On iOS and Android, device capabilities include the supported typed-workflow actions and capture formats, allowing clients to avoid unavailable operations such as standalone `press-key`.
 
 ## Toast Messages
 
