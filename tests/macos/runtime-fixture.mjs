@@ -29,7 +29,7 @@ export async function startFixture() {
    <button id="scroll-target">Scrolled target</button>`;
   const script=`(()=>{const documentId=crypto.randomUUID();let sequence=0;
   const send=(value)=>fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
-   documentId,sequence:++sequence,...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight},
+   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}})}).catch(()=>{});
   for(const type of ['pointermove','pointerdown','pointerup','click','input'])document.addEventListener(type,event=>{
    const target=event.target.closest('button,a,input,textarea');const r=target?.getBoundingClientRect();

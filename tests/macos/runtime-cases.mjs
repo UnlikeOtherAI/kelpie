@@ -2,6 +2,7 @@ import {writeFile} from "node:fs/promises";
 import path from "node:path";
 import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture.mjs";
 import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
+import {runSafety} from "./runtime-safety.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
@@ -26,7 +27,7 @@ export async function runEngine(client,fixture,engine,report) {
  const tabId=engine==="chromium"?"chromium":(entries.find(t=>t.active||t.isActive)??entries[0]).id;
  const base={version:1,tabId,defaultWaitBetweenActions:0,tapIndicator:{color:"#F54242",radius:25,durationMs:700,wobble:true,fade:true}};
  const play=actions=>client.api("play-script",{...base,actions});
- async function load(route="/"){const result=await play([{action:"navigate",url:fixture.url+route},{action:"wait-ready",state:"complete",timeoutMs:10000}]);requireTrue(result.success,"FIXTURE_NAVIGATION");}
+ async function load(route="/"){const begin=fixture.events.length;const result=await play([{action:"navigate",url:fixture.url+route},{action:"wait-ready",state:"complete",timeoutMs:10000}]);requireTrue(result.success,"FIXTURE_NAVIGATION");await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="document"&&e.path===route));}
  await check("strict-capability",async()=>{
   const direct=await client.api("get-script-status");
   const generic=await client.direct("kelpie_get_script_status",{},true);
@@ -171,5 +172,6 @@ export async function runEngine(client,fixture,engine,report) {
   const artifacts=await client.download(result,engine+"-curve-"+curve);
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
  });
+ await runSafety({client,fixture,engine,base,capture,check,play,load});
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
 }
