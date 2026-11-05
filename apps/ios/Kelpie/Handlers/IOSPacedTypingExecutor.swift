@@ -11,7 +11,7 @@ enum IOSPacedTypingExecutor {
 
     static func isAcknowledgement(_ body: [String: Any], token: String?) -> Bool {
         guard let token, !token.isEmpty else { return false }
-        return jsonBoolean(body["ok"]) == true && (body["error"] == nil || body["error"] is NSNull) &&
+        return jsonBoolean(body["ok"]) == true && body["error"] == nil &&
             jsonBoolean(body["sensitive"]) != nil && jsonBoolean(body["sensitivityKnown"]) != nil &&
             jsonBoolean(body["mayHaveCompleted"]) == true && body["token"] as? String == token &&
             body["inputGuarantee"] as? String == "synthetic-coordinate"

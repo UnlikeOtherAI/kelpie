@@ -289,6 +289,9 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         var contradiction = valid
         contradiction["error"] = "INPUT_UNCERTAIN"
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        contradiction["error"] = NSNull()
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(contradiction, token: "t1"))
         XCTAssertTrue(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": true, "sensitivityKnown": false]))
         XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": false, "sensitivityKnown": false]))
         XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitivityKnown": true]))
