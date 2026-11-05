@@ -826,3 +826,32 @@ without capture behaves equivalently, or a physical GNOME display. The test
 receipt's legacy invocation and pointer-duration labels incorrectly describe
 the old Stop flow; this run used no abort and disabled the pointer. The labels
 were corrected in test source feb1dc08, after this observation.
+
+## Paired Fedora synthetic marker control
+
+The 42102220654 Fedora installed candidate failed its strict final MP4 marker
+check in the original and untraced runs. Both had 15 manifest and 15 decoded
+frames: the retained original MP4 SHA-256 was
+45348d2b6356f97cb822397ae7d910a8a1a7384fdcd6f3ed89218e77518f3bf9
+with two red pixels, and the replay MP4 SHA-256 was
+5ece92efd08a2f73f0e1525512638d56d9fbac5055e8a4c4f0a704bc6bbbfd32
+with eleven. Their same-frame pre-encoder rasters were not retained.
+
+A separate synthetic control used product source 0fef3222ca6bdcc5aa3df12b4a6c4371b4858490
+with admission observation ON, instrumented ELF SHA-256
+a0f2214c3b4b54321724ae80eb653f5ca660be3c5c17471ce0d051cbd64de869.
+All 15 admitted frames mapped to 15 decoded MP4 frames without drops, and
+their PTS aligned within 2 ms. The last frame's PTS was 2.035926 s and its
+marker age was 808.57 ms of 700 ms. The fixed 45×45 ROI contained zero red
+pixels before overlay, after overlay, and in the corresponding decoded frame.
+The post-overlay raw ROI SHA-256 was
+770d4c6b4bff8ae1d0660fdb1a2a6f190c7f8e839d963e065a308699ff51fa45;
+the MP4 SHA-256 was
+30a223ed4d3be0413591caaa262707116443254d3e1b9a7502c24cf9db852115;
+the analysis receipt SHA-256 was
+a6e205dddca547b45a1ec62e31bc3c8f58bae48b03758593bf45990f6b94f1b4.
+The test app exited normally and its bounded unit retired.
+
+This clear/clear control did not reproduce the installed failures and cannot
+attribute them to source admission or encoder carryover. The original files,
+strict zero-pixel requirement and failed receipts remain unchanged.
