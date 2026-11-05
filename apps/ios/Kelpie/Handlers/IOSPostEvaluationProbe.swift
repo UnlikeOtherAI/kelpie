@@ -74,6 +74,7 @@ final class IOSPostEvaluationProbe: NSObject, WKScriptMessageHandlerWithReply {
                         throw IOSWorkflowFailure("TIMEOUT")
                     }
                     authorized = true
+                    IOSFrameSampler.diagnostic("postedit-authorized")
                     replyHandler(true, nil)
                 } catch {
                     replyHandler(false, nil)
@@ -83,6 +84,7 @@ final class IOSPostEvaluationProbe: NSObject, WKScriptMessageHandlerWithReply {
         case "result":
             replyHandler(true, nil)
             guard authorized else { finish(.failure(IOSWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: true))); return }
+            IOSFrameSampler.diagnostic("postedit-result")
             finish(.success(body["value"]))
         case "expired":
             replyHandler(true, nil)
