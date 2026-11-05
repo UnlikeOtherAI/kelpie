@@ -45,6 +45,8 @@ class ScriptOverlay {
     private var tap: Tap? = null
     private var commentary: Commentary? = null
     private var document: String? = null
+    private var viewportLeft = 0.0
+    private var viewportTop = 0.0
     private var viewportWidth = 0.0
     private var viewportHeight = 0.0
     private var view = WeakReference<View>(null)
@@ -61,7 +63,13 @@ class ScriptOverlay {
         width: Double,
         height: Double,
         documentId: String,
+        offsetLeft: Double = 0.0,
+        offsetTop: Double = 0.0,
+        preserveExisting: Boolean = false,
     ) {
+        if (preserveExisting && document == documentId && viewportWidth > 0) return
+        viewportLeft = offsetLeft
+        viewportTop = offsetTop
         document = documentId
         viewportWidth = width
         viewportHeight = height
@@ -94,6 +102,8 @@ class ScriptOverlay {
         document = null
         viewportWidth = 0.0
         viewportHeight = 0.0
+        viewportLeft = 0.0
+        viewportTop = 0.0
         changed()
     }
 
@@ -110,6 +120,8 @@ class ScriptOverlay {
         canvas.scale((width / viewportWidth).toFloat(), (height / viewportHeight).toFloat())
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var animate = false
+        canvas.save()
+        canvas.translate(-viewportLeft.toFloat(), -viewportTop.toFloat())
         pointer?.let { motion ->
             val elapsed = (now - motion.start) / 1_000_000.0
             val point =
@@ -155,6 +167,7 @@ class ScriptOverlay {
                 animate = true
             }
         }
+        canvas.restore()
         commentary?.let { item ->
             val elapsed = (now - item.start) / 1_000_000.0
             if (elapsed < item.durationMs) {

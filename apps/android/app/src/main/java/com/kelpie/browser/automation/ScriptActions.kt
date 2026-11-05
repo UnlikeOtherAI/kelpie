@@ -22,7 +22,10 @@ class ScriptActions(
 ) {
     private val gateway = checkNotNull(ctx.browserGateway)
     private val overlay = ctx.scriptOverlay
-    private val key = "__kelpie_script_" + run.id.replace("-", "")
+
+    // One page registry; every action resolves without a token first. The
+    // existing retirement lease prevents overlap with an earlier run.
+    private val key = "__kelpie_script_android_v1"
     private var pointerX = 20.0
     private var pointerY = 20.0
     var mutationInFlight = false
@@ -84,7 +87,7 @@ class ScriptActions(
             "commentary" ->
                 gateway.scriptLease(run.tabId, view, false, ::guard) {
                     val metrics = ctx.viewportMetrics()
-                    overlay.viewport(metrics.viewportWidth.toDouble(), metrics.viewportHeight.toDouble(), document())
+                    overlay.viewport(metrics.viewportWidth.toDouble(), metrics.viewportHeight.toDouble(), document(), preserveExisting = true)
                     overlay.narrate(
                         ScriptOverlay.Commentary(
                             action["text"] as String,
@@ -125,11 +128,15 @@ class ScriptActions(
         if (sensitive) {
             if (edit) run.redactor.add(action["text"] as String)
             if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
-                throw ScriptFailure("SENSITIVE_CAPTURE")
+                throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED")
             }
         }
         val oldDocument = document()
-        overlay.viewport(width, height, oldDocument)
+        val visual = objectMap(resolved["visualViewport"])
+        val visualWidth = number(visual, "width")
+        val visualHeight = number(visual, "height")
+        if (visualWidth <= 0 || visualHeight <= 0 || number(visual, "scale") <= 0) throw ScriptFailure("TARGET_EVALUATION_FAILED")
+        overlay.viewport(visualWidth, visualHeight, oldDocument, number(visual, "offsetLeft"), number(visual, "offsetTop"))
         val pointer = objectMap(run.script["pointer"])
         if (pointer["enabled"] == true) {
             val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 500.0
@@ -145,6 +152,7 @@ class ScriptActions(
                 ),
             )
             pause(duration.toLong())
+            resolve(action, token) // Refuse a changed viewport before showing/capturing the tap.
         }
         guard()
         val tap = objectMap(run.script["tapIndicator"])

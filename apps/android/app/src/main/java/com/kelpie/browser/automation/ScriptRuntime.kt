@@ -255,26 +255,34 @@ class ScriptRuntime(
                 } catch (_: Exception) {
                     if (failure == null) failure = ScriptFailure("SCRIPT_RETIREMENT_FAILED")
                 }
+                withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.clear() }
+                val safeOutputs =
+                    try {
+                        run.prepareOutputs()
+                    } catch (_: Exception) {
+                        run.stop("OUTPUT_REDACTION_FAILED")
+                        if (failure == null) failure = ScriptFailure("OUTPUT_REDACTION_FAILED")
+                        null
+                    }
                 val stopped = run.stopReason.get()
                 if (failure == null && stopped != null) failure = ScriptFailure(stopped)
-                withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.clear() }
                 val code = failure?.code
-                val aborted = code == "SCRIPT_ABORTED" || code == "SCRIPT_BACKGROUND"
-                run.finish(code, aborted, failure?.mayHaveCompleted == true || actions?.mutationInFlight == true)
-                if (aborted) {
+                run.finish(code, failure?.mayHaveCompleted == true || actions?.mutationInFlight == true)
+                val response =
+                    if (safeOutputs != null) {
+                        run.status(includeOutputs = true, preparedOutputs = safeOutputs)
+                    } else {
+                        run.status() + errorResponse(code ?: "OUTPUT_REDACTION_FAILED", "Script output unavailable")
+                    }
+                val terminal = run.status()
+                val terminalError = (terminal["runError"] as? Map<*, *>)?.get("code") as? String
+                if (terminal["state"] == "aborted") {
                     playback.finishAborted()
-                } else if (code != null) {
-                    playback.finishFatalFailure(code, "Script stopped")
+                } else if (terminalError != null) {
+                    playback.finishFatalFailure(terminalError, "Script stopped")
                 } else {
                     playback.finishSuccess()
                 }
-                val response =
-                    try {
-                        run.status(includeOutputs = true)
-                    } catch (_: Exception) {
-                        run.finish("SCRIPT_OUTPUT_REDACTION_FAILED", false, false)
-                        run.status() + errorResponse("SCRIPT_OUTPUT_REDACTION_FAILED", "Script output unavailable")
-                    }
                 run.clearPrivate()
                 result.complete(response)
 

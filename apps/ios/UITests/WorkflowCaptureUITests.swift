@@ -30,8 +30,28 @@ final class WorkflowCaptureUITests: XCTestCase {
         }
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,
                                                                    "actions": [["action": "navigate", "url": url]]])
-        XCTAssertEqual(navigated["success"] as? Bool, true, "\(navigated["error"] ?? "")")
+        guard navigated["success"] as? Bool == true else {
+            let code = (navigated["error"] as? Body)?["code"] as? String ?? "UNKNOWN"
+            throw NSError(domain: "WorkflowFixtureNavigation", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Initial fixture navigation failed: " + code
+            ])
+        }
         return (fixture, tab)
+    }
+
+    @MainActor
+    func testInitialOwnedHTTPNavigationLoadsFixture() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let result = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "output", "name": "title", "source": "title"]]
+        ])
+        XCTAssertEqual(result["success"] as? Bool, true)
+        XCTAssertEqual((result["outputs"] as? Body)?["title"] as? String, "Count 0")
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = "Owned tab after real HTTP workflow navigation"
+        evidence.lifetime = .keepAlways
+        add(evidence)
     }
 
     @MainActor

@@ -145,7 +145,7 @@ let kelpieUITests = Target.target(
     bundleId: "com.unlikeotherai.kelpie.uitests",
     deploymentTargets: .iOS("17.0"),
     infoPlist: .default,
-    sources: [.glob("UITests/**/*.swift")],
+    sources: [.glob("UITests/**/*.swift"), .glob("Tests/WorkflowLoopbackPage.swift")],
     dependencies: [.target(name: "Kelpie")],
     settings: .settings(base: ["SWIFT_VERSION": "5.0"])
 )

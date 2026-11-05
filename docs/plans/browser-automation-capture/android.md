@@ -284,3 +284,102 @@ queued-before-start cancellation, already-cancelled scope and worker cleanup.
 The run used one worker, in-process Kotlin,2GiB heap/two logical processors,
 without native/package/emulator jobs. Public device cancellation/recovery remains
 pending; this result does not replace the failed hosted CI or final full checks.
+Hosted build-only fixing run41956455688 passed on635d88ace7f2a7c3f722b4c572fa1e2d3f285945:
+lint, ktlintCheck, Debug/Release unit tests and shipping ARM64/x86_64 native builds;
+Gradle reported6m48s. Previous failed41950362604 evidence remains preserved.
+
+## Opt-in hosted native verification
+
+Android workflow_dispatch accepts native_test (boolean, defaultfalse). Its
+dedicated Ubuntu24.04 job requires accessible KVM, builds the same revision's CLI,
+shipping x86_64 debug app and AndroidTest APK, then cold-boots API35 google_apis
+Pixel7 phone and Pixel Tablet sequentially. Source/APK/packaged-native/installed
+APK hashes, image fingerprint, profile/display and version accompany the results.
+Only one compiler or emulator runs at a time in this job. AVDs use two cores/3GiB;
+Gradle uses one worker, two logical processors and a2GiB heap. No local Maxis AVD,
+physical device, signing, publication or desktop input is involved.
+
+The existing Compose pairing/Stop tests and real loopback HTTP, direct/generic
+MCP, chunk/hash, native media decode, observer/target, JNI UTF8 and controlled
+inference-cancel/recovery corpus run through AndroidX instrumentation. CLI is
+built and hashed but authenticated host CLI replay is not claimed by this job.
+An adb zero exit cannot establish success: the driver requires an explicit JUnit
+OK count and rejects failure/crash markers. KVM absence/boot failure is a blocker.
+Each profile shuts down before the next starts, including failure cleanup.
+
+Seven-day artifacts contain curated fixture media/decoded frames/native screenshots,
+instrumentation/boot/install logs, hash manifests, report.json and unit test reports.
+They exclude AVD images, unrestricted logcat, pairing stores, endpoint secrets and
+application databases. bash syntax, Node syntax and the report's false-pass/
+missing-profile regression pass on Maxis. New Kotlin tests and hosted emulator
+execution are compile/runtime-unverified at this source checkpoint; root dispatch
+and actual per-profile results must close those gates.
+Privacy/protocol follow-up (source checkpoint, runtime pending): inferred-sensitive
+edit text is registered before refusal; captures are discarded by an independent
+latch for privacy or redaction failure, while the first concrete error and
+uncertainty survive cleanup/Stop. Redacted output is prepared exactly once before
+terminal state/UI restoration. The four strict-v1 aliases match iOS; legacy is
+unchanged. A native test checks raw/URI/form title output before implicit-password
+refusal, no edit, masked earlier output, zero final/status artifacts and value-free
+status. A JVM case injects a failed native redactor and verifies discard/error/
+uncertainty survive subsequent failure and Stop.
+
+Artifact tests now reconstruct the entire artifact independently through HTTP,
+direct MCP and generic MCP, checking every echoed identity/MIME/length/hash,
+offset, positive bounded progress and exact EOF under chunk/deadline bounds.
+A deterministic noisy PNG exceeds262144 bytes to cross the canonical chunk
+boundary. The hosted CLI bridge is excluded from the ordinary corpus, then runs
+separately: native Compose approves the CLI's own persistent pairing request,
+the actual CLI runs a screenshot workflow, queries pinned owner status and
+downloads/hashes a large PNG. No bearer is copied or printed. Only non-secret
+fixture URL/tab coordinates cross adb. CLI output/status/download evidence is
+retained separately; a profile passes only when both native corpus and CLI bridge
+pass. No physical-device/publication/signing claim follows from this emulator job.
+Focused checks for this checkpoint: offline Gradle ktlintFormat dry-run graph
+contained only source-format tasks (25s); exact formatter passed24s and final21s
+with one worker, hard affinity mask1, ActiveProcessorCount1 and1GiB heap.
+No compile/native/emulator tasks ran. bash syntax, Node CLI/report syntax and
+report regression1/1 pass. The initial direct cached CLI formatter could not
+start because CLI-only dependencies were absent; it changed no source and is not
+a successful check. Kotlin compilation/JVM privacy test and actual hosted
+phone/tablet/public CLI/privacy replay remain pending.
+## G07 native pinch and pending resize probe
+
+Source depends on integrated b3f2d93e/common34a39319: target x/y remain layout CSS,
+and the same captured target frame supplies visualViewport offsets, size and scale.
+Android's one live/export overlay canvas maps those coordinates by visual size and
+offset, including pointer shape and tap radius. No separate numerical trajectory
+or resolver implementation is introduced. A target is checked again after pointer
+animation before the tap is shown/captured, then atomically rechecked at dispatch.
+
+Normal shipping tabs now enable built-in WebView pinch while hiding zoom buttons.
+Android's official WebSettings reference states builtInZoomControls enables pinch
+and defaultsfalse; displayZoomControls false hides deprecated visible controls:
+https://developer.android.com/reference/android/webkit/WebSettings#setBuiltInZoomControls(boolean)
+The setting is in TabStore, never enabled only in a test.
+
+The authored phone/tablet probe sends standard two-pointer Android MotionEvents
+only to the exact visible app-owned WebView before playback. It records actual
+scale/offset/size and requires real zoom/nonzero offset, not CSS zoom or a stage
+transform. A partially visible button records the actual event and viewport; the
+test checks intersection center and decoded exported PNG marker pixels. The probe covers pre-play pinch only. Recording blocks ordinary renderer touches; iOS also locks orientation. Android originally had no matching orientation lock; the focused orientation checkpoint below adds production parity with iOS. No mid-play gesture or rotation is presented as a supported shared user flow. Common JS/CDP tests cover stale pinch-token rejection; native stale-viewport evidence remains unclaimed.
+This probe is authored, not yet compiled or executed on either emulator profile.
+## Recording orientation parity
+
+The browser's existing recording state now owns a thin Activity orientation effect:
+lock the current orientation during presentation and restore the exact previous
+requestedOrientation when normal finish/abort/failure changes recording state,
+or when the effect disposes. No setting, product API or visible button was added.
+Recording remains true until media/renderer/output finalization, so orientation
+restoration follows retirement rather than an early Stop acknowledgement.
+
+The authored phone/tablet case covers success, owner abort and a real missing-target
+failure. It asserts the active lock, uses standard UiAutomation device rotation,
+requires stable owned-renderer dimensions while active, then exact prior-policy
+restoration and an actual resize from the same rotation request after termination.
+This is an orientation-policy probe, not a bypass of the recording touch overlay
+or a claimed mid-play viewport failure. Device rotation is restored only as normal
+test cleanup after terminal assertions. Runtime results are not yet available.
+Official instrumentation API:
+https://developer.android.com/reference/android/app/UiAutomation#setRotation(int)
+Orientation checkpoint source-format check: exact offline ktlintFormat passed22s with affinity1/one worker/1GiB, no compile/native/emulator. Kotlin compilation and actual policy/rotation assertions remain pending hosted verification.

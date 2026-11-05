@@ -192,19 +192,19 @@ final class IOSWorkflowTab {
         guard router.browserLease.begin() else { throw IOSWorkflowFailure("BUSY") }
         defer { router.browserLease.end() }
         router.invalidateAllBrowserReferences()
-        let navigationLease = ConnectNavigationLease(initial: ConnectDocument.version(view))
-        ConnectDocument.reserve(view, lease: navigationLease)
+        let navigationLease = try await IOSWorkflowNavigation.issue(on: view, authorize: requireMutationAuthority) {
+            context.lastNavigationError = nil
+            return view.load(URLRequest(url: url))
+        }
         defer { ConnectDocument.reserve(view, lease: nil) }
-        try await requireMutationAuthority()
-        context.lastNavigationError = nil
-        let navigation = view.load(URLRequest(url: url))
-        context.navigationIssued(navigation)
-        guard navigation != nil else { throw IOSWorkflowFailure("NAVIGATION_FAILED") }
         let end = ContinuousClock.now.advanced(by: .seconds(10))
         repeat {
             try? await Task.sleep(nanoseconds: 50_000_000)
             let version = ConnectDocument.version(view)
             guard navigationLease.allowsWait(version: version, authorized: true) else {
+                #if DEBUG
+                print("[WorkflowNavigationLease] wait-refused=" + navigationLease.debugState)
+                #endif
                 throw IOSWorkflowFailure("NAVIGATION_REPLACED", mayHaveCompleted: true)
             }
             do { try await check(); try requireCurrent() } catch {
@@ -214,6 +214,9 @@ final class IOSWorkflowTab {
             if context.lastNavigationError != nil { throw IOSWorkflowFailure("NAVIGATION_FAILED", mayHaveCompleted: true) }
             if navigationLease.allowsRead(version: version, loading: view.isLoading, authorized: true) { return }
         } while ContinuousClock.now < end
+        #if DEBUG
+        print("[WorkflowNavigationLease] timeout=" + navigationLease.debugState)
+        #endif
         if navigationLease.allowsWait(version: ConnectDocument.version(view), authorized: true) { view.stopLoading() }
         throw IOSWorkflowFailure("TIMEOUT", mayHaveCompleted: true)
     }

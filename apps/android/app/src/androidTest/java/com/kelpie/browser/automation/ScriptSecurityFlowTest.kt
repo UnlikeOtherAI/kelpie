@@ -28,12 +28,12 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                         "SESSION_UNSUPPORTED" to JSONObject(base.toString()).put("sessionId", "unknown"),
                         "SESSION_UNSUPPORTED" to JSONObject(base.toString()).put("sessionId", "foreign-owner-session"),
                         "UNSUPPORTED_SCRIPT_ACTION" to client.script(tab, click(), client.action("press-key").put("key", "Enter")),
-                        "UNRESOLVED_SCRIPT_INPUT" to client.script(tab, click()).put("inputs", JSONObject().put("name", JSONObject().put("type", "string"))),
-                        "UNRESOLVED_SCRIPT_INPUT" to
+                        "UNRESOLVED_INPUT" to client.script(tab, click()).put("inputs", JSONObject().put("name", JSONObject().put("type", "string"))),
+                        "UNRESOLVED_INPUT" to
                             client.script(tab, click(), client.action("fill").put("target", JSONObject().put("label", "Name")).put("text", JSONObject().put("secret", "operator-reference"))),
                         "INVALID_SCRIPT" to client.script(tab, click(), client.action("evaluate").put("script", "document.title='WRONG'")),
                         "INVALID_SCRIPT" to client.script(tab, click()).put("continueOnError", true),
-                        "SENSITIVE_CAPTURE" to
+                        "SENSITIVE_CAPTURE_REFUSED" to
                             client
                                 .script(
                                     tab,
@@ -111,6 +111,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                 val executor = Executors.newSingleThreadExecutor()
                 try {
                     val pending = executor.submit<JSONObject> { client.request("/v1/play-script", script).second }
+                    awaitRecordingUi(pending)
                     val deadline = System.nanoTime() + 5_000_000_000L
                     while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(20)
                     Thread.sleep(1200)
@@ -155,6 +156,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     val executor = Executors.newSingleThreadExecutor()
                     try {
                         val pending = executor.submit<Pair<Int, JSONObject>> { first.request("/v1/play-script", first.script(tab, first.action("wait").put("ms", 20_000))) }
+                        awaitRecordingUi(pending)
                         val deadline = System.nanoTime() + 5_000_000_000L
                         var own = first.call("get-script-status")
                         while (!own.optBoolean("playing") && System.nanoTime() < deadline) {
@@ -211,7 +213,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                                 .put("maxWidth", 320)
                                 .put("maxDurationMs", 100),
                         )
-                val response = client.request("/v1/play-script", script).second
+                val response = playRecorded(client, script)
                 assertFalse(response.getBoolean("success"))
                 assertEquals("CAPTURE_DURATION_LIMIT", response.getJSONObject("error").getString("code"))
                 assertEquals("Ready", client.core("tab.title", tab).getString("value"))
@@ -226,6 +228,72 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     assertTrue(frames > 0)
                 }
                 assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
+            }
+        }
+    }
+
+    @Test
+    fun screenshotsOnlyDeadlineInterruptsWaitWithoutSamplerOrNextPng() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                val script =
+                    client
+                        .script(
+                            tab,
+                            client.action("wait").put("ms", 1000),
+                            client.action("click").put("target", client.target("Submit")),
+                        ).put("capture", JSONObject().put("formats", JSONArray(listOf("screenshots"))).put("maxWidth", 320).put("maxDurationMs", 100))
+                val result = playRecorded(client, script)
+                assertFalse(result.getBoolean("success"))
+                assertEquals("CAPTURE_DURATION_LIMIT", result.getJSONObject("error").getString("code"))
+                assertEquals(0, result.getInt("actionsExecuted"))
+                assertEquals(0, result.getJSONArray("artifacts").length())
+                assertEquals("Ready", client.core("tab.title", tab).getString("value"))
+                assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
+            }
+        }
+    }
+
+    @Test
+    fun genericMcpAbortReturnsOwnerMetadataAndAllowsNextRun() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                val executor = Executors.newSingleThreadExecutor()
+                try {
+                    val pending =
+                        executor.submit<JSONObject> {
+                            client.request("/v1/play-script", client.script(tab, client.action("wait").put("ms", 20_000))).second
+                        }
+                    awaitRecordingUi(pending)
+                    val active = client.mcpValue("kelpie_get_script_status")
+                    assertTrue(active.getBoolean("playing"))
+                    val runId = active.getString("runId")
+                    val abort =
+                        client.mcpValue(
+                            "kelpie_extension",
+                            JSONObject().put("name", "kelpie_abort_script").put("arguments", JSONObject().put("runId", runId)),
+                        )
+                    assertTrue(abort.getBoolean("success"))
+                    assertTrue(abort.getBoolean("abortRequested"))
+                    val result = pending.get(15, TimeUnit.SECONDS)
+                    assertEquals("SCRIPT_ABORTED", result.getJSONObject("error").getString("code"))
+                    ui.waitForIdle()
+                    val status = client.mcpValue("kelpie_get_script_status", JSONObject().put("runId", runId))
+                    assertTrue(status.getBoolean("success"))
+                    assertFalse(status.getBoolean("runSuccess"))
+                    assertEquals("aborted", status.getString("state"))
+                    assertFalse(status.has("error"))
+                    assertFalse(status.has("outputs"))
+                    assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
+                } finally {
+                    executor.shutdownNow()
+                }
             }
         }
     }

@@ -36,9 +36,9 @@ class ScriptRedactor(
             )
         val response =
             native(request)?.let(OpenAIJson::parseObjectOrNull)?.let(OpenAIJson::toMap)
-                ?: throw ScriptFailure("SCRIPT_OUTPUT_REDACTION_FAILED")
-        if (response["ok"] != true) throw ScriptFailure("SCRIPT_OUTPUT_REDACTION_FAILED")
+                ?: throw ScriptFailure("OUTPUT_REDACTION_FAILED")
+        if (response["ok"] != true) throw ScriptFailure("OUTPUT_REDACTION_FAILED")
         @Suppress("UNCHECKED_CAST")
-        return response["outputs"] as? Map<String, Any?> ?: throw ScriptFailure("SCRIPT_OUTPUT_REDACTION_FAILED")
+        return response["outputs"] as? Map<String, Any?> ?: throw ScriptFailure("OUTPUT_REDACTION_FAILED")
     }
 }

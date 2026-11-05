@@ -60,6 +60,11 @@ on:
         description: Run paired capture, CLI and MCP journeys on an existing hosted iPhone and iPad
         type: boolean
         default: false
+      native_workflow_scope:
+        description: Select the full corpus or the focused navigation diagnostic
+        type: choice
+        options: [full, navigation]
+        default: full
 
 permissions:
   contents: read
@@ -195,7 +200,10 @@ jobs:
         if: inputs.native_workflow_tests
         env:
           KELPIE_RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: python3 scripts/testing/ios-workflow-acceptance.py
+          KELPIE_IOS_TEST_SCOPE: ${{ inputs.native_workflow_scope || 'full' }}
+        run: |
+          python3 -m unittest discover -s scripts/testing -p test_ios_workflow_driver.py
+          python3 scripts/testing/ios-workflow-acceptance.py
 
       - name: Keep simulator results and media
         if: always() && inputs.native_workflow_tests

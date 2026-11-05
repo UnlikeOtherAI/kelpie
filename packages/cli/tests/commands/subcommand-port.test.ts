@@ -20,7 +20,7 @@ vi.mock("../../src/mcp/transport.js", () => ({
 import { execFile, spawn } from "node:child_process";
 import { allocateBrowserPort } from "../../src/browser/launch.js";
 import { probeHealth } from "../../src/discovery/local-probe.js";
-import { getBrowserAlias, readLocalReadiness, readinessPath } from "../../src/browser/store.js";
+import { getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
 import { startHttp } from "../../src/mcp/transport.js";
 import { createProgram } from "../../src/program.js";
 
@@ -72,6 +72,40 @@ describe("browser launch --port on Windows", () => {
     expect(spawn).not.toHaveBeenCalled();
     expect(allocateBrowserPort).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(5);
+  });
+
+  it("forwards headless only to a Linux alias on Linux and retains verified launch identity", async () => {
+    vi.spyOn(os, "platform").mockReturnValue("linux");
+    vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "linux", appPath: process.execPath, profileDir: "/profile" });
+    await run("browser", "launch", "x", "--headless", "--port", "8467");
+    expect(spawnedArgs()).toEqual(["--port", "8467", "--profile-dir", "/profile", "--headless"]);
+    expect(vi.mocked(spawn).mock.calls[0]?.[2]).toEqual({ detached: true, stdio: "ignore" });
+    expect(setRunningBrowser).toHaveBeenCalledWith("x", expect.objectContaining({
+      pid: 4321, port: 8467, launchId: "launch-new", deviceId: "device-new", readinessFile: "C:/profile/readiness.json",
+    }));
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it.each([
+    ["win32", "linux"], ["darwin", "linux"], ["linux", "windows"], ["linux", "macos"],
+  ] as const)("refuses --headless for host %s alias %s before allocation or mutation", async (host, platform) => {
+    vi.spyOn(os, "platform").mockReturnValue(host);
+    vi.mocked(getBrowserAlias).mockResolvedValue({ platform, appPath: process.execPath, profileDir: "/profile" });
+    await run("browser", "launch", "x", "--headless");
+    expect(allocateBrowserPort).not.toHaveBeenCalled(); expect(spawn).not.toHaveBeenCalled();
+    expect(setRunningBrowser).not.toHaveBeenCalled(); expect(readLocalReadiness).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(5);
+  });
+
+  it("keeps Linux windowed by default and refuses mixed platform launch flags", async () => {
+    vi.spyOn(os, "platform").mockReturnValue("linux");
+    vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "linux", appPath: process.execPath, profileDir: "/profile" });
+    await run("browser", "launch", "x", "--port", "8467");
+    expect(spawnedArgs()).toEqual(["--port", "8467", "--profile-dir", "/profile"]);
+    vi.clearAllMocks(); process.exitCode = undefined;
+    await run("browser", "launch", "x", "--headless", "--hidden");
+    expect(spawn).not.toHaveBeenCalled(); expect(allocateBrowserPort).not.toHaveBeenCalled();
+    expect(setRunningBrowser).not.toHaveBeenCalled(); expect(process.exitCode).toBe(5);
   });
 
   it("spawns the app on the port given after the subcommand", async () => {

@@ -124,21 +124,24 @@ jobs:
             build-for-testing CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee .cache/macos-ci/build.log
 
-      - name: Retain compile diagnostics
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: macos-build-diagnostics
-          path: .cache/macos-ci/build.log
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Prepare explicitly requested hosted runtime
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
         run: |
+          set -euo pipefail
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation started 0
+          trap 'prepare_exit=$?; node scripts/testing/macos-workflow-acceptance.mjs --preparation failed "$prepare_exit"; exit "$prepare_exit"' ERR
+          xcodebuild \
+            -workspace apps/macos/Kelpie.xcworkspace \
+            -scheme Kelpie \
+            -configuration Debug \
+            -derivedDataPath apps/macos/.build-runtime \
+            -jobs 1 \
+            build CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee .cache/macos-ci/runtime-build.log
           brew install ffmpeg
           pnpm --filter @unlikeotherai/kelpie build
           bash scripts/testing/macos-sign-test-app.sh
+          node scripts/testing/macos-workflow-acceptance.mjs --preparation ready 0
 
       - name: Exercise owned native app without global input
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
@@ -154,4 +157,15 @@ jobs:
           name: macos-native-runtime-evidence
           path: .cache/macos-runtime/evidence
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain compile diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-build-diagnostics
+          path: |
+            .cache/macos-ci/build.log
+            .cache/macos-ci/runtime-build.log
+          if-no-files-found: ignore
           retention-days: 7

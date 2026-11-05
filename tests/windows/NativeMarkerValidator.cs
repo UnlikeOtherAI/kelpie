@@ -96,9 +96,9 @@ public static class NativeMarkerValidator {
         }
       } finally {bitmap.UnlockBits(data);}
     }
-    double vw=Number(viewport,"width"),vh=Number(viewport,"height"),x=Number(target,"x"),y=Number(target,"y"),radius=Number(scene,"radius");
-    Need(vw>0&&vh>0&&vw<=16384&&vh<=16384&&x>=0&&y>=0&&x<vw&&y<vh&&radius>=2&&radius<=100,"Scene geometry bound");
-    var region=Region(raw,width,height,x*width/vw,y*height/vh,radius*width/vw,radius*height/vh);
+    double vw=Number(viewport,"width"),vh=Number(viewport,"height"),expectedX=Number(target,"x"),expectedY=Number(target,"y"),radius=Number(scene,"radius");
+    Need(vw>0&&vh>0&&vw<=16384&&vh<=16384&&expectedX>=0&&expectedY>=0&&expectedX<vw&&expectedY<vh&&radius>=2&&radius<=100,"Scene geometry bound");
+    var region=Region(raw,width,height,expectedX*width/vw,expectedY*height/vh,radius*width/vw,radius*height/vh);
     bool background=(zero>0&&opaque+partial>0)||nonBlack>=(long)width*height*.8;
     bool valid=(bool)region["verified"]&&alphaPreserved&&background;
     region["verified"]=valid;

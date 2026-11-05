@@ -17,9 +17,10 @@ export async function waitFor(run,ms=10000){
  throw last??new Failure("WAIT_TIMEOUT");
 }
 export class Client {
- constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.artifacts=[];this.counter=0;}
+ constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
  pin(port){requireTrue(listenerState(listeners(port),this.pid)==="owned","LISTENER_IDENTITY");}
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
+  if(this.readiness.at(-1)?.states.join(",")!==states.join(",")&&this.readiness.length<16)this.readiness.push({elapsedMs:Date.now()-this.began,states});
   requireTrue(!states.includes("foreign"),"LISTENER_IDENTITY");return states.every(state=>state==="owned");}
  async request(route,body={},options={}){
   const port=options.reveal?8421:28420;this.pin(port);
@@ -27,7 +28,7 @@ export class Client {
   if(!options.reveal&&(options.token??this.token))headers.authorization="Bearer "+(options.token??this.token);
   const response=await fetch("http://127.0.0.1:"+port+route,{method:options.method??"POST",headers,
    body:options.method==="GET"?undefined:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(options.timeout??365000)]):AbortSignal.timeout(options.timeout??365000),redirect:"error"});
-  const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));}
+  const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));options.onChunk?.(size);}
   let text=Buffer.concat(pieces).toString("utf8");
   this.pin(port);
   if(text.startsWith("event:")||text.startsWith("data:"))text=text.split("\n").filter(x=>x.startsWith("data:")).map(x=>x.slice(5).trim()).at(-1);

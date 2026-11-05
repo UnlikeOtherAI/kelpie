@@ -7,23 +7,31 @@ on:
       - 'native/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
+      - 'scripts/testing/android-native-*'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
       - '.github/actions/browser-contract/**'
+      - '.github/workflows/android.yml'
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'apps/android/**'
       - 'native/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
+      - 'scripts/testing/android-native-*'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
       - '.github/actions/browser-contract/**'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
+    inputs:
+      native_test:
+        description: Run sequential API35 phone/tablet native acceptance on hosted KVM
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,16 +45,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.3
       - uses: ./.github/actions/browser-contract
-
       - name: Set up JDK 17
         uses: actions/setup-java@v5.2.0
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4.0.3
-
       - name: Cache Gradle
         uses: actions/cache@v5.0.5
         with:
@@ -57,7 +62,77 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('apps/android/**/*.gradle*', 'apps/android/**/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
-
       - name: Lint, ktlint, build
         working-directory: apps/android
         run: ./gradlew --no-daemon lint ktlintCheck build
+
+  native-test:
+    name: Native phone + tablet acceptance
+    if: github.event_name == 'workflow_dispatch' && inputs.native_test
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: '1'
+      GRADLE_OPTS: -Dorg.gradle.workers.max=1
+      JAVA_TOOL_OPTIONS: -XX:ActiveProcessorCount=2
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - uses: ./.github/actions/browser-contract
+      - uses: actions/setup-java@v5.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4.0.3
+      - name: Verify hosted KVM
+        shell: bash
+        run: |
+          mkdir -p native-evidence
+          if [[ ! -c /dev/kvm ]]; then
+            echo KVM_UNAVAILABLE | tee native-evidence/blocker.txt
+            exit 1
+          fi
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Build matching CLI
+        run: pnpm install --frozen-lockfile && pnpm --workspace-concurrency=1 -r build
+      - name: Build shipping JNI app and test APK sequentially
+        working-directory: apps/android
+        run: >-
+          ./gradlew --no-daemon --max-workers=1
+          '-Dorg.gradle.jvmargs=-Xmx2g -XX:ActiveProcessorCount=2'
+          -Dorg.gradle.parallel=false
+          -Pkotlin.compiler.execution.strategy=in-process
+          -Pandroid.injected.build.abi=x86_64
+          ktlintCheck testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      - name: Execute phone then tablet public native corpus
+        shell: bash
+        run: |
+          bash scripts/testing/android-native-capture.sh "$PWD/native-evidence" \
+            apps/android/app/build/intermediates/apk/debug/app-debug.apk \
+            apps/android/app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk
+      - name: Retain curated evidence for seven days
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-native-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            native-evidence/*.txt
+            native-evidence/*.log
+            native-evidence/report.json
+            native-evidence/phone/*.json
+            native-evidence/phone/*.txt
+            native-evidence/phone/*.log
+            native-evidence/phone/avd-config.ini
+            native-evidence/phone/script-acceptance/**
+            native-evidence/phone/script-codec-acceptance/**
+            native-evidence/tablet/*.json
+            native-evidence/tablet/*.txt
+            native-evidence/tablet/*.log
+            native-evidence/tablet/avd-config.ini
+            native-evidence/tablet/script-acceptance/**
+            native-evidence/tablet/script-codec-acceptance/**
+            apps/android/app/build/reports/tests/**
+            apps/android/app/build/test-results/**
