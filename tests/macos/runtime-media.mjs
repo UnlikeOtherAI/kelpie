@@ -1,6 +1,7 @@
 import {execFileSync} from "node:child_process";
 import {createHash} from "node:crypto";
 import {requireTrue} from "./runtime-client.mjs";
+import {scriptPointerPosition} from "../../packages/shared/dist/index.js";
 export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
  const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_streams","-show_frames","-of","json",item.file],{maxBuffer:16*1024*1024}));
  const stream=meta.streams[0];requireTrue(stream?.width===item.width&&stream?.height===item.height,"MEDIA_DIMENSIONS");
@@ -89,4 +90,53 @@ export function inspectEdgeMarker(item,event){
  const error=Math.hypot(actual.x-expected.x,actual.y-expected.y);
  requireTrue(error<4,"EDGE_MARKER_ALIGNMENT");
  return {actual,expected,error,clientWidth:event.viewport.clientWidth,innerWidth:event.viewport.width};
+}
+
+// Fit one real decoded pointer path to the omitted-duration default and the prior 500 ms timing.
+export function inspectDefaultMotion(item,scene){
+ const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_frames","-show_entries",
+  "frame=best_effort_timestamp_time","-of","json",item.file],{maxBuffer:16*1024*1024}));
+ const frames=meta.frames??[];
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,
+  "-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const stride=item.width*item.height*3;requireTrue(rgb.length===stride*frames.length,"DEFAULT_MOTION_DECODE");
+ const tracks=[];
+ for(let index=0;index<frames.length;index++){
+  let minX=item.width,minY=item.height,maxX=-1,maxY=-1,count=0;
+  for(let y=0;y<item.height;y++)for(let x=0;x<item.width;x++){
+   const offset=index*stride+(y*item.width+x)*3;
+   if(rgb[offset]<170&&rgb[offset+1]<170&&rgb[offset+2]<170){count++;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+  }
+  const time=Number(frames[index].best_effort_timestamp_time)*1000;
+  if(count>=3&&maxX-minX<24&&maxY-minY<24&&Number.isFinite(time))
+   tracks.push({time,x:minX*scene.width/item.width,y:minY*scene.height/item.height});
+ }
+ const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+ const endpoint=tracks.filter(point=>distance(point,scene.second)<8).at(-1);
+ requireTrue(endpoint,"DEFAULT_MOTION_ENDPOINT");
+ const offset={x:scene.second.x-endpoint.x,y:scene.second.y-endpoint.y};
+ const corrected=tracks.map(point=>({...point,x:point.x+offset.x,y:point.y+offset.y}));
+ const start=corrected.filter(point=>point.time<endpoint.time&&distance(point,scene.first)<4).at(-1);
+ requireTrue(start,"DEFAULT_MOTION_START");
+ const end=corrected.find(point=>point.time>start.time&&distance(point,scene.second)<4);
+ requireTrue(end,"DEFAULT_MOTION_END");
+ const path=corrected.filter(point=>point.time>start.time&&point.time<end.time);
+ requireTrue(path.length>=4,"DEFAULT_MOTION_INSUFFICIENT_FRAMES");
+ const dx=scene.second.x-scene.first.x,dy=scene.second.y-scene.first.y,length2=dx*dx+dy*dy;
+ const progress=point=>((point.x-scene.first.x)*dx+(point.y-scene.first.y)*dy)/length2;
+ requireTrue(Math.min(...path.map(progress))<.35&&Math.max(...path.map(progress))>.65,"DEFAULT_MOTION_INSUFFICIENT_COVERAGE");
+ const samples=[start,...path,end],motion={from:scene.first,to:scene.second,curve:"s"};
+ function fit(duration){
+  let best=Infinity,bestOnset=null;
+  for(let onset=start.time;onset<=path[0].time;onset+=2){
+   const errors=samples.map(point=>distance(point,scriptPointerPosition(motion,(point.time-onset)/duration)));
+   const rms=Math.sqrt(errors.reduce((sum,error)=>sum+error*error,0)/errors.length);
+   if(rms<best){best=rms;bestOnset=onset;}
+  }
+  return {rms:best,onset:bestOnset};
+ }
+ const current=fit(350),previous=fit(500);
+ requireTrue(current.rms<9&&previous.rms>current.rms+6,"DEFAULT_MOTION_DURATION");
+ return {samples:path.length,durationMs:350,fit350Px:current.rms,fit500Px:previous.rms,
+  observedSpanMs:end.time-start.time,endpointErrorPx:distance(endpoint,scene.second)};
 }
