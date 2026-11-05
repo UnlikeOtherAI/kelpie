@@ -107,7 +107,7 @@ run_arm() {
   fi
  fi
  if [[ "$backend" == sandbox && -s "$dir/namespace-verified.json" ]]; then
-  for _ in $(seq 1 300); do
+  for _ in $(seq 1 450); do
    [[ -s "$dir/browser-identity.json" ]] && break
    kill -0 "$launcher" 2>/dev/null || break
    sleep 0.1
