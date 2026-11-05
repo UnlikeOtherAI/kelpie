@@ -34,7 +34,7 @@ The next full hosted run at `c661062447d4fd8529896deba8d12831f4b05f4c` passed 36
 * Step PNGs for a pointed action show the resolved marker before input. Other steps capture after the action. The visual viewport maps CSS points into the selected WKWebView's bounds. The same native presentation is drawn into the snapshot at the latched timestamp. Provisional navigation and a committed document each invalidate the previous presentation.
 * Before admitting the first captured frame of a document, iOS waits within the existing two-second admission and capture budgets for the full native and CSS visual viewport to remain stable through the recording chrome transition. Authorization, Stop, document and pinned native-canvas checks continue during this wait. Once a baseline is admitted, the existing snapshot and same-document resize fences remain in force.
 
-* Until its paced-edit adapter is implemented, iOS rejects a supplied `typingDelayMs` during full preflight instead of silently editing atomically.
+* Paced fill and type preflight every scalar plan before workflow execution. Each continuation checks the pinned target, document, viewport, focus, authorization and sensitivity; an uncertain or sensitive partial edit stops without replay. Empty paced type still resolves its target and captures its requested step screenshot without focusing or inserting text. Native iPhone and iPad runtime verification is pending.
 
 * The enabled pointer defaults to 350 ms; an explicit duration, including the G08 fixture's 2400 ms, is preserved. A hosted native test records the default motion as a GIF, decodes all frames and checks real movement and elapsed time; its runtime result is pending.
 

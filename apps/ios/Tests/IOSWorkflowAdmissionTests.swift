@@ -193,9 +193,103 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         XCTAssertEqual(requested["easing"] as? String, "ease-in-out")
     }
 
-    func testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented() {
-        let delayed: Body = ["action": "fill", "target": ["label": "Entry"], "text": "abc", "typingDelayMs": 10]
-        assertRejected(workflow([tap, delayed]), "UNSUPPORTED_SCRIPT_ACTION")
+    @MainActor
+    func testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars() async throws {
+        var events: [String] = []
+        try await IOSPacedTypingExecutor.run(
+            clearFirst: true,
+            scalars: ["A", "\u{1F600}"],
+            delayMs: 25,
+            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            wait: { delay in events.append("wait:\(delay)") }
+        )
+        XCTAssertEqual(events, ["fill::false", "type:A:true", "wait:25", "type:\u{1F600}:true"])
+        events = []
+        try await IOSPacedTypingExecutor.run(
+            clearFirst: false,
+            scalars: ["A", "B"],
+            delayMs: 25,
+            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            wait: { delay in events.append("wait:\(delay)") }
+        )
+        XCTAssertEqual(events, ["type:A:false", "wait:25", "type:B:true"])
+        events = []
+        try await IOSPacedTypingExecutor.run(
+            clearFirst: false, scalars: [], delayMs: 25,
+            apply: { _, _, _ in events.append("input") }, wait: { _ in events.append("wait") }
+        )
+        XCTAssertTrue(events.isEmpty)
+        try await IOSPacedTypingExecutor.run(
+            clearFirst: true, scalars: [], delayMs: 25,
+            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            wait: { _ in events.append("wait") }
+        )
+        XCTAssertEqual(events, ["fill::false"])
+    }
+
+    @MainActor
+    func testPacedExecutorStopsWithoutReplayAndPreservesUncertainty() async {
+        var writes = 0
+        do {
+            try await IOSPacedTypingExecutor.run(
+                clearFirst: false, scalars: ["A", "B"], delayMs: 25,
+                apply: { _, _, _ in writes += 1 }, wait: { _ in throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+            )
+            XCTFail("Stop must interrupt before the second scalar")
+        } catch let failure as IOSWorkflowFailure {
+            XCTAssertEqual(failure.code, "SCRIPT_ABORTED")
+            XCTAssertTrue(failure.mayHaveCompleted)
+        } catch { XCTFail("Unexpected failure type") }
+        XCTAssertEqual(writes, 1)
+
+        do {
+            try await IOSPacedTypingExecutor.run(
+                clearFirst: false, scalars: ["A"], delayMs: 25,
+                apply: { _, _, _ in throw IOSWorkflowFailure("STALE_TARGET") }, wait: { _ in XCTFail("No wait") }
+            )
+            XCTFail("Target refusal must stop input")
+        } catch let failure as IOSWorkflowFailure {
+            XCTAssertEqual(failure.code, "STALE_TARGET")
+            XCTAssertFalse(failure.mayHaveCompleted)
+        } catch { XCTFail("Unexpected failure type") }
+
+        do {
+            try await IOSPacedTypingExecutor.run(
+                clearFirst: false, scalars: ["A"], delayMs: 25,
+                apply: { _, _, _ in throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) },
+                wait: { _ in XCTFail("No wait") }
+            )
+            XCTFail("Unknown input must not be retried")
+        } catch let failure as IOSWorkflowFailure {
+            XCTAssertEqual(failure.code, "INPUT_UNCERTAIN")
+            XCTAssertTrue(failure.mayHaveCompleted)
+        } catch { XCTFail("Unexpected failure type") }
+    }
+
+    func testPacedEditsArePlannedBeforeAnyEarlierAction() throws {
+        let target: Body = ["label": "Entry"]
+        let text = "e\u{0301}\u{1F600}"
+        let delayed: Body = ["action": "fill", "target": target, "text": text, "typingDelayMs": 20]
+        let planned = try IOSBoundWorkflow(workflow([tap, delayed]))
+        XCTAssertNil(planned.pacedPlans[0])
+        let plan = try XCTUnwrap(planned.pacedPlans[1])
+        XCTAssertTrue(plan.clearFirst)
+        XCTAssertEqual(plan.delayMs, 20)
+        XCTAssertEqual(plan.scalars, ["e", "\u{0301}", "\u{1F600}"])
+
+        let atomic: Body = ["action": "fill", "target": target, "text": "abc"]
+        XCTAssertTrue(try IOSBoundWorkflow(workflow([atomic])).pacedPlans.isEmpty)
+        let emptyFill = try IOSBoundWorkflow(workflow([delayed.merging(["text": ""]) { _, new in new }]))
+        XCTAssertEqual(emptyFill.pacedPlans[0]?.clearFirst, true)
+        XCTAssertEqual(emptyFill.pacedPlans[0]?.scalars, [])
+        let emptyType = try IOSBoundWorkflow(workflow([delayed.merging(["action": "type", "text": ""]) { _, new in new }]))
+        XCTAssertEqual(emptyType.pacedPlans[0]?.clearFirst, false)
+        XCTAssertEqual(emptyType.pacedPlans[0]?.scalars, [])
+
+        let tooMany = delayed.merging(["text": String(repeating: "a", count: 1001)]) { _, new in new }
+        assertRejected(workflow([tap, tooMany]), "INVALID_PACED_TYPING")
+        let tooLong = delayed.merging(["text": String(repeating: "a", count: 62), "typingDelayMs": 1000]) { _, new in new }
+        assertRejected(workflow([tap, tooLong]), "INVALID_PACED_TYPING")
     }
 
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {
