@@ -214,6 +214,23 @@ final class ScriptWorkflowTab {
         return try Self.decodeCaptureState(result, bounds: renderer.scriptViewportRect.size)
     }
 
+    #if DEBUG && KELPIE_HOSTED_STREAM_TEST
+    /// The fixture identity is checked in the same renderer turn as document and viewport.
+    func hostedFixtureCaptureState(origin: String) async throws -> (viewport: Viewport, document: String) {
+        guard let input = Self.json(["origin": origin]) else { throw ScriptWorkflowFailure("INVALID_PARAM") }
+        let expression = """
+        (()=>{const expected=\(input).origin;return {viewport:\(Self.viewportExpression),
+        document:\(documentIdentityExpression),fixture:location.origin===expected&&
+        (location.pathname==='/stream'||location.pathname==='/stream-nav')&&location.search===''&&location.hash===''}})()
+        """
+        let raw = try await fixed(expression)
+        guard let body = raw as? Body, ScriptWorkflowBoolean.value(body["fixture"]) == true else {
+            throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
+        }
+        return try Self.decodeCaptureState(body, bounds: renderer.scriptViewportRect.size)
+    }
+    #endif
+
     static func decodeCaptureState(_ raw: Any?, bounds: CGSize) throws -> (viewport: Viewport, document: String) {
         guard let body = raw as? Body, let document = body["document"] as? String, document.count == 32 else {
             throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_UNAVAILABLE")

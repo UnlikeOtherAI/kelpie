@@ -1,4 +1,4 @@
-#if KELPIE_HOSTED_STREAM_TEST
+#if DEBUG && KELPIE_HOSTED_STREAM_TEST
 import AppKit
 
 /// Hosted synthetic-fixture diagnostic only; the product capture path never consumes this stream.
@@ -12,6 +12,7 @@ final class ScriptHostedStreamDiagnostic {
     private let geometry: ScriptMarkerGeometry
     private let viewport: ScriptCaptureViewport
     private let documentID: String
+    private let fixtureOrigin: String
     private var probe: CEFHostedStreamProbe?
 
     static var requested: Bool {
@@ -22,10 +23,17 @@ final class ScriptHostedStreamDiagnostic {
 
     init(tab: ScriptWorkflowTab) async throws {
         try await tab.check()
+        guard let origin = ProcessInfo.processInfo.environment["KELPIE_CEF_STREAM_ORIGIN"],
+              let parts = URLComponents(string: origin), parts.scheme == "http", parts.host == "127.0.0.1",
+              let port = parts.port, (1...65535).contains(port), parts.user == nil, parts.password == nil,
+              parts.path.isEmpty, parts.query == nil, parts.fragment == nil,
+              origin == "http://127.0.0.1:\(port)" else { throw ScriptWorkflowFailure("INVALID_PARAM") }
         guard let renderer = tab.renderer as? CEFRenderer, let bridge = renderer.bridge,
               let window = tab.view.window else { throw ScriptWorkflowFailure("SCRIPT_RENDERER_UNSUPPORTED") }
-        let state = try await tab.captureState()
+        let state = try await tab.hostedFixtureCaptureState(origin: origin)
         try await tab.check()
+        guard state.viewport.scale == 1, state.viewport.pageOrigin == .zero,
+              state.viewport.visible.origin == .zero else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         self.tab = tab
         self.renderer = renderer
         self.bridge = bridge
@@ -34,6 +42,7 @@ final class ScriptHostedStreamDiagnostic {
         self.geometry = ScriptMarkerGeometry(tab: tab, window: window)
         self.viewport = state.viewport
         self.documentID = state.document
+        self.fixtureOrigin = origin
     }
 
     private func isCurrent() -> Bool {
@@ -47,9 +56,15 @@ final class ScriptHostedStreamDiagnostic {
     func start() async throws {
         try await tab.check()
         guard isCurrent() else { throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED") }
-        let probe = CEFHostedStreamProbe(bridge: bridge, epoch: UInt64.random(in: 1...UInt64.max)) { [weak self] in
-            MainActor.assumeIsolated { self?.isCurrent() == true }
-        }
+        let probe = CEFHostedStreamProbe(
+            bridge: bridge,
+            epoch: UInt64.random(in: 1...UInt64.max),
+            width: Double(viewport.bounds.width),
+            height: Double(viewport.bounds.height),
+            identity: { [weak self] in
+                MainActor.assumeIsolated { self?.isCurrent() == true }
+            }
+        )
         self.probe = probe
         do {
             let started = try await ScriptRendererDeadline.run(
@@ -88,7 +103,7 @@ final class ScriptHostedStreamDiagnostic {
             )
             guard stopped, allowed else { print("[WorkflowHostedStream] event=discarded"); return }
             try await tab.check()
-            let state = try await tab.captureState()
+            let state = try await tab.hostedFixtureCaptureState(origin: fixtureOrigin)
             try await tab.check()
             guard isCurrent(), state.document == documentID, state.viewport == viewport,
                   let samples = probe.seal(afterAudit: true) as? [[String: NSNumber]], samples.count <= 64 else {

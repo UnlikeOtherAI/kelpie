@@ -19,6 +19,6 @@
 
 #import "CEFBridge+ScriptCapture.h"
 
-#if defined(KELPIE_HOSTED_STREAM_TEST)
+#if defined(DEBUG) && defined(KELPIE_HOSTED_STREAM_TEST)
 #import "CEFHostedStreamProbe.h"
 #endif

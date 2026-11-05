@@ -1,6 +1,6 @@
 #import "CEFHostedStreamProbe.h"
 
-#if defined(KELPIE_HOSTED_STREAM_TEST)
+#if defined(DEBUG) && defined(KELPIE_HOSTED_STREAM_TEST)
 #if defined(KELPIE_HOSTED_STREAM_MOCK)
 #import "CEFHostedStreamMock.h"
 #else
@@ -18,6 +18,9 @@
 struct HostedStreamObserver {
     cef_dev_tools_message_observer_t api{};
     std::atomic<int> references{1};
+    std::atomic<unsigned> ingress{0};
+    std::atomic<bool> overflowSignaled{false};
+    int browserID = 0;
     __weak CEFHostedStreamProbe *owner = nil;
 };
 
@@ -25,6 +28,8 @@ struct HostedStreamObserver {
     __weak CEFBridge *_bridge;
     BOOL (^_identity)(void);
     uint64_t _epoch;
+    double _expectedWidth;
+    double _expectedHeight;
     int _browserID;
     cef_browser_host_t *_host;
     cef_registration_t *_registration;
@@ -40,6 +45,7 @@ struct HostedStreamObserver {
 }
 - (void)consumeBrowser:(int)browser payload:(NSData *)payload;
 - (void)agentDetached;
+- (void)ingressOverflow;
 - (void)finishStop:(BOOL)success;
 - (void)releaseHandles;
 @end
@@ -62,17 +68,36 @@ static void StreamDetached(cef_dev_tools_message_observer_t *base, cef_browser_t
     CEFHostedStreamProbe *owner = reinterpret_cast<HostedStreamObserver *>(base)->owner;
     dispatch_async(dispatch_get_main_queue(), ^{ [owner agentDetached]; });
 }
+static void StreamOverflow(HostedStreamObserver *observer, CEFHostedStreamProbe *owner) {
+    if (!observer->overflowSignaled.exchange(true)) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [owner ingressOverflow]; });
+    }
+}
 static void StreamEvent(cef_dev_tools_message_observer_t *base, cef_browser_t *browser,
                         const cef_string_t *method, const void *payload, size_t length) {
-    if (method == nullptr || method->str == nullptr || payload == nullptr) { return; }
+    auto *observer = reinterpret_cast<HostedStreamObserver *>(base);
+    if (method == nullptr || method->str == nullptr || method->length > 64 || payload == nullptr ||
+        CEFBridgeBrowserIdentifier(browser) != observer->browserID) { return; }
     NSString *name = [[NSString alloc] initWithCharacters:(const unichar *)method->str length:method->length];
     if (![name isEqualToString:@"Page.screencastFrame"]) { return; }
-    CEFHostedStreamProbe *owner = reinterpret_cast<HostedStreamObserver *>(base)->owner;
+    CEFHostedStreamProbe *owner = observer->owner;
     if (owner == nil) { return; }
-    const int browserID = CEFBridgeBrowserIdentifier(browser);
-    // Keep even malformed/oversize events bounded; zero bytes invalidates the probe.
-    NSData *copy = length <= 2 * 1024 * 1024 + 4096 ? [NSData dataWithBytes:payload length:length] : [NSData data];
-    dispatch_async(dispatch_get_main_queue(), ^{ [owner consumeBrowser:browserID payload:copy]; });
+    if (length == 0 || length > 2 * 1024 * 1024 + 4096) { StreamOverflow(observer, owner); return; }
+
+    // Bound ingress before allocating a payload or scheduling a main-queue block.
+    unsigned pending = observer->ingress.load();
+    do {
+        if (pending >= 3) { StreamOverflow(observer, owner); return; }
+    } while (!observer->ingress.compare_exchange_weak(pending, pending + 1));
+    NSData *copy = [NSData dataWithBytes:payload length:length];
+    if (copy == nil) { observer->ingress.fetch_sub(1); StreamOverflow(observer, owner); return; }
+    observer->api.base.add_ref(&observer->api.base);
+    const int browserID = observer->browserID;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [owner consumeBrowser:browserID payload:copy];
+        observer->ingress.fetch_sub(1);
+        observer->api.base.release(&observer->api.base);
+    });
 }
 
 static BOOL StreamJSONNumber(id value) {
@@ -81,10 +106,16 @@ static BOOL StreamJSONNumber(id value) {
 
 @implementation CEFHostedStreamProbe
 
-- (instancetype)initWithBridge:(CEFBridge *)bridge epoch:(uint64_t)epoch identity:(BOOL (^)(void))identity {
+- (instancetype)initWithBridge:(CEFBridge *)bridge
+                         epoch:(uint64_t)epoch
+                         width:(double)width
+                        height:(double)height
+                      identity:(BOOL (^)(void))identity {
     if ((self = [super init])) {
         _bridge = bridge;
         _epoch = epoch;
+        _expectedWidth = width;
+        _expectedHeight = height;
         _identity = [identity copy];
         if (_identity == nil) { _identity = ^BOOL { return NO; }; }
         _pending = dispatch_group_create();
@@ -98,7 +129,9 @@ static BOOL StreamJSONNumber(id value) {
     NSDictionary *env = NSProcessInfo.processInfo.environment;
     if (_started || _stopping || ![env[@"GITHUB_ACTIONS"] isEqualToString:@"true"] ||
         ![env[@"RUNNER_OS"] isEqualToString:@"macOS"] || ![env[@"KELPIE_HOSTED_RUNTIME"] isEqualToString:@"1"] ||
-        ![env[@"KELPIE_CEF_STREAM_TEST"] isEqualToString:@"1"] || !_identity()) {
+        ![env[@"KELPIE_CEF_STREAM_TEST"] isEqualToString:@"1"] || !_identity() ||
+        !std::isfinite(_expectedWidth) || !std::isfinite(_expectedHeight) ||
+        _expectedWidth <= 0 || _expectedHeight <= 0 || _expectedWidth > 8192 || _expectedHeight > 8192) {
         completion(NO);
         return;
     }
@@ -112,6 +145,7 @@ static BOOL StreamJSONNumber(id value) {
     }
     _observer = new HostedStreamObserver();
     _observer->owner = self;
+    _observer->browserID = _browserID;
     _observer->api.base.size = sizeof(_observer->api);
     _observer->api.base.add_ref = StreamAddRef;
     _observer->api.base.release = StreamRelease;
@@ -150,16 +184,29 @@ static BOOL StreamJSONNumber(id value) {
     if (![event isKindOfClass:NSDictionary.class]) { _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return; }
     id number = event[@"sessionId"];
     id data = event[@"data"];
-    id timestamp = [event[@"metadata"] isKindOfClass:NSDictionary.class] ? event[@"metadata"][@"timestamp"] : nil;
+    NSDictionary *metadata = [event[@"metadata"] isKindOfClass:NSDictionary.class] ? event[@"metadata"] : nil;
+    id timestamp = metadata[@"timestamp"];
     const double session = StreamJSONNumber(number) ? [number doubleValue] : 0;
     const double protocolMs = StreamJSONNumber(timestamp) ? [timestamp doubleValue] * 1000 : NAN;
     if (!std::isfinite(session) || session < 1 || session > INT_MAX || floor(session) != session ||
         ![data isKindOfClass:NSString.class]) {
         _fence->invalidate(); [self stopWithCompletion:^(BOOL) {}]; return;
     }
+    BOOL coherentMetadata = YES;
+    const NSArray<NSString *> *fields = @[@"deviceWidth", @"deviceHeight", @"pageScaleFactor",
+                                           @"scrollOffsetX", @"scrollOffsetY", @"offsetTop"];
+    const double expected[] = {_expectedWidth, _expectedHeight, 1, 0, 0, 0};
+    for (NSUInteger index = 0; index < fields.count; ++index) {
+        id value = metadata[fields[index]];
+        if (!StreamJSONNumber(value) || !std::isfinite([value doubleValue]) ||
+            std::abs([value doubleValue] - expected[index]) > 0.01) {
+            coherentMetadata = NO;
+            break;
+        }
+    }
     uint64_t token = 0;
     const auto decision = _fence->admit(browser, _epoch, static_cast<int>(session),
-        NSProcessInfo.processInfo.systemUptime * 1000, protocolMs, [data length], _identity(), &token);
+        NSProcessInfo.processInfo.systemUptime * 1000, protocolMs, [data length], _identity() && coherentMetadata, &token);
     if (decision == CEFHostedStreamFence::Decision::reject) { return; }
     dispatch_group_enter(_pending);
     CEFBridgeSendBrowserControlCommand(_host, @"Page.screencastFrameAck", @{@"sessionId": number},
@@ -180,6 +227,11 @@ static BOOL StreamJSONNumber(id value) {
             dispatch_group_leave(self->_pending);
         });
     });
+}
+
+- (void)ingressOverflow {
+    if (_fence) { _fence->invalidate(); }
+    [self stopWithCompletion:^(BOOL) {}];
 }
 
 - (void)agentDetached {

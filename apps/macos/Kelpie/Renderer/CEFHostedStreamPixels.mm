@@ -1,6 +1,6 @@
 #import "CEFHostedStreamPixels.h"
 
-#if defined(KELPIE_HOSTED_STREAM_TEST)
+#if defined(DEBUG) && defined(KELPIE_HOSTED_STREAM_TEST)
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 

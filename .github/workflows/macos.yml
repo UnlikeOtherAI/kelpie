@@ -128,9 +128,9 @@ jobs:
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
             elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" ]]; then
-              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_STREAM_TEST=1' \
-                'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) KELPIE_HOSTED_STREAM_TEST' \
-                'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
+                'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
+                'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
             else
               xcodebuild "$@"
             fi
@@ -160,7 +160,7 @@ jobs:
           xcrun clang++ -std=c++17 -Wall -Wextra -Werror tests/macos/cef-stream-fence.test.cpp -o .cache/macos-ci/cef-stream-fence
           .cache/macos-ci/cef-stream-fence
           xcrun clang++ -std=c++17 -fobjc-arc -fblocks -Wall -Wextra -Werror \
-            -DKELPIE_HOSTED_STREAM_TEST=1 -DKELPIE_HOSTED_STREAM_MOCK=1 -I tests/macos \
+            -DDEBUG=1 -DKELPIE_HOSTED_STREAM_TEST=1 -DKELPIE_HOSTED_STREAM_MOCK=1 -I tests/macos \
             -framework AppKit -framework Foundation -framework ImageIO -framework CoreGraphics \
             tests/macos/cef-stream-probe.test.mm apps/macos/Kelpie/Renderer/CEFHostedStreamProbe.mm \
             apps/macos/Kelpie/Renderer/CEFHostedStreamPixels.mm -o .cache/macos-ci/cef-stream-probe
@@ -211,9 +211,9 @@ jobs:
             if [[ "${{ inputs.runtime_scope }}" == "cef-pump-compare" ]]; then
               xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_PUMP_TEST=1' "$@"
             elif [[ "${{ inputs.runtime_scope }}" == "cef-stream" ]]; then
-              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) KELPIE_HOSTED_STREAM_TEST=1' \
-                'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) KELPIE_HOSTED_STREAM_TEST' \
-                'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
+              xcodebuild 'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) DEBUG=1 KELPIE_HOSTED_STREAM_TEST=1' \
+                'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG KELPIE_HOSTED_STREAM_TEST' \
+                'OTHER_SWIFT_FLAGS=$(inherited) -Xcc -DDEBUG=1 -Xcc -DKELPIE_HOSTED_STREAM_TEST=1' "$@"
             else
               xcodebuild "$@"
             fi

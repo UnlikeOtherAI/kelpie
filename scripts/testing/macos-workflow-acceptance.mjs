@@ -46,8 +46,10 @@ const report={source,scope,pumpMode,platform:process.platform,
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
 const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[],cefPumpSignals=[],streamSignals=[];
 report.streamSignals=streamSignals;
+if(scope==="cef-stream")fixture=await startFixture();
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],
- env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:scope==="cef-stream"?"1":"0"}});
+ env:{...process.env,NSUnbufferedIO:"YES",KELPIE_CEF_STREAM_TEST:scope==="cef-stream"?"1":"0",
+  KELPIE_CEF_STREAM_ORIGIN:fixture?.url??""}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
  const decoder=new StringDecoder("utf8");let text="";
@@ -76,7 +78,7 @@ try{
  report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
- fixture=await startFixture();
+ fixture??=await startFixture();
  const failures=[];
  async function independent(name,operation){
   phase=name;

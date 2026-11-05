@@ -12,6 +12,7 @@ static cef_registration_t registration{};
 static cef_dev_tools_message_observer_t *observer = nullptr;
 static int acknowledgements = 0;
 static int stops = 0;
+static int eventWidth = 100;
 static BOOL holdAck = NO;
 static void (^heldAck)(BOOL, NSDictionary *) = nil;
 static void addRef(cef_base_ref_counted_t *) {}
@@ -53,7 +54,8 @@ static NSData *redPNG() {
 }
 static void emitFrame(cef_browser_t *target = &browser, cef_dev_tools_message_observer_t *destination = observer) {
     NSString *encoded = [redPNG() base64EncodedStringWithOptions:0];
-    NSData *json = [NSJSONSerialization dataWithJSONObject:@{@"sessionId": @8, @"metadata": @{@"timestamp": @1.25}, @"data": encoded} options:0 error:nil];
+    NSData *json = [NSJSONSerialization dataWithJSONObject:@{@"sessionId": @8, @"metadata": @{@"timestamp": @1.25, @"deviceWidth": @(eventWidth), @"deviceHeight": @100,
+        @"pageScaleFactor": @1, @"scrollOffsetX": @0, @"scrollOffsetY": @0, @"offsetTop": @0}, @"data": encoded} options:0 error:nil];
     NSString *event = @"Page.screencastFrame";
     std::u16string methodText(event.length, 0);
     [event getCharacters:reinterpret_cast<unichar *>(methodText.data()) range:NSMakeRange(0,event.length)];
@@ -67,7 +69,7 @@ int main() {
         host.base.add_ref = addRef; host.base.release = releaseRef;
         host.add_dev_tools_message_observer = registerObserver;
         CEFBridge *bridge = [CEFBridge new];
-        CEFHostedStreamProbe *probe = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:123 identity:^BOOL { return YES; }];
+        CEFHostedStreamProbe *probe = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:123 width:100 height:100 identity:^BOOL { return YES; }];
         [probe startWithCompletion:^(BOOL started) {
             assert(started);
             auto *lateObserver = observer;
@@ -84,7 +86,7 @@ int main() {
                     assert(samples.count == 1 && [samples[0][@"x"] intValue] >= 28);
                     assert([probe sealAfterAudit:YES] == nil);
                     __block BOOL identity = YES;
-                    CEFHostedStreamProbe *second = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:124 identity:^BOOL { return identity; }];
+                    CEFHostedStreamProbe *second = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:124 width:100 height:100 identity:^BOOL { return identity; }];
                     holdAck = YES;
                     [second startWithCompletion:^(BOOL secondStarted) {
                         assert(secondStarted);
@@ -97,15 +99,37 @@ int main() {
                                 assert(secondStopped && [second sealAfterAudit:YES] == nil);
                                 assert(acknowledgements == 2 && stops == 2);
                                 holdAck = NO;
-                                CEFHostedStreamProbe *third = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:125 identity:^BOOL { return YES; }];
+                                CEFHostedStreamProbe *third = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:125 width:100 height:100 identity:^BOOL { return YES; }];
                                 [third startWithCompletion:^(BOOL thirdStarted) {
                                     assert(thirdStarted);
                                     observer->on_dev_tools_agent_detached(observer, &browser);
                                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
                                         [third stopWithCompletion:^(BOOL) {
                                             assert([third sealAfterAudit:YES] == nil && stops == 3);
-                                            puts("PASS: ACK, bounded decode, late events, delayed retirement, stale identity and detach");
-                                            exit(0);
+                                            CEFHostedStreamProbe *fourth = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:126 width:100 height:100 identity:^BOOL { return YES; }];
+                                            [fourth startWithCompletion:^(BOOL fourthStarted) {
+                                                assert(fourthStarted);
+                                                eventWidth = 101;
+                                                emitFrame();
+                                                dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                    [fourth stopWithCompletion:^(BOOL) {
+                                                        assert([fourth sealAfterAudit:YES] == nil && stops == 4 && acknowledgements == 3);
+                                                        eventWidth = 100;
+                                                        CEFHostedStreamProbe *fifth = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:127 width:100 height:100 identity:^BOOL { return YES; }];
+                                                        [fifth startWithCompletion:^(BOOL fifthStarted) {
+                                                            assert(fifthStarted);
+                                                            emitFrame(); emitFrame(); emitFrame(); emitFrame();
+                                                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,100 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                [fifth stopWithCompletion:^(BOOL) {
+                                                                    assert([fifth sealAfterAudit:YES] == nil && stops == 5);
+                                                                    puts("PASS: ACK, bounded ingress/decode, metadata, late events, retirement, identity and detach");
+                                                                    exit(0);
+                                                                }];
+                                                            });
+                                                        }];
+                                                    }];
+                                                });
+                                            }];
                                         }];
                                     });
                                 }];

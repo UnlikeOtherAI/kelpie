@@ -17,7 +17,7 @@ final class ScriptCapture {
     private var frames: [(URL, Double)] = []
     private var writer: ScriptVideoWriter?
     private var frameTask: Task<Void, Never>?
-    #if KELPIE_HOSTED_STREAM_TEST
+    #if DEBUG && KELPIE_HOSTED_STREAM_TEST
     private var streamDiagnostic: ScriptHostedStreamDiagnostic?
     #endif
     private var sampling = false
@@ -62,7 +62,7 @@ final class ScriptCapture {
 
     func start() async throws {
         started = ProcessInfo.processInfo.systemUptime
-        #if KELPIE_HOSTED_STREAM_TEST
+        #if DEBUG && KELPIE_HOSTED_STREAM_TEST
         if hasMovies, fps == 30, ScriptHostedStreamDiagnostic.requested {
             let diagnostic = try await ScriptHostedStreamDiagnostic(tab: tab)
             try await diagnostic.start()
@@ -142,7 +142,7 @@ final class ScriptCapture {
         stopSampling()
         await frameTask?.value
         frameTask = nil
-        #if KELPIE_HOSTED_STREAM_TEST
+        #if DEBUG && KELPIE_HOSTED_STREAM_TEST
         await streamDiagnostic?.finish(allowed: !partial && !discard && failure == nil)
         streamDiagnostic = nil
         #endif
