@@ -29,3 +29,8 @@ export function editFocusSignal(line){
  const match=/^\[WorkflowEditFocus\] phase=(before|after|result) key=([01u]) responder=([01u]) doc=([01u]) body=([01u]) target=([01u])$/.exec(line);
  return match?{phase:match[1],key:match[2],responder:match[3],documentFocused:match[4],activeBody:match[5],targetFocused:match[6]}:null;
 }
+
+// The hosted driver launches this exact executable with these exact arguments.
+export function processCommandMatches(command,executable){
+ return typeof command==="string"&&typeof executable==="string"&&command.trim()===executable+" --port 28420";
+}
