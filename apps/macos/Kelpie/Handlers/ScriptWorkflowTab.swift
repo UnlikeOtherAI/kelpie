@@ -125,6 +125,10 @@ final class ScriptWorkflowTab {
         let value: Any?
         var evaluationStarted = false
         var valueReturned = false
+        var documentAccepted = false
+        func observeDocumentChange(_ value: Any?) {
+            if before != document, !documentAccepted { documentAccepted = acceptChangedDocument?(value) == true }
+        }
         do {
             value = try await ScriptRendererDeadline.run(
                 renderer: renderer,
@@ -137,6 +141,7 @@ final class ScriptWorkflowTab {
                     evaluationStarted = true
                     let result = try await renderer.evaluateBrowserControlJS(expression)
                     consume?(result)
+                    observeDocumentChange(result)
                     valueReturned = true
                     return result
                 }
@@ -145,11 +150,14 @@ final class ScriptWorkflowTab {
             if evaluationStarted, !valueReturned { uncertain?() }
             throw error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates)
         }
+        observeDocumentChange(value)
         do { try await check() } catch {
+            observeDocumentChange(value)
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates)
         }
+        observeDocumentChange(value)
         if before != document {
-            guard acceptChangedDocument?(value) == true else {
+            guard documentAccepted else {
                 throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
             }
         }
@@ -203,42 +211,61 @@ final class ScriptWorkflowTab {
         guard let result = try await fixed(
             expression,
             mutates: dispatch || edit != nil,
-            consume: { value in Self.consumeTargetResult(value, mutates: dispatch || edit != nil, consume: consume, uncertain: uncertain) },
+            consume: { value in
+                Self.consumeTargetResult(
+                    value,
+                    mutates: dispatch || edit != nil,
+                    expectedToken: token,
+                    consume: consume,
+                    uncertain: uncertain
+                )
+            },
             uncertain: uncertain,
             acceptChangedDocument: { value in
-                allowFinalMutationDocumentChange && Self.acceptAcknowledgedDocumentChange(
-                    value, editing: edit != nil, uncertain: uncertain
-                )
+                guard allowFinalMutationDocumentChange, let token else { return false }
+                return Self.acceptAcknowledgedDocumentChange(value, token: token, editing: edit != nil, uncertain: uncertain)
             }
         ) as? Body else {
             uncertain?()
             throw ScriptWorkflowFailure(dispatch || edit != nil ? "INPUT_UNCERTAIN" : "TARGET_FAILED",
                                         mayHaveCompleted: dispatch || edit != nil)
         }
+        if dispatch || edit != nil, result["ok"] as? Bool == true,
+           let token, result["token"] as? String != token {
+            throw ScriptWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
         return result
     }
 
     static func acceptAcknowledgedDocumentChange(
-        _ value: Any?, editing: Bool, uncertain: (@MainActor () -> Void)?
+        _ value: Any?, token: String, editing: Bool, uncertain: (@MainActor () -> Void)?
     ) -> Bool {
-        guard isAcknowledgedMutation(value) else { return false }
+        guard isAcknowledgedMutation(value, token: token) else { return false }
         // A changed realm makes subsequent edit privacy classification unknown.
         if editing { uncertain?() }
         return true
     }
 
-    static func isAcknowledgedMutation(_ value: Any?) -> Bool {
+    static func isAcknowledgedMutation(_ value: Any?, token: String) -> Bool {
         guard let body = value as? Body else { return false }
-        return body["ok"] as? Bool == true && body["error"] == nil && body["mayHaveCompleted"] as? Bool == true &&
+        return body["token"] as? String == token && body["ok"] as? Bool == true && body["error"] == nil &&
+            body["mayHaveCompleted"] as? Bool == true &&
             body["sensitive"] is Bool && body["sensitivityKnown"] is Bool
     }
 
     /// A malformed callback is uncertain before any subsequent authority or document guard.
     static func consumeTargetResult(
-        _ value: Any?, mutates: Bool = false, consume: (@MainActor (Body) -> Void)?, uncertain: (@MainActor () -> Void)?
+        _ value: Any?,
+        mutates: Bool = false,
+        expectedToken: String? = nil,
+        consume: (@MainActor (Body) -> Void)?,
+        uncertain: (@MainActor () -> Void)?
     ) {
         guard let body = value as? Body else { uncertain?(); return }
         consume?(body)
+        if mutates, body["ok"] as? Bool == true, let expectedToken, body["token"] as? String != expectedToken {
+            uncertain?()
+        }
         let invalidStatus = body["ok"] as? Bool == true
             ? body["error"] != nil || body["mayHaveCompleted"] as? Bool != true
             : !(body["error"] is String)

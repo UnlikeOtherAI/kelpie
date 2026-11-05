@@ -147,22 +147,29 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
 
     @MainActor
     func testFinalPacedAckDistinguishesUnknownPrivacyFromLostCallback() throws {
-        let known: Body = ["ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": true]
-        let unknown: Body = ["ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]
-        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(known))
-        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown))
+        let known: Body = ["token": "expected", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": true]
+        let unknown: Body = ["token": "expected", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(known, token: "expected"))
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown, token: "expected"))
         var uncertaintyCount = 0
-        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, editing: false) { uncertaintyCount += 1 })
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "expected", editing: false) { uncertaintyCount += 1 })
         XCTAssertEqual(uncertaintyCount, 0)
-        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, editing: true) { uncertaintyCount += 1 })
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "expected", editing: true) { uncertaintyCount += 1 })
         XCTAssertEqual(uncertaintyCount, 1)
-        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(nil, editing: false) { uncertaintyCount += 1 })
+        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(nil, token: "expected", editing: false) { uncertaintyCount += 1 })
         XCTAssertEqual(uncertaintyCount, 1)
+        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "other", editing: true) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
+        let mismatched = ScriptWorkflowPrivacy(secrets: [], captures: true)
+        ScriptWorkflowTab.consumeTargetResult(known, mutates: true, expectedToken: "other",
+            consume: { mismatched.consume($0, text: "full literal") }, uncertain: { mismatched.uncertain(text: "full literal") })
+        XCTAssertEqual(mismatched.secrets, ["full literal"])
+        XCTAssertTrue(mismatched.discardMedia)
         for malformed: Any? in [nil, "missing", [:], ["ok": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": false, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": true, "error": "bad", "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": true, "mayHaveCompleted": false, "sensitive": false, "sensitivityKnown": true]] {
-            XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(malformed))
+            XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(malformed, token: "expected"))
         }
         try ScriptWorkflowActions.requirePacedAckShape(known)
         try ScriptWorkflowActions.requirePacedAckShape(unknown)
