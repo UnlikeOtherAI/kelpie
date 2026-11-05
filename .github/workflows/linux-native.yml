@@ -332,11 +332,15 @@ jobs:
           path: |
             dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
             dist/release/${{ matrix.distro.name }}/installed-smoke/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/*.json
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/capture/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.log
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/count-mismatch.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/count-mismatch.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/*.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/capture/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.log

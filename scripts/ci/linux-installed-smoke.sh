@@ -117,9 +117,7 @@ if run tests/linux/verify-native-replay.mjs "$output/capture" > "$output/native-
   :
 else
   media_status=$?
-  if [[ "${KELPIE_LINUX_RESOURCE_DIAGNOSTIC:-}" == 1 ]]; then
-    run tests/linux/diagnose-media-count.mjs "$output/capture" > "$output/media-diagnostic.log" 2>&1 || true
-  fi
+  run tests/linux/diagnose-media-count.mjs "$output/capture" --synthetic-fixture > "$output/media-diagnostic.log" 2>&1 || true
   exit "$media_status"
 fi
 stage=public-cli
