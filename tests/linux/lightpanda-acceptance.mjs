@@ -151,6 +151,9 @@ try {
     assert.equal(report.hiddenAdversariesInstalled, true);
     assert.equal(privateCanaryDetected, false);
     if (kind === "snapshot") {
+      for (const hidden of ["HIDDEN_ATTRIBUTE_LP", "HIDDEN_DISPLAY_LP", "HIDDEN_INHERITED_LP"])
+        assert.ok(!serialized.includes(hidden), "Snapshot included hidden public text");
+      assert.deepEqual(value.elements.slice(0, 10).map(element => element.name), ["Confirm order", "Duplicate action", "Duplicate action", "Disabled action", "Covered action", "Remove blocking overlay", "Moving action", "Start moving target", "Stop moving target", "Details"]);
       assert.ok(value.elements.some(el => el.name === "Confirm order"));
       assert.equal(value.elements.length, 20); assert.equal(value.truncated, true);
       assert.ok(value.text.length <= 8000 && value.elements.every(el => el.ref.startsWith("lp-audit-a-")));
@@ -165,7 +168,11 @@ try {
     const value = await evaluate(page, "(" + fixedObservationExpression("snapshot", {
       scope: "#catalogue", prefix: "lp-audit-b-", maxElements: 20, maxChars: 8000, prioritize: true,
     }) + ").snapshot");
-    assert.ok(!JSON.stringify(value).includes("CAPTURE_SECRET_"));
+    const serialized = JSON.stringify(value);
+    assert.ok(!serialized.includes("CAPTURE_SECRET_"));
+    for (const hidden of ["HIDDEN_ATTRIBUTE_LP", "HIDDEN_DISPLAY_LP", "HIDDEN_INHERITED_LP"])
+      assert.ok(!serialized.includes(hidden), "Scoped snapshot included hidden public text");
+    assert.ok(!value.elements.some(element => element.name === "Confirm order"), "Snapshot escaped its catalogue scope");
     for (const name of ["Available products", "Green tea", "Black tea"])
       assert.ok(value.elements.some(element => element.name === name), name);
     assert.equal(value.elements.filter(element => element.role === "link" && element.name === "Details").length, 2);
