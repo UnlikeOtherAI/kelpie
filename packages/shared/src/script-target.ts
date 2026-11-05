@@ -223,6 +223,13 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     entry.url === location.href && unchangedViewport() &&
     eligible(entry.element) && !isLimited() && unchangedGeometry() && document.elementFromPoint(entry.x, entry.y) === hit &&
     !(sensitivity() && policy?.refuseSensitive);
+  // Final page handlers may synchronously replace the target or document. The
+  // mutation has already been sent, so preserve uncertainty and sensitivity.
+  const postDispatchValid = (): boolean => {
+    sensitivity();
+    return entry.element.isConnected && hit.isConnected && entry.document === document &&
+      entry.url === location.href;
+  };
   if (observe && (dispatch || edit)) return fail("INVALID_TARGET_OPERATION");
   if (edit) {
     const el = entry.element;
@@ -237,6 +244,8 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       if (!descriptor?.set) return fail("INPUT_UNCERTAIN", true);
       descriptor.set.call(el, edit.action === "fill" ? edit.text : el.value + edit.text);
       el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: edit.text }));
+      if (!postDispatchValid()) return fail("INPUT_UNCERTAIN", true);
+      if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }
   if (dispatch) {
@@ -252,6 +261,8 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("mouseup", { ...options, buttons: 0 }));
       if (!unchanged()) return fail("INPUT_UNCERTAIN", true);
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
+      if (!postDispatchValid()) return fail("INPUT_UNCERTAIN", true);
+      if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }
   return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: sensitivity(), sensitivityKnown: true, viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };

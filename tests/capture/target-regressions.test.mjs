@@ -244,3 +244,35 @@ test("known false requires the original classified target entry", () => {
   assert.equal(newRealm.sensitive, false);
   assert.equal(newRealm.sensitivityKnown, false);
 });
+
+for (const action of ["click","input"]) for (const mutation of ["url","replace"]) {
+  test("final "+action+" handler "+mutation+" reports uncertain without retry",()=>{
+    const f=fixture(action==="input"?new Input():new Element());
+    f.element.onEvent=event=>{
+      if(event.type!==action)return;
+      if(action==="input")f.element.autocomplete="current-password";
+      if(mutation==="url")globalThis.location.href="https://fixture.test/after";
+      else {f.element.isConnected=false;const replacement=new Element();f.setHit(replacement);}
+    };
+    const first=resolveScriptTarget({selector:"#target"},"post-dispatch");
+    const result=action==="click"
+      ?resolveScriptTarget({selector:"#target"},"post-dispatch",first.token,true)
+      :resolveScriptTarget({selector:"#target"},"post-dispatch",first.token,false,
+        {action:"fill",text:"SYNTHETIC_POST_INPUT"},false,{refuseSensitive:true});
+    assert.equal(result.ok,false);assert.equal(result.error,"INPUT_UNCERTAIN");
+    assert.equal(result.mayHaveCompleted,true);assert.equal(result.sensitivityKnown,true);
+    if(action==="input")assert.equal(result.sensitive,true);
+    assert.equal(f.element.events.filter(event=>event===action).length,1);
+  });
+}
+test("post-input sensitive classification refuses capture but permits ordinary no-capture result",()=>{
+  for(const capture of [true,false]){
+    const f=fixture(new Input());f.element.onEvent=event=>{if(event.type==="input")f.element.autocomplete="current-password";};
+    const first=resolveScriptTarget({selector:"#target"},"post-sensitive");
+    const result=resolveScriptTarget({selector:"#target"},"post-sensitive",first.token,false,
+      {action:"fill",text:"SYNTHETIC_POST_INPUT"},false,{refuseSensitive:capture});
+    assert.equal(result.sensitive,true);assert.equal(result.sensitivityKnown,true);
+    assert.equal(result.ok,!capture);
+    if(capture){assert.equal(result.error,"SENSITIVE_CAPTURE_REFUSED");assert.equal(result.mayHaveCompleted,true);}
+  }
+});
