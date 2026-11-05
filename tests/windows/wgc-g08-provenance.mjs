@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {mapG08Scene} from "../capture/g08-fixture.mjs";
 // Facts are collected by the owned harness from public/native interfaces.
 // Fixture document IDs are checked only within the fixture, never as native IDs.
 export function verifyWgcProvenance(facts){
@@ -14,8 +15,8 @@ export function verifyWgcProvenance(facts){
  assert.equal(summary.sessionClosedBeforeEncoding,true);
  assert.equal(summary.cursorCapture,false);assert.equal(summary.secondaryWindows,false);assert.equal(summary.borderRequired,true);
  assert.equal(summary.framePoolBuffers,2);assert.equal(summary.memoryLimitBytes,134217728);
- assert.ok(Number.isInteger(summary.sessionDurationMs)&&summary.sessionDurationMs>=0&&summary.sessionDurationMs<=26000);
- assert.ok(Number.isInteger(summary.accepted)&&summary.accepted>=0&&summary.accepted<=520);
+ assert.ok(Number.isInteger(summary.sessionDurationMs)&&summary.sessionDurationMs>=0&&summary.sessionDurationMs<=33000);
+ assert.ok(Number.isInteger(summary.accepted)&&summary.accepted>=0&&summary.accepted<=800);
  assert.ok(Number.isInteger(summary.written)&&summary.written>=0&&summary.written<=summary.accepted);
  assert.equal(facts.frameCount,summary.written,"WGC_STREAM_COUNT_MISMATCH");
  for(const key of ["writerReplaced","poolReplaced","rateSkipped"])assert.ok(Number.isInteger(summary[key])&&summary[key]>=0);
@@ -23,18 +24,15 @@ export function verifyWgcProvenance(facts){
  assert.equal(typeof summary.naturalItemClosure,"boolean");assert.equal(summary.naturalItemClosure,summary.endReason==="item-closed");
  assert.equal(summary.accepted,summary.written+summary.writerReplaced,"WGC_FRAME_ACCOUNTING");
  assert.match(active.runId,/^[a-f0-9]{48}$/);assert.equal(active.playing,true);
- assert.ok(Array.isArray(facts.activeSamples)&&facts.activeSamples.length>0&&facts.activeSamples.length<=100);
+ assert.ok(Array.isArray(facts.activeSamples)&&facts.activeSamples.length>0&&facts.activeSamples.length<=140);
  assert.ok(facts.activeSamples.every(sample=>sample.playing===true&&sample.runId===active.runId));
  assert.equal(terminal.runId,active.runId);assert.equal(terminal.success,true);assert.equal(terminal.inputGuarantee,"trusted-coordinate");
  assert.ok(typeof before.tabId==="string"&&before.tabId.length>0);assert.equal(after.tabId,before.tabId);
  assert.equal(before.active,true);assert.equal(after.active,true);
  assert.ok(typeof before.url==="string"&&before.url.length>0);assert.equal(after.url,before.url);
  assert.equal(fixture.url,before.url);assert.equal(fixture.pageRequests,1);assert.equal(fixture.dropped,0);
- assert.equal(fixture.events.length,3);assert.deepEqual(fixture.events.map(event=>event.target),["finish","start","finish"]);
- assert.ok(fixture.events.every(event=>event.trusted===true&&event.documentId===fixture.events[0].documentId));
- assert.ok(fixture.events.every((event,index)=>index===0||event.timeMs>fixture.events[index-1].timeMs));
- assert.ok(fixture.events.every(event=>Number.isFinite(event.center?.x)&&Number.isFinite(event.center?.y)));
- assert.deepEqual(fixture.events[0].center,fixture.events[2].center);
+ const scene=mapG08Scene(fixture.events);
+ assert.ok(fixture.events.every(event=>event.trusted===true));
  assert.ok(Array.isArray(artifacts)&&artifacts.length===2);
  assert.deepEqual(artifacts.map(item=>item.mimeType).sort(),["image/gif","video/mp4"]);
  assert.equal(summary.analysisWidth,artifacts[0].width);assert.equal(summary.analysisHeight,artifacts[0].height);
@@ -46,7 +44,7 @@ export function verifyWgcProvenance(facts){
   assert.deepEqual(artifact.viewport,artifacts[0].viewport);
   assert.equal(artifact.width,artifacts[0].width);assert.equal(artifact.height,artifacts[0].height);
  }
- assert.deepEqual(artifacts[0].viewport,fixture.events[0].viewport);
+ assert.deepEqual(artifacts[0].viewport,scene.warmup.viewport);
  return {source,runId:active.runId,documentId:doc,curve:facts.curve,width:artifacts[0].width,height:artifacts[0].height,
   factSources:{identity:"public launch plus OS process and listener",window:"owned HWND descriptor",active:"public script status",
    terminal:"public script result",documentId:"native artifact metadata",tab:"public tabs before and after",

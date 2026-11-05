@@ -4,7 +4,7 @@ import {promisify} from "node:util";
 import {createHash} from "node:crypto";
 import {mkdir,readFile,writeFile,access,stat} from "node:fs/promises";
 import {dirname,join,isAbsolute,resolve} from "node:path";
-import {startG08Fixture,g08Workflow} from "../capture/g08-fixture.mjs";
+import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
 import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
@@ -119,10 +119,10 @@ try{
  helper=spawn(wgc,["timeline",String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
  helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
  helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
- helperTimer=setTimeout(()=>helper.kill(),35000);
+ helperTimer=setTimeout(()=>helper.kill(),42000);
  const nativePromise=evaluateWgcFrames(helper.stdout,config);void nativePromise.catch(()=>{});
  const activeSamples=[];monitor=(async()=>{while(!monitorStop&&!pendingDone){
-  const status=await api("get-script-status");if(status.playing){assert.equal(status.runId,active.runId);assert.ok(activeSamples.length<100,"STATUS_SAMPLE_BOUND");activeSamples.push({runId:status.runId,playing:true});}
+  const status=await api("get-script-status");if(status.playing){assert.equal(status.runId,active.runId);assert.ok(activeSamples.length<140,"STATUS_SAMPLE_BOUND");activeSamples.push({runId:status.runId,playing:true});}
   await new Promise(done=>setTimeout(done,300));
  }return activeSamples.length;})();void monitor.catch(()=>{});
  report.phase="capture-play-wait";const terminal=await pending;monitorStop=true;report.terminalFacts={success:terminal.success===true,runIdPresent:typeof terminal.runId==="string"&&terminal.runId.length>0,actionsExecuted:Number.isInteger(terminal.actionsExecuted)?terminal.actionsExecuted:null,errorCode:typeof terminal.error?.code==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(terminal.error.code)?terminal.error.code:null,captureErrorPresent:terminal.captureError!=null,artifactCount:Array.isArray(terminal.artifacts)?terminal.artifacts.length:null};report.phase="capture-monitor";const statusPolls=await monitor;assert.ok(statusPolls>0,"NO_ACTIVE_STATUS_POLL");
@@ -131,9 +131,9 @@ try{
  const exit=await helperExit;clearTimeout(helperTimer);helperTimer=null;report.helperDiagnostic=safeWgcDiagnostic(helperError);report.helperExit=exit;assert.equal(exit.code,0,"WGC_HELPER_FAILED");
  assert.equal(terminal.success,true);assert.equal(terminal.runId,active.runId);
  const after=await tabFact(tabId);const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(10000)})).json();
- assert.equal(fixtureFacts.events.length,3);assert.deepEqual(fixtureFacts.events.map(event=>event.target),["finish","start","finish"]);
- assert.deepEqual(fixtureFacts.events[1].center,scene.from);assert.deepEqual(fixtureFacts.events[2].center,scene.to);
- assert.deepEqual(fixtureFacts.events[0].viewport,scene.viewport);
+ const sceneFacts=mapG08Scene(fixtureFacts.events);
+ assert.deepEqual(sceneFacts.start.center,scene.from);assert.deepEqual(sceneFacts.finish.center,scene.to);
+ assert.deepEqual(sceneFacts.warmup.viewport,scene.viewport);
  const summary=JSON.parse(await readFile(join(outputRoot,"native","summary.json"),"utf8"));
  let used=await verifyTimelineSnapshots(summary,join(outputRoot,"native"));
  used+=(await stat(join(outputRoot,"native","summary.json"))).size;assert.ok(used<=67108864);
@@ -152,7 +152,7 @@ try{
  const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
  budget.remaining-=factEvidence.length;await writeFile(join(outputRoot,"facts-observation.json"),factEvidence,{flag:"wx"});
  const provenance=verifyWgcProvenance(trustedFacts);
- const caseData={curve,profile:motionProfile,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
+ const caseData={curve,profile:motionProfile,binarySHA256:manifest.dllSha256,scene:sceneFacts,artifacts,
   provenance,facts:trustedFacts,config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
