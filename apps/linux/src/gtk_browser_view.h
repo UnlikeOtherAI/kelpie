@@ -1,5 +1,5 @@
 #pragma once
-#include <string>
+#include "script_marker_anchor.h"
 
 #if KELPIE_LINUX_HAS_GTK
 #include <gtk/gtk.h>
@@ -25,9 +25,7 @@ class GtkBrowserView {
   GtkWidget* label_ = nullptr;
   GtkWidget* stop_ = nullptr;
   bool attached_ = false;
-  std::string marker_anchor_;
-  int marker_x_=0, marker_y_=0, marker_width_=0, marker_height_=0, marker_scale_=0;
-  int marker_frame_width_=0, marker_frame_height_=0;
+  ScriptMarkerAnchor marker_anchor_;
 #if KELPIE_LINUX_HAS_GTK
   void ConnectKeyboard();
   GtkIMContext* input_ = nullptr;

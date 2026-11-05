@@ -108,15 +108,13 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
                            marker.value("actionIndex",-1)}).dump();
                          const bool detached=shown.value("detachedMarker",false);
                          if (!detached && valid_frame && origin && width>0 && height>0 && scale>0) {
-                           self->marker_anchor_=identity; self->marker_x_=x; self->marker_y_=y;
-                           self->marker_width_=width; self->marker_height_=height; self->marker_scale_=scale;
-                           self->marker_frame_width_=frame.width; self->marker_frame_height_=frame.height;
-                         } else if (detached && (!valid_frame || !origin || self->marker_anchor_!=identity ||
-                             self->marker_x_!=x || self->marker_y_!=y || self->marker_width_!=width ||
-                             self->marker_height_!=height || self->marker_scale_!=scale ||
-                             self->marker_frame_width_!=frame.width || self->marker_frame_height_!=frame.height)) {
+                           self->marker_anchor_.Observe(identity,{x,y,width,height,scale,frame.width,frame.height});
+                         } else if (!detached) {
+                           self->marker_anchor_.Clear();
+                         } else if (detached && (!valid_frame || !origin ||
+                             !self->marker_anchor_.Matches(identity,{x,y,width,height,scale,frame.width,frame.height}))) {
                            self->app_.RetireDetachedScriptMarker(shown.value("_presentationRevision",std::uint64_t{}));
-                           shown.erase("marker"); self->marker_anchor_.clear();
+                           shown.erase("marker"); self->marker_anchor_.Clear();
                          }
                        }
                        CompositeScriptFrame(self->app_, frame, std::move(shown));
