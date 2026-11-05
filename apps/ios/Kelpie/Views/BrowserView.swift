@@ -68,11 +68,12 @@ struct BrowserView: View {
         ZStack {
             VStack(spacing: 0) {
                 ConnectControls(compact: true)
-                if isPad && !serverState.isScriptRecording {
+                if isPad && !serverState.isScriptImmersive {
                     TabletTabStrip(tabStore: tabStore, appearance: chromeAppearance)
+                        .allowsHitTesting(!serverState.isScriptRecording)
                 }
 
-                if browserState.isLoading && !serverState.isScriptRecording {
+                if browserState.isLoading && !serverState.isScriptImmersive {
                     ProgressView(value: browserState.progress)
                         .progressViewStyle(.linear)
                 }
@@ -159,8 +160,9 @@ struct BrowserView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if !serverState.isScriptRecording && !showTabOverview {
+            if !serverState.isScriptImmersive && !showTabOverview {
                 bottomChrome
+                    .allowsHitTesting(!serverState.isScriptRecording)
                     .padding(.bottom, keyboardBottomInset)
                     .offset(y: keyboardBottomInset > 0 ? 0 : bottomBarSink)
                     .animation(.easeOut(duration: 0.2), value: keyboardBottomInset)
@@ -198,8 +200,8 @@ struct BrowserView: View {
         .onReceive(debugTimer) { _ in if debugOverlayEnabled { updateDebug() } }
         .onChange(of: debugOverlayEnabled) { enabled in if enabled { updateDebug() } }
         .onAppear { migrateLegacyTabletViewportSelectionIfNeeded() }
-        .ignoresSafeArea(.container, edges: serverState.isScriptRecording ? [.top, .bottom] : [])
-        .statusBarHidden(serverState.isScriptRecording)
+        .ignoresSafeArea(.container, edges: serverState.isScriptImmersive ? [.top, .bottom] : [])
+        .statusBarHidden(serverState.isScriptImmersive)
         .onChange(of: browserState.currentURL) { _ in
             externalDisplayManager.triggerSyncPass()
             updateChromeSample()

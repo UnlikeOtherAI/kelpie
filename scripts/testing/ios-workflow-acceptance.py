@@ -28,9 +28,12 @@ def selection(scope):
         marker_targets, marker_names = selection("marker")
         return geometry_targets + marker_targets, geometry_names | marker_names
     if scope == "marker":
-        names = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
-                 "testRetiredMarkerDoesNotReappearAfterTabChange"}
-        return ["KelpieUITests/WorkflowCaptureUITests/" + name for name in sorted(names)], names
+        ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
+              "testRetiredMarkerDoesNotReappearAfterTabChange",
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion"}
+        unit = {"testOnlyMovieFormatsSelectImmersiveLayout"}
+        return (["KelpieTests/IOSWorkflowPresentationModeTests"] +
+                ["KelpieUITests/WorkflowCaptureUITests/" + name for name in sorted(ui)]), ui | unit
     if scope == "keyboard":
         name = "testKeyboardGeometryForOwnedPacedCapture"
         return ["KelpieUITests/WorkflowCaptureUITests/" + name], {name}
@@ -60,14 +63,15 @@ def selection(scope):
     if scope == "full":
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
                         "KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSG08GeometryTests",
-                        "KelpieUITests/WorkflowCaptureUITests"])
+                        "KelpieTests/IOSWorkflowPresentationModeTests", "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"), Path("apps/ios/Tests/IOSCaptureViewportTests.swift"),
-                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), Path("apps/ios/Tests/IOSWorkflowPresentationModeTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
             targets.append("KelpieTests/IOSCaptureViewportTests")
             targets.append("KelpieTests/IOSG08GeometryTests")
+            targets.append("KelpieTests/IOSWorkflowPresentationModeTests")
             targets.append("KelpieTests/IOSWorkflowReceiptTests/testCanonicalMutationReceiptMatrix")
             targets.append("KelpieTests/IOSWorkflowReceiptTests/testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard")
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
@@ -90,6 +94,7 @@ def selection(scope):
                 "testLivePointerMarkerAndStopAppearDuringCapture",
                 "testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
                 "testRetiredMarkerDoesNotReappearAfterTabChange",
+                "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
@@ -118,6 +123,7 @@ def selection(scope):
         if scope == "diagnostics":
             required.update([
                 "testConstantG08GeometryBindsEverySampleToBothDocuments",
+                "testOnlyMovieFormatsSelectImmersiveLayout",
                 "testFirstCaptureRequiresInsetPropagationIncludingZoom",
                 "testProjectionUsesInsetContentOriginAndVisualViewport",
                 "testUnsettledInsetAdmissionHonorsDeadlineAndStop",

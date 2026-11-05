@@ -51,8 +51,8 @@ extension BrowserView {
             tabStore: tabStore,
             browserState: browserState,
             handlerContext: serverState.handlerContext,
-            bottomClearance: serverState.isScriptRecording ? 0 : bottomBarClearance(collapsed: bottomBarCollapsed),
-            bottomViewportInsets: serverState.isScriptRecording
+            bottomClearance: serverState.isScriptImmersive ? 0 : bottomBarClearance(collapsed: bottomBarCollapsed),
+            bottomViewportInsets: serverState.isScriptImmersive
                 ? 0...0
                 : bottomBarClearance(collapsed: true)...bottomBarClearance(collapsed: false),
             onScrollDirectionChange: { direction in
@@ -73,7 +73,7 @@ extension BrowserView {
 
     @ViewBuilder
     func stagedWebViewContainer(preset: TabletViewportPreset, stageSize: CGSize) -> some View {
-        if serverState.isScriptRecording {
+        if serverState.isScriptImmersive {
             webViewContainer
                 .frame(width: stageSize.width, height: stageSize.height)
         } else {
