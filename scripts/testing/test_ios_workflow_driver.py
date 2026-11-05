@@ -16,6 +16,33 @@ SPEC.loader.exec_module(DRIVER)
 
 
 class HostedSimulatorCleanupTests(unittest.TestCase):
+    def test_navigation_diagnostics_emit_only_known_fixed_events(self):
+        from ios_workflow_diagnostics import fixed_events
+        raw = [
+            "[WorkflowNavigationLease] invalid=unexpected-navigation-token",
+            "prefix [WorkflowNavigationLease] invalid=unexpected-navigation-token trailing",
+            "[WorkflowNavigationLease] wait-refused=awaiting-issue",
+            "[WorkflowNavigationLease] invalid=private-user-value",
+            "authorization: fixture-credential",
+        ]
+        self.assertEqual(fixed_events(raw), {
+            "invalid=unexpected-navigation-token": 2, "wait-refused=awaiting-issue": 1,
+        })
+
+    def test_navigation_selection_has_only_real_native_and_public_navigation_cases(self):
+        targets, names = DRIVER.selection("navigation")
+        self.assertEqual(len(targets), 2)
+        self.assertEqual(names, {
+            "testRealWebKitHTTPNavigationUsesIssuedToken",
+            "testRealWebKitHTTPNavigationAfterPriorBlankUsesIssuedToken",
+            "testInitialOwnedHTTPNavigationLoadsFixture",
+        })
+        _, full_names = DRIVER.selection("full")
+        self.assertTrue(names < full_names)
+        self.assertIn("testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat", full_names)
+        with self.assertRaises(ValueError):
+            DRIVER.selection("unrecognized")
+
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")

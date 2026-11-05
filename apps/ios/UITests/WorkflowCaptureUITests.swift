@@ -40,6 +40,21 @@ final class WorkflowCaptureUITests: XCTestCase {
     }
 
     @MainActor
+    func testInitialOwnedHTTPNavigationLoadsFixture() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let result = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "output", "name": "title", "source": "title"]]
+        ])
+        XCTAssertEqual(result["success"] as? Bool, true)
+        XCTAssertEqual((result["outputs"] as? Body)?["title"] as? String, "Count 0")
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = "Owned tab after real HTTP workflow navigation"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+    }
+
+    @MainActor
     func testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
