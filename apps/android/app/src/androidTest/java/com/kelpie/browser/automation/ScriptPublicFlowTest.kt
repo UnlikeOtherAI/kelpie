@@ -53,7 +53,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                 val result: JSONObject
                 try {
                     val pending = executor.submit<JSONObject> { client.call("play-script", script) }
-                    awaitRecordingUi(pending)
+                    // Sampling the animation must not wait for Compose to become idle.
                     val deadline = System.nanoTime() + 5_000_000_000L
                     while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(30)
                     Thread.sleep(550)
