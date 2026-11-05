@@ -16,24 +16,41 @@ internal class ScriptOverlayFrame private constructor(
     private val scale: Float,
 ) {
     @Suppress("DEPRECATION")
-    fun matches(): Boolean =
-        ViewFrame.capture(renderer)?.sameAs(rendererFrame) == true &&
-            ViewFrame.capture(overlay)?.sameAs(overlayFrame) == true &&
-            renderer.scrollX == scrollX &&
-            renderer.scrollY == scrollY &&
-            renderer.scale == scale
-
+    fun matches(): Boolean {
+        val currentRenderer = ViewFrame.capture(renderer)
+        val currentOverlay = ViewFrame.capture(overlay)
+        val reason =
+            when {
+                currentRenderer == null -> "RENDERER_UNAVAILABLE"
+                currentOverlay == null -> "OVERLAY_UNAVAILABLE"
+                !currentRenderer.sameAs(rendererFrame) -> "RENDERER_CHANGED"
+                !currentOverlay.sameAs(overlayFrame) -> "OVERLAY_CHANGED"
+                renderer.scrollX != scrollX || renderer.scrollY != scrollY -> "SCROLL_CHANGED"
+                renderer.scale != scale -> "SCALE_CHANGED"
+                else -> null
+            }
+        if (reason != null) {
+            scriptMarkerTrace("frame", reason)
+            if (reason == "RENDERER_CHANGED") currentRenderer?.difference(rendererFrame)?.let { scriptMarkerTrace("renderer", it) }
+            if (reason == "OVERLAY_CHANGED") currentOverlay?.difference(overlayFrame)?.let { scriptMarkerTrace("overlay", it) }
+        }
+        return reason == null
+    }
     companion object {
         @Suppress("DEPRECATION")
         fun capture(
             renderer: WebView,
             overlay: View,
         ): ScriptOverlayFrame? {
-            val rendererFrame = ViewFrame.capture(renderer) ?: return null
-            val overlayFrame = ViewFrame.capture(overlay) ?: return null
-            if (!rendererFrame.sameAs(overlayFrame)) return null
+            val rendererFrame = ViewFrame.capture(renderer) ?: run { scriptMarkerTrace("bind", "RENDERER_UNAVAILABLE"); return null }
+            val overlayFrame = ViewFrame.capture(overlay) ?: run { scriptMarkerTrace("bind", "OVERLAY_UNAVAILABLE"); return null }
+            if (!rendererFrame.sameAs(overlayFrame)) {
+                scriptMarkerTrace("bind", "FRAME_PAIR_DIFFERENT")
+                rendererFrame.difference(overlayFrame)?.let { scriptMarkerTrace("pair", it) }
+                return null
+            }
             val scale = renderer.scale
-            if (!scale.isFinite() || scale <= 0f) return null
+            if (!scale.isFinite() || scale <= 0f) { scriptMarkerTrace("bind", "SCALE_INVALID"); return null }
             return ScriptOverlayFrame(
                 renderer,
                 overlay,
@@ -56,15 +73,17 @@ private class ViewFrame(
     val screenY: Int,
     val matrix: FloatArray,
 ) {
-    fun sameAs(other: ViewFrame): Boolean =
-        root === other.root &&
-            token === other.token &&
-            width == other.width &&
-            height == other.height &&
-            screenX == other.screenX &&
-            screenY == other.screenY &&
-            matrix.contentEquals(other.matrix)
+    fun sameAs(other: ViewFrame): Boolean = difference(other) == null
 
+    fun difference(other: ViewFrame): String? =
+        when {
+            root !== other.root -> "ROOT_IDENTITY"
+            token !== other.token -> "WINDOW_IDENTITY"
+            width != other.width || height != other.height -> "SIZE"
+            screenX != other.screenX || screenY != other.screenY -> "ORIGIN"
+            !matrix.contentEquals(other.matrix) -> "TRANSFORM"
+            else -> null
+        }
     companion object {
         fun capture(view: View): ViewFrame? {
             if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) return null

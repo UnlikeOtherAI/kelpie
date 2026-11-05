@@ -348,23 +348,30 @@ class ScriptRuntime(
                         val expectedDocument = ctx.tabStore?.activeTab?.documentVersion
                         val valid: () -> Boolean = {
                             val active = ctx.tabStore?.activeTab
-                            ctx.scriptForeground &&
-                                active != null &&
-                                active.id == run.tabId &&
-                                active.webView === view &&
-                                active.documentVersion == expectedDocument &&
-                                ctx.scriptPlaybackState?.isRecording?.value != true &&
-                                view.isAttachedToWindow &&
-                                view.isShown &&
-                                view.hasWindowFocus() &&
-                                view.rootView === root &&
-                                view.windowToken === windowToken &&
-                                runCatching { authority.permitsOnMain() }.getOrDefault(false)
+                            val reason =
+                                when {
+                                    !ctx.scriptForeground -> "BACKGROUND"
+                                    active == null -> "NO_TAB"
+                                    active.id != run.tabId -> "TAB_CHANGED"
+                                    active.webView !== view -> "VIEW_CHANGED"
+                                    active.documentVersion != expectedDocument -> "DOCUMENT_CHANGED"
+                                    ctx.scriptPlaybackState?.isRecording?.value == true -> "PLAYBACK_ACTIVE"
+                                    !view.isAttachedToWindow -> "DETACHED"
+                                    !view.isShown -> "HIDDEN"
+                                    !view.hasWindowFocus() -> "WINDOW_FOCUS_LOST"
+                                    view.rootView !== root -> "ROOT_CHANGED"
+                                    view.windowToken !== windowToken -> "WINDOW_CHANGED"
+                                    !runCatching { authority.permitsOnMain() }.getOrDefault(false) -> "GRANT_REVOKED"
+                                    else -> null
+                                }
+                            if (reason != null) scriptMarkerTrace("guard", reason)
+                            reason == null
                         }
                         val retained =
                             if (windowToken != null && expectedDocument != null) {
                                 overlay.retainFinalTap(run.id, System.nanoTime(), valid)
                             } else {
+                                scriptMarkerTrace("retain", "OWNER_CONTEXT_MISSING")
                                 null
                             }
                         if (retained != null && retained.document == expectedDocument && windowToken != null) {

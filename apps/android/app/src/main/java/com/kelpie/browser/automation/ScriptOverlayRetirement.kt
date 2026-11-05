@@ -29,25 +29,35 @@ internal object ScriptOverlayRetirement {
                 try {
                     while (overlay.isRetained(retained)) {
                         val remaining = retained.deadlineNs - System.nanoTime()
-                        if (remaining <= 0) break
+                        if (remaining <= 0) { scriptMarkerTrace("poll", "EXPIRED"); break }
                         val timeoutMs = ((remaining + 999_999) / 1_000_000).coerceIn(1, 100)
-                        if (withTimeoutOrNull(timeoutMs) { authority.permits() } != true) break
+                        val permitted = withTimeoutOrNull(timeoutMs) { authority.permits() }
+                        if (permitted != true) {
+                            scriptMarkerTrace("poll", if (permitted == null) "GRANT_TIMEOUT" else "GRANT_DENIED")
+                            break
+                        }
                         val valid =
                             withContext(Dispatchers.Main.immediate) {
-                                overlay.isRetained(retained) &&
-                                    runCatching { authority.permitsOnMain() }.getOrDefault(false) &&
-                                    context.scriptForeground &&
-                                    context.tabStore?.activeTabId?.value == tabId &&
-                                    context.tabStore?.activeTab?.webView === view &&
-                                    context.tabStore?.activeTab?.documentVersion == retained.document &&
-                                    context.scriptPlaybackState?.isRecording?.value != true &&
-                                    view.isAttachedToWindow &&
-                                    view.isShown &&
-                                    view.hasWindowFocus() &&
-                                    view.rootView === root &&
-                                    view.windowToken === windowToken
+                                val reason =
+                                    when {
+                                        !overlay.isRetained(retained) -> "OWNER_CHANGED"
+                                        !runCatching { authority.permitsOnMain() }.getOrDefault(false) -> "GRANT_REVOKED"
+                                        !context.scriptForeground -> "BACKGROUND"
+                                        context.tabStore?.activeTabId?.value != tabId -> "TAB_CHANGED"
+                                        context.tabStore?.activeTab?.webView !== view -> "VIEW_CHANGED"
+                                        context.tabStore?.activeTab?.documentVersion != retained.document -> "DOCUMENT_CHANGED"
+                                        context.scriptPlaybackState?.isRecording?.value == true -> "PLAYBACK_ACTIVE"
+                                        !view.isAttachedToWindow -> "DETACHED"
+                                        !view.isShown -> "HIDDEN"
+                                        !view.hasWindowFocus() -> "WINDOW_FOCUS_LOST"
+                                        view.rootView !== root -> "ROOT_CHANGED"
+                                        view.windowToken !== windowToken -> "WINDOW_CHANGED"
+                                        else -> null
+                                    }
+                                if (reason != null) scriptMarkerTrace("pollGuard", reason)
+                                reason == null
                             }
-                        if (!valid) break
+                        if (!valid) { scriptMarkerTrace("poll", "SYNC_GUARD_FAILED"); break }
                         val delayMs = ((retained.deadlineNs - System.nanoTime()) / 1_000_000).coerceIn(1, 25)
                         delay(delayMs)
                     }

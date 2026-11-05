@@ -73,7 +73,7 @@ class ScriptOverlay {
 
     @Synchronized
     fun attach(target: View) {
-        if (view.get() !== target && retainedOwner != null) clear()
+        if (view.get() !== target && retainedOwner != null) { scriptMarkerTrace("view", "VIEW_REPLACED"); clear() }
         view = WeakReference(target)
         changed()
     }
@@ -160,7 +160,9 @@ class ScriptOverlay {
 
     @Synchronized
     fun bindRetirementFrame(target: android.webkit.WebView) {
-        markerFrame = view.get()?.let { ScriptOverlayFrame.capture(target, it) }
+        val presentation = view.get()
+        if (presentation == null) scriptMarkerTrace("bind", "OVERLAY_REFERENCE_MISSING")
+        markerFrame = presentation?.let { ScriptOverlayFrame.capture(target, it) }
     }
 
     /** Keeps only the final live tap until its original deadline; never extends it. */
@@ -170,21 +172,23 @@ class ScriptOverlay {
         now: Long,
         guard: () -> Boolean,
     ): RetainedTap? {
-        if (activeOwner != owner) return null
-        val current = tap ?: return null
-        val currentDocument = document ?: return null
-        if (markerFrame?.matches() != true || !runCatching(guard).getOrDefault(false)) return null
-        if (current.held || !current.durationMs.isFinite() || current.durationMs <= 0.0) return null
+        if (activeOwner != owner) { scriptMarkerTrace("retain", "OWNER_CHANGED"); return null }
+        val current = tap ?: run { scriptMarkerTrace("retain", "NO_TAP"); return null }
+        val currentDocument = document ?: run { scriptMarkerTrace("retain", "NO_DOCUMENT"); return null }
+        if (markerFrame?.matches() != true) { scriptMarkerTrace("retain", "FRAME_INVALID"); return null }
+        if (!runCatching(guard).getOrDefault(false)) { scriptMarkerTrace("retain", "GUARD_FAILED"); return null }
+        if (current.held || !current.durationMs.isFinite() || current.durationMs <= 0.0) { scriptMarkerTrace("retain", "TAP_INVALID"); return null }
         val deadline = current.start + (current.durationMs.coerceAtMost(5_000.0) * 1_000_000).toLong()
-        if (deadline <= now) return null
+        if (deadline <= now) { scriptMarkerTrace("retain", "EXPIRED"); return null }
         pointer = null
         commentary = null
         retainedOwner = owner
         retainedDeadlineNs = deadline
         retainedGuard = guard
+        scriptMarkerTrace("retain", "ACCEPTED")
         val retained = RetainedTap(generation, owner, currentDocument, deadline)
         val delayMs = ((deadline - now + 999_999) / 1_000_000).coerceAtLeast(1)
-        val timeout = Runnable { clearRetained(retained) }
+        val timeout = Runnable { scriptMarkerTrace("timer", "EXPIRED"); clearRetained(retained) }
         retirementTimeout = timeout
         main.postDelayed(timeout, delayMs)
         changed()
@@ -217,7 +221,10 @@ class ScriptOverlay {
 
     @Synchronized
     fun clearRetainedForView(target: View) {
-        if (view.get() === target) retainedOwner?.let(::clearOwned)
+        if (view.get() === target && retainedOwner != null) {
+            scriptMarkerTrace("view", "VIEW_LOST")
+            retainedOwner?.let(::clearOwned)
+        }
     }
 
     @Synchronized
@@ -228,16 +235,20 @@ class ScriptOverlay {
         now: Long,
         documentId: String?,
     ): Boolean {
-        if (retainedOwner != null &&
-            (
-                now >= retainedDeadlineNs ||
-                    documentId != document ||
-                    markerFrame?.matches() != true ||
-                    !runCatching { retainedGuard?.invoke() == true }.getOrDefault(false)
-            )
-        ) {
-            clear()
-            return false
+        if (retainedOwner != null) {
+            val reason =
+                when {
+                    now >= retainedDeadlineNs -> "EXPIRED"
+                    documentId != document -> "DOCUMENT_CHANGED"
+                    markerFrame?.matches() != true -> "FRAME_INVALID"
+                    !runCatching { retainedGuard?.invoke() == true }.getOrDefault(false) -> "GUARD_FAILED"
+                    else -> null
+                }
+            if (reason != null) {
+                scriptMarkerTrace("draw", reason)
+                clear()
+                return false
+            }
         }
         if (BuildConfig.DEBUG && tap != null && !markerDrawLogged) {
             markerDrawLogged = true
