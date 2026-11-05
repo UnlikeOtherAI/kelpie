@@ -62,6 +62,7 @@ def selection(scope):
                 "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+                "testLiveMarkerProjectionMatchesSameSceneTarget",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
