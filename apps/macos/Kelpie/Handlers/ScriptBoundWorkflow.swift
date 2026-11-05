@@ -34,6 +34,7 @@ struct ScriptBoundWorkflow {
                 throw ScriptWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION")
             }
             if action == "fill" || action == "type" {
+                try Self.requireSupportedEdit(step)
                 guard let value = step["text"] as? String else { throw ScriptWorkflowFailure("UNRESOLVED_INPUT") }
                 if step["sensitive"] as? Bool == true { secrets.append(value) }
             }
@@ -65,6 +66,11 @@ struct ScriptBoundWorkflow {
         } else {
             capture = nil
         }
+    }
+
+    /// Refuse paced edits until their native per-character fences are implemented.
+    static func requireSupportedEdit(_ step: Body) throws {
+        guard step["typingDelayMs"] == nil else { throw ScriptWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION") }
     }
 
     static func json(_ body: Body) -> String? {
