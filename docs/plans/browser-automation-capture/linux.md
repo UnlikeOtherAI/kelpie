@@ -638,3 +638,22 @@ The offscreen harness isolation change was then exercised against the same 0d3d
 executable with deliberately invalid inherited display and session-bus variables.
 Test revision `cb520132e3b83a3fc405cf45e109a30afa5d664c` passed 36/36 cases
 and all supplements, and removed readiness on clean exit.
+
+A further uninstrumented one-CPU G08 run of the headless-pump candidate
+(retaining the exact screenshot and five-metric fences) retained 128 C frames
+and 129 S frames across about 13 seconds, while dropping 144 and 140 cadence
+slots. The shared oracle passed S/MP4, reported S/GIF marker stuck, and found
+insufficient C/GIF marker phases and C/MP4 wobble phases. The full gate remains
+open. This candidate ELF is
+`b012335bc2f025a8c365e77317eadd3f096c5322589e6579026651b2c622ae82`;
+the test source includes the no-CEF port fix and pump candidate.
+
+Matched 1000x702 GIF and OpenH264 MP4 controls used the actual Linux production
+encoder and marker compositor, with matching requested 15 fps, 14 frames and
+3.85-second duration. With a wobble/fade history, all four clean tail frames
+contained zero thresholded red pixels in both formats. A retained two-pixel
+radius marker produced 16 GIF and eight MP4 red pixels; a fainter retained marker
+produced zero in both under the existing threshold. Therefore a 19-pixel MP4
+allowance would hide a demonstrably retained marker, and the current metric also
+cannot prove absence of a fainter marker. The strict failed result is retained
+pending a stronger validated oracle; no tolerance was relaxed.
