@@ -167,13 +167,21 @@ final class ScriptWorkflowTab {
         guard let result = try await fixed(
             expression,
             mutates: dispatch || edit != nil,
-            consume: { value in if let body = value as? Body { consume?(body) } },
+            consume: { value in Self.consumeTargetResult(value, consume: consume, uncertain: uncertain) },
             uncertain: uncertain
         ) as? Body else {
             uncertain?()
             throw ScriptWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
         }
         return result
+    }
+
+    /// A malformed callback is uncertain before any subsequent authority or document guard.
+    static func consumeTargetResult(
+        _ value: Any?, consume: (@MainActor (Body) -> Void)?, uncertain: (@MainActor () -> Void)?
+    ) {
+        guard let body = value as? Body else { uncertain?(); return }
+        consume?(body)
     }
 
     func documentIdentity() async throws -> String {
