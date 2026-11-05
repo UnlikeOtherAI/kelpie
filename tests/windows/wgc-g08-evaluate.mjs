@@ -7,7 +7,7 @@ import {evaluateG08} from "../capture/g08-timeline.mjs";
 import {createG08Retention} from "./wgc-g08-retention.mjs";
 // No caller-provided analysis is accepted. Provenance must be verified by the
 // orchestration layer before any cross-stream comparison.
-export async function evaluateWgcFrames(stream,config){
+export async function evaluateWgcFrames(stream,config,{onProgress}={}){
  assert.ok(config&&["c","s"].includes(config.curve));
  assert.ok(Number.isFinite(config.viewport?.width)&&config.viewport.width>0&&Number.isFinite(config.viewport?.height)&&config.viewport.height>0);
  const retention=createG08Retention({warmupCalibration:true,pointerMs:config.pointerMs,markerMs:config.markerMs}),samples=retention.samples;let origin,shape;
@@ -20,7 +20,7 @@ export async function evaluateWgcFrames(stream,config){
   const marker={center:{x:config.to.x*scale.x,y:config.to.y*scale.y},radius:config.radius*scale.x,color:config.color};
   const rgb=whiteBackedRGB(bgra,meta.width,meta.height,meta.alphaMode);
   const sample={timeMs:(meta.tick100ns-origin)/10000,analysisBgraSha256:createHash("sha256").update(bgra).digest("hex"),...measureG08Frame(rgb,meta.width,meta.height,marker)};
-  retention.push(sample);
+  retention.push(sample);if(onProgress)onProgress({samples,frameCount:samples.length,shape});
  });
  assert.equal(count,samples.length);
  if(count===0)return {samples,analysis:null,oracleError:"INSUFFICIENT_EVIDENCE no frames",frameCount:0};
