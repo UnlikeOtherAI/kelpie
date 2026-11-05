@@ -28,16 +28,17 @@ final class IOSKeyboardGeometryProbe {
     }
 
     private func record(_ note: Notification, phase: String) {
-        guard let window, let end = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        guard let window, let scene = window.windowScene,
+              let end = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
         let local = (note.userInfo?[UIResponder.keyboardIsLocalUserInfoKey] as? NSNumber)?.boolValue == true
-        let inWindow = window.convert(end, from: window.screen.coordinateSpace)
+        let inWindow = window.convert(end, from: scene.screen.coordinateSpace)
         let inView = tab.view.convert(inWindow, from: window)
         let overlap = tab.view.bounds.intersection(inView)
         let guide = window.keyboardLayoutGuide.layoutFrame
         let sameTab = (try? tab.requireCurrent()) != nil
         let values: [CGFloat] = [
             local ? 1 : 0, sameTab ? 1 : 0, tab.document == document ? 1 : 0,
-            tab.view.window === window ? 1 : 0, window.windowScene?.activationState == .foregroundActive ? 1 : 0,
+            tab.view.window === window ? 1 : 0, scene.activationState == .foregroundActive ? 1 : 0,
             tab.rendererContainsFirstResponder ? 1 : 0,
             tab.view.bounds.width, tab.view.bounds.height, end.minX, end.minY, end.width, end.height,
             overlap.isNull ? 0 : overlap.minX, overlap.isNull ? 0 : overlap.minY,
