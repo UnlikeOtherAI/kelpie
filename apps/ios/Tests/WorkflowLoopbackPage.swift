@@ -32,7 +32,7 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
-        if(location.pathname==='/secret-guard'||location.pathname.startsWith('/focus-secret-')){
+        if(location.pathname==='/secret-guard'||location.pathname.startsWith('/focus-secret-')||location.pathname.startsWith('/post-input-secret-')){
           document.title='iOS Reflected+Canary! | iOS%20Reflected%2bCanary! | iOS+Reflected%2bCanary%21';
           document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'};
           const field=document.querySelector('#entry');
@@ -42,6 +42,17 @@ final class WorkflowLoopbackPage {
           if(location.pathname==='/focus-secret-timeout')field.onfocus=()=>{
             const end=performance.now()+6500;while(performance.now()<end){}
           };
+          if(location.pathname.startsWith('/post-input-secret-')){
+            let inputs=0,later=0;
+            const report=()=>{document.title='Input '+inputs+' Later '+later};
+            field.oninput=()=>{
+              inputs++;
+              if(location.pathname.endsWith('password'))field.type='password';
+              else field.autocomplete='current-password';
+              report();
+            };
+            button.onclick=()=>{later++;report()};
+          }
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
