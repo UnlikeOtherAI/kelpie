@@ -63,6 +63,20 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(WorkflowCaptureProbe.containsMarker(try image(faded), minimumCoverage: 0.12))
         XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(.lightGray), minimumCoverage: 0.12))
         XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(faded, small: true), minimumCoverage: 0.12))
+        func marker(offset: CGFloat) throws -> CGImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 100, height: 100), format: format).image { renderer in
+                UIColor.white.setFill()
+                renderer.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+                faded.setFill()
+                renderer.cgContext.fillEllipse(in: CGRect(x: 25, y: 25 + offset, width: 50, height: 50))
+            }.cgImage)
+        }
+        let target = CGRect(x: 25, y: 25, width: 50, height: 50)
+        let app = CGRect(x: 0, y: 0, width: 100, height: 100)
+        XCTAssertTrue(WorkflowCaptureProbe.containsCenteredMarker(try marker(offset: 0), target: target, app: app))
+        XCTAssertFalse(WorkflowCaptureProbe.containsCenteredMarker(try marker(offset: -20), target: target, app: app))
     }
 
     @MainActor

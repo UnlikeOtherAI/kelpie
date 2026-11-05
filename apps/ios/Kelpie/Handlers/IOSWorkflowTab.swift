@@ -10,12 +10,23 @@ final class IOSWorkflowTab {
         let visible: CGRect
         let scale: CGFloat
         let pixelRatio: CGFloat
+        let content: CGRect
+
+        init(bounds: CGSize, layout: CGSize, visible: CGRect, scale: CGFloat, pixelRatio: CGFloat, content: CGRect? = nil) {
+            self.bounds = bounds
+            self.layout = layout
+            self.visible = visible
+            self.scale = scale
+            self.pixelRatio = pixelRatio
+            self.content = content ?? CGRect(origin: .zero, size: bounds)
+        }
 
         var metadata: Body { ["width": layout.width, "height": layout.height] }
+        var pointsPerCSSX: CGFloat { content.width / visible.width }
 
         func displayPoint(_ css: CGPoint) -> CGPoint {
-            CGPoint(x: (css.x - visible.minX) * bounds.width / visible.width,
-                    y: (css.y - visible.minY) * bounds.height / visible.height)
+            CGPoint(x: content.minX + (css.x - visible.minX) * pointsPerCSSX,
+                    y: content.minY + (css.y - visible.minY) * content.height / visible.height)
         }
     }
 
@@ -174,12 +185,24 @@ final class IOSWorkflowTab {
               parts[4] > 0, parts[5] > 0, view.bounds.width > 0, view.bounds.height > 0 else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
+        let native = view.bounds.size
+        let insets = view.scrollView.adjustedContentInset
+        let insetValues = [insets.top, insets.bottom, insets.left, insets.right]
+        guard insetValues.allSatisfy({ $0.isFinite && $0 >= 0 }), insets.left + insets.right < native.width,
+              insets.top + insets.bottom < native.height else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        let content = CGRect(
+            x: insets.left,
+            y: insets.top,
+            width: native.width - insets.left - insets.right,
+            height: native.height - insets.top - insets.bottom
+        )
         return Viewport(
-            bounds: view.bounds.size,
+            bounds: native,
             layout: CGSize(width: parts[0], height: parts[1]),
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
-            pixelRatio: parts[7]
+            pixelRatio: parts[7],
+            content: content
         )
     }
 

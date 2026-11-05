@@ -12,9 +12,9 @@ STATES = frozenset({
     "missing-issued-token", "missing-callback-token", "unexpected-navigation-token", "duplicate-issue",
 })
 CAPTURE_REASONS = frozenset({
-    "native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
+    "native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
     "responder-accepted", "responder-refused", "responder-descendant", "responder-outside",
-    *(f"snapshot-{value}" for value in ("native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale")),
+    *(f"snapshot-{value}" for value in ("native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale")),
     *(f"focus-{value}" for value in (
         "document-focus", "target-focus", "identity", "viewport", "eligibility",
         "budget", "geometry", "hit", "sensitivity", "unknown",

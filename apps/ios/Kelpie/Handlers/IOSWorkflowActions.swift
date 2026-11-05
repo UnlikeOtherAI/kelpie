@@ -166,7 +166,7 @@ final class IOSWorkflowActions {
         #endif
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
-        let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width
+        let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.pointsPerCSSX
         try requireOK(try await tab.target(
             target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
         ))

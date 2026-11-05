@@ -92,6 +92,7 @@ def selection(scope):
         if scope == "diagnostics":
             required.update([
                 "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                "testProjectionUsesInsetContentOriginAndVisualViewport",
                 "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
                 "testCanonicalMutationReceiptMatrix",
                 "testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard",

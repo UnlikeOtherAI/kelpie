@@ -36,6 +36,29 @@ final class IOSCaptureViewportTests: XCTestCase {
     }
 
     @MainActor
+    func testProjectionUsesInsetContentOriginAndVisualViewport() {
+        let phone = IOSWorkflowTab.Viewport(
+            bounds: CGSize(width: 402, height: 874), layout: CGSize(width: 402, height: 778),
+            visible: CGRect(x: 0, y: 0, width: 402, height: 778), scale: 1, pixelRatio: 3,
+            content: CGRect(x: 0, y: 62, width: 402, height: 778)
+        )
+        XCTAssertEqual(phone.displayPoint(CGPoint(x: 175, y: 340)), CGPoint(x: 175, y: 402))
+        let pad = IOSWorkflowTab.Viewport(
+            bounds: CGSize(width: 1024, height: 1366), layout: CGSize(width: 1024, height: 1346),
+            visible: CGRect(x: 0, y: 0, width: 1024, height: 1346), scale: 1, pixelRatio: 2,
+            content: CGRect(x: 0, y: 0, width: 1024, height: 1346)
+        )
+        XCTAssertEqual(pad.displayPoint(CGPoint(x: 175, y: 340)), CGPoint(x: 175, y: 340))
+        let zoom = IOSWorkflowTab.Viewport(
+            bounds: CGSize(width: 874, height: 402), layout: CGSize(width: 389, height: 190.5),
+            visible: CGRect(x: 10, y: 20, width: 389, height: 190.5), scale: 2, pixelRatio: 3,
+            content: CGRect(x: 62, y: 0, width: 778, height: 381)
+        )
+        XCTAssertEqual(zoom.displayPoint(CGPoint(x: 30, y: 40)), CGPoint(x: 102, y: 40))
+        XCTAssertEqual(zoom.pointsPerCSSX, 2)
+    }
+
+    @MainActor
     func testUnsettledInsetAdmissionHonorsDeadlineAndStop() async throws {
         let viewport = IOSWorkflowTab.Viewport(bounds: CGSize(width: 402, height: 874),
                                                layout: CGSize(width: 402, height: 812),
