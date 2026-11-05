@@ -8,8 +8,8 @@ prove Linux native behavior. Assigned bounded Linux test checkout:
  /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104.
 
 The native implementation checkpoint is explicitly unverified before transport
-through Git to Fedora. All48 requirements below remain pending their actual
-Linux-specific evidence; source presence is not a passing result.
+through Git to Fedora. The48 rows below distinguish actual case evidence from remaining gates;
+source presence is not a passing result.
 
 ## Source inventory and reuse
 
@@ -60,7 +60,7 @@ Linux-specific evidence; source presence is not a passing result.
 
 ## Canonical requirement checklist
 
-Every row is pending Linux real-interface evidence; shared source or another
+Partial rows name their actual Linux case evidence. Shared source or another
 platform's test is not a Linux pass.
 
 | ID | Linux implementation/evidence target | Status |
@@ -331,3 +331,10 @@ native relink/MCP/CLI success claim. Those actual gates remain pending.
 The independent actual Lightpanda phase is complete at diagnostic scope; see
 lightpanda-analysis.md for all four revisions, failed expectations and measured
 limits. No public reader/WebMCP/pixel profile was enabled.
+
+The finalization supplement now observes its in-flight public play Promise
+immediately through the common observeInFlight helper, preserving the original
+rejection for the main assertion. Cleanup awaits it for at most5 seconds before
+the launcher's owned app shutdown. Four early-rejection/cleanup regressions
+passed on Maxis using the common helper. The real Linux fault run remains
+pending the native slot; no product state was edited to manufacture recovery.
