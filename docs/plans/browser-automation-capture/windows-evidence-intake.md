@@ -168,3 +168,41 @@ A source diff from 5877e6fa to root revision 65fe4866 found no changes under
 `apps/windows`, `native`, `packages/shared/src` or `packages/cli`,
 and no changes to root lockfile or Windows build scripts. This maps the tested
 binary's inputs to that revision; it does not replace the final rebuild.
+
+## Windows finite gate audit at 65fe4866
+
+All runtime results below refer to the unsigned 5877e6fa candidate unless
+otherwise stated. Its Windows production/build inputs are unchanged at
+65fe4866, as recorded above. Evidence is bounded to the named flows.
+
+- Native HTTP corpus: 36/36, including semantic trusted input, capture
+  limits, preflight refusals, navigation, abort/recovery, partial artifacts,
+  sensitivity, invalid bearer and unknown session/run cases. The original
+  combined run's CLI alias case failed; a separate exact-candidate alias
+  replay passed four cases after its readiness barrier. Preserve both.
+- Observations/extraction/readiness: 10/10. Public alias CLI and stdio MCP:
+  separate 4/4. Direct/generic MCP and HTTP artifact publication and chunk
+  download checks ran, including the 906,882-byte PNG with four chunks on
+  each protocol. Focus, post-input and realm privacy replays passed their
+  recorded cases; their raw reports remain under `native-api-5877`.
+- Geometry/motion API: 7/7 in `native-motion-5877`, including CSS zoom and
+  clipped targets. Legacy fixed-pixel fade assertion is a documented false
+  positive; the newer shared G08 oracle independently passed both curves in
+  GIF and MP4 with 47/48 reported dropped frames. The longstanding
+  `get-viewport` DPR value is 1; capture geometry uses page metrics and
+  the Session1 scene independently measured DPR2.
+- Native UI: exact owned Session1 presentation WGC centroid and radius agreed
+  with the trusted click at DPR2; separate native Stop pixels, UIA Stop,
+  partial export, recovery and supported cleanup passed. Export timeline and
+  native spatial evidence use different fixtures and are not a simultaneous
+  native-versus-export frame comparison. Root visual intake remains required.
+- Ownership boundary: invalid bearer and unknown run are tested. This listener
+  offers one immutable valid control token, so a second valid foreign grant on
+  the same app is not claimed; see the boundary above.
+
+Windows 0.1.16 is consistent in CMake, RC, device info and runtime at
+65fe4866. The final integrated revision still requires the sandboxed CEF
+rebuild/package and candidate replay, keyless signing of verified copies on
+Minis, signature/timestamp/EKU and SignTool verification, immutable upload,
+then exact published-package install and runtime checks. The current candidate
+and native screenshots do not establish those release steps.
