@@ -18,6 +18,9 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
             wobble: false,
             fade: false
         )
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: 100))
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: marker.started)) // Held at its admission time.
+        XCTAssertNil(ScriptPresentation.exposedMarker(marker, time: 101))
         let admitted = ScriptPresentation.Frame(
             viewport: CGSize(width: 50, height: 50), pointer: nil, marker: marker, commentary: nil, time: 100
         )
@@ -39,8 +42,6 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
             return bytes[(25 * 50 + 25) * 4 + 3]
         }
         XCTAssertGreaterThan(try alpha(admitted), 0)
-        // Simulate a snapshot that returns after the 700 ms live marker lifetime.
-        Thread.sleep(forTimeInterval: 0.75)
         XCTAssertEqual(try alpha(later), 0)
         // The same immutable admission is used even when the renderer returns after its live marker expired.
         XCTAssertGreaterThan(try alpha(admitted), 0)

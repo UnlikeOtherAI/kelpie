@@ -209,13 +209,19 @@ final class ScriptPresentation {
         }
     }
 
+    static func exposedMarker(_ marker: Marker?, time: TimeInterval) -> Marker? {
+        guard let marker, ScriptOverlayDrawing.markerIsVisible(marker, now: time) else { return nil }
+        return marker
+    }
+
     func frame() -> Frame {
-        Frame(
+        let time = held ? heldTime : ProcessInfo.processInfo.systemUptime
+        return Frame(
             viewport: canvas.bounds.size,
             pointer: pointer,
-            marker: marker,
+            marker: Self.exposedMarker(marker, time: time),
             commentary: commentary,
-            time: held ? heldTime : ProcessInfo.processInfo.systemUptime
+            time: time
         )
     }
 

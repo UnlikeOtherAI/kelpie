@@ -93,7 +93,9 @@ final class ScriptCapture {
         guard formats.contains("screenshots") else { throw ScriptWorkflowFailure("SCREENSHOT_UNSUPPORTED") }
         let overlay = presentation.frame()
         let overlayDocument = tab.document
-        guard let overlayWindow = tab.view.window else { throw ScriptWorkflowFailure("TAB_NOT_VISIBLE") }
+        let overlayView = tab.view
+        guard tab.renderer.makeView() === overlayView,
+              let overlayWindow = overlayView.window else { throw ScriptWorkflowFailure("TAB_NOT_VISIBLE") }
         let overlayGeometry = ScriptMarkerGeometry(tab: tab, window: overlayWindow)
         if overlay.marker != nil {
             guard presentation.markerWindow === overlayWindow, presentation.markerDocument == overlayDocument,
@@ -108,7 +110,8 @@ final class ScriptCapture {
             sample: "screenshot",
             overlay: overlay,
             overlayIsCurrent: {
-                self.tab.document == overlayDocument && self.tab.view.window === overlayWindow &&
+                self.tab.document == overlayDocument && self.tab.view === overlayView &&
+                    self.tab.renderer.makeView() === overlayView && overlayView.window === overlayWindow &&
                     ScriptMarkerGeometry(tab: self.tab, window: overlayWindow) == overlayGeometry
             }
         )
