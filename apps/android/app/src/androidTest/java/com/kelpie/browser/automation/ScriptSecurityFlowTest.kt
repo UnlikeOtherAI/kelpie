@@ -69,10 +69,14 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     )
                 assertEquals(200, initialize.first)
                 assertTrue(initialize.second.has("result"))
-                val catalog = client.mcp("kelpie_extension_tools")
+                val catalog =
+                    client.mcp(
+                        "kelpie_extension_tools",
+                        JSONObject().put("names", JSONArray(listOf("kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"))),
+                    )
                 for (name in listOf("kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact")) assertTrue(catalog.toString().contains(name))
                 val completed =
-                    client.mcp(
+                    client.mcpValue(
                         "kelpie_extension",
                         JSONObject()
                             .put("name", "kelpie_play_script")
@@ -80,7 +84,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     )
                 assertTrue(completed.getBoolean("success"))
                 val status =
-                    client.mcp(
+                    client.mcpValue(
                         "kelpie_extension",
                         JSONObject()
                             .put("name", "kelpie_get_script_status")
@@ -120,6 +124,7 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     assertEquals("aborted", status.getString("state"))
                     assertFalse(status.has("error"))
                     assertFalse(status.has("outputs"))
+                    java.io.File(evidence, "stopped-manifest.json").writeText(stopped.toString(2))
                     val artifacts = stopped.getJSONArray("artifacts")
                     assertEquals(2, artifacts.length())
                     for (index in 0 until artifacts.length()) {
@@ -181,6 +186,46 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                         executor.shutdownNow()
                     }
                 }
+            }
+        }
+    }
+
+    @Test
+    fun captureDeadlineStopsBeforeFollowingInputAndCapsPartialMovieDuration() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                val script =
+                    client
+                        .script(
+                            tab,
+                            client.action("wait").put("ms", 1000),
+                            client.action("click").put("target", client.target("Submit")),
+                        ).put(
+                            "capture",
+                            JSONObject()
+                                .put("formats", JSONArray(listOf("gif", "video")))
+                                .put("fps", 10)
+                                .put("maxWidth", 320)
+                                .put("maxDurationMs", 100),
+                        )
+                val response = client.request("/v1/play-script", script).second
+                assertFalse(response.getBoolean("success"))
+                assertEquals("CAPTURE_DURATION_LIMIT", response.getJSONObject("error").getString("code"))
+                assertEquals("Ready", client.core("tab.title", tab).getString("value"))
+                val artifacts = response.getJSONArray("artifacts")
+                assertTrue(artifacts.length() > 0)
+                for (index in 0 until artifacts.length()) {
+                    val artifact = artifacts.getJSONObject(index)
+                    assertTrue(artifact.getBoolean("partial"))
+                    assertTrue(artifact.getDouble("durationMs") <= 101.0)
+                    var frames = 0
+                    ScriptMovieProbe.frames(retrieve(client, response.getString("runId"), artifact)) { _, _ -> frames++ }
+                    assertTrue(frames > 0)
+                }
+                assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
             }
         }
     }

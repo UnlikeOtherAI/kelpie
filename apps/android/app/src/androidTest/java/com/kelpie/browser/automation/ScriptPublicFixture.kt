@@ -1,5 +1,6 @@
 package com.kelpie.browser.automation
 
+import android.graphics.Bitmap
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -44,7 +45,7 @@ abstract class ScriptPublicFixture {
             <style>body{margin:0;background:white}button{position:absolute;left:100px;top:140px;width:120px;height:60px}</style>
             <button onclick="$activation">Submit</button>
             <input aria-label="Name" style="position:absolute;top:250px" value="private-form-canary">
-            <div id="public" style="position:absolute;top:320px">Public fixture</div>""",
+            <p id="public" style="position:absolute;top:320px">Public fixture</p>""",
             ),
         )
         val tab = client.call("get-tabs").getString("activeTab")
@@ -89,5 +90,27 @@ abstract class ScriptPublicFixture {
                 else -> "mp4"
             }
         return File(evidence, artifact.getString("id") + "." + extension).apply { writeBytes(all) }
+    }
+
+    protected fun captureBlueMarker(): Bitmap {
+        val deadline = System.nanoTime() + 10_000_000_000L
+        while (System.nanoTime() < deadline) {
+            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            var blue = 0
+            for (y in 0 until bitmap.height step 16) {
+                for (x in 0 until bitmap.width step 16) {
+                    val color = bitmap.getPixel(x, y)
+                    if (android.graphics.Color.blue(color) > android.graphics.Color.red(color) + 50 &&
+                        android.graphics.Color.blue(color) > android.graphics.Color.green(color) + 20
+                    ) {
+                        blue++
+                    }
+                }
+            }
+            if (blue >= 10) return bitmap
+            bitmap.recycle()
+            Thread.sleep(50)
+        }
+        throw AssertionError("Native blue marker never appeared")
     }
 }

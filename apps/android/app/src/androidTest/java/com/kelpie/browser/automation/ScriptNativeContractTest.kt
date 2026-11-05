@@ -32,6 +32,9 @@ class ScriptNativeContractTest {
         assertEquals(20.0, start[1], 0.0001)
         assertEquals(210.0, end[0], 0.0001)
         assertEquals(120.0, end[1], 0.0001)
+        val curveS = ScriptNative.pointerPosition(10.0, 20.0, 210.0, 120.0, true, 250.0, 500.0)
+        val curveC = ScriptNative.pointerPosition(10.0, 20.0, 210.0, 120.0, false, 250.0, 500.0)
+        assertTrue(kotlin.math.abs(curveS[0] - curveC[0]) + kotlin.math.abs(curveS[1] - curveC[1]) > 1)
         val tap = ScriptNative.tapPresentation(700.0, 700.0, true, true)
         assertEquals(0.0, tap[1], 0.0001)
     }
@@ -62,11 +65,11 @@ class ScriptNativeContractTest {
         projector.add("private")
         val output =
             projector.redact(
-                mapOf("records" to mapOf("url" to "https://example.test/private", "pageSource" to "private")),
+                mapOf("records" to mapOf("url" to "https://example.test/private", "fields" to emptyList<Any>(), "metadata" to emptyList<Any>(), "truncated" to false, "pageSource" to "private")),
                 listOf("records"),
             )
         assertFalse(output.toString().contains("private"))
-        assertFalse(output.toString().contains("pageSource"))
+        assertEquals("[redacted]", (output["records"] as Map<*, *>)["pageSource"])
         assertTrue(output.toString().contains("[redacted]"))
     }
 
