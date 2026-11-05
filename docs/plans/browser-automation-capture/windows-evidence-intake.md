@@ -101,3 +101,20 @@ native pairing dialog or second valid grant on that listener. Invalid bearer,
 unknown-run and distinct-grant unit checks do not establish a foreign valid
 grant in the same app. Two independently owned listeners can provide a separate
 cross-listener test, without describing them as two grants on one listener.
+
+A bounded single-thread decode of the 5877 C-curve MP4 subsequently measured
+the verifier's first fixed sample at frame 12 as RGB (17,17,17), surrounded by
+gray and white pixels. Frames 14 through 20 at that same point measured
+approximately (79,193,255). The old test includes that achromatic pointer/edge
+sample in its marker-opacity range: its fade-disabled failure is a pixel-oracle
+false positive. This does not prove the full motion/fade timeline. The 39-frame
+measurements and Job policy are retained under
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/legacy-pixels*`.
+
+A separate exact-5877 shared G08 replay on Maxis failed at public CLI launch,
+before recording a browser identity or any fixture facts. Public stop also
+failed. The Job ended; no candidate process or listener remained. Both failures
+and the absence of timeline evidence are preserved under
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/g08-5877*`.
+The harness did not retain exit/signal details for that run; its subsequent
+diagnostic change cannot retroactively determine the cause.
