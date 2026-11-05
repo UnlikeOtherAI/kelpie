@@ -213,8 +213,8 @@ final class IOSWorkflowActions {
         action: String,
         text: String?,
         document: String,
-        consume: @MainActor (Body) -> Void,
-        missing: @MainActor () -> Void
+        consume: @escaping @MainActor (Body) -> Void,
+        missing: @escaping @MainActor () -> Void
     ) async throws {
         let editing = action == "type" || action == "fill"
         let edit: Body? = editing ? ["action": action, "text": text ?? ""] : nil
