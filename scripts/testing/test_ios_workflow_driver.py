@@ -29,6 +29,14 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")
             self.assertEqual(run.call_args.args[0], ["xcrun", "simctl", "shutdown", "owned"])
 
+    def test_inventory_failure_keeps_shutdown_unconfirmed(self):
+        for error in (RuntimeError("Selected simulator is missing"), KeyError("devices")):
+            with self.subTest(error=type(error).__name__), patch.object(
+                DRIVER, "device_state", side_effect=error
+            ), patch.object(DRIVER.subprocess, "run") as run:
+                self.assertEqual(DRIVER.shutdown_owned("owned"), "unconfirmed: simulator shutdown")
+                run.assert_not_called()
+
     def test_container_query_failure_does_not_mean_the_app_is_absent(self):
         failure = types.SimpleNamespace(returncode=149, stdout="", stderr="Unable to lookup in current state")
         with patch.object(DRIVER, "device_state", return_value="Booted"), patch.object(

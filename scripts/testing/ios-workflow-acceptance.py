@@ -105,7 +105,7 @@ def shutdown_owned(udid):
             if device_state(udid) == "Shutdown":
                 return "verified shutdown"
             time.sleep(2)
-    except (ValueError, OSError, subprocess.SubprocessError):
+    except (ValueError, OSError, KeyError, RuntimeError, subprocess.SubprocessError):
         pass
     return "unconfirmed: simulator shutdown"
 
