@@ -12,9 +12,14 @@ const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 const hash=async p=>createHash("sha256").update(await readFile(p)).digest("hex");
 assert.equal(await hash(exe),manifest.exeSha256);assert.equal(await hash(join(dirname(exe),"kelpie.dll")),manifest.dllSha256);
 assert.equal(await hash(cli),manifest.cliSha256);await mkdir(privateRoot,{recursive:false});
+const exec=promisify(execFile);
+const sidCommand="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
+const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCommand,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
+assert.match(sid,/^S-1-[0-9-]+$/);
+await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+sid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"],{windowsHide:true,timeout:15000});
 const home=join(privateRoot,"cli-home"),profile=join(privateRoot,"profile");await mkdir(home);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:"--max-old-space-size=2048"};
-const exec=promisify(execFile),alias="capture-launch-diagnostic-"+manifest.source.slice(0,8);
+const alias="capture-launch-diagnostic-"+manifest.source.slice(0,8);
 const report={source:manifest.source,stage:"register",checks:[],cleanup:"not-started"};
 function summarize(error){
  let data;try{data=JSON.parse(String(error.stdout??""));}catch{}
