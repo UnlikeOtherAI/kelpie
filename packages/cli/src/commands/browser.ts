@@ -79,12 +79,13 @@ export interface LaunchChild {
 }
 
 /** Retire only the original process handle; false means its identity stays pending. */
-export async function retireUnreadyChild(child: ChildProcess): Promise<boolean> {
+export async function retireUnreadyChild(child: ChildProcess, timeoutMs = STOP_TIMEOUT_MS): Promise<boolean> {
   if (!child.pid || child.exitCode !== null || child.signalCode !== null) return true;
   return new Promise<boolean>((resolve) => {
     const onError = () => { cleanup(); resolve(false); };
     const onExit = () => { cleanup(); resolve(true); };
-    const cleanup = () => { child.removeListener("error", onError); child.removeListener("exit", onExit); };
+    const timer = setTimeout(onError, timeoutMs);
+    const cleanup = () => { clearTimeout(timer); child.removeListener("error", onError); child.removeListener("exit", onExit); };
     child.once("exit", onExit);
     child.once("error", onError);
     if (child.exitCode !== null || child.signalCode !== null) { onExit(); return; }
@@ -97,6 +98,14 @@ export function pendingProcessGone(pid: number): boolean {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return false; }
   catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH"; }
+}
+
+async function reconcilePendingLaunch(name: string): Promise<boolean> {
+  const running = (await loadBrowserStore()).running[name];
+  if (!running?.pendingLaunch) return true;
+  if (!running.pid || !pendingProcessGone(running.pid)) return false;
+  await clearRunningBrowser(name);
+  return true;
 }
 export interface ReadinessWaitOptions {
   timeoutMs?: number;
@@ -175,8 +184,7 @@ export function registerBrowser(program: Command): void {
         process.exitCode = 4;
         return;
       }
-      const store = await loadBrowserStore();
-      if (store.running[name]?.pendingLaunch) {
+      if (!await reconcilePendingLaunch(name)) {
         print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch is still pending; retry launch after its process exits" } }, globals.format);
         process.exitCode = 6; return;
       }
@@ -233,8 +241,7 @@ export function registerBrowser(program: Command): void {
     .command("remove <name>")
     .action(async (name: string) => {
       const globals = program.opts<GlobalOptions>();
-      const store = await loadBrowserStore();
-      if (store.running[name]?.pendingLaunch) {
+      if (!await reconcilePendingLaunch(name)) {
         print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch is still pending; retry launch after its process exits" } }, globals.format);
         process.exitCode = 6; return;
       }
@@ -256,13 +263,9 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
-      const previousRunning = (await loadBrowserStore()).running[name];
-      if (previousRunning?.pendingLaunch) {
-        if (!previousRunning.pid || !pendingProcessGone(previousRunning.pid)) {
-          print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch process is still present; it will not be killed by PID" } }, globals.format);
-          process.exitCode = 6; return;
-        }
-        await clearRunningBrowser(name);
+      if (!await reconcilePendingLaunch(name)) {
+        print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch process is still present; it will not be killed by PID" } }, globals.format);
+        process.exitCode = 6; return;
       }
       const { hidden = false, headless = false } = command.opts<{ hidden?: boolean; headless?: boolean }>();
       if (headless && (alias.platform !== "linux" || os.platform() !== "linux")) {

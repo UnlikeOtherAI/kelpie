@@ -66,6 +66,27 @@ describe("public browser launch child lifecycle", () => {
     expect(control.child).not.toBe(child);
     expect((await loadBrowserStore()).running.owned).toBeUndefined();
   }, 30000);
+  it("reconciles an absent pending PID before register and remove", async () => {
+    home = await mkdtemp(path.join(os.tmpdir(), "kelpie-launch-dead-"));
+    process.env.KELPIE_HOME = home;
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const profile = path.join(home, "profile");
+    await run("browser", "register", "owned", "--platform", "windows", "--app-path", process.execPath, "--profile-dir", profile);
+    control.exitsEarly = true;
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, []);
+    await once(child, "exit");
+    const pending = { port: 28423, lastLaunchedAt: "now", pid: child.pid, readinessFile: path.join(profile, "readiness.json"),
+      pendingLaunch: { attemptId: "attempt", appPath: process.execPath, profileDir: profile, startedAt: "now" } };
+    await setRunningBrowser("owned", pending);
+    await run("browser", "register", "owned", "--platform", "windows", "--app-path", process.execPath, "--profile-dir", profile);
+    expect((await loadBrowserStore()).running.owned).toBeUndefined();
+    await setRunningBrowser("owned", pending);
+    await run("browser", "remove", "owned");
+    const store = await loadBrowserStore();
+    expect(store.running.owned).toBeUndefined();
+    expect(store.aliases.owned).toBeUndefined();
+  });
   it("keeps a pending live PID and does not replace or kill it", async () => {
     home = await mkdtemp(path.join(os.tmpdir(), "kelpie-launch-pending-"));
     process.env.KELPIE_HOME = home;

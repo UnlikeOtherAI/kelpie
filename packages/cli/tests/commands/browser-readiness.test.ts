@@ -47,6 +47,23 @@ describe("unready owned process retirement", () => {
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
   });
 
+  it("bounds an acknowledged termination when the child stays alive", async () => {
+    const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 250)"], { stdio: "ignore" });
+    await once(child, "spawn");
+    const kill = vi.spyOn(child, "kill").mockReturnValue(true);
+    expect(await retireUnreadyChild(child, 30)).toBe(false);
+    expect(child.exitCode).toBeNull();
+    await once(child, "exit");
+    kill.mockRestore();
+  });
+
+  it.skipIf(process.platform === "win32")("bounds a real child that ignores SIGTERM", async () => {
+    const child = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});console.log('ready');setTimeout(()=>{},500)"]);
+    if (!child.stdout) throw new Error("Expected child output");
+    await once(child.stdout, "data");
+    expect(await retireUnreadyChild(child, 50)).toBe(false);
+    await once(child, "exit");
+  });
   it("reports refused termination without killing a different process", async () => {
     const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 250)"], { stdio: "ignore" });
     await once(child, "spawn");
