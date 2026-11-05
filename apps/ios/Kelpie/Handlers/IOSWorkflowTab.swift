@@ -186,6 +186,12 @@ final class IOSWorkflowTab {
         return value
     }
 
+    static func fixtureID(_ candidate: String?) -> String? {
+        candidate.flatMap {
+            $0.range(of: #"^[0-9]{13}-[a-z0-9]{1,16}\z"#, options: .regularExpression) == nil ? nil : $0
+        }
+    }
+
     func viewport() async throws -> Viewport {
         #if DEBUG
         let bindFixture = ProcessInfo.processInfo.arguments.contains("--test-g08-document-binding")
@@ -202,10 +208,8 @@ final class IOSWorkflowTab {
               let values = Array(raw.prefix(8)) as? [NSNumber] else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
-        let fixtureID = bindFixture ? raw.last as? String : nil
-        guard fixtureID == nil || (fixtureID?.utf8.count ?? 0) <= 128 else {
-            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
-        }
+        let candidate = bindFixture ? raw.last as? String : nil
+        let fixtureID = Self.fixtureID(candidate)
         let parts = values.map { CGFloat($0.doubleValue) }
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0,
               parts[4] > 0, parts[5] > 0, view.bounds.width > 0, view.bounds.height > 0 else {

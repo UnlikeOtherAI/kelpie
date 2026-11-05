@@ -24,7 +24,7 @@ struct IOSG08GeometryEvidence {
         let viewport = first.viewport
         return [
             "kind": "constant-native-content", "nativeDocumentId": first.document, "fixtureDocumentId": fixtureID,
-            "stableNativeDocument": true, "fixtureEventsBound": true, "sampledFrames": encodedFrames,
+            "stableNativeDocument": true, "observedFrames": samples, "encodedFrames": encodedFrames,
             "nativeBounds": ["width": viewport.bounds.width, "height": viewport.bounds.height],
             "contentRect": ["x": viewport.content.minX, "y": viewport.content.minY,
                             "width": viewport.content.width, "height": viewport.content.height],

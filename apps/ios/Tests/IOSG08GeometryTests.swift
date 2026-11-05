@@ -13,26 +13,32 @@ final class IOSG08GeometryTests: XCTestCase {
                 content: CGRect(x: 0, y: 62, width: 402, height: 778), fixtureDocumentID: id
             )
         }
-        let scene = viewport(id: "fixture-1")
+        XCTAssertEqual(IOSWorkflowTab.fixtureID("1234567890123-abc123"), "1234567890123-abc123")
+        for invalid in ["secret", "1234567890123-", "1234567890123-ABC", "1234567890123-abcdefghijklmnopq",
+                        "1234567890123-abc\n", "123456789012-abc"] {
+            XCTAssertNil(IOSWorkflowTab.fixtureID(invalid))
+        }
+        let scene = viewport(id: "1234567890123-abc")
         var valid = IOSG08GeometryEvidence()
         valid.record(document: "native-1", viewport: scene)
         valid.record(document: "native-1", viewport: scene)
         let geometry = try XCTUnwrap(valid.manifest(encodedFrames: 2))
         XCTAssertEqual(geometry["nativeDocumentId"] as? String, "native-1")
-        XCTAssertEqual(geometry["fixtureDocumentId"] as? String, "fixture-1")
-        XCTAssertEqual(geometry["sampledFrames"] as? Int, 2)
+        XCTAssertEqual(geometry["fixtureDocumentId"] as? String, "1234567890123-abc")
+        XCTAssertEqual(geometry["observedFrames"] as? Int, 2)
+        XCTAssertEqual(geometry["encodedFrames"] as? Int, 2)
         XCTAssertEqual((geometry["contentRect"] as? [String: CGFloat])?["y"], 62)
         XCTAssertNil(valid.manifest(encodedFrames: 3))
         XCTAssertNil(valid.manifest(encodedFrames: 0))
 
         var scrolled = valid
-        scrolled.record(document: "native-1", viewport: viewport(id: "fixture-1", x: 1))
+        scrolled.record(document: "native-1", viewport: viewport(id: "1234567890123-abc", x: 1))
         XCTAssertNil(scrolled.manifest(encodedFrames: 2))
         var newDocument = valid
         newDocument.record(document: "native-2", viewport: scene)
         XCTAssertNil(newDocument.manifest(encodedFrames: 2))
         var changedFixture = valid
-        changedFixture.record(document: "native-1", viewport: viewport(id: "fixture-2"))
+        changedFixture.record(document: "native-1", viewport: viewport(id: "1234567890123-def"))
         XCTAssertNil(changedFixture.manifest(encodedFrames: 2))
         var absent = IOSG08GeometryEvidence()
         absent.record(document: "native-1", viewport: viewport(id: nil))
