@@ -12,6 +12,7 @@ target_sources(kelpie PRIVATE
   ${KELPIE_SCRIPT_CODEC_SOURCES}
   src/script_capture_service.cpp
   src/script_artifact_store.cpp
+  src/script_artifact_lifecycle.cpp
   src/script_frame_compositor.cpp
   src/script_native_overlay.cpp
 )
@@ -71,12 +72,14 @@ endif()
 
 if(BUILD_TESTING AND WIN32)
   add_executable(kelpie_windows_script_capture_file_identity_test
-    tests/script_capture_file_identity_test.cpp src/script_artifact_store.cpp)
+    tests/script_capture_file_identity_test.cpp src/script_artifact_store.cpp
+    src/script_artifact_lifecycle.cpp src/script_native_overlay.cpp src/script_frame_compositor.cpp)
   target_include_directories(kelpie_windows_script_capture_file_identity_test PRIVATE src)
   target_compile_definitions(kelpie_windows_script_capture_file_identity_test PRIVATE
     WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
   target_link_libraries(kelpie_windows_script_capture_file_identity_test PRIVATE
-    kelpie_engine_chromium_desktop nlohmann_json::nlohmann_json crypt32 advapi32)
+    kelpie_engine_chromium_desktop kelpie_core_automation nlohmann_json::nlohmann_json
+    crypt32 advapi32 ole32 windowscodecs gdiplus)
   kelpie_enable_test_assertions(kelpie_windows_script_capture_file_identity_test)
   if(MSVC)
     target_compile_options(kelpie_windows_script_capture_file_identity_test PRIVATE /W4 /WX)
