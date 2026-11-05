@@ -103,3 +103,23 @@ test("calibration allows an initial pointer movement but requires same-position 
   assert.throws(()=>evaluateG08(render(config,"noStableCalibration"),config),
     /INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline/);
 });
+
+test("validated model reference substitutes only exact tail pixels",()=>{
+  const config={...base,curve:"s",color:"#0000ff"};
+  const clean=render(config,"overlapClean");
+  const reference=Buffer.from(clean[0].marker.roi);
+  const unstable=render(config,"overlapClean");
+  const candidate=unstable.find(sample=>sample.timeMs===1900);
+  candidate.marker.roi=Buffer.from(candidate.marker.roi);candidate.marker.roi[0]^=1;
+  assert.throws(()=>evaluateG08(unstable,config),/unstable pre-dispatch baseline/);
+  const result=evaluateG08(unstable,config,reference);
+  assert.match(result.confidence,/ENCODED-VISIBLE only/);
+  for(const mode of ["overlapSmall","overlapFaint","stuck"]){
+    assert.throws(()=>evaluateG08(render(config,mode),config,reference),/INSUFFICIENT|G08_/);
+  }
+  const noMarker=render(config,"overlapClean");
+  for(const sample of noMarker)if(sample.timeMs>=2000&&sample.timeMs<2150)sample.marker.alpha=0;
+  assert.throws(()=>evaluateG08(noMarker,config,reference),/calibration dispatch marker/);
+  assert.throws(()=>evaluateG08(clean,config,Buffer.alloc(0)),/invalid model reference/);
+  assert.throws(()=>evaluateG08(clean,config,Buffer.alloc(reference.length)),/tail differs/);
+});
