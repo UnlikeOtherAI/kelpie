@@ -32,7 +32,7 @@ for(const item of input.cases){
    const sx=artifact.width/start.viewport.width,sy=artifact.height/start.viewport.height;
    assert.ok(sx>0&&sy>0&&Math.abs(sx-sy)<0.03);
    const marker={center:{x:finish.center.x*sx,y:finish.center.y*sy},radius:48*sx,color:item.curve==="c"?"#ff0000":"#0000ff"};
-   const child=spawn("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",resolve(artifact.file),"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],{stdio:["ignore","pipe","pipe"]});
+   const child=spawn("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",resolve(artifact.file),"-map","0:v:0","-vsync","0","-f","rawvideo","-pix_fmt","rgb24","-"],{stdio:["ignore","pipe","pipe"]});
    let stderr="";child.stderr.on("data",chunk=>{stderr+=chunk.toString().slice(0,Math.max(0,4096-stderr.length));});
    const done=new Promise((yes,no)=>{child.once("error",no);child.once("close",code=>code===0?yes():no(Error("DECODER_FAILED "+stderr)));});void done.catch(()=>{});
    const timer=setTimeout(()=>child.kill(),120000);
