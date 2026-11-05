@@ -41,10 +41,11 @@ on:
         default: ""
 
       worker_comparison_mode:
-        description: Prepare Chromium identity or execute reviewed comparison
+        description: Probe isolation, prepare Chromium identity, or execute reviewed comparison
         type: choice
         options:
           - 'off'
+          - probe
           - prepare
           - execute
         default: 'off'
@@ -67,6 +68,7 @@ jobs:
       contents: read
     with:
       prepare_only: ${{ inputs.worker_comparison_mode != 'execute' }}
+      isolation_only: ${{ inputs.worker_comparison_mode == 'probe' }}
       chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
       chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
 

@@ -14,7 +14,7 @@ import {fileURLToPath} from "node:url";
 import {loadavg,release} from "node:os";
 import {promisify} from "node:util";
 import {runLightpandaReaderDiagnostics} from "./lightpanda-reader-diagnostics.mjs";
-import {probeWorkerBoundary} from "./worker-comparison-network.mjs";
+import {observeWorkerBoundary,validateProbe} from "./worker-comparison-network.mjs";
 import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
@@ -69,9 +69,10 @@ const endpoint="http://127.0.0.1:"+port;
 const args=backend==="lightpanda"?["serve","--host","127.0.0.1","--port",String(port),"--log-level","error"]:
  ["--headless=new","--remote-debugging-address=127.0.0.1","--remote-debugging-port="+port,
   "--user-data-dir="+join(home,"chromium"),"--no-first-run","about:blank"];
-const networkProbe=await probeWorkerBoundary(process.env.KELPIE_AB_CANARY_HOST??"",
- Number(process.env.KELPIE_AB_CANARY_PORT),"inside");
-await writeFile(join(dir,"network-probe.json"),JSON.stringify(networkProbe),{mode:0o600,flag:"wx"});
+const networkObservation=await observeWorkerBoundary(process.env.KELPIE_AB_CANARY_HOST??"",
+ Number(process.env.KELPIE_AB_CANARY_PORT));
+await writeFile(join(dir,"network-observation.json"),JSON.stringify({pid:process.pid,uid:process.getuid(),observed:networkObservation}),{mode:0o600,flag:"wx"});
+const networkProbe=validateProbe("inside",networkObservation.local,networkObservation.nonlocal);
 const hostBinding=createHash("sha256").update(await readFile("/etc/machine-id"))
  .update(process.env.KELPIE_COMPARISON_ID).digest("hex");
 const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBinding,

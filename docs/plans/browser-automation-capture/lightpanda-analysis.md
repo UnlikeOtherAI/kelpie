@@ -381,3 +381,6 @@ the denominator. The four explicit Lightpanda method refusals are reported;
 shared sessions and concurrent contexts are labelled untested by this corpus
 and remain separately refused by the tested Lightpanda profile. No result
 establishes rendered pixels, input, native UI or automatic backend fallback.
+
+
+The measured hosted run 42121378935 stopped before starting either browser: the in-unit non-loopback probe did not establish denial. Its raw failure is retained in artifact 13460155244; the original probe did not record whether the connection succeeded, timed out, or returned a specific error. The probe-only workflow mode records a fixed connection classification, independently captured unit configuration and, when available, effective BPF attachment information. It runs no browser or cost measurement. Only an explicit in-unit EACCES or EPERM denial with a reachable outside control can pass the existing boundary check; other outcomes require investigation. The probe configuration and its execution require review before dispatch.

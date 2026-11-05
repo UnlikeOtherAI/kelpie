@@ -1,7 +1,7 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {validateProbe} from "./worker-comparison-network.mjs";
-import {validateWorkerPolicy,verifyWorkerPolicyBinding} from "./worker-comparison-policy.mjs";
+import {validateProbe,classifySocketError} from "./worker-comparison-network.mjs";
+import {validateWorkerPolicy,verifyWorkerPolicyBinding,verifyWorkerObservationBinding} from "./worker-comparison-policy.mjs";
 const good=["User=1001","ActiveState=active","ExecMainPID=123","NoNewPrivileges=yes",
  "KillMode=control-group","ControlGroup=/system.slice/kelpie-worker-ab-123-1-lightpanda.service","MemoryMax=2147483648","TasksMax=256","CPUQuotaPerSecUSec=1s",
  "IPAddressDeny=0.0.0.0/0 ::/0","IPAddressAllow=127.0.0.0/8 ::1/128"].join("\n");
@@ -33,4 +33,14 @@ test("unit policy must bind to the observed benchmark process and denial",()=>{
  assert.throws(()=>verifyWorkerPolicyBinding(policy,{...report,pid:124},"1001"),/POLICY_PROCESS_MISMATCH/);
  assert.throws(()=>verifyWorkerPolicyBinding(policy,{...report,uid:0},"1001"),/POLICY_USER_MISMATCH/);
  assert.throws(()=>verifyWorkerPolicyBinding(policy,{...report,networkProbe:{local:"connected",nonlocal:"connected"}},"1001"));
+});
+test("raw connection classifications remain bounded and tied to the active process",()=>{
+ for(const code of ["EACCES","EPERM","ECONNREFUSED","ECONNRESET","ENETUNREACH","EHOSTUNREACH","EADDRNOTAVAIL","ETIMEDOUT"]) assert.equal(classifySocketError(code),code);
+ assert.equal(classifySocketError("sensitive unexpected text"),"OTHER");
+ const policy=validateWorkerPolicy(good,"1001");
+ const observation={pid:123,uid:1001,observed:{local:"connected",nonlocal:"timeout"}};
+ assert.deepEqual(verifyWorkerObservationBinding(policy,observation,"1001"),observation.observed);
+ assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,pid:124},"1001"));
+ assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,uid:0},"1001"));
+ assert.throws(()=>verifyWorkerObservationBinding(policy,{...observation,observed:{local:"connected",nonlocal:"raw message"}},"1001"));
 });

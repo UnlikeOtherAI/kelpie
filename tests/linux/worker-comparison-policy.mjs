@@ -15,7 +15,7 @@ export function validateWorkerPolicy(text,expectedUser){
  assert.equal(entries.get("NoNewPrivileges"),"yes","POLICY_NNP");
  assert.equal(entries.get("KillMode"),"control-group","POLICY_KILL_MODE");
  assert.match(entries.get("ControlGroup")??"",
-  /^\/system\.slice\/kelpie-worker-ab-\d+-\d+-(lightpanda|playwright)\.service$/);
+  /^\/system\.slice\/kelpie-worker-ab-\d+-\d+-(lightpanda|playwright|probe)\.service$/);
  assert.equal(entries.get("MemoryMax"),"2147483648","POLICY_MEMORY");
  assert.equal(entries.get("TasksMax"),"256","POLICY_TASKS");
  assert.ok(["1s","1000000us"].includes(entries.get("CPUQuotaPerSecUSec")),"POLICY_CPU");
@@ -32,4 +32,13 @@ export function verifyWorkerPolicyBinding(policy,report,expectedUser){
  assert.equal(report.pid,policy.pid,"POLICY_PROCESS_MISMATCH");
  assert.equal(String(report.uid),expectedUser,"POLICY_USER_MISMATCH");
  assert.deepEqual(report.networkProbe,{local:"connected",nonlocal:"denied"});
+}
+export function verifyWorkerObservationBinding(policy,observation,expectedUser){
+ assert.equal(observation.pid,policy.pid,"POLICY_PROCESS_MISMATCH");
+ assert.equal(String(observation.uid),expectedUser,"POLICY_USER_MISMATCH");
+ const values=["connected","timeout","EACCES","EPERM","ECONNREFUSED","ECONNRESET",
+  "ENETUNREACH","EHOSTUNREACH","EADDRNOTAVAIL","ETIMEDOUT","OTHER"];
+ assert.ok(values.includes(observation.observed?.local)&&values.includes(observation.observed?.nonlocal),
+  "OBSERVATION_INVALID");
+ return observation.observed;
 }
