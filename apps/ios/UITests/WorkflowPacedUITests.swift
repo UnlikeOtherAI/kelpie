@@ -135,13 +135,13 @@ extension WorkflowCaptureUITests {
         let image = UIGraphicsImageRenderer(size: CGSize(width: first.width, height: first.height), format: format).image { renderer in
             UIColor.black.setFill()
             renderer.fill(CGRect(x: 0, y: 0, width: first.width, height: first.height))
-            UIImage(cgImage: second).draw(in: CGRect(x: 0, y: 0, width: first.width, height: height))
+            UIImage(cgImage: second).draw(in: CGRect(x: 0, y: 0, width: CGFloat(first.width), height: height))
         }
         for (name, data) in [("Original WK snapshot", before), ("Keyboard WK snapshot", after),
                              ("Unstretched fixed-canvas candidate", try XCTUnwrap(image.pngData()))] {
             let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
             attachment.name = name
-            attachment.lifetime = .keepAlways
+            attachment.lifetime = XCTAttachment.Lifetime.keepAlways
             add(attachment)
         }
     }
