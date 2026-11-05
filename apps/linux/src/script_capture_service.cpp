@@ -4,6 +4,7 @@
 #include "script_media_encoder.h"
 #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
 #include "../tests/script_admission_trace.h"
+#include "../tests/script_fixture_roi.h"
 #endif
 #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
 #include "../tests/g08_backing_observation.h"
@@ -51,16 +52,25 @@ class Capture final : public DesktopScriptCapture {
     #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
     auto backing = ObserveG08Backing(frame, source_size, shown, run_, observed_frames_);
     #endif
-    DrawScriptOverlay(frame, shown);
-    DesktopScriptFrameAdmission committed;
     // Step PNG requests share samples but must not increase movie frame rate.
     const bool movie_due=ScriptMovieFrameDue(last_movie_frame_,elapsed,options_.value("fps", 15));
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    std::vector<std::uint8_t> fixture_before;
+    if (movie_due && FixtureRoiEnabled()) fixture_before=FixtureRoi(frame);
+    int admitted_index=-1;
+    #endif
+    DrawScriptOverlay(frame, shown);
+    DesktopScriptFrameAdmission committed;
     #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
     const double previous_movie=last_movie_frame_;
     const auto committed_before=encoder_->committed_movie_frames();
     #endif
     if (movie_due) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+      admitted_index=static_cast<int>(trace_admitted_index_++);
+      if (FixtureRoiEnabled()) WriteFixtureRoi(admitted_index,fixture_before,FixtureRoi(frame));
+      #endif
       #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
       WriteG08Backing(backing); ++observed_frames_;
       #endif
@@ -93,7 +103,8 @@ class Capture final : public DesktopScriptCapture {
       WriteAdmissionTrace({{"phase",0},{"elapsedMs",elapsed},{"hasMarker",int(has_marker)},
         {"markerStartMs",start},{"markerDurationMs",duration},{"markerAgeMs",has_marker ? elapsed-start : -1},
         {"previousMovieMs",previous_movie},{"due",int(movie_due)},{"committedBefore",committed_before},
-        {"committedAfter",encoder_->committed_movie_frames()},{"actionIndex",index},{"stepPng",int(step)}});
+        {"committedAfter",encoder_->committed_movie_frames()},{"actionIndex",index},{"stepPng",int(step)},
+        {"admittedIndex",admitted_index}});
     }
     #endif
     if (step && screenshots_) {
@@ -164,6 +175,9 @@ class Capture final : public DesktopScriptCapture {
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
   std::size_t committed_marker_frames_ = 0;
   bool screenshots_ = false, movies_ = false, finished_ = false;
+  #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+  std::size_t trace_admitted_index_ = 0;
+  #endif
   #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
   std::size_t observed_frames_ = 0;
   #endif
