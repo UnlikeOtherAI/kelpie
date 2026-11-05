@@ -2,6 +2,7 @@ import {writeFile} from "node:fs/promises";
 import path from "node:path";
 import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture.mjs";
 import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
+import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
@@ -122,6 +123,7 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(!("outputs" in status),"STATUS_OUTPUT_LEAK");
   return {code:value.error.code,priorOutputScrubbed:true,noInput:true,artifactsDiscarded:true};
  });
+ await runPrivacy({client,fixture,base,capture,check,load});
  await check("gif-native-stop-partial-recovery",async()=>{
   await load();
   const pending=client.api("play-script",{...base,capture:{...capture,formats:["gif"]},actions:[

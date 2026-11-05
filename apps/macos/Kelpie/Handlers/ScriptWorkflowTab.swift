@@ -77,7 +77,12 @@ final class ScriptWorkflowTab {
         throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
     }
 
-    func fixed(_ expression: String, mutates: Bool = false) async throws -> Any? {
+    func fixed(
+        _ expression: String,
+        mutates: Bool = false,
+        consume: (@MainActor (Any?) -> Void)? = nil,
+        uncertain: (@MainActor () -> Void)? = nil
+    ) async throws -> Any? {
         try await check()
         guard !ScriptRendererDeadline.isRetiring(renderer) else { throw ScriptWorkflowFailure("BUSY") }
         if mutates {
@@ -87,6 +92,8 @@ final class ScriptWorkflowTab {
         defer { if mutates { router.browserLease.end() } }
         let before = document
         let value: Any?
+        var evaluationStarted = false
+        var valueReturned = false
         do {
             value = try await ScriptRendererDeadline.run(
                 renderer: renderer,
@@ -96,12 +103,25 @@ final class ScriptWorkflowTab {
                 operation: { [self] in
                     try await check()
                     guard before == document else { throw ScriptWorkflowFailure("DOCUMENT_CHANGED") }
-                    return try await renderer.evaluateBrowserControlJS(expression)
+                    evaluationStarted = true
+                    let result = try await renderer.evaluateBrowserControlJS(expression)
+                    consume?(result)
+                    valueReturned = true
+                    return result
                 }
             )
-        } catch let failure as ScriptWorkflowFailure { throw failure } catch { throw ScriptWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates) }
-        do { try await check() } catch { throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates) }
-        guard before == document else { throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates) }
+        } catch {
+            if evaluationStarted, !valueReturned { uncertain?() }
+            throw error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates)
+        }
+        do { try await check() } catch {
+            if mutates { uncertain?() }
+            throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates)
+        }
+        guard before == document else {
+            if mutates { uncertain?() }
+            throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
+        }
         return value
     }
 
@@ -125,18 +145,34 @@ final class ScriptWorkflowTab {
         )
     }
 
-    func target(_ target: Body, token: String? = nil, observe: Bool = false, dispatch: Bool = false, edit: Body? = nil) async throws -> Body {
+    func target(
+        _ target: Body,
+        token: String? = nil,
+        observe: Bool = false,
+        dispatch: Bool = false,
+        edit: Body? = nil,
+        refuseSensitive: Bool = false,
+        consume: (@MainActor (Body) -> Void)? = nil,
+        uncertain: (@MainActor () -> Void)? = nil
+    ) async throws -> Body {
         var options: Body = ["key": key, "target": target, "dispatch": dispatch]
         if let token { options["token"] = token }
         if observe { options["observe"] = true }
         if let edit { options["edit"] = edit }
+        if refuseSensitive { options["policy"] = ["refuseSensitive": true] }
         guard let input = ScriptBoundWorkflow.json(options),
               let pointer = kelpie_browser_script_target_expression(input) else { throw ScriptWorkflowFailure("INVALID_TARGET") }
         defer { kelpie_mcp_free_string(pointer) }
         guard let expression = ScriptBoundWorkflow.decode(String(cString: pointer))?["expression"] as? String else {
             throw ScriptWorkflowFailure("INVALID_TARGET")
         }
-        guard let result = try await fixed(expression, mutates: dispatch || edit != nil) as? Body else {
+        guard let result = try await fixed(
+            expression,
+            mutates: dispatch || edit != nil,
+            consume: { value in if let body = value as? Body { consume?(body) } },
+            uncertain: uncertain
+        ) as? Body else {
+            uncertain?()
             throw ScriptWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
         }
         return result

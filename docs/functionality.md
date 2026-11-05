@@ -694,3 +694,5 @@ changes. Page touches remain blocked while recording is active.
 Android recording holds the current orientation through finalization and restores the previous orientation policy on completion, abort, failure or UI disposal, matching iOS.
 
 Debug macOS builds initialize the existing AppReveal companion once per process and declare its Bonjour service. Hosted native checks use its app-owned controls alongside ordinary protected HTTP/MCP pairing.
+
+Mac workflow privacy consumes late fixed-reader classifications before renderer guards and waits for existing callback retirement before publishing terminal outputs or media. Unknown classification after attempted target evaluation scrubs the current edit literal; recording additionally discards captures. Active artifacts remain withheld while prior safe terminal artifacts stay readable. Hosted native focus-transition and timeout cases are defined; execution is pending the AppReveal startup candidate.

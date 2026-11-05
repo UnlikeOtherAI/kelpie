@@ -11,6 +11,8 @@ final class ScriptWorkflowActions {
     var capture: ScriptCapture?
     private(set) var outputs: Body = [:]
     private(set) var secrets: [String]
+    private var knownSecrets: Set<String>
+    private(set) var discardMedia = false
 
     init(
         workflow: ScriptBoundWorkflow,
@@ -25,6 +27,7 @@ final class ScriptWorkflowActions {
         self.router = router
         self.check = check
         secrets = workflow.sensitiveValues
+        knownSecrets = Set(workflow.sensitiveValues)
     }
 
     func execute(_ step: Body, index: Int) async throws {
@@ -111,11 +114,14 @@ final class ScriptWorkflowActions {
     }
 
     private func requireOK(_ result: Body) throws {
+        guard result["sensitive"] is Bool else {
+            throw ScriptWorkflowFailure("TARGET_FAILED", mayHaveCompleted: result["mayHaveCompleted"] as? Bool == true)
+        }
         guard result["ok"] as? Bool == true else {
             // The isolated-world fixed target function supplies these diagnostic enums.
             let allowed: Set<String> = [
                 "AMBIGUOUS_TARGET", "INPUT_UNCERTAIN", "INVALID_TARGET", "INVALID_TARGET_OPERATION",
-                "STALE_TARGET", "TARGET_MOVED", "TARGET_NOT_EDITABLE", "TARGET_NOT_FOUND",
+                "SENSITIVE_CAPTURE_REFUSED", "STALE_TARGET", "TARGET_MOVED", "TARGET_NOT_EDITABLE", "TARGET_NOT_FOUND",
                 "TARGET_NOT_INTERACTABLE", "TARGET_OBSCURED", "TARGET_OUTSIDE_VIEWPORT",
                 "TARGET_QUERY_LIMIT", "VIEWPORT_CHANGED"
             ]
@@ -125,24 +131,47 @@ final class ScriptWorkflowActions {
         }
     }
 
+    private func registerSecret(_ text: String?) {
+        if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
+    }
+
+    private func consumeSensitivity(_ result: Body, text: String?) {
+        guard let sensitive = result["sensitive"] as? Bool else { consumeUncertainty(text: text); return }
+        guard sensitive else {
+            if result["sensitivityKnown"] as? Bool != true { consumeUncertainty(text: text) }
+            return
+        }
+        registerSecret(text)
+        if workflow.capture != nil { discardMedia = true }
+    }
+
+    private func consumeUncertainty(text: String?) {
+        registerSecret(text)
+        if workflow.capture != nil { discardMedia = true }
+    }
+
     private func interact(_ step: Body, action: String, index: Int) async throws {
         let target = step["target"] as? Body ?? [:]
+        let editing = action == "type" || action == "fill"
+        let text = editing ? step["text"] as? String : nil
+        let consume = { [self] (result: Body) in consumeSensitivity(result, text: text) }
+        let uncertain = { [self] in consumeUncertainty(text: text) }
+        if step["sensitive"] as? Bool == true { consume(["sensitive": true]) }
         let document = tab.document
         let viewport = try await tab.viewport()
-        let found = try await tab.target(target)
+        let found = try await tab.target(target, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain)
         try requireOK(found)
         guard let token = found["token"] as? String, let x = found["x"] as? Double, let y = found["y"] as? Double else {
             throw ScriptWorkflowFailure("INVALID_TARGET")
         }
-        let editing = action == "type" || action == "fill"
-        let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
-        if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
-        if sensitive, workflow.capture != nil { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await presentation.move(to: point, options: workflow.settings["pointer"] as? Body ?? [:], check: check)
         var settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         settings["radius"] = Double(CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width)
-        try requireOK(try await tab.target(target, token: token))
+        try requireOK(try await tab.target(
+            target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, uncertain: uncertain
+        ))
         presentation.indicate(at: point, options: settings, hold: capture?.hasMovies == true)
         if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
         try await capture?.ensureMarkerAdmission()
@@ -151,9 +180,21 @@ final class ScriptWorkflowActions {
         let current = try await tab.viewport()
         guard tab.document == document, viewport == current else { throw ScriptWorkflowFailure("STALE_TARGET") }
         let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
-        let result = try await tab.target(target, token: token, dispatch: !editing, edit: edit)
+        let result = try await tab.target(
+            target,
+            token: token,
+            dispatch: !editing,
+            edit: edit,
+            refuseSensitive: workflow.capture != nil,
+            consume: consume,
+            uncertain: uncertain
+        )
         try requireOK(result)
-        do { try await check() } catch { throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true) }
+        if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+        do { try await check() } catch {
+            uncertain()
+            throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
     }
 
 }
