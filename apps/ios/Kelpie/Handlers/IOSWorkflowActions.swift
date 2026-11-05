@@ -375,6 +375,9 @@ final class IOSWorkflowActions {
             let known = ["document-focus", "target-focus", "identity", "viewport", "eligibility",
                          "budget", "geometry", "hit", "sensitivity", "unknown"]
             if known.contains(reason) { IOSFrameSampler.diagnostic("focus-" + reason) }
+            if reason == "document-focus" {
+                IOSFrameSampler.diagnostic(tab.rendererContainsFirstResponder ? "responder-descendant" : "responder-outside")
+            }
         }
         #endif
         guard result["sensitive"] as? Bool == true else { return }

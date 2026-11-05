@@ -84,10 +84,21 @@ final class IOSWorkflowTab {
 
     func focusForEditing() throws {
         try requireCurrent()
-        guard view.window != nil, view.becomeFirstResponder() else {
-            throw IOSWorkflowFailure("INPUT_NOT_AVAILABLE")
-        }
+        let accepted = view.window != nil && view.becomeFirstResponder()
+        #if DEBUG
+        IOSFrameSampler.diagnostic(accepted ? "responder-accepted" : "responder-refused")
+        #endif
+        guard accepted else { throw IOSWorkflowFailure("INPUT_NOT_AVAILABLE") }
     }
+
+    #if DEBUG
+    var rendererContainsFirstResponder: Bool {
+        func containsResponder(_ current: UIView) -> Bool {
+            current.isFirstResponder || current.subviews.contains(where: containsResponder)
+        }
+        return containsResponder(view)
+    }
+    #endif
 
     private func requireMutationAuthority() async throws {
         guard await grant.isCurrent() else { throw IOSWorkflowFailure("AUTHORIZATION_REVOKED") }
