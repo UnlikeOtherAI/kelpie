@@ -3,6 +3,15 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
+    private func fixedCoordinate(_ element: XCUIElement, in application: XCUIApplication) -> XCUICoordinate {
+        let frame = element.frame
+        let appFrame = application.frame
+        return application.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(dx: frame.midX - appFrame.minX, dy: frame.midY - appFrame.minY)
+        )
+    }
+
+    @MainActor
     func testScriptStopPreservesNonMovieViewportAndMovieImmersion() async throws {
         let (fixture, tab) = try await ready()
         continueAfterFailure = true
@@ -20,7 +29,7 @@ extension WorkflowCaptureUITests {
         let application = XCUIApplication()
         let initialChrome = application.buttons["browser.more"]
         XCTAssertTrue(initialChrome.waitForExistence(timeout: 5))
-        let chromeCoordinate = initialChrome.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let chromeCoordinate = fixedCoordinate(initialChrome, in: application)
         chromeCoordinate.tap()
         let menuItem = application.buttons["browser.tabs.count"]
         XCTAssertTrue(menuItem.waitForExistence(timeout: 5), "More must open at the captured coordinate")
@@ -93,7 +102,7 @@ extension WorkflowCaptureUITests {
         let before = viewport.frame
         let closeBefore = application.buttons["browser.viewport.close"]
         XCTAssertTrue(closeBefore.waitForExistence(timeout: 5))
-        let closeCoordinate = closeBefore.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let closeCoordinate = fixedCoordinate(closeBefore, in: application)
         let original = XCTAttachment(screenshot: application.screenshot())
         original.name = "Tablet stage before non-movie script"
         original.lifetime = .keepAlways
@@ -141,7 +150,7 @@ extension WorkflowCaptureUITests {
         let application = XCUIApplication()
         let address = application.textFields["browser.url.field"]
         XCTAssertTrue(address.waitForExistence(timeout: 5))
-        let addressCoordinate = address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let addressCoordinate = fixedCoordinate(address, in: application)
         addressCoordinate.tap()
         XCTAssertTrue(application.keyboards.firstMatch.waitForExistence(timeout: 5), "Address must focus before playback")
         let playback = Task.detached { [probe] in
