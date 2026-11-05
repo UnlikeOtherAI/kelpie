@@ -178,6 +178,7 @@ class ScriptActions(
                 held = movies,
             )
         overlay.indicate(marker)
+        if (!movies) withContext(Dispatchers.Main.immediate) { overlay.bindRetirementFrame(view) }
         prepareInput(index, (marker.start - run.startedNanos) / 1_000_000.0, oldDocument)
         if (movies) overlay.indicate(marker.copy(start = System.nanoTime(), held = false))
         guard()

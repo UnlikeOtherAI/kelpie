@@ -43,6 +43,14 @@ class ScriptOverlay {
         val position: String,
     )
 
+    data class RetainedTap(val generation: Long, val owner: String, val document: String, val deadlineNs: Long)
+
+    private var activeOwner: String? = null
+    private var generation = 0L
+    private var retainedOwner: String? = null
+    private var retainedDeadlineNs = 0L
+    private var retainedGuard: (() -> Boolean)? = null
+    private var markerFrame: ScriptOverlayFrame? = null
     private var pointer: Pointer? = null
     private var tap: Tap? = null
     private var markerDrawLogged = false
@@ -57,6 +65,7 @@ class ScriptOverlay {
 
     @Synchronized
     fun attach(target: View) {
+        if (view.get() !== target && retainedOwner != null) clear()
         view = WeakReference(target)
         changed()
     }
@@ -87,6 +96,10 @@ class ScriptOverlay {
 
     @Synchronized
     fun indicate(value: Tap) {
+        generation++
+        retainedOwner = null
+        retainedGuard = null
+        markerFrame = null
         tap = value
         markerDrawLogged = false
         if (BuildConfig.DEBUG) {
@@ -103,6 +116,12 @@ class ScriptOverlay {
 
     @Synchronized
     fun clear() {
+        activeOwner = null
+        generation++
+        retainedOwner = null
+        retainedDeadlineNs = 0L
+        retainedGuard = null
+        markerFrame = null
         pointer = null
         tap = null
         commentary = null
@@ -115,6 +134,62 @@ class ScriptOverlay {
     }
 
     @Synchronized
+    fun claimRun(owner: String) {
+        clear()
+        activeOwner = owner
+    }
+
+    @Synchronized
+    fun clearOwned(owner: String) {
+        if (activeOwner == owner) clear()
+    }
+
+    @Synchronized
+    fun bindRetirementFrame(target: android.webkit.WebView) {
+        markerFrame = view.get()?.let { ScriptOverlayFrame.capture(target, it) }
+    }
+    /** Keeps only the final live tap until its original deadline; never extends it. */
+    @Synchronized
+    fun retainFinalTap(owner: String, now: Long, guard: () -> Boolean): RetainedTap? {
+        if (activeOwner != owner) return null
+        val current = tap ?: return null
+        val currentDocument = document ?: return null
+        if (markerFrame?.matches() != true || !runCatching(guard).getOrDefault(false)) return null
+        if (current.held || !current.durationMs.isFinite() || current.durationMs <= 0.0) return null
+        val deadline = current.start + (current.durationMs.coerceAtMost(5_000.0) * 1_000_000).toLong()
+        if (deadline <= now) return null
+        pointer = null
+        commentary = null
+        retainedOwner = owner
+        retainedDeadlineNs = deadline
+        retainedGuard = guard
+        val retained = RetainedTap(generation, owner, currentDocument, deadline)
+        val delayMs = ((deadline - now + 999_999) / 1_000_000).coerceAtLeast(1)
+        main.postDelayed({ clearRetained(retained) }, delayMs)
+        changed()
+        return retained
+    }
+
+    @Synchronized
+    fun isRetained(value: RetainedTap): Boolean = generation == value.generation && retainedOwner == value.owner
+
+    @Synchronized
+    fun clearRetained(value: RetainedTap) {
+        if (isRetained(value)) clear()
+    }
+
+    @Synchronized
+    fun clearRetainedOwner(owner: String) {
+        if (retainedOwner == owner) clear()
+    }
+    @Synchronized
+    fun isAttachedView(target: View): Boolean = view.get() === target
+
+    @Synchronized
+    fun clearRetainedForView(target: View) {
+        if (view.get() === target && retainedOwner != null) clear()
+    }
+    @Synchronized
     fun draw(
         canvas: Canvas,
         width: Int,
@@ -122,6 +197,13 @@ class ScriptOverlay {
         now: Long,
         documentId: String?,
     ): Boolean {
+        if (retainedOwner != null &&
+            (now >= retainedDeadlineNs || documentId != document ||
+                markerFrame?.matches() != true || !runCatching { retainedGuard?.invoke() == true }.getOrDefault(false))
+        ) {
+            clear()
+            return false
+        }
         if (BuildConfig.DEBUG && tap != null && !markerDrawLogged) {
             markerDrawLogged = true
             Log.d(
@@ -228,9 +310,24 @@ class ScriptOverlayView(
         overlay.attach(this)
     }
 
+    override fun onDetachedFromWindow() {
+        overlay.clearRetainedForView(this)
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) overlay.clearRetainedForView(this)
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility != VISIBLE) overlay.clearRetainedForView(this)
+    }
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean = recording()
 
     override fun onDraw(canvas: Canvas) {
+        if (!overlay.isAttachedView(this)) return
         if (overlay.draw(canvas, width, height, System.nanoTime(), document())) postInvalidateOnAnimation()
     }
 }
