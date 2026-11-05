@@ -14,6 +14,7 @@ import type { DiscoveredDevice } from "../types.js";
 import type { GlobalOptions } from "../types.js";
 import {
   clearRunningBrowser,
+  clearRunningBrowserIfMatches,
   getBrowserAlias,
   loadBrowserStore,
   readLocalReadiness,
@@ -106,6 +107,12 @@ async function reconcilePendingLaunch(name: string): Promise<boolean> {
   if (!running.pid || !pendingProcessGone(running.pid)) return false;
   await clearRunningBrowser(name);
   return true;
+}
+async function deadReadinessMatches(file: string, launchId: string): Promise<boolean> {
+  const readiness = await readLocalReadiness(file);
+  if (readiness) return readiness.launchId === launchId;
+  try { await access(file); return false; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT"; }
 }
 export interface ReadinessWaitOptions {
   timeoutMs?: number;
@@ -384,6 +391,17 @@ export function registerBrowser(program: Command): void {
         return;
       }
       const readiness = await readLocalReadiness(running.readinessFile);
+      if (pendingProcessGone(running.pid)) {
+        if (!await deadReadinessMatches(running.readinessFile, running.launchId) ||
+            !pendingProcessGone(running.pid) ||
+            !await deadReadinessMatches(running.readinessFile, running.launchId) ||
+            !await clearRunningBrowserIfMatches(name, running)) {
+          print({ success: false, error: { code: "BROWSER_LAUNCH_MISMATCH", message: "Launch identity changed or readiness is unreadable during dead-process reconciliation" } }, globals.format);
+          process.exitCode = 5; return;
+        }
+        print({ success: true, name, alreadyExitedPid: running.pid }, globals.format);
+        return;
+      }
       if (readiness?.launchId !== running.launchId) {
         print({ success: false, error: { code: "BROWSER_LAUNCH_MISMATCH", message: "Refusing to stop a process whose readiness launch ID changed" } }, globals.format);
         process.exitCode = 5;
