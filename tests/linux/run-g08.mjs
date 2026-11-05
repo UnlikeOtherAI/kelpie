@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { promisify } from "node:util";
-import { startG08Fixture, g08Workflow } from "../capture/g08-fixture.mjs";
+import { startG08Fixture, g08Workflow, mapG08Scene } from "../capture/g08-fixture.mjs";
 
 const [readinessFile, binaryFile, outputArg, runtime] = process.argv.slice(2);
 assert.ok(readinessFile && binaryFile && outputArg && ["linux-osr-cef", "linux-gtk-cef"].includes(runtime));
@@ -15,7 +15,7 @@ const ready = JSON.parse(await readFile(readinessFile, "utf8"));
 assert.equal(ready.controlMode, "loopback");
 const source = process.env.KELPIE_CAPTURE_SOURCE;
 const binarySHA256 = createHash("sha256").update(await readFile(binaryFile)).digest("hex");
-const report = { source, binarySHA256, runtime, eventsDropped: 0, cases: [] };
+const report = { source, testSource: process.env.KELPIE_TEST_REVISION ?? source, binarySHA256, runtime, eventsDropped: 0, cases: [] };
 const api = async (method, body = {}) => {
   const response = await fetch(`http://127.0.0.1:${ready.port}/v1/${method}`, {
     method: "POST", headers: { authorization: `Bearer ${ready.token}`, "content-type": "application/json" },
@@ -46,8 +46,8 @@ try {
       assert.equal(result.success, true, JSON.stringify(result.error));
       const facts = await (await fetch(new URL("/events", fixture.url))).json();
       report.eventsDropped += facts.dropped;
-      assert.deepEqual(facts.events.map(fact => fact.target), ["finish", "start", "finish"]);
-      const entry = { curve, runId: result.runId, capture: workflow.capture, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts: [] };
+      const scene = mapG08Scene(facts.events);
+      const entry = { curve, runId: result.runId, capture: workflow.capture, scene, artifacts: [] };
       report.cases.push(entry);
       for (const artifact of result.artifacts) {
         if (!["image/gif", "video/mp4"].includes(artifact.mimeType)) continue;

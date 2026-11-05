@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 const [recordPath, gifPath, expectedPath, evidencePath, candidatePath, capturePath, outputPath] = process.argv.slice(2);
 assert.ok(outputPath, "Expected records, GIF, expected geometry, live candidate evidence, executable, capture report, new output");
 const hash = value => createHash("sha256").update(value).digest("hex");
-assert.ok((await stat(recordPath)).size <= 20000000, "Backing evidence too large");
+assert.ok((await stat(recordPath)).size <= 24000000, "Backing evidence too large");
 const data = await readFile(recordPath);
 const records = data.toString("utf8").trimEnd().split("\n").map(line => JSON.parse(line));
 const expected = JSON.parse(await readFile(expectedPath,"utf8"));
@@ -64,7 +64,7 @@ for (const [name,member] of Object.entries({compositor:"script_frame_compositor.
   assert.equal(hash(extracted.stdout),evidence.mediaObjectSHA256[name]);
   assert.ok(map.includes(Buffer.from("libkelpie_linux_script_media.a("+member+")")));
 }
-assert.ok(records.length > 0 && records.length <= 600);
+assert.ok(records.length > 0 && records.length <= 800);
 assert.match(expected.binarySHA256,/^[a-f0-9]{64}$/);
 assert.match(expected.source,/^[a-f0-9]{40}$/);
 const probe=spawnSync("ffprobe",["-v","error","-select_streams","v:0","-show_entries",

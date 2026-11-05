@@ -19,7 +19,8 @@ int main() {
   frame.bgra[std::size_t(260)*frame.stride+515*4]=0;
   const auto second=ObserveG08Backing(frame,source,shown,"run",1);
   assert(first.at("bgraSHA256")!=second.at("bgraSHA256"));
+  assert(ObserveG08Backing(frame,source,shown,"run",799).at("sequence")==799);
   bool refused=false;
-  try { (void)ObserveG08Backing(frame,source,shown,"run",600); } catch (...) { refused=true; }
+  try { (void)ObserveG08Backing(frame,source,shown,"run",800); } catch (...) { refused=true; }
   assert(refused);
 }
