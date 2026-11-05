@@ -53,6 +53,7 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
         var visible = false
+        var mismatch: (screen: XCUIScreenshot, target: CGRect, greenElsewhere: Bool)?
         repeat {
             let viewport = app.webViews.firstMatch
             let submit = viewport.buttons["Submit"].firstMatch
@@ -70,8 +71,26 @@ final class WorkflowCaptureUITests: XCTestCase {
                 visible = true
                 break
             }
+            if stop.exists {
+                let greenElsewhere = screen.image.cgImage.map { WorkflowCaptureProbe.containsMarker($0) } ?? false
+                if mismatch == nil || (target.isNull == false && mismatch?.target.isNull == true) ||
+                    (greenElsewhere && mismatch?.greenElsewhere == false) {
+                    mismatch = (screen, target, greenElsewhere)
+                }
+            }
             try await Task.sleep(nanoseconds: 70_000_000)
         } while Date() < deadline && stop.exists
+        if !visible, let mismatch {
+            let screenshot = XCTAttachment(screenshot: mismatch.screen)
+            screenshot.name = "Native marker check failed while Stop was visible"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let geometry = XCTAttachment(string: "Visible Submit frame " + String(describing: mismatch.target) +
+                ", green component elsewhere " + String(mismatch.greenElsewhere))
+            geometry.name = "Failed marker target geometry"
+            geometry.lifetime = .keepAlways
+            add(geometry)
+        }
         XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
         let result = try await playback.value
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
