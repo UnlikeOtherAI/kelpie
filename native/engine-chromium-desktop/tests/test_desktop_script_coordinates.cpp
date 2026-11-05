@@ -5,6 +5,9 @@
 int main(){
   assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false}}));
   assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown","false"}}));
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown",false},{"error","bad"}}));
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",false},{"sensitive",false},{"sensitivityKnown",false}}));
+  assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","STALE_TARGET"}}));
   assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown",false}}));
   assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",true},{"sensitivityKnown",true}}));
   assert(kelpie::ScriptTargetInspectionUncertain(nullptr));

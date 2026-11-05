@@ -122,6 +122,10 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
         uncertain();
         return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy classification is malformed");
       }
+      if (!target["ok"].get<bool>()) {
+        uncertain();
+        return BrowserControlResult::Failure(target["error"].get<std::string>(), "Post-input classification failed");
+      }
       const bool known = target["sensitivityKnown"].get<bool>();
       if (!known) {
         const bool navigated = same_tab_navigated();
@@ -130,8 +134,6 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       }
       if (target.value("sensitive", false) && options.value("policy", Json::object()).value("refuseSensitive", false))
         return BrowserControlResult::Failure("SENSITIVE_CAPTURE_REFUSED", "Sensitive input cannot expose captures");
-      if (!target.value("ok", false))
-        return BrowserControlResult::Failure("INPUT_UNCERTAIN", "Post-input classification failed");
       return BrowserControlResult::Success();
     }
     if (!target.value("ok", false))
