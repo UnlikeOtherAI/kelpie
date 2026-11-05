@@ -81,14 +81,14 @@ jobs:
         run: |
           set -euo pipefail
           package_root="dist/release/${DISTRO_NAME}"
-          printf 'referenceRun=42066988249\nsourceRun=%s\nimage=%s\n' "${SOURCE_RUN}" "${DISTRO_IMAGE}" > "${package_root}/resource-image.txt"
+          printf 'referenceRun=42066988249\nsourceRun=%s\nimage=%s\nshmSizeBytes=268435456\n' "${SOURCE_RUN}" "${DISTRO_IMAGE}" > "${package_root}/resource-image.txt"
           curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "${RUNNER_TEMP}/kelpie-moby-default.json"
           KELPIE_SECCOMP_BASELINE="${RUNNER_TEMP}/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
           node scripts/ci/linux-test-seccomp.mjs "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json"
           expected="$(awk 'NR==2 {print $1}' "${package_root}/test-seccomp-sha256.txt")"
           test "$(sha256sum "${RUNNER_TEMP}/kelpie-test-seccomp.json" | cut -d' ' -f1)" = "${expected}"
           test_revision="$(cat "${package_root}/resource-test-revision.txt")"
-          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
             --security-opt no-new-privileges=true \
             --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
             -e KELPIE_LINUX_RESOURCE_DIAGNOSTIC=1 -e KELPIE_INSTALLED_SMOKE_DIAGNOSTIC=1 \
