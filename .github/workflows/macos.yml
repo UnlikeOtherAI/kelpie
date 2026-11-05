@@ -11,7 +11,24 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect macOS build inputs
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Check dependency scope
+        id: scope
+        run: python3 scripts/ci/macos_inputs.py >> "$GITHUB_OUTPUT"
+      - name: Verify scope gate
+        run: python3 -m unittest discover -s tests/ci -p 'test_macos_inputs.py'
+
   build:
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     name: Build macOS (app + XCTest)
     # The existing CEF bootstrap targets Apple Silicon; this stable image includes Xcode 26.
     runs-on: macos-26
