@@ -7,6 +7,7 @@ import { executePlaywrightPage } from "./playwright.js";
 export const LIGHTPANDA_CANDIDATE_METHODS = [
   "tabs.list", "tabs.new", "tabs.close", "tab.goto", "tab.back", "tab.forward",
   "tab.reload", "tab.url", "tab.title",
+  "tab.snapshot", "tab.extract", "tab.status", "tab.ready",
 ] as const satisfies readonly BrowserControlMethod[];
 export type LightpandaVerifiedMethod = typeof LIGHTPANDA_CANDIDATE_METHODS[number];
 
