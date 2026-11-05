@@ -5,17 +5,23 @@ export async function startFixture() {
  const server=createServer(async(req,res)=>{
   const url=new URL(req.url,"http://fixture.invalid");
   if(req.method==="POST"&&url.pathname==="/events"){
-   let text="";for await(const bytes of req){text+=bytes;if(text.length>16384){res.writeHead(413).end();return;}}
+   let text="";
+   try{for await(const bytes of req){text+=bytes;if(text.length>16384){res.writeHead(413).end();return;}}}
+   catch(error){
+    if(req.aborted||error?.code==="ECONNRESET")return;
+    if(!res.headersSent)res.writeHead(500).end();
+    return;
+   }
    let value;try{value=JSON.parse(text);}catch{res.writeHead(400).end();return;}
    if(events.length<10000)events.push(value);
    res.writeHead(202).end();return;
   }
   const mode=url.pathname;
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
-  const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive"].includes(mode)?mode:"";
-  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":"Hosted Mac fixture";
-  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
-  const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
+  const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"].includes(mode)?mode:"";
+  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":mode==="/paced-final-delay"?"Delayed X fixture":"Hosted Mac fixture";
+  const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next",edge=mode==="/edge";
+  const body=edge?'<button id="edge" aria-label="Edge"></button>':motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
    <label>Draft message<textarea id="entry">Draft seed</textarea></label>
    <label>Account password<input id="password" type="password"></label>
@@ -27,6 +33,7 @@ export async function startFixture() {
    <div id="cover-box"><button id="covered">Covered</button><div id="cover">Cover</div></div>
    <button id="replace"><span>Replace child</span></button>
    <label>Readonly on focus<input id="readonly" value="seed"></label>
+   <label>Static readonly<input id="static-readonly" value="seed" readonly></label>
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
@@ -43,6 +50,7 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
+  for(const id of ['submit','static-readonly'])document.getElementById(id)?.addEventListener('focus',()=>send({type:'paced-focus',target:id},true));
   for(const id of ['entry','focus-privacy']){
    const field=document.getElementById(id);
    field?.addEventListener('focus',()=>{if(pacedMode)send({type:'paced-focus',target:id},true)});
@@ -53,6 +61,8 @@ export async function startFixture() {
     if(id==='entry'&&pacedMode==='/paced-blur')value.blur();
     if(id==='entry'&&pacedMode==='/paced-replace')value.replaceWith(value.cloneNode(true));
     if(id==='focus-privacy'&&pacedMode==='/paced-sensitive')value.autocomplete='current-password';
+    if(id==='entry'&&pacedMode==='/paced-final-url')history.replaceState(null,'','/paced-final-url-changed');
+    if(id==='entry'&&pacedMode==='/paced-final-delay'){const end=performance.now()+5500;while(performance.now()<end){}}
    });
   }
   document.querySelector('#submit')?.addEventListener('pointerdown',()=>{if(privacyMode==='/known-url'){send({type:'known-mid-transition'},true);history.replaceState(null,'','/known-url-changed')}});
@@ -75,7 +85,7 @@ export async function startFixture() {
   addEventListener('scroll',()=>send({type:'scroll'}));
   send({type:'document'});
   })();`;
-  const style=motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
+  const style=edge?`body{margin:0;min-height:2000px;background:white}#edge{position:absolute;right:10px;top:90px;width:30px;height:30px;border:0;background:white}`:motion?`body{margin:0;background:white;overflow:hidden}button{position:absolute;border:0;background:white;color:white}
    #first{left:40px;top:230px;width:30px;height:30px}#second{left:540px;top:60px;width:30px;height:30px}`:
    bands?`body{margin:0;height:9000px;background:repeating-linear-gradient(to bottom,#f00 0 1000px,#0f0 1000px 2000px,#00f 2000px 3000px,#f0f 3000px 4000px)}`:
    next?"body{background:#ffe881;color:black}":`

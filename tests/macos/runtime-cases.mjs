@@ -9,7 +9,7 @@ import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
-import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
+import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
@@ -197,6 +197,16 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(actual.every((v,i)=>Math.abs(v-expected[i])<20),"SCROLLED_SOURCE_DESTINATION_PIXEL");
   return {sourceY,expected,actual,viewport:event.viewport,visual:event.visual,artifact:item};
  });
+ await check("scrollbar-right-edge-marker",async()=>{
+  await load("/edge");const begin=fixture.events.length;
+  const result=await client.api("play-script",{...base,tapIndicator:{color:"#F54242",radius:18,durationMs:700,wobble:false,fade:false},
+   capture:{...capture,formats:["screenshots"]},actions:[{action:"click",target:{role:"button",name:"Edge"}}]});
+  requireTrue(result.success,"EDGE_WORKFLOW");
+  const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="edge"));
+  const artifacts=await client.download(result,engine+"-edge");
+  const image=artifacts.find(a=>a.mimeType==="image/png");requireTrue(image,"EDGE_SCREENSHOT");
+  return inspectEdgeMarker(image,event);
+ });
  for(const formats of [["gif","video"],["gif","video","screenshots"]])await check("low-fps-navigation-marker-"+formats.length,async()=>{
   await load();
   const begin=fixture.events.length;
@@ -243,6 +253,27 @@ export async function runEngine(client,fixture,engine,report) {
    tapIndicator:{color:curve==="s"?"#F54242":"#22CCFF",radius:curve==="s"?30:12,durationMs:700,wobble:curve==="s",fade:curve==="s"},
    capture:{...capture,formats:["gif","video"],fps:15},actions:[{action:"click",target:{role:"button",name:"First"}},
     {action:"wait",ms:800},{action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:800}]});
+  if(!result.success){
+   const allowed=new Set(["AUTHORIZATION_REVOKED","BUSY","CAPTURE_ADMISSION_FAILED","CAPTURE_AFTER_ACTION_FAILED",
+    "CAPTURE_ARTIFACT_FAILED","CAPTURE_BYTE_LIMIT","CAPTURE_DOCUMENT_CHANGED","CAPTURE_DURATION_LIMIT",
+    "CAPTURE_FAILED","CAPTURE_FINALIZATION_LIMIT","CAPTURE_STOPPED","CAPTURE_VIEWPORT_CHANGED",
+    "CAPTURE_VIEWPORT_UNAVAILABLE","DOCUMENT_CHANGED","INPUT_INTERRUPTED","INPUT_UNCERTAIN","INVALID_PARAM",
+    "INVALID_SCRIPT","INVALID_TARGET","RECORDING_IN_PROGRESS","RENDERER_CHANGED","SCRIPT_ABORTED",
+    "SENSITIVE_CAPTURE_REFUSED","STALE_TARGET","TAB_CHANGED","TAB_NOT_ACTIVE","TAB_NOT_VISIBLE",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_INTERACTABLE","TARGET_OBSCURED",
+    "TARGET_OUTSIDE_VIEWPORT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR","WORKFLOW_FAILED"]);
+   const events=fixture.events.slice(begin);
+   const failure={engine,curve,code:allowed.has(result.error?.code)?result.error.code:"OTHER",
+    mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
+    firstClicks:events.filter(e=>e.type==="click"&&e.target==="first").length,
+    secondClicks:events.filter(e=>e.type==="click"&&e.target==="second").length,play:playFacts(result)};
+   (report.motionFailures??=[]).push(failure);
+   try{
+    const artifacts=await client.download(result,engine+"-motion-failure");
+    failure.downloaded=artifacts.map(a=>({mimeType:a.mimeType,partial:a.partial,byteLength:a.byteLength,sha256:a.sha256}));
+    failure.decode=artifacts.filter(a=>a.mimeType!=="image/png").map(a=>inspectMedia(a));
+   }catch(error){failure.downloadError=errorFacts(error);}
+  }
   requireTrue(result.success,"MOTION_WORKFLOW");
   const events=fixture.events.slice(begin),first=events.find(e=>e.type==="click"&&e.target==="first"),second=events.find(e=>e.type==="click"&&e.target==="second");
   requireTrue(first&&second,"MOTION_TARGET_EVENTS");

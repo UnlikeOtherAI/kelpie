@@ -127,6 +127,10 @@ zero until actual encoded admission and one requested sample interval, then star
 the configured animation before exact target recheck and input. Navigation clears
 the old-document overlay. Screenshots-only and uncaptured scripts have no extra
 marker dwell. PNG steps never force movie frames above the requested FPS.
+Optional `typingDelayMs` on strict fill/type is planned before the run and applies
+between Unicode scalar inputs. The first fill clears once; continuation keeps the
+original target and requires focus. Empty paced type performs no input. Privacy,
+cancellation and owner checks remain active between characters.
 The existing native Stop recording control has an accessible name for assistive
 technology and supported AndroidX UI testing. Video acknowledgements retain the
 captured document associated with the encoded presentation timestamp, even when

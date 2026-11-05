@@ -139,3 +139,20 @@ native overlay equivalence, navigation cleanup, media playback, dropped-frame
 causes, or a platform acceptance pass. Compare the native presentation separately
 and preserve real renderer, binary, document and viewport identity in the
 acceptance report.
+
+The Linux test-only GIF model intake is optional. To evaluate an instrumented
+capture with its own backing proof, pass the model manifest, backing-receipt
+directory and candidate-evidence JSON after the input and output arguments:
+
+```sh
+node tests/capture/g08-verify.mjs input.json output.json model/model-manifest.json backing-directory candidate-evidence.json
+```
+
+The directory must contain per-curve `c-backing-receipt.json`,
+`s-backing-receipt.json`, `c-backing.jsonl` and `s-backing.jsonl`.
+The intake binds the exact instrumented binary, run, GIF, source geometry,
+model controls and each observed pre-overlay frame. The reference substitutes
+only an exact GIF tail comparison; all motion and marker tests still apply.
+Matching encoded pixels cannot prove physical zero alpha: a near-expiry
+positive-alpha marker is a demonstrated palette collision. MP4 receives no
+model reference. An ordinary or mismatched capture remains insufficient.

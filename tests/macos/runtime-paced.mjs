@@ -30,6 +30,16 @@ export async function runPaced({client,fixture,engine,base,capture,check,load,pl
   requireTrue(!events.some(e=>e.type==="paced-focus"||e.type==="paced-input"),"PACED_EMPTY_FOCUSED_OR_WROTE");
   return {screenshot:true,noFocusOrInput:true};
  });
+ await check("paced-empty-type-ineligible",async()=>{
+  await load("/paced");
+  for(const ineligible of [{role:"button",name:"Submit"},{label:"Static readonly"}]){
+   const begin=fixture.events.length;
+   const value=await play([{action:"type",target:ineligible,text:"",typingDelayMs:250}]);
+   requireTrue(!value.success&&value.error?.code==="TARGET_NOT_EDITABLE","PACED_EMPTY_INELIGIBLE");
+   requireTrue(!fixture.events.slice(begin).some(e=>e.type==="paced-focus"||e.type==="paced-input"),"PACED_EMPTY_INELIGIBLE_FOCUSED");
+  }
+  return {buttonRefused:true,readonlyRefused:true,noFocusOrInput:true};
+ });
  for(const route of ["/paced-blur","/paced-replace"])await check("paced-fence-"+route.slice(7),async()=>{
   await load(route);const begin=fixture.events.length;
   const value=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"]},
@@ -54,6 +64,24 @@ export async function runPaced({client,fixture,engine,base,capture,check,load,pl
   if(recording)requireTrue(!value.success&&inputs.length===1&&(value.artifacts??[]).length===0,"PACED_SENSITIVE_CAPTURE");
   else requireTrue(value.success&&inputs.length===Array.from(canary).length,"PACED_SENSITIVE_NO_CAPTURE");
   return {recording,code:value.error?.code??null,inputs:inputs.length,scrubbed:true,artifactsDiscarded:recording};
+ });
+ await check("paced-final-ack-navigation",async()=>{
+  await load("/paced-final-url");const begin=fixture.events.length;
+  const value=await client.api("play-script",{...base,actions:[
+   {action:"type",target,text:"Z",typingDelayMs:20},{action:"output",name:"after",source:"url"}]});
+  const inputs=fixture.events.slice(begin).filter(e=>e.type==="paced-input"&&e.target==="entry");
+  requireTrue(value.success&&inputs.length===1&&value.outputs?.after?.endsWith("/paced-final-url-changed"),"PACED_FINAL_ACK_NAVIGATION");
+  return {acknowledged:true,inputs:inputs.length,navigationObserved:true};
+ });
+ for(const recording of [true,false])await check("paced-final-lost-ack-"+(recording?"capture":"no-capture"),async()=>{
+  await load("/paced-final-delay");const begin=fixture.events.length,started=Date.now();
+  const value=await client.api("play-script",{...base,...(recording?{capture:{...capture,formats:["screenshots"]}}:{}),actions:[
+   {action:"output",name:"before",source:"title"},{action:"type",target,text:"X",typingDelayMs:20}]});
+  const inputs=fixture.events.slice(begin).filter(e=>e.type==="paced-input"&&e.target==="entry");
+  requireTrue(!value.success&&value.error?.code==="TIMEOUT"&&value.mayHaveCompleted===true&&inputs.length===1&&Date.now()-started>=5300,"PACED_FINAL_LOST_ACK");
+  requireTrue(value.outputs?.before?.includes("[redacted]"),"PACED_FINAL_LOST_ACK_NOT_SCRUBBED");
+  if(recording)requireTrue((value.artifacts??[]).length===0,"PACED_FINAL_LOST_ACK_MEDIA_RETAINED");
+  return {recording,code:value.error.code,inputs:inputs.length,scrubbed:true,discarded:recording};
  });
  await check("paced-abort-partial-recovery",async()=>{
   await load("/paced");const begin=fixture.events.length;

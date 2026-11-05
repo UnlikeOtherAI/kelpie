@@ -28,11 +28,15 @@ def selection(scope):
     targets = ["KelpieTests/IOSWorkflowNavigationTests"]
     files = [NAVIGATION_TESTS]
     if scope == "full":
-        targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
-        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+        targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
+                        "KelpieUITests/WorkflowCaptureUITests"])
+        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"),
+                      *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
+            targets.append("KelpieTests/IOSWorkflowReceiptTests/testCanonicalMutationReceiptMatrix")
+            targets.append("KelpieTests/IOSWorkflowReceiptTests/testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard")
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
@@ -50,6 +54,7 @@ def selection(scope):
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testDefaultPointerMotionUsesShorterNativeTiming",
+                "testLivePointerMarkerAndStopAppearDuringCapture",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
@@ -74,6 +79,8 @@ def selection(scope):
         required.update(methods)
         if scope == "diagnostics":
             required.update([
+                "testCanonicalMutationReceiptMatrix",
+                "testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard",
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
                 "testFirstCaptureWaitsForStableCompleteViewport",

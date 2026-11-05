@@ -1,26 +1,54 @@
+import CoreFoundation
 import Foundation
 
 /// Sequences already-planned scalars; each mutation callback owns the renderer fences.
 @MainActor
 enum IOSPacedTypingExecutor {
+    nonisolated static func jsonBoolean(_ value: Any?) -> Bool? {
+        guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+
     static func isAcknowledgement(_ body: [String: Any], token: String?) -> Bool {
         guard let token, !token.isEmpty else { return false }
-        return body["ok"] as? Bool == true && (body["error"] == nil || body["error"] is NSNull) &&
-            body["sensitive"] is Bool && body["sensitivityKnown"] is Bool &&
-            body["mayHaveCompleted"] as? Bool == true && body["token"] as? String == token &&
+        return jsonBoolean(body["ok"]) == true && body["error"] == nil &&
+            jsonBoolean(body["sensitive"]) != nil && jsonBoolean(body["sensitivityKnown"]) != nil &&
+            jsonBoolean(body["mayHaveCompleted"]) == true && body["token"] as? String == token &&
             body["inputGuarantee"] as? String == "synthetic-coordinate"
     }
 
+    static func isRefusal(_ body: [String: Any]) -> Bool {
+        guard let error = body["error"] as? String, !error.isEmpty else { return false }
+        return jsonBoolean(body["ok"]) == false && jsonBoolean(body["mayHaveCompleted"]) != nil &&
+            jsonBoolean(body["sensitive"]) != nil && jsonBoolean(body["sensitivityKnown"]) != nil
+    }
+
     static func needsPrivacyLatch(_ body: [String: Any], token: String?) -> Bool {
-        if isAcknowledgement(body, token: token) { return false }
-        let refusedBeforeInput = body["ok"] as? Bool == false && body["mayHaveCompleted"] as? Bool == false &&
-            body["error"] is String && hasKnownSensitivity(body)
-        return !refusedBeforeInput
+        if jsonBoolean(body["sensitive"]) == true { return true }
+        guard isAcknowledgement(body, token: token) || isRefusal(body) else { return true }
+        return !hasKnownSensitivity(body)
     }
 
     static func hasKnownSensitivity(_ body: [String: Any]) -> Bool {
-        body["sensitive"] as? Bool == true ||
-            (body["sensitive"] as? Bool == false && body["sensitivityKnown"] as? Bool == true)
+        jsonBoolean(body["sensitive"]) == true ||
+            (jsonBoolean(body["sensitive"]) == false && jsonBoolean(body["sensitivityKnown"]) == true)
+    }
+
+    static func consumeCallback(
+        _ result: Any?,
+        token: String?,
+        validateMutation: Bool,
+        consume: (@MainActor ([String: Any]) -> Void)?,
+        missing: (@MainActor () -> Void)?
+    ) -> [String: Any]? {
+        guard let body = result as? [String: Any], jsonBoolean(body["sensitive"]) != nil else {
+            missing?()
+            return nil
+        }
+        consume?(body)
+        if validateMutation && needsPrivacyLatch(body, token: token) { missing?() }
+        if jsonBoolean(body["sensitive"]) != true, jsonBoolean(body["sensitivityKnown"]) != true { missing?() }
+        return isAcknowledgement(body, token: token) ? body : nil
     }
 
     static func requireKnownSensitivity(_ known: Bool?, hasContinuation: Bool) throws {

@@ -124,6 +124,22 @@ jobs:
             build-for-testing CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee .cache/macos-ci/build.log
 
+      - name: Run hosted workflow admission XCTest
+        if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace apps/macos/Kelpie.xcworkspace \
+            -scheme Kelpie \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath apps/macos/.build \
+            -only-testing:KelpieTests/ScriptWorkflowAdmissionTests \
+            -resultBundlePath .cache/macos-ci/workflow-admission.xcresult \
+            test-without-building CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee .cache/macos-ci/workflow-admission.log
+
       - name: Prepare explicitly requested hosted runtime
         if: github.event_name == 'workflow_dispatch' && inputs.runtime_acceptance
         run: |
@@ -167,5 +183,7 @@ jobs:
           path: |
             .cache/macos-ci/build.log
             .cache/macos-ci/runtime-build.log
+            .cache/macos-ci/workflow-admission.log
+            .cache/macos-ci/workflow-admission.xcresult
           if-no-files-found: ignore
           retention-days: 7

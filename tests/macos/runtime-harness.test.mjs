@@ -1,8 +1,10 @@
 import vm from "node:vm";
+import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
+import {runIndependentPhase} from "./runtime-orchestration.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{
@@ -21,6 +23,21 @@ test("fixture rejects oversized event bodies without retaining them",async()=>{
  try{
   const response=await fetch(fixture.url+"/events",{method:"POST",body:"x".repeat(16385)});
   assert.equal(response.status,413);assert.equal(fixture.events.length,0);
+ }finally{await fixture.close();}
+});
+
+test("aborted event POST does not crash or retain a partial event",async()=>{
+ const fixture=await startFixture();
+ try{
+  const pending=request(fixture.url+"/events",{method:"POST",headers:{"content-type":"application/json"}});
+  pending.on("error",()=>{});
+  pending.write('{"type":');
+  await new Promise(resolve=>setTimeout(resolve,30));
+  pending.destroy();
+  await new Promise(resolve=>setTimeout(resolve,30));
+  const response=await fetch(fixture.url+"/events",{method:"POST",body:JSON.stringify({type:"click",target:"submit"})});
+  assert.equal(response.status,202);
+  assert.deepEqual(fixture.events,[{type:"click",target:"submit"}]);
  }finally{await fixture.close();}
 });
 
@@ -88,7 +105,7 @@ test("viewport diagnostics accept only bounded fixed numeric fields",()=>{
 test("paced fixture logs only synthetic lengths and bounded fixed transitions",async()=>{
  const fixture=await startFixture();
  try{
-  for(const route of ["/paced","/paced-blur","/paced-replace","/paced-sensitive"]){
+  for(const route of ["/paced","/paced-blur","/paced-replace","/paced-sensitive","/paced-final-url","/paced-final-delay"]){
    const html=await (await fetch(fixture.url+route)).text();
    new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)[1]);
    assert.ok(html.includes("pacedMode="+JSON.stringify(route)));
@@ -96,4 +113,15 @@ test("paced fixture logs only synthetic lengths and bounded fixed transitions",a
    assert.ok(!html.includes("value:value.value"));
   }
  }finally{await fixture.close();}
+});
+
+test("a renderer failure is retained while an independent phase still runs",async()=>{
+ const failures=[],seen=[];
+ const childState=()=>({childExitAtFailure:null,childAliveAtFailure:true});
+ await runIndependentPhase("webkit",async()=>{seen.push("webkit");throw Object.assign(new Error(),{code:"MOTION_WORKFLOW"});},failures,childState);
+ await runIndependentPhase("chromium",async()=>{seen.push("chromium");},failures,childState);
+ assert.deepEqual(seen,["webkit","chromium"]);
+ assert.deepEqual(failures,[{phase:"webkit",code:"MOTION_WORKFLOW",childExitAtFailure:null,childAliveAtFailure:true}]);
+ await runIndependentPhase("inference",async()=>{throw Object.assign(new Error(),{code:"unsafe value"});},failures,childState);
+ assert.equal(failures[1].code,"HOSTED_RUNTIME_FAILED");
 });

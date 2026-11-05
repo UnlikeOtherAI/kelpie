@@ -5,6 +5,7 @@ import {createHash} from "node:crypto";
 import {mkdir,readFile,writeFile,access,stat} from "node:fs/promises";
 import {dirname,join,isAbsolute,resolve} from "node:path";
 import {startG08Fixture,g08Workflow} from "../capture/g08-fixture.mjs";
+import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
@@ -17,7 +18,7 @@ import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
 const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast"].includes(motionProfile));
+assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast","default"].includes(motionProfile));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -32,13 +33,13 @@ const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
 const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
-let fixture,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,monitorStop=false,monitor;
+let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,helperExit,helperError="",monitorStop=false,monitor;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
   headers:{authorization:"Bearer "+readiness.token,"content-type":"application/json"},body:JSON.stringify(body),
   signal:AbortSignal.timeout(method==="play-script"?60000:10000)});
- assert.ok(response.ok,"HTTP_"+response.status);return response.json();
+ const value=await response.json();if(method==="play-script")report.playHttpStatus=response.status;else assert.ok(response.ok,"HTTP_"+response.status);return value;
 };
 const tabFact=async tabId=>{
  const value=await api("get-tabs"),tab=value.tabs.find(item=>item.id===tabId);
@@ -67,9 +68,26 @@ try{
  report.phase="revision";const revision=(await run("git.exe",["rev-parse","HEAD"])).stdout.trim();assert.equal(revision,expectedRevision);
  report.phase="tracked-status";assert.equal((await run("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");report.testRevision=revision;
  fixture=await startG08Fixture();report.phase="register";
- assert.equal((await cliRun(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile])).success,true);
+ assert.equal((await cliRun(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile])).success,true);registered=true;
  const started=new Date().toISOString();report.phase="launch";
- assert.equal((await cliRun(["browser","launch",alias,"--port","28420"])).success,true);launched=true;
+ const observer=process.env.KELPIE_STARTUP_OBSERVER,observerHash=process.env.KELPIE_STARTUP_OBSERVER_SHA256;
+ assert.ok(observer&&isAbsolute(observer));assert.match(observerHash??"",/^[a-f0-9]{64}$/);assert.equal(await hash(observer),observerHash);
+ const completion=join(outputRoot,"startup.done"),observationPath=join(outputRoot,"startup-observation.json");
+ let launchDone=false,observation;const launch=cliRun(["browser","launch",alias,"--port","28420"]).finally(()=>{launchDone=true;});void launch.catch(()=>{});
+ for(let attempt=0;attempt<90&&!launchDone;attempt++){
+  try{const current=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")).running[alias];
+   if(Number.isSafeInteger(current?.pid)&&current.pid>0){
+    observation=run(observer,[String(current.pid),exe,"28420",join(profile,"readiness.json"),completion,observationPath],55000);void observation.catch(()=>{});break;
+   }
+  }catch{}
+  await new Promise(done=>setTimeout(done,250));
+ }
+ try{assert.equal((await launch).success,true);launched=true;}finally{
+  await writeFile(completion,"done",{flag:"wx"});
+  if(observation){try{await observation;report.startupObservation=JSON.parse(await readFile(observationPath,"utf8"));}
+   catch{report.startupObservation={status:"observer-failed"};}}
+  else report.startupObservation={status:"pending-pid-not-observed"};
+ }
  report.phase="readiness";const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));running=store.running[alias];assert.ok(running?.pid&&running.port===28420);
  readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
  report.phase="pin";identity=await uiaRun(["pin",String(running.pid),exe,started]);
@@ -83,9 +101,9 @@ try{
  report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:motionProfile==="fast"?350:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
+ const config={...scene,curve,pointerMs:motionProfile==="dense"?2400:350,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
- const workflow=g08Workflow(tabId,curve);workflow.pointer.durationMs=config.pointerMs;
+ const workflow=applyG08MotionProfile(g08Workflow(tabId,curve),motionProfile);
  pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
  for(let attempt=0;attempt<100&&!pendingDone;attempt++){
@@ -99,16 +117,16 @@ try{
  assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");assert.equal(window.className,"KelpieScriptPresentation");
  report.phase="capture";report.active={runId:active.runId,playing:true};report.window=window;await save();
  helper=spawn(wgc,["timeline",String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
- let helperError="";helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
- const helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
+ helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
+ helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
  helperTimer=setTimeout(()=>helper.kill(),35000);
  const nativePromise=evaluateWgcFrames(helper.stdout,config);void nativePromise.catch(()=>{});
  const activeSamples=[];monitor=(async()=>{while(!monitorStop&&!pendingDone){
   const status=await api("get-script-status");if(status.playing){assert.equal(status.runId,active.runId);assert.ok(activeSamples.length<100,"STATUS_SAMPLE_BOUND");activeSamples.push({runId:status.runId,playing:true});}
   await new Promise(done=>setTimeout(done,300));
  }return activeSamples.length;})();void monitor.catch(()=>{});
- const terminal=await pending;monitorStop=true;const statusPolls=await monitor;assert.ok(statusPolls>0,"NO_ACTIVE_STATUS_POLL");
- let native;
+ report.phase="capture-play-wait";const terminal=await pending;monitorStop=true;report.terminalFacts={success:terminal.success===true,runIdPresent:typeof terminal.runId==="string"&&terminal.runId.length>0,actionsExecuted:Number.isInteger(terminal.actionsExecuted)?terminal.actionsExecuted:null,errorCode:typeof terminal.error?.code==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(terminal.error.code)?terminal.error.code:null,captureErrorPresent:terminal.captureError!=null,artifactCount:Array.isArray(terminal.artifacts)?terminal.artifacts.length:null};report.phase="capture-monitor";const statusPolls=await monitor;assert.ok(statusPolls>0,"NO_ACTIVE_STATUS_POLL");
+ report.phase="capture-evaluate";let native;
  try{native=await nativePromise;}catch(error){helper.kill();report.helperExit=await helperExit.catch(()=>({code:null,signal:null}));report.helperDiagnostic=safeWgcDiagnostic(helperError);throw error;}
  const exit=await helperExit;clearTimeout(helperTimer);helperTimer=null;report.helperDiagnostic=safeWgcDiagnostic(helperError);report.helperExit=exit;assert.equal(exit.code,0,"WGC_HELPER_FAILED");
  assert.equal(terminal.success,true);assert.equal(terminal.runId,active.runId);
@@ -139,9 +157,11 @@ try{
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
 }catch(error){
- const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL)[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
+ if(helperExit&&!report.helperExit){if(helper&&helper.exitCode===null)helper.kill();try{report.helperExit=await awaitBounded(helperExit,2000);}catch{report.helperExit={code:null,signal:null};}report.helperDiagnostic=safeWgcDiagnostic(helperError);}
+ const errorKind=["AbortError","TimeoutError","TypeError","AssertionError","Error"].includes(error.name)?error.name:"Other";
+ const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
  report.checks.push({name:"owned native and exported G08 case",passed:false,stage:report.phase,
-  category:error.safeDetails?.category??safe,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
+  category:error.safeDetails?.category??safe,errorKind,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;
 }finally{
  monitorStop=true;if(helperTimer)clearTimeout(helperTimer);if(helper&&helper.exitCode===null)helper.kill();
@@ -149,7 +169,12 @@ try{
  if(launched){try{assert.equal((await cliRun(["browser","stop",alias])).success,true);
   if(identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:identity.startTime});assert.equal(report.processExit.exited,true);}
   let readinessAbsent=false;try{await access(running.readinessFile);}catch{readinessAbsent=true;}
-  const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));assert.ok(readinessAbsent&&!store.running[alias]);report.cleanup="supported-cli-closed";
+  let store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));assert.ok(readinessAbsent&&!store.running[alias]);
+  assert.equal((await cliRun(["browser","remove",alias])).success,true);store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));assert.ok(!store.running[alias]&&!store.aliases[alias]);report.cleanup="supported-cli-closed-and-removed";
+ }catch(error){report.cleanup="failed";report.cleanupFailure=error.safeDetails??{category:"cleanup-failed",code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed===true};process.exitCode=1;}}
+ if(registered&&!launched){try{
+  assert.equal((await cliRun(["browser","remove",alias])).success,true);
+  const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));assert.ok(!store.running[alias]&&!store.aliases[alias]);report.cleanup="registered-alias-removed";
  }catch(error){report.cleanup="failed";report.cleanupFailure=error.safeDetails??{category:"cleanup-failed",code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed===true};process.exitCode=1;}}
  if(fixture)await fixture.close();await save();
 }

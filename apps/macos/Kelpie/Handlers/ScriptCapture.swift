@@ -25,6 +25,7 @@ final class ScriptCapture {
     private var nextSlot = 0
     private var initialViewport: ScriptWorkflowTab.Viewport?
     private var outputSize = CGSize.zero
+    private var previousDocument: String?
     private var firstDocument: String?
     private var sameDocument = true
     private var droppedFrames = 0
@@ -228,15 +229,18 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
-        if let initialViewport, !initialViewport.sameGeometry(as: viewport) {
+        let document = try await tab.documentIdentity()
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
+        let documentChanged = ScriptCaptureViewport.confirmedDocumentChange(previous: previousDocument, current: document)
+        if let initialViewport, !initialViewport.sameGeometry(as: viewport),
+           !initialViewport.acceptsScrollbarTransition(to: viewport, documentChanged: documentChanged) {
             #if DEBUG
             initialViewport.debugDifference(from: viewport)
             #endif
             throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
         }
         initialViewport = viewport
-        let document = try await tab.documentIdentity()
-        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
+        previousDocument = document
         if let firstDocument {
             if firstDocument != document { sameDocument = false }
         } else { firstDocument = document }

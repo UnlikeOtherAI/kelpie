@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureMcp } from "./capture-mcp.mjs";
@@ -412,7 +413,7 @@ try {
   });
   await check("security inferred sensitive refusal redacts earlier outputs",async()=>{
     await navigate();
-    const canary="Synthetic Aa b+! "+crypto.randomUUID();
+    const canary="Synthetic Aa b+! "+randomUUID();
     const encoded=encodeURIComponent(canary).replace(/%2B/g,"%2b");
     const form=new URLSearchParams({value:canary}).toString().slice(6).replace(/%2B/g,"%2b");
     assert.equal((await api("evaluate",{tabId,expression:"(()=>{document.title="+JSON.stringify(canary+" "+encoded+" "+form)+";document.body.innerHTML='<input id=password-target type=password aria-label=Password>';window.__sensitiveEdits=0;document.querySelector('input').oninput=()=>window.__sensitiveEdits++;return true;})()"})).success,true);
