@@ -21,7 +21,8 @@ await mkdir(privateRoot,{recursive:false});await mkdir(evidenceRoot,{recursive:f
 const profile=join(privateRoot,"profile"),readinessPath=join(profile,"readiness.json");
 const stageTiming=process.env.KELPIE_DIRECT_STAGE_G08==="1";
 const startupOnly=process.env.KELPIE_DIRECT_STARTUP_ONLY==="1";
-assert.ok(!(stageTiming&&startupOnly));
+const hostedG08=process.env.KELPIE_HOSTED_PUBLIC_G08==="1";
+assert.ok(Number(stageTiming)+Number(startupOnly)+Number(hostedG08)<=1);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:join(privateRoot,"cli-home"),KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS:"1",...(stageTiming?{KELPIE_CAPTURE_STAGE_DIAGNOSTICS:"1"}:{})};
 const exec=promisify(execFile),report={source:manifest.source,stage:"launch",diagnostics:[],cleanup:"not-started"};
 let pending="",child,closed,readiness,fixture,api;
@@ -34,8 +35,10 @@ try{
  const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCode,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
  assert.match(sid,/^S-1-[0-9-]+$/);await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+sid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"],{windowsHide:true,timeout:15000});
  const started=Date.now();child=spawn(exe,["--port","28420","--profile-dir",profile],{env,windowsHide:true,stdio:["ignore","ignore","pipe"]});
+ if(hostedG08)report.spawn={pid:child.pid??null,startedMs:started};
  closed=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",(code,signal)=>resolve({code,signal}));});void closed.catch(()=>{});
  child.stderr.on("data",chunk=>{pending+=chunk.toString();const lines=pending.split(String.fromCharCode(10));pending=lines.pop().slice(-32768);for(const line of lines)acceptLine(line.trimEnd());});
+ if(hostedG08)await writeFile(join(evidenceRoot,"hosted-spawn.json"),JSON.stringify(report.spawn),{flag:"wx"});
  while(Date.now()-started<20000){
   if(child.exitCode!==null)throw new Error("OWNED_PROCESS_EXITED");
   try{readiness=JSON.parse(await readFile(readinessPath,"utf8"));break;}catch{}
@@ -49,7 +52,23 @@ try{
  const device=await api("get-device-info");assert.equal(device.success,true);assert.equal(device.version,"0.1.16");
  report.stage="corpus";
  const tests=dirname(fileURLToPath(import.meta.url));
- if(stageTiming||startupOnly){
+ if(hostedG08){
+  report.scope="hosted-public-export-only";
+  const identityFile=join(privateRoot,"hosted-identity.json");
+  await writeFile(identityFile,JSON.stringify({source:manifest.source,hashes:{dllSha256:manifest.dllSha256}}),{flag:"wx"});
+  try{
+   await exec(process.execPath,[join(tests,"run-g08-acceptance.mjs"),readinessPath,join(evidenceRoot,"hosted"),identityFile,"--single-c"],
+    {env,windowsHide:true,timeout:240000,maxBuffer:2097152});
+   report.casePassed=true;
+  }catch(error){
+   report.casePassed=false;report.caseExit=typeof error.code==="number"?error.code:null;
+   try{
+    const failure=JSON.parse(await readFile(join(evidenceRoot,"hosted","capture-failure.json"),"utf8"));
+    if(failure.stage==="play-script"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(failure.code))report.captureFailure=failure.code;
+    if(failure.code==="CAPTURE_NATIVE_PRESENTATION_FAILED")report.hostedPresentation="unavailable-cause-unproven";
+   }catch{}
+  }
+ }else if(stageTiming||startupOnly){
   const step=(name,fn)=>captureDiagnosticStep(report,name,fn);
   fixture=await step("fixture-start",()=>startG08Fixture());
   const tabId=await step("tabs",async()=>{const tabs=await api("get-tabs"),id=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(id);return id;});
@@ -79,6 +98,7 @@ try{
  assert.ok(report.readinessAbsent);report.cleanup="public-close-exited";
 }catch(error){
  report.failure={stage:report.stage,kind:["AssertionError","Error","TypeError","AbortError","TimeoutError"].includes(error.name)?error.name:"Other"};
+ if(hostedG08&&["READINESS_MISSING","OWNED_PROCESS_EXITED","CLOSE_TIMEOUT"].includes(error.message))report.hostedFailureCode=error.message;
  process.exitCode=1;
  if(api&&child&&child.exitCode===null){
   try{

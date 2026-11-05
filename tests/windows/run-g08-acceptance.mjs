@@ -6,8 +6,10 @@ import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {resolve} from "node:path";
 import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
-const [readinessFile,outputPath,identityFile]=process.argv.slice(2);
+import {g08Curves,safeG08Failure} from "./g08-hosted-options.mjs";
+const [readinessFile,outputPath,identityFile,mode]=process.argv.slice(2);
 assert.ok(readinessFile&&outputPath&&identityFile);
+const curves=g08Curves(mode);
 const readiness=JSON.parse(await readFile(readinessFile,"utf8"));
 const identity=JSON.parse(await readFile(identityFile,"utf8"));
 const output=resolve(outputPath);await mkdir(output,{recursive:false});
@@ -37,11 +39,16 @@ async function download(run,item){
 let fixture;
 try{
  const tabs=await api("get-tabs"),tabId=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(tabId);
- for(const curve of ["c","s"]){
+ for(const curve of curves){
   fixture=await startG08Fixture();
   assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);
   assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
-  const run=await api("play-script",g08Workflow(tabId,curve));assert.equal(run.success,true,JSON.stringify(run.error));
+  const run=await api("play-script",g08Workflow(tabId,curve));
+  if(run.success!==true){
+   const code=safeG08Failure(run.error);
+   await writeFile(resolve(output,"capture-failure.json"),JSON.stringify({stage:"play-script",code}),{flag:"wx"});
+   throw Error("PUBLIC_CAPTURE_FAILED");
+  }
   const eventResponse=await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(10000)});
   assert.ok(eventResponse.ok);const {events,dropped}=await eventResponse.json();
   await writeFile(resolve(output,curve+"-events.json"),JSON.stringify({events,dropped},null,2),{flag:"wx"});
