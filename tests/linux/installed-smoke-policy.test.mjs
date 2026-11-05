@@ -59,3 +59,30 @@ test("package upload uses an explicit allowlist and never traverses private CLI 
   assert.match(diagnostics,/installed-smoke\/alias\/report\.json/);
   assert.match(diagnostics,/installed-smoke\/capture\/media-verification\.json|installed-smoke\/capture\/\*\.json/);
 });
+
+test("exact Fedora CLI-only diagnostic is scoped and leaves full smoke default",async()=>{
+  const diagnostic=await readFile(new URL("../../.github/workflows/linux-installed-cli-diagnostic.yml",import.meta.url),"utf8");
+  assert.match(script,/KELPIE_INSTALLED_SMOKE_CLI_ONLY:-0/);
+  assert.match(script,/\[\[ "\$cli_only" == 0 \]\]; then\nstage=native-http-mcp/);
+  assert.match(script,/stage=cli-only-complete/);
+  assert.match(diagnostic,/run-id: 42102220654/);
+  assert.match(diagnostic,/sourceArtifact=13454040953/);
+  assert.match(diagnostic,/7872126627adb7e58a4d67497d578d94666dc3b7c6e12b5a3d6ff3380ed0f96e/);
+  assert.match(diagnostic,/e4020d1600a0a9701bcfc32047aaaa238c576b58a86f1915fface71fa0ca7c8d/);
+  assert.match(diagnostic,/--memory=6g --pids-limit=512 --shm-size=256m/);
+  assert.match(diagnostic,/no-new-privileges=true/);
+  assert.match(diagnostic,/test-seccomp-sha256\.txt/);
+  assert.doesNotMatch(diagnostic,/--privileged|cap-add|seccomp=unconfined|--no-sandbox/);
+});
+
+test("CLI diagnostic shell blocks parse before container execution",async()=>{
+  const text=await readFile(new URL("../../.github/workflows/linux-installed-cli-diagnostic.yml",import.meta.url),"utf8");
+  const blocks=[...text.matchAll(/        run: \|\r?\n((?:          [^\n]*\r?\n|\r?\n)*)/g)];
+  assert.equal(blocks.length,2);
+  const bash=process.platform==="win32"?"C:/Program Files/Git/bin/bash.exe":"bash";
+  for(const block of blocks) {
+    const script=block[1].split(/\r?\n/).map(line=>line.startsWith("          ")?line.slice(10):line).join("\n");
+    const result=spawnSync(bash,["-n"],{input:script});
+    assert.equal(result.status,0,result.stderr?.toString()??result.error?.message);
+  }
+});
