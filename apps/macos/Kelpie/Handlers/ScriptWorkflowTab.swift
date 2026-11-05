@@ -217,7 +217,10 @@ final class ScriptWorkflowTab {
     #if DEBUG && KELPIE_HOSTED_STREAM_TEST
     /// The fixture identity is checked in the same renderer turn as document and viewport.
     func hostedFixtureCaptureState(origin: String) async throws -> (viewport: Viewport, document: String) {
-        guard let input = Self.json(["origin": origin]) else { throw ScriptWorkflowFailure("INVALID_PARAM") }
+        guard let data = try? JSONSerialization.data(withJSONObject: ["origin": origin]),
+              let input = String(data: data, encoding: .utf8) else {
+            throw ScriptWorkflowFailure("INVALID_PARAM")
+        }
         let expression = """
         (()=>{const expected=\(input).origin;return {viewport:\(Self.viewportExpression),
         document:\(documentIdentityExpression),fixture:location.origin===expected&&
