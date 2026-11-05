@@ -180,6 +180,7 @@ extension WorkflowCaptureUITests {
         let zoomedNative = await nativeZoomEvidence()
         let finalObservation = try XCTUnwrap(zoomedNative["observation"] as? Body)
         XCTAssertEqual(finalObservation["sameView"] as? Bool, true)
+        XCTAssertEqual(finalObservation["sameDocument"] as? Bool, true)
         let evidence = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
             "initial": initial, "zoomed": zoomed, "nativeBefore": initialNative, "nativeAfter": zoomedNative
         ], options: [.sortedKeys]), uniformTypeIdentifier: "public.json")

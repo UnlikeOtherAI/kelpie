@@ -58,8 +58,9 @@ def selection(scope):
             "testFirstCaptureRequiresInsetPropagationIncludingZoom",
             "testProjectionUsesInsetContentOriginAndVisualViewport",
             "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
+            "testObserverRetiresAndRejectsChangedDocument",
         }
-        return (["KelpieTests/IOSCaptureViewportTests"] +
+        return (["KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSPinchObservationTests"] +
                 ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods]), set(methods) | unit
     if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
@@ -68,9 +69,11 @@ def selection(scope):
     if scope == "full":
         targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
                         "KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSG08GeometryTests",
-                        "KelpieTests/IOSWorkflowPresentationModeTests", "KelpieUITests/WorkflowCaptureUITests"])
+                        "KelpieTests/IOSWorkflowPresentationModeTests", "KelpieTests/IOSPinchObservationTests",
+                        "KelpieUITests/WorkflowCaptureUITests"])
         files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"), Path("apps/ios/Tests/IOSCaptureViewportTests.swift"),
-                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), Path("apps/ios/Tests/IOSWorkflowPresentationModeTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), Path("apps/ios/Tests/IOSWorkflowPresentationModeTests.swift"),
+                      Path("apps/ios/Tests/IOSPinchObservationTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
