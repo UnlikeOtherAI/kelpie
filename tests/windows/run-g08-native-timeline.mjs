@@ -5,6 +5,7 @@ import {createHash} from "node:crypto";
 import {mkdir,readFile,writeFile,access,stat} from "node:fs/promises";
 import {dirname,join,isAbsolute,resolve} from "node:path";
 import {startG08Fixture,g08Workflow} from "../capture/g08-fixture.mjs";
+import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
@@ -17,7 +18,7 @@ import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
 const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast"].includes(motionProfile));
+assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast","default"].includes(motionProfile));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -83,9 +84,9 @@ try{
  report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:motionProfile==="fast"?350:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
+ const config={...scene,curve,pointerMs:motionProfile==="dense"?2400:350,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
- const workflow=g08Workflow(tabId,curve);workflow.pointer.durationMs=config.pointerMs;
+ const workflow=applyG08MotionProfile(g08Workflow(tabId,curve),motionProfile);
  pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
  for(let attempt=0;attempt<100&&!pendingDone;attempt++){
