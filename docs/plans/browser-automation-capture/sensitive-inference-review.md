@@ -66,8 +66,10 @@ artifacts. The reusable-secret paragraph forbids capture for secret-bearing
 workflows,while DOM inference happens only at runtime. The docs do not explicitly
 say whether every earlier pre-input artifact must be discarded after late
 sensitivity inference. This review does not invent an all-artifact purge rule
-or claim ordinary partial retention is always unsafe. Root was asked to settle
-that precise policy and document/test it consistently. A reflected title can
+or claim ordinary partial retention is always unsafe. Root subsequently settled
+that precise policy: privacy refusal and output-redaction failure discard all
+run capture artifacts. A latched privacy-discard flag must survive later issue
+replacement; ordinary failure/abort still retain valid partials. A reflected title can
 already be visible in earlier captured pixels,so string redaction alone cannot
 establish pixel secrecy if those artifacts are returned.
 
@@ -77,5 +79,9 @@ establish pixel secrecy if those artifacts are returned.
 - macOS WK/CEF: source defect confirmed; owner reports a draft ordering fix and hosted raw/URI/form regression for both renderers; immutable checked fix/runtime replay pending.
 - iOS: source defect confirmed; owner notified; fix/runtime replay pending.
 - Android: registration order covers this branch; no new runtime pass inferred.
-- Earlier-artifact policy: explicit common decision pending; no automatic
-  security or whole-platform acceptance from this review.
+- Earlier-artifact policy: clarified by root after this review,not retroactively
+  classified as a proven violation of the earlier ambiguous wording. All
+  privacy captures discard; later error replacement cannot clear that latch.
+- Shared acceptance oracle tests/capture/privacy-refusal.mjs checks raw result/
+  owner status,raw+URI/form reflection,no edit and empty artifact manifests.
+  Its synthetic tests are harness evidence only,not native execution.
