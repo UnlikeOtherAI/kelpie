@@ -11,6 +11,7 @@ import {bootstrapDiagnostics} from "../../tests/macos/runtime-bootstrap.mjs";
 import {startFixture} from "../../tests/macos/runtime-fixture.mjs";
 import {publicCLI,inference} from "../../tests/macos/runtime-interfaces.mjs";
 import {runEngine} from "../../tests/macos/runtime-cases.mjs";
+import {runIndependentPhase} from "../../tests/macos/runtime-orchestration.mjs";
 requireTrue(process.env.GITHUB_ACTIONS==="true"&&process.env.RUNNER_OS==="macOS","DEDICATED_HOSTED_RUNNER_REQUIRED");
 if(process.argv[2]==="--preparation"){
  const state=process.argv[3],exitCode=Number(process.argv[4]);
@@ -59,14 +60,38 @@ try{
  report.pid=child.pid;client=new Client(child.pid,out,executable);phase="listeners";
  await waitFor(()=>client.ready(),30000);
  phase="pairing";client.token=await client.pair("Hosted Mac acceptance");
- fixture=await startFixture();phase="webkit";
- await runEngine(client,fixture,"webkit",report);
- phase="cli";report.publicCLI=await publicCLI(client,fixture,privateDir);
- phase="inference";report.inference=await inference(client,privateDir);
- phase="chromium";await runEngine(client,fixture,"chromium",report);
+ fixture=await startFixture();
+ const failures=[];
+ async function independent(name,operation){
+  phase=name;
+  await runIndependentPhase(name,operation,failures,()=>({
+   childExitAtFailure:childExit,childAliveAtFailure:!childExited&&child.exitCode===null&&child.signalCode===null
+  }));
+ }
+ await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
+ await independent("chromium",async()=>{
+  // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
+  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+  await runEngine(client,fixture,"chromium",report);
+ });
+ await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
+ await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
+ if(failures.length){
+  report.phaseFailures=failures;
+  phase=failures[0].phase;
+  throw new Failure(failures[0].code);
+ }
  report.corpusPassed=true;
 }catch(error){
- report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;report.childExitAtFailure=childExit;report.childAliveAtFailure=!childExited&&child.exitCode===null&&child.signalCode===null;process.exitCode=1;
+ report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;
+ if(report.phaseFailures?.length){
+  report.childExitAtFailure=report.phaseFailures[0].childExitAtFailure;
+  report.childAliveAtFailure=report.phaseFailures[0].childAliveAtFailure;
+ }else{
+  report.childExitAtFailure=childExit;
+  report.childAliveAtFailure=!childExited&&child.exitCode===null&&child.signalCode===null;
+ }
+ process.exitCode=1;
  if(["launch","listeners"].includes(phase)){
   try{report.bootstrap=await bootstrapDiagnostics({pid:child.pid,executable,started,privateDir});}
   catch{report.bootstrapDiagnosticError="BOOTSTRAP_DIAGNOSTICS_FAILED";}
