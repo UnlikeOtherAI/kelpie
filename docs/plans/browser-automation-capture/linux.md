@@ -203,3 +203,27 @@ Linux now leaves that setting false and lets Chromium fail closed when no usable
 sandbox exists. This is source/kernel prerequisite evidence, not yet proof of a
 sandboxed renderer. Actual child namespace/seccomp/flags and native API flows
 remain pending.
+## Startup diagnostics after sandbox correction
+
+The2657 native smoke exited before readiness. A bounded GDB run identified
+Chromium's ProcessSingleton socket setup CHECK. The task's deeply nested TMPDIR
+can exceed Linux AF_UNIX's108-byte pathname field; a short0700 owned runtime
+directory advances startup beyond that check without deleting the failed profile.
+The permanent smoke now creates short private runtime scratch and can reuse its
+preserved synthetic profile through KELPIE_TEST_PROFILE. Build caches remain
+inside the assigned test checkout. Early child exit is reported immediately.
+
+That run exposed a separate headless defect: the exact stack entered Ozone's
+X11CursorFactory and failed its property cache because the SSH session has no X
+display. Windowless rendering alone does not select a display backend.
+[Chromium120 Ozone documentation](https://raw.githubusercontent.com/chromium/chromium/120.0.6099.234/docs/ozone_overview.md)
+documents Linux's default X11 backend and explicit headless backend.
+The Linux-only CEF command-line hook now selects ozone-platform=headless for the
+existing headless launch flag. Windows behavior is preserved. Actual startup,
+renderer sandbox and HTTP/MCP success remain pending this source checkpoint.
+
+At570d2c5e, the real system codecs passed independent all-frame decoding:
+GIF5 frames/500ms/1691 bytes; H.264 MP4 5 frames/500ms/1487 bytes, matching
+red overlay centers and100ms timestamps. The2200-byte GIF budget retained a
+fully decodable10-frame/2171-byte prefix. These codec tests do not prove native
+capture, marker ACK, UI Stop, cancellation or final-container recovery.

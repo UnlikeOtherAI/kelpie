@@ -17,7 +17,11 @@ const executable = resolve(process.argv[2]);
 const require = createRequire(new URL("../../packages/cli/package.json", import.meta.url));
 const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
 const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js");
-const profile = await mkdtemp(join(tmpdir(), "kelpie-linux-sandbox-"));
+// Chromium uses AF_UNIX singleton sockets below TMPDIR (108-byte path limit).
+// Keep runtime scratch short and private even when build caches are deeply nested.
+const runtime = await mkdtemp("/tmp/kelpie-native-");
+process.env.TMPDIR = runtime;
+const profile = process.env.KELPIE_TEST_PROFILE ?? await mkdtemp(join(tmpdir(), "kelpie-linux-sandbox-"));
 const readinessPath = join(profile, "readiness.json");
 const fixture = await startCaptureFixture();
 const browser = startBrowser(executable, ["--headless", "--port", "0", "--profile-dir", profile,
@@ -25,7 +29,7 @@ const browser = startBrowser(executable, ["--headless", "--port", "0", "--profil
 const report = {
   source: process.env.KELPIE_TEST_REVISION ?? "unrecorded",
   binarySHA256: createHash("sha256").update(await readFile(executable)).digest("hex"),
-  host: process.env.HOSTNAME ?? "linux", headless: true, checks: [],
+  host: process.env.HOSTNAME ?? "linux", headless: true, runtime, profile, checks: [],
 };
 const execute = promisify(execFile);
 let readiness, client;
@@ -55,7 +59,12 @@ async function namespace(pid, name) {
   }
 }
 try {
-  readiness = await waitForReadiness(readinessPath, 30000);
+  readiness = await Promise.race([
+    waitForReadiness(readinessPath, 30000),
+    browser.exited.then(({ code, signal, error }) => {
+      throw new Error("Native app exited before readiness: " + (error?.message ?? signal ?? code));
+    }),
+  ]);
   await waitFor(async () => (await control(readiness, "get-current-url")).url?.startsWith(fixture.url), "fixture navigation", 15000);
   const tabs = (await control(readiness, "get-tabs")).tabs;
   assert.ok(tabs.length > 0);
