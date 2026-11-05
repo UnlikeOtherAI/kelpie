@@ -86,7 +86,7 @@ if(BUILD_TESTING AND WIN32)
   target_compile_definitions(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE
     WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
   target_link_libraries(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE
-    kelpie_core_automation nlohmann_json::nlohmann_json gdiplus)
+    kelpie_core_automation nlohmann_json::nlohmann_json crypt32 gdiplus)
   kelpie_enable_test_assertions(kelpie_windows_script_native_overlay_lifecycle_test)
   if(MSVC)
     target_compile_options(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE /W4 /WX)
