@@ -52,10 +52,11 @@ class ScriptChromeInputFlowTest : ScriptPublicFixture() {
                 }
 
                 fun facts(): JSONObject =
-                    client.call(
-                        "evaluate",
-                        JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0})"),
-                    ).getJSONObject("result")
+                    client
+                        .call(
+                            "evaluate",
+                            JSONObject().put("expression", "({href:location.href, keys:window.__ownedKeyCount || 0})"),
+                        ).getJSONObject("result")
 
                 tapMore()
                 ui.waitForIdle()
