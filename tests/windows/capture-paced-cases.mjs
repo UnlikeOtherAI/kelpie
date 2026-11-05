@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-export async function runPacedCases({check,navigate,api,workflow,download,click,tabId}) {
+export async function runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture}) {
   await check("paced fill emits trusted Unicode scalars with intervals", async () => {
     await navigate();
     const setup="(()=>{document.body.innerHTML='<input id=paced value=old>';window.__paced=[];" +
@@ -74,7 +74,10 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
   });
   await check("paced typing abort stops without replay and keeps partial capture", async () => {
     await navigate();
-    assert.equal((await api("evaluate",{tabId,expression:"document.body.innerHTML='<input id=abort-paced>';true"})).success,true);
+    const baseline=fixture.events.length;
+    const setup="(()=>{document.body.innerHTML='<input id=abort-paced>';" +
+      "document.querySelector('#abort-paced').oninput=()=>fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({documentId:'paced-abort-proof',type:'paced-first'})});return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
     const pending=api("play-script",{...workflow([{action:"type",target:{selector:"#abort-paced"},
       text:"ABCDEFGHIJ",typingDelayMs:1000}]),
       capture:{formats:["gif","screenshots"],fps:15,maxWidth:640,maxDurationMs:20000,maxBytes:8388608}});
@@ -84,7 +87,10 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     assert.equal(status.playing,true);
-    await new Promise(resolve=>setTimeout(resolve,800));
+    const end=Date.now()+10000;
+    while(!fixture.events.slice(baseline).some(event=>event.type==="paced-first") && Date.now()<end)
+      await new Promise(resolve=>setTimeout(resolve,25));
+    assert.ok(fixture.events.slice(baseline).some(event=>event.type==="paced-first"),"first input was not observed");
     assert.equal((await api("abort-script",{runId:status.runId})).success,true);
     const result=await pending;
     assert.equal(result.success,false);assert.equal(result.aborted,true);assert.equal(result.mayHaveCompleted,true);
