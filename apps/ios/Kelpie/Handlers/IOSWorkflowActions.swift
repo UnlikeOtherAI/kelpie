@@ -194,19 +194,57 @@ final class IOSWorkflowActions {
             try await pacedEdit(plan, context: context)
             return
         }
-        let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
+        try await atomicMutation(
+            target: target,
+            token: token,
+            action: action,
+            text: text,
+            document: document,
+            consume: consume,
+            missing: missing
+        )
+    }
+
+    private func atomicMutation(
+        target: Body,
+        token: String,
+        action: String,
+        text: String?,
+        document: String,
+        consume: @MainActor (Body) -> Void,
+        missing: @MainActor () -> Void
+    ) async throws {
+        let editing = action == "type" || action == "fill"
+        let edit: Body? = editing ? ["action": action, "text": text ?? ""] : nil
         let result = try await tab.target(
             target,
             token: token,
             dispatch: !editing,
             edit: edit,
+            acceptFinalAcknowledgement: true,
+            unknownOnFinalNavigation: editing,
+            validateMutationAcknowledgement: true,
             refuseSensitive: workflow.capture != nil,
             consume: consume,
             missingResult: missing
         )
         try requireOK(result)
+        try requireMutationAcknowledgement(result, token: token, missing: missing)
+        if editing && tab.document != document { missing() }
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
-        do { try await check() } catch { throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true) }
+        do { try await check() } catch {
+            if editing && tab.document != document { missing() }
+            throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
+    }
+
+    private func requireMutationAcknowledgement(
+        _ result: Body, token: String, missing: () -> Void
+    ) throws {
+        guard IOSPacedTypingExecutor.isAcknowledgement(result, token: token) else {
+            missing()
+            throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
     }
 
     private struct PacedTarget {
@@ -244,7 +282,7 @@ final class IOSWorkflowActions {
                 token: context.token,
                 edit: ["action": action, "text": text, "requireFocused": requireFocused],
                 acceptFinalAcknowledgement: final,
-                validatePacedAcknowledgement: true,
+                validateMutationAcknowledgement: true,
                 refuseSensitive: workflow.capture != nil,
                 consume: context.consume,
                 missingResult: context.missing

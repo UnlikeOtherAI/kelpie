@@ -169,7 +169,8 @@ final class IOSWorkflowTab {
         edit: Body? = nil,
         postMutation: Bool = false,
         acceptFinalAcknowledgement: Bool = false,
-        validatePacedAcknowledgement: Bool = false,
+        unknownOnFinalNavigation: Bool = true,
+        validateMutationAcknowledgement: Bool = false,
         refuseSensitive: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
@@ -198,7 +199,7 @@ final class IOSWorkflowTab {
                     if IOSPacedTypingExecutor.isAcknowledgement(body, token: token) {
                         acknowledgement = body
                     }
-                    if validatePacedAcknowledgement && IOSPacedTypingExecutor.needsPrivacyLatch(body, token: token) {
+                    if validateMutationAcknowledgement && IOSPacedTypingExecutor.needsPrivacyLatch(body, token: token) {
                         missingResult?()
                     }
                     if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
@@ -207,7 +208,7 @@ final class IOSWorkflowTab {
             )
         } catch let failure as IOSWorkflowFailure {
             guard acceptFinalAcknowledgement, failure.code == "DOCUMENT_CHANGED", let acknowledgement else { throw failure }
-            missingResult?()
+            if unknownOnFinalNavigation || !IOSPacedTypingExecutor.hasKnownSensitivity(acknowledgement) { missingResult?() }
             return acknowledgement
         }
         guard let result = value as? Body, result["sensitive"] is Bool else {
