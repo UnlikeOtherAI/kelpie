@@ -237,6 +237,14 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_retirement("[WorkflowMarkerRetirement] reason=private remainingMs=250"))
         self.assertIsNone(fixed_retirement("[WorkflowMarkerRetirement] reason=began remainingMs=10001"))
 
+    def test_mobilecheck_selection_is_the_exact_union(self):
+        targets, names = DRIVER.selection("mobilecheck")
+        geometry_targets, geometry_names = DRIVER.selection("geometry")
+        marker_targets, marker_names = DRIVER.selection("marker")
+        self.assertEqual(targets, geometry_targets + marker_targets)
+        self.assertEqual(names, geometry_names | marker_names)
+        self.assertEqual(len(names), 9)
+
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")
