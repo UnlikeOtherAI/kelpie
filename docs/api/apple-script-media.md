@@ -58,3 +58,13 @@ The binding passed scoped SwiftLint, warning-free macOS 14 compilation and actua
 ```sh
 NLOHMANN_JSON_INCLUDE_DIR=/path/to/pinned/include bash scripts/testing/apple-script-redaction.sh
 ```
+
+## Shared Apple gateway admission
+
+ScriptGatewayPolicy.swift classifies only version-present play-script and the existing abort/status/artifact controls for an independent product coordinator. Named MCP and generic kelpie_extension calls use the same classifier. Unversioned legacy play keeps the persistent path. An invalid present version still reaches strict native preflight; it never falls back to legacy.
+
+Router+BrowserControl retains the same registered methods, extension catalog, profile scope and callback authorization when creating the independent coordinator. V1 native run admission must first reject an already admitted browser mutation, then acquire its recording gate before releasing the short admission lease. Inner extraction/readiness calls can then acquire the persistent browser lease without deadlocking their outer workflow. The transport budget is 360 seconds for strict play, distinct from the native 300-second run/capture bounds and finalization grace; controls retain 30 seconds.
+
+Fixed mutating reader dispatch checks the authoritative recording gate and the platform's exact-renderer retirement callback. Abort/status/artifact controls reach their native owner checks while a run is active. The classifier never grants ownership. Pending callbacks continue to retain the existing browser lease through timeout, and uncertain mutations are not replayed.
+
+The source checkpoint passed SwiftLint, parsing of the actual shared gateway/router sources and the production policy's standalone tests, including named/generic strict admission, unchanged legacy path, unrelated mutation refusal, recording/retirement gates and actual artifact-store foreign-owner denial. Reproduce the focused policy test with bash scripts/testing/apple-script-gateway.sh. Real compiled iOS/macOS HTTP/MCP flows and native Stop remain separate acceptance requirements.

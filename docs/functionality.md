@@ -661,3 +661,5 @@ session IDs and unsupported mobile keyboard defaults fail before actions.
 The matching iOS binding belongs to the same integrated PR. Native relink and real
 HTTP/MCP phone/tablet acceptance remain pending; the
 [Android ledger](plans/browser-automation-capture/android.md) records exact results.
+
+Apple workflow gateway admission keeps long strict scripts separate from the persistent browser lease while preserving authoritative recording, retirement and owner checks. Nested extraction/readiness and run controls use the same protected native methods; unversioned scripts keep their existing path. See [shared Apple gateway admission](api/apple-script-media.md#shared-apple-gateway-admission) for verification scope.
