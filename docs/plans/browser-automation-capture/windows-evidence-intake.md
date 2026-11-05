@@ -141,3 +141,68 @@ were absent. Receipt: `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/
 The earlier c9 failure was not recorded with sufficiently specific stages to
 prove that its cause was the prior subtree traversal. This is a capture-free
 startup result, not WGC or Stop-button evidence.
+
+The subsequent exact 5877 Session1 WGC/Stop run passed with the narrowed pin.
+The helper captured only its owned presentation HWND with cursor disabled,
+default border and no secondary windows. The separate Stop window was captured,
+the spatial marker validator passed at DPR2, and standard UIA Stop invocation
+aborted the run, recovered partial artifacts and allowed a following run.
+Public stop and process, listener, readiness, alias and task cleanup passed.
+The WGC call took 1.378 seconds with unchanged 8-second helper and 10-second
+parent bounds. Raw BGRA and PNG were independently hashed. The successful
+wrapper discarded the helper's stage stderr, so no per-stage times can be
+claimed; the earlier WGC failure remains unexplained.
+
+Evidence root:
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/wgc-5877-pin907`.
+The report is 19,843 bytes, SHA-256
+`c1adc24ca0ba8231ef2f5350841cd3f80ebe08feddd66e807c1a1e58e1f1f41d`.
+The 9,703-byte presentation PNG SHA-256 is
+`1a74b88fada0e8941811bbab5a1a4081f66efff3b02805accff13ff9c2b09e98`;
+the 641-byte native Stop PNG SHA-256 is
+`fa6854ba2b4e8e32254d69bc78f13e35cb872dd60f9fc256713c46f73784055b`.
+This is a bounded native spatial and Stop result, not a full animation or
+signed-release result.
+
+A source diff from 5877e6fa to root revision 65fe4866 found no changes under
+`apps/windows`, `native`, `packages/shared/src` or `packages/cli`,
+and no changes to root lockfile or Windows build scripts. This maps the tested
+binary's inputs to that revision; it does not replace the final rebuild.
+
+## Windows finite gate audit at 65fe4866
+
+All runtime results below refer to the unsigned 5877e6fa candidate unless
+otherwise stated. Its Windows production/build inputs are unchanged at
+65fe4866, as recorded above. Evidence is bounded to the named flows.
+
+- Native HTTP corpus: 36/36, including semantic trusted input, capture
+  limits, preflight refusals, navigation, abort/recovery, partial artifacts,
+  sensitivity, invalid bearer and unknown session/run cases. The original
+  combined run's CLI alias case failed; a separate exact-candidate alias
+  replay passed four cases after its readiness barrier. Preserve both.
+- Observations/extraction/readiness: 10/10. Public alias CLI and stdio MCP:
+  separate 4/4. Direct/generic MCP and HTTP artifact publication and chunk
+  download checks ran, including the 906,882-byte PNG with four chunks on
+  each protocol. Focus, post-input and realm privacy replays passed their
+  recorded cases; their raw reports remain under `native-api-5877`.
+- Geometry/motion API: 7/7 in `native-motion-5877`, including CSS zoom and
+  clipped targets. Legacy fixed-pixel fade assertion is a documented false
+  positive; the newer shared G08 oracle independently passed both curves in
+  GIF and MP4 with 47/48 reported dropped frames. The longstanding
+  `get-viewport` DPR value is 1; capture geometry uses page metrics and
+  the Session1 scene independently measured DPR2.
+- Native UI: exact owned Session1 presentation WGC centroid and radius agreed
+  with the trusted click at DPR2; separate native Stop pixels, UIA Stop,
+  partial export, recovery and supported cleanup passed. Export timeline and
+  native spatial evidence use different fixtures and are not a simultaneous
+  native-versus-export frame comparison. Root visual intake remains required.
+- Ownership boundary: invalid bearer and unknown run are tested. This listener
+  offers one immutable valid control token, so a second valid foreign grant on
+  the same app is not claimed; see the boundary above.
+
+Windows 0.1.16 is consistent in CMake, RC, device info and runtime at
+65fe4866. The final integrated revision still requires the sandboxed CEF
+rebuild/package and candidate replay, keyless signing of verified copies on
+Minis, signature/timestamp/EKU and SignTool verification, immutable upload,
+then exact published-package install and runtime checks. The current candidate
+and native screenshots do not establish those release steps.

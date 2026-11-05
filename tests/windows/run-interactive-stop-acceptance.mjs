@@ -4,6 +4,7 @@ import {createHash,randomUUID} from "node:crypto";
 import {nativeWindowFixtureExpression} from "./native-window-fixture.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
+import {parseWgcStages} from "./wgc-stage-timing.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {fileURLToPath} from "node:url";
@@ -128,11 +129,11 @@ try {
    report.phase="native-wgc-capture";
    const captureBegan=performance.now();report.captureTiming={requestedAt:new Date().toISOString(),workflowElapsedMs:current.elapsedMs};
    try {
-   report.wgc=JSON.parse((await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
-     {signal:deadline.signal,timeout:10000})).stdout);
+   const captured=await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
+     {signal:deadline.signal,timeout:10000});report.wgc=JSON.parse(captured.stdout);report.wgcStages=parseWgcStages(captured.stderr);
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
    assert.equal(report.wgc.windowHandle,window.windowHandle);
-   }catch(error){report.wgcFailure={error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false,stderr:String(error.stderr??"").slice(0,8192)};}
+   }catch(error){report.wgcFailure={error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false,stages:parseWgcStages(error.stderr),stderr:String(error.stderr??"").slice(0,8192)};}
    finally{report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;}
    await save();
  }
