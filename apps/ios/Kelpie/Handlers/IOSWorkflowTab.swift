@@ -202,6 +202,9 @@ final class IOSWorkflowTab {
             try? await Task.sleep(nanoseconds: 50_000_000)
             let version = ConnectDocument.version(view)
             guard navigationLease.allowsWait(version: version, authorized: true) else {
+                #if DEBUG
+                print("[WorkflowNavigationLease] wait-refused=" + navigationLease.debugState)
+                #endif
                 throw IOSWorkflowFailure("NAVIGATION_REPLACED", mayHaveCompleted: true)
             }
             do { try await check(); try requireCurrent() } catch {
@@ -211,6 +214,9 @@ final class IOSWorkflowTab {
             if context.lastNavigationError != nil { throw IOSWorkflowFailure("NAVIGATION_FAILED", mayHaveCompleted: true) }
             if navigationLease.allowsRead(version: version, loading: view.isLoading, authorized: true) { return }
         } while ContinuousClock.now < end
+        #if DEBUG
+        print("[WorkflowNavigationLease] timeout=" + navigationLease.debugState)
+        #endif
         if navigationLease.allowsWait(version: ConnectDocument.version(view), authorized: true) { view.stopLoading() }
         throw IOSWorkflowFailure("TIMEOUT", mayHaveCompleted: true)
     }
