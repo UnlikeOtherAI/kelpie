@@ -60,8 +60,8 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
       self->Show(shown,self->stop_,self->valid_);
     } catch(...) {
       const auto stop=self->stop_;
-      self->RetireIfRevision(revision);
-      try { if(stop) stop(); } catch(...) {}
+      const bool retired=self->RetireIfRevision(revision);
+      try { if(retired && stop) stop(); } catch(...) {}
     }
     return 0;
   }
@@ -69,8 +69,9 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
   if (message==WM_MOUSEACTIVATE) return MA_NOACTIVATE;
   return DefWindowProcW(hwnd,message,wparam,lparam);
 }
-void ScriptNativeOverlay::RetireIfRevision(std::uint64_t revision) {
-  if(shown_.value("_presentationRevision",std::uint64_t{})==revision) RetireDetached();
+bool ScriptNativeOverlay::RetireIfRevision(std::uint64_t revision) {
+  if(shown_.value("_presentationRevision",std::uint64_t{})!=revision) return false;
+  RetireDetached(); return true;
 }
 void ScriptNativeOverlay::RetireDetached() {
   shown_={{"playing",false}}; stop_={}; valid_={}; detachedAnchored_=false;
@@ -171,6 +172,10 @@ void ScriptNativeOverlay::Show(const nlohmann::json& presentation,std::function<
   if (bitmap && bits) {
     std::memcpy(bits,frame.bgra.data(),frame.bgra.size());
     HGDIOBJ previous=SelectObject(memory,bitmap);
+    if(detached && (!previous || previous==HGDI_ERROR)) {
+      DeleteObject(bitmap); DeleteDC(memory); ReleaseDC(nullptr,screen);
+      throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
+    }
     SIZE size{width,height}; POINT source{}; BLENDFUNCTION blend{AC_SRC_OVER,0,255,AC_SRC_ALPHA};
     const bool updated=UpdateLayeredWindow(canvas_,screen,&origin,&size,memory,&source,0,&blend,ULW_ALPHA)!=FALSE;
     if(!updated) {

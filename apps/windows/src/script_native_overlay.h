@@ -11,7 +11,7 @@ class ScriptNativeOverlay {
   ScriptNativeOverlay(HWND viewport, HWND owner, DocumentGuard guard);
   ~ScriptNativeOverlay();
   void Show(const nlohmann::json& presentation, std::function<void()> stop, std::function<bool()> valid);
-  void RetireIfRevision(std::uint64_t revision);
+  bool RetireIfRevision(std::uint64_t revision);
  private:
   static LRESULT CALLBACK StopProc(HWND,UINT,WPARAM,LPARAM);
   void RetireDetached();
