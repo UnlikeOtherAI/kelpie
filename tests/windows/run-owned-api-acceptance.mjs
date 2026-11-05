@@ -90,14 +90,14 @@ try{
  ])await childCase(name,file,[readinessFile,join(evidenceRoot,output),...(expectation?[expectation]:[])],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }
 }catch(error){
- report.checks.push({name:"owned API flow",passed:false,error:error.message});process.exitCode=1;
+ report.checks.push({name:"owned API flow",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;
 }finally{
  await writeFile(join(evidenceRoot,"flow-report.json"),JSON.stringify(report,null,2));
  if(launched){
   try{assert.equal((await publicCli(["browser","stop",alias])).success,true);
    if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
    report.cleanup="public-cli-closed";}
-  catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message});process.exitCode=1;}
+  catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;}
  }
  if(running){
   const finalStore=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));
