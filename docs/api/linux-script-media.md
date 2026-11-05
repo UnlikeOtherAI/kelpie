@@ -102,3 +102,29 @@ the real MCP client, attests actual renderer namespaces/NoNewPrivs/seccomp and
 shuts down the exact app. Namespace links may require read-only sudo inspection;
 it never installs a helper or changes kernel/SELinux policy. Profiles remain
 available for failure/recovery inspection. Computer Use and OS input are unused.
+## Release dependency graph
+
+Linux release CI retains Ubuntu22.04 and now targets Fedora44, matching the
+bounded native test target. Each build installs Cairo/GIF/GStreamer development
+headers and the system app, conversion, OpenH264, parser and MP4-mux plugins.
+It checks actual selected factory metadata and runs native media/artifact tests;
+registration alone is insufficient because a noopenh264 placeholder can expose
+a factory without a working encoder. Missing actual encoding fails the build.
+
+Ubuntu's official [Jammy package file list](https://packages.ubuntu.com/jammy/amd64/gstreamer1.0-plugins-bad/filelist)
+includes libgstopenh264.so. Fedora's official
+[OpenH264 guidance](https://fedoraproject.org/wiki/OpenH264) distinguishes the real
+openh264 runtime from plugin registration; its
+[Fedora44 plugin listing](https://packages.fedoraproject.org/pkgs/gstreamer1-plugins-bad-free/gstreamer1-plugin-openh264/fedora-44.html)
+includes the encoder but lists a noopenh264 dependency. The release graph
+explicitly requires real openh264 from existing official distro repositories.
+It adds no repository or alternative codec fallback. Distro-container release
+execution remains pending; Fedora44 installed-system codec tests are the actual
+evidence so far.
+
+The runtime bundle and AppImage keep system-codec dependencies; they do not
+bundle codec binaries or claim a self-contained cross-distro codec distribution.
+They include generated ELF dependencies and selected plugin provenance. RPM
+keeps private CEF automatic dependency handling disabled and adds the GIF SONAME
+read from the exact app ELF. The verified Fedora44 giflib6.1.3 still provides
+libgif.so.7; a package-version-to-SONAME inference was incorrect and is not used.

@@ -39,6 +39,14 @@ if [ -z "${VERSION}" ] || [ -z "${BUNDLE_DIR}" ] || [ -z "${OUTPUT_DIR}" ]; then
   exit 1
 fi
 
+# AutoReqProv is disabled for private bundled CEF libraries.
+# Bind GIF to the actual app ELF SONAME, not a package version guess.
+GIF_SONAME="$(readelf -d "${BUNDLE_DIR}/kelpie-linux" | sed -n 's/.*Shared library: \[\(libgif\.so\.[0-9]*\)\].*/\1/p')"
+if [[ ! "${GIF_SONAME}" =~ ^libgif\.so\.[0-9]+$ ]]; then
+  echo "Expected exactly one linked GIF ABI in the CEF capture app" >&2
+  exit 1
+fi
+
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 
@@ -83,10 +91,13 @@ Requires:       fontconfig
 Requires:       gtk3
 Requires:       cairo
 Requires:       giflib
-Requires:       gstreamer1-plugins-base
+Requires:       ${GIF_SONAME}()(64bit)
+Requires:       gstreamer1 >= 1.20
+Requires:       gstreamer1-plugins-base >= 1.20
 Requires:       gstreamer1-plugins-good
 Requires:       gstreamer1-plugins-bad-free
 Requires:       gstreamer1-plugin-openh264
+Requires:       openh264
 Requires:       libX11
 Requires:       libXcomposite
 Requires:       libXdamage

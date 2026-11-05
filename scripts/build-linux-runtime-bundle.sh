@@ -62,6 +62,9 @@ done < "${MANIFEST}"
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/kelpie-linux"
 chmod 755 "${OUTPUT_DIR}/kelpie-linux/chrome-sandbox"
 
+readelf -d "${BUILD_DIR}/kelpie-linux" > "${OUTPUT_DIR}/kelpie-linux/elf-dependencies.txt"
+bash scripts/check-linux-script-codecs.sh > "${OUTPUT_DIR}/kelpie-linux/capture-codecs.txt"
+
 cat > "${OUTPUT_DIR}/kelpie-linux/README.txt" <<EOF
 Kelpie Linux release bundle
 Version: ${VERSION}
@@ -74,6 +77,12 @@ Notes:
 - This bundle includes the Chromium Embedded Framework runtime.
 - It still depends on common system libraries such as GTK3, NSS, NSPR, Pango,
   Fontconfig, Avahi, and ALSA.
+- Native capture also requires Cairo, the linked GIF ABI recorded in
+  elf-dependencies.txt, and system GStreamer 1.20+ appsrc/appsink,
+  videoconvert, openh264enc, h264parse and mp4mux factories.
+- capture-codecs.txt records selected system plugin provenance. Codec binaries
+  are not bundled. The AppImage has these same system requirements and is not
+  a self-contained codec distribution. Missing video support refuses before input.
 - Native distro packages and package repositories are generated from this same
   runtime bundle during release automation.
 EOF

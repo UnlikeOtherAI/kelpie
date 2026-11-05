@@ -64,15 +64,19 @@ jobs:
                 pkg-config \
                 tar \
                 xz-utils
+              bash scripts/install-linux-capture-deps.sh ubuntu
               rm -rf /var/lib/apt/lists/*
               export CC=gcc-12 CXX=g++-12
             package_kind: deb
             build_appimage: true
-          - name: fedora-40
-            image: fedora:40
+          - name: fedora-44
+            image: fedora:44
             install: |
               dnf install -y \
-                @development-tools \
+                make \
+                gcc \
+                binutils \
+                xz \
                 ca-certificates \
                 cmake \
                 curl \
@@ -103,6 +107,7 @@ jobs:
                 ninja-build \
                 rpm-build \
                 tar
+              bash scripts/install-linux-capture-deps.sh fedora
               dnf clean all
             package_kind: rpm
             build_appimage: false
@@ -151,7 +156,9 @@ jobs:
               npm install --global pnpm@10.12.4
 
               bash scripts/download-cef.sh linux
+              bash scripts/check-linux-script-codecs.sh
               make linux
+              ctest --test-dir apps/linux/build --output-on-failure -R "^linux_script_(media|artifact)_test$"
 
               package_root="dist/release/${DISTRO_NAME}"
               bundle_root="${package_root}/bundle"
