@@ -21,6 +21,10 @@ inline bool ScriptTargetInspectionExplicit(const nlohmann::json& value) {
   return value.is_object() && value.contains("ok") && value["ok"].is_boolean() &&
     value.contains("sensitive") && value["sensitive"].is_boolean();
 }
+inline bool ScriptTargetPostMutationExplicit(const nlohmann::json& value) {
+  return ScriptTargetInspectionExplicit(value) && value.contains("sensitivityKnown") &&
+    value["sensitivityKnown"].is_boolean();
+}
 inline bool ScriptTargetInspectionUncertain(const nlohmann::json& value) {
   return !ScriptTargetInspectionExplicit(value) || (!value["sensitive"].get<bool>() &&
     (!value.contains("sensitivityKnown") || !value["sensitivityKnown"].is_boolean() || !value["sensitivityKnown"].get<bool>()));
