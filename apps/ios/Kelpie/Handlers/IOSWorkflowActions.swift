@@ -131,11 +131,6 @@ final class IOSWorkflowActions {
         let target = step["target"] as? Body ?? [:]
         let editing = action == "type" || action == "fill"
         let plan = workflow.pacedPlans[index]
-        let emptyPacedType = plan.map { !$0.clearFirst && $0.scalars.isEmpty } == true
-        if editing && !emptyPacedType {
-            try tab.focusForEditing()
-            try await check()
-        }
         let document = tab.document
         let viewport = try await tab.viewport()
         let text = editing ? step["text"] as? String : nil
@@ -171,6 +166,13 @@ final class IOSWorkflowActions {
             target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
         ))
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if editing {
+            try tab.focusForEditing()
+            try await check()
+            guard tab.document == document, viewport == (try await tab.viewport()) else {
+                throw IOSWorkflowFailure("STALE_TARGET")
+            }
+        }
         let hold = sampler?.recordsMotion == true
         let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
         if let sampler {
