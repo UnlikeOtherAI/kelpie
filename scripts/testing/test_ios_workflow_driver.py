@@ -80,6 +80,12 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         ]), {"focus-viewport": 1, "observation-INVALID_ARGUMENTS": 1, "responder-outside": 1,
               "snapshot-visible-size": 1})
 
+    def test_projection_diagnostics_accept_only_finite_bounded_vectors(self):
+        from ios_workflow_diagnostics import fixed_projection
+        self.assertEqual(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 17)), [1] * 17)
+        self.assertIsNone(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 16)))
+        self.assertIsNone(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 16 + ["10001"])))
+
     def test_capture_encode_diagnostics_accept_only_bounded_numbers(self):
         from ios_workflow_diagnostics import fixed_capture_encode
         self.assertEqual(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=137"), 137)
@@ -166,6 +172,18 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIn("testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat", full_names)
         with self.assertRaises(ValueError):
             DRIVER.selection("unrecognized")
+
+    def test_geometry_selection_uses_only_real_target_pinch_and_keyboard_journeys(self):
+        targets, names = DRIVER.selection("geometry")
+        self.assertEqual(names, {
+            "testLiveMarkerProjectionMatchesSameSceneTarget",
+            "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+            "testNativePinchClipsTapCenterAndExportedMarker",
+            "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+        })
+        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+        _, full_names = DRIVER.selection("full")
+        self.assertTrue(names < full_names)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

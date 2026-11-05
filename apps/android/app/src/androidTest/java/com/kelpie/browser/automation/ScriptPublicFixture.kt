@@ -173,7 +173,8 @@ abstract class ScriptPublicFixture {
                     viewport.offset(rootLocation[0], rootLocation[1])
                 }
             }
-            val target = submitTargetBounds(owned, geometry)
+            val projection = JSONObject()
+            val target = submitTargetBounds(owned, geometry, projection)
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
             val now = System.nanoTime()
@@ -185,6 +186,7 @@ abstract class ScriptPublicFixture {
                         .put("actionIndex", status?.optInt("actionIndex", -1) ?: -1)
                         .put("playing", status?.optBoolean("playing") ?: false)
                         .put("targetVisible", target != null)
+                        .put("projection", projection)
                         .put("markerFound", marker != null)
                         .put("accessibility", diagnoseSubmitWindows()),
                 )
@@ -293,21 +295,42 @@ abstract class ScriptPublicFixture {
     private fun submitTargetBounds(
         view: android.webkit.WebView,
         geometry: JSONObject,
+        diagnostic: JSONObject,
     ): android.graphics.Rect? {
         var target: android.graphics.Rect? = null
         instrumentation.runOnMainSync {
-            if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) return@runOnMainSync
+            diagnostic.put("viewWidth", view.width).put("viewHeight", view.height)
+            if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) {
+                diagnostic.put("reason", "view-unavailable")
+                return@runOnMainSync
+            }
             val width = geometry.getDouble("width")
             val height = geometry.getDouble("height")
-            if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) return@runOnMainSync
+            diagnostic.put("cssWidth", width).put("cssHeight", height)
+            if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) {
+                diagnostic.put("reason", "viewport-invalid")
+                return@runOnMainSync
+            }
             val scaleX = view.width / width
             val scaleY = view.height / height
-            if (kotlin.math.abs(scaleX / scaleY - 1.0) > 0.02) return@runOnMainSync
+            diagnostic.put("scaleX", scaleX).put("scaleY", scaleY)
+            if (kotlin.math.abs(scaleX / scaleY - 1.0) > 0.02) {
+                diagnostic.put("reason", "viewport-scale-mismatch")
+                return@runOnMainSync
+            }
             val left = (geometry.getDouble("left") - geometry.getDouble("offsetLeft")) * scaleX
             val top = (geometry.getDouble("top") - geometry.getDouble("offsetTop")) * scaleY
             val right = (geometry.getDouble("right") - geometry.getDouble("offsetLeft")) * scaleX
             val bottom = (geometry.getDouble("bottom") - geometry.getDouble("offsetTop")) * scaleY
-            if (left < 0 || top < 0 || right > view.width || bottom > view.height) return@runOnMainSync
+            diagnostic
+                .put("localLeft", left)
+                .put("localTop", top)
+                .put("localRight", right)
+                .put("localBottom", bottom)
+            if (left < 0 || top < 0 || right > view.width || bottom > view.height) {
+                diagnostic.put("reason", "target-outside-view")
+                return@runOnMainSync
+            }
             val rect = android.graphics.RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
             val matrix = android.graphics.Matrix()
             view.transformMatrixToGlobal(matrix)
@@ -315,6 +338,7 @@ abstract class ScriptPublicFixture {
             matrix.getValues(values)
             val sx = values[android.graphics.Matrix.MSCALE_X]
             val sy = values[android.graphics.Matrix.MSCALE_Y]
+            diagnostic.put("matrixScaleX", sx.toDouble()).put("matrixScaleY", sy.toDouble())
             if (!matrix.isAffine ||
                 sx <= 0f ||
                 sy <= 0f ||
@@ -322,6 +346,7 @@ abstract class ScriptPublicFixture {
                 kotlin.math.abs(values[android.graphics.Matrix.MSKEW_X]) > 0.0001f ||
                 kotlin.math.abs(values[android.graphics.Matrix.MSKEW_Y]) > 0.0001f
             ) {
+                diagnostic.put("reason", "native-transform-unsupported")
                 return@runOnMainSync
             }
             val origin = floatArrayOf(0f, 0f)
@@ -331,7 +356,10 @@ abstract class ScriptPublicFixture {
             view.getLocationOnScreen(screen)
             rect.offset(screen[0] - origin[0], screen[1] - origin[1])
             val visible = android.graphics.Rect()
-            if (!view.getGlobalVisibleRect(visible)) return@runOnMainSync
+            if (!view.getGlobalVisibleRect(visible)) {
+                diagnostic.put("reason", "view-not-visible")
+                return@runOnMainSync
+            }
             val rootLocation = IntArray(2)
             view.rootView.getLocationOnScreen(rootLocation)
             visible.offset(rootLocation[0], rootLocation[1])
@@ -342,7 +370,13 @@ abstract class ScriptPublicFixture {
                     kotlin.math.ceil(rect.right.toDouble()).toInt(),
                     kotlin.math.ceil(rect.bottom.toDouble()).toInt(),
                 )
-            if (visible.contains(projected)) target = projected
+            diagnostic.put("visible", visible.toShortString()).put("projected", projected.toShortString())
+            if (visible.contains(projected)) {
+                diagnostic.put("reason", "admitted")
+                target = projected
+            } else {
+                diagnostic.put("reason", "target-clipped")
+            }
         }
         return target
     }

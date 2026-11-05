@@ -4,6 +4,14 @@ export function listenerState(owners,pid){
  return owners.length===1&&owners[0]===pid?"owned":"foreign";
 }
 
+// Keep an empty lsof result distinct from a failed process invocation.
+export function listenerProbeFailure(error){
+ const stderrPresent=typeof error?.stderr?.length==="number"&&error.stderr.length>0;
+ const outcome=error?.status===1&&!stderrPresent?"no-match":"probe-error";
+ const causes=new Set(["ENOENT","EACCES","EAGAIN","ETIMEDOUT"]);
+ return {outcome,cause:causes.has(error?.code)?error.code:"OTHER",stderrPresent};
+}
+
 // Only fixed labels leave the pre-pairing stdout parser, never the message text.
 export function startupSignal(line){
  if(line==="[KelpieApp] AppReveal start requested")return "APPREVEAL_START_REQUESTED";
@@ -39,4 +47,10 @@ export function processCommandMatches(command,executable){
 export function viewportSignal(line){
  const match=/^\[WorkflowViewport\] bounds=([01]) layout=([01]) visible=([01]) scale=([01]) pixel=([01]) widths=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2}) heights=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2})$/.exec(line);
  return match?{boundsSame:match[1]==="1",layoutSame:match[2]==="1",visibleSame:match[3]==="1",scaleSame:match[4]==="1",pixelSame:match[5]==="1",oldWidth:Number(match[6]),newWidth:Number(match[7]),oldHeight:Number(match[8]),newHeight:Number(match[9])}:null;
+}
+
+// Fixed native visibility guard flags only; no window identity or page data.
+export function workflowVisibilitySignal(line){
+ const match=/^\[WorkflowVisibility\] phase=(check|focus) visible=([01u]) hidden=([01u]) key=([01u]) sheet=([01u])$/.exec(line);
+ return match?{phase:match[1],visible:match[2],hidden:match[3],key:match[4],sheet:match[5]}:null;
 }
