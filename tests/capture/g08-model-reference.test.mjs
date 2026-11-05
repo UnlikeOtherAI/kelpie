@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {validateG08ModelFacts,validateG08ObservedRows} from "./g08-model-reference.mjs";
+import {G08_MAX_BACKING_BYTES,validateG08ModelFacts,validateG08ObservedRows} from "./g08-model-reference.mjs";
 const hash=value=>createHash("sha256").update(value).digest("hex");
 function fixture(){
  const white=hash(Buffer.alloc(71*71*4,255)), pointer="1".repeat(64);
@@ -61,4 +61,11 @@ test("observed backing requires every exact white frame and matching timestamp",
   r=>r[1].bgraBase64=Buffer.alloc(71*71*4,254).toString("base64"),
   r=>r[1].roi[2]--
  ]){const changed=structuredClone(rows);mutate(changed);assert.throws(()=>validateG08ObservedRows(changed,f,evidence,backing),/INSUFFICIENT_EVIDENCE/);}
+});
+test("800 bounded backing observations fit the intake budget",()=>{
+ const row={pid:123456,run:"r".repeat(128),documentId:"d".repeat(128),sequence:799,elapsedMs:33000,
+  frameWidth:640,frameHeight:450,stride:2560,sourceWidth:1280,sourceHeight:900,viewportWidth:1280,viewportHeight:900,
+  visualViewport:{offsetLeft:0,offsetTop:0,width:1280,height:900,scale:1},roi:[445,190,71,71],
+  bgraSHA256:"a".repeat(64),bgraBase64:Buffer.alloc(71*71*4,255).toString("base64")};
+ assert.ok(Buffer.byteLength(JSON.stringify(row)+"\n")*800<G08_MAX_BACKING_BYTES);
 });

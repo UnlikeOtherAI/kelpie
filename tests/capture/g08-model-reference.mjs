@@ -7,6 +7,7 @@ import {isDeepStrictEqual} from "node:util";
 import {consumeG08Frames} from "./g08-frame-stream.mjs";
 import {measureG08Frame} from "./g08-pixels.mjs";
 
+export const G08_MAX_BACKING_BYTES=24000000;
 const digest=bytes=>createHash("sha256").update(bytes).digest("hex");
 const equal=(a,b)=>isDeepStrictEqual(a,b);
 const check=(value,message)=>assert.ok(value,"INSUFFICIENT_EVIDENCE model "+message);
@@ -108,7 +109,7 @@ export async function loadG08ModelReference(paths,context) {
     json(paths.manifest,2000000),json(paths.backing,2000000),json(paths.evidence,2000000)]);
   const {roiHash}=validateG08ModelFacts({...context,manifest:modelFile.value,backing:backingFile.value,
     evidence:evidenceFile.value,evidenceSHA256:digest(evidenceFile.bytes)});
-  const observed=await bounded(paths.observations,20000000);
+  const observed=await bounded(paths.observations,G08_MAX_BACKING_BYTES);
   check(digest(observed)===backingFile.value.observationSHA256,"observation hash");
   const records=observed.toString("utf8").trimEnd().split("\n").map(line=>JSON.parse(line));
   validateG08ObservedRows(records,context,evidenceFile.value,backingFile.value);
