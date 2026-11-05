@@ -169,6 +169,10 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         }
         let good = try decoded(#"{"token":"expected","ok":true,"mayHaveCompleted":true,"sensitive":false,"sensitivityKnown":true,"inputGuarantee":"synthetic-coordinate"}"#)
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(good, token: "expected"))
+        var emptyError = good
+        emptyError["ok"] = false
+        emptyError["error"] = ""
+        XCTAssertFalse(ScriptWorkflowTab.hasValidMutationReceipt(emptyError))
         for field in ["ok", "mayHaveCompleted", "sensitive", "sensitivityKnown"] {
             for raw in ["1", "0", #""true""#, "null"] {
                 var candidate = good

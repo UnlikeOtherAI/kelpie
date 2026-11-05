@@ -273,7 +273,8 @@ final class ScriptWorkflowTab {
             return body["error"] == nil && ScriptWorkflowBoolean.value(body["mayHaveCompleted"]) == true &&
                 body["inputGuarantee"] as? String == "synthetic-coordinate"
         }
-        return body["error"] is String
+        guard let error = body["error"] as? String else { return false }
+        return !error.isEmpty
     }
 
     /// A malformed callback is uncertain before any subsequent authority or document guard.
