@@ -95,11 +95,11 @@ return ISOLATION_UNAVAILABLE before creating or using any shared context, in
 both the SDK and public worker factory. This refuses an unverified storage mode;
 it never substitutes borrowed/default storage.
 
-The minimal navigation inventory under verification is tabs.list/tabs.close,
+The minimal navigation inventory verified through the built production stdio CLI is tabs.list/tabs.close,
 tab.goto/tab.url/tab.title/tab.back/tab.forward/tab.reload. tabs.new and the
 snapshot/extract/status/ready reader family remain unadmitted publicly. Passing
 a limited fixed-reader diagnostic does not establish the full reader contract.
-The final production stdio corpus is a separate gate; no visual/input/WebMCP
+The seven-case production stdio corpus passed for exact 1.0.2 with one isolated session/tab; no visual/input/WebMCP
 support is inferred from these diagnostics.
 
 No canonical screenshot, visual geometry, pointer motion, tap effect, GIF or video
@@ -109,7 +109,7 @@ endpoint as a compatibility workaround. There is no automatic backend fallback.
 
 The [Lightpanda analysis](../plans/browser-automation-capture/lightpanda-analysis.md)
 records exact upstream revisions and the bounded real-binary diagnostics, including
-failures and pending production acceptance.
+failures, completed narrow production acceptance and pending reader expansion.
 Passing protocol or mock tests alone does not establish compatibility.
 
 ## Experimental WebMCP controller

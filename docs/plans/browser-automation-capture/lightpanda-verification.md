@@ -1,6 +1,6 @@
 # Bounded Lightpanda Linux verification
 
-Status: bounded actual diagnostics completed; public production profile pending. The coordinator must assign the exact committed source,
+Status: bounded diagnostics and seven production stdio navigation cases passed. Reader expansion and comparable engine benchmarking remain pending. The coordinator must assign the exact committed source,
 owned Fedora test worktree and resource slot before execution. Fedora is a bounded
 Linux-native test target, not a development host or ongoing worker service.
 
@@ -179,4 +179,41 @@ artifact, maxSessions1/maxTabs1 and the proven navigation-only method list.
 Seven sequential cases cover version/initialize, pre-allocation shared refusal,
 exact capabilities/resource ceilings, public history/reload, unsupported/foreign/
 origin refusal, close/fresh storage, TTL and clean shutdown preserving the
-borrowed LP endpoint. It has not run; source preparation is not admission proof.
+borrowed LP endpoint. The seven public cases passed in the later production checkpoint below.
+
+## Verified production stdio navigation profile, 5 November 2026
+
+The built production CLI/SDK at 9a30140514720ad34fe71e1a065b8de0209b5f00
+passed all seven public stdio cases from fixture revision
+0a6913f700f16080b47244f322a23ced23cebe65 on the exact 1.0.2 Linux asset above.
+CLI/package/MCP initialize all reported 0.1.22. The archive SHA-256 was
+2fa04e2e4cec3ae06c33047fc8c4bd84a0283135aaaa6a5389139cab7556a989.
+
+The operator configured one isolated session and one tab. Verified methods were
+tabs.list, tabs.close, tab.goto, tab.url, tab.title, tab.back, tab.forward and
+tab.reload, alongside documentation/capabilities. Shared isolation refused before
+allocation; a second session refused RESOURCE_LIMIT. Actual history/reload,
+foreign-tab and origin refusal, closed/stale handles, fresh cookie/localStorage
+isolation, TTL retirement and clean stdio shutdown all passed. A fresh context
+on the borrowed LP endpoint still worked after worker shutdown. No human storage
+or pages were imported. Unsupported readers/input/pixels/WebMCP stayed refused;
+the corrected diagnostic snapshot assertions remain separately unexecuted.
+
+The enforced unit retained one CPU/CPUWeight 1, 2 GiB, 64 tasks, 120 seconds,
+NoNewPrivileges and loopback-only egress. There were 41 tool calls and 3,999
+response bytes. Whole-service cost was 7.464 seconds wall, 4.280 seconds CPU,
+301.1 MiB peak; the report measured 6.462 seconds including teardown and a
+315,830,272-byte cgroup peak before exit. Quota throttling and host contention
+were present. These are one absolute sample, not a same-host engine comparison.
+Earlier four diagnostic attempts/failures remain in the denominator and table.
+
+Unit kelpie-lightpanda-public-1793850018 exited successfully, then was collected:
+not-found/inactive, MainPID 0, cgroup absent, no LP process. Worker stderr was
+empty and stdout remained valid MCP. Evidence on Maxis:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/lightpanda-actual/public-9a301405,
+including report.json, journal.txt, unit-begin.txt and teardown.txt.
+Report SHA-256:
+d7ca0d84efe7f232bb508443af655790cd0d6447b56a275e47f85261c7f63267.
+An initial artifact-copy wildcard encountered the synthetic empty-home directory;
+explicit report-file transfer then succeeded with the same verified report hash.
+No corpus result was changed. No ongoing worker service remains.
