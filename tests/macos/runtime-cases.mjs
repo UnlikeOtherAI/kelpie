@@ -47,8 +47,6 @@ export async function runEngine(client,fixture,engine,report) {
   return {success:true};
  });
  await load();
- await check("dense-animation",()=>runG08(client,tabId,engine,report));
- await load();
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
   const result=await client.direct("kelpie_play_script",{...base,capture,actions:[
@@ -188,5 +186,6 @@ export async function runEngine(client,fixture,engine,report) {
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
  });
  await runSafety({client,fixture,engine,base,capture,check,play,load});
+ await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
 }
