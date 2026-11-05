@@ -9,7 +9,7 @@ import {runPaced} from "./runtime-paced.mjs";
 import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
-import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker} from "./runtime-media.mjs";
+import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker,inspectDefaultMotion} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
@@ -253,6 +253,22 @@ export async function runEngine(client,fixture,engine,report) {
   const artifacts=await client.download(result,engine+"-lowfps"),movies=artifacts.filter(a=>a.mimeType!=="image/png");
   requireTrue(movies.length===2,"LOW_FPS_FORMATS");
   return movies.map(a=>inspectMedia(a,{marker:true,preNavigation:true}));
+ });
+ await check("default-350ms-pointer-motion",async()=>{
+  await load("/motion");const begin=fixture.events.length;
+  const result=await client.api("play-script",{...base,pointer:{enabled:true},
+   tapIndicator:{color:"#F54242",radius:2,durationMs:100,wobble:false,fade:true},
+   capture:{...capture,formats:["gif","video"],fps:30},actions:[
+    {action:"click",target:{role:"button",name:"First"}},{action:"wait",ms:800},
+    {action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:400}]});
+  requireTrue(result.success,"DEFAULT_MOTION_WORKFLOW");
+  const events=fixture.events.slice(begin),first=events.find(e=>e.type==="click"&&e.target==="first"),
+   second=events.find(e=>e.type==="click"&&e.target==="second");
+  requireTrue(first&&second,"DEFAULT_MOTION_EVENTS");
+  const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
+  const artifacts=await client.download(result,engine+"-default-motion");
+  requireTrue(artifacts.length===2,"DEFAULT_MOTION_FORMATS");
+  return artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}));
  });
  for(const curve of ["s","c"])await check("movie-pointer-curve-"+curve,async()=>{
   await load("/motion");const begin=fixture.events.length;
