@@ -11,7 +11,6 @@ final class IOSWorkflowRunner {
     private var actionIndex = 0
     private var totalActions = 0
     private var finalizing = false
-    private var currentArtifacts: [Body] = []
     private var terminal: [(id: String, owner: String, value: Body)] = []
 
     init(host: ScriptHandler) { self.host = host }
@@ -22,7 +21,11 @@ final class IOSWorkflowRunner {
         let authorized = await grant?.isCurrent() ?? false
         if method == "get-script-artifact" {
             guard let grant, authorized else { return denied() }
-            return ScriptArtifactStore.shared.read(body, owner: grant.owner)
+            return ScriptArtifactStore.shared.read(
+                body,
+                owner: grant.owner,
+                blockedRunID: owner == grant.owner ? runID : nil
+            )
         }
         guard Set(body.keys).isSubset(of: ["runId"]), body["runId"] == nil ||
                 (body["runId"] as? String).map({ !$0.isEmpty && $0.count <= 128 }) == true else {
@@ -54,7 +57,7 @@ final class IOSWorkflowRunner {
         if method == "abort-script" { _ = host.playbackState.requestAbort() }
         var status = IOSBoundWorkflow.capabilities
         status["runId"] = runID
-        if !currentArtifacts.isEmpty { status["artifacts"] = currentArtifacts }
+        status["artifacts"] = [Body]()
         status["state"] = finalizing ? "finalizing" : "running"
         status["playing"] = true
         status["actionIndex"] = min(actionIndex, max(0, totalActions - 1))
@@ -139,7 +142,11 @@ final class IOSWorkflowRunner {
         } catch { issue = error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
         await sampler?.stop()
-        var discardMedia = issue?.code == "SENSITIVE_CAPTURE_REFUSED"
+        presentation?.finish()
+        // Late renderer results may still classify an attempted edit as sensitive.
+        // Stop sampling first; the existing retirement fence owns callback completion.
+        await IOSRendererDeadline.waitForRetirement(tab.view)
+        var discardMedia = actions?.discardMedia == true || issue?.code == "SENSITIVE_CAPTURE_REFUSED"
         if let actions {
             do {
                 outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets)
@@ -148,7 +155,6 @@ final class IOSWorkflowRunner {
                 if issue == nil { issue = IOSWorkflowFailure("OUTPUT_REDACTION_FAILED") }
             }
         }
-        presentation?.finish()
         let artifacts = await media?.finish(
             elapsed: sampler?.elapsed ?? 0,
             dropped: sampler?.dropped ?? 0,
@@ -156,8 +162,6 @@ final class IOSWorkflowRunner {
             discard: discardMedia,
             isAborted: { [state = host.playbackState] in state.isAbortRequested() }
         ) ?? []
-        currentArtifacts = artifacts
-        await IOSRendererDeadline.waitForRetirement(tab.view)
         await tab.resetTargets()
         await IOSRendererDeadline.waitForRetirement(tab.view)
         await host.setRecordingMode(false)
@@ -199,7 +203,6 @@ final class IOSWorkflowRunner {
         finalizing = false
         owner = nil
         sampler = nil
-        currentArtifacts = []
         return result
     }
 }

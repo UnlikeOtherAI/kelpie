@@ -89,7 +89,12 @@ final class IOSWorkflowTab {
         guard view.window?.windowScene?.activationState == .foregroundActive else { throw IOSWorkflowFailure("TAB_NOT_VISIBLE") }
     }
 
-    private func fixed(_ expression: String, mutates: Bool = false) async throws -> Any? {
+    private func fixed(
+        _ expression: String,
+        mutates: Bool = false,
+        consume: (@MainActor (Any?) -> Void)? = nil,
+        missingResult: (@MainActor () -> Void)? = nil
+    ) async throws -> Any? {
         try requireCurrent()
         if mutates {
             guard router.browserLease.begin() else { throw IOSWorkflowFailure("BUSY") }
@@ -98,14 +103,29 @@ final class IOSWorkflowTab {
         defer { if mutates { router.browserLease.end() } }
         let before = document
         let value: Any?
+        var evaluationStarted = false
+        var resultReceived = false
         do {
             value = try await IOSRendererDeadline.run(view: view, mutates: mutates, lease: mutates ? router.browserLease : nil) { [self] in
                 if mutates { try await requireMutationAuthority() }
                 try requireCurrent()
                 guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
-                return try await BrowserControlWebKit.evaluate(expression, in: view)
+                evaluationStarted = true
+                do {
+                    let result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    resultReceived = true
+                    // Consume privacy metadata before guards and even after the caller's deadline.
+                    consume?(result)
+                    return result
+                } catch {
+                    missingResult?()
+                    throw error
+                }
             }
-        } catch let error as IOSWorkflowFailure { throw error } catch { throw IOSWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates) }
+        } catch {
+            if evaluationStarted, !resultReceived { missingResult?() }
+            throw error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates)
+        }
         do { try requireCurrent() } catch { throw IOSWorkflowFailure("TAB_CHANGED", mayHaveCompleted: mutates) }
         guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates) }
         return value
@@ -139,19 +159,31 @@ final class IOSWorkflowTab {
         token: String? = nil,
         observe: Bool = false,
         dispatch: Bool = false,
-        edit: Body? = nil
+        edit: Body? = nil,
+        refuseSensitive: Bool = false,
+        consume: (@MainActor (Body) -> Void)? = nil,
+        missingResult: (@MainActor () -> Void)? = nil
     ) async throws -> Body {
         var options: Body = ["key": key, "target": target, "dispatch": dispatch]
         if let token { options["token"] = token }
         if observe { options["observe"] = true }
         if let edit { options["edit"] = edit }
+        if refuseSensitive { options["policy"] = ["refuseSensitive": true] }
         guard let input = IOSBoundWorkflow.json(options),
               let pointer = kelpie_browser_script_target_expression(input) else { throw IOSWorkflowFailure("INVALID_TARGET") }
         defer { kelpie_mcp_free_string(pointer) }
         guard let expression = IOSBoundWorkflow.decode(String(cString: pointer))?["expression"] as? String else {
             throw IOSWorkflowFailure("INVALID_TARGET")
         }
-        guard let result = try await fixed(expression, mutates: dispatch || edit != nil) as? Body else {
+        let value = try await fixed(
+            expression,
+            mutates: dispatch || edit != nil,
+            consume: { result in
+                if let body = result as? Body, body["sensitive"] is Bool { consume?(body) } else { missingResult?() }
+            },
+            missingResult: missingResult
+        )
+        guard let result = value as? Body, result["sensitive"] is Bool else {
             throw IOSWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
         }
         return result
@@ -192,12 +224,21 @@ final class IOSWorkflowTab {
         guard router.browserLease.begin() else { throw IOSWorkflowFailure("BUSY") }
         defer { router.browserLease.end() }
         router.invalidateAllBrowserReferences()
-        let navigationLease = try await IOSWorkflowNavigation.issue(on: view, authorize: requireMutationAuthority) {
-            context.lastNavigationError = nil
-            return view.load(URLRequest(url: url))
-        }
-        defer { ConnectDocument.reserve(view, lease: nil) }
         let end = ContinuousClock.now.advanced(by: .seconds(10))
+        let navigationLease = try await IOSWorkflowNavigation.issue(
+            on: view,
+            deadline: end,
+            authorize: {
+                try await check()
+                try await self.requireMutationAuthority()
+            },
+            isLoading: { self.view.isLoading },
+            load: {
+                self.context.lastNavigationError = nil
+                return self.view.load(URLRequest(url: url))
+            }
+        )
+        defer { ConnectDocument.reserve(view, lease: nil) }
         repeat {
             try? await Task.sleep(nanoseconds: 50_000_000)
             let version = ConnectDocument.version(view)

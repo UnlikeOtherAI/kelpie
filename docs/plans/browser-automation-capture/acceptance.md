@@ -136,7 +136,12 @@ dwell is separately recorded from configured animation duration. Preserve the
 FPS cap, cancellable bounds and final exact-target recheck; screenshots-only/no
 capture must not inherit an unnecessary movie-admission delay.
 
-The initial ledger author ran no flows at creation. Later source/core/headless and exported-media results are recorded in the linked implementation/review/platform ledgers; they do not automatically promote any native cell to passed. UI/Stop verification remains blocked by the user hold.
+The initial ledger author ran no flows at creation. Later source/core/headless,
+exported-media and authorized native-instrumentation results are recorded in the
+linked ledgers. CUA/VNC/arbitrary desktop input remain off; there is no blanket
+UI/Stop hold. Windows f188 WGC spatial/Stop and Android c71 phone/tablet spatial
+subcases have actual evidence; failed phone Stop and other failed journeys remain
+failed. See reviewed-cells.md for explicit acceptance and remaining limits.
 
 ## Canonical ID crosswalk
 This ledger is the sole definition of acceptance IDs. Earlier planning/checklist

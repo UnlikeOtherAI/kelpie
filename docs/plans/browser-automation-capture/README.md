@@ -1,6 +1,10 @@
 # Browser automation and walkthrough capture
 
-This plan covers the full Lightpanda-inspired browser automation brief and the original walkthrough export request. The QA acceptance ledger records actual evidence by revision and platform. Current common snapshot:6f10b31bb724db74042ae7a40841ce4762ffe089,with later owner reports explicitly labelled below and in outstanding-gates.md. Earlier bases/checkpoints remain historical.
+This plan covers the full Lightpanda-inspired browser automation brief and the original walkthrough export request. The QA acceptance ledger records actual evidence by revision and platform. Current independently reviewed source snapshot:5f4c4fcb, plus common privacy-oracle cbce8f97.
+The [integration branch](https://github.com/UnlikeOtherAI/kelpie/tree/codex/script-capture-integration-20261104)
+is the moving source reference; every evidence receipt retains its exact older
+binary/source identity. See outstanding-gates.md and reviewed-cells.md for current
+closure decisions. Earlier bases/checkpoints remain historical.
 
 | IDs | Scope | Dependencies |
 | --- | --- | --- |
@@ -13,6 +17,9 @@ This plan covers the full Lightpanda-inspired browser automation brief and the o
 | REPLAY / WFL family | Reusable typed workflows, declared inputs and secret references, assertions/readiness, structured outputs, one play-script runtime | READY, SESSION |
 | BACKEND family | Restricted optional Lightpanda adapter exploration; opt-in, capability boundaries and conformance; no AGPL copying | OBS, SESSION, evals |
 | WEBMCP family | Page tool discovery/invocation exploration with explicit origin/session permission; untrusted declarations, no automatic invocation | SESSION, DIA |
+
+The finite changed-native-state screenshot inventory and later per-component
+version/release actions are in [final UI and release actions](final-ui-release-actions.md).
 
 ## Phases
 

@@ -3,21 +3,39 @@ import XCTest
 extension WorkflowCaptureUITests {
     @MainActor
     func testInferredPasswordCaptureRefusalRedactsEarlierNamedOutputsAndDiscardsFrames() async throws {
+        try await sensitiveRefusal(path: "/secret-guard", selector: "input[type=password]", throughMCP: false, focused: false)
+    }
+
+    @MainActor
+    func testFocusPasswordRefusalRedactsEarlierOutputsAndDiscardsFrames() async throws {
+        try await sensitiveRefusal(path: "/focus-secret-password", selector: "#entry", throughMCP: false, focused: true)
+    }
+
+    @MainActor
+    func testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames() async throws {
+        try await sensitiveRefusal(path: "/focus-secret-autocomplete", selector: "#entry", throughMCP: true, focused: true)
+    }
+
+    @MainActor
+    private func sensitiveRefusal(path: String, selector: String, throughMCP: Bool, focused: Bool) async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
         let canary = "iOS Reflected+Canary!"
         let variants = [canary, "iOS%20Reflected%2bCanary!", "iOS+Reflected%2bCanary%21"]
-        let failed = try await probe.request("/v1/play-script", [
+        let workflow: Body = [
             "version": 1, "tabId": tab, "capture": ["formats": ["screenshots"]],
             "actions": [
-                ["action": "navigate", "url": origin + "/secret-guard"],
+                ["action": "navigate", "url": origin + path],
                 ["action": "output", "source": "title", "name": "before"],
-                ["action": "fill", "target": ["selector": "input[type=password]"], "text": canary]
+                ["action": "fill", "target": ["selector": selector], "text": canary]
             ]
-        ])
+        ]
+        let failed = throughMCP ? try await probe.call("kelpie_play_script", workflow) :
+            try await probe.request("/v1/play-script", workflow)
         XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
         XCTAssertEqual(failed["actionsExecuted"] as? Int, 2)
+        if focused { XCTAssertEqual(failed["mayHaveCompleted"] as? Bool, true) }
         XCTAssertTrue((failed["artifacts"] as? [Body])?.isEmpty == true)
         let scrubbed = try XCTUnwrap((failed["outputs"] as? Body)?["before"] as? String)
         XCTAssertTrue(variants.allSatisfy { !scrubbed.contains($0) })
@@ -108,11 +126,23 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual((foreign["error"] as? Body)?["code"] as? String, "ARTIFACT_NOT_FOUND")
         let running = Task.detached { [probe] in
             try await probe.request("/v1/play-script", ["version": 1, "tabId": tab, "actions": [
-                ["action": "wait", "ms": 5000], ["action": "click", "target": ["role": "button", "name": "Submit"]]
+                ["action": "wait", "ms": 15000], ["action": "click", "target": ["role": "button", "name": "Submit"]]
             ]])
         }
         let stop = XCUIApplication().buttons["browser.recording.stop"]
         XCTAssertTrue(stop.waitForExistence(timeout: 8))
+        let active = try await probe.call("kelpie_get_script_status", [:])
+        XCTAssertTrue((active["artifacts"] as? [Body])?.isEmpty == true)
+        let activeID = try XCTUnwrap(active["runId"] as? String)
+        let premature = range.merging(["runId": activeID]) { _, new in new }
+        let notReady = try await probe.request("/v1/get-script-artifact", premature)
+        XCTAssertEqual((notReady["error"] as? Body)?["code"] as? String, "ARTIFACT_NOT_READY")
+        let malformed = try await probe.request("/v1/get-script-artifact", premature.merging(["length": true]) { _, new in new })
+        XCTAssertEqual((malformed["error"] as? Body)?["code"] as? String, "INVALID_PARAM")
+        let hidden = try await second.request("/v1/get-script-artifact", premature)
+        XCTAssertEqual((hidden["error"] as? Body)?["code"] as? String, "ARTIFACT_NOT_FOUND")
+        let older = try await probe.request("/v1/get-script-artifact", range)
+        XCTAssertEqual(older["nextOffset"] as? Int, 1)
         _ = try await probe.request("/v1/pair", method: "DELETE")
         let denied = try await probe.request("/v1/get-script-artifact", range.merging(["offset": 1]) { _, new in new })
         XCTAssertEqual((denied["error"] as? Body)?["code"] as? String, "UNAUTHORIZED")

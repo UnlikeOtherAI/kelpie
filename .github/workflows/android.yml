@@ -84,6 +84,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v4.0.3
+      - name: Check native runner ownership and report guards
+        run: node --test scripts/testing/android-native-ownership.test.mjs scripts/testing/android-native-report.test.mjs
       - name: Verify hosted KVM
         shell: bash
         run: |

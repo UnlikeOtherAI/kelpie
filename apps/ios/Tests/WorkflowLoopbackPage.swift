@@ -5,7 +5,9 @@ import Network
 final class WorkflowLoopbackPage {
     enum Failure: Error { case listener }
     let listener: NWListener
-    init() throws {
+    private let responseDelay: TimeInterval
+    init(responseDelay: TimeInterval = 0) throws {
+        self.responseDelay = responseDelay
         let params = NWParameters.tcp
         params.requiredInterfaceType = .loopback
         listener = try NWListener(using: params, on: .any)
@@ -30,9 +32,16 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
-        if(location.pathname==='/secret-guard'){
+        if(location.pathname==='/secret-guard'||location.pathname.startsWith('/focus-secret-')){
           document.title='iOS Reflected+Canary! | iOS%20Reflected%2bCanary! | iOS+Reflected%2bCanary%21';
-          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'}
+          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'};
+          const field=document.querySelector('#entry');
+          field.oninput=()=>{document.title='Unexpected edit'};
+          if(location.pathname==='/focus-secret-password')field.onfocus=()=>{field.type='password'};
+          if(location.pathname==='/focus-secret-autocomplete')field.onfocus=()=>{field.autocomplete='current-password'};
+          if(location.pathname==='/focus-secret-timeout')field.onfocus=()=>{
+            const end=performance.now()+6500;while(performance.now()<end){}
+          };
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
@@ -82,10 +91,12 @@ final class WorkflowLoopbackPage {
         </script>
         """
         let data = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)".utf8)
-        listener.newConnectionHandler = { connection in
+        listener.newConnectionHandler = { [responseDelay] connection in
             connection.start(queue: queue)
             connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { _, _, _, _ in
-                connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                queue.asyncAfter(deadline: .now() + responseDelay) {
+                    connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                }
             }
         }
         let port: UInt16 = try await withCheckedThrowingContinuation { continuation in

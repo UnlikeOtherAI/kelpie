@@ -11,7 +11,19 @@ import java.net.URLEncoder
 
 class ScriptPrivacyFlowTest : ScriptPublicFixture() {
     @Test
-    fun inferredPasswordRefusalScrubsEarlierRawUriFormOutputsAndDiscardsCapture() {
+    fun inferredPasswordRefusalScrubsEarlierRawUriFormOutputsAndDiscardsCapture() = privacyRefusal("initial", "password", "")
+
+    @Test
+    fun focusAutocompleteRefusalScrubsEarlierOutputsWithoutEditing() = privacyRefusal("focus-autocomplete", "text", "this.autocomplete='current-password'")
+
+    @Test
+    fun focusPasswordRefusalScrubsEarlierOutputsWithoutEditing() = privacyRefusal("focus-password", "text", "this.type='password'")
+
+    private fun privacyRefusal(
+        case: String,
+        type: String,
+        focus: String,
+    ) {
         val secret = "Aa b+!\uD83C\uDF0A"
         val form = URLEncoder.encode(secret, "UTF-8")
         val uri = form.replace("+", "%20").replace("%21", "!")
@@ -22,14 +34,15 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                 pair(client)
                 val tab = load(client, server)
                 server.enqueue(
-                    MockResponse().setHeader("Content-Type", "text/html").setBody(
-                        "<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>" + title +
-                            "</title><label>Password<input type=\"password\" oninput=\"document.title='EDITED'\"></label>",
+                    MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(
+                        "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>" + title +
+                            "</title><label>Password<input type=\"$type\" autocomplete=\"off\" onfocus=\"$focus\" oninput=\"document.title='EDITED'\"></label>",
                     ),
                 )
                 assertTrue(client.call("navigate", JSONObject().put("url", server.url("/privacy").toString())).getBoolean("success"))
                 val end = System.nanoTime() + 10_000_000_000L
                 while (client.core("tab.title", tab).optString("value") != title && System.nanoTime() < end) Thread.sleep(20)
+                assertEquals("UTF-8 fixture title must commit before capture", title, client.core("tab.title", tab).getString("value"))
                 val script =
                     client
                         .script(
@@ -38,7 +51,9 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                             client.action("fill").put("target", JSONObject().put("label", "Password")).put("text", secret),
                         ).put("capture", JSONObject().put("formats", org.json.JSONArray().put("screenshots")))
                 val result = playRecorded(client, script)
-                java.io.File(evidence, "privacy-result.json").writeText(result.toString(2))
+                java.io.File(evidence, "$case-result.json").writeText(result.toString(2))
+                val status = client.call("get-script-status", JSONObject().put("runId", result.getString("runId")))
+                java.io.File(evidence, "$case-status.json").writeText(status.toString(2))
                 assertFalse(result.getBoolean("success"))
                 assertEquals("SENSITIVE_CAPTURE_REFUSED", result.getJSONObject("error").getString("code"))
                 assertEquals(1, result.getInt("actionsExecuted"))
@@ -46,8 +61,6 @@ class ScriptPrivacyFlowTest : ScriptPublicFixture() {
                 val before = result.getJSONObject("outputs").getString("before")
                 for (value in listOf(secret, uri, form)) assertFalse(before.contains(value))
                 assertEquals(title, client.core("tab.title", tab).getString("value"))
-                val status = client.call("get-script-status", JSONObject().put("runId", result.getString("runId")))
-                java.io.File(evidence, "privacy-status.json").writeText(status.toString(2))
                 assertEquals("SENSITIVE_CAPTURE_REFUSED", status.getJSONObject("runError").getString("code"))
                 assertEquals(0, status.getJSONArray("artifacts").length())
                 assertFalse(status.has("outputs"))

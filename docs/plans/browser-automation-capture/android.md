@@ -383,3 +383,88 @@ test cleanup after terminal assertions. Runtime results are not yet available.
 Official instrumentation API:
 https://developer.android.com/reference/android/app/UiAutomation#setRotation(int)
 Orientation checkpoint source-format check: exact offline ktlintFormat passed22s with affinity1/one worker/1GiB, no compile/native/emulator. Kotlin compilation and actual policy/rotation assertions remain pending hosted verification.
+
+## Hosted c71 execution: failed, evidence retained
+
+Run41967310018 at c71aeabd513c4d19c5088cbae7202cd59fbb95f6 completed full build/lint
+and hosted shipping app/test compilation. Retained Debug JVM XML totals180/180.
+KVM was available; both API35 phone/tablet AVDs booted and ran22 corpus methods.
+Phone17/22 passed; tablet19/22 passed. The separate native CLI bridge was1/1
+on each, but both host CLI controllers failed before download on the large-PNG
+expectation. Pair/run/status happened; full CLI download was not established.
+
+Artifact13388674226 expires12November2026; original ZIP SHA-256:
+70abfcf4b2420f0d119e7b96f688f8f7514b9dd328e6889794217df8b5cdc072.
+The verified archive and unaltered extraction are preserved on Maxis under
+D:/BuildArtifacts/kelpie/capture-android-20261104/hosted-41967310018.
+
+Both profiles passed real public controlled inference cancellation/retirement/
+recovery, native orientation lock/restoration on success/abort/failure, scoped
+observations/extraction/readiness, JNI Unicode/NUL/provenance checks, low-FPS
+movies, owner/revocation controls, generic MCP abort/recovery, deadlines, target
+ambiguity/obscuration/label edits and native video decode/budget cases. Phone
+combined capture and native Stop methods failed; their old assertion helper
+discarded the error body, so their exact failure cause remains unclaimed.
+
+Both failed noisy PNG size, fractional event getter expectation and the UTF-8
+privacy fixture title. The tiny images were not downloaded before the old size
+assertion. The new harness waits for the new canvas document plus draw-complete
+title and retains original native/captured negatives before size checks. Fixture
+entry now requires its unique DOM sentinel and stable native geometry, not an old
+document's complete state. Explicit UTF-8 fixes the title precondition; c71 URI/
+form values were masked and capture discarded, but that failed method is not a
+full privacy pass. Chromium clientX/clientY getters floor fractional values:
+https://raw.githubusercontent.com/chromium/chromium/main/third_party/blink/renderer/core/events/mouse_event.h
+The new test checks exact floor and less than1CSSpx error; core coordinates and
+native PNG center/page-underlay checks remain fractional and unchanged.
+
+Original native phone/tablet screenshots were independently viewed by worker and
+root with hashes verified: actual blue circle/pointer centered on Submit, visible
+Stop. Read-only image ROI analysis found phone component8689px at418.73/581.33
+versus button421/583; tablet5616px at319.5/387.5 versus320/388. This accepts only
+the native spatial/visible UI case, not failed phone Stop invocation. All18 retained
+decoded low-FPS frames were also viewed. Phone5frames/format at320x652 showed
+old-document marker,2drops, GIF6860ms/MP4 6857.174ms. Tablet4frames/format at320x186
+showed old-document marker then final Destination,1drop, GIF5220ms/MP4 5218.475ms.
+Phone destination-frame presence is not claimed.
+
+The native screenshot guard now scopes to owned WebView intersected with actual
+Submit accessibility bounds and checks component area, shape, centroid and center
+coverage. An authored counterexample test rejects unrelated chrome, focus rings
+and thin text fringes. The runner now requires github-hosted Linux, rejects
+preexisting proposed serial/ports, verifies spawned PID generation/SDK binary/AVD/
+port and console AVD identity before mutation or termination, and preserves failed
+JUnit denominators. Node guard/report4/4 and shell/Node syntax pass; new native
+checks remain compile/runtime pending. No local emulator/heavy build was launched.
+
+Critical separate gate: common review reproduced focus-time sensitivity changes
+(text to password/autocomplete=current-password) leaking earlier outputs/captures.
+Android needs the common private policy and pre-guard result-consumer adapter;
+the initial-password case does not cover or close that gate. Next hosted run must
+include that common fix and native focus-time cases.
+## Late classification and publication follow-up (source only)
+
+The Android fixed-target callback now consumes token-latched sensitivity before
+current-document checks and before releasing its existing renderer-retirement
+ticket. Capture uses the shared private refuseSensitive policy. Missing or
+uncertain classification after attempted editing registers the current editing
+literal even without capture; capture additionally latches discard independently
+of the first concrete failure. Final outputs still wait for renderer retirement.
+
+Running/finalizing status returns no artifact manifests. Owned active-run
+downloads return ARTIFACT_NOT_READY after parameter validation; unknown/foreign
+runs return ARTIFACT_NOT_FOUND. Prior safe terminal downloads remain available.
+The publication transition and read share the run monitor.
+
+Authored regressions add focus-time autocomplete/password changes with earlier
+raw/URI/form output, plus public HTTP/direct/generic MCP early-download refusal
+and a prior terminal download during a new run. JVM ownership cases exercise a
+known current artifact ID in both active phases and privacy discard afterward.
+These additions have not been compiled or run on a device in this checkpoint.
+The c71 hosted failure denominators above remain unchanged.
+The classification fallback is scoped to an actually started fixed evaluation
+without explicit Boolean metadata. A decoded sensitive:false followed by a
+document/abort guard failure preserves ordinary partial capture and does not
+register the editing literal. A pre-evaluation refusal also leaves provenance
+unchanged. New JVM vectors and a real-WebView callback guard regression cover
+these boundaries; they are authored but not yet compiled/run.

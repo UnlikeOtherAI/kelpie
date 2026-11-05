@@ -692,3 +692,5 @@ keeps semantic target coordinates in layout CSS and maps native/exported indicat
 through the captured visual viewport. Pending input refuses when that viewport
 changes. Page touches remain blocked while recording is active.
 Android recording holds the current orientation through finalization and restores the previous orientation policy on completion, abort, failure or UI disposal, matching iOS.
+
+Debug macOS builds initialize the existing AppReveal companion once per process and declare its Bonjour service. Hosted native checks use its app-owned controls alongside ordinary protected HTTP/MCP pairing.

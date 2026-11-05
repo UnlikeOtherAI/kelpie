@@ -59,6 +59,11 @@ void DesktopScriptHandler::Register() {
   impl_->router.Register("get-script-artifact", [this](const Json& body) {
     const auto owner = ScopedDesktopScriptOwner::Current();
     if (owner.empty() || !impl_->config.revalidate || !impl_->config.revalidate(owner) || !impl_->config.artifact) return ErrorResponse("SCRIPT_OWNER_REQUIRED", "Authenticated script owner is required");
+    {
+      std::lock_guard lock(impl_->mutex);
+      if(impl_->running && owner==impl_->owner && body.value("runId",std::string())==impl_->run_id)
+        return ErrorResponse("ARTIFACT_NOT_READY","Run artifacts become available after terminal privacy checks");
+    }
     return impl_->config.artifact(body, owner);
   });
 }
@@ -82,7 +87,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Status(const Json& body) 
   if (running) {
     result["state"]=stop_sampler.load()?"finalizing":"running";
     result["elapsedMs"]=Elapsed(); result["abortRequested"]=abort->load();
-    result["artifacts"]=artifacts;
+    result["artifacts"]=Json::array();
   } else {
     const bool succeeded=terminal.value("success",false);
     const bool aborted=terminal.value("aborted",false);
@@ -276,7 +281,9 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   { std::lock_guard lock(mutex); presentation = {{"playing", false}}; }
   try { if (config.present) config.present({{"playing", false}}, {}); }
   catch(...) {
-    result["success"]=false; result["error"]={{"code","CAPTURE_NATIVE_PRESENTATION_FAILED"},{"message","Native presentation cleanup failed"}};
+    if(result.value("success",false)) result["error"]={{"code","CAPTURE_NATIVE_PRESENTATION_FAILED"},{"message","Native presentation cleanup failed"}};
+    else result["captureError"]="CAPTURE_NATIVE_PRESENTATION_FAILED";
+    result["success"]=false;
     for(auto& artifact:result["artifacts"]) artifact["partial"]=true;
   }
   {

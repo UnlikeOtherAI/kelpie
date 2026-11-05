@@ -43,7 +43,8 @@ final class ScriptArtifactStore {
         return manifest
     }
 
-    func read(_ body: [String: Any], owner: String) -> [String: Any] {
+    /// The caller supplies blockedRunID only after matching the active run owner.
+    func read(_ body: [String: Any], owner: String, blockedRunID: String? = nil) -> [String: Any] {
         expire()
         let keys: Set<String> = ["runId", "artifactId", "offset", "length"]
         guard Set(body.keys).isSubset(of: keys),
@@ -53,6 +54,9 @@ final class ScriptArtifactStore {
               let length = Self.integer(body["length"], default: 262144),
               offset >= 0, length > 0, length <= 1048576 else {
             return errorResponse(code: "INVALID_PARAM", message: "Invalid artifact request or range")
+        }
+        if runID == blockedRunID {
+            return errorResponse(code: "ARTIFACT_NOT_READY", message: "Artifact decision is not terminal")
         }
         guard let entry = entries[artifactID], entry.runID == runID, entry.owner == owner else {
             return errorResponse(code: "ARTIFACT_NOT_FOUND", message: "Artifact expired or does not belong to this run")

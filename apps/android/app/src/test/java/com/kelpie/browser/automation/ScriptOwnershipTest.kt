@@ -101,7 +101,7 @@ class ScriptOwnershipTest {
         }
         fails("INVALID_PARAMS") { artifacts.read("run", mapOf("artifactId" to entry.id, "length" to 1_048_577)) }
         fails("INVALID_PARAMS") { artifacts.read("run", mapOf("artifactId" to entry.id, "path" to "/secret")) }
-        fails("SCRIPT_ARTIFACT_NOT_FOUND") { artifacts.read("run", mapOf("artifactId" to "../other")) }
+        fails("ARTIFACT_NOT_FOUND") { artifacts.read("run", mapOf("artifactId" to "../other")) }
         val keep = File(file.parentFile, "not-owned.txt").apply { writeText("keep") }
         artifacts.deleteOwned()
         assertEquals("keep", keep.readText())
@@ -122,6 +122,34 @@ class ScriptOwnershipTest {
         assertTrue(budget.take(1024))
         assertFalse(budget.take(1))
         assertFalse(budget.take(0))
+    }
+
+    @Test
+    fun artifactsPublishOnlyAfterTerminalClassificationAndPriorSafeRunStaysReadable() {
+        val store = ScriptRunStore(temporary.newFolder("publication"))
+        val owner = authority()
+        val run = store.start(owner, script())
+        val file = run.artifacts.newFile("png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val entry = run.artifacts.register(file, "image/png", emptyMap())
+        val request = mapOf("artifactId" to entry.id)
+        for (finalizing in listOf(false, true)) {
+            if (finalizing) run.finalizing()
+            assertEquals(emptyList<Any>(), run.status()["artifacts"])
+            fails("ARTIFACT_NOT_READY") { run.readArtifact(request) }
+            fails("INVALID_PARAMS") { run.readArtifact(request + ("length" to 0)) }
+        }
+        run.finish(null, false)
+        val next = store.start(owner, script())
+        assertTrue(next.active())
+        assertEquals(3L, run.readArtifact(request)["byteLength"])
+        assertEquals(1, (run.status()["artifacts"] as List<*>).size)
+        next.discardCapture.set(true)
+        val privateFile = next.artifacts.newFile("png").apply { writeBytes(byteArrayOf(4)) }
+        val privateEntry = next.artifacts.register(privateFile, "image/png", emptyMap())
+        next.finish("INPUT_UNCERTAIN", true)
+        assertEquals(emptyList<Any>(), next.status()["artifacts"])
+        fails("ARTIFACT_NOT_FOUND") { next.readArtifact(mapOf("artifactId" to privateEntry.id)) }
+        assertEquals(3L, run.readArtifact(request)["byteLength"])
     }
 
     @Test

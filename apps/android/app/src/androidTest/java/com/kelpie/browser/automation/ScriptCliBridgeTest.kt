@@ -32,7 +32,7 @@ class ScriptCliBridgeTest : ScriptPublicFixture() {
                 ui.onNodeWithText("Always allow").performClick()
                 ui.waitForIdle()
                 ui.waitUntil(180_000) { finish.exists() }
-                assertTrue(finish.readText().trim() == "complete")
+                assertTrue(finish.readText().trim() == "complete:0")
             }
         }
     }

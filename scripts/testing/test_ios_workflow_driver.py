@@ -35,6 +35,10 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertEqual(names, {
             "testRealWebKitHTTPNavigationUsesIssuedToken",
             "testRealWebKitHTTPNavigationAfterPriorBlankUsesIssuedToken",
+            "testRealWebKitDelayedPriorHTTPCallbackRetiresBeforeNewLease",
+            "testRealWebKitPriorLoadDeadlineDoesNotIssueAnotherLoad",
+            "testRealWebKitPriorLoadCancellationDoesNotIssueAnotherLoad",
+            "testRealWebKitForeignCallbackAfterReservationStillRefuses",
             "testInitialOwnedHTTPNavigationLoadsFixture",
         })
         _, full_names = DRIVER.selection("full")

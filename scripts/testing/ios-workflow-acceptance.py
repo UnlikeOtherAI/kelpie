@@ -183,7 +183,7 @@ def run_device(device, product_hashes, scope):
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + (6 if scope == "navigation" else 24) * 60
+            deadline = time.monotonic() + (10 if scope == "navigation" else 24) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:

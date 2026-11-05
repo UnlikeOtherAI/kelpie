@@ -34,9 +34,33 @@ finished. Earlier safe terminal runs may remain downloadable during another run.
 This prevents irreversible media disclosure before a later sensitivity decision.
 
 A destroyed context that produces no result cannot reveal an unobservable
-transient classification. Preserve uncertainty; do not claim zero input or
-detection of every intermediate DOM mutation. Do not blanket-redact unrelated
-ordinary input.
+transient classification. For an attempted target inspection with missing or
+uncertain classification, register the current edit literal before final redaction,
+even WITHOUT capture. If capture exists, also latch capture discard. Preserve the
+first concrete failure and actual input-completion uncertainty: a lost read-only
+inspection need not claim input was dispatched.
+This is scoped to the current edit and uncertain target inspection; do not
+blanket-redact unrelated ordinary inputs or claim zero input.
+
+Canonical current-owner active-run retrieval refusal is ARTIFACT_NOT_READY;
+foreign run refusal is ARTIFACT_NOT_FOUND. Tests/capture/uncertain-target-privacy.mjs
+is an independent raw-response oracle: it checks retained uncertainty, first error,
+raw/URI/form omission and empty terminal media without asserting no input.
+The oracle parameter expectedMayHaveCompleted defaults true for focus/dispatch
+loss; read-only loss callers pass false rather than fabricating uncertain input.
+Its active-publication oracle checks running/finalizing status and three retrieval
+branches (owner, foreign and earlier safe completed run).
+
+Independent source intake of iOS b779c6849d935ab12b3ec852c605c6cb00a68689 confirms
+the metadata callback executes inside actual renderer evaluation before post-result
+guards and retirement completion. Root-approved no-result conservative handling
+was still absent in that checkpoint and reported to its owner; source alone
+does not establish actual transport-race or platform privacy acceptance.
+Focused command node --test --test-concurrency=1
+tests/capture/uncertain-target-privacy.test.mjs tests/capture/privacy-refusal.test.mjs
+passed5/5 on Maxis after adding capture/no-capture and actual-uncertainty vectors. The initial test incorrectly lowercased ordinary letters in
+the synthetic encoded value; corrected fixture folds only percent-triplet hex,
+matching the case-sensitive raw policy. No production matcher change.
 
 ## Durable tests and pending evidence
 

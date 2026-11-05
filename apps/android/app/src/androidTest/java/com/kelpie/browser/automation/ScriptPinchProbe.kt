@@ -52,6 +52,28 @@ internal class ScriptPinchProbe(
         return checkNotNull(result)
     }
 
+    @Suppress("DEPRECATION")
+    fun settledNativeGeometry(): JSONObject {
+        fun read(): Triple<Int, Int, Float> {
+            lateinit var value: Triple<Int, Int, Float>
+            instrumentation.runOnMainSync { value = Triple(view.width, view.height, view.scale) }
+            return value
+        }
+        var previous = read()
+        var stableSince = SystemClock.uptimeMillis()
+        val deadline = stableSince + 5_000
+        while (SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(25)
+            val current = read()
+            if (current != previous) stableSince = SystemClock.uptimeMillis()
+            previous = current
+            if (SystemClock.uptimeMillis() - stableSince >= 200) {
+                return JSONObject().put("width", current.first).put("height", current.second).put("nativeScale", current.third)
+            }
+        }
+        throw AssertionError("Owned native renderer geometry did not settle")
+    }
+
     fun settledMetrics(): JSONObject {
         var previous = metrics()
         var stableSince = SystemClock.uptimeMillis()

@@ -12,6 +12,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -68,15 +70,19 @@ class ScriptPinchFlowTest : ScriptPublicFixture() {
                 val result = playRecorded(client, script)
                 assertTrue("Pinched semantic click failed", result.getBoolean("success"))
                 record.put("clickResult", result)
+                evidenceFile.writeText(record.toString(2))
+                val artifact = result.getJSONArray("artifacts").getJSONObject(0)
+                val file = retrieve(client, result.getString("runId"), artifact)
                 val clicked = JSONObject(client.core("tab.title", tab).getString("value"))
                 record.put("clicked", clicked)
+                evidenceFile.writeText(record.toString(2))
                 assertEquals(1, clicked.getInt("clicks"))
                 assertFalse(clicked.getBoolean("trusted"))
                 val expected = clippedCenter(clicked)
-                assertEquals(expected.first, clicked.getDouble("x"), 0.6)
-                assertEquals(expected.second, clicked.getDouble("y"), 0.6)
-                val artifact = result.getJSONArray("artifacts").getJSONObject(0)
-                val file = retrieve(client, result.getString("runId"), artifact)
+                assertEquals(floor(expected.first), clicked.getDouble("x"), 0.0)
+                assertTrue(abs(expected.first - clicked.getDouble("x")) < 1.0)
+                assertEquals(floor(expected.second), clicked.getDouble("y"), 0.0)
+                assertTrue(abs(expected.second - clicked.getDouble("y")) < 1.0)
                 val bitmap = checkNotNull(BitmapFactory.decodeFile(file.path))
                 try {
                     val center = blueCenter(bitmap)

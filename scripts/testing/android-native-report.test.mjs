@@ -16,6 +16,8 @@ test('adb success cannot hide JUnit failure or missing tablet, and exports have 
     writeFileSync(join(phone, 'script-acceptance', 'frame.png'), 'fixture');
     const failed = summarize(root);
     assert.equal(failed.profiles[0].passed, false);
+    assert.equal(failed.profiles[0].tests, 1);
+    assert.equal(failed.profiles[0].failures, 1);
     assert.equal(failed.profiles[1].passed, false);
     assert.match(failed.profiles[0].exports[0].sha256, /^[a-f0-9]{64}$/);
     writeFileSync(join(phone, 'instrumentation.log'), 'OK (19 tests)\n');

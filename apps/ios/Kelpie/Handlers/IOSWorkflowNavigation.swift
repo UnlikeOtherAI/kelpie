@@ -1,14 +1,24 @@
 import Foundation
 
-/// Reserve only after asynchronous authorization, then issue and record on the same pinned view.
+/// An existing load must retire before reserving the next mutation's navigation token.
 @MainActor
 enum IOSWorkflowNavigation {
     static func issue(
         on view: AnyObject,
+        deadline: ContinuousClock.Instant = .now.advanced(by: .seconds(10)),
         authorize: () async throws -> Void,
+        isLoading: () -> Bool = { false },
         load: () -> AnyObject?
     ) async throws -> ConnectNavigationLease {
-        try await authorize()
+        while true {
+            guard !Task.isCancelled else { throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+            try await authorize()
+            guard !Task.isCancelled else { throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+            guard ContinuousClock.now < deadline else { throw IOSWorkflowFailure("NAVIGATION_BUSY") }
+            if !isLoading() { break }
+            do { try await Task.sleep(nanoseconds: 50_000_000) } catch { throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+        }
+        // No suspension between the final authorized state check and the pinned load.
         let lease = ConnectNavigationLease(initial: ConnectDocument.version(view))
         ConnectDocument.reserve(view, lease: lease)
         guard let navigation = load() else {
