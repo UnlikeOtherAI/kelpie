@@ -19,6 +19,18 @@ on:
         description: Compare the retained Ubuntu AVC fixture through bounded mux modes
         type: boolean
         default: false
+      linux_resource_expected_source:
+        description: Exact candidate source revision for CLI-only replay
+        type: string
+        default: ""
+      linux_resource_expected_rpm:
+        description: Exact RPM SHA-256 for CLI-only replay
+        type: string
+        default: ""
+      linux_resource_expected_cli:
+        description: Exact CLI archive SHA-256 for CLI-only replay
+        type: string
+        default: ""
       linux_resource_source_run:
         description: Prior Linux candidate run ID for numeric resource diagnosis
         type: string
@@ -44,6 +56,9 @@ jobs:
     with:
       source_run: ${{ inputs.linux_resource_source_run }}
       cli_only: ${{ inputs.linux_resource_cli_only }}
+      expected_source: ${{ inputs.linux_resource_expected_source }}
+      expected_rpm: ${{ inputs.linux_resource_expected_rpm }}
+      expected_cli: ${{ inputs.linux_resource_expected_cli }}
 
   linux-native-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
