@@ -94,3 +94,11 @@ packaging results remain in
 [the Linux ledger](../plans/browser-automation-capture/linux.md).
 Computer Use is off; no manual Stop click or before/after UI screenshot is claimed
 without actual evidence.
+
+The native smoke entrypoint is
+node tests/linux/native-sandbox.mjs /absolute/path/kelpie-linux.
+It creates only an owned synthetic profile/fixture, uses authenticated HTTP and
+the real MCP client, attests actual renderer namespaces/NoNewPrivs/seccomp and
+shuts down the exact app. Namespace links may require read-only sudo inspection;
+it never installs a helper or changes kernel/SELinux policy. Profiles remain
+available for failure/recovery inspection. Computer Use and OS input are unused.
