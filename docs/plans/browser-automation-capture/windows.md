@@ -38,22 +38,22 @@ Each run creates an exclusive temporary directory with a protected current-user/
 
 Exact candidate 9333ff50 has the machine-interface/media evidence below. Remaining physical UI and release gates stay open.
 
-- [ ] Required shared helper and codec follow-up revisions integrated.
+- [x] Required shared helper and codec follow-up revisions integrated.
 - [ ] Release build uses pinned CEF bootstrap/sandbox and matching runtime assets; no warnings.
-- [ ] Native owner-scope/HTTP test, existing native tests and compositor/codec checks pass.
-- [ ] Direct HTTP, direct MCP and CLI MCP alias run the same strict workflow.
+- [x] Native owner-scope/HTTP test, existing native tests and compositor/codec checks pass.
+- [x] Direct HTTP, direct MCP and CLI MCP alias run the same strict workflow.
 - [ ] Native Stop, remote same-owner abort and status/download remain responsive during capture/finalize.
 - [ ] Another grant/listener, invalid/revoked token, forged body owner and rotated grant fail.
-- [ ] Unique semantic button/label succeeds; duplicates, missing, obscured, disabled, moved and replaced targets refuse safely.
-- [ ] Trusted down-to-replacement/cancel releases native pressed state; next run works.
-- [ ] Fill/type cannot cross to another focused field and never echo values in progress/status/errors.
+- [x] Unique semantic button/label succeeds; duplicates, missing, obscured, disabled, moved and replaced targets refuse safely.
+- [x] Trusted down-to-replacement/cancel releases native pressed state; next run works.
+- [x] Fill/type cannot cross to another focused field and never echo values in progress/status/errors.
 - [ ] Zero-duration pointer and both S/C curves work; no page hover from presentation.
 - [ ] Native marker color/radius/wobble/fade matches GIF, MP4 and step PNG pixels.
-- [ ] Navigation tap PNG has the prior document generation; new-document frames have no old marker.
+- [x] Navigation tap PNG has the prior document generation; new-document frames have no old marker.
 - [ ] Final fade and real elapsed timing survive decode/playback.
 - [ ] Viewport/DPR resize, tall viewport, duration/byte limits and backpressure return truthful partial media.
-- [ ] Screenshot-only scripts enforce default limits and explicit steps without capture block.
-- [ ] Empty/failed/partial encoder finalization preserves valid siblings, cleans owned scratch and allows a next run.
+- [x] Screenshot-only scripts enforce default limits and explicit steps without capture block.
+- [x] Empty/failed/partial encoder finalization preserves valid siblings, cleans owned scratch and allows a next run.
 - [ ] Actual changed native recording state has matching base/final screenshot evidence when Computer Use is cleared.
 
 ## Build plan
@@ -161,3 +161,10 @@ Thirty native artifacts were retrieved by authenticated opaque IDs/chunks across
 FPS1 navigation with PNG run b380398683bca4af274a845639fe21aa838def10c21abf38 and movies-only run 918a92c63189a0134b3bfd584539bca08fda0f52698d19c1 each retained four GIF/MP4 frames. Actual source frames contain the red circle at the link center; destination frames contain no old marker. Movies-only MP4 78130e6d41df829566e8b968ad0c4da1c2659c0b6eed3adc-all-0002.png and -all-0004.png were visually inspected. Added-hold duration, abort and replacement all refused input and permitted the next run.
 
 Physical native Stop, foreground/minimize/modal behavior, alternate DPR/zoom, forced encoder throttle and viewport-resize race remain unclaimed. No signed release/install or complete cross-platform acceptance is claimed.
+
+### Evidence preservation and cleanup
+The 6 final public alias recipe artifacts and 3 security-case artifacts were also fetched across the authenticated ID/chunk interface and fully decoded: 39 final-candidate artifacts total. The permanent tests/capture/verify-native-media.mjs replay passed for all 30 core artifacts and separately for all 5 FPS1 navigation artifacts with --red-marker. The native security corpus additionally passed actual encoded secret output/status redaction, malformed artifact identity/range admission and BUSY mutation versus responsive abort/status.
+
+Normal CLI browser stop capture-9333 succeeded. PID 29076 exited; socket 28420, readiness and the CLI running record cleared without manual edits. The unrelated installed app PID 52960 remained intact. The owned SSH tunnel ended. Exact EXE/DLL/identity files are archived at D:/BuildArtifacts/kelpie/capture-windows-20261104/candidates/source-9333ff50.
+
+The 48-record canonical ledger D:/BuildArtifacts/kelpie/capture-windows-20261104/windows-evidence-9333.json passes tests/capture/evidence.mjs. It retains pending or blocked rows rather than upgrading source/unit checks to native UI or release success. Preserve both assigned worktrees and ignored media/build evidence until the coordinator archives it; source is pushed, but these files contain unique verification output.
