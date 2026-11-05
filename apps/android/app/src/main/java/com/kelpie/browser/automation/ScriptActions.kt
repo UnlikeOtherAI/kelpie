@@ -279,7 +279,6 @@ class ScriptActions(
         edit: Boolean = false,
         observe: Boolean = false,
     ): Map<String, Any?> {
-        val editing = action["action"] in setOf("fill", "type")
         val options = mutableMapOf<String, Any?>("target" to action["target"], "key" to key)
         if (token != null) options["token"] = token
         if (dispatch) options["dispatch"] = true
@@ -299,13 +298,13 @@ class ScriptActions(
                     // Before validity checks and retirement: a late focus handler
                     // can make the original editing literal private.
                     classification.received(result["sensitive"] as? Boolean)
-                    val unknown = (editing || dispatch) && classification.unknown()
+                    val unknown = classification.unknown()
                     consumeSensitivity(action, result["sensitive"] == true || unknown)
                 }
             }
         } catch (error: Exception) {
             // A lost classification cannot certify the inspected edit literal.
-            if ((editing || dispatch) && classification.unknown()) consumeSensitivity(action, true)
+            if (classification.unknown()) consumeSensitivity(action, true)
             throw error
         }
     }
