@@ -675,3 +675,24 @@ pointer antialiasing. Matched overlapping blue controls produced 32 flagged
 pixels for a small retained marker, 33 for a faint marker and 1804 for a full
 marker, against 18 for the pointer alone. This supports a matched pointer-baseline
 oracle but does not validate a generic 18-pixel allowance; no oracle was changed.
+
+The canonical Fedora test RPM for source
+`f9cc1c6ffa142689d20b9acc2cb2e2a4d72f1040` was built with verified Fedora
+RPM tools, SHA-256
+`4b70530296ee4e8553cdbccd16c329511102d86d00cdc6dc74304cc2bac1e794`.
+This was an unsigned test package, not a release. Two private COW install
+attempts failed before package installation: first the nonrecursive root bind
+returned EINVAL; then recursive read-only binding passed for all 34 mounts but
+overlayfs failed to clone the lower path. Host mount/package/binary snapshots
+matched before and after both attempts.
+
+The test RPM was then installed by the supported Fedora package manager. Its
+installed app and CEF hashes matched the tested build; the real installed entry
+point passed 36/36 HTTP/MCP checks, supplements, and five CLI alias checks with
+ten observations and clean shutdown. Full-frame decode completed; the strict
+marker check failed on three final MP4 pixels and remains open. Calibrated
+Finish/Start/Finish G08 runs had no fixture-event loss but all four current
+oracle results were insufficient on pre-dispatch pointer position. The prior
+published Fedora RPM was restored with the package manager and its package
+identity, file manifest, executable/CEF hashes, and rpm verification matched
+the pre-test snapshots.
