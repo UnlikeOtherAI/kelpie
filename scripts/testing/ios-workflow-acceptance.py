@@ -80,6 +80,7 @@ def selection(scope):
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testLivePointerMarkerAndStopAppearDuringCapture",
+                "testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",

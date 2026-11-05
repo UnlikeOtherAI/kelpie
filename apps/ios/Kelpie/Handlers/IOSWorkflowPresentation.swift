@@ -61,6 +61,8 @@ final class IOSWorkflowPresentation: NSObject {
     private var note: Note?
     private var generation: String
     private var latched: State?
+    private weak var retirementWindow: UIWindow?
+    private var retirementDocument: String?
 
     init(tab: IOSWorkflowTab) throws {
         self.tab = tab
@@ -86,7 +88,10 @@ final class IOSWorkflowPresentation: NSObject {
     }
 
     var lastPointer: CGPoint? { generation == tab.document ? pointer : nil }
-    var markerEnd: TimeInterval? { marker.map { $0.started + $0.duration } }
+    var markerEnd: TimeInterval? {
+        guard generation == tab.document else { return nil }
+        return marker.map { $0.started + $0.duration }
+    }
 
     func move(to point: CGPoint) {
         synchronize()
@@ -168,6 +173,12 @@ final class IOSWorkflowPresentation: NSObject {
         refresh()
     }
 
+    func beginRetirement(window: UIWindow, document: String) {
+        retirementWindow = window
+        retirementDocument = document
+        refresh()
+    }
+
     func finish() {
         clock?.invalidate()
         clock = nil
@@ -198,7 +209,10 @@ final class IOSWorkflowPresentation: NSObject {
 
     @objc private func refresh() {
         synchronize()
-        let visible = (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
+        let retirementValid = retirementDocument.map {
+            $0 == tab.document && retirementWindow != nil && tab.view.window === retirementWindow
+        } ?? true
+        let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
         canvas.isHidden = !visible
         canvas.state = visible ? (latched ?? current()) : nil
