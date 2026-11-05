@@ -128,7 +128,7 @@ class ScriptActions(
         if (sensitive) {
             if (edit) run.redactor.add(action["text"] as String)
             if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
-                throw ScriptFailure("SENSITIVE_CAPTURE")
+                throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED")
             }
         }
         val oldDocument = document()

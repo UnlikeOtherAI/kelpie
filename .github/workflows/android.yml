@@ -122,11 +122,13 @@ jobs:
             native-evidence/*.txt
             native-evidence/*.log
             native-evidence/report.json
+            native-evidence/phone/*.json
             native-evidence/phone/*.txt
             native-evidence/phone/*.log
             native-evidence/phone/avd-config.ini
             native-evidence/phone/script-acceptance/**
             native-evidence/phone/script-codec-acceptance/**
+            native-evidence/tablet/*.json
             native-evidence/tablet/*.txt
             native-evidence/tablet/*.log
             native-evidence/tablet/avd-config.ini

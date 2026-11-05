@@ -64,39 +64,56 @@ abstract class ScriptPublicFixture {
         runId: String,
         artifact: JSONObject,
     ): File {
-        val bytes = ByteArrayOutputStream()
-        var offset = 0L
-        var chunkIndex = 0
-        do {
-            val request =
-                JSONObject()
-                    .put("runId", runId)
-                    .put("artifactId", artifact.getString("id"))
-                    .put("offset", offset)
-                    .put("length", 4093)
-            val chunk =
-                when (chunkIndex++ % 3) {
-                    0 -> client.call("get-script-artifact", request)
-                    1 -> client.mcpValue("kelpie_get_script_artifact", request)
-                    else -> client.mcpValue("kelpie_extension", JSONObject().put("name", "kelpie_get_script_artifact").put("arguments", request))
-                }
-            assertEquals(offset, chunk.getLong("offset"))
-            val data = Base64.getDecoder().decode(chunk.getString("data"))
-            bytes.write(data)
-            offset += data.size
-            assertEquals(offset, chunk.getLong("nextOffset"))
-        } while (!chunk.getBoolean("eof"))
-        val all = bytes.toByteArray()
-        assertEquals(artifact.getLong("byteLength"), all.size.toLong())
-        val hash = MessageDigest.getInstance("SHA-256").digest(all).joinToString("") { "%02x".format(it) }
-        assertEquals(artifact.getString("sha256"), hash)
+        val expected = artifact.getLong("byteLength")
+        assertTrue(expected in 1..268_435_456L)
+        var verified: ByteArray? = null
+        for (protocol in 0..2) {
+            val bytes = ByteArrayOutputStream()
+            var offset = 0L
+            var count = 0L
+            val deadline = System.nanoTime() + 60_000_000_000L
+            do {
+                assertTrue("Artifact download deadline", System.nanoTime() < deadline)
+                assertTrue("Artifact chunk bound", count++ <= (expected + 4092) / 4093)
+                val request =
+                    JSONObject()
+                        .put("runId", runId)
+                        .put("artifactId", artifact.getString("id"))
+                        .put("offset", offset)
+                        .put("length", 4093)
+                val chunk =
+                    when (protocol) {
+                        0 -> client.call("get-script-artifact", request)
+                        1 -> client.mcpValue("kelpie_get_script_artifact", request)
+                        else -> client.mcpValue("kelpie_extension", JSONObject().put("name", "kelpie_get_script_artifact").put("arguments", request))
+                    }
+                assertEquals(runId, chunk.getString("runId"))
+                assertEquals(artifact.getString("id"), chunk.getString("artifactId"))
+                assertEquals(artifact.getString("mimeType"), chunk.getString("mimeType"))
+                assertEquals(artifact.getString("sha256"), chunk.getString("sha256"))
+                assertEquals(expected, chunk.getLong("byteLength"))
+                assertEquals(offset, chunk.getLong("offset"))
+                val data = Base64.getDecoder().decode(chunk.getString("data"))
+                assertTrue("Non-progressing or oversized chunk", data.isNotEmpty() && data.size <= 4093)
+                bytes.write(data)
+                offset += data.size
+                assertTrue(offset <= expected)
+                assertEquals(offset, chunk.getLong("nextOffset"))
+                assertEquals(offset == expected, chunk.getBoolean("eof"))
+            } while (offset < expected)
+            val all = bytes.toByteArray()
+            assertEquals(expected, all.size.toLong())
+            assertEquals(artifact.getString("sha256"), MessageDigest.getInstance("SHA-256").digest(all).joinToString("") { "%02x".format(it) })
+            verified?.let { assertTrue("Protocol bytes differ", it.contentEquals(all)) }
+            verified = all
+        }
         val extension =
             when (artifact.getString("mimeType")) {
                 "image/png" -> "png"
                 "image/gif" -> "gif"
                 else -> "mp4"
             }
-        return File(evidence, artifact.getString("id") + "." + extension).apply { writeBytes(all) }
+        return File(evidence, artifact.getString("id") + "." + extension).apply { writeBytes(checkNotNull(verified)) }
     }
 
     protected fun awaitRecordingUi(pending: java.util.concurrent.Future<*>? = null) {

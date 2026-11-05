@@ -147,4 +147,13 @@ debug app/test APKs and CLI, then runs the authored AndroidX Compose/public HTTP
 and direct/generic MCP corpus on sequential API35 x86_64 phone/tablet emulators
 using hosted KVM. Curated hashes, reports and media are retained for seven days.
 Missing KVM is reported as a blocker. These are emulator results, not physical
-device, signed-release or authenticated host CLI acceptance.
+device or signed-release acceptance. Authenticated host CLI replay now has a separate native-pairing bridge and explicit run/status/download assertions; it must pass before CLI acceptance is claimed.
+Strict v1 uses SENSITIVE_CAPTURE_REFUSED, UNRESOLVED_INPUT, DUPLICATE_OUTPUT and
+OUTPUT_REDACTION_FAILED consistently with iOS; legacy responses are unchanged.
+When a resolved edit target is sensitive, its literal becomes redaction provenance
+before capture refusal. Earlier outputs are scrubbed and every capture from that
+run is discarded. Any output-redaction failure also discards captures. A separate
+discard latch survives later errors, cleanup or Stop; the first concrete failure
+and uncertainty flag remain authoritative. Ordinary abort/failure can retain valid
+partial captures. Output preparation and capture disposal precede terminal state
+and restoration of recording UI.

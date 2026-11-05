@@ -82,7 +82,11 @@ class ScriptTargetBindingTest : ScriptPublicFixture() {
                     action: String,
                     label: String,
                     text: String,
-                ) = client.action(action).put("target", JSONObject().put("label", label)).put("text", text).put("sensitive", true)
+                ) = client
+                    .action(action)
+                    .put("target", JSONObject().put("label", label))
+                    .put("text", text)
+                    .put("sensitive", true)
                 val wave = "\uD83C\uDF0A"
                 val seal = "\uD83E\uDDAD"
                 val result =

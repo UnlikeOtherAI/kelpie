@@ -28,12 +28,12 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                         "SESSION_UNSUPPORTED" to JSONObject(base.toString()).put("sessionId", "unknown"),
                         "SESSION_UNSUPPORTED" to JSONObject(base.toString()).put("sessionId", "foreign-owner-session"),
                         "UNSUPPORTED_SCRIPT_ACTION" to client.script(tab, click(), client.action("press-key").put("key", "Enter")),
-                        "UNRESOLVED_SCRIPT_INPUT" to client.script(tab, click()).put("inputs", JSONObject().put("name", JSONObject().put("type", "string"))),
-                        "UNRESOLVED_SCRIPT_INPUT" to
+                        "UNRESOLVED_INPUT" to client.script(tab, click()).put("inputs", JSONObject().put("name", JSONObject().put("type", "string"))),
+                        "UNRESOLVED_INPUT" to
                             client.script(tab, click(), client.action("fill").put("target", JSONObject().put("label", "Name")).put("text", JSONObject().put("secret", "operator-reference"))),
                         "INVALID_SCRIPT" to client.script(tab, click(), client.action("evaluate").put("script", "document.title='WRONG'")),
                         "INVALID_SCRIPT" to client.script(tab, click()).put("continueOnError", true),
-                        "SENSITIVE_CAPTURE" to
+                        "SENSITIVE_CAPTURE_REFUSED" to
                             client
                                 .script(
                                     tab,

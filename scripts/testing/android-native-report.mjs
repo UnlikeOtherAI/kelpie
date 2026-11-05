@@ -26,7 +26,10 @@ export function summarize(root) {
       }
     }
     for (const name of ['script-acceptance', 'script-codec-acceptance']) collect(join(folder, name));
-    report.profiles.push({ deviceClass: profile, passed: Boolean(match) && !failed && read('instrumentation-exit.txt') === '0',
+    let cli = null;
+    try { cli = JSON.parse(read('cli-report.json')); } catch { /* Missing/invalid report fails closed. */ }
+    const cliPassed = cli?.success === true && read('cli-exit.txt') === '0' && /^OK \(1 test\)/m.test(read('cli-instrumentation.log'));
+    report.profiles.push({ deviceClass: profile, cliPassed, passed: Boolean(match) && !failed && read('instrumentation-exit.txt') === '0' && cliPassed,
       tests: match ? Number(match[1]) : null, exports, blocker: read('blocker.txt') || null });
   }
   return report;

@@ -314,3 +314,32 @@ application databases. bash syntax, Node syntax and the report's false-pass/
 missing-profile regression pass on Maxis. New Kotlin tests and hosted emulator
 execution are compile/runtime-unverified at this source checkpoint; root dispatch
 and actual per-profile results must close those gates.
+Privacy/protocol follow-up (source checkpoint, runtime pending): inferred-sensitive
+edit text is registered before refusal; captures are discarded by an independent
+latch for privacy or redaction failure, while the first concrete error and
+uncertainty survive cleanup/Stop. Redacted output is prepared exactly once before
+terminal state/UI restoration. The four strict-v1 aliases match iOS; legacy is
+unchanged. A native test checks raw/URI/form title output before implicit-password
+refusal, no edit, masked earlier output, zero final/status artifacts and value-free
+status. A JVM case injects a failed native redactor and verifies discard/error/
+uncertainty survive subsequent failure and Stop.
+
+Artifact tests now reconstruct the entire artifact independently through HTTP,
+direct MCP and generic MCP, checking every echoed identity/MIME/length/hash,
+offset, positive bounded progress and exact EOF under chunk/deadline bounds.
+A deterministic noisy PNG exceeds262144 bytes to cross the canonical chunk
+boundary. The hosted CLI bridge is excluded from the ordinary corpus, then runs
+separately: native Compose approves the CLI's own persistent pairing request,
+the actual CLI runs a screenshot workflow, queries pinned owner status and
+downloads/hashes a large PNG. No bearer is copied or printed. Only non-secret
+fixture URL/tab coordinates cross adb. CLI output/status/download evidence is
+retained separately; a profile passes only when both native corpus and CLI bridge
+pass. No physical-device/publication/signing claim follows from this emulator job.
+Focused checks for this checkpoint: offline Gradle ktlintFormat dry-run graph
+contained only source-format tasks (25s); exact formatter passed24s and final21s
+with one worker, hard affinity mask1, ActiveProcessorCount1 and1GiB heap.
+No compile/native/emulator tasks ran. bash syntax, Node CLI/report syntax and
+report regression1/1 pass. The initial direct cached CLI formatter could not
+start because CLI-only dependencies were absent; it changed no source and is not
+a successful check. Kotlin compilation/JVM privacy test and actual hosted
+phone/tablet/public CLI/privacy replay remain pending.

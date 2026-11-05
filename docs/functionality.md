@@ -671,3 +671,9 @@ Apple workflow gateway admission keeps long strict scripts separate from the per
 The macOS strict workflow adapter pins the authenticated listener/client grant and active WebKit or Chromium renderer for the run. Its native pointer/tap canvas and exported overlays use the same model; renderer-only snapshots reject mixed documents and viewport changes. Literal sensitive-field input refuses recording before mutation and discards prior private capture files. Explicit screenshot actions always produce PNG, independently of automatic per-step screenshot selection. Full adapter and installed-app acceptance are tracked in [macOS automation capture](plans/browser-automation-capture/macos.md).
 
 Windows release CI retains clearly labelled unsigned candidates only. Public Windows assets require agent-run Azure Public Trust signing on Minis, signature verification and an installed signed-artifact acceptance run; CI does not attach unsigned ZIPs to releases.
+
+Android v1 recording refuses capture for an inferred-sensitive edit target after
+registering its text for redaction. Earlier outputs are scrubbed and the whole
+run's capture is discarded on privacy refusal or output-redaction failure. The
+first concrete error and uncertainty remain visible through finalization; ordinary
+abort/failure may retain valid partial artifacts.

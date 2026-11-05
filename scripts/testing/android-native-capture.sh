@@ -65,18 +65,55 @@ for profile in phone tablet; do
   adb -s "$serial" install -t --no-streaming "$tests" > "$dir/install-tests.log"
   installed="$(adb -s "$serial" shell pm path com.kelpie.browser | head -1 | tr -d '\r' | cut -d: -f2-)"
   adb -s "$serial" shell sha256sum "$installed" > "$dir/installed-apk-sha256.txt"
+  [[ "$(cut -d ' ' -f1 "$dir/installed-apk-sha256.txt")" == "$(sha256sum "$app" | cut -d ' ' -f1)" ]] || {
+    echo INSTALLED_APK_HASH_MISMATCH > "$dir/blocker.txt"
+    exit 1
+  }
   adb -s "$serial" shell dumpsys package com.kelpie.browser | grep -E 'versionCode=|versionName=' > "$dir/installed-version.txt"
   # Supported AndroidX instrumentation performs pairing/native UI assertions.
   # No adb input, desktop input or screen-control service is used.
   set +e
   timeout 20m adb -s "$serial" shell am instrument -w -r \
-    -e package com.kelpie.browser.automation -e sourceRevision "$revision" \
+    -e package com.kelpie.browser.automation -e notClass com.kelpie.browser.automation.ScriptCliBridgeTest -e sourceRevision "$revision" \
     -e deviceClass "$profile" \
     com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
     > "$dir/instrumentation.log" 2>&1
   instrument_exit=$?
   set -e
   printf '%s\n' "$instrument_exit" > "$dir/instrumentation-exit.txt"
+
+  # Start a fresh native fixture; the real CLI requests its own persistent grant.
+  timeout 5m adb -s "$serial" shell am instrument -w -r \
+    -e class com.kelpie.browser.automation.ScriptCliBridgeTest \
+    -e sourceRevision "$revision" -e deviceClass "$profile" \
+    com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
+    > "$dir/cli-instrumentation.log" 2>&1 &
+  bridge_pid=$!
+  bridge_ready=false
+  for _ in $(seq 1 60); do
+    if adb -s "$serial" pull /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-bridge.json "$dir/cli-bridge.json" >/dev/null 2>&1; then bridge_ready=true; break; fi
+    kill -0 "$bridge_pid" 2>/dev/null || break
+    sleep 1
+  done
+  cli_exit=1
+  if [[ "$bridge_ready" == true ]]; then
+    adb -s "$serial" forward tcp:18420 tcp:8420
+    set +e
+    node "$root/scripts/testing/android-native-cli.mjs" "$root" "$dir" 18420 > "$dir/cli-driver.log" 2>&1
+    cli_exit=$?
+    set -e
+    # Test coordination only: never a credential or product-state repair.
+    printf 'complete\n' > "$dir/cli-finish.txt"
+    adb -s "$serial" push "$dir/cli-finish.txt" /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-finish.txt > /dev/null
+    adb -s "$serial" forward --remove tcp:18420
+  fi
+  set +e
+  wait "$bridge_pid"
+  bridge_exit=$?
+  set -e
+  if [[ "$cli_exit" -ne 0 || "$bridge_exit" -ne 0 ]] || ! grep -Eq '^OK \(1 test\)' "$dir/cli-instrumentation.log"; then result=1; fi
+  printf '%s\n' "$cli_exit" > "$dir/cli-exit.txt"
+
   # Only curated fixture exports, never pairing stores, endpoint credentials,
   # unrestricted logcat or application-private databases.
   adb -s "$serial" pull /sdcard/Android/data/com.kelpie.browser/files/script-acceptance "$dir/" > "$dir/pull-capture.log" 2>&1 || true
