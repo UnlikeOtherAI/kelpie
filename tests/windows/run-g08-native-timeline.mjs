@@ -9,15 +9,15 @@ import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/sha
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
 import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
-import {acceptPresentation,presentationNotVisible} from "./wgc-presentation-identity.mjs";
+import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
-const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision]=process.argv.slice(2);
+const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));
+assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast"].includes(motionProfile));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -31,7 +31,7 @@ const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const uiaRun=async args=>JSON.parse((await run(uia,args,10000)).stdout);
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
-const report={source:manifest.source,curve,phase:"session",checks:[],cleanup:"not-started"};
+const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
 let fixture,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,monitorStop=false,monitor;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
@@ -55,7 +55,7 @@ async function download(result,item,budget){
  const bytes=Buffer.concat(chunks);assert.equal(bytes.length,item.byteLength);assert.equal(createHash("sha256").update(bytes).digest("hex"),item.sha256);
  const file=resolve(outputRoot,item.id+(item.mimeType==="image/gif"?".gif":".mp4"));
  assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=bytes.length;await writeFile(file,bytes,{flag:"wx"});
- const probe=await run(process.env.FFPROBE||"ffprobe",["-v","error","-select_streams","v:0","-show_entries","frame=best_effort_timestamp_time","-of","json",file],120000);
+ report.phase="artifact-probe";const probe=await run(process.env.FFPROBE||"ffprobe",["-v","error","-select_streams","v:0","-show_entries","frame=best_effort_timestamp_time","-of","json",file],120000);
  const timestamps=JSON.parse(probe.stdout).frames.map(frame=>Number(frame.best_effort_timestamp_time));
  assert.ok(timestamps.length>0&&timestamps.every(Number.isFinite));return {...item,runId:result.runId,file,timestamps};
 }
@@ -64,8 +64,8 @@ try{
  await run(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+session.userSid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"]);await mkdir(home);
  report.hashes={exe:await hash(exe),dll:await hash(join(dirname(exe),"kelpie.dll")),cli:await hash(cli),uia:await hash(uia),wgc:await hash(wgc)};
  assert.equal(report.hashes.uia,expectedUiaHash);assert.equal(report.hashes.wgc,expectedWgcHash);
- const revision=(await run("git.exe",["rev-parse","HEAD"])).stdout.trim();assert.equal(revision,expectedRevision);
- assert.equal((await run("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");report.testRevision=revision;
+ report.phase="revision";const revision=(await run("git.exe",["rev-parse","HEAD"])).stdout.trim();assert.equal(revision,expectedRevision);
+ report.phase="tracked-status";assert.equal((await run("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");report.testRevision=revision;
  fixture=await startG08Fixture();report.phase="register";
  assert.equal((await cliRun(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile])).success,true);
  const started=new Date().toISOString();report.phase="launch";
@@ -83,9 +83,10 @@ try{
  const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
+ const config={...scene,curve,pointerMs:motionProfile==="fast"?350:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
- pending=observeInFlight(api("play-script",g08Workflow(tabId,curve)).finally(()=>{pendingDone=true;}));
+ const workflow=g08Workflow(tabId,curve);workflow.pointer.durationMs=config.pointerMs;
+ pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
  for(let attempt=0;attempt<100&&!pendingDone;attempt++){
   const status=await api("get-script-status");if(status.playing){active=status;
@@ -97,7 +98,7 @@ try{
  }
  assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");assert.equal(window.className,"KelpieScriptPresentation");
  report.phase="capture";report.active={runId:active.runId,playing:true};report.window=window;await save();
- helper=spawn(wgc,["timeline",String(running.pid),exe,identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
+ helper=spawn(wgc,["timeline",String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let helperError="";helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
  const helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
  helperTimer=setTimeout(()=>helper.kill(),35000);
@@ -119,14 +120,21 @@ try{
  let used=await verifyTimelineSnapshots(summary,join(outputRoot,"native"));
  used+=(await stat(join(outputRoot,"native","summary.json"))).size;assert.ok(used<=67108864);
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));assert.equal(items.length,2);
- const budget={remaining:67108864-used-65536};assert.ok(budget.remaining>=0,"OUTPUT_BUDGET");const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
+ const budget={remaining:67108864-used-65536};assert.ok(budget.remaining>=0,"OUTPUT_BUDGET");
+ const serialSamples=native.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
+ const nativeEvidence=Buffer.from(JSON.stringify({config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount}}));
+ assert.ok(nativeEvidence.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=nativeEvidence.length;
+ await writeFile(join(outputRoot,"native-observation.json"),nativeEvidence,{flag:"wx"});
+ report.phase="artifact-download";const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
  const trustedFacts={source:manifest.source,curve,frameCount:native.frameCount,
   identity:{pid:running.pid,sessionId:identity.sessionId,executable:identity.executable,startFileTime:identity.startFileTime,launchId:readiness.launchId,port:28420},
-  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success},
+  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success,inputGuarantee:terminal.inputGuarantee,totalDurationMs:terminal.totalDurationMs},
   before,after,fixture:{url:fixture.url,pageRequests:fixture.pageRequests,...fixtureFacts},artifacts,summary};
+ report.phase="provenance";
+ const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
+ budget.remaining-=factEvidence.length;await writeFile(join(outputRoot,"facts-observation.json"),factEvidence,{flag:"wx"});
  const provenance=verifyWgcProvenance(trustedFacts);
- const serialSamples=native.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
- const caseData={curve,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
+ const caseData={curve,profile:motionProfile,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
   provenance,facts:trustedFacts,config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;

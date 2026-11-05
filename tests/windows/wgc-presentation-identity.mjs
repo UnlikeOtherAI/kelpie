@@ -11,3 +11,8 @@ export function acceptPresentation(result,identity,pid){
 export function presentationNotVisible(error){
  return String(error.stderr??"").trim()==="InvalidOperationException: Exactly one visible owned target window is required";
 }
+
+export function presentationCaptureExecutable(identity){
+ assert.ok(typeof identity.executable==="string"&&/^[a-z]:\\/i.test(identity.executable)&&!identity.executable.includes("/"));
+ return identity.executable;
+}

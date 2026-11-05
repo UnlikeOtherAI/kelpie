@@ -27,7 +27,7 @@ async function loadCase(path,expectedCase,expectedReport,curve){
  assert.equal(observed.cleanup,"supported-cli-closed");assert.equal(observed.processExit?.exited,true);
  assert.equal(observed.testRevision,expectedRevision);assert.equal(observed.hashes?.uia,expectedUiaHash);assert.equal(observed.hashes?.wgc,expectedWgcHash);assert.equal(observed.hashes?.dll,value.binarySHA256);
  assert.ok(observed.checks.some(check=>check.name==="owned native and exported G08 case"&&check.passed===true));
- assert.equal(value.curve,curve);assert.match(value.binarySHA256,/^[a-f0-9]{64}$/);
+ assert.equal(value.curve,curve);assert.equal(value.profile,"dense");assert.match(value.binarySHA256,/^[a-f0-9]{64}$/);
  const provenance=verifyWgcProvenance(value.facts);assert.deepEqual(provenance,value.provenance);
  assert.deepEqual(value.scene,{calibration:value.facts.fixture.events[0],start:value.facts.fixture.events[1],finish:value.facts.fixture.events[2]});
  await verifyTimelineSnapshots(value.summary,join(dir,"native"));
