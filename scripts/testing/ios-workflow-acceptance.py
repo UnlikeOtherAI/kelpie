@@ -66,11 +66,23 @@ def runner_config(nonce, port):
     return config, ui["TestHostBundleIdentifier"]
 
 
+def device_state(udid):
+    devices = json.loads(command("xcrun", "simctl", "list", "devices", "-j", timeout=30))["devices"]
+    states = [d["state"] for items in devices.values() for d in items if d["udid"] == udid]
+    if len(states) != 1:
+        raise RuntimeError("Selected simulator is missing from the inventory")
+    return states[0]
+
+
 def terminate_owned(udid, bundle, pins):
+    if device_state(udid) == "Shutdown":
+        return "device already shutdown"
     installed = subprocess.run(["xcrun", "simctl", "get_app_container", udid, bundle, "app"],
                                capture_output=True, text=True, timeout=20)
     if installed.returncode:
-        return "absent"
+        if "No such file or directory" in installed.stderr:
+            return "absent"
+        raise RuntimeError("Could not query the pinned bundle container")
     root = Path(installed.stdout.strip())
     if not pins or not all((root / name).is_file() and digest(root / name) == value for name, value in pins.items()):
         raise RuntimeError("Refusing to terminate a bundle whose build hashes differ")
@@ -85,11 +97,12 @@ def terminate_owned(udid, bundle, pins):
 def shutdown_owned(udid):
     # Only a simulator booted by this invocation may be shut down. Confirm actual state, not command admission.
     try:
-        subprocess.run(["xcrun", "simctl", "shutdown", udid], capture_output=True, check=True, timeout=100)
+        if device_state(udid) == "Shutdown":
+            return "verified shutdown"
+        subprocess.run(["xcrun", "simctl", "shutdown", udid], capture_output=True, check=False, timeout=100)
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
-            inventory = json.loads(command("xcrun", "simctl", "list", "devices", "-j", timeout=30))["devices"]
-            if any(d["udid"] == udid and d["state"] == "Shutdown" for items in inventory.values() for d in items):
+            if device_state(udid) == "Shutdown":
                 return "verified shutdown"
             time.sleep(2)
     except (ValueError, OSError, subprocess.SubprocessError):
@@ -133,6 +146,13 @@ def run_device(device, product_hashes):
         if started_here:
             command("xcrun", "simctl", "boot", udid, timeout=120)
         command("xcrun", "simctl", "bootstatus", udid, "-b", timeout=300)
+        command("xcrun", "simctl", "install", udid, PRODUCTS / "Debug-iphonesimulator/Kelpie.app", timeout=120)
+        installed = Path(command("xcrun", "simctl", "get_app_container", udid, BUNDLE, "app"))
+        installed_hashes = {key: digest(installed / key) for key in product_hashes}
+        install_report = {"device": device, "beforeHashes": installed_hashes}
+        (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
+        if installed_hashes != product_hashes:
+            raise RuntimeError("Installed simulator app differs from the generic build")
         args = ["xcodebuild", "test-without-building", "-xctestrun", str(config), "-destination", "id=" + udid,
                 "-parallel-testing-enabled", "NO", "-maximum-concurrent-test-simulator-destinations", "1",
                 "-test-timeouts-enabled", "YES", "-default-test-execution-time-allowance", "210",
@@ -157,20 +177,30 @@ def run_device(device, product_hashes):
                 time.sleep(1)
             if process.poll() is None:
                 raise RuntimeError("XCTest exceeded the per-device runtime budget")
-        installed = Path(command("xcrun", "simctl", "get_app_container", udid, BUNDLE, "app"))
-        installed_hashes = {key: digest(installed / key) for key in product_hashes}
-        (folder / "installed.json").write_text(json.dumps({"device": device, "hashes": installed_hashes}, indent=2))
-        if installed_hashes != product_hashes:
-            raise RuntimeError("Installed simulator app differs from the generic build")
         summary = command("xcrun", "xcresulttool", "get", "test-results", "summary", "--path", result)
         (folder / "summary.json").write_text(summary)
         tests = command("xcrun", "xcresulttool", "get", "test-results", "tests", "--path", result)
         (folder / "tests.json").write_text(tests)
+        install_verified = False
+        try:
+            state = device_state(udid)
+            install_report["afterState"] = state
+            if state != "Shutdown":
+                installed = Path(command("xcrun", "simctl", "get_app_container", udid, BUNDLE, "app"))
+            # The known container can be hashed on disk even after XCTest shuts the simulator down.
+            after_hashes = {key: digest(installed / key) for key in product_hashes}
+            install_report["afterHashes"] = after_hashes
+            install_verified = after_hashes == product_hashes
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+            install_report["afterError"] = type(error).__name__
+        (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
         selected = list(Path("apps/ios/UITests").glob("Workflow*.swift")) + [Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift")]
         required = {method for file in selected for method in re.findall(r"func (test\w+)\(", file.read_text())}
         missing = sorted(method for method in required if method not in tests)
         if process.returncode or not cli_started or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
+        if not install_verified:
+            raise RuntimeError("Post-test installed app hash could not be verified; see installation report")
         return True
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
         (folder / "primary-failure.txt").write_text(type(error).__name__ + ": " + str(error)[:500] + "\n")
@@ -193,9 +223,15 @@ def run_device(device, product_hashes):
         if started_here:
             cleanup["simulator"] = shutdown_owned(udid)
         else:
-            cleanup["simulator"] = "preserved initial boot state"
+            try:
+                state = device_state(udid)
+                cleanup["simulator"] = "preserved initial boot state" if state == "Booted" else "changed by XCTest: " + state
+            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError):
+                cleanup["simulator"] = "unconfirmed: initial boot state"
         individually_retired = all(not cleanup[b].startswith("unconfirmed") for b in (runner, BUNDLE))
-        cleanup["nextDeviceAllowed"] = cleanup["simulator"] == "verified shutdown" or (not started_here and individually_retired)
+        cleanup["nextDeviceAllowed"] = cleanup["simulator"] == "verified shutdown" or (
+            not started_here and individually_retired and cleanup["simulator"] == "preserved initial boot state"
+        )
         (folder / "cleanup.json").write_text(json.dumps(cleanup, indent=2))
         failure_diagnostics(log_path, folder / "diagnostics.txt")
         if result.is_dir():
