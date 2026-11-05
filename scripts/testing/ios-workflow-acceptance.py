@@ -145,7 +145,7 @@ def failure_diagnostics(log_path, destination):
     lines = []
     with log_path.open(errors="replace") as log:
         for line in log:
-            capture = re.search(r"\[WorkflowCapture\] reason=(native-bounds|pixel-ratio|layout-size|visible-size|scale|snapshot-viewport|presentation-parent)\b", line)
+            capture = re.search(r"\[WorkflowCapture\] reason=(native-bounds|pixel-ratio|layout-size|visible-size|scale|snapshot-viewport|presentation-parent|observation-(?:BUSY|TAB_CHANGED|WEBVIEW_ERROR|UNAUTHORIZED|RECORDING_IN_PROGRESS|TIMEOUT|INVALID_PARAM|INVALID_VALUE|OTHER))\b", line)
             if capture:
                 lines.append("[WorkflowCapture] reason=" + capture.group(1))
                 if len(lines) >= 100:

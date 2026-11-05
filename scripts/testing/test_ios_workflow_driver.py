@@ -54,9 +54,11 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             source = Path(directory) / "log"
             output = Path(directory) / "diagnostics"
             source.write_text("prefix [WorkflowCapture] reason=visible-size\n"
+                              "[WorkflowCapture] reason=observation-BUSY\n"
                               "[WorkflowCapture] reason=private-user-value\n")
             DRIVER.failure_diagnostics(source, output)
-            self.assertEqual(output.read_text(), "[WorkflowCapture] reason=visible-size\n")
+            self.assertEqual(output.read_text(), "[WorkflowCapture] reason=visible-size\n"
+                             "[WorkflowCapture] reason=observation-BUSY\n")
 
     def test_cli_failure_status_keeps_only_bounded_metadata(self):
         from ios_workflow_cli import run_fixture
