@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "tabId": "chosen-tab",
+  "inputs": {
+    "name": { "type": "string" }
+  },
+  "actions": [
+    {
+      "action": "fill",
+      "target": { "label": "Name" },
+      "text": { "input": "name" },
+      "typingDelayMs": 50
+    },
+    { "action": "screenshot", "name": "filled" }
+  ],
+  "capture": { "formats": ["gif", "video", "screenshots"], "fps": 15 }
+}

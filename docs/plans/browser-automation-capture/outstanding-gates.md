@@ -117,3 +117,28 @@ in progress. A reported subset is not a platform or full-matrix pass.
   source. Final portable checks, component versions, one reviewed PR, release
   publication and installed signed/package verification remain open. No
   nine-runtime or 432-cell completion is asserted.
+
+## Paced typing and privacy checkpoint at 2153a422
+
+The shared planner and Windows, Linux, macOS and iOS paced adapters are
+integrated in source. Android was still working on its native adapter at this
+checkpoint.
+Every platform must independently verify bounded Unicode pacing, full-literal
+conditional redaction, no refocus after drift, cancellation, lost callbacks,
+and actual decoded capture. An acknowledged final input may complete when
+its later privacy classification is unknown only without capture and with
+full-literal redaction; capture remains fail-closed. Unknown before another
+scalar and any unacknowledged callback must halt without replay.
+
+The CEF isolated-reader brand proof is available in source but is not itself
+a native input-path or cross-document capture pass. The Linux consumer must
+bind an exact-hit genuine anchor/button proof to the original action, token and
+document, and consume it only after the final input ACK. Inputs, labels,
+descendant hits, malformed or missing proof and lost ACK remain unknown. The
+request- and response-stage Fetch probes and the first CEF release-context
+probe did not supply an old-realm classification. Keep the two actual failed
+next-document capture cases open until the final native replay.
+
+The production GIF model generator remains test-only and unwired. Its first
+candidate run stopped on a dependency mismatch; a model acceptance cannot be
+claimed until the exact producer provenance and retained-marker controls pass.
