@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 // The pre-release brand must not be treated as evidence for a replacement target.
-export async function runBrandReleaseCases({check,navigate,api,workflow,tabId}) {
+export async function runBrandReleaseCases({check,navigate,api,workflow,tabId,fixture}) {
   await check("brand proof never permits captured input navigation", async () => {
     await navigate();
     const setup="(()=>{document.body.innerHTML='<input id=brand-input type=text>';" +
@@ -15,15 +15,20 @@ export async function runBrandReleaseCases({check,navigate,api,workflow,tabId}) 
   });
   await check("brand proof does not consume a late release acknowledgement", async () => {
     await navigate();
+    const baseline=fixture.events.length;
     const setup="(()=>{document.body.innerHTML='<button id=slow-release>Slow release</button>';window.__slowClicks=0;" +
-      "const e=document.querySelector('#slow-release');e.onmouseup=()=>{const end=performance.now()+11000;while(performance.now()<end){}};" +
+      "const e=document.querySelector('#slow-release');e.onmouseup=()=>{navigator.sendBeacon('/events',JSON.stringify({documentId:'late-release-proof',type:'mouseup-entered'}));const end=performance.now()+11000;while(performance.now()<end){}};" +
       "e.onclick=()=>window.__slowClicks++;return true})()";
     assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",{...workflow([{action:"click",target:{selector:"#slow-release"}}]),
+    const pending=api("play-script",{...workflow([{action:"click",target:{selector:"#slow-release"}}]),
       capture:{formats:["screenshots"],maxWidth:640,maxDurationMs:30000}});
-    assert.equal(result.success,false);
-    assert.equal(result.mayHaveCompleted,true);
-    assert.deepEqual(result.artifacts,[]);
+    const startedDeadline=Date.now()+8000;
+    while(!fixture.events.slice(baseline).some(event=>event.type==="mouseup-entered") && Date.now()<startedDeadline)
+      await new Promise(resolve=>setTimeout(resolve,25));
+    const entered=fixture.events.slice(baseline).some(event=>event.type==="mouseup-entered");
+    const result=await pending;
+    // Retire through the ordinary interface before asserting so a failed
+    // expectation cannot contaminate unrelated cases with this pending call.
     let observed;
     const end=Date.now()+15000;
     while(Date.now()<end){
@@ -32,6 +37,10 @@ export async function runBrandReleaseCases({check,navigate,api,workflow,tabId}) 
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     assert.equal(observed?.success,true,"late operation did not retire");
+    assert.equal(entered,true,"mouseup handler did not start");
+    assert.equal(result.success,false,JSON.stringify(result));
+    assert.equal(result.mayHaveCompleted,true,JSON.stringify(result));
+    assert.deepEqual(result.artifacts,[]);
     assert.ok(observed.result<=1,"late release was replayed");
     assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
     return {code:result.error?.code,clicks:observed.result};

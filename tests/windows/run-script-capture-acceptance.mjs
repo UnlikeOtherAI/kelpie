@@ -139,7 +139,7 @@ try {
     assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
   });
   await runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture});
-  await runBrandReleaseCases({check,navigate,api,workflow,tabId});
+  await runBrandReleaseCases({check,navigate,api,workflow,tabId,fixture});
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],
     ["Covered action", "TARGET_OBSCURED"], ["Hidden action", "TARGET_NOT_FOUND"]]) {
     await check("safe refusal " + name, async () => {

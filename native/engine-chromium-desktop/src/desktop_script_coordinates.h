@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <optional>
+#include <string>
 #include <nlohmann/json.hpp>
 
 namespace kelpie {
@@ -22,8 +23,15 @@ inline bool ScriptTargetInspectionExplicit(const nlohmann::json& value) {
     value.contains("sensitive") && value["sensitive"].is_boolean();
 }
 inline bool ScriptTargetPostMutationExplicit(const nlohmann::json& value) {
-  return ScriptTargetInspectionExplicit(value) && value.contains("sensitivityKnown") &&
-    value["sensitivityKnown"].is_boolean();
+  if (!ScriptTargetInspectionExplicit(value) || !value.contains("sensitivityKnown") ||
+      !value["sensitivityKnown"].is_boolean()) return false;
+  if (value["ok"].get<bool>()) return !value.contains("error");
+  return value.contains("error") && value["error"].is_string() && !value["error"].get<std::string>().empty();
+}
+inline std::string ScriptTargetPostMutationErrorCode(const nlohmann::json& value) {
+  if (ScriptTargetPostMutationExplicit(value) && !value["ok"].get<bool>() &&
+      value["error"].get<std::string>() == "INVALID_TARGET_OPERATION") return "INVALID_TARGET_OPERATION";
+  return "TARGET_INSPECTION_INVALID";
 }
 inline bool ScriptTargetInspectionUncertain(const nlohmann::json& value) {
   return !ScriptTargetInspectionExplicit(value) || (!value["sensitive"].get<bool>() &&

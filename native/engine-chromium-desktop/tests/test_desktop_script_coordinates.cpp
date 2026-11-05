@@ -5,8 +5,13 @@
 int main(){
   assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false}}));
   assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown","false"}}));
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown",false},{"error","bad"}}));
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",false},{"sensitive",false},{"sensitivityKnown",false}}));
+  assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","STALE_TARGET"}}));
   assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown",false}}));
   assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",true},{"sensitivityKnown",true}}));
+  assert(kelpie::ScriptTargetPostMutationErrorCode({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","INVALID_TARGET_OPERATION"}}) == "INVALID_TARGET_OPERATION");
+  assert(kelpie::ScriptTargetPostMutationErrorCode({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","private-canary-73951"}}) == "TARGET_INSPECTION_INVALID");
   assert(kelpie::ScriptTargetInspectionUncertain(nullptr));
   assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","STALE_TARGET"}}));
   assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false}}));

@@ -63,14 +63,14 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     // requirement, cancellation and deadline. A closed/replaced tab is not a
     // navigation proof and never authorizes fallback.
     const auto same_tab_navigated = [&]() {
-      if (!lease.document_version || (cancelled && cancelled())) return false;
+      if (!lease.document_version || lease.document_version->empty() || (cancelled && cancelled())) return false;
       TabLease same_tab = lease; same_tab.document_version.reset();
       BrowserNavigationState state;
       const auto remaining = std::min(RemainingTimeout(began, timeout),
         std::chrono::duration_cast<Timeout>(std::chrono::seconds(2)));
       if (remaining <= Timeout::zero()) return false;
       const auto observed = GetNavigationState(same_tab, &state, remaining);
-      return observed.ok && !(cancelled && cancelled()) &&
+      return observed.ok && !(cancelled && cancelled()) && !state.tab.document_version.empty() &&
         state.tab.document_version != *lease.document_version;
     };
     const auto unknown_privacy = [&](bool confirmed_navigation) {
@@ -122,6 +122,10 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
         uncertain();
         return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy classification is malformed");
       }
+      if (!target["ok"].get<bool>()) {
+        uncertain();
+        return BrowserControlResult::Failure(ScriptTargetPostMutationErrorCode(target), "Post-input classification failed");
+      }
       const bool known = target["sensitivityKnown"].get<bool>();
       if (!known) {
         const bool navigated = same_tab_navigated();
@@ -130,8 +134,6 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       }
       if (target.value("sensitive", false) && options.value("policy", Json::object()).value("refuseSensitive", false))
         return BrowserControlResult::Failure("SENSITIVE_CAPTURE_REFUSED", "Sensitive input cannot expose captures");
-      if (!target.value("ok", false))
-        return BrowserControlResult::Failure("INPUT_UNCERTAIN", "Post-input classification failed");
       return BrowserControlResult::Success();
     }
     if (!target.value("ok", false))
