@@ -40,6 +40,7 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
@@ -64,6 +65,7 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
             ])
     return targets, required
 

@@ -34,6 +34,8 @@ The next full hosted run at `c661062447d4fd8529896deba8d12831f4b05f4c` passed 36
 * Step PNGs for a pointed action show the resolved marker before input. Other steps capture after the action. The visual viewport maps CSS points into the selected WKWebView's bounds. The same native presentation is drawn into the snapshot at the latched timestamp. Provisional navigation and a committed document each invalidate the previous presentation.
 * Before admitting the first captured frame of a document, iOS waits within the existing two-second admission and capture budgets for the full native and CSS visual viewport to remain stable through the recording chrome transition. Authorization, Stop, document and pinned native-canvas checks continue during this wait. Once a baseline is admitted, the existing snapshot and same-document resize fences remain in force.
 
+* Until its paced-edit adapter is implemented, iOS rejects a supplied `typingDelayMs` during full preflight instead of silently editing atomically.
+
 * The enabled pointer defaults to 350 ms; an explicit duration, including the G08 fixture's 2400 ms, is preserved.
 
 * For movies, a pointed action holds the marker at progress zero until every requested movie format accepts its old-document frame. The app waits one requested frame interval after acknowledgement, starts the configured animation clock, then rechecks the target and dispatches. A step PNG records the pre-input point without an extra movie dwell when only screenshots are requested. A successful movie ends with an admitted frame of the final page.
