@@ -55,6 +55,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
       presentation["tabId"]=lease.id; presentation["generation"]=lease.generation;
       presentation["documentVersion"] = navigation.tab.document_version;
       presentation["viewportWidth"] = resolved.at("viewportWidth"); presentation["viewportHeight"] = resolved.at("viewportHeight");
+      if(resolved.contains("visualViewport")) presentation["visualViewport"]=resolved.at("visualViewport");
+      else presentation.erase("visualViewport");
     }
     const double moved_at = Elapsed();
     do {

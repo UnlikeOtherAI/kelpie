@@ -20,6 +20,8 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   std::unique_ptr<DesktopScriptCapture> encoder;
   const auto cancellation=abort;
   int initial_width = 0, initial_height = 0;
+  Json initial_viewport;
+  const std::string viewport_expression="(()=>{const v=window.visualViewport;return {width:innerWidth,height:innerHeight,visualViewport:{offsetLeft:v?.offsetLeft??0,offsetTop:v?.offsetTop??0,width:v?.width??innerWidth,height:v?.height??innerHeight,scale:v?.scale??1}}})()";
   std::string first_document;
   std::size_t dropped = 0;
   bool partial = false;
@@ -43,12 +45,12 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       Json viewport;
-      result = engine.EvaluateBrowserControl(lease, "({width:innerWidth,height:innerHeight})", &viewport, std::chrono::seconds(2));
+      result = engine.EvaluateBrowserControl(lease, viewport_expression, &viewport, std::chrono::seconds(2));
       if (!result.ok || !viewport.is_object()) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
       const int width = viewport.value("width", 0), height = viewport.value("height", 0);
       if (width <= 0 || height <= 0) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
-      if (initial_width == 0) { initial_width = width; initial_height = height; first_document = before.tab.document_version; }
-      if (width != initial_width || height != initial_height) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      if (initial_width == 0) { initial_width = width; initial_height = height; first_document = before.tab.document_version; initial_viewport=viewport; }
+      if (width != initial_width || height != initial_height || viewport!=initial_viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
       {
@@ -65,6 +67,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         throw std::runtime_error("CAPTURE_TARGET_DOCUMENT_CHANGED");
       shown["tabId"]=lease.id; shown["generation"]=lease.generation;
       shown["documentVersion"]=before.tab.document_version;
+      shown["visualViewport"]=viewport.at("visualViewport");
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
       if(config.present) config.present(shown,[this,cancellation] { cancellation->store(true); changed.notify_all(); });
       BrowserScreenshot image;
@@ -79,7 +82,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         continue;
       }
       Json after_viewport;
-      result = engine.EvaluateBrowserControl(lease, "({width:innerWidth,height:innerHeight})", &after_viewport, std::chrono::seconds(2));
+      result = engine.EvaluateBrowserControl(lease, viewport_expression, &after_viewport, std::chrono::seconds(2));
       if (!result.ok || after_viewport != viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
       const bool proof=!movies || expected_document.empty() ||

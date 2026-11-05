@@ -1,6 +1,7 @@
 // Trusted CDP script input. Target preflight and input are separate renderer commands;
 // the unavoidable recheck-to-dispatch gap is reported, never described as atomic.
 #include "desktop_engine_control_support.h"
+#include "desktop_script_coordinates.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 #include <chrono>

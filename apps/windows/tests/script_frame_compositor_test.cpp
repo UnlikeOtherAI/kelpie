@@ -38,4 +38,27 @@ int main() {
   assert(transparent.bgra[outside+3]==0);
   auto pointer=White(); DrawScriptOverlay(pointer,{{"viewportWidth",100},{"viewportHeight",100},{"pointer",{{"x",20},{"y",20}}}});
   assert(pointer.bgra!=White().bgra);
+  auto visual=shown;
+  visual["visualViewport"]={{"offsetLeft",10},{"offsetTop",5},{"width",50},{"height",50},{"scale",2}};
+  auto zoomed=White();DrawScriptOverlay(zoomed,visual);
+  const auto mapped=80*zoomed.stride+60*4;
+  assert(zoomed.bgra[mapped]<100&&zoomed.bgra[mapped+1]<100&&zoomed.bgra[mapped+2]==255);
+  const auto left=80*zoomed.stride+10*4;
+  assert(zoomed.bgra[left]==255&&zoomed.bgra[left+1]==255);
+  auto invalid=visual;invalid["visualViewport"]["width"]=0;
+  bool refused=false;try{auto ignored=White();DrawScriptOverlay(ignored,invalid);}catch(...){refused=true;}
+  assert(refused);
+  nlohmann::json note={{"elapsedMs",0},{"visualViewport",visual["visualViewport"]},
+    {"commentary",{{"text","Viewport note"},{"position","center"},{"startedMs",0},{"durationMs",3000}}}};
+  auto note_first=White();DrawScriptOverlay(note_first,note);
+  note["visualViewport"]["offsetLeft"]=30;note["visualViewport"]["offsetTop"]=25;
+  auto note_panned=White();DrawScriptOverlay(note_panned,note);
+  assert(note_first.bgra==note_panned.bgra);
+  assert(note_first.bgra!=White().bgra);
+
+  auto scrollbar=shown;
+  scrollbar["visualViewport"]={{"offsetLeft",0},{"offsetTop",0},{"width",90},{"height",90},{"scale",1}};
+  auto classic_bar=White();DrawScriptOverlay(classic_bar,scrollbar);
+  assert(classic_bar.bgra==frame.bgra); // A scrollbar must not scale or drift the marker.
+
 }
