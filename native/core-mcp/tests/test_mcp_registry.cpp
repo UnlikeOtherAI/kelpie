@@ -55,7 +55,10 @@ void TestRegistryFiltering() {
     assert(registry.is_tool_available(name, kelpie::Platform::kIos, "webkit"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "chromium"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "gecko"));
-    assert(!ContainsTool(android_tools, name));
+    assert(ContainsTool(android_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kAndroid, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "gecko"));
     assert(!ContainsTool(macos_tools, name));
     assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "webkit"));
@@ -72,6 +75,13 @@ void TestRegistryFiltering() {
     assert(tool.availability.engines == kelpie::StringList{"webkit"});
     assert(tool.availability.requires_ui); assert(!tool.availability.allowed_headless);
   }
+  for (const auto& tool : android_tools) if (tool.http_endpoint == "play-script" ||
+      tool.http_endpoint == "abort-script" || tool.http_endpoint == "get-script-status" ||
+      tool.http_endpoint == "get-script-artifact") {
+    assert(tool.availability.platforms == std::vector<kelpie::Platform>{kelpie::Platform::kAndroid});
+    assert(tool.availability.engines == kelpie::StringList{"chromium"});
+    assert(tool.availability.requires_ui); assert(!tool.availability.allowed_headless);
+  }
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
@@ -80,7 +90,7 @@ void TestRegistryFiltering() {
   // Update these deliberately when the catalogue changes.
   assert(all_tools.size() == 128);
   assert(ios_tools.size() == 125);
-  assert(android_tools.size() == 121);
+  assert(android_tools.size() == 125);
   assert(macos_tools.size() == 118);
   assert(windows_tools.size() == 118);
   assert(webkit_tools.size() == 128);

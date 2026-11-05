@@ -38,6 +38,11 @@ void ScriptRegistryForwarding(int platform) {
     for (const auto& tool : extensions) if (tool["name"] == call.first) {
       found = true; assert(tool["method"] == endpoint); assert(tool["mutates"] == mutates);
       assert(tool["inputSchema"] == kelpie::NativeExtensionInputSchema(endpoint));
+      if (platform != KELPIE_PLATFORM_WINDOWS) {
+        assert(tool["availability"]["requires_ui"] == true);
+        assert(tool["availability"]["allowed_headless"] == false);
+        assert(tool["availability"]["engines"] == json::array({platform == KELPIE_PLATFORM_IOS ? "webkit" : "chromium"}));
+      }
       assert(!tool["inputSchema"]["properties"].contains("values"));
       assert(!tool["inputSchema"]["properties"].contains("secretEnv"));
     }
@@ -131,6 +136,7 @@ int main() {
   ScriptSessionPreflightErrors();
   ScriptRegistryForwarding(KELPIE_PLATFORM_WINDOWS);
   ScriptRegistryForwarding(KELPIE_PLATFORM_IOS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_ANDROID);
   const kelpie::McpRegistry registry;
   for (const auto& tool : registry.all_tools()) {
     const auto schema = kelpie::NativeExtensionInputSchema(tool.http_endpoint);

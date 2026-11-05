@@ -13,10 +13,12 @@ const std::vector<P> kMobilePlatforms = {P::kIos, P::kAndroid};
 const std::vector<P> kOrientationPlatforms = {P::kIos, P::kAndroid, P::kMacos};
 const std::vector<P> kLocalDesktop = {P::kWindows, P::kLinux};
 // Profiles describe compiled route bindings, never authority or runtime grants.
-const ToolAvailability kScriptAvailability{{P::kWindows, P::kIos}, {"chromium", "webkit"}, true, false, {},
-  {{P::kWindows, {"chromium"}, false, true}, {P::kIos, {"webkit"}, true, false}}};
-const ToolAvailability kScriptPlaybackAvailability{{P::kWindows, P::kIos}, {"chromium", "webkit"}, true, false, {},
-  {{P::kWindows, {"chromium"}, true, false}, {P::kIos, {"webkit"}, true, false}}};
+const ToolAvailability kScriptAvailability{{P::kWindows, P::kIos, P::kAndroid}, {"chromium", "webkit"}, true, false, {},
+  {{P::kWindows, {"chromium"}, false, true}, {P::kIos, {"webkit"}, true, false},
+   {P::kAndroid, {"chromium"}, true, false}}};
+const ToolAvailability kScriptPlaybackAvailability{{P::kWindows, P::kIos, P::kAndroid}, {"chromium", "webkit"}, true, false, {},
+  {{P::kWindows, {"chromium"}, true, false}, {P::kIos, {"webkit"}, true, false},
+   {P::kAndroid, {"chromium"}, true, false}}};
 const std::vector<P> kRendererPlatforms = {P::kIos, P::kAndroid, P::kMacos, P::kLinux,
                                            P::kWindows};
 
