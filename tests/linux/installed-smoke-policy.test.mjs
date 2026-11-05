@@ -110,4 +110,3 @@ test("CLI-only source and digest inputs fail closed",async()=>{
   assert.notEqual(run({SOURCE_RUN:"not-a-run"}).status,0);
   assert.equal(run({CLI_ONLY:"false",EXPECTED_SOURCE:"",EXPECTED_RPM:"",EXPECTED_CLI:""}).status,0);
 });
-
