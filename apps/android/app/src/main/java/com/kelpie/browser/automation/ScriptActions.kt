@@ -139,7 +139,7 @@ class ScriptActions(
         overlay.viewport(visualWidth, visualHeight, oldDocument, number(visual, "offsetLeft"), number(visual, "offsetTop"))
         val pointer = objectMap(run.script["pointer"])
         if (pointer["enabled"] == true) {
-            val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 500.0
+            val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 350.0
             overlay.move(
                 ScriptOverlay.Pointer(
                     pointerX.coerceIn(0.0, width),
