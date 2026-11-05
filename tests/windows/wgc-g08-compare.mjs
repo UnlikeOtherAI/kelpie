@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {evaluateG08} from "../capture/g08-timeline.mjs";
 const rms=values=>Math.sqrt(values.reduce((sum,value)=>sum+value*value,0)/values.length);
 function interpolate(samples,time,maxGap,read){
  let before,after;
@@ -18,7 +19,8 @@ function ensure(result){
  for(const key of ["pointerStartMs","markerStartMs","radiusBiasPx"])assert.ok(Number.isFinite(result.analysis[key]));
  assert.ok(Number.isFinite(result.analysis.endpointOffset?.x)&&Number.isFinite(result.analysis.endpointOffset?.y));
 }
-export function compareWgcExport(native,exported){
+// Low-level metric helper only; it is not an acceptance result.
+export function compareMeasuredPhases(native,exported){
  ensure(native);ensure(exported);
  const a=native.provenance,b=exported.provenance;
  assert.ok(a&&b&&/^[a-f0-9]{40}$/.test(a.source)&&/^[a-f0-9]{48}$/.test(a.runId));
@@ -43,4 +45,12 @@ export function compareWgcExport(native,exported){
  assert.ok(result.pointerRmsPx<=6&&result.pointerMaxPx<=12,"G08_CROSS_STREAM_POINTER_MISMATCH");
  assert.ok(result.alphaRms<=.12&&result.radiusRmsPx<=2.5,"G08_CROSS_STREAM_MARKER_MISMATCH");
  return result;
+}
+
+// Always rerun the common oracle on the actual sample arrays before comparing.
+export function compareWgcExport(native,exported,config){
+ const nativeAnalysis=evaluateG08(native.samples,config);
+ const exportedAnalysis=evaluateG08(exported.samples,config);
+ const comparison=compareMeasuredPhases({...native,analysis:nativeAnalysis},{...exported,analysis:exportedAnalysis});
+ return {nativeAnalysis,exportedAnalysis,comparison};
 }
