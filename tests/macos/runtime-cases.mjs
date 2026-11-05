@@ -20,12 +20,19 @@ export async function runEngine(client,fixture,engine,report) {
    tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
   checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
+  client.nativeControlStage="engine-before";
+  const before=await client.api("get-renderer");
+  client.lastEngine=["webkit","chromium"].includes(before.engine)?before.engine:"unknown";
   const focus=await client.focusOwnedBrowser();
+  client.nativeControlStage="more-find";
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
-  await client.tap("browser.action.more",more);
-  const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
-  await client.tap(id,window);
-  await waitFor(async()=>{const value=await client.api("get-renderer");return value.engine===engine;});
+  client.nativeControlStage="more-tap";await client.tap("browser.action.more",more);
+  client.nativeControlStage="engine-find";const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
+  client.nativeControlStage="engine-tap";await client.tap(id,window);
+  client.nativeControlStage="engine-confirm";await waitFor(async()=>{const value=await client.api("get-renderer");
+   if(["webkit","chromium"].includes(value.engine))client.lastEngine=value.engine;
+   return value.engine===engine;});
+  client.nativeControlStage=null;
   const resized=await client.api("resize-viewport",{width:900,height:700});
   requireTrue(resized.success,"NATIVE_VIEWPORT_RESIZE");
   return {...await client.screenshot(engine+"-renderer"),focus};
