@@ -3,13 +3,15 @@ import path from "node:path";
 import {createHash} from "node:crypto";
 import {inspectMedia} from "./runtime-media.mjs";
 import {cli,cliMCP,requireTrue,waitFor} from "./runtime-client.mjs";
-export async function publicCLI(client,fixture,privateDir){
- const pairing=cli(["pair","--client-name","Hosted public CLI","--timeout-ms","35000"]);
- const window=await waitFor(()=>client.find("pair.dialog.always"));
- await client.tap("pair.dialog.always",window);await pairing.result;
- const tabs=await client.api("get-tabs");const tabId=tabs.activeTab;
- requireTrue(tabId,"CLI_WEBKIT_TAB");
- const file=path.join(privateDir,"recipe.json"),inputs=path.join(privateDir,"inputs.json"),out=path.join(client.out,"cli");
+export async function publicCLI(client,fixture,privateDir,engine="webkit"){
+ if(engine==="webkit"){
+  const pairing=cli(["pair","--client-name","Hosted public CLI","--timeout-ms","35000"]);
+  const window=await waitFor(()=>client.find("pair.dialog.always"));
+  await client.tap("pair.dialog.always",window);await pairing.result;
+ }
+ const tabs=await client.api("get-tabs");const tabId=engine==="chromium"?"chromium":tabs.activeTab;
+ requireTrue(tabId,engine==="chromium"?"CLI_CEF_TAB":"CLI_WEBKIT_TAB");
+ const file=path.join(privateDir,"recipe-"+engine+".json"),inputs=path.join(privateDir,"inputs-"+engine+".json"),out=path.join(client.out,"cli-"+engine);
  await mkdir(out,{recursive:true});
  await writeFile(file,JSON.stringify({version:1,tabId,inputs:{draft:{type:"string"}},capture:{formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxDurationMs:15000,maxBytes:33554432},
  actions:[{action:"navigate",url:fixture.url},{action:"wait-ready",state:"complete"},
@@ -31,7 +33,7 @@ export async function publicCLI(client,fixture,privateDir){
  }
  requireTrue(new Set(decoded.map(item=>item.mimeType)).size===3,"PUBLIC_CLI_ALL_FORMATS");
  const mcp=await cliMCP();
- return {runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
+ return {engine,runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
 }
 export async function inference(client,privateDir){
  const revision="499bc8821c6b12b4e53c5bffcb21ec206f212d81";

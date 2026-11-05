@@ -76,6 +76,12 @@ try{
   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
   await runEngine(client,fixture,"chromium",report);
  });
+ await independent("cef-cli",async()=>{
+  const selected=report.engines.find(item=>item.engine==="chromium")?.checks.some(item=>item.name==="native-renderer-control"&&item.passed);
+  requireTrue(selected,"CLI_CEF_RENDERER_UNAVAILABLE");
+  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+  report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
+ });
  if(failures.length){
   report.phaseFailures=failures;
   phase=failures[0].phase;
