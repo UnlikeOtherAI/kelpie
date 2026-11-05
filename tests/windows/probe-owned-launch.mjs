@@ -7,13 +7,13 @@ import {join,dirname,isAbsolute} from "node:path";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 
-const [exe,cli,privateRoot,reportPath,manifestPath,expectedRevision,expectedBundle]=process.argv.slice(2);
-assert.ok([exe,cli,privateRoot,reportPath,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);assert.match(expectedBundle??"",/^[a-f0-9]{64}$/);
+const [exe,cli,privateRoot,reportPath,manifestPath,expectedRevision,expectedBundle,observer,expectedObserver]=process.argv.slice(2);
+assert.ok([exe,cli,privateRoot,reportPath,manifestPath,observer].every(p=>p&&isAbsolute(p)));
+assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);assert.match(expectedBundle??"",/^[a-f0-9]{64}$/);assert.match(expectedObserver??"",/^[a-f0-9]{64}$/);
 const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 const hash=async p=>createHash("sha256").update(await readFile(p)).digest("hex");
 assert.equal(await hash(exe),manifest.exeSha256);assert.equal(await hash(join(dirname(exe),"kelpie.dll")),manifest.dllSha256);
-assert.equal(await hash(cli),manifest.cliSha256);
+assert.equal(await hash(cli),manifest.cliSha256);assert.equal(await hash(observer),expectedObserver);
 const files=(await readdir(dirname(cli))).filter(name=>name.endsWith(".js")).sort(),bundle=createHash("sha256");
 assert.ok(files.length>0);for(const name of files)bundle.update(name+":"+await hash(join(dirname(cli),name))+"\n");
 assert.equal(bundle.digest("hex"),expectedBundle);
@@ -39,7 +39,23 @@ async function run(args,timeout){
 try{
  let result=await run(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile],30000);
  report.checks.push({stage:"register",...result,value:undefined});assert.ok(result.ok);
- report.stage="launch";result=await run(["browser","launch",alias,"--hidden","--port","28420"],45000);
+ report.stage="launch";
+ let done=false, observation;const completion=reportPath+".done",observationPath=reportPath+".observation.json";
+ const launch=run(["browser","launch",alias,"--port","28420"],45000).finally(()=>{done=true;});
+ for(let attempt=0;attempt<90&&!done;attempt++){
+  try{const current=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")).running[alias];
+   if(Number.isSafeInteger(current?.pid)&&current.pid>0){
+    observation=exec(observer,[String(current.pid),exe,"28420",join(profile,"readiness.json"),completion,observationPath],
+      {env,windowsHide:true,timeout:55000,maxBuffer:65536});
+    void observation.catch(()=>{});break;
+   }
+  }catch{}
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ result=await launch;await writeFile(completion,"done",{flag:"wx"});
+ if(observation){try{await observation;report.observation=JSON.parse(await readFile(observationPath,"utf8"));}
+  catch{report.observation={status:"observer-failed"};}}
+ else report.observation={status:"pending-pid-not-observed"};
  report.checks.push({stage:"launch",...result,value:undefined});
  if(result.ok){
   const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8")),running=store.running[alias];
