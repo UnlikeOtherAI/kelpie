@@ -44,6 +44,11 @@ for(const mode of ["straight","noease","nowobble","nofade","stuck","wrongduratio
     assert.throws(()=>evaluateG08(render(config,mode),config),/G08_|INSUFFICIENT/);
   });
 }
+test("unstable pointer silhouette is insufficient rather than a curve failure",()=>{
+  const config={...base,curve:"s"},samples=render(config);
+  for(let i=0;i<samples.length;i++)if(samples[i].pointer&&i%2)samples[i].pointer.dark=5;
+  assert.throws(()=>evaluateG08(samples,config),/INSUFFICIENT_EVIDENCE unstable decoded pointer silhouette/);
+});
 test("sparse samples are insufficient rather than a timeline pass",()=>{
   const config={...base,curve:"s"};
   assert.throws(()=>evaluateG08(render(config).filter((_,i)=>i%8===0),config),/INSUFFICIENT/);

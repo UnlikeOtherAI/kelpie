@@ -28,6 +28,9 @@ export function evaluateG08(samples,config){
   const path=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}))
     .filter(s=>project(s.p)>.025&&project(s.p)<.975);
   demand(path.length>=18,"INSUFFICIENT_EVIDENCE dense motion samples");
+  const pointerDark=path.map(s=>s.pointer.dark);
+  demand(Math.min(...pointerDark)/Math.max(...pointerDark)>=.5,
+    "INSUFFICIENT_EVIDENCE unstable decoded pointer silhouette");
   const span=path.at(-1).timeMs-path[0].timeMs;
   demand(span>pointerMs*.65,"INSUFFICIENT_EVIDENCE motion phase coverage");
   const gaps=path.slice(1).map((s,i)=>s.timeMs-path[i].timeMs);
