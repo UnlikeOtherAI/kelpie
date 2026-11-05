@@ -8,7 +8,7 @@ import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 const [exe,cli,privateRoot,evidenceRoot,manifestFile,mode="full"]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,evidenceRoot,manifestFile].every(value=>value&&isAbsolute(value)));
-assert.ok(mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
+assert.ok(mode==="alias-only"||mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
 const execute=promisify(execFile),tests=dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(await readFile(manifestFile,"utf8"));
 for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(manifest[key],/^[a-f0-9]{64}$/);
@@ -61,7 +61,9 @@ try{
  const expectedVersion=/project\(kelpie_windows VERSION ([0-9.]+)/.exec(cmakeSource)?.[1];
  assert.ok(expectedVersion);assert.equal(nativeInfo.version,expectedVersion);report.nativeVersion=nativeInfo.version;
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
- if(mode==="edit-diagnostic" || mode==="edit-regression"){
+ if(mode==="alias-only"){
+  await childCase("public alias CLI and stdio MCP","run-alias-cli-acceptance.mjs",[cli,alias,cliHome,readinessFile,join(evidenceRoot,"alias")],{KELPIE_CAPTURE_SOURCE:manifest.source});
+ }else if(mode==="edit-diagnostic" || mode==="edit-regression"){
   await childCase("post-edit privacy and focus viewport diagnostic","probe-post-edit-sensitivity.mjs",[readinessFile,join(evidenceRoot,"post-edit.json"),mode==="edit-regression"?"expect-fixed":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }else if(mode==="privacy-focus" || mode==="privacy-regression"){
   await childCase("late sensitivity focus diagnostic","probe-sensitive-focus.mjs",[readinessFile,join(evidenceRoot,"privacy-focus.json"),mode==="privacy-regression"?"expect-refused":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
