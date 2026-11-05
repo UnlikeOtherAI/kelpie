@@ -64,8 +64,10 @@ try{
  const failures=[];
  async function independent(name,operation){
   phase=name;
-  await runIndependentPhase(name,operation,failures,()=>({
-   childExitAtFailure:childExit,childAliveAtFailure:!childExited&&child.exitCode===null&&child.signalCode===null
+  await runIndependentPhase(name,operation,failures,error=>({
+   childExitAtFailure:childExit,childAliveAtFailure:!childExited&&child.exitCode===null&&child.signalCode===null,
+   ...(["cli","cef-cli"].includes(name)?{cliStage:client.cliStage,cliFacts:error.cliFacts}:{}),
+   ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
  await independent("webkit",()=>runEngine(client,fixture,"webkit",report));

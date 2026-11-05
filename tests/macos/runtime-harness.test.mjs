@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
+import {cliExitFacts} from "./runtime-diagnostics.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
  try{
@@ -124,4 +125,13 @@ test("a renderer failure is retained while an independent phase still runs",asyn
  assert.deepEqual(failures,[{phase:"webkit",code:"MOTION_WORKFLOW",childExitAtFailure:null,childAliveAtFailure:true}]);
  await runIndependentPhase("inference",async()=>{throw Object.assign(new Error(),{code:"unsafe value"});},failures,childState);
  assert.equal(failures[1].code,"HOSTED_RUNTIME_FAILED");
+});
+
+test("CLI exit diagnostics retain fixed codes and structural facts only",()=>{
+ const known=cliExitFacts(1,JSON.stringify({error:{code:"UNAUTHORIZED",message:"private-value"}}),"private-stderr");
+ assert.deepEqual(known,{exitCode:1,stdoutJson:true,stderrPresent:true,errorCode:"UNAUTHORIZED"});
+ const unknown=cliExitFacts(2,JSON.stringify({error:{code:"private-value"}}),"");
+ assert.equal(unknown.errorCode,"OTHER");
+ assert.ok(!JSON.stringify([known,unknown]).includes("private-value"));
+ assert.equal(cliExitFacts(1,"not-json","").stdoutJson,false);
 });
