@@ -16,6 +16,7 @@ test("exact distro package and installed binary are required before app admissio
   assert.match(script, /dnf install -y "\$candidate"/);
   assert.match(script, /\$\{#candidates\[@\]\} == 1/);
   assert.match(script, /sha256sum \/usr\/bin\/kelpie-linux/);
+  assert.ok(script.includes('$(cat /opt/kelpie/source-revision.txt)" == "$source_revision"'));
   assert.match(script, /unshare --user --map-root-user --net --pid --fork true/);
   assert.ok(script.indexOf("stage=sandbox-preflight") < script.indexOf("stage=native-http-mcp"));
   assert.doesNotMatch(script, /--no-sandbox|chmod 4755|sysctl|setenforce/);
