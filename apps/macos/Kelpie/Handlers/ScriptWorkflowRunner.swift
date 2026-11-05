@@ -8,6 +8,7 @@ final class ScriptWorkflowRunner {
     private var owner: String?
     private var started: TimeInterval = 0
     private var capture: ScriptCapture?
+    private var markerRetiree: ScriptMarkerRetiree?
     private var actionIndex = 0
     private var totalActions = 0
     private var finalizing = false
@@ -77,6 +78,8 @@ final class ScriptWorkflowRunner {
             let admitted = host.playbackState.start(totalActions: workflow.steps.count, continueOnError: false, holdSession: true)
             host.router.browserLease.end()
             guard admitted else { throw ScriptWorkflowFailure("RECORDING_IN_PROGRESS") }
+            markerRetiree?.stop()
+            markerRetiree = nil
             let id = UUID().uuidString
             runID = id
             owner = grant.owner
@@ -142,10 +145,17 @@ final class ScriptWorkflowRunner {
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
         await tab.resetTargets()
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
-        presentation?.stop()
         await host.setRecordingMode(false)
         if host.playbackState.isAbortRequested(), issue == nil {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
+        }
+        if let presentation, issue == nil, capture?.hasMovies != true,
+           let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
+           let window = tab.view.window {
+            presentation.keepMarkerOnly()
+            markerRetiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end)
+        } else {
+            presentation?.stop()
         }
         if issue != nil { artifacts = artifacts.map { $0.merging(["partial": true]) { _, new in new } } }
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
