@@ -1,4 +1,6 @@
 #include "desktop_script_capture_state.h"
+#include "desktop_presentation_validity.h"
+#include <stdexcept>
 #include "kelpie/desktop_presentation_order.h"
 #include <cassert>
 #include <condition_variable>
@@ -24,6 +26,21 @@ int main() {
   assert(!kelpie::DetachedDesktopMarker(active,800.0).contains("marker"));
   active.erase("documentVersion");
   assert(!kelpie::DetachedDesktopMarker(active,300.0).contains("marker"));
+  kelpie::DesktopPresentationValidity grant([](const std::string& owner) { return owner=="owner"; });
+  assert(grant.Check("owner") && !grant.Check("other"));
+  grant.Close(); assert(!grant.Check("owner"));
+  kelpie::DesktopPresentationValidity throwing([](const std::string&) -> bool { throw std::runtime_error("failure"); });
+  assert(!throwing.Check("owner"));
+  std::mutex gate_mutex; std::condition_variable gate_cv; bool entered=false, leave=false;
+  kelpie::DesktopPresentationValidity synchronized([&](const std::string&) {
+    std::unique_lock lock(gate_mutex); entered=true; gate_cv.notify_all();
+    gate_cv.wait(lock,[&] { return leave; }); return true;
+  });
+  std::thread check([&] { assert(synchronized.Check("owner")); });
+  { std::unique_lock lock(gate_mutex); gate_cv.wait(lock,[&] { return entered; }); }
+  std::thread close([&] { synchronized.Close(); });
+  { std::lock_guard lock(gate_mutex); leave=true; } gate_cv.notify_all();
+  check.join(); close.join(); assert(!synchronized.Check("owner"));
   std::uint64_t revision=0;
   assert(kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{2}}},revision));
   assert(!kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{1}}},revision));

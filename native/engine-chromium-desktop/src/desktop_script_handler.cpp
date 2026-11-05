@@ -33,9 +33,7 @@ DesktopScriptHandler::DesktopScriptHandler(DesktopEngine& engine, DesktopRouter&
     : impl_(std::make_unique<Impl>(engine, router, std::move(config))) {}
 DesktopScriptHandler::~DesktopScriptHandler() {
   RequestLocalAbort();
-  std::lock_guard lock(impl_->presentation_validity->mutex);
-  impl_->presentation_validity->alive = false;
-  impl_->presentation_validity->revalidate = {};
+  impl_->presentation_validity->Close();
 }
 void DesktopScriptHandler::RequestLocalAbort() {
   std::lock_guard lock(impl_->mutex);
@@ -323,9 +321,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   auto valid = [validity,presentation_owner,cancellation,revoked] {
     const auto gate=validity.lock();
     if (!gate) return false;
-    std::lock_guard lock(gate->mutex);
-    if (!gate->alive || cancellation->load() || revoked->load() || !gate->revalidate) return false;
-    try { if (gate->revalidate(presentation_owner)) return true; } catch (...) {}
+    if (cancellation->load() || revoked->load()) return false;
+    if (gate->Check(presentation_owner)) return !cancellation->load() && !revoked->load();
     revoked->store(true);
     return false;
   };
