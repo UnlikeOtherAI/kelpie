@@ -664,3 +664,22 @@ The native blue marker was not found. The first poll reported a visible target
 height of 1794 px, while the post-response WebView measured 1631 px. This
 supports investigating layout change but does not identify the exact retirement
 branch. Phone PNG/next-run and all tablet retirement cases remain open.
+
+With the active/immersive layout split, API 35 phone no-capture and
+screenshots-only public final-marker tests passed. The screenshots-only marker
+was centered at (418.69, 508.21) in target [262,430,577,588]; its retained PNG
+SHA-256 is 7e872eafe75b6e3851be8d1e29d6414843f276772653399ebb8f557e2d88abb1.
+The native Stop test passed with WebView frame (0,63,1080,1631) before, during
+and after. The no-capture screenshot was overwritten by the next case; its
+instrumentation assertion remains, but its image is not retained. The separate
+input test failed before execution because its generic test Activity was not
+declared. Phone explicit-PNG and movie controls remain unrun.
+
+The tablet no-capture public workflow succeeded but its final native marker was
+not detected. First poll was 239 ms after polling began; the final first-draw
+log and post-response WebView both reported 2560 by 1266 pixels. The final
+rejected image SHA-256 is 17506523d5156337cce349e9c36fc3ac859064c8673f2ff7b0ee2cedb6e99400.
+This does not establish the reason for retirement. Tablet PNG, Stop and movie
+cases remain open. Both runs used app SHA-256
+4c412fc82eadfe8daf8246235f8456e6b4735b76c689a5bc375dd93d8985f84e and test
+SHA-256 7169e038d25de9f3c73fcbc67c3c7ac3e97642e839c181ba3b75a32329b62cec.
