@@ -56,6 +56,10 @@ try{
  assert.equal(pinned.path.replaceAll("\\","/").toLowerCase(),exe.replaceAll("\\","/").toLowerCase());
  assert.ok(Date.parse(pinned.startTime)>=Date.parse(started)-1000);
  report.identity={...pinned,source:manifest.source,launchId:readiness.launchId,port:28420,hashes:manifest};
+ const nativeInfo=await (await fetch("http://127.0.0.1:28420/v1/get-device-info",{method:"POST",headers:{authorization:"Bearer "+readiness.token,"content-type":"application/json"},body:"{}",signal:AbortSignal.timeout(10000)})).json();
+ const cmakeSource=(await run("git",["show",manifest.source+":apps/windows/CMakeLists.txt"])).stdout;
+ const expectedVersion=/project\(kelpie_windows VERSION ([0-9.]+)/.exec(cmakeSource)?.[1];
+ assert.ok(expectedVersion);assert.equal(nativeInfo.version,expectedVersion);report.nativeVersion=nativeInfo.version;
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
  if(mode==="edit-diagnostic" || mode==="edit-regression"){
   await childCase("post-edit privacy and focus viewport diagnostic","probe-post-edit-sensitivity.mjs",[readinessFile,join(evidenceRoot,"post-edit.json"),mode==="edit-regression"?"expect-fixed":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
@@ -72,6 +76,12 @@ try{
   [cli,alias,cliHome,readinessFile,join(evidenceRoot,"alias")],{KELPIE_CAPTURE_SOURCE:manifest.source});
  await childCase("three artifact protocols","run-artifact-protocol-acceptance.mjs",
   [readinessFile,identityFile,join(evidenceRoot,"protocols")]);
+ for(const [name,file,output,expectation] of [
+  ["focus privacy regression","probe-sensitive-focus.mjs","privacy-focus.json","expect-refused"],
+  ["post-input privacy and viewport regression","probe-post-edit-sensitivity.mjs","post-edit.json","expect-fixed"],
+  ["realm retirement privacy","probe-sensitive-realm.mjs","realm.json"],
+  ["active artifact publication across three protocols","probe-active-artifact-publication.mjs","publication.json"]
+ ])await childCase(name,file,[readinessFile,join(evidenceRoot,output),...(expectation?[expectation]:[])],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }
 }catch(error){
  report.checks.push({name:"owned API flow",passed:false,error:error.message});process.exitCode=1;

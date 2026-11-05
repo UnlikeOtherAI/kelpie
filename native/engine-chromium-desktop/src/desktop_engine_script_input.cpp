@@ -49,7 +49,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     ~CleanupOnExit() { if(mouse || keys) QueueRelease(impl,lease); }
   } cleanup{impl_,lease,native_pressed,native_keys};
   Json target;
-  const auto inspect = [&]() -> BrowserControlResult {
+  const auto inspect = [&](bool privacy_only=false) -> BrowserControlResult {
     const auto remaining = RemainingTimeout(began, timeout);
     if (remaining <= Timeout::zero()) return DeadlineExceeded();
     char* raw = kelpie_browser_script_target_expression(options.dump().c_str());
@@ -66,6 +66,13 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     if(output && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
     if (!read.ok) return read;
     if(!ScriptTargetInspectionExplicit(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
+    if(privacy_only && !ScriptTargetInspectionUncertain(target)) {
+      // Input already completed. A changed type/rectangle cannot undo it; this
+      // final observation classifies privacy without repeating pre-input gates.
+      if(target.value("sensitive",false) && options.value("policy",Json::object()).value("refuseSensitive",false))
+        return BrowserControlResult::Failure(target.value("error",std::string("SENSITIVE_CAPTURE_REFUSED")),"Sensitive edit cannot expose captures");
+      return BrowserControlResult::Success();
+    }
     if (!target.value("ok", false))
       return BrowserControlResult::Failure(target.value("error", std::string("TARGET_FAILED")), "Target preflight refused input");
     if(ScriptTargetInspectionUncertain(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable classification");
@@ -145,7 +152,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     result = send("Input.insertText", {{"text", action.at("text")}});
     if (!result.ok) return fail(result);
     // The trusted input handler may change sensitivity before returning.
-    result=inspect();
+    result=inspect(true);
     if(!result.ok) return fail(result);
   }
   if (output) { const bool sensitive=output->value("sensitive",false); *output = {{"sensitive",sensitive},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
