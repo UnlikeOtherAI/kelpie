@@ -182,21 +182,44 @@ final class ScriptPresentation {
         ScriptOverlayDrawing.path(from: start, to: end, progress: progress, curve: curve)
     }
 
-    func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
-ScriptOverlayDrawing.draw(in: graphics, size: size, viewport: canvas.bounds.size, pointer: pointer, marker: marker, now: held ? heldTime : ProcessInfo.processInfo.systemUptime, flipped: flipped)
-        if let commentary, !commentary.isEmpty {
-            graphics.saveGState()
-            if flipped { graphics.translateBy(x: 0, y: size.height); graphics.scaleBy(x: 1, y: -1) }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: max(12, size.width / 80)),
-                .foregroundColor: NSColor.white
-            ]
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: commentary, attributes: attributes))
-            graphics.setFillColor(CGColor(gray: 0, alpha: 0.8))
-            graphics.fill(CGRect(x: 8, y: 8, width: max(0, size.width - 16), height: 40))
-            graphics.textPosition = CGPoint(x: 16, y: 22)
-            CTLineDraw(line, graphics)
-            graphics.restoreGState()
+    struct Frame {
+        let viewport: CGSize
+        let pointer: CGPoint?
+        let marker: Marker?
+        let commentary: String?
+        let time: TimeInterval
+
+        func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
+            ScriptOverlayDrawing.draw(in: graphics, size: size, viewport: viewport, pointer: pointer, marker: marker, now: time, flipped: flipped)
+            if let commentary, !commentary.isEmpty {
+                graphics.saveGState()
+                if flipped { graphics.translateBy(x: 0, y: size.height); graphics.scaleBy(x: 1, y: -1) }
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: max(12, size.width / 80)),
+                    .foregroundColor: NSColor.white
+                ]
+                let line = CTLineCreateWithAttributedString(NSAttributedString(string: commentary, attributes: attributes))
+                graphics.setFillColor(CGColor(gray: 0, alpha: 0.8))
+                graphics.fill(CGRect(x: 8, y: 8, width: max(0, size.width - 16), height: 40))
+                graphics.textPosition = CGPoint(x: 16, y: 22)
+                CTLineDraw(line, graphics)
+                graphics.restoreGState()
+            }
+
         }
+    }
+
+    func frame() -> Frame {
+        Frame(
+            viewport: canvas.bounds.size,
+            pointer: pointer,
+            marker: marker,
+            commentary: commentary,
+            time: held ? heldTime : ProcessInfo.processInfo.systemUptime
+        )
+    }
+
+    func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
+        frame().draw(in: graphics, size: size, flipped: flipped)
     }
 }
