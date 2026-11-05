@@ -46,6 +46,10 @@ try{
   socket.addEventListener("message",event=>{const msg=JSON.parse(event.data);if(msg.id&&pending.has(msg.id)){const [ok,bad,timer]=pending.get(msg.id);
     clearTimeout(timer);pending.delete(msg.id);msg.error?bad(Error(JSON.stringify(msg.error))):ok(msg.result);}});
   const call=(method,params={})=>new Promise((ok,bad)=>{const id=++next;const timer=setTimeout(()=>{pending.delete(id);bad(Error(method+" deadline"));},5000);pending.set(id,[ok,bad,timer]);socket.send(JSON.stringify({id,method,params}));});
+  await until(async()=>{
+    const state=await call("Runtime.evaluate",{expression:"document.readyState==='complete'&&!!document.querySelector('#edit')",returnByValue:true});
+    return state.result.value===true;
+  },15000);
   const tree=await call("Page.getFrameTree");
   const frameId=tree.frameTree.frame.id;
   mainContext=(await call("Page.createIsolatedWorld",{frameId,worldName:"kelpie-proof"})).executionContextId;
