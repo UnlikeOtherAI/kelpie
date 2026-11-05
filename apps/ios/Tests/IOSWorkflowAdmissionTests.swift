@@ -16,6 +16,42 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles() throws {
+        let manager = FileManager.default
+        let base = manager.temporaryDirectory.appendingPathComponent("ios-capture-cleanup-" + UUID().uuidString)
+        let real = base.appendingPathComponent("real")
+        let alias = base.appendingPathComponent("alias")
+        let directory = real.appendingPathComponent("run")
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: base) }
+        try manager.createSymbolicLink(at: alias, withDestinationURL: real)
+        let retained = alias.appendingPathComponent("run/retained.png")
+        let discarded = directory.appendingPathComponent("unpublished.png")
+        let bytes = Data([1, 3, 5, 7])
+        try bytes.write(to: retained)
+        try Data([2, 4]).write(to: discarded)
+        let entries = try manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        XCTAssertFalse(entries.contains(retained), "The test must use different path spellings")
+        let run = UUID().uuidString
+        let manifest = try ScriptArtifactStore.shared.add(url: retained, runID: run, mimeType: "image/png", owner: "owner")
+        let id = try XCTUnwrap(manifest["id"] as? String)
+        let request: Body = ["runId": run, "artifactId": id, "offset": 0, "length": 4]
+
+        IOSCaptureCleanup.prune(directory: directory, retaining: [retained])
+        let owned = ScriptArtifactStore.shared.read(request, owner: "owner")
+        XCTAssertEqual(owned["data"] as? String, bytes.base64EncodedString())
+        XCTAssertEqual((ScriptArtifactStore.shared.read(request, owner: "foreign")["error"] as? Body)?["code"] as? String,
+                       "ARTIFACT_NOT_FOUND")
+        XCTAssertFalse(manager.fileExists(atPath: discarded.path))
+
+        // Privacy discard publishes no files: the retained set is empty.
+        IOSCaptureCleanup.prune(directory: directory, retaining: [])
+        XCTAssertFalse(manager.fileExists(atPath: directory.path))
+        XCTAssertEqual((ScriptArtifactStore.shared.read(request, owner: "owner")["error"] as? Body)?["code"] as? String,
+                       "ARTIFACT_READ_FAILED")
+    }
+
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {
         XCTAssertEqual(try IOSBoundWorkflow(workflow([tap])).steps.count, 1)
         for session in ["unknown-session", "other-owner-session"] {

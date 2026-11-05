@@ -33,6 +33,7 @@ def selection(scope):
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
+            targets.append("KelpieTests/IOSWorkflowAdmissionTests/testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles")
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
@@ -47,6 +48,8 @@ def selection(scope):
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
     if scope != "full":
         required.update(methods)
+        if scope == "diagnostics":
+            required.add("testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles")
     return targets, required
 
 
