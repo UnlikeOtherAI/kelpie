@@ -188,8 +188,12 @@ gateway. A native device advertises them only with its fixed-reader capability.
 Native workflow bindings use generated shared assets through
 `kelpie_browser_validate_script(script_json)` for strict schema validation/defaults and
 `kelpie_browser_script_target_expression(options_json)` for a fixed target expression.
-The latter accepts `{target,key,token?,dispatch?,edit?,observe?}` with mutually exclusive
-operations. These internal APIs do not resolve host secrets or authorize a workflow;
+The latter accepts `{target,key,token?,dispatch?,edit?,observe?,policy?}` with mutually exclusive
+operations. Optional private `policy:{refuseSensitive:boolean}` is the seventh fixed
+resolver argument; omitted policy preserves the six-argument behavior. Every explicit
+result carries token-latched `sensitive:boolean`, including failed checks. Capture
+runners set the policy and consume classification before post-evaluation guards,
+register edit text, and latch media discard. See [late sensitivity](../plans/browser-automation-capture/late-sensitive-target.md). These internal APIs do not resolve host secrets or authorize a workflow;
 the runner must enforce session ownership, binding and sensitivity/capture policy.
 Generated Zod/native parity fixtures include duplicate capture-format refusals.
 
