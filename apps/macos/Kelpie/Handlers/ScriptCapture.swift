@@ -121,17 +121,36 @@ final class ScriptCapture {
                 let fps = fps
                 let url = directory.appendingPathComponent("capture.gif")
                 let budget = budget
-                let deadline = ProcessInfo.processInfo.systemUptime + 45
                 let playback = tab.playback
+                let finalization = ScriptCaptureFinalization(
+                    started: ProcessInfo.processInfo.systemUptime, alreadyAborted: playback.isAbortRequested()
+                )
                 let result = try await Task.detached(priority: .utility) {
-try ScriptImageEncoder.gif(frames: frames, fps: fps, endSeconds: end, to: url, budget: budget, shouldContinue: { ProcessInfo.processInfo.systemUptime < deadline && !playback.isAbortRequested() })
+                    try ScriptImageEncoder.gif(
+                        frames: frames,
+                        fps: fps,
+                        endSeconds: end,
+                        to: url,
+                        budget: budget,
+                        shouldContinue: {
+                            finalization.allows(now: ProcessInfo.processInfo.systemUptime, isAborted: playback.isAbortRequested())
+                        }
+                    )
                 }.value
                 var info = metadata
                 info["frameCount"] = result.frameCount
                 info["durationMs"] = result.durationMs
                 info["partial"] = partial || failure != nil || result.partial
                 candidates.append((url, "image/gif", info))
-                if result.partial { failure = "CAPTURE_BYTE_LIMIT" }
+                if result.partial {
+                    if playback.isAbortRequested() {
+                        failure = "SCRIPT_ABORTED"
+                    } else if ProcessInfo.processInfo.systemUptime >= finalization.deadline {
+                        failure = "CAPTURE_FINALIZATION_LIMIT"
+                    } else {
+                        failure = "CAPTURE_BYTE_LIMIT"
+                    }
+                }
             } catch { failure = Self.code(error) }
         }
         if discard {
@@ -203,7 +222,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         try await tab.check()
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
-        if let initialViewport, initialViewport != viewport { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+        if let initialViewport, !initialViewport.sameGeometry(as: viewport) { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
         initialViewport = viewport
         let document = try await tab.documentIdentity()
         if let firstDocument {

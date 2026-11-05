@@ -6,3 +6,17 @@ enum ScriptCaptureDeadline {
         stopped || (elapsed.isFinite && elapsed >= 0 && elapsed <= maximum)
     }
 }
+
+struct ScriptCaptureFinalization: Sendable {
+    let alreadyAborted: Bool
+    let deadline: TimeInterval
+
+    init(started: TimeInterval, alreadyAborted: Bool) {
+        self.alreadyAborted = alreadyAborted
+        deadline = started + (alreadyAborted ? 2 : 45)
+    }
+
+    func allows(now: TimeInterval, isAborted: Bool) -> Bool {
+        now < deadline && (alreadyAborted || !isAborted)
+    }
+}

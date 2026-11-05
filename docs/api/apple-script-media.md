@@ -70,3 +70,11 @@ Fixed mutating reader dispatch checks the authoritative recording gate and the p
 The source checkpoint passed SwiftLint, parsing of the actual shared gateway/router sources and the production policy's standalone tests, including named/generic strict admission, unchanged legacy path, unrelated mutation refusal, recording/retirement gates and actual artifact-store foreign-owner denial. Reproduce the focused policy test with bash scripts/testing/apple-script-gateway.sh. Real compiled iOS/macOS HTTP/MCP flows and native Stop remain separate acceptance requirements.
 
 Normal MP4 completion additionally requires the segmented sink frame count to equal every submitted sample after AVAssetWriter finishes. A mismatch rolls back the owned file; a bounded valid budget prefix remains eligible as partial. The standalone codec suite rechecked single-frame, sparse, dropped-buffer, full and bounded-prefix cases on macOS after this guard.
+
+## macOS current-surface admission
+
+Chromium script capture uses the current renderer surface without a CDP clip, preserving normal scrolling and page scale. Native backing viewports above 8192 pixels on either axis or 8,388,608 total pixels are refused before dispatch. The source PNG allowance is separately capped at 68 MiB with a derived base64 limit; metadata and byte limits precede bounded ImageIO thumbnail decoding. Export remains within requested maxWidth and 1920 maximum height. These source/protocol buffers, the queued-frame budget, per-frame GIF scratch and retained-artifact cap are separate limits, not one total memory budget.
+
+Document page origin participates in frame coherence, while CSS visual offsets remain the pointer transform. A scroll during an individual snapshot refuses that mixed frame; legal scrolling between samples does not count as resizing. Pinned Chromium source and independent headless pixel evidence are recorded in the [macOS plan](../plans/browser-automation-capture/macos.md#current-surface-snapshot-correction-and-bounded-source-admission); exact native CEF acceptance remains separate.
+
+Mac GIF finalization that begins with an existing abort has a two-second prefix-retention grace. A new abort interrupts normal finalization between frames. Abort, finalization timeout and byte exhaustion remain distinct fixed outcomes, with terminal failed/aborted manifests marked partial.
