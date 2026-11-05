@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureMcp } from "./capture-mcp.mjs";
+import { runPacedCases } from "./capture-paced-cases.mjs";
 import { downloadArtifacts } from "./capture-artifact-download.mjs";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
@@ -136,69 +137,7 @@ try {
     assert.equal(result.success,true,JSON.stringify(result));
     assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
   });
-  await check("paced fill emits trusted Unicode scalars with intervals", async () => {
-    await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=paced value=old>';window.__paced=[];" +
-      "document.querySelector('#paced').oninput=e=>window.__paced.push({data:e.data,time:performance.now(),trusted:e.isTrusted});return true})()";
-    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",{...workflow([{action:"fill",target:{selector:"#paced"},text:"A😀B",typingDelayMs:120}]),
-      capture:{formats:["gif","screenshots"],fps:15,maxWidth:640,maxDurationMs:12000,maxBytes:8388608}});
-    assert.equal(result.success,true,JSON.stringify(result));
-    const events=(await api("evaluate",{tabId,expression:"window.__paced"})).result;
-    const inserted=events.filter(event=>event.data!==null);
-    assert.deepEqual(inserted.map(event=>event.data),["A","😀","B"]);
-    assert.ok(inserted.every(event=>event.trusted===true));
-    assert.ok(inserted[1].time-inserted[0].time>=90 && inserted[2].time-inserted[1].time>=90);
-    assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#paced').value"})).result,"A😀B");
-    assert.ok(result.artifacts.some(item=>item.mimeType==="image/gif"));
-    assert.ok(result.artifacts.some(item=>item.mimeType==="image/png"));
-    await download(result);
-    return {events:events.length,intervals:[inserted[1].time-inserted[0].time,inserted[2].time-inserted[1].time]};
-  });
-  await check("empty paced type validates without focus or input", async () => {
-    await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=empty-paced>';window.__emptyFocus=0;window.__emptyInput=0;" +
-      "const e=document.querySelector('#empty-paced');e.onfocus=()=>window.__emptyFocus++;e.oninput=()=>window.__emptyInput++;return true})()";
-    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",{...workflow([{action:"type",target:{selector:"#empty-paced"},text:"",typingDelayMs:1000}]),
-      capture:{formats:["screenshots"],maxWidth:640}});
-    assert.equal(result.success,true,JSON.stringify(result));
-    assert.ok(result.artifacts.some(item=>item.mimeType==="image/png"));
-    assert.deepEqual((await api("evaluate",{tabId,expression:"[window.__emptyFocus,window.__emptyInput]"})).result,[0,0]);
-    await download(result);
-  });
-  await check("paced typing stops on focus drift without refocus", async () => {
-    await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=drift><input id=other>';window.__drift=[];" +
-      "document.querySelector('#drift').oninput=e=>{window.__drift.push(e.data);document.querySelector('#other').focus()};return true})()";
-    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",workflow([{action:"type",target:{selector:"#drift"},text:"ABC",typingDelayMs:100}]));
-    assert.equal(result.success,false);assert.equal(result.mayHaveCompleted,true);
-    assert.equal(result.error?.code,"INPUT_UNCERTAIN");
-    assert.deepEqual((await api("evaluate",{tabId,expression:"window.__drift"})).result,["A"]);
-    assert.equal((await api("evaluate",{tabId,expression:"document.activeElement.id"})).result,"other");
-    assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
-  });
-  await check("paced edit sensitivity change discards capture", async () => {
-    await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=paced-secret>';window.__pacedSecret=0;" +
-      "document.querySelector('#paced-secret').oninput=e=>{window.__pacedSecret++;e.currentTarget.type='password'};return true})()";
-    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
-    const result=await api("play-script",{...workflow([{action:"type",target:{selector:"#paced-secret"},text:"ABC",typingDelayMs:100}]),
-      capture:{formats:["gif","screenshots"],fps:15,maxWidth:640,maxDurationMs:12000,maxBytes:8388608}});
-    assert.equal(result.success,false);assert.equal(result.mayHaveCompleted,true);
-    assert.equal(result.error?.code,"SENSITIVE_CAPTURE_REFUSED");
-    assert.deepEqual(result.artifacts,[]);
-    assert.equal((await api("evaluate",{tabId,expression:"window.__pacedSecret"})).result,1);
-  });
-  await check("paced plan rejects excess duration before any action", async () => {
-    await navigate();
-    assert.equal((await api("evaluate",{tabId,expression:"window.__planned=0;document.querySelector('#unique').onclick=()=>window.__planned++;true"})).success,true);
-    const result=await api("play-script",workflow([click("Confirm order"),
-      {action:"type",target:{selector:"#unique"},text:"x".repeat(62),typingDelayMs:1000}]));
-    assert.equal(result.success,false);assert.equal(result.error?.code,"INVALID_PACED_TYPING");
-    assert.equal((await api("evaluate",{tabId,expression:"window.__planned"})).result,0);
-  });
+  await runPacedCases({check,navigate,api,workflow,download,click,tabId});
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],
     ["Covered action", "TARGET_OBSCURED"], ["Hidden action", "TARGET_NOT_FOUND"]]) {
     await check("safe refusal " + name, async () => {

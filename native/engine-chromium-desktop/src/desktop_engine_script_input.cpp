@@ -105,7 +105,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     if (remaining <= Timeout::zero()) return DeadlineExceeded();
     Json ignored;
     dispatched = true;
-    auto result=RunDevTools(impl_,lease,method,params,&ignored,remaining,[impl=impl_,lease,&cancelled] {
+    auto result=RunDevTools(impl_,lease,method,params,&ignored,remaining,[impl=impl_,lease,cancelled] {
       return IsDialogOpen(impl,lease) || (cancelled && cancelled());
     });
     if(result.error_code=="INTERRUPTED") {
