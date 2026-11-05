@@ -2,19 +2,31 @@
 // Direct owned GNOME diagnostic: never records readiness credentials or raw logs.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { control, rawRequest, bearerHeaders } from "../windows/lib/http.mjs";
 import { startBrowser, stopBrowser, delay } from "../windows/lib/process.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
 import { runGtkStop } from "./gtk-stop.mjs";
+import { verifyOwnedListener } from "./worker-comparison-listener.mjs";
 
 const [binaryArg, expectedHash, outputArg] = process.argv.slice(2);
 assert.ok(binaryArg && /^[a-f0-9]{64}$/.test(expectedHash ?? "") && outputArg);
 assert.equal(process.env.GDK_BACKEND, "wayland");
+assert.equal(expectedHash, "6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c");
+assert.equal(process.env.KELPIE_CAPTURE_SOURCE, "c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2");
+assert.match(process.env.KELPIE_TEST_REVISION ?? "", /^[a-f0-9]{40}$/);
+assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", timeout: 5000 }).trim(),
+  process.env.KELPIE_TEST_REVISION);
+execFileSync("git", ["diff", "--quiet"], { timeout: 5000 });
+execFileSync("git", ["diff", "--cached", "--quiet"], { timeout: 5000 });
 const binary = await realpath(resolve(binaryArg)), output = resolve(outputArg);
+const worktree = await realpath(process.cwd()), parent = await realpath(resolve(output, ".."));
+const parentRelative = relative(worktree, parent);
+assert.ok(parentRelative !== ".." && !parentRelative.startsWith(".." + sep) && !isAbsolute(parentRelative));
 await mkdir(output, { recursive: false, mode: 0o700 });
-const runtime = await mkdtemp("/tmp/kelpie-direct-gtk-");
+const runtime = await mkdtemp(join(output, ".private-runtime-"));
 const profile = join(runtime, "profile");
 await mkdir(profile, { mode: 0o700 });
 const readinessPath = join(profile, "readiness.json");
@@ -24,7 +36,8 @@ const report = { source: process.env.KELPIE_CAPTURE_SOURCE, testSource: process.
   binarySHA256: digest, stages: [], cleanup: "not-started" };
 const stage = name => report.stages.push({ name, elapsedMs: Math.round(performance.now() - began) });
 const began = performance.now();
-let browser, identity, readiness, failed = false;
+let browser, identity, readiness, verified = false, acknowledged = false, failed = false;
+const verify = () => verifyOwnedListener(identity.pid, readiness.port, identity.startTicks);
 const cancel = new AbortController();
 const deadline = setTimeout(() => cancel.abort(), 150000);
 try {
@@ -54,15 +67,19 @@ try {
   const current = await readNativeIdentity(identity.pid);
   if (!current || current.startTicks !== identity.startTicks ||
       await realpath("/proc/" + identity.pid + "/exe") !== binary) throw Error("identity_mismatch");
+  await verify();
+  verified = true;
   report.identity = { pid: identity.pid, startTicks: identity.startTicks, port: readiness.port };
   stage("ready");
   try { await control(readiness, "get-device-info"); } catch { throw Error("http_failure"); }
   stage("http");
+  await verify();
   const mcp = await rawRequest({ port: readiness.port, path: "/mcp", headers: bearerHeaders(readiness.token),
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize",
       params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "direct-gtk-diagnostic", version: "1" } } }) });
   if (mcp.status !== 200 || !mcp.json?.result?.serverInfo) throw Error("mcp_failure");
   stage("mcp");
+  await verify();
   try {
     const result = await runGtkStop({ readiness, identity, binary, hash: digest, output,
       env: process.env, signal: cancel.signal, sanitizeFailure: true });
@@ -84,11 +101,15 @@ try {
       bindOrPermission: /address already in use|permission denied|eacces|eaddrinuse/i.test(stderr),
       profileOrReadiness: /profile|readiness/i.test(stderr), library: /shared librar|cannot open shared/i.test(stderr),
       other: stderr.length > 0 };
-    report.exit = { code: browser.child.exitCode, signal: browser.child.signalCode };
+
     try {
-      await stopBrowser(browser, { gracefulClose: readiness ? () => control(readiness, "close-browser") : undefined,
+      await stopBrowser(browser, { gracefulClose: verified ? async () => {
+        await verify();
+        const result = await control(readiness, "close-browser");
+        assert.equal(result.accepted, true); acknowledged = true;
+      } : undefined,
         timeoutMs: 10000 });
-      if (!readiness) { report.cleanup = "owned-process-only"; failed = true; }
+      if (!acknowledged) { report.cleanup = "owned-process-only"; failed = true; }
       else {
         await waitForNativeRetirement(identity);
         await verifyClosedSocket(readiness.port);
@@ -97,9 +118,12 @@ try {
         report.cleanup = "public-close-and-retirement";
       }
     } catch { report.cleanup = "failed"; failed = true; }
+    report.exit = { code: browser.child.exitCode, signal: browser.child.signalCode };
   }
   const remaining = identity ? await readNativeIdentity(identity.pid) : undefined;
-  if (!remaining || remaining.startTicks !== identity.startTicks) {
+  const retired = identity ? (!remaining || remaining.startTicks !== identity.startTicks)
+    : !browser?.child.pid || browser.child.exitCode !== null || browser.child.signalCode !== null;
+  if (retired) {
     await rm(runtime, { recursive: true, force: true });
     report.privateRuntimeRemoved = true;
   } else {
