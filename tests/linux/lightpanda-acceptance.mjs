@@ -91,9 +91,12 @@ try {
   browser = await chromium.connectOverCDP(endpoint, { timeout: 5000 });
   report.timingsMs.startup = performance.now() - launched; report.browserVersion = browser.version();
   const a = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false }); contexts.push(a);
-  const b = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false }); contexts.push(b);
-  const page = await a.newPage(), other = await b.newPage();
-  page.setDefaultTimeout(3000); other.setDefaultTimeout(3000);
+  const page = await a.newPage(); page.setDefaultTimeout(3000);
+  let other;
+  const multiplePages = await check("multiple pages in one owned context", async () => {
+    other = await a.newPage(); other.setDefaultTimeout(3000);
+    return { pages: a.pages().length };
+  });
   const navigation = await check("cold navigation/title/url", async () => {
     await page.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
     assert.equal(await page.title(), "Kelpie capture acceptance"); assert.equal(page.url(), fixture.url);
@@ -109,11 +112,23 @@ try {
     const values = await evaluate(page, "Array.from(document.querySelectorAll('#catalogue h3'),el=>el.textContent.trim())");
     assert.deepEqual(values, ["Green tea", "Black tea"]); return { values };
   });
-  const isolation = await check("isolated cookies and storage", async () => {
+  await check("set synthetic cookie and local storage", async () => {
+    assert.equal(await evaluate(page, "document.cookie='lp_owned=one';localStorage.setItem('lp_owned','one');true"), true);
+    report.previousStateSet = true; return { syntheticStateSet: true };
+  });
+  const isolation = await check("concurrent isolated contexts (expected backend limit if refused)", async () => {
+    const b = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false }); contexts.push(b);
+    const isolated = await b.newPage();
+    await isolated.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
+    const value = await evaluate(isolated, "({cookie:document.cookie,storage:localStorage.getItem('lp_owned')})");
+    assert.ok(!value.cookie.includes("lp_owned=one")); assert.equal(value.storage, null);
+    await b.close(); return { isolated: true };
+  });
+  report.concurrentIsolatedContextsSupported = isolation;
+  if (other) await check("explicit same-context storage sharing", async () => {
     await other.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
-    await evaluate(page, "document.cookie='lp_owned=one';localStorage.setItem('lp_owned','one');true");
     const value = await evaluate(other, "({cookie:document.cookie,storage:localStorage.getItem('lp_owned')})");
-    assert.ok(!value.cookie.includes("lp_owned=one")); assert.equal(value.storage, null); return { isolated: true };
+    assert.ok(value.cookie.includes("lp_owned=one")); assert.equal(value.storage, "one"); return { shared: true };
   });
   for (const [kind, options] of [
     ["snapshot", { maxChars: 1024, maxElements: 20, prioritize: true }],
@@ -140,16 +155,25 @@ try {
     await page.goForward({ timeout: 3000 }); assert.equal(page.url(), next);
     report.verifiedMethods.push("tab.back", "tab.forward"); return { history: true };
   });
-  await check("reload", async () => { await other.reload({ timeout: 3000 }); assert.equal(await other.title(), "Kelpie capture acceptance"); report.verifiedMethods.push("tab.reload"); });
-  const methods = [...new Set(["tabs.list", "tabs.new", "tabs.close", ...report.verifiedMethods])];
+  await check("reload", async () => { const target = other ?? page; await target.reload({ timeout: 3000 }); assert.equal(await target.title(), "Kelpie capture acceptance"); report.verifiedMethods.push("tab.reload"); });
+  await a.close();
+  const automation = await browser.newContext({ serviceWorkers: "block", acceptDownloads: false }); contexts.push(automation);
+  const borrowed = await automation.newPage();
+  await check("close then new context storage isolation", async () => {
+    assert.equal(report.previousStateSet, true);
+    await borrowed.goto(fixture.url, { waitUntil: "domcontentloaded", timeout: 5000 });
+    const value = await evaluate(borrowed, "({cookie:document.cookie,storage:localStorage.getItem('lp_owned')})");
+    assert.ok(!value.cookie.includes("lp_owned=one")); assert.equal(value.storage, null); return { sequentialIsolation: true };
+  });
+  const methods = [...new Set(["tabs.list", "tabs.close", ...(multiplePages ? ["tabs.new"] : []), ...report.verifiedMethods])];
   const make = async isolation => {
     const session = await allocateManagedBrowserSession({ browser, backend: "lightpanda", owner: "fixture-operator", authorize() {},
-      options: { isolation, ttlMs: 60000 }, verifiedLightpandaMethods: methods,
+      options: { isolation, ttlMs: 60000 }, sharedContext: automation, verifiedLightpandaMethods: methods,
       network: { boundary: "operator-enforced", allowNavigation: url => url.origin === origin } });
     sessions.push(session); return session;
   };
-  const managed = isolation && await check("managed owned tabs/refusal/borrowed sibling lifecycle", async () => {
-    const first = await make("isolated"), second = await make("isolated");
+  const managed = await check("managed owned tabs/refusal/borrowed sibling lifecycle", async () => {
+    const first = await make("shared"), second = await make("shared");
     for (const session of [first, second]) {
       const tabId = session.describe().ownedTabIds[0];
       assert.equal((await session.transport.call({ version: 1, method: "tab.goto", tabId, params: { url: fixture.url } })).ok, true);
@@ -161,11 +185,12 @@ try {
     const foreign = await first.transport.call({ version: 1, method: "tab.title", tabId: second.describe().ownedTabIds[0], params: {} });
     assert.equal(foreign.ok, false); assert.equal(foreign.error.code, "TAB_NOT_FOUND");
     await first.close();
-    assert.equal(await other.title(), "Kelpie capture acceptance");
+    assert.equal(await borrowed.title(), "Kelpie capture acceptance");
     const owned = await second.transport.call({ version: 1, method: "tabs.list", params: {} }); assert.equal(owned.value.length, 1);
     await second.close(); return { methods, screenshot: "refused", foreign: "refused", sibling: "preserved" };
   });
-  if (managed) await check("production CLI stdio reachable restricted profile", async () => {
+  if (managed && process.env.KELPIE_LP_ALLOW_PUBLIC_VERIFIED === "1") await check("production CLI stdio reachable restricted profile", async () => {
+    await automation.close();
     const root = resolve(new URL("../../", import.meta.url).pathname);
     const bin = join(root, "packages/cli/bin/kelpie.js");
     const version = JSON.parse(await readFile(join(root, "packages/cli/package.json"), "utf8")).version;
@@ -185,7 +210,7 @@ try {
       const result = await client.callTool({ name, arguments: request });
       return JSON.parse(result.content.find(item => item.type === "text").text);
     };
-    const created = await call("kelpie_worker_session", { request: { action: "create", options: { isolation: "isolated", ttlMs: 10000 } } });
+    const created = await call("kelpie_worker_session", { request: { action: "create", options: { isolation: "shared", ttlMs: 10000 } } });
     assert.equal(created.ok, true);
     const session = created.value, tabId = session.ownedTabIds[0];
     const command = (method, params = {}) => call("kelpie_browser_control", { sessionId: session.sessionId, request: { version: 1, method, tabId, params } });
@@ -194,7 +219,7 @@ try {
     assert.equal((await command("tab.screenshot")).error.code, "UNSUPPORTED");
     assert.equal((await call("kelpie_worker_session", { request: { action: "close", sessionId: session.sessionId } })).ok, true);
     await bounded(client.close(), 3000); client = undefined;
-    assert.ok(await alive(lp.pid)); assert.equal(await other.title(), "Kelpie capture acceptance"); assert.deepEqual(errors, []);
+    assert.ok(await alive(lp.pid)); const peer = await browser.newContext(); await peer.close(); assert.deepEqual(errors, []);
     return { version, stdoutProtocol: "clean", borrowedEndpoint: "preserved", methods };
   });
   report.resources = { memoryPeak: (await readFile(cgroup + "/memory.peak", "utf8")).trim(), cpu: (await readFile(cgroup + "/cpu.stat", "utf8")).trim() };

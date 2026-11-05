@@ -146,3 +146,24 @@ worker-boundary-journal-report.txt, worker-boundary-journal-unit.txt and
 worker-boundary-baseline.json. Future corpus execution must use the verified
 journal transport, retain the exact unit identity and recheck teardown. Runtime
 execution remains subject to the coordinator's functional-workload slot.
+
+## Initial actual binary result, 5 November2026
+
+The official1.0.2 Linux asset matched76408136 bytes and SHA-256
+ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e.
+Its version command reported1.0.2 and Playwright1.62.1 connected over CDP inside
+the verified resource/egress service. Exact corpus source1a182318d09ce81452d466e36b9cd893af14b6ce
+then encountered a definite refusal on the second new browser context:
+Cannot have more than one browser context at a time.
+
+That failure happened before navigation/read tasks and is retained in the
+denominator. No text/extraction/public profile is inferred from the handshake.
+The owned LP process exited and the transient unit was collected with MainPID0.
+Service totals were1.477s wall,1.402s CPU and187MiB peak on the contended host;
+these include setup and are not a comparison with Chromium.
+
+Root authorized one further diagnostic run with a single owned context, separate
+concurrent-context refusal, close-then-new storage checks and explicit shared
+owned tabs. The source now continues those diagnostics instead of abandoning
+independent reader facts at context allocation. Production stdio profile
+advertisement remains gated off unless a later operator verification is approved.
