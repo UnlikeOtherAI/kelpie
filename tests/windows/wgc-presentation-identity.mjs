@@ -16,3 +16,14 @@ export function presentationCaptureExecutable(identity){
  assert.ok(typeof identity.executable==="string"&&/^[a-z]:\\/i.test(identity.executable)&&!identity.executable.includes("/"));
  return identity.executable;
 }
+
+export function safeUiaFailure(error){
+ const reasons=new Map([
+  ["InvalidOperationException: Exactly one visible owned target window is required","owned-window-unavailable"],
+  ["InvalidOperationException: Candidate executable/session identity mismatch","process-session-mismatch"],
+  ["InvalidOperationException: Candidate start-time identity mismatch","process-start-mismatch"],
+  ["InvalidOperationException: UIA test requires interactive Session1","wrong-session"]
+ ]);
+ return {category:reasons.get(String(error.stderr??"").trim())??"uia-other",
+  code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed===true};
+}

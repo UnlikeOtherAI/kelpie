@@ -9,7 +9,7 @@ import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/sha
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
 import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
-import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable} from "./wgc-presentation-identity.mjs";
+import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable,safeUiaFailure} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
@@ -29,7 +29,7 @@ const home=join(privateRoot,"cli-home"),profile=join(privateRoot,"profile");
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:"--max-old-space-size=2048"};
 const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:true,timeout,maxBuffer:2097152});
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
-const uiaRun=async args=>JSON.parse((await run(uia,args,10000)).stdout);
+const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
 const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
 let fixture,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,monitorStop=false,monitor;
@@ -70,17 +70,17 @@ try{
  assert.equal((await cliRun(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile])).success,true);
  const started=new Date().toISOString();report.phase="launch";
  assert.equal((await cliRun(["browser","launch",alias,"--port","28420"])).success,true);launched=true;
- const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));running=store.running[alias];assert.ok(running?.pid&&running.port===28420);
+ report.phase="readiness";const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));running=store.running[alias];assert.ok(running?.pid&&running.port===28420);
  readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
  report.phase="pin";identity=await uiaRun(["pin",String(running.pid),exe,started]);
  assert.equal(identity.processId,running.pid);assert.equal(identity.sessionId,1);
- const sockets=(await run(join(process.env.WINDIR,"System32/netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/).map(line=>line.trim().split(/\s+/)).filter(parts=>parts[1]==="127.0.0.1:28420"&&parts[3]==="LISTENING");
+ report.phase="socket";const sockets=(await run(join(process.env.WINDIR,"System32/netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/).map(line=>line.trim().split(/\s+/)).filter(parts=>parts[1]==="127.0.0.1:28420"&&parts[3]==="LISTENING");
  assert.ok(sockets.length>0&&sockets.every(parts=>Number(parts[4])===running.pid));
- assert.equal((await api("get-device-info")).success,true);
- const tabs=await api("get-tabs"),tabId=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(tabId);
- assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);
- assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
- const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
+ report.phase="device-info";assert.equal((await api("get-device-info")).success,true);
+ report.phase="tabs";const tabs=await api("get-tabs"),tabId=tabs.tabs.find(tab=>tab.active)?.id;assert.ok(tabId);
+ report.phase="navigate";assert.equal((await api("navigate",{tabId,url:fixture.url})).success,true);
+ report.phase="fixture-ready";assert.equal((await api("play-script",{version:1,tabId,actions:[{action:"wait-ready",state:"complete"}]})).success,true);
+ report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
  const config={...scene,curve,pointerMs:motionProfile==="fast"?350:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
@@ -150,6 +150,6 @@ try{
   if(identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:identity.startTime});assert.equal(report.processExit.exited,true);}
   let readinessAbsent=false;try{await access(running.readinessFile);}catch{readinessAbsent=true;}
   const store=JSON.parse(await readFile(join(home,"browsers.json"),"utf8"));assert.ok(readinessAbsent&&!store.running[alias]);report.cleanup="supported-cli-closed";
- }catch{report.cleanup="failed";process.exitCode=1;}}
+ }catch(error){report.cleanup="failed";report.cleanupFailure=error.safeDetails??{category:"cleanup-failed",code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed===true};process.exitCode=1;}}
  if(fixture)await fixture.close();await save();
 }
