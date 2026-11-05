@@ -66,6 +66,7 @@ test("semantic target resolves the center of its visible viewport portion", () =
   assert.equal(result.ok, true);
   assert.equal(result.x, 10);
   assert.equal(result.y, 50);
+  assert.deepEqual(result.visualViewport, { offsetLeft: 0, offsetTop: 0, width: 800, height: 600, scale: 1 });
 });
 
 test("dispatch stops uncertain after captured descendant is replaced", () => {
@@ -147,6 +148,8 @@ test("visual viewport clips layout CSS center and refuses offscreen coordinates"
   f.element.rect = { x: 350, y: 30, width: 200, height: 40 };
   const result = resolveScriptTarget({ selector: "#target" }, "acceptance");
   assert.equal(result.ok, true); assert.equal(result.x, 375); assert.equal(result.width, 50);
+  assert.deepEqual(result.visualViewport, { offsetLeft: 100, offsetTop: 0, width: 300, height: 300, scale: 2 });
+  assert.equal(result.viewportWidth, 800); assert.equal(result.viewportHeight, 600);
   assert.equal(resolveScriptTarget({ x: 450, y: 50 }, "acceptance").error, "TARGET_OUTSIDE_VIEWPORT");
 });
 

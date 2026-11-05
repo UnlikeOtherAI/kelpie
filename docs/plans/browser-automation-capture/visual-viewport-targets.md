@@ -33,7 +33,11 @@ coordinates. It captures all five visual fields,including scale,in the internal
 token and checks them before input and after synchronous dispatch/focus.
 Missing visualViewport falls back to layout bounds. Invalid/nonfinite viewport
 metrics refuse safely. Public result viewportWidth/Height stay layout dimensions;
-the six-argument generated-reader ABI is unchanged.
+the six-argument generated-reader ABI is unchanged. The internal success result
+also projects visualViewport:{offsetLeft,offsetTop,width,height,scale} from the
+same captured token frame. Thin native adapters map layout CSS points using
+(point-offset)/visibleSize times owned renderer bounds. Caller request schemas
+accept no viewport authority or metric overrides; this adds no public endpoint.
 
 The same actual Chromium case now resolves center375,width50,refuses the
 offscreen target and rejects the old token as VIEWPORT_CHANGED. Focused11-node
