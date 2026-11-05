@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 const MAX_HEADER=4096,MAX_PIXELS=640*1600,MAX_PAYLOAD=MAX_PIXELS*4,MAX_FRAMES=520;
+export function expectedAnalysisSize(sourceWidth,sourceHeight){
+ assert.ok(Number.isInteger(sourceWidth)&&sourceWidth>0&&Number.isInteger(sourceHeight)&&sourceHeight>0,"WGC_ANALYSIS_SIZE");
+ const scale=Math.min(1,640/sourceWidth,1920/sourceHeight);
+ assert.ok(sourceWidth*scale>=2&&sourceHeight*scale>=2,"WGC_ANALYSIS_SIZE");
+ const width=Math.max(2,Math.floor(sourceWidth*scale/2)*2),height=Math.max(2,Math.floor(sourceHeight*scale/2)*2);
+ assert.ok(width<=640&&height<=1600,"WGC_ANALYSIS_SIZE");return {width,height};
+}
 // The async consumer imposes backpressure; no frame backlog is accumulated.
 export async function consumeWgcFrames(stream,onFrame){
  let parts=[],held=0,need=8,state="prefix",headerLength=0,payloadLength=0,metadata,count=0,lastTick=-1,firstTick=-1,lastReceipt=-1,shape;
@@ -24,8 +31,9 @@ export async function consumeWgcFrames(stream,onFrame){
     assert.equal(metadata.sourceStride,metadata.sourceWidth*4,"WGC_SOURCE_STRIDE");
     assert.ok(Number.isInteger(metadata.width)&&metadata.width>0&&metadata.width<=640);
     assert.ok(Number.isInteger(metadata.height)&&metadata.height>0&&metadata.height<=1600);
-    assert.equal(metadata.width,Math.min(640,metadata.sourceWidth),"WGC_ANALYSIS_WIDTH");
-    assert.ok(Math.abs(metadata.height-Math.round(metadata.sourceHeight*metadata.width/metadata.sourceWidth))<=1,"WGC_ANALYSIS_HEIGHT");
+    const expected=expectedAnalysisSize(metadata.sourceWidth,metadata.sourceHeight);
+    assert.equal(metadata.width,expected.width,"WGC_ANALYSIS_WIDTH");
+    assert.equal(metadata.height,expected.height,"WGC_ANALYSIS_HEIGHT");
     assert.equal(payloadLength,metadata.width*metadata.height*4,"WGC_PAYLOAD_SIZE");
     assert.ok(["straight","premultiplied"].includes(metadata.alphaMode),"WGC_ALPHA_MODE");
     const current=[metadata.width,metadata.height,metadata.sourceWidth,metadata.sourceHeight,metadata.alphaMode].join(":");

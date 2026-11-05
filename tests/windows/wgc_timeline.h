@@ -1,5 +1,17 @@
 #pragma once
+#include <algorithm>
 // Test-only timeline mode. Owner and the WGC aliases are defined by the caller.
+struct TimelineDimensions {int width,height;};
+// Match the independently specified export canvas, preserving raw snapshots.
+inline TimelineDimensions TimelineAnalysisSize(int sourceWidth,int sourceHeight) {
+  if(sourceWidth<=0||sourceHeight<=0)throw std::runtime_error("WGC_ANALYSIS_SIZE");
+  const double scale=std::min({1.0,640.0/sourceWidth,1920.0/sourceHeight});
+  if(sourceWidth*scale<2||sourceHeight*scale<2)throw std::runtime_error("WGC_ANALYSIS_SIZE");
+  const int width=std::max(2,static_cast<int>(sourceWidth*scale)/2*2);
+  const int height=std::max(2,static_cast<int>(sourceHeight*scale)/2*2);
+  if(width>640||height>1600)throw std::runtime_error("WGC_ANALYSIS_SIZE");
+  return {width,height};
+}
 struct TimelineState {
   std::mutex mutex;std::condition_variable changed;
   Direct3D11CaptureFrame latest{nullptr};std::uint64_t receipt=0,replaced=0;
@@ -118,9 +130,8 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   const auto size=capture.item.Size();
   if(size.Width<=0||size.Height<=0||size.Width>4096||size.Height>4096||
      static_cast<std::uint64_t>(size.Width)*size.Height>2097152)throw std::runtime_error("WGC_TIMELINE_PIXEL_BOUND");
-  const int width=std::min(640,size.Width);
-  const int height=static_cast<int>((static_cast<std::int64_t>(size.Height)*width+size.Width/2)/size.Width);
-  if(height<=0||height>1600)throw std::runtime_error("WGC_ANALYSIS_SIZE");
+  const auto dimensions=TimelineAnalysisSize(size.Width,size.Height);
+  const int width=dimensions.width,height=dimensions.height;
   capture.pool=Direct3D11CaptureFramePool::CreateFreeThreaded(projected,winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,2,size);
   capture.session=capture.pool.CreateCaptureSession(capture.item);capture.session.IsCursorCaptureEnabled(false);
   capture.session.IncludeSecondaryWindows(false);if(!capture.session.IsBorderRequired())throw std::runtime_error("WGC_BORDER_REQUIRED");
