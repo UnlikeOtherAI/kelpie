@@ -65,8 +65,6 @@ jobs:
             [[ "$CHROMIUM_BINARY_SHA256" =~ ^[a-f0-9]{64}$ ]]
           fi
           pnpm install --frozen-lockfile
-          pnpm --filter @unlikeotherai/kelpie-shared build
-          pnpm --filter @unlikeotherai/kelpie build
           node --test tests/linux/worker-comparison-result.test.mjs tests/linux/worker-comparison-policy.test.mjs tests/linux/worker-comparison-listener.test.mjs tests/linux/worker-comparison-workflow.test.mjs
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/testing/test_extract_worker_chromium.py
           node -e 'const p=require("./node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/browsers.json");const c=p.browsers.find(x=>x.name==="chromium");if(c.revision!=="1234"||c.browserVersion!=="151.0.7922.34")process.exit(1)'
@@ -102,6 +100,12 @@ jobs:
             [[ "$archive_sha" == "$CHROMIUM_ARCHIVE_SHA256" ]]
             [[ "$binary_sha" == "$CHROMIUM_BINARY_SHA256" ]]
           fi
+      - name: Build comparison CLI and shared packages
+        if: inputs.prepare_only == false
+        shell: bash
+        run: |
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          pnpm --filter @unlikeotherai/kelpie build
       - name: Compare in separately bounded loopback-only units
         if: inputs.prepare_only == false
         shell: bash

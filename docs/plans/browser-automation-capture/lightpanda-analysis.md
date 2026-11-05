@@ -350,12 +350,12 @@ not start benchmark units. An explicitly enabled measurement requires the
 previously reviewed archive and executable hashes and rejects a mismatch.
 
 The existing dispatchable `lint.yml` can call the reusable workflow on the
-reviewed integration ref. Set `worker_comparison_prepare` for identity
-preparation. A later reviewed measurement uses `worker_comparison_execute`
-and both `worker_comparison_*_sha256` inputs; if both booleans are set,
-preparation takes precedence. The new workflow can also be dispatched
-directly once present on the default branch. Downloads, package setup and
-build occur before the measured units.
+reviewed integration ref. Set `worker_comparison_mode` to `prepare` for
+identity preparation; the default `off` does nothing. A later reviewed
+measurement sets the mode to `execute` and supplies both
+`worker_comparison_*_sha256` inputs. The new workflow can also be dispatched
+directly once present on the default branch. Downloads and package setup occur
+before measured units; CLI and shared bundles are built only for execution.
 After a reviewed dispatch, `scripts/testing/run-worker-comparison-hosted.sh`
 runs the arms sequentially as the same non-root user in separate systemd units
 on one host: one CPU, 2 GiB, 256 tasks, 120 seconds,

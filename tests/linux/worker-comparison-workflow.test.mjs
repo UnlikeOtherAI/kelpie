@@ -10,6 +10,12 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  assert.match(workflow,/if: inputs\.prepare_only == false/);
  assert.match(workflow,/\[\[ "\$archive_sha" == "\$CHROMIUM_ARCHIVE_SHA256" \]\]/);
  assert.match(workflow,/\[\[ "\$binary_sha" == "\$CHROMIUM_BINARY_SHA256" \]\]/);
- assert.match(caller,/prepare_only: \$\{\{ !inputs\.worker_comparison_execute \|\| inputs\.worker_comparison_prepare \}\}/);
+ assert.match(caller,/prepare_only: \$\{\{ inputs\.worker_comparison_mode != 'execute' \}\}/);
+ assert.match(caller,/worker_comparison_mode:[\s\S]*?type: choice[\s\S]*?default: 'off'/);
+ const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
+ assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
+ assert.match(build,/^\s*if: inputs\.prepare_only == false/m);
+ assert.match(build,/pnpm --filter @unlikeotherai\/kelpie-shared build/);
+ assert.match(build,/pnpm --filter @unlikeotherai\/kelpie build/);
  assert.doesNotMatch(corpus,/--no-sandbox/);
 });
