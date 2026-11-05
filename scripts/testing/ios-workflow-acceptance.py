@@ -39,6 +39,7 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
@@ -62,6 +63,7 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
             ])
     return targets, required
 

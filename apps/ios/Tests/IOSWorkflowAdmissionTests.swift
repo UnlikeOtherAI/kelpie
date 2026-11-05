@@ -163,6 +163,20 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         withExtendedLifetime(store) {}
     }
 
+    func testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions() throws {
+        let enabled = IOSBoundWorkflow.deviceCapabilities(videoAvailable: true)
+        let disabled = IOSBoundWorkflow.deviceCapabilities(videoAvailable: false)
+        let actions = try XCTUnwrap(enabled["supportedActions"] as? [String])
+        XCTAssertEqual(actions, ["assert", "click", "commentary", "extract", "fill", "navigate", "output",
+                                 "screenshot", "scroll", "tap", "type", "wait", "wait-ready"])
+        XCTAssertFalse(actions.contains("press-key"))
+        XCTAssertEqual(enabled["captureFormats"] as? [String], ["gif", "screenshots", "video"])
+        XCTAssertEqual(disabled["captureFormats"] as? [String], ["gif", "screenshots"])
+        XCTAssertEqual(enabled["nativeSessions"] as? Bool, false)
+        XCTAssertEqual((enabled["webMcp"] as? Body)?["available"] as? Bool, false)
+        XCTAssertEqual((enabled["lightpanda"] as? Body)?["available"] as? Bool, false)
+    }
+
     func testPointerDefaultAndExplicitDurationUseSharedContract() throws {
         let defaulted = try IOSBoundWorkflow(workflow([tap], ["pointer": ["enabled": true]]))
         let normal = try XCTUnwrap(defaulted.settings["pointer"] as? Body)

@@ -10,6 +10,18 @@ struct IOSBoundWorkflow {
     static let capabilities: Body = [
         "success": true, "supportedVersions": [1], "inputGuarantee": "synthetic-coordinate"
     ]
+    static func deviceCapabilities(videoAvailable: Bool) -> Body {
+        [
+            "supportedVersions": [1],
+            "inputGuarantee": "synthetic-coordinate",
+            "supportedActions": actions.sorted(),
+            "captureFormats": ["gif", "screenshots"] + (videoAvailable ? ["video"] : []),
+            "nativeSessions": false,
+            "webMcp": ["available": false, "reason": "No registered real API and explicit host grant"],
+            "lightpanda": ["available": false, "reason": "Desktop orchestration backend"]
+        ]
+    }
+
     let settings: Body
     let steps: [Body]
     let tabID: String

@@ -68,6 +68,21 @@ final class WorkflowCaptureUITests: XCTestCase {
     func testInitialOwnedHTTPNavigationLoadsFixture() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
+        let httpCapabilities = try await probe.request("/v1/get-capabilities", [:])
+        let mcpCapabilities = try await probe.call("kelpie_get_capabilities", [:])
+        let httpWorkflow = try XCTUnwrap(httpCapabilities["scriptWorkflow"] as? Body)
+        let mcpWorkflow = try XCTUnwrap(mcpCapabilities["scriptWorkflow"] as? Body)
+        XCTAssertTrue((httpWorkflow as NSDictionary).isEqual(to: mcpWorkflow))
+        XCTAssertEqual(httpWorkflow["supportedActions"] as? [String],
+                       ["assert", "click", "commentary", "extract", "fill", "navigate", "output",
+                        "screenshot", "scroll", "tap", "type", "wait", "wait-ready"])
+        XCTAssertEqual(httpWorkflow["nativeSessions"] as? Bool, false)
+        XCTAssertEqual(httpWorkflow["inputGuarantee"] as? String, "synthetic-coordinate")
+        let formats = Set(try XCTUnwrap(httpWorkflow["captureFormats"] as? [String]))
+        XCTAssertTrue(Set(["gif", "screenshots"]).isSubset(of: formats))
+        XCTAssertTrue(formats.isSubset(of: Set(["gif", "screenshots", "video"])))
+        XCTAssertEqual((httpWorkflow["webMcp"] as? Body)?["available"] as? Bool, false)
+        XCTAssertEqual((httpWorkflow["lightpanda"] as? Body)?["available"] as? Bool, false)
         let result = try await probe.request("/v1/play-script", [
             "version": 1, "tabId": tab, "actions": [["action": "output", "name": "title", "source": "title"]]
         ])
