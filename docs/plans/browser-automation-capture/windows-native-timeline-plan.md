@@ -136,3 +136,18 @@ document before and after the run. A fixture event ID cannot establish this
 binding by itself. If the public contract cannot exclude intervening navigation
 or bind the active run to native document provenance, report insufficient
 evidence rather than assigning the page-supplied ID as authority.
+
+## Capture-free helper verification
+
+On Maxis, source revision aab3c236 compiled the C++ helper with /W4 /WX
+and the UI Automation helper with /warn:4 /warnaserror under separate
+one-CPU, 2 GiB jobs. The C++ buffer and bounded-stream self-tests passed;
+the bounded-writer test replaced one pending frame and stopped in 2041 ms.
+The first C# invocation failed because its relative source path was resolved
+incorrectly; the absolute-path retry passed. Both receipts are retained in
+D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/wgc-timeline-aab3.
+
+The helper hashes are 247bfd425aecc614d898846fb4d1ac3deb33088448ce9e4361f91028cf14c0b9
+(C++) and fbfaa6d364d68260d90dda27dc632d62485a4f479e7d083a0960c2efe1ecb780
+(C#). The 23 focused Node checks passed. This is capture-free verification;
+the public orchestration and native timeline have not yet been exercised.
