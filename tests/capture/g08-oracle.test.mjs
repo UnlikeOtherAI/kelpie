@@ -12,14 +12,14 @@ function render(config,mode){
   for(let timeMs=0;timeMs<=6400;timeMs+=50){
     const bytes=Buffer.alloc(width*height*3,255);
     const phase=Math.max(0,Math.min(1,(timeMs-200)/config.pointerMs));
-    let p=scriptPointerPosition(config,mode==="noease"?inverse(phase):phase);
+    let p=scriptPointerPosition(mode==="wrongcurve"?{...config,curve:"s"}:config,mode==="noease"?inverse(phase):phase);
     if(mode==="straight")p={x:config.from.x+(config.to.x-config.from.x)*phase,y:config.from.y};
     p={x:p.x*scale.x,y:p.y*scale.y};
     const progress=(timeMs-2800)/(mode==="wrongduration"?config.markerMs*.65:config.markerMs);
     if(progress>=0&&(progress<1||mode==="stuck")){
       const tap=scriptTapPresentation(progress,mode!=="nowobble",true);
       const alpha=(["stuck","nofade"].includes(mode)?1:tap.alpha)*(mode==="opaque"?1:mode==="wrongopacity"?.85:(config.baseAlpha??0.7)),radius=config.radius*scale.x*tap.scale;
-      const channels=config.color.match(/[a-f0-9]{2}/gi).map(value=>parseInt(value,16));
+      const channels=(mode==="wrongcolor"?"#0000ff":config.color).match(/[a-f0-9]{2}/gi).map(value=>parseInt(value,16));
       for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(Math.hypot(x-center.x,y-center.y)<=radius){
         const i=(y*width+x)*3;for(let c=0;c<3;c++)bytes[i+c]=Math.round(255*(1-alpha)+channels[c]*alpha);
       }
@@ -38,7 +38,7 @@ for(const curve of ["c","s"])for(const palette of [false,true])for(const baseAlp
     assert.equal(result.passed,true);assert.ok(result.motionSamples>=18);
   });
 }
-for(const mode of ["straight","noease","nowobble","nofade","stuck","wrongduration","opaque","wrongopacity"]){
+for(const mode of ["straight","noease","nowobble","nofade","stuck","wrongduration","opaque","wrongopacity","wrongcurve","wrongcolor"]){
   test("pixel negative rejects "+mode,()=>{
     const config={...base,curve:"c"};
     assert.throws(()=>evaluateG08(render(config,mode),config),/G08_|INSUFFICIENT/);
