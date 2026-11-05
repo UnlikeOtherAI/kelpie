@@ -19,7 +19,7 @@ void EnsureGdi() {
     return value; }(); (void)token;
 }
 }
-ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,double elapsed_ms) {
+ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,double elapsed_ms,ScriptFrameSourceSize* source_size) {
   if(encoded.size()>67108864) throw std::runtime_error("CAPTURE_FRAME_TOO_LARGE");
   DWORD size=0;
   if(!CryptStringToBinaryA(encoded.data(),static_cast<DWORD>(encoded.size()),CRYPT_STRING_BASE64,nullptr,&size,nullptr,nullptr))
@@ -33,6 +33,7 @@ ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,doub
   ComPtr<IWICBitmapFrameDecode> source; Check(decoder->GetFrame(0,&source));
   UINT width=0,height=0; Check(source->GetSize(&width,&height));
   if(!width||!height||width>16384||height>16384||static_cast<std::uint64_t>(width)*height>8388608) throw std::runtime_error("CAPTURE_FRAME_TOO_LARGE");
+  if(source_size) *source_size={static_cast<int>(width),static_cast<int>(height)};
   const double scale=std::min({1.0,static_cast<double>(max_width)/width,1920.0/height});
   if(width*scale<2 || height*scale<2) throw std::runtime_error("CAPTURE_VIEWPORT_UNSUPPORTED");
   ScriptMediaFrame frame; frame.width=std::max(2,static_cast<int>(width*scale)/2*2);
@@ -52,11 +53,22 @@ void DrawScriptOverlay(ScriptMediaFrame& frame,const nlohmann::json& shown) {
   Gdiplus::Bitmap bitmap(frame.width,frame.height,frame.stride,PixelFormat32bppPARGB,frame.bgra.data());
   if(bitmap.GetLastStatus()!=Gdiplus::Ok) throw std::runtime_error("CAPTURE_OVERLAY_FAILED");
   Gdiplus::Graphics graphics(&bitmap); graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+  const auto visual=shown.value("visualViewport",nlohmann::json::object());
   const float width=static_cast<float>(shown.value("viewportWidth",static_cast<double>(frame.width)));
   const float height=static_cast<float>(shown.value("viewportHeight",static_cast<double>(frame.height)));
-  graphics.ScaleTransform(frame.width/std::max(1.0f,width),frame.height/std::max(1.0f,height));
+  const float visible_width=visual.value("width",width),visible_height=visual.value("height",height);
+  const float offset_x=visual.value("offsetLeft",0.0f),offset_y=visual.value("offsetTop",0.0f);
+  const float scale=visual.value("scale",1.0f);
+  if(!std::isfinite(width)||!std::isfinite(height)||width<=0||height<=0||
+     !std::isfinite(visible_width)||!std::isfinite(visible_height)||visible_width<=0||visible_height<=0||
+     !std::isfinite(offset_x)||!std::isfinite(offset_y)||!std::isfinite(scale)||scale<=0||
+     !std::isfinite(frame.width/width*scale)||!std::isfinite(frame.height/height*scale))
+    throw std::runtime_error("CAPTURE_OVERLAY_FAILED");
+  // The full renderer includes classic scrollbars; visualViewport.width does
+  // not. Preserve the full-layout base scale, then apply the observed pinch.
+  graphics.ScaleTransform(frame.width/width*scale,frame.height/height*scale);
   if(shown.contains("pointer")) {
-    const auto& point=shown["pointer"]; const float x=point.value("x",0.0f),y=point.value("y",0.0f);
+    const auto& point=shown["pointer"]; const float x=point.value("x",0.0f)-offset_x,y=point.value("y",0.0f)-offset_y;
     Gdiplus::PointF points[]={{x,y},{x+5,y+19},{x+10,y+12},{x+18,y+10}};
     Gdiplus::SolidBrush fill(Gdiplus::Color(255,255,255,255)); Gdiplus::Pen edge(Gdiplus::Color(255,0,0,0),1.5f);
     graphics.FillPolygon(&fill,points,4); graphics.DrawPolygon(&edge,points,4);
@@ -71,9 +83,11 @@ void DrawScriptOverlay(ScriptMediaFrame& frame,const nlohmann::json& shown) {
       unsigned long color=0x3B82F6; try { color=std::stoul(marker.value("color",std::string("#3B82F6")).substr(1),nullptr,16); } catch(...) {}
       const BYTE alpha=static_cast<BYTE>(178*state.alpha);
       Gdiplus::SolidBrush fill(Gdiplus::Color(alpha,static_cast<BYTE>(color>>16),static_cast<BYTE>(color>>8),static_cast<BYTE>(color)));
-      const float x=marker.value("x",0.0f),y=marker.value("y",0.0f); graphics.FillEllipse(&fill,x-radius,y-radius,2*radius,2*radius);
+      const float x=marker.value("x",0.0f)-offset_x,y=marker.value("y",0.0f)-offset_y; graphics.FillEllipse(&fill,x-radius,y-radius,2*radius,2*radius);
     }
   }
+  graphics.ResetTransform();
+  graphics.ScaleTransform(frame.width/width,frame.height/height);
   if(shown.contains("commentary")) {
     const auto& note=shown["commentary"];
     if(elapsed-note.value("startedMs",elapsed)<note.value("durationMs",3000.0)) {

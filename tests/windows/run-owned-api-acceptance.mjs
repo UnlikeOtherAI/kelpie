@@ -8,7 +8,7 @@ import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 const [exe,cli,privateRoot,evidenceRoot,manifestFile,mode="full"]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,evidenceRoot,manifestFile].every(value=>value&&isAbsolute(value)));
-assert.ok(mode==="full"||mode==="fixture");
+assert.ok(mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
 const execute=promisify(execFile),tests=dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(await readFile(manifestFile,"utf8"));
 for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(manifest[key],/^[a-f0-9]{64}$/);
@@ -57,7 +57,9 @@ try{
  assert.ok(Date.parse(pinned.startTime)>=Date.parse(started)-1000);
  report.identity={...pinned,source:manifest.source,launchId:readiness.launchId,port:28420,hashes:manifest};
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
- if(mode==="fixture"){
+ if(mode==="privacy-focus" || mode==="privacy-regression"){
+  await childCase("late sensitivity focus diagnostic","probe-sensitive-focus.mjs",[readinessFile,join(evidenceRoot,"privacy-focus.json"),mode==="privacy-regression"?"expect-refused":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
+ }else if(mode==="fixture"){
   await childCase("native fixture preparation diagnosis","probe-script-fixture.mjs",[readinessFile,join(evidenceRoot,"fixture.json")]);
  }else{
  await childCase("native full script capture corpus","run-script-capture-acceptance.mjs",

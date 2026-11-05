@@ -1,4 +1,5 @@
 #include "desktop_script_runtime.h"
+#include "desktop_script_coordinates.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/response_helpers.h"
@@ -9,8 +10,9 @@
 
 namespace kelpie {
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Target(
-    TabLease lease, const Json& target, const std::string& token, bool observe) {
+    TabLease lease, const Json& target, const std::string& token, bool observe, bool refuse_sensitive) {
   Json options = {{"target", target}, {"key", target_key}, {"dispatch", false}, {"observe", observe}};
+  options["policy"]={{"refuseSensitive",refuse_sensitive}};
   if (!token.empty()) options["token"] = token;
   char* raw = kelpie_browser_script_target_expression(options.dump().c_str());
   if (!raw) return {{"ok", false}, {"error", "INVALID_TARGET"}};
@@ -19,7 +21,13 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Target(
   if (generated.is_discarded() || !generated.contains("expression")) return {{"ok", false}, {"error", "INVALID_TARGET"}};
   Json value;
   const auto result = engine.EvaluateBrowserControl(lease, generated.at("expression"), &value, std::chrono::seconds(5));
-  return result.ok ? value : Json{{"ok", false}, {"error", result.error_code}, {"mayHaveCompleted", result.operation_may_have_completed}};
+  const bool unknown=ScriptTargetInspectionUncertain(value);
+  if(result.ok && !unknown) return value;
+  if(!value.is_object()) value=Json::object();
+  value["ok"]=false; value["error"]=result.ok?"TARGET_INSPECTION_INVALID":result.error_code;
+  value["mayHaveCompleted"]=result.operation_may_have_completed;
+  value["inspectionUncertain"]=unknown;
+  return value;
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     TabLease lease, const Json& action, const Json& script, Json* outputs, std::vector<std::string>* redactions) {
@@ -31,15 +39,17 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     return result;
   };
   if (name == "click" || name == "tap" || name == "fill" || name == "type") {
-    auto resolved = Target(lease, action.at("target"));
+    const bool capturing=script.contains("capture") || std::any_of(script["actions"].begin(),script["actions"].end(),[](const Json& item){return item["action"]=="screenshot";});
+    const auto ingest_sensitive=[&](const Json& target) {
+      if(!target.is_object()) return;
+      const bool uncertain=(name=="fill" || name=="type") && (target.value("inspectionUncertain",false) || target.value("mayHaveCompleted",false));
+      if(!target.value("sensitive",false) && !uncertain) return;
+      if(capturing) privacy_discard.store(true);
+      if(name=="fill" || name=="type") redactions->push_back(action.at("text"));
+    };
+    auto resolved = Target(lease, action.at("target"), "", false, capturing);
+    ingest_sensitive(resolved);
     if (!resolved.value("ok", false)) return failed_target(resolved);
-    const bool sensitive_capture=resolved.value("sensitive",false) && (script.contains("capture") ||
-      std::any_of(script["actions"].begin(),script["actions"].end(),[](const Json& item) {return item["action"]=="screenshot";}));
-    if(sensitive_capture) privacy_discard.store(true);
-    // Inferred sensitivity also protects outputs produced before this refusal.
-    if(resolved.value("sensitive",false) && (name=="fill" || name=="type")) redactions->push_back(action.at("text"));
-    if(sensitive_capture)
-      return ErrorResponse("SENSITIVE_CAPTURE_REFUSED","Sensitive controls cannot be edited while capturing");
     BrowserNavigationState navigation;
     const auto observed = engine.GetNavigationState(lease, &navigation, std::chrono::seconds(2));
     if (!observed.ok) return ErrorResponse(observed.error_code, "Owned document is unavailable");
@@ -55,6 +65,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
       presentation["tabId"]=lease.id; presentation["generation"]=lease.generation;
       presentation["documentVersion"] = navigation.tab.document_version;
       presentation["viewportWidth"] = resolved.at("viewportWidth"); presentation["viewportHeight"] = resolved.at("viewportHeight");
+      if(resolved.contains("visualViewport")) presentation["visualViewport"]=resolved.at("visualViewport");
+      else presentation.erase("visualViewport");
     }
     const double moved_at = Elapsed();
     do {
@@ -69,7 +81,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
       if (progress >= 1) break;
       Pause(16);
     } while (true);
-    resolved = Target(lease, action.at("target"), resolved.at("token"));
+    resolved = Target(lease, action.at("target"), resolved.at("token"), false, capturing);
+    ingest_sensitive(resolved);
     if (!resolved.value("ok", false)) return failed_target(resolved);
     bool sampling=false;
     {
@@ -95,9 +108,12 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     }
     if(Cancelled()) throw std::runtime_error("SCRIPT_STOPPED");
     Json options = {{"target", action.at("target")}, {"key", target_key}, {"token", resolved.at("token")}, {"dispatch", false}};
-    Json output;
+    options["policy"]={{"refuseSensitive",capturing}};
+    Json output=Json::object();
     lease.document_version = navigation.tab.document_version;
     const auto result = engine.DispatchScriptTarget(lease, options, action, &output, std::chrono::seconds(10));
+    if(!result.ok && result.operation_may_have_completed) output["mayHaveCompleted"]=true;
+    ingest_sensitive(output);
     if(config.invalidate) config.invalidate();
     if (!result.ok) {
       { std::lock_guard lock(mutex); presentation.erase("marker"); }
