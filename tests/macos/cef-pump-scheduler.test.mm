@@ -41,8 +41,14 @@ int main() {
                 StopPumpExperiment();
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
                     if (pumpCalls != 2) { fprintf(stderr, "callback escaped shutdown\n"); exit(1); }
-                    fprintf(stdout, "PASS: coalescing, delay replacement, no reentry, shutdown fence\n");
-                    exit(0);
+                    StartPumpExperiment();
+                    SchedulePump(20);
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+                        if (pumpCalls != 3) { fprintf(stderr, "restart generation failed\n"); exit(1); }
+                        StopPumpExperiment();
+                        fprintf(stdout, "PASS: coalescing, replacement, no reentry, shutdown and restart fences\n");
+                        exit(0);
+                    });
                 });
             });
         });

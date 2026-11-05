@@ -47,7 +47,8 @@ void SchedulePump(int64_t delay) {
             pumpTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
             dispatch_source_set_event_handler(pumpTimer, ^{
                 bool enabled;
-                { std::lock_guard<std::mutex> guard(pumpLock); enabled = pumpEnabled && !pumpHandoffPending; }
+                { std::lock_guard<std::mutex> guard(pumpLock);
+                  enabled = pumpEnabled && pumpGeneration == generation && !pumpHandoffPending; }
                 if (enabled) { RunPump(); }
             });
             dispatch_resume(pumpTimer);
