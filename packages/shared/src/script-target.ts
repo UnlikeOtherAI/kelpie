@@ -18,6 +18,7 @@ export interface ScriptTargetResult {
   enabled?: boolean;
   sensitive?: boolean;
   sensitivityKnown?: boolean;
+  focusFailure?: "document-focus" | "target-focus" | "identity" | "viewport" | "eligibility" | "budget" | "geometry" | "hit" | "sensitivity" | "unknown";
   editable?: boolean;
   focused?: boolean;
 }
@@ -27,7 +28,7 @@ export interface ScriptTargetResult {
  * Resolution stores object identity; preflight never silently retargets after animation.
  * Optional dispatch is atomic synthetic coordinate input, never advertised as trusted input.
  */
-export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string }, observe = false, policy?: { refuseSensitive: boolean }, postMutation = false): ScriptTargetResult {
+export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string; requireFocused?: boolean }, observe = false, policy?: { refuseSensitive: boolean }, postMutation = false): ScriptTargetResult {
   interface VisualViewportFrame { x: number; y: number; width: number; height: number; scale: number };
   interface Entry { sensitive?: boolean; visual: VisualViewportFrame; element: Element; document: Document; inputType?: string; readOnly?: boolean; rectX: number; rectY: number; rectWidth: number; rectHeight: number; x: number; y: number; width: number; height: number; coordinate: boolean; url: string; viewportWidth: number; viewportHeight: number };
   interface State { document: Document; documentId: string; next: number; entries: Record<string, Entry> };
@@ -234,10 +235,17 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     const el = entry.element;
     if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || el.readOnly || el.disabled ||
         (el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type))) return fail("TARGET_NOT_EDITABLE");
-    el.focus();
-    if (document.activeElement !== el || !document.hasFocus()) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false };
+    if (!edit.requireFocused) el.focus();
+    if (!document.hasFocus()) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false, focusFailure: "document-focus" };
+    if (document.activeElement !== el) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false, focusFailure: "target-focus" };
     if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
-    if (!unchanged()) return fail("INPUT_UNCERTAIN", true);
+    if (!unchanged()) {
+      const reason = !entry.element.isConnected || !hit.isConnected || entry.document !== document || entry.url !== location.href ? "identity"
+        : !unchangedViewport() ? "viewport" : !eligible(entry.element) ? "eligibility" : isLimited() ? "budget"
+        : !unchangedGeometry() ? "geometry" : document.elementFromPoint(entry.x, entry.y) !== hit ? "hit"
+        : sensitivity() && policy?.refuseSensitive ? "sensitivity" : "unknown";
+      return { ...fail("INPUT_UNCERTAIN", true), focusFailure: reason };
+    }
     try {
       const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
       const descriptor = Object.getOwnPropertyDescriptor(proto, "value");

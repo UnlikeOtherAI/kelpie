@@ -14,6 +14,16 @@ describe("strict authored workflows", () => {
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif"], fps: 31 } }).success).toBe(false);
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif", "gif"] } }).success).toBe(false);
   });
+  it("admits only bounded opt-in paced timing on fill and type", () => {
+    for (const action of ["fill", "type"]) {
+      const step = { action, target: { selector: "#edit" }, text: "A😀é", typingDelayMs: 50 };
+      expect(scriptV1Schema.safeParse({ ...script, actions: [step] }).success).toBe(true);
+      for (const invalid of [0, 1001, 1.5]) {
+        expect(scriptV1Schema.safeParse({ ...script, actions: [{ ...step, typingDelayMs: invalid }] }).success).toBe(false);
+      }
+    }
+    expect(scriptV1Schema.safeParse({ ...script, actions: [{ action: "click", target: { selector: "#edit" }, typingDelayMs: 50 }] }).success).toBe(false);
+  });
   it("uses a faster pointer default while preserving explicit durations", () => {
     const pointer = scriptV1Schema.parse({ ...script, pointer: { enabled: true } }).pointer!;
     expect(pointer).toEqual({ enabled: true, curve: "s", durationMs: 350, easing: "ease-in-out" });

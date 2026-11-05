@@ -27,6 +27,13 @@ anchors; the [open gates](outstanding-gates.md) track runtime and delivery.
   62 points from its reported target and separate viewport-change refusals.
   The cause and the later geometry fix remain unconfirmed. Treat these as
   actual failures requiring replay, not as a proven current-source defect.
+- **Paced typing with new exports:** the original recording catalogue specifies
+  character-by-character type and a configurable delayed fill mode. Mobile and
+  Mac legacy interaction paths retain this behavior, but the new native capture
+  runners are strict v1, whose type/fill schema has no pacing option and whose
+  current edit dispatch inserts the supplied string at once. An unversioned
+  legacy run does not activate the new GIF/MP4/step-PNG capture path. This is a
+  capture-path implementation gap, not evidence that timed typing is exported.
 - **Action scope:** standalone press-key is a documented native subset, not a
   required mobile implementation. Android and iOS both admit the same 13
   strict actions in source and refuse press-key; Windows/Linux admit supported
