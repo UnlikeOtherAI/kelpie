@@ -124,7 +124,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       }
       if (!target["ok"].get<bool>()) {
         uncertain();
-        return BrowserControlResult::Failure(target["error"].get<std::string>(), "Post-input classification failed");
+        return BrowserControlResult::Failure(ScriptTargetPostMutationErrorCode(target), "Post-input classification failed");
       }
       const bool known = target["sensitivityKnown"].get<bool>();
       if (!known) {
