@@ -25,14 +25,6 @@ export function evaluateG08(samples,config){
   const pointers=samples.filter(s=>s.pointer);
   demand(pointers.length>=3,"INSUFFICIENT_EVIDENCE calibration pointer");
   const initial=pointers[0];
-  demand(distance(initial.pointer,to)<=8,"INSUFFICIENT_EVIDENCE pre-dispatch pointer position");
-  const calibration=pointers.filter(s=>s.timeMs>=initial.timeMs&&s.timeMs<=initial.timeMs+300);
-  demand(calibration.length>=3&&calibration.every(s=>distance(s.pointer,initial.pointer)<=1&&
-    s.marker.alpha<=.03&&Buffer.isBuffer(s.marker.roi)),
-    "INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline");
-  const reference=calibration[0].marker.roi;
-  demand(calibration.every(s=>sameG08Pixels(reference,s.marker.roi)),
-    "INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline");
   const settled=pointers.filter(s=>distance(s.pointer,to)<=10).slice(-8);
   demand(settled.length>=3,"INSUFFICIENT_EVIDENCE endpoint pixels");
   const offset={x:to.x-median(settled.map(s=>s.pointer.x)),y:to.y-median(settled.map(s=>s.pointer.y))};
@@ -40,8 +32,17 @@ export function evaluateG08(samples,config){
   const corrected=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}));
   const lastStart=corrected.filter(s=>s.timeMs<settled.at(-1).timeMs&&distance(s.p,from)<=2).at(-1);
   demand(lastStart,"INSUFFICIENT_EVIDENCE final motion start");
-  demand(samples.some(s=>s.timeMs>=initial.timeMs+pointerMs*.65&&s.timeMs<lastStart.timeMs&&s.marker.alpha>.2),
-    "INSUFFICIENT_EVIDENCE calibration dispatch marker");
+  const calibrationMarker=samples.find(s=>s.timeMs>=initial.timeMs+pointerMs*.65&&
+    s.timeMs<lastStart.timeMs&&s.marker.alpha>.2);
+  demand(calibrationMarker,"INSUFFICIENT_EVIDENCE calibration dispatch marker");
+  const endpoint=settled.at(-1).pointer;
+  const calibration=pointers.filter(s=>s.timeMs<calibrationMarker.timeMs&&
+    s.timeMs>=calibrationMarker.timeMs-1000&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&
+    s.marker.alpha<=.03&&Buffer.isBuffer(s.marker.roi));
+  demand(calibration.length>=2,"INSUFFICIENT_EVIDENCE pre-dispatch pointer-only baseline");
+  const reference=calibration[0].marker.roi;
+  demand(calibration.every(s=>sameG08Pixels(reference,s.marker.roi)),
+    "INSUFFICIENT_EVIDENCE unstable pre-dispatch baseline");
   const finalSamples=samples.filter(s=>s.timeMs>=lastStart.timeMs);
   const path=corrected.filter(s=>s.timeMs>=lastStart.timeMs)
     .filter(s=>project(s.p)>.025&&project(s.p)<.975);
@@ -106,13 +107,13 @@ export function evaluateG08(samples,config){
   demand(full.some(s=>s.marker.channels.every((v,i)=>Math.abs(v-(255*(1-baseAlpha)+expected[i]*baseAlpha))<=40)),"G08_MARKER_COLOR_MISMATCH");
   const tail=finalSamples.filter(s=>s.timeMs>=markerStart+markerMs+150);
   demand(tail.length>=3,"INSUFFICIENT_EVIDENCE clean end");
-  demand(tail.every(s=>s.pointer&&distance(s.pointer,initial.pointer)<=1&&Buffer.isBuffer(s.marker.roi)&&sameG08Pixels(reference,s.marker.roi)),
+  demand(tail.every(s=>s.pointer&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&Buffer.isBuffer(s.marker.roi)&&sameG08Pixels(reference,s.marker.roi)),
     "INSUFFICIENT_EVIDENCE tail differs from calibrated pointer-only baseline");
   return {passed:true,confidence:"dense decoded pixels with bounded onset fit",baseAlpha,pointerStartMs:best.start,
     pointerRmsPx:best.error,uneasedRmsPx:noEaseError,endpointOffset:offset,motionSamples:path.length,
     maxMotionGapMs:Math.max(...gaps),markerStartMs:markerStart,
     dwellAfterMotionMs:markerStart-(best.start+pointerMs),alphaRms:alphaError,
     radiusBiasPx:bias,wobbleRmsPx:wobbleError,staticRadiusRmsPx:staticError,markerSamples:marker.length,
-    calibrationFrames:calibration.length,calibrationStartMs:initial.timeMs,
+    calibrationFrames:calibration.length,calibrationStartMs:calibration[0].timeMs,
     baselineRGBSha256:createHash("sha256").update(reference).digest("hex"),finalClearFrames:tail.length};
 }

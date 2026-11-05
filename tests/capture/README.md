@@ -127,7 +127,8 @@ Run `node tests/capture/g08-verify.mjs input.json fresh-output.json` with
 Node 20 or newer, the built shared package, ffmpeg and ffprobe. The verifier checks file hashes, probes dimensions
 and actual PTS, streams one RGB frame at a time, and emits per-frame measurements,
 bounded onset-fit diagnostics and failure/insufficient-evidence outcomes. The
-calibration requires stable same-position pixels before the first dispatch; the
+calibration requires at least two stable, exactly same-position frames before
+the first Finish marker appears; the
 last frames must match their bounded RGB region exactly. A codec mismatch is
 insufficient evidence, not an allowance for residual marker pixels. It
 uses the shared presentation model and a 0.7 marker opacity baseline. Retain
