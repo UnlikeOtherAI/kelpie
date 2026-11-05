@@ -234,6 +234,11 @@ void ScriptAssets() {
   const std::string expression = json::parse(encoded)["expression"];
   assert(expression.find(R"json("exact":true)json") != std::string::npos);
   kelpie_mcp_free_string(encoded);
+  target["policy"] = {{"refuseSensitive", true}};
+  encoded = kelpie_browser_script_target_expression(target.dump().c_str());
+  assert(encoded);
+  assert(json::parse(encoded)["expression"].get<std::string>().find(R"json(,{"refuseSensitive":true}))json") != std::string::npos);
+  kelpie_mcp_free_string(encoded);
   target["observe"] = true; target["dispatch"] = true;
   assert(kelpie_browser_script_target_expression(target.dump().c_str()) == nullptr);
   encoded = kelpie_browser_validate_script(nullptr);

@@ -102,6 +102,7 @@ export const scriptArtifactSchema = z.object({
 export type ScriptArtifact = z.infer<typeof scriptArtifactSchema>;
 const targetRequestBase = {
   target: scriptTargetSchema,
+  policy: z.object({ refuseSensitive: z.boolean() }).strict().optional(),
   key: z.string().min(1).max(256),
   token: z.string().min(1).max(128).optional(),
 };

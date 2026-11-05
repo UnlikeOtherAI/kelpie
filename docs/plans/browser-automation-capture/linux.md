@@ -375,3 +375,139 @@ the actual generic kelpie_extension wrapper must reconstruct identical bytes,
 hash, length, offsets, EOF and MIME. Callback fetches honor the supplied abort
 signal; the helper creates no app or authority. The fixture closes in finally.
 Node syntax/whitespace checks passed; real native transport execution is pending.
+
+## Compiled privacy/identity checkpoint, 5 November 2026
+
+Exact integrated source 3001aa4171030b241657df9e3da4e247045fc5e1 built the Linux
+app, linux_script_media_test and linux_script_artifact_test on Fedora 44. Both
+focused tests passed (2/2, 0.26 seconds), including scope/replacement revocation,
+denied-unlink cleanup retry, decoded GIF/MP4 retained prefixes, budgets and
+finalization failure. Compiler diagnostics contained no warning/error matches.
+This is native compilation/unit evidence; the new browser-level privacy,
+finalization/profile/HTTP/MCP/CLI and GTK flows are still pending.
+
+Native executable SHA-256:
+efd1b73dc8bcb557344cefd4689b327dcd1870d6d32d1c3d458f73f0a0f070f0.
+Generated browser contract SHA-256:
+a4c274fedfa14433baebcdb0b34ade0f7b19fec1e92ddb9215482d87138dd831.
+The authoritative configure graph validated the unchanged frozen lock/cache
+(33 ms, no resolution/download), rebuilt shared TypeScript and regenerated the
+contract. Existing pinned CEF/cache assets were reused; no CEF/bootstrap install
+or general portable suite ran in Fedora.
+
+Actual unit limits were one CPU/CPUWeight 1, 2 GiB, 256 tasks, 15 minutes,
+NoNewPrivileges and loopback-only egress. A process sample showed one compiler.
+Build cost was 3 minutes 55.330 seconds wall, 3 minutes 50.088 seconds CPU and
+727 MiB peak; no memory-limit increase was needed. The initial orchestration
+wrapper stripped embedded shell quotes and exited 2 at its CTest expression
+after successful compilation. That failure is retained. CTest then ran directly
+in a separate 60-second unit under the same limits and passed. Both units were
+collected, their cgroups absent, and no compiler/app/LP process remained.
+Maxis free memory was 14.88 GiB at start and 18.64 GiB after teardown.
+
+Evidence:
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/linux-native/native-3001-incremental,
+including build.log, ctest.log, unit journals/teardown, cgroup-limits.txt,
+processes.txt, generated/final hashes and actual runtime/package provenance.
+The separate common visual-viewport correction must land and relink before
+claiming the final geometry case; this build does not pre-empt that gate.
+
+## Actual offscreen replay at 3001aa41
+
+The actual native app replay completed 32 of 36 canonical checks on Fedora,
+then exited cleanly and removed readiness. Privacy refusal, earlier-output
+redaction, discarded artifact manifests, status, recovery, foreign grants,
+direct/generic MCP, native input and navigation-marker cases passed. Four
+failures remain explicit: readonly-focus uncertainty, moving-target recovery,
+the retained-byte-budget expectation and replacement during movie-evidence hold.
+Their cause is not yet established; no canonical assertion was weakened.
+
+All 27 downloaded PNG/GIF/MP4 artifacts independently decoded every frame with
+matching dimensions/counts and increasing timestamps. OSR cost was 61.460 seconds
+wall, 16.979 seconds CPU, 334.7 MiB peak; decode cost was 8.048 seconds wall,
+7.779 seconds CPU and 43.4 MiB peak under the same one-CPU/resource/egress policy.
+The OSR unit exited 1 from the failed assertions. Its app/readiness and both
+unit cgroups were cleaned; no compiler/app/LP/decoder remained.
+
+The wrapper previously asserted the canonical subprocess exit before independent
+protocol/finalization supplements, preventing those facts from being collected.
+It now runs them independently and still fails overall on canonical/supplement
+failure. An optional four-case diagnostic records actual result codes, uncertainty,
+read-only/input state, moving-target hit/recovery, encoded byte sizes and page
+replacement timing. It does not replace acceptance or enable a capability.
+Node syntax and whitespace checks passed; that diagnostic replay is pending.
+
+The first independent supplement replay verified an 802,134-byte native PNG over
+HTTP, direct MCP and generic MCP: four chunks per transport, identical SHA-256
+f4898af43ab2b72f788179b484855839fa740b8e0102792a64a4b6324f430ef7.
+Its finalization/readonly/moving probes exposed a harness assumption: semantic
+native refusals use HTTP 400 (DesktopRouter::StatusForResponse), while these
+helpers required every response to be HTTP 200. They now parse an HTTP 400 only
+when it contains success:false and a structured error code; other non-200
+statuses still fail. No production response or acceptance assertion changed.
+The byte-budget probe returned a complete 64,751-byte, ten-frame GIF below its
+150,000-byte limit, so that particular fixture did not exercise overflow.
+Replacement/click times were observed, but initial target-resolution timing was
+not; no unsafe identity conclusion follows yet. The replay's failing status,
+227.6 MiB peak and clean app/readiness teardown remain in its evidence.
+
+The corrected independent replay (native 3001aa41, test source 9b79b91e) passed
+the three-transport PNG reconstruction and the post-ACK finalization fault:
+CAPTURE_FINALIZE_FAILED, failed terminal status, one downloadable partial GIF,
+unchanged collision file and next-run recovery. The app/readiness retired.
+Readonly diagnostics showed TARGET_MOVED with mayHaveCompleted:true, no input
+events and an unchanged empty control. Moving-target setup was offscreen after
+same-URL scroll restoration (TARGET_NOT_FOUND before any action), rather than
+a completed click on a stale moving target. These facts inform fixture fixes;
+the first 32/36 result remains retained.
+
+A separate durable driver now uses the actual packaged CLI to register a fresh
+Linux alias, launch with --headless, verify exact executable/PID/start ticks and
+readiness, run the existing observation and alias MCP/recipe/secret cases, then
+stop through the public alias command. It never writes running records or copies
+grants. The checked private package is source2c4b0fb8, SHA-256
+ef4b2c77954ab4120331c88dc567b8c2b6b140dac67387ae7b26caf230e8a6b9;
+it is not a newly published release. Driver syntax passed; actual alias replay
+is the next bounded gate.
+
+The first packaged --headless alias replay passed all five public launch/MCP/
+recipe/secret cases and all ten observation cases (native3001, package2c4).
+Public stop removed readiness and its running record; service cost was16.626s
+wall/11.094s CPU/403.4MiB. It did not observe natural process/socket retirement
+before unit exit, so that stronger cleanup claim is deliberately unmade.
+The driver now waits up to8 seconds for the exact PID/start-ticks identity to
+disappear or recycle, checks the credential-free socket refuses connection, then
+checks readiness/running absence before exiting its unit. It also explicitly
+requires the offscreen catalogue to advertise the mutating play-script schema.
+Readiness format version1 is labelled separately from actual device app version
+and native MCP serverInfo. These strengthened assertions await their replay.
+
+## Durable fixture corrections prepared
+
+Windows ownership explicitly delegated the portable capture-corpus test hunks
+in this Linux worktree. Fixture navigation now performs an explicit public
+scroll reset after same-URL reload; product navigation behavior is unchanged.
+Focus-change checks keep uncertainty/no-input/no-edit and record the actual
+enumerated safe refusal reason. The GIF budget case uses the fixed 512-pixel
+RGB-noise asset, expanded to cover the native capture, with a 512 KiB cap and
+unchanged partial/recovery/sum-within-cap assertions. This forces encoder
+pressure instead of assuming a mostly-white page exceeds an estimated budget.
+
+The unsound 300 ms replacement timer is replaced by deterministic whole-target
+replacement on trusted pointerdown after movie ACK. It requires uncertainty,
+observed trusted pointerdown, no click/navigation and recovery. The distinct
+pre-input requirement has its own whitebox critical-PNG/SSE supplement below;
+the two phases are not conflated. Node syntax/whitespace checks passed. Real
+replay of these corrected cases is still pending; earlier failures remain.
+
+The before-input replacement supplement uses whitebox coordination explicitly:
+only the new owned0700 capture directory and its complete step-0.png are read.
+That critical pre-input sample proves target resolution/presentation before a
+fixed SSE command clones the target. Renderer mutation events must precede any
+pointerdown; a lost race fails setup rather than being called a product defect.
+The saved native PNG is independently decoded for the requested red marker.
+The public result must refuse with no pointerdown/click/navigation, partial
+artifacts remain downloadable/hashed, and a fresh run must recover.
+No product API, arbitrary page command or longer timing guess is added.
+The fixture command/cleanup test passed on Maxis (1/1,178ms total); module syntax
+checks passed. Real native barrier execution is pending the next exact replay.

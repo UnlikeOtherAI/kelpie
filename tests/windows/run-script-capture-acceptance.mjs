@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
+import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
 import { scriptArtifactSchema, scriptArtifactChunkSchema, scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
 
 const [readinessPath, outputPath] = process.argv.slice(2);
@@ -79,6 +80,7 @@ async function navigate() {
   const response = await api("navigate", { tabId, url: fixture.url });
   assert.equal(response.success, true, JSON.stringify(response.error));
   await delay(300);
+  assert.equal((await api("evaluate", { tabId, expression: "window.scrollTo(0,0);true" })).success, true);
 }
 try {
   const tabs = await api("get-tabs");
@@ -203,8 +205,11 @@ try {
   for(const selector of ["#focus-readonly","#focus-navigate"]) {
     await check("focus race refuses input "+selector,async()=>{
       await navigate();await reveal(selector);
+      await api("evaluate",{tabId,expression:"window.__focusInputs=0;document.querySelector("+JSON.stringify(selector)+").addEventListener('input',()=>window.__focusInputs++);true"});
       const result=await api("play-script",workflow([{action:"fill",target:{selector},text:"MUST_NOT_ENTER"}]));
       assert.equal(result.success,false);assert.equal(result.mayHaveCompleted,true);
+      assert.ok(["TARGET_MOVED","STALE_TARGET","STALE_DOCUMENT","TARGET_NOT_EDITABLE","TARGET_NOT_FOUND","INPUT_UNCERTAIN"].includes(result.error.code));
+      assert.equal(await evaluate("window.__focusInputs"),0);
       assert.equal(await evaluate("document.querySelector("+JSON.stringify(selector)+").value"),"");
       await navigate();
       const recovery=await api("play-script",workflow([click("Confirm order")]));
@@ -241,16 +246,33 @@ try {
   });
   for(const [name,capture,code] of [
     ["duration",{formats:["gif","video"],fps:15,maxWidth:640,maxDurationMs:100,maxBytes:8388608},"CAPTURE_DURATION_EXCEEDED"],
-    ["retained bytes",{formats:["gif"],fps:15,maxWidth:640,maxDurationMs:10000,maxBytes:150000},"CAPTURE_BUDGET_EXCEEDED"]]) {
+    ["retained bytes",{formats:["gif"],fps:15,maxWidth:640,maxDurationMs:10000,maxBytes:524288},"CAPTURE_BUDGET_EXCEEDED"]]) {
     await check("capture limit "+name+" produces playable partial",async()=>{
       await navigate();
-      const result=await api("play-script",{...workflow([{action:"wait",ms:2000}]),capture});
-      assert.equal(result.success,false);assert.equal(result.error.code,code);
-      assert.ok(result.artifacts.length>0);assert.ok(result.artifacts.every(a=>a.partial));
-      assert.ok(result.artifacts.reduce((bytes,a)=>bytes+a.byteLength,0)<=capture.maxBytes);
-      await download(result);
-      assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
-      return {runId:result.runId,durationMs:result.totalDurationMs};
+      let entropy;
+      try {
+        if(name==="retained bytes") {
+          entropy=await startArtifactProtocolFixture();
+          const imageURL=JSON.stringify(entropy.url+"/noise.png");
+          assert.equal((await api("evaluate",{tabId,expression:
+            "(()=>{const e=document.createElement('img');e.id='budget-entropy';e.src="+imageURL+
+            ";e.style.cssText='position:fixed;left:0;top:0;width:1024px;height:1024px';"+
+            "document.body.replaceChildren(e);document.body.style.margin='0';return true;})()"})).success,true);
+          let loaded=false;
+          for(let attempt=0;attempt<100&&!loaded;attempt++) {
+            loaded=(await evaluate("document.querySelector('#budget-entropy').complete&&document.querySelector('#budget-entropy').naturalWidth===512"))===true;
+            if(!loaded)await delay(20);
+          }
+          assert.equal(loaded,true,"Fixed entropy image did not load");
+        }
+        const result=await api("play-script",{...workflow([{action:"wait",ms:name==="retained bytes"?6000:2000}]),capture});
+        assert.equal(result.success,false);assert.equal(result.error.code,code);
+        assert.ok(result.artifacts.length>0);assert.ok(result.artifacts.every(a=>a.partial));
+        assert.ok(result.artifacts.reduce((bytes,a)=>bytes+a.byteLength,0)<=capture.maxBytes);
+        await download(result);
+        assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
+        return {runId:result.runId,durationMs:result.totalDurationMs,entropy:name==="retained bytes"?"fixed512RGB":undefined};
+      } finally {if(entropy)await entropy.close();}
     });
   }
   for(const formats of [["gif","video","screenshots"],["gif","video"]]) {
@@ -270,9 +292,9 @@ try {
   }
 
   for(const reason of ["duration","abort","replace"]) {
-    await check("movie evidence hold "+reason+" refuses input and recovers",async()=>{
+    await check(reason==="replace" ? "target replacement after movie ACK refuses click and recovers" : "movie evidence hold "+reason+" refuses input and recovers",async()=>{
       await navigate();await reveal("#next");const before=fixture.events.length;
-      if(reason==="replace") await evaluate("setTimeout(()=>{const e=document.querySelector('#next');e.replaceWith(e.cloneNode(true))},300);true");
+      if(reason==="replace") await evaluate("document.querySelector('#next').addEventListener('pointerdown',function(){this.replaceWith(this.cloneNode(true))},{once:true});true");
       const pending=api("play-script",{...workflow([{action:"click",target:{selector:"#next"}}]),
         capture:{formats:["gif","video"],fps:1,maxWidth:640,maxBytes:8388608,maxDurationMs:reason==="duration"?100:20000}});
       if(reason==="abort") {
@@ -280,6 +302,14 @@ try {
         await delay(300);assert.equal((await mcp("kelpie_abort_script")).success,true);
       }
       const result=await pending;assert.equal(result.success,false);await download(result);
+      if(reason==="replace") {
+        assert.equal(result.mayHaveCompleted,true);
+        let down;for(let attempt=0;attempt<100&&!down;attempt++) {
+          down=fixture.events.slice(before).find(event=>event.type==="pointerdown"&&event.target==="next");
+          if(!down)await delay(20);
+        }
+        assert.equal(down?.trusted,true,"Replacement did not reach trusted pointerdown");
+      }
       assert.ok(!fixture.events.slice(before).some(e=>e.type==="click"&&e.target==="next"));
       assert.ok((await api("get-current-url",{tabId})).url!==fixture.url+"/next");
       const recovery=await api("play-script",workflow([{action:"wait",ms:0}]));

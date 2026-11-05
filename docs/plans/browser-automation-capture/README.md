@@ -34,4 +34,6 @@ Secret references resolve only on the authorized host. Secret values stay out of
 
 See [workflows checklist](workflows.md). The common-contracts owner maintains the master acceptance checklist and per-platform evidence; platform owners supply exact exercised revisions and artifacts.
 
+Read-only final component/signing/install and native attachment routes are mapped in [release-pr-readiness.md](release-pr-readiness.md). Actual newer Windows API/media intake is [windows-f188-intake.md](windows-f188-intake.md); it does not replace native UI gates.
+
 The canonical IDs and evidence requirements are in [acceptance.md](acceptance.md). Local workflow authoring items use WLOCAL identifiers; historical family ranges above are scope categories, not a second acceptance ledger.

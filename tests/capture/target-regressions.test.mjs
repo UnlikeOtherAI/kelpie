@@ -180,5 +180,48 @@ test("visual viewport changing during dispatch reports uncertainty", () => {
   const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
   f.element.onEvent = () => { window.visualViewport.scale = 3; };
   assert.deepEqual(resolveScriptTarget({ selector: "#target" }, "acceptance", first.token, true),
-    { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true });
+    { ok: false, error: "INPUT_UNCERTAIN", mayHaveCompleted: true, sensitive: false });
+});
+
+for (const change of ["autocomplete", "type", "remove"]) {
+  test("capture policy retains sensitivity after focus " + change, () => {
+    const f = fixture(new Input());
+    f.element.onFocus = () => {
+      f.element.autocomplete = "current-password";
+      if (change === "type") f.element.type = "password";
+      if (change === "remove") f.element.isConnected = false;
+    };
+    const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+    const result = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token,
+      false, { action: "fill", text: "PRIVATE_CANARY" }, false, { refuseSensitive: true });
+    assert.equal(result.ok, false);
+    assert.equal(result.sensitive, true);
+    assert.equal(result.mayHaveCompleted, true);
+    assert.equal(f.element.value, "");
+    assert.deepEqual(f.element.events, []);
+    f.element.autocomplete = "";
+    f.element.type = "text";
+    const recheck = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token);
+    assert.equal(recheck.sensitive, true);
+  });
+}
+test("legacy no-capture edit reports focus-inferred sensitivity", () => {
+  const f = fixture(new Input());
+  f.element.onFocus = () => { f.element.autocomplete = "new-password"; };
+  const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  const result = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token,
+    false, { action: "fill", text: "PRIVATE_CANARY" });
+  assert.equal(result.ok, true);
+  assert.equal(result.sensitive, true);
+  assert.equal(f.element.value, "PRIVATE_CANARY");
+});
+test("failed type change without capture still carries sensitivity", () => {
+  const f = fixture(new Input());
+  f.element.onFocus = () => { f.element.type = "password"; };
+  const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
+  const result = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token,
+    false, { action: "type", text: "PRIVATE_CANARY" });
+  assert.equal(result.ok, false);
+  assert.equal(result.sensitive, true);
+  assert.equal(f.element.value, "");
 });

@@ -12,10 +12,29 @@ import uuid
 from pathlib import Path
 from ios_workflow_cli import run_fixture
 from ios_workflow_rendezvous import HostedCLIRendezvous
+from ios_workflow_diagnostics import export_lease_diagnostics
 
 PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
 BUNDLE = "com.unlikeotherai.kelpie"
+NAVIGATION_UI_TEST = "testInitialOwnedHTTPNavigationLoadsFixture"
+NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
+
+
+def selection(scope):
+    if scope not in ("full", "navigation"):
+        raise ValueError("Unsupported native workflow test scope")
+    targets = ["KelpieTests/IOSWorkflowNavigationTests"]
+    files = [NAVIGATION_TESTS]
+    if scope == "full":
+        targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
+        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+    else:
+        targets.append("KelpieUITests/WorkflowCaptureUITests/" + NAVIGATION_UI_TEST)
+    required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
+    if scope == "navigation":
+        required.add(NAVIGATION_UI_TEST)
+    return targets, required
 
 
 def command(*args, timeout=60):
@@ -127,7 +146,7 @@ def failure_diagnostics(log_path, destination):
     destination.write_text("\n".join(lines) + "\n")
 
 
-def run_device(device, product_hashes):
+def run_device(device, product_hashes, scope):
     udid = device["udid"]
     folder = EVIDENCE / device["family"]
     folder.mkdir()
@@ -156,14 +175,15 @@ def run_device(device, product_hashes):
         args = ["xcodebuild", "test-without-building", "-xctestrun", str(config), "-destination", "id=" + udid,
                 "-parallel-testing-enabled", "NO", "-maximum-concurrent-test-simulator-destinations", "1",
                 "-test-timeouts-enabled", "YES", "-default-test-execution-time-allowance", "210",
-                "-maximum-test-execution-time-allowance", "240", "-resultBundlePath", str(result),
-                "-only-testing:KelpieTests/IOSWorkflowAdmissionTests", "-only-testing:KelpieUITests/WorkflowCaptureUITests"]
+                "-maximum-test-execution-time-allowance", "240", "-resultBundlePath", str(result)]
+        targets, required = selection(scope)
+        args.extend("-only-testing:" + target for target in targets)
         cli_error = None
         cli_started = False
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + 24 * 60
+            deadline = time.monotonic() + (6 if scope == "navigation" else 24) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:
@@ -194,10 +214,9 @@ def run_device(device, product_hashes):
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
             install_report["afterError"] = type(error).__name__
         (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
-        selected = list(Path("apps/ios/UITests").glob("Workflow*.swift")) + [Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift")]
-        required = {method for file in selected for method in re.findall(r"func (test\w+)\(", file.read_text())}
         missing = sorted(method for method in required if method not in tests)
-        if process.returncode or not cli_started or cli_error or missing or json.loads(summary).get("failedTests", 0):
+        cli_required = scope == "full"
+        if process.returncode or (cli_required and not cli_started) or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         if not install_verified:
             raise RuntimeError("Post-test installed app hash could not be verified; see installation report")
@@ -235,8 +254,12 @@ def run_device(device, product_hashes):
         (folder / "cleanup.json").write_text(json.dumps(cleanup, indent=2))
         failure_diagnostics(log_path, folder / "diagnostics.txt")
         if result.is_dir():
-            subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
-                            "--output-path", str(folder / "attachments")], check=False, timeout=120)
+            export_lease_diagnostics(result, folder)
+            try:
+                subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
+                                "--output-path", str(folder / "attachments")], check=False, timeout=120)
+            except (OSError, subprocess.SubprocessError) as error:
+                (folder / "attachment-export-error.txt").write_text(type(error).__name__)
         if not cleanup["nextDeviceAllowed"] and sys.exc_info()[0] is None:
             raise RuntimeError("Device app cleanup could not be confirmed; see cleanup report")
 
@@ -244,6 +267,8 @@ def run_device(device, product_hashes):
 def main():
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("KELPIE_RUNNER_ENVIRONMENT") != "github-hosted":
         raise RuntimeError("This driver only runs on a disposable GitHub-hosted runner")
+    scope = os.environ.get("KELPIE_IOS_TEST_SCOPE", "full")
+    selection(scope)
     EVIDENCE.mkdir(exist_ok=False)
     sdk = command("xcrun", "--sdk", "iphonesimulator", "--show-sdk-version")
     inventory = json.loads(command("xcrun", "simctl", "list", "devices", "available", "-j"))["devices"]
@@ -258,12 +283,12 @@ def main():
     report = {"revision": revision, "sourceTree": command("git", "rev-parse", "HEAD^{tree}"),
               "appReveal": command("git", "-C", "vendor/AppReveal", "rev-parse", "HEAD"),
               "xcode": command("xcodebuild", "-version"), "sdk": sdk, "devices": devices, "hashes": hashes,
-              "imageVersion": os.environ.get("ImageVersion"), "outcomes": {}}
+              "imageVersion": os.environ.get("ImageVersion"), "scope": scope, "outcomes": {}}
     path = EVIDENCE / "report.json"
     path.write_text(json.dumps(report, indent=2))
     for device in sorted(devices, key=lambda item: item["state"] != "Booted"):
         try:
-            passed = run_device(device, hashes)
+            passed = run_device(device, hashes, scope)
             report["outcomes"][device["family"]] = {"passed": passed}
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
             report["outcomes"][device["family"]] = {"passed": False, "error": str(error)[:512]}
