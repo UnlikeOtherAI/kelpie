@@ -13,9 +13,8 @@ import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
-const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
+const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,expectedUiaHash,expectedWgcHash,expectedRevision]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast","default"].includes(motionProfile));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -28,8 +27,8 @@ const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:
 const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:true,timeout,maxBuffer:2097152});
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
-const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
-const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
+const alias="capture-detached-marker-"+manifest.source.slice(0,8);
+const report={source:manifest.source,profile:"screenshots-only",phase:"session",checks:[],cleanup:"not-started"};
 let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,capturePromise;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
@@ -91,7 +90,6 @@ try{
  report.phase="geometry";const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:motionProfile==="dense"?2400:350,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
  const workflow={version:1,tabId,pointer:{enabled:false},tapIndicator:{color:"#ff0000",radius:48,durationMs:5000,wobble:false,fade:true},
   capture:{formats:["screenshots"],fps:15,maxWidth:640,maxDurationMs:30000,maxBytes:16777216},
