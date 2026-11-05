@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 internal fun TabletViewportStage(
     preset: TabletViewportPreset,
     stageSize: Pair<Dp, Dp>,
+    isScriptRecording: Boolean,
     onClose: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -93,14 +94,19 @@ internal fun TabletViewportStage(
                 Modifier
                     .padding(top = 10.dp)
                     .size(stageSize.first, stageSize.second)
-                    .shadow(18.dp, RoundedCornerShape(26.dp)),
+                    .shadow(18.dp, RoundedCornerShape(26.dp), clip = !isScriptRecording),
         ) {
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(26.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(26.dp)),
+                    if (isScriptRecording) {
+                        // The capture rectangle must contain only complete WebView pixels.
+                        Modifier.fillMaxSize()
+                    } else {
+                        Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(26.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(26.dp))
+                    },
             ) {
                 content()
             }

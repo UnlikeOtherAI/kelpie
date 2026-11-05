@@ -518,3 +518,25 @@ The source removes both waits for this probe; bounded native
 screenshots and main-thread geometry sampling remain. It requires replay.
 The separate native Stop test completed with partial GIF/MP4 and SCRIPT_ABORTED
 in this run; this is b927-only evidence, not a final-source acceptance claim.
+
+## Compositor replacement (source only)
+
+Strict capture now requests the exact certified visible WebView rectangle from
+the parent Window after a WebView visual-state callback and committed-frame
+callback. It rechecks current grant, document, scene generation, dimensions,
+scale, window focus and bounds before and after the copy. Timeout or cancellation
+quarantines one private bitmap until the late PixelCopy callback recycles it;
+no later copy is admitted while it remains outstanding. The live
+marker already belongs to the sampled frame and is never painted a second time.
+The existing Stop control uses a separate non-focusable Popup, and recording
+hides other browser sheets. Rounded staged viewports remove clipping while recording so the complete page
+rectangle can be certified; API28 fails closed pending a verified frame fence. New native tests
+cover uncertified-scene refusal and Stop exclusion, alongside the existing
+noise PNG and pinched underlay cases. Compilation and device replay are pending.
+
+Focused Maxis source check: after one formatting-only preliminary failure,
+ktlintFormat, ktlintCheck, compileDebugKotlin, compileDebugAndroidTestKotlin
+and ScriptPixelCopyGateTest3/3 passed in4m40s. It used a fresh writable Gradle
+home, separately copied read-only modules-2 seed, one CPU and2GiB heap. Existing
+unrelated warnings remain. No emulator, native screenshot, media replay, API28,
+or signed release was exercised by this check.
