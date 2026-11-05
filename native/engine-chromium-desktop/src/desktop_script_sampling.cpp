@@ -178,7 +178,6 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       if(receipt_test_old_document) {
         if(shown.value("documentVersion",std::string())==*receipt_test_old_document)
           throw std::runtime_error("CAPTURE_RECEIPT_TEST_STALE_FRAME");
-
       }
 #endif
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png,

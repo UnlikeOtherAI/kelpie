@@ -158,15 +158,7 @@ target_include_directories(kelpie_engine_chromium_desktop
 if(KELPIE_ENABLE_CHROMIUM_DESKTOP)
   target_compile_features(kelpie_engine_chromium_desktop PRIVATE cxx_std_20)
   target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-  option(KELPIE_CAPTURE_RECEIPT_TEST_HOOK "Enable the deterministic capture receipt test hook" OFF)
-if(KELPIE_CAPTURE_RECEIPT_TEST_HOOK)
-  if(NOT BUILD_TESTING OR NOT KELPIE_ENABLE_CHROMIUM_DESKTOP)
-    message(FATAL_ERROR "The capture receipt test hook requires CEF and BUILD_TESTING")
-  endif()
-  target_compile_definitions(kelpie_engine_chromium_desktop PRIVATE KELPIE_CAPTURE_RECEIPT_TEST_HOOK=1)
-endif()
-
-target_include_directories(kelpie_engine_chromium_desktop PRIVATE ${CEF_ROOT})
+  target_include_directories(kelpie_engine_chromium_desktop PRIVATE ${CEF_ROOT})
   if(KELPIE_CHROMIUM_DESKTOP_CEF_WRAPPER)
     target_link_libraries(kelpie_engine_chromium_desktop
       PUBLIC
