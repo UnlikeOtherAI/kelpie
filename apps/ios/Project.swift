@@ -126,6 +126,7 @@ let kelpieTests = Target.target(
         .glob("../macos/Tests/BrowserControlGatewayTests.swift"),
         .glob("../macos/Tests/RealWebKitBrowserControlTests.swift"),
     ],
+    resources: [.glob(pattern: "../../tests/capture/ack-receipt-cases.json")],
     dependencies: [
         .target(name: "Kelpie"),
     ],
