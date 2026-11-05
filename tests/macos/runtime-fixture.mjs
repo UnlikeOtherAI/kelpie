@@ -5,7 +5,13 @@ export async function startFixture() {
  const server=createServer(async(req,res)=>{
   const url=new URL(req.url,"http://fixture.invalid");
   if(req.method==="POST"&&url.pathname==="/events"){
-   let text="";for await(const bytes of req){text+=bytes;if(text.length>16384){res.writeHead(413).end();return;}}
+   let text="";
+   try{for await(const bytes of req){text+=bytes;if(text.length>16384){res.writeHead(413).end();return;}}}
+   catch(error){
+    if(req.aborted||error?.code==="ECONNRESET")return;
+    if(!res.headersSent)res.writeHead(500).end();
+    return;
+   }
    let value;try{value=JSON.parse(text);}catch{res.writeHead(400).end();return;}
    if(events.length<10000)events.push(value);
    res.writeHead(202).end();return;
