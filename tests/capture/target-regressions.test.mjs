@@ -33,7 +33,7 @@ class Input extends Element {
   disabled = false;
   stored = "";
   onFocus = () => {};
-  focus() { this.onFocus(); }
+  focus() { document.activeElement = this; this.onFocus(); }
   get value() { return this.stored; }
   set value(value) { this.stored = value; }
 }
@@ -41,7 +41,7 @@ function fixture(element = new Element()) {
   let hit = element;
   Object.assign(globalThis, {
     window: {}, document: {
-      documentElement: element,
+      documentElement: element, hasFocus: () => true, activeElement: null,
       querySelectorAll: selector => [element, ...element.children].filter(el => el.matches(selector)),
       elementFromPoint: () => hit,
       createTreeWalker(root, whatToShow) {
@@ -205,6 +205,18 @@ for (const change of ["autocomplete", "type", "remove"]) {
     assert.equal(recheck.sensitive, true);
   });
 }
+test("unfocused document refuses editing even when activeElement is the target", () => {
+  const f = fixture(new Input());
+  document.hasFocus = () => false;
+  const first = resolveScriptTarget({ selector: "#target" }, "focus-check");
+  const result = resolveScriptTarget({ selector: "#target" }, "focus-check", first.token, false, { action: "fill", text: "PRIVATE_CANARY" });
+  assert.equal(document.activeElement, f.element);
+  assert.equal(result.error, "INPUT_UNCERTAIN");
+  assert.equal(result.mayHaveCompleted, true);
+  assert.equal(result.sensitivityKnown, false);
+  assert.equal(f.element.value, "");
+  assert.deepEqual(f.element.events, []);
+});
 test("legacy no-capture edit reports focus-inferred sensitivity", () => {
   const f = fixture(new Input());
   f.element.onFocus = () => { f.element.autocomplete = "new-password"; };
@@ -246,7 +258,7 @@ test("known false requires the original classified target entry", () => {
 });
 
 for (const action of ["click","input"]) for (const mutation of ["url","replace"]) {
-  test("final "+action+" handler "+mutation+" reports uncertain without retry",()=>{
+  test("final "+action+" handler "+mutation+" preserves acknowledged completion",()=>{
     const f=fixture(action==="input"?new Input():new Element());
     f.element.onEvent=event=>{
       if(event.type!==action)return;
@@ -259,7 +271,8 @@ for (const action of ["click","input"]) for (const mutation of ["url","replace"]
       ?resolveScriptTarget({selector:"#target"},"post-dispatch",first.token,true)
       :resolveScriptTarget({selector:"#target"},"post-dispatch",first.token,false,
         {action:"fill",text:"SYNTHETIC_POST_INPUT"},false,{refuseSensitive:true});
-    assert.equal(result.ok,false);assert.equal(result.error,"INPUT_UNCERTAIN");
+    assert.equal(result.ok,action==="click");
+    if(action==="input")assert.equal(result.error,"SENSITIVE_CAPTURE_REFUSED");
     assert.equal(result.mayHaveCompleted,true);assert.equal(result.sensitivityKnown,true);
     if(action==="input")assert.equal(result.sensitive,true);
     assert.equal(f.element.events.filter(event=>event===action).length,1);

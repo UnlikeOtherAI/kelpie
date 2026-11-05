@@ -27,7 +27,7 @@ export interface ScriptTargetResult {
  * Resolution stores object identity; preflight never silently retargets after animation.
  * Optional dispatch is atomic synthetic coordinate input, never advertised as trusted input.
  */
-export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string }, observe = false, policy?: { refuseSensitive: boolean }): ScriptTargetResult {
+export function resolveScriptTarget(target: ScriptTarget, key: string, token?: string, dispatch = false, edit?: { action: "fill" | "type"; text: string }, observe = false, policy?: { refuseSensitive: boolean }, postMutation = false): ScriptTargetResult {
   interface VisualViewportFrame { x: number; y: number; width: number; height: number; scale: number };
   interface Entry { sensitive?: boolean; visual: VisualViewportFrame; element: Element; document: Document; inputType?: string; readOnly?: boolean; rectX: number; rectY: number; rectWidth: number; rectHeight: number; x: number; y: number; width: number; height: number; coordinate: boolean; url: string; viewportWidth: number; viewportHeight: number };
   interface State { document: Document; documentId: string; next: number; entries: Record<string, Entry> };
@@ -45,6 +45,12 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   };
   const fail = (error: string, mayHaveCompleted = false): ScriptTargetResult =>
     ({ ok: false, error, mayHaveCompleted, sensitive: sensitivity(), sensitivityKnown: entry !== undefined });
+  if (postMutation) {
+    if (!token || dispatch || edit || observe) return fail("INVALID_TARGET_OPERATION", true);
+    const sensitive = sensitivity();
+    if (entry?.document !== document) return { ok: true, sensitive: false, sensitivityKnown: false };
+    return { ok: true, token, documentId: state.documentId, sensitive, sensitivityKnown: true };
+  }
   if ((dispatch && edit) || (observe && (dispatch || edit))) return fail("INVALID_TARGET_OPERATION");
   const viewportFrame = (): VisualViewportFrame => {
     const view = window.visualViewport;
@@ -223,19 +229,13 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     entry.url === location.href && unchangedViewport() &&
     eligible(entry.element) && !isLimited() && unchangedGeometry() && document.elementFromPoint(entry.x, entry.y) === hit &&
     !(sensitivity() && policy?.refuseSensitive);
-  // Final page handlers may synchronously replace the target or document. The
-  // mutation has already been sent, so preserve uncertainty and sensitivity.
-  const postDispatchValid = (): boolean => {
-    sensitivity();
-    return entry.element.isConnected && hit.isConnected && entry.document === document &&
-      entry.url === location.href;
-  };
   if (observe && (dispatch || edit)) return fail("INVALID_TARGET_OPERATION");
   if (edit) {
     const el = entry.element;
     if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || el.readOnly || el.disabled ||
         (el instanceof HTMLInputElement && !["text", "search", "tel", "url", "email", "password"].includes(el.type))) return fail("TARGET_NOT_EDITABLE");
     el.focus();
+    if (document.activeElement !== el || !document.hasFocus()) return { ...fail("INPUT_UNCERTAIN", true), sensitivityKnown: false };
     if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     if (!unchanged()) return fail("INPUT_UNCERTAIN", true);
     try {
@@ -244,7 +244,6 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       if (!descriptor?.set) return fail("INPUT_UNCERTAIN", true);
       descriptor.set.call(el, edit.action === "fill" ? edit.text : el.value + edit.text);
       el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: edit.text }));
-      if (!postDispatchValid()) return fail("INPUT_UNCERTAIN", true);
       if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }
@@ -261,7 +260,6 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("mouseup", { ...options, buttons: 0 }));
       if (!unchanged()) return fail("INPUT_UNCERTAIN", true);
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
-      if (!postDispatchValid()) return fail("INPUT_UNCERTAIN", true);
       if (sensitivity() && policy?.refuseSensitive) return fail("SENSITIVE_CAPTURE_REFUSED", true);
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }

@@ -47,7 +47,8 @@ char* kelpie_browser_script_target_expression(const char* input) {
       value.value("dispatch", nlohmann::json(false)).dump() + "," +
       value.value("edit", nlohmann::json(nullptr)).dump() + "," +
       value.value("observe", nlohmann::json(false)).dump() + "," +
-      value.value("policy", nlohmann::json(nullptr)).dump() + ")";
+      value.value("policy", nlohmann::json(nullptr)).dump() + "," +
+      value.value("postMutation", nlohmann::json(false)).dump() + ")";
     return Copy({{"expression", expression}});
   } catch (...) { return nullptr; }
 }
