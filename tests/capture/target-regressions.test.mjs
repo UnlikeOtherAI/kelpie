@@ -257,6 +257,17 @@ test("known false requires the original classified target entry", () => {
   assert.equal(newRealm.sensitivityKnown, false);
 });
 
+test("post-mutation unknown document preserves a positive sensitivity latch", () => {
+  const f = fixture(new Input());
+  const first = resolveScriptTarget({ selector: "#target" }, "post-latched");
+  f.element.autocomplete = "current-password";
+  window["post-latched"].entries[first.token].document = {};
+  const result = resolveScriptTarget({ selector: "#target" }, "post-latched", first.token, false, undefined, false, undefined, true);
+  assert.equal(result.ok, true);
+  assert.equal(result.sensitive, true);
+  assert.equal(result.sensitivityKnown, false);
+});
+
 for (const action of ["click","input"]) for (const mutation of ["url","replace"]) {
   test("final "+action+" handler "+mutation+" preserves acknowledged completion",()=>{
     const f=fixture(action==="input"?new Input():new Element());

@@ -48,7 +48,7 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
   if (postMutation) {
     if (!token || dispatch || edit || observe) return fail("INVALID_TARGET_OPERATION", true);
     const sensitive = sensitivity();
-    if (entry?.document !== document) return { ok: true, sensitive: false, sensitivityKnown: false };
+    if (entry?.document !== document) return { ok: true, sensitive, sensitivityKnown: false };
     return { ok: true, token, documentId: state.documentId, sensitive, sensitivityKnown: true };
   }
   if ((dispatch && edit) || (observe && (dispatch || edit))) return fail("INVALID_TARGET_OPERATION");
