@@ -3,6 +3,7 @@
 #ifdef KELPIE_LINUX_CODEC_FORCE_TEST
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #endif
 #include "script_artifact_store.h"
 #include "script_gstreamer.h"
@@ -141,13 +142,18 @@ class Video final : public Writer {
     const auto end = GstClockTime(std::llround(end_ms * GST_MSECOND));
     Buffer packet;
     if (prepared_) {
+      if (purpose == ScriptMediaFramePurpose::TerminalClear && !ContainsVclAccessUnit(prepared_.get(), caps_, true)) {
+        terminal_force_failed_=true; stopped_=true; ++output_.dropped_frames; return false;
+      }
       packet = std::move(prepared_);
-      if (purpose == ScriptMediaFramePurpose::TerminalClear && !ContainsVclAccessUnit(packet.get(), caps_, true))
-        throw std::runtime_error("CAPTURE_ENCODING_FAILED");
       GST_BUFFER_PTS(packet.get()) = start; GST_BUFFER_DTS(packet.get()) = start;
       GST_BUFFER_DURATION(packet.get()) = std::max<GstClockTime>(1, end - start);
     } else {
-      packet = Encode(input, start, std::max<GstClockTime>(1, end - start), purpose == ScriptMediaFramePurpose::TerminalClear);
+      try { packet = Encode(input, start, std::max<GstClockTime>(1, end - start), purpose == ScriptMediaFramePurpose::TerminalClear); }
+      catch (...) {
+        if (purpose != ScriptMediaFramePurpose::TerminalClear) throw;
+        terminal_force_failed_=true; stopped_=true; ++output_.dropped_frames; return false;
+      }
       if (!Admit(packet.get())) { stopped_ = true; ++output_.dropped_frames; return false; }
     }
     if (packets_.size() >= 36000) { budget_.exceeded = true; stopped_ = true; ++output_.dropped_frames; return false; }
@@ -157,8 +163,9 @@ class Video final : public Writer {
   ScriptMediaOutput Finish() override {
     if (finished_) return output_;
     if (encoder_) {
-      if (!encoder_->Complete()) throw std::runtime_error("CAPTURE_FINALIZE_FAILED");
+      const bool completed=encoder_->Complete();
       encoder_.reset();
+      if (!completed && !terminal_force_failed_) throw std::runtime_error("CAPTURE_FINALIZE_FAILED");
     }
     prepared_.reset();
     // Encoded packets are bounded independently of container overhead. If muxer
@@ -194,6 +201,9 @@ class Video final : public Writer {
     if (index==14) force_keyframe=true;
 #endif
     if (force_keyframe) {
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+      if (std::getenv("KELPIE_TEST_FORCE_FAILURE")) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
+#endif
       auto* sinkpad=gst_element_get_static_pad(GST_ELEMENT(encoder_->sink()),"sink");
       if (!sinkpad) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
 #ifdef KELPIE_LINUX_CODEC_FORCE_TEST
@@ -264,7 +274,7 @@ class Video final : public Writer {
   Buffer prepared_;
   std::vector<Buffer> packets_;
   std::size_t reserved_ = 0;
-  bool finished_ = false, stopped_ = false;
+  bool finished_ = false, stopped_ = false, terminal_force_failed_ = false;
 #ifdef KELPIE_LINUX_CODEC_FORCE_TEST
   std::size_t encoded_test_index_=0;
 #endif

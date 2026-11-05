@@ -256,16 +256,15 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       if(index+1<actions.size()) Pause(script.value("defaultWaitBetweenActions", 0));
     }
     if(sampler.joinable() && DesktopMovieEndpointRequired(script) && !Cancelled() && result.value("success",false)) {
-      double remaining=0; bool has_marker=false;
+      double remaining=0;
       { std::lock_guard lock(mutex); if(presentation.contains("marker")) {
-        has_marker=true;
         const auto& marker=presentation["marker"];
         remaining=marker.value("startedMs",0.0)+marker.value("durationMs",700.0)-Elapsed();
       } }
       if(remaining>0) Pause(static_cast<int>(std::ceil(remaining)));
       // Admit a fully faded movie endpoint without exceeding configured FPS.
       Pause(static_cast<int>(std::ceil(1000.0/script.value("capture",Json::object()).value("fps",15))));
-      StepScreenshot(action_index,false,"",has_marker ? DesktopScriptFramePurpose::TerminalClear : DesktopScriptFramePurpose::Ordinary);
+      StepScreenshot(action_index,false,"",DesktopScriptFramePurpose::TerminalClear);
     }
     // Only explicitly requested terminal outputs are returned. Sensitive values never enter status.
     try { RedactScriptOutputs(outputs,actions,redactions); }

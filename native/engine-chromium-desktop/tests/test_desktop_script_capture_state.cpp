@@ -19,6 +19,7 @@ int main() {
   json active={{"runId","run"},{"tabId","tab"},{"generation",std::uint64_t{7}},{"documentVersion","doc"},
                {"marker",{{"actionIndex",3},{"startedMs",100.0},{"durationMs",700.0}}},
                {"pointer",true},{"commentary","text"}};
+  assert(kelpie::DesktopTerminalTicketPurpose(active)==kelpie::DesktopScriptFramePurpose::TerminalClear);
   const auto markerIdentity=kelpie::DesktopTerminalMarkerIdentity(active);
   assert(!markerIdentity.is_null());
   auto changedIdentity=active; changedIdentity["documentVersion"]="other";
@@ -32,6 +33,9 @@ int main() {
   assert(detached.contains("marker") && !detached.contains("pointer") && !detached.contains("commentary"));
   assert(detached.value("elapsedMs",0.0)==300.0);
   assert(!kelpie::DetachedDesktopMarker(active,800.0).contains("marker"));
+  auto retiredMarker=active;
+  assert(kelpie::ClearRetiredDesktopPresentation(retiredMarker,{"tab",7,"doc"}));
+  assert(kelpie::DesktopTerminalTicketPurpose(retiredMarker)==kelpie::DesktopScriptFramePurpose::Ordinary);
   active.erase("documentVersion");
   assert(!kelpie::DetachedDesktopMarker(active,300.0).contains("marker"));
   kelpie::DesktopPresentationValidity grant([](const std::string& owner) { return owner=="owner"; });

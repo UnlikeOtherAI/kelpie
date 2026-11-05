@@ -1,5 +1,6 @@
 #pragma once
 #include <nlohmann/json.hpp>
+#include "kelpie/desktop_script_capture.h"
 #include <cstdint>
 #include <cmath>
 #include <string>
@@ -37,6 +38,9 @@ inline nlohmann::json DetachedDesktopMarker(const nlohmann::json& state, double 
   detached.erase("pointer"); detached.erase("commentary");
   detached["playing"] = false; detached["detachedMarker"] = true; detached["elapsedMs"] = elapsed;
   return detached;
+}
+inline DesktopScriptFramePurpose DesktopTerminalTicketPurpose(const nlohmann::json& state) {
+  return state.contains("marker") ? DesktopScriptFramePurpose::TerminalClear : DesktopScriptFramePurpose::Ordinary;
 }
 inline nlohmann::json DesktopTerminalMarkerIdentity(const nlohmann::json& state) {
   if (!state.contains("runId") || !state["runId"].is_string() || state["runId"].get<std::string>().empty() ||

@@ -84,7 +84,10 @@ std::vector<ScriptMediaOutput> ScriptMediaEncoder::Finish(double terminal_elapse
   if (!std::isfinite(terminal_elapsed_ms) || terminal_elapsed_ms > 3600000 || (state.pending && terminal_elapsed_ms <= state.last))
     throw std::runtime_error("CAPTURE_TIMESTAMP_INVALID");
   if (state.pending) {
-    state.Emit(terminal_elapsed_ms, state.terminal_clear ? ScriptMediaFramePurpose::TerminalClear : ScriptMediaFramePurpose::Ordinary);
+    if (state.terminal_clear) {
+      try { if (!state.Emit(terminal_elapsed_ms,ScriptMediaFramePurpose::TerminalClear)) state.failed=true; }
+      catch (...) { state.failed=true; }
+    } else state.Emit(terminal_elapsed_ms);
     state.pending.reset();
   }
   for (auto& writer : state.writers) {

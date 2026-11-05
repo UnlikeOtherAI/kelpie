@@ -20,6 +20,7 @@ void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlo
 }
 void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document, DesktopScriptFramePurpose purpose) {
   std::unique_lock lock(mutex);
+  if (purpose==DesktopScriptFramePurpose::TerminalClear) purpose=DesktopTerminalTicketPurpose(presentation);
   requested_step = index; requested_step_png=png; requested_step_document=document; requested_purpose=purpose;
   requested_terminal_identity=purpose==DesktopScriptFramePurpose::TerminalClear ? DesktopTerminalMarkerIdentity(presentation) : Json(nullptr);
   const auto ticket=++requested_ticket;
