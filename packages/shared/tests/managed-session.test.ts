@@ -69,6 +69,22 @@ describe("restricted Lightpanda profile", () => {
 });
 
 describe("operator-managed automation sessions", () => {
+  it("refuses unverified Lightpanda shared isolation before any allocation or borrowed-context access", async () => {
+    const f = fixture();
+    f.input.backend = "lightpanda";
+    f.input.options.isolation = "shared";
+    f.input.sharedContext = f.context as unknown as BrowserContext;
+    await expect(allocateManagedBrowserSession(f.input)).rejects.toMatchObject({
+      code: "ISOLATION_UNAVAILABLE", mayHaveCompleted: false,
+    });
+    expect(f.browser.newContext).not.toHaveBeenCalled();
+    expect(f.context.newPage).not.toHaveBeenCalled();
+    expect(f.context.pages).not.toHaveBeenCalled();
+    expect(f.context.close).not.toHaveBeenCalled();
+    expect(f.browser.close).not.toHaveBeenCalled();
+    expect(f.created).toHaveLength(0);
+  });
+
   it("owns fresh isolated storage and refuses foreign tabs without enumeration", async () => {
     const f = fixture();
     const session = await allocateManagedBrowserSession(f.input);

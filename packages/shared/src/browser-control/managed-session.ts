@@ -49,6 +49,9 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
       !Number.isInteger(maxTabs) || maxTabs < 1 || maxTabs > 16) {
     throw new BrowserControlError("INVALID_ARGUMENTS", "Invalid managed session resource or ownership policy.");
   }
+  if (input.backend === "lightpanda" && isolation === "shared") {
+    throw new BrowserControlError("ISOLATION_UNAVAILABLE", "Shared storage is not verified for this restricted worker.");
+  }
   const shared = (): BrowserContext => {
     if (!input.sharedContext) throw new BrowserControlError("ISOLATION_UNAVAILABLE", "Shared storage requires an operator-selected context.");
     return input.sharedContext;
