@@ -79,6 +79,18 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             self.assertEqual(output.read_text(), "[WorkflowCapture] reason=visible-size\n"
                              "[WorkflowCapture] reason=observation-BUSY\n")
 
+    def test_cli_timeout_metadata_excludes_output_values(self):
+        from ios_workflow_cli import timeout_metadata
+        payload = json.dumps({"result": {"success": True, "state": "completed",
+                                         "outputs": {"secret": "private"}, "artifacts": [{}, {}]},
+                              "downloaded": [{}, {}]}).encode()
+        report = timeout_metadata(subprocess.TimeoutExpired("script", 60, output=payload, stderr=b"private"))
+        self.assertEqual(report, {"stdoutBytes": len(payload), "stderrBytes": 7, "resultSuccess": True,
+                                  "resultState": "completed", "artifactCount": 2, "downloadCount": 2})
+        self.assertNotIn("private", json.dumps(report))
+        self.assertEqual(timeout_metadata(subprocess.TimeoutExpired("script", 60, output=b"{")),
+                         {"stdoutBytes": 1, "stderrBytes": 0})
+
     def test_cli_failure_status_keeps_only_bounded_metadata(self):
         from ios_workflow_cli import run_fixture
         responses = [{"success": True}, subprocess.TimeoutExpired("script", 60),
@@ -89,8 +101,8 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
                 with self.assertRaises(subprocess.TimeoutExpired):
                     run_fixture("a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed", Path(directory) / "cli")
             report = json.loads((Path(directory) / "cli/status-on-failure.json").read_text())
-            self.assertEqual(report, {"status": "observed", "state": "running", "playing": True,
-                                      "actionIndex": 1, "errorCode": "SAFE_CODE"})
+            self.assertEqual(report, {"status": "observed", "stdoutBytes": 0, "stderrBytes": 0,
+                                      "state": "running", "playing": True, "actionIndex": 1, "errorCode": "SAFE_CODE"})
             self.assertNotIn("private", json.dumps(report))
 
     def test_navigation_diagnostics_emit_only_known_fixed_events(self):
