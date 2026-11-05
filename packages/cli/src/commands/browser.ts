@@ -343,7 +343,7 @@ export function registerBrowser(program: Command): void {
             print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "The launch process could not be retired; its pending record was preserved", retirement } }, globals.format);
             process.exitCode = 6; return;
           }
-          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser" } }, globals.format);
+          print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser", ...(child ? { retirement } : {}) } }, globals.format);
           process.exitCode = 6;
         }
         return;

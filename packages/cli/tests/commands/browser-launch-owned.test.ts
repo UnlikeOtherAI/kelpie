@@ -38,6 +38,7 @@ describe("public browser launch child lifecycle", () => {
     await run("browser", "launch", "owned", "--port", "28423");
     const first = control.child!;
     expect(first.exitCode !== null || first.signalCode !== null).toBe(true);
+    expect(vi.mocked(console.log).mock.calls.flat().join(" ")).toContain('"outcome": "exited"');
     expect((await loadBrowserStore()).running.owned).toBeUndefined();
     process.exitCode = undefined;
     control.exitsEarly = true;
