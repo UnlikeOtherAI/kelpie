@@ -1,21 +1,14 @@
 import {uptime} from "node:os";
-import {consumeWgcFrames} from "./wgc-frame-stream.mjs";
 import assert from "node:assert/strict";
-import {spawn,execFile} from "node:child_process";
+import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {createHash} from "node:crypto";
-import {mkdir,readFile,writeFile,access,stat} from "node:fs/promises";
-import {dirname,join,isAbsolute,resolve} from "node:path";
-import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
-import {applyG08MotionProfile} from "../capture/g08-motion-profile.mjs";
+import {mkdir,readFile,writeFile,access} from "node:fs/promises";
+import {dirname,join,isAbsolute} from "node:path";
+import {startG08Fixture} from "../capture/g08-fixture.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptV1Schema} from "../../packages/shared/dist/index.js";
-import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
-import {evaluateFastWgc} from "./wgc-fast-profile.mjs";
-import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
-import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
 import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable,safeUiaFailure} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
-import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
@@ -36,7 +29,7 @@ const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
 const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
-let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,helperExit,helperError="",nativeProgress,monitorStop=false,monitor;
+let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
@@ -48,21 +41,6 @@ const tabFact=async tabId=>{
  const value=await api("get-tabs"),tab=value.tabs.find(item=>item.id===tabId);
  assert.ok(tab);return {tabId:tab.id,active:tab.active,url:tab.url};
 };
-async function download(result,item,budget){
- assert.ok(item.byteLength<=budget.remaining,"OUTPUT_BUDGET");const chunks=[];let offset=0;
- while(offset<item.byteLength){
-  const c=scriptArtifactChunkSchema.parse(await api("get-script-artifact",{runId:result.runId,artifactId:item.id,offset,length:262144}));
-  assert.equal(c.runId,result.runId);assert.equal(c.artifactId,item.id);assert.equal(c.offset,offset);
-  const bytes=Buffer.from(c.data,"base64");assert.ok(bytes.length>0);offset+=bytes.length;
-  assert.equal(c.nextOffset,offset);assert.equal(c.eof,offset===item.byteLength);chunks.push(bytes);
- }
- const bytes=Buffer.concat(chunks);assert.equal(bytes.length,item.byteLength);assert.equal(createHash("sha256").update(bytes).digest("hex"),item.sha256);
- const file=resolve(outputRoot,item.id+(item.mimeType==="image/gif"?".gif":".mp4"));
- assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=bytes.length;await writeFile(file,bytes,{flag:"wx"});
- report.phase="artifact-probe";const probe=await run(process.env.FFPROBE||"ffprobe",["-v","error","-select_streams","v:0","-show_entries","frame=best_effort_timestamp_time","-of","json",file],120000);
- const timestamps=JSON.parse(probe.stdout).frames.map(frame=>Number(frame.best_effort_timestamp_time));
- assert.ok(timestamps.length>0&&timestamps.every(Number.isFinite));return {...item,runId:result.runId,file,timestamps};
-}
 try{
  const session=await uiaRun(["session"]);assert.equal(session.sessionId,1);assert.equal(session.user.toLowerCase(),"maxis\\ondre");
  await run(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+session.userSid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"]);await mkdir(home);
@@ -121,61 +99,52 @@ try{
   await new Promise(done=>setTimeout(done,50));
  }
  assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");report.window=window;
- helper=spawn(wgc,["timeline",String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
- helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
- helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
- helperTimer=setTimeout(()=>helper.kill(),42000);
- let responseTickUpper=Infinity,savedPost=false;const frames=[];const nativePromise=consumeWgcFrames(helper.stdout,async(bgra,meta)=>{
-  const sx=meta.width/scene.viewport.width,sy=meta.height/scene.viewport.height;
-  const cx=scene.to.x*sx,cy=scene.to.y*sy,r=48*Math.max(sx,sy)*1.5;
-  let redPixels=0,maxAlpha=0;
-  for(let y=Math.max(0,Math.floor(cy-r));y<Math.min(meta.height,Math.ceil(cy+r));y++)
-   for(let x=Math.max(0,Math.floor(cx-r));x<Math.min(meta.width,Math.ceil(cx+r));x++){
-    const i=(y*meta.width+x)*4;if(bgra[i+2]>20&&bgra[i+2]>bgra[i+1]*2&&bgra[i+3]>20){redPixels++;maxAlpha=Math.max(maxAlpha,bgra[i+3]);}
-   }
-  if(!savedPost && meta.receiptMs>responseTickUpper && redPixels>0){
-   savedPost=true;await writeFile(join(outputRoot,"post-response.bgra"),bgra,{flag:"wx"});
-  }
-  frames.push({receiptMs:meta.receiptMs,tick100ns:meta.tick100ns,width:meta.width,height:meta.height,
-   redPixels,maxAlpha,sha256:createHash("sha256").update(bgra).digest("hex")});
- });void nativePromise.catch(()=>{});
  report.phase="terminal";const terminal=await pending;
- responseTickUpper=Math.ceil(uptime())*1000+1000;
+ const responseTickUpper=Math.ceil(uptime())*1000+1000;
  report.terminal={success:terminal.success===true,runId:terminal.runId,actionsExecuted:terminal.actionsExecuted,
   totalDurationMs:terminal.totalDurationMs,artifactCount:terminal.artifacts?.length,responseTickUpper};
  assert.equal(terminal.success,true);assert.equal(terminal.runId,active.runId);assert.equal(terminal.actionsExecuted,3);
  assert.ok(terminal.totalDurationMs<7000,"PNG_RUN_WAITED_FOR_MARKER");
- report.phase="stop-state";const stopState=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
+ // A fresh capture session starts only after the HTTP response, avoiding any
+ // ambiguity about old frames queued before the response.
+ report.phase="post-response-capture";
+ const capture=run(wgc,[String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"post-response")],10000);
+ void capture.catch(()=>{});
+ const stopState=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
  report.stopState={visibleInvokableButtons:stopState.visibleInvokableButtons};assert.equal(stopState.visibleInvokableButtons,0);
  const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
  report.fixture={trustedClicks:fixtureFacts.events.length,pageRequests:fixture.pageRequests};
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));
- assert.ok(items.some(item=>item.mimeType==="image/png"),"PNG_ARTIFACT_MISSING");
- const png=items.find(item=>item.mimeType==="image/png"),chunks=[];let offset=0;
+ assert.ok(items.some(item=>item.mimeType==="image/png" && item.actionIndex===2),"PNG_ARTIFACT_MISSING");
+ const png=items.find(item=>item.mimeType==="image/png" && item.actionIndex===2),chunks=[];let offset=0;
  assert.ok(png.byteLength<=16777216,"OUTPUT_BUDGET");
  while(offset<png.byteLength){
   const chunk=scriptArtifactChunkSchema.parse(await api("get-script-artifact",{runId:terminal.runId,artifactId:png.id,offset,length:262144}));
-  assert.equal(chunk.offset,offset);const bytes=Buffer.from(chunk.data,"base64");assert.ok(bytes.length>0);
-  chunks.push(bytes);offset+=bytes.length;assert.equal(chunk.nextOffset,offset);
+  assert.equal(chunk.runId,terminal.runId);assert.equal(chunk.artifactId,png.id);assert.equal(chunk.offset,offset);const bytes=Buffer.from(chunk.data,"base64");assert.ok(bytes.length>0);
+  chunks.push(bytes);offset+=bytes.length;assert.equal(chunk.nextOffset,offset);assert.equal(chunk.eof,offset===png.byteLength);
  }
  const pngBytes=Buffer.concat(chunks);assert.equal(createHash("sha256").update(pngBytes).digest("hex"),png.sha256);
  await writeFile(join(outputRoot,"terminal.png"),pngBytes,{flag:"wx"});
- report.phase="capture-finish";await nativePromise;const exit=await helperExit;clearTimeout(helperTimer);helperTimer=null;
- report.helperExit=exit;report.helperDiagnostic=safeWgcDiagnostic(helperError);assert.equal(exit.code,0,"WGC_HELPER_FAILED");
- await writeFile(join(outputRoot,"marker-frames.json"),JSON.stringify({responseTickUpper,frames},null,2),{flag:"wx"});
- const post=frames.filter(frame=>frame.receiptMs>responseTickUpper&&frame.redPixels>0);
- report.phase="marker-check";report.checks.push({name:"post-response owned marker",passed:post.length>0,postFrames:post.length,frameCount:frames.length});
- assert.ok(post.length>0,"POST_RESPONSE_MARKER_NOT_OBSERVED");
+ const captured=JSON.parse((await capture).stdout);
+ assert.equal(captured.processId,running.pid);assert.equal(captured.className,"KelpieScriptPresentation");
+ assert.equal(captured.windowHandle,window.windowHandle);
+ const pixels=await readFile(join(outputRoot,"post-response","frame.bgra"));
+ assert.equal(pixels.length,captured.width*captured.height*4);
+ assert.equal(createHash("sha256").update(pixels).digest("hex"),captured.raw.sha256);
+ const sx=captured.width/scene.viewport.width,sy=captured.height/scene.viewport.height;
+ const cx=scene.to.x*sx,cy=scene.to.y*sy,r=48*Math.max(sx,sy)*1.5;
+ let redPixels=0,maxAlpha=0;
+ for(let y=Math.max(0,Math.floor(cy-r));y<Math.min(captured.height,Math.ceil(cy+r));y++)
+  for(let x=Math.max(0,Math.floor(cx-r));x<Math.min(captured.width,Math.ceil(cx+r));x++){
+   const i=(y*captured.width+x)*4;if(pixels[i+2]>20&&pixels[i+2]>pixels[i+1]*2&&pixels[i+3]>20){redPixels++;maxAlpha=Math.max(maxAlpha,pixels[i+3]);}
+  }
+ report.native={width:captured.width,height:captured.height,redPixels,maxAlpha,rawSha256:captured.raw.sha256,pngSha256:captured.png.sha256};
+ report.checks.push({name:"post-response owned marker",passed:redPixels>0,redPixels});
+ assert.ok(redPixels>0,"POST_RESPONSE_MARKER_NOT_OBSERVED");
  report.phase="complete";
 }catch(error){
- if(helperExit&&!report.helperExit){if(helper&&helper.exitCode===null)helper.kill();try{report.helperExit=await awaitBounded(helperExit,2000);}catch{report.helperExit={code:null,signal:null};}report.helperDiagnostic=safeWgcDiagnostic(helperError);}
- if(nativeProgress){try{
-  const samples=nativeProgress.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
-  const bytes=Buffer.from(JSON.stringify({config:nativeProgress.config,frameCount:nativeProgress.frameCount,shape:nativeProgress.shape,samples}));
-  if(bytes.length<=33554432)await writeFile(join(outputRoot,"partial-native-observation.json"),bytes,{flag:"wx"});
- }catch{}}
  if(fixture){try{
   const partial=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(3000)})).json();
   const bytes=Buffer.from(JSON.stringify(partial));if(bytes.length<=16384)await writeFile(join(outputRoot,"partial-fixture-events.json"),bytes,{flag:"wx"});
@@ -183,11 +152,10 @@ try{
  const location=String(error.stack??"").match(/(?:wgc-frame-stream|wgc-g08-evaluate|wgc-g08-rgb|g08-pixels|g08-retention).mjs:\d+/)?.[0]??null;
  const errorKind=["AbortError","TimeoutError","TypeError","AssertionError","Error"].includes(error.name)?error.name:"Other";
  const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|INVALID_PREMULTIPLIED_ALPHA|WGC_|G08_|FAST_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
- report.checks.push({name:"owned native and exported G08 case",passed:false,stage:report.phase,
+ report.checks.push({name:"post-response owned marker",passed:false,stage:report.phase,
   category:error.safeDetails?.category??safe,errorKind,location,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;
 }finally{
- monitorStop=true;if(helperTimer)clearTimeout(helperTimer);if(helper&&helper.exitCode===null)helper.kill();
  if(pending&&readiness&&!pendingDone){try{await api("abort-script",{});}catch{}try{await awaitBounded(pending,5000);}catch{}}
  if(launched){try{assert.equal((await cliRun(["browser","stop",alias])).success,true);
   if(identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:identity.startTime});assert.equal(report.processExit.exited,true);}
