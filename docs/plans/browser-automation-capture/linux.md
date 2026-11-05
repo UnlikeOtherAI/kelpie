@@ -481,3 +481,21 @@ checks readiness/running absence before exiting its unit. It also explicitly
 requires the offscreen catalogue to advertise the mutating play-script schema.
 Readiness format version1 is labelled separately from actual device app version
 and native MCP serverInfo. These strengthened assertions await their replay.
+
+## Durable fixture corrections prepared
+
+Windows ownership explicitly delegated the portable capture-corpus test hunks
+in this Linux worktree. Fixture navigation now performs an explicit public
+scroll reset after same-URL reload; product navigation behavior is unchanged.
+Focus-change checks keep uncertainty/no-input/no-edit and record the actual
+enumerated safe refusal reason. The GIF budget case uses the fixed 512-pixel
+RGB-noise asset, expanded to cover the native capture, with a 512 KiB cap and
+unchanged partial/recovery/sum-within-cap assertions. This forces encoder
+pressure instead of assuming a mostly-white page exceeds an estimated budget.
+
+The unsound 300 ms replacement timer is replaced by deterministic whole-target
+replacement on trusted pointerdown after movie ACK. It requires uncertainty,
+observed trusted pointerdown, no click/navigation and recovery. The distinct
+pre-input requirement has its own whitebox critical-PNG/SSE supplement below;
+the two phases are not conflated. Node syntax/whitespace checks passed. Real
+replay of these corrected cases is still pending; earlier failures remain.
