@@ -69,13 +69,13 @@ try{
   }));
  }
  await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
+ await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
+ await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
  await independent("chromium",async()=>{
   // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
   await runEngine(client,fixture,"chromium",report);
  });
- await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
- await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
  if(failures.length){
   report.phaseFailures=failures;
   phase=failures[0].phase;
