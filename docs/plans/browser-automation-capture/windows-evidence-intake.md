@@ -141,3 +141,30 @@ were absent. Receipt: `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/
 The earlier c9 failure was not recorded with sufficiently specific stages to
 prove that its cause was the prior subtree traversal. This is a capture-free
 startup result, not WGC or Stop-button evidence.
+
+The subsequent exact 5877 Session1 WGC/Stop run passed with the narrowed pin.
+The helper captured only its owned presentation HWND with cursor disabled,
+default border and no secondary windows. The separate Stop window was captured,
+the spatial marker validator passed at DPR2, and standard UIA Stop invocation
+aborted the run, recovered partial artifacts and allowed a following run.
+Public stop and process, listener, readiness, alias and task cleanup passed.
+The WGC call took 1.378 seconds with unchanged 8-second helper and 10-second
+parent bounds. Raw BGRA and PNG were independently hashed. The successful
+wrapper discarded the helper's stage stderr, so no per-stage times can be
+claimed; the earlier WGC failure remains unexplained.
+
+Evidence root:
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/wgc-5877-pin907`.
+The report is 19,843 bytes, SHA-256
+`c1adc24ca0ba8231ef2f5350841cd3f80ebe08feddd66e807c1a1e58e1f1f41d`.
+The 9,703-byte presentation PNG SHA-256 is
+`1a74b88fada0e8941811bbab5a1a4081f66efff3b02805accff13ff9c2b09e98`;
+the 641-byte native Stop PNG SHA-256 is
+`fa6854ba2b4e8e32254d69bc78f13e35cb872dd60f9fc256713c46f73784055b`.
+This is a bounded native spatial and Stop result, not a full animation or
+signed-release result.
+
+A source diff from 5877e6fa to root revision 65fe4866 found no changes under
+`apps/windows`, `native`, `packages/shared/src` or `packages/cli`,
+and no changes to root lockfile or Windows build scripts. This maps the tested
+binary's inputs to that revision; it does not replace the final rebuild.
