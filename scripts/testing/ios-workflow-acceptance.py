@@ -33,8 +33,10 @@ def selection(scope):
               "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
               "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
               "testNonMovieLoadingAndScrollKeepChromeGeometry"}
-        unit = {"testOnlyMovieFormatsSelectImmersiveLayout"}
-        return (["KelpieTests/IOSWorkflowPresentationModeTests"] +
+        unit = {"testOnlyMovieFormatsSelectImmersiveLayout",
+                "testIssuedNavigationInterruptionPreservesStopAndUncertainty"}
+        return (["KelpieTests/IOSWorkflowPresentationModeTests",
+                 "KelpieTests/IOSWorkflowNavigationTests/testIssuedNavigationInterruptionPreservesStopAndUncertainty"] +
                 ["KelpieUITests/WorkflowCaptureUITests/" + name for name in sorted(ui)]), ui | unit
     if scope == "keyboard":
         name = "testKeyboardGeometryForOwnedPacedCapture"
