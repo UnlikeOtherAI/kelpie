@@ -62,6 +62,26 @@ export async function runEngine(client,fixture,engine,report) {
    {action:"extract",name:"catalogue",params:{scope:"#catalogue",fields:[{name:"tea",selector:"h3",source:"text",multiple:true}],metadata:true}}]});
   semanticPlay=playFacts(result);
   semanticStage="validate-output";
+  if(!result.success){
+   const codes=new Set(["INPUT_UNCERTAIN","INPUT_INTERRUPTED","SENSITIVE_CAPTURE_REFUSED","DOCUMENT_CHANGED",
+    "AUTHORIZATION_REVOKED","CAPTURE_DOCUMENT_CHANGED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_FAILED",
+    "CAPTURE_DURATION_LIMIT","CAPTURE_ADMISSION_FAILED","TAB_CHANGED","TAB_NOT_VISIBLE","RENDERER_CHANGED",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_EDITABLE","TARGET_NOT_INTERACTABLE",
+    "TIMEOUT","WEBVIEW_ERROR","WORKFLOW_FAILED","COMMAND_FAILED","BUSY","UNAUTHORIZED"]);
+   const classify=code=>codes.has(code)?code:"OTHER";
+   const evidence={engine,mcpCode:classify(result.error?.code)};
+   report.semanticFailure=evidence;
+   try{
+    const status=await client.api("get-script-status");
+    evidence.status={success:status.success===true,state:["idle","running","finalizing","completed","failed","aborted"].includes(status.state)?status.state:"OTHER",
+     hasRunId:typeof status.runId==="string",runSuccess:status.runSuccess===true?true:status.runSuccess===false?false:null,
+     runError:classify(status.runError?.code),mayHaveCompleted:status.mayHaveCompleted===true,
+     artifactCount:Array.isArray(status.artifacts)?status.artifacts.length:null};
+   }catch(error){evidence.statusException=errorFacts(error);}
+   const events=fixture.events.slice(begin);
+   evidence.entryInputObserved=events.some(event=>event.type==="input"&&event.target==="entry");
+   evidence.submitClickObserved=events.some(event=>event.type==="click"&&event.target==="submit");
+  }
   requireTrue(result.success,"SEMANTIC_WORKFLOW");
   const field=result.outputs?.catalogue?.fields?.[0];
   requireTrue(field?.status==="ok"&&field.values.join("|")==="Green tea|Black tea"&&field.provenance.selector==="h3","STRUCTURED_EXTRACTION_PROVENANCE");
