@@ -173,6 +173,18 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DRIVER.selection("unrecognized")
 
+    def test_geometry_selection_uses_only_real_target_pinch_and_keyboard_journeys(self):
+        targets, names = DRIVER.selection("geometry")
+        self.assertEqual(names, {
+            "testLiveMarkerProjectionMatchesSameSceneTarget",
+            "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+            "testNativePinchClipsTapCenterAndExportedMarker",
+            "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+        })
+        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+        _, full_names = DRIVER.selection("full")
+        self.assertTrue(names < full_names)
+
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")
