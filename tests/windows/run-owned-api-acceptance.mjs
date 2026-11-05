@@ -8,7 +8,7 @@ import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 const [exe,cli,privateRoot,evidenceRoot,manifestFile,mode="full"]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,evidenceRoot,manifestFile].every(value=>value&&isAbsolute(value)));
-assert.ok(mode==="motion"||mode==="g08"||mode==="alias-only"||mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
+assert.ok(mode==="paced-probe"||mode==="motion"||mode==="g08"||mode==="alias-only"||mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
 const execute=promisify(execFile),tests=dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(await readFile(manifestFile,"utf8"));
 for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(manifest[key],/^[a-f0-9]{64}$/);
@@ -61,7 +61,9 @@ try{
  const expectedVersion=/project\(kelpie_windows VERSION ([0-9.]+)/.exec(cmakeSource)?.[1];
  assert.ok(expectedVersion);assert.equal(nativeInfo.version,expectedVersion);report.nativeVersion=nativeInfo.version;
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
- if(mode==="motion"){
+ if(mode==="paced-probe"){
+  await childCase("paced fill geometry diagnostic","run-script-capture-acceptance.mjs",[readinessFile,join(evidenceRoot,"native")],{KELPIE_CAPTURE_SOURCE:manifest.source,KELPIE_CAPTURE_CASE_FILTER:"paced fill emits trusted Unicode scalars"});
+ }else if(mode==="motion"){
   await childCase("native clipped geometry and motion media","run-geometry-media-acceptance.mjs",[readinessFile,join(evidenceRoot,"geometry"),"motion"],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }else if(mode==="g08"){
   await childCase("shared G08 fixture through Windows HTTP", "run-g08-acceptance.mjs", [readinessFile,join(evidenceRoot,"g08"),identityFile]);

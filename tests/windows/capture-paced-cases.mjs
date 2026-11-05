@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 export async function runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture}) {
   await check("paced fill emits trusted Unicode scalars with intervals", async () => {
     await navigate();
-    const setup="(()=>{document.body.innerHTML='<input id=paced value=old>';window.__paced=[];" +
-      "document.querySelector('#paced').oninput=e=>window.__paced.push({data:e.data,time:performance.now(),trusted:e.isTrusted});return true})()";
+    const setup="(()=>{document.body.innerHTML='<input id=paced value=old style=display:block>';window.__paced=[];" +
+      "document.querySelector('#paced').oninput=e=>window.__paced.push({data:e.data,time:performance.now(),trusted:e.isTrusted});" +
+      "window.__geometry=[];const record=kind=>{const e=document.querySelector('#paced'),r=e.getBoundingClientRect(),v=visualViewport;if(window.__geometry.length<160)window.__geometry.push({kind,time:performance.now(),rect:[r.x,r.y,r.width,r.height],scroll:[scrollX,scrollY],viewport:[innerWidth,innerHeight,v.width,v.height,v.offsetLeft,v.offsetTop,v.scale]})};" +
+      "const e=document.querySelector('#paced');e.addEventListener('focus',()=>record('focus'));e.addEventListener('input',()=>record('input'));record('setup');window.__geometryTimer=setInterval(()=>record('sample'),25);return true})()";
     assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
     const result=await api("play-script",{...workflow([{action:"fill",target:{selector:"#paced"},text:"A😀B",typingDelayMs:120}]),
       capture:{formats:["gif","screenshots"],fps:15,maxWidth:640,maxDurationMs:12000,maxBytes:8388608}});
-    assert.equal(result.success,true,JSON.stringify(result));
+    const geometry=(await api("evaluate",{tabId,expression:"(clearInterval(window.__geometryTimer),window.__geometry)"})).result;
+    if(!result.success)throw new Error(JSON.stringify({code:result.error?.code,mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:result.actionsExecuted,artifactCount:result.artifacts?.length,geometry}));
     const events=(await api("evaluate",{tabId,expression:"window.__paced"})).result;
     const inserted=events.filter(event=>event.data!==null);
     assert.deepEqual(inserted.map(event=>event.data),["A","😀","B"]);
@@ -18,7 +21,7 @@ export async function runPacedCases({check,navigate,api,workflow,download,click,
     assert.ok(result.artifacts.some(item=>item.mimeType==="image/gif"));
     assert.ok(result.artifacts.some(item=>item.mimeType==="image/png"));
     await download(result);
-    return {events:events.length,intervals:[inserted[1].time-inserted[0].time,inserted[2].time-inserted[1].time]};
+    return {events:events.length,intervals:[inserted[1].time-inserted[0].time,inserted[2].time-inserted[1].time],geometry};
   });
   await check("paced type appends Unicode and empty fill clears once", async () => {
     await navigate();
