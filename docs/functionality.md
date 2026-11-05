@@ -686,3 +686,9 @@ registering its text for redaction. Earlier outputs are scrubbed and the whole
 run's capture is discarded on privacy refusal or output-redaction failure. The
 first concrete error and uncertainty remain visible through finalization; ordinary
 abort/failure may retain valid partial artifacts.
+
+Android tabs support native pinch zoom without on-screen zoom buttons. Recording
+keeps semantic target coordinates in layout CSS and maps native/exported indicators
+through the captured visual viewport. Pending input refuses when that viewport
+changes. Page touches remain blocked while recording is active.
+Android recording holds the current orientation through finalization and restores the previous orientation policy on completion, abort, failure or UI disposal, matching iOS.

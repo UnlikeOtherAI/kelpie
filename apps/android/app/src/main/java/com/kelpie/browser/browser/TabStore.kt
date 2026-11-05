@@ -160,6 +160,8 @@ class TabStore(
                 settings.domStorageEnabled = true
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
                 settings.setSupportMultipleWindows(false)
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.userAgentString = BROWSER_USER_AGENT
