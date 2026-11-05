@@ -48,6 +48,10 @@ final class ScriptCapture {
         rawBudget = ScriptCaptureBudget(directory: rawDirectory, maximumBytes: 67108864)
     }
 
+    func checkTime() throws {
+        guard ScriptCaptureDeadline.allows(elapsed: now, maximum: maximumDuration, stopped: stopped) else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
+    }
+
     func start() async throws {
         started = ProcessInfo.processInfo.systemUptime
         if hasMovies {
