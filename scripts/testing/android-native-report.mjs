@@ -14,6 +14,7 @@ export function summarize(root) {
     const text = read('instrumentation.log');
     const match = /^OK \((\d+) tests?\)/m.exec(text);
     const failed = /FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed/.test(text);
+    const failureCount = /Tests run:\s*(\d+),\s*Failures:\s*(\d+)/.exec(text);
     const exports = [];
     function collect(path) {
       if (!existsSync(path)) return;
@@ -30,7 +31,8 @@ export function summarize(root) {
     try { cli = JSON.parse(read('cli-report.json')); } catch { /* Missing/invalid report fails closed. */ }
     const cliPassed = cli?.success === true && read('cli-exit.txt') === '0' && /^OK \(1 test\)/m.test(read('cli-instrumentation.log'));
     report.profiles.push({ deviceClass: profile, cliPassed, passed: Boolean(match) && !failed && read('instrumentation-exit.txt') === '0' && cliPassed,
-      tests: match ? Number(match[1]) : null, exports, blocker: read('blocker.txt') || null });
+      tests: match ? Number(match[1]) : failureCount ? Number(failureCount[1]) : null,
+      failures: failureCount ? Number(failureCount[2]) : match ? 0 : null, exports, blocker: read('blocker.txt') || null });
   }
   return report;
 }

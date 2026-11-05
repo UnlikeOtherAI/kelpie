@@ -41,21 +41,28 @@ abstract class ScriptPublicFixture {
         server: MockWebServer,
         navigation: Boolean = false,
     ): String {
+        val fixtureId = "fixture-" + java.util.UUID.randomUUID()
         val activation = if (navigation) "location.href=\'/next\'" else "document.title=\'Clicked:\'+event.isTrusted"
         server.enqueue(
             MockResponse().setHeader("Content-Type", "text/html").setBody(
                 """<!doctype html><meta name="viewport" content="width=device-width"><title>Ready</title>
-            <style>body{margin:0;background:white}button{position:absolute;left:100px;top:140px;width:120px;height:60px}</style>
-            <button onclick="$activation">Submit</button>
+            <style>body{margin:0;background:white}button{position:absolute;left:100px;top:140px;width:120px;height:60px;background:#eee;color:#111;border:1px solid #777;box-sizing:border-box}</style>
+            <button id="$fixtureId" onclick="$activation">Submit</button>
             <input aria-label="Name" style="position:absolute;top:250px" value="private-form-canary">
             <p id="public" style="position:absolute;top:320px">Public fixture</p>""",
             ),
         )
         val tab = client.call("get-tabs").getString("activeTab")
         assertTrue(client.call("navigate", JSONObject().put("url", server.url("/fixture").toString())).getBoolean("success"))
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (client.core("tab.title", tab).optString("value") != "Ready" && System.nanoTime() < deadline) Thread.sleep(50)
-        assertEquals("Ready", client.core("tab.title", tab).getString("value"))
+        ui.waitUntil(15_000) {
+            client.core("tab.title", tab).optString("value") == "Ready" &&
+                client
+                    .core("tab.ready", tab, JSONObject().put("state", "complete").put("selector", "#" + fixtureId))
+                    .getJSONObject("value")
+                    .getBoolean("ready")
+        }
+        ui.waitForIdle()
+        ScriptPinchProbe(instrumentation, ui.activity.window.decorView).settledNativeGeometry()
         return tab
     }
 
@@ -142,25 +149,76 @@ abstract class ScriptPublicFixture {
     }
 
     protected fun captureBlueMarker(): Bitmap {
+        val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
         val deadline = System.nanoTime() + 10_000_000_000L
+        var rejected: Bitmap? = null
         while (System.nanoTime() < deadline) {
             ui.waitForIdle()
-            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
-            var blue = 0
-            for (y in 0 until bitmap.height step 16) {
-                for (x in 0 until bitmap.width step 16) {
-                    val color = bitmap.getPixel(x, y)
-                    if (android.graphics.Color.blue(color) > android.graphics.Color.red(color) + 50 &&
-                        android.graphics.Color.blue(color) > android.graphics.Color.green(color) + 20
-                    ) {
-                        blue++
-                    }
-                }
+            val viewport = android.graphics.Rect()
+            instrumentation.runOnMainSync {
+                val location = IntArray(2)
+                owned.getLocationOnScreen(location)
+                viewport.set(location[0], location[1], location[0] + owned.width, location[1] + owned.height)
             }
-            if (blue >= 10) return bitmap
-            bitmap.recycle()
+            val target = submitTargetBounds(viewport)
+            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
+            if (marker != null) {
+                val confirmedTarget = checkNotNull(target)
+                rejected?.recycle()
+                File(evidence, "native-marker-evidence.json").writeText(
+                    JSONObject()
+                        .put(
+                            "target",
+                            JSONObject()
+                                .put("left", confirmedTarget.left)
+                                .put("top", confirmedTarget.top)
+                                .put("right", confirmedTarget.right)
+                                .put("bottom", confirmedTarget.bottom),
+                        ).put(
+                            "webView",
+                            JSONObject()
+                                .put("left", viewport.left)
+                                .put("top", viewport.top)
+                                .put("right", viewport.right)
+                                .put("bottom", viewport.bottom),
+                        ).put("componentArea", marker.area)
+                        .put("centerX", marker.x)
+                        .put("centerY", marker.y)
+                        .put("centerCoverage", marker.centerCoverage)
+                        .toString(2),
+                )
+                return bitmap
+            }
+            rejected?.recycle()
+            rejected = bitmap
             Thread.sleep(50)
         }
-        throw AssertionError("Native blue marker never appeared")
+        rejected?.let { image ->
+            File(evidence, "native-marker-rejected.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            image.recycle()
+        }
+        throw AssertionError("Scene-centered native Submit marker never appeared")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun submitTargetBounds(viewport: android.graphics.Rect): android.graphics.Rect? {
+        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
+        try {
+            val nodes = root.findAccessibilityNodeInfosByText("Submit")
+            try {
+                for (node in nodes) {
+                    if (!node.isVisibleToUser || !node.isClickable || node.text?.toString() != "Submit") continue
+                    val rect = android.graphics.Rect()
+                    node.getBoundsInScreen(rect)
+                    if (rect.intersect(viewport) && !rect.isEmpty) return rect
+                }
+            } finally {
+                nodes.forEach { it.recycle() }
+            }
+        } finally {
+            root.recycle()
+        }
+        return null
     }
 }

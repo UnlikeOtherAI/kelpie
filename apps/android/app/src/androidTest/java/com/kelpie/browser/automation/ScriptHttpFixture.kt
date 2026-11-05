@@ -34,6 +34,15 @@ class ScriptHttpFixture : AutoCloseable {
             val status = connection.responseCode
             val stream = if (status < 400) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (path == "/v1/play-script") {
+                // Authored fixture replies only: never pairing responses or credentials.
+                val context =
+                    androidx.test.platform.app.InstrumentationRegistry
+                        .getInstrumentation()
+                        .targetContext
+                val folder = java.io.File(context.getExternalFilesDir(null), "script-acceptance").apply { mkdirs() }
+                java.io.File(folder, "script-reply-" + UUID.randomUUID() + "-http-" + status + ".json").writeText(body)
+            }
             return status to if (body.isEmpty()) JSONObject() else JSONObject(body)
         } finally {
             connection.disconnect()
@@ -76,7 +85,7 @@ class ScriptHttpFixture : AutoCloseable {
         body: JSONObject = JSONObject(),
     ): JSONObject {
         val response = request("/v1/" + method, body)
-        assertEquals("HTTP status for " + method, 200, response.first)
+        assertEquals("HTTP status for " + method + " code=" + response.second.optJSONObject("error")?.optString("code"), 200, response.first)
         return response.second
     }
 

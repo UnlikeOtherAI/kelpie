@@ -115,6 +115,10 @@ class ScriptSecurityFlowTest : ScriptPublicFixture() {
                     val deadline = System.nanoTime() + 5_000_000_000L
                     while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(20)
                     Thread.sleep(1200)
+                    ui.waitForIdle()
+                    val beforeStop = client.call("get-script-status")
+                    java.io.File(evidence, "before-native-stop-status.json").writeText(beforeStop.toString(2))
+                    assertTrue("Run ended before native Stop: " + beforeStop.optJSONObject("runError")?.optString("code"), beforeStop.getBoolean("playing"))
                     ui.onNodeWithContentDescription("Stop recording").performClick()
                     val stopped = pending.get(15, TimeUnit.SECONDS)
                     assertFalse(stopped.getBoolean("success"))

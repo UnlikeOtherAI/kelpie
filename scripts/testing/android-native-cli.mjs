@@ -21,10 +21,23 @@ const paired = await command('cli-pair', ['pair', '--client-name', 'Hosted nativ
 assert.equal(paired.success, true);
 assert.equal(paired.persisted, true);
 assert.equal((await command('cli-navigate', ['navigate', bridge.url])).success, true);
+const readyUntil = Date.now() + 60000;
+let ready = false;
+while (!ready && Date.now() < readyUntil) {
+  const title = await command('cli-new-document-title', ['browser-control', JSON.stringify({
+    version: 1, method: 'tab.title', tabId: bridge.tabId, params: {},
+  })]);
+  const state = await command('cli-new-document-ready', ['browser-control', JSON.stringify({
+    version: 1, method: 'tab.ready', tabId: bridge.tabId, params: { selector: '#pixels', state: 'complete' },
+  })]);
+  ready = title.ok === true && title.value === 'Noise ready' && state.ok === true && state.value.ready === true;
+  if (!ready) await new Promise(resolveReady => setTimeout(resolveReady, 50));
+}
+assert.equal(ready, true, 'New canvas document must finish drawing before capture starts');
 const script = {
   version: 1, tabId: bridge.tabId,
   capture: { formats: ['screenshots'], maxWidth: 640, maxBytes: 16777216 },
-  actions: [{ action: 'wait-ready', state: 'complete', timeoutMs: 10000 },
+  actions: [{ action: 'wait-ready', state: 'complete', selector: '#pixels', timeoutMs: 10000 },
     { action: 'screenshot' }],
 };
 const scriptFile = join(folder, 'cli-script.json');
@@ -38,8 +51,8 @@ assert.equal(status.runId, run.runId);
 assert.equal(status.state, 'completed');
 assert.equal(status.runSuccess, true);
 assert.equal(Object.hasOwn(status, 'outputs'), false);
-const artifact = run.artifacts.find(item => item.mimeType === 'image/png' && item.byteLength > 262144);
-assert.ok(artifact, 'Expected PNG spanning the canonical artifact chunk boundary');
+const artifact = run.artifacts.filter(item => item.mimeType === 'image/png').sort((a, b) => b.byteLength - a.byteLength)[0];
+assert.ok(artifact, 'Expected a retained PNG, including negative tiny captures');
 const exports = join(folder, 'script-acceptance');
 await mkdir(exports, { recursive: true });
 const destination = join(exports, 'cli-' + artifact.id + '.png');
@@ -47,6 +60,7 @@ await command('cli-download', ['script', 'download', run.runId, artifact.id, des
 const bytes = await readFile(destination);
 assert.equal(bytes.length, artifact.byteLength);
 assert.equal(createHash('sha256').update(bytes).digest('hex'), artifact.sha256);
+assert.ok(artifact.byteLength > 262144, 'Expected PNG spanning the canonical artifact chunk boundary');
 await writeFile(join(folder, 'cli-report.json'), JSON.stringify({
   success: true, transport: 'authenticated public CLI', runId: run.runId,
   sha256: artifact.sha256, byteLength: bytes.length, sourceRevision: process.env.GITHUB_SHA,
