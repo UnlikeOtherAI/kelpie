@@ -72,3 +72,8 @@ export function listenerTransitionSignal(line){
  const renderer=/^\[WorkflowRenderer\] event=(begin|created|active|service-update) engine=(webkit|chromium)$/.exec(line);
  return renderer?{event:renderer[1],engine:renderer[2]}:null;
 }
+
+export function captureCoherenceSignal(line){
+ const match=/^\[WorkflowCaptureCoherence\] sample=(screenshot|critical|movie) change=(document|viewport)$/.exec(line);
+ return match?{sample:match[1],change:match[2]}:null;
+}
