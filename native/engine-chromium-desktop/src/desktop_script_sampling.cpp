@@ -3,6 +3,9 @@
 #include "desktop_script_capture_state.h"
 #include "desktop_capture_stage_timing.h"
 #include "desktop_capture_receipt.h"
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+#include "desktop_capture_receipt_test_hook.h"
+#endif
 #include <stdexcept>
 #include <algorithm>
 #include <cstdio>
@@ -42,6 +45,10 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   std::string previous_document;
   const std::string viewport_expression="(()=>{const v=window.visualViewport;return {width:innerWidth,height:innerHeight,visualViewport:{offsetLeft:v?.offsetLeft??0,offsetTop:v?.offsetTop??0,width:v?.width??innerWidth,height:v?.height??innerHeight,scale:v?.scale??1}}})()";
   std::string first_document;
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+  std::optional<std::string> receipt_test_old_document;
+  bool receipt_test_new_admitted=false;
+#endif
   std::size_t dropped = 0;
   bool partial = false;
   std::string reason;
@@ -106,6 +113,15 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const auto timing_pre=stage_timing.Now();
       BrowserScreenshot image;
       result = engine.CaptureScreenshot(lease, &image, &after, std::chrono::seconds(3));
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+      if(result.ok && !receipt_test_old_document && std::getenv("KELPIE_CAPTURE_RECEIPT_FIXTURE_URL")) {
+        if(!config.revalidate || !config.revalidate(owner)) {
+          grant_revoked.store(true);abort->store(true);
+          throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+        }
+        receipt_test_old_document=ReceiptTestNavigateOnce(engine,lease,before);
+      }
+#endif
       const auto timing_screenshot=stage_timing.Now();
       const auto timing_post_nav=timing_screenshot;
       if (!result.ok) throw std::runtime_error(result.error_code=="CAPTURE_DOCUMENT_UNAVAILABLE" ?
@@ -130,6 +146,11 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         if(failure==CaptureViewportFailure::DocumentUnavailable)
           throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
         if(failure==CaptureViewportFailure::TornFrame) {
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+          if(receipt_test_old_document && before.tab.document_version==*receipt_test_old_document) {
+            std::fputs("KELPIE_RECEIPT_TEST_TORN_DROPPED\n",stderr);std::fflush(stderr);
+          }
+#endif
           bool cleared=false;
           { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
           ++dropped;
@@ -153,8 +174,21 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
             DesktopTerminalMarkerIdentity(shown)!=terminal_identity)
           throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
       }
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+      if(receipt_test_old_document) {
+        if(shown.value("documentVersion",std::string())==*receipt_test_old_document)
+          throw std::runtime_error("CAPTURE_RECEIPT_TEST_STALE_FRAME");
+
+      }
+#endif
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png,
           terminal ? purpose : DesktopScriptFramePurpose::Ordinary);
+#ifdef KELPIE_CAPTURE_RECEIPT_TEST_HOOK
+      if(receipt_test_old_document && !receipt_test_new_admitted) {
+        std::fputs("KELPIE_RECEIPT_TEST_NEW_FRAME\n",stderr);std::fflush(stderr);
+        receipt_test_new_admitted=true;
+      }
+#endif
       stage_timing.Add(frame_time,timing_start,timing_pre_nav,timing_pre,timing_screenshot,timing_post_nav,timing_post,stage_timing.Now());
       if (terminal && (!config.revalidate || !config.revalidate(owner))) {
         grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");

@@ -27,7 +27,12 @@ const exec=promisify(execFile),report={source:manifest.source,stage:"launch",dia
 let pending="",child,closed,readiness,fixture,api;
 if(stageTiming||startupOnly)report.steps=[];
 if(stageTiming)report.captureStages=[];
-function acceptLine(line){const value=parseViewportDiagnostic(line);if(value&&report.diagnostics.length<16)report.diagnostics.push(value);
+function acceptLine(line){
+ if(process.env.KELPIE_CAPTURE_RECEIPT_FIXTURE_URL &&
+    ["KELPIE_RECEIPT_TEST_NAVIGATED","KELPIE_RECEIPT_TEST_TORN_DROPPED","KELPIE_RECEIPT_TEST_NEW_FRAME"].includes(line)){
+  report.receiptTestEvents??=[];report.receiptTestEvents.push(line);
+ }
+ const value=parseViewportDiagnostic(line);if(value&&report.diagnostics.length<16)report.diagnostics.push(value);
  if(stageTiming){const stage=parseCaptureStage(line);if(stage&&report.captureStages.length<801)report.captureStages.push(stage);}}
 try{
  const sidCode="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
@@ -74,9 +79,12 @@ try{
   assert.ok(Array.isArray(filters)&&filters.length>0&&filters.length<=6);
   assert.ok(filters.every(filter=>typeof filter==="string"&&/^[A-Za-z0-9 ,_-]{1,100}$/.test(filter)));
   report.caseFilters=filters;
+  const receiptTest=Boolean(process.env.KELPIE_CAPTURE_RECEIPT_FIXTURE_URL);
+  if(receiptTest) assert.deepEqual(filters,["receipt checkpoint"]);
   for(const [index,filter] of filters.entries()){
    const output=filters.length===1?join(evidenceRoot,"native"):join(evidenceRoot,"native-"+index);
-   await exec(process.execPath,[join(tests,"run-script-capture-acceptance.mjs"),readinessPath,output],
+   const script=receiptTest?"run-receipt-navigation-case.mjs":"run-script-capture-acceptance.mjs";
+   await exec(process.execPath,[join(tests,script),readinessPath,output],
      {env:{...env,KELPIE_CAPTURE_SOURCE:manifest.source,KELPIE_CAPTURE_CASE_FILTER:filter},windowsHide:true,timeout:180000,maxBuffer:2097152});
    const caseReport=JSON.parse(await readFile(join(output,"report.json"),"utf8"));
    assert.ok(Array.isArray(caseReport.checks)&&caseReport.checks.length>0 && caseReport.checks.every(check=>check.passed===true));
@@ -89,6 +97,8 @@ try{
  report.processExit=await Promise.race([closed,new Promise((_,reject)=>setTimeout(()=>reject(new Error("CLOSE_TIMEOUT")),12000))]);
  let present=true;try{await access(readinessPath);}catch{present=false;}report.readinessAbsent=!present;
  assert.ok(report.readinessAbsent);report.cleanup="public-close-exited";
+ if(process.env.KELPIE_CAPTURE_RECEIPT_FIXTURE_URL)
+  assert.deepEqual(report.receiptTestEvents,["KELPIE_RECEIPT_TEST_NAVIGATED","KELPIE_RECEIPT_TEST_TORN_DROPPED","KELPIE_RECEIPT_TEST_NEW_FRAME"]);
 }catch(error){
  report.failure={stage:report.stage,kind:["AssertionError","Error","TypeError","AbortError","TimeoutError"].includes(error.name)?error.name:"Other"};
  process.exitCode=1;
