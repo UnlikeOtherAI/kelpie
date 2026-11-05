@@ -1,0 +1,76 @@
+name: Fedora installed CLI diagnostic
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: linux-native-candidate-fedora-44
+          path: dist/release/fedora-44
+          run-id: 42102220654
+          github-token: ${{ github.token }}
+      - uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22.14.0
+      - name: Verify and prepare exact candidate
+        run: |
+          set -euo pipefail
+          root=dist/release/fedora-44
+          test "$(cat "$root/source-revision.txt")" = 1a148927ad081fab54a71ba8ada95bf038c7c9ef
+          printf '%s  %s\n' 7872126627adb7e58a4d67497d578d94666dc3b7c6e12b5a3d6ff3380ed0f96e "$root/kelpie-0.1.15~candidate.1a148927ad08-1.x86_64.rpm" | sha256sum -c -
+          printf '%s  %s\n' e4020d1600a0a9701bcfc32047aaaa238c576b58a86f1915fface71fa0ca7c8d "$root/unlikeotherai-kelpie-0.1.22.tgz" | sha256sum -c -
+          test_revision="$(git rev-parse HEAD)"
+          git diff 1a148927ad081fab54a71ba8ada95bf038c7c9ef "$test_revision" -- scripts/ci/linux-installed-smoke.sh > "$root/cli-hook-diff.patch"
+          git checkout --detach 1a148927ad081fab54a71ba8ada95bf038c7c9ef
+          git show "$test_revision:scripts/ci/linux-installed-smoke.sh" > scripts/ci/linux-installed-smoke.sh
+          printf '%s\n' "$test_revision" > "$root/cli-test-revision.txt"
+          pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          pnpm --filter @unlikeotherai/kelpie build
+      - name: Run exact installed CLI only
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          root=dist/release/fedora-44
+          curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "$RUNNER_TEMP/kelpie-moby-default.json"
+          KELPIE_SECCOMP_BASELINE="$RUNNER_TEMP/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
+          node scripts/ci/linux-test-seccomp.mjs "$RUNNER_TEMP/kelpie-moby-default.json" "$RUNNER_TEMP/kelpie-test-seccomp.json"
+          test "$(sha256sum "$RUNNER_TEMP/kelpie-test-seccomp.json" | cut -d' ' -f1)" = "$(awk 'NR==2 {print $1}' "$root/test-seccomp-sha256.txt")"
+          printf '%s\n' 'sourceRun=42102220654' 'sourceArtifact=13454040953' 'image=fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e' 'scope=installed-cli-only' > "$root/cli-scope.txt"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
+            --security-opt no-new-privileges=true --security-opt "seccomp=$RUNNER_TEMP/kelpie-test-seccomp.json" \
+            -e KELPIE_INSTALLED_SMOKE_CLI_ONLY=1 -e KELPIE_RESOURCE_TEST_REVISION="$(cat "$root/cli-test-revision.txt")" \
+            -v "$PWD:/workspace:ro" -v "$PWD/$root:/workspace/$root" -w /workspace \
+            fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e \
+            bash scripts/ci/linux-installed-smoke.sh fedora-44 "/workspace/$root" 2>&1 | tee "$root/cli-diagnostic.log"
+      - name: Upload bounded CLI evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: fedora-installed-cli-only
+          path: |
+            dist/release/fedora-44/cli-scope.txt
+            dist/release/fedora-44/cli-hook-diff.patch
+            dist/release/fedora-44/cli-test-revision.txt
+            dist/release/fedora-44/cli-diagnostic.log
+            dist/release/fedora-44/installed-smoke-cli-only/outcome.json
+            dist/release/fedora-44/installed-smoke-cli-only/installed-sha256.txt
+            dist/release/fedora-44/installed-smoke-cli-only/client-package-sha256.txt
+            dist/release/fedora-44/installed-smoke-cli-only/public-cli.log
+            dist/release/fedora-44/installed-smoke-cli-only/alias/report.json
+            dist/release/fedora-44/installed-smoke-cli-only/alias/observations.json
+            dist/release/fedora-44/installed-smoke-cli-only/alias/alias/report.json
+          if-no-files-found: warn

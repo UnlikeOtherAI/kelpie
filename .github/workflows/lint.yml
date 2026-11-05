@@ -7,6 +7,10 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      linux_fedora_cli_diagnostic:
+        description: Run exact prior Fedora RPM installed CLI-only diagnostic
+        type: boolean
+        default: false
       linux_native_candidate:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
@@ -24,6 +28,13 @@ permissions:
   contents: read
 
 jobs:
+  linux-fedora-cli-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_fedora_cli_diagnostic
+    uses: ./.github/workflows/linux-installed-cli-diagnostic.yml
+    permissions:
+      contents: read
+      actions: read
+
   linux-mux-probe:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
     uses: ./.github/workflows/linux-mux-probe.yml

@@ -5,9 +5,15 @@ set -euo pipefail
 distro="$1"
 package_root="$(realpath "$2")"
 [[ "$package_root" == /workspace/dist/release/* && -d "$package_root" ]] || exit 1
+cli_only="${KELPIE_INSTALLED_SMOKE_CLI_ONLY:-0}"
+[[ "$cli_only" == 0 || ( "$cli_only" == 1 && "$distro" == fedora-44 ) ]] || exit 1
 output="$package_root/installed-smoke"
 if [[ "${KELPIE_INSTALLED_SMOKE_REPLAY:-}" == 1 ]]; then output="$package_root/installed-smoke-replay"; fi
 if [[ "${KELPIE_INSTALLED_SMOKE_DIAGNOSTIC:-}" == 1 ]]; then output="$package_root/installed-smoke-resource"; fi
+if [[ "$cli_only" == 1 ]]; then
+  [[ "${KELPIE_INSTALLED_SMOKE_DIAGNOSTIC:-0}" == 0 && "${KELPIE_INSTALLED_SMOKE_REPLAY:-0}" == 0 ]] || exit 1
+  output="$package_root/installed-smoke-cli-only"
+fi
 mkdir "$output"
 stage=install
 cgroup_snapshot() {
@@ -109,6 +115,7 @@ run() {
     KELPIE_LINUX_FINALIZE_FAULT=1 KELPIE_LINUX_PREINPUT_REPLACEMENT=1 \
     timeout --signal=TERM --kill-after=10 300 "$node" "$@"
 }
+if [[ "$cli_only" == 0 ]]; then
 stage=native-http-mcp
 run tests/linux/run-native-capture-acceptance.mjs /usr/bin/kelpie-linux "$output/capture" \
   > "$output/native-corpus.log" 2>&1
@@ -120,7 +127,8 @@ else
   run tests/linux/diagnose-media-count.mjs "$output/capture" --synthetic-fixture > "$output/media-diagnostic.log" 2>&1 || true
   exit "$media_status"
 fi
+fi
 stage=public-cli
 run tests/linux/run-native-alias-acceptance.mjs /usr/bin/kelpie-linux \
   "$home/client/package/bin/kelpie.js" "$output/alias" offscreen > "$output/public-cli.log" 2>&1
-stage=complete
+if [[ "$cli_only" == 1 ]]; then stage=cli-only-complete; else stage=complete; fi
