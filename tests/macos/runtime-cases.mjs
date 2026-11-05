@@ -337,9 +337,9 @@ export async function runEngine(client,fixture,engine,report) {
   const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
   const artifacts=await client.download(result,engine+"-curve-"+curve);
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
- });
+ },{continueOnFailure:true});
+ await check("dense-animation",()=>runG08(client,tabId,engine,report),{continueOnFailure:true});
  await runSafety({client,fixture,engine,base,capture,check,play,load});
- await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
  const failed=checks.find(item=>!item.passed);
  if(failed)throw new Failure(failed.code);
