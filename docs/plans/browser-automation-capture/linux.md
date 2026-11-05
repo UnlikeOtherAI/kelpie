@@ -68,45 +68,45 @@ platform's test is not a Linux pass.
 | OBS-01 | Native shared value-free snapshot/private canaries | Pending |
 | OBS-02 | Scoped/prioritized observation under real bounds | Pending |
 | OBS-03 | Text/name/element/metadata limits and truthful truncation | Pending |
-| EXT-01 | Scalar extraction with missing/ambiguity/source checks | Pending |
+| EXT-01 | Scalar extraction with missing/ambiguity/source checks | HTTP90eb products passed; missing/ambiguity cases pending |
 | EXT-02 | Nested/repeated deterministic records | Pending |
 | EXT-03 | Bounded publisher metadata and JSON-LD allowlist | Pending |
 | EXT-04 | Document/source/truncation provenance | Pending |
 | RDY-01 | Actual DOM status and unavailable diagnostic facts | Pending |
 | RDY-02 | Explicit readiness/hidden/duplicate/failure cases | Pending |
-| OWN-01 | Managed backend prerequisite real sessions; native scope not expanded | Prerequisite pending follow-up |
+| OWN-01 | Managed backend prerequisite real sessions; native scope not expanded | Portable eee passed; LP c774 one-tab diagnostic; public LP pending |
 | OWN-02 | Exact native lease/refs/pins/late callback ownership | Pending |
-| WFL-01 | Shared strict v1 validation before admission/action | Pending |
+| WFL-01 | Shared strict v1 validation before admission/action | HTTP90eb six actions passed; malformed cases pending |
 | WFL-02 | Typed inputs/secrets without executable interpolation | Pending |
-| WFL-03 | Ordered waits/assertions/extractions/outputs | Pending |
+| WFL-03 | Ordered waits/assertions/extractions/outputs | HTTP90eb ordered six actions; extended cases pending |
 | WFL-04 | Existing legacy route with no v1 privilege widening | Pending |
 | WFL-05 | Unknown mutation stops; one activation; self-recovery | Pending |
-| TGT-01 | Unique eligible semantic target | Pending |
-| TGT-02 | Visible hit-tested center | Pending |
+| TGT-01 | Unique eligible semantic target | HTTP90eb unique target passed; extended cases pending |
+| TGT-02 | Visible hit-tested center | HTTP90eb visible center passed; extended cases pending |
 | TGT-03 | Scroll/DPR/zoom/clipped viewport correctness | Pending |
 | TGT-04 | Exact object/document/geometry revalidation | Pending |
-| TGT-05 | Real input trust matches advertised guarantee | Pending |
+| TGT-05 | Real input trust matches advertised guarantee | HTTP90eb trusted-coordinate passed; extended cases pending |
 | PTR-01 | C/S eased visible trajectory/endpoints | Pending |
 | PTR-02 | Numeric display/export correspondence | Pending |
-| VIS-01 | Requested marker color/radius/opacity in decoded pixels | Pending |
+| VIS-01 | Requested marker color/radius/opacity in decoded pixels | Codec red-center units passed; app pixel checker pending |
 | VIS-02 | Wobble/fade timeline and clean end state | Pending |
-| CAP-01 | Real GIF/MP4/every-step PNG through public script | Pending |
-| CAP-02 | GIF loop/frame delays/fixed dimensions | Pending |
-| CAP-03 | MP4 independent decode/PTS/duration/dimensions | Pending |
+| CAP-01 | Real GIF/MP4/every-step PNG through public script | HTTP90eb GIF/MP4/six PNG passed; recovery pending |
+| CAP-02 | GIF loop/frame delays/fixed dimensions | All13 actual GIF frames decoded; extended timing pending |
+| CAP-03 | MP4 independent decode/PTS/duration/dimensions | All13 actual MP4 frames/PTS decoded; app limits pending |
 | CAP-04 | Step marker captured at intended timestamp | Pending |
 | CAP-05 | Document/viewport coherence and resize partial refusal | Pending |
 | CAP-06 | Duration/FPS/width/bytes/steps resource preflight | Pending |
 | CAP-07 | Bounded encoder backpressure, drop count, real time | Pending |
 | CAP-08 | Cancel/failure partial finalization and next run | Pending |
-| ART-01 | Separate remote CLI/MCP chunk retrieval | Pending |
+| ART-01 | Separate remote CLI/MCP chunk retrieval | HTTP90eb chunks/hash passed; MCP/CLI pending |
 | ART-02 | Same/foreign/revoked owner status/cancel/download | Pending |
 | ART-03 | Integer/range/size/id/path refusal without unbounded read | Pending |
-| ART-04 | MIME/size/hash/partial/time/document manifest | Pending |
+| ART-04 | MIME/size/hash/partial/time/document manifest | HTTP90eb manifests passed; partial/failure pending |
 | SEC-01 | No synthetic secrets in output/error/log/manifest | Pending |
 | SEC-02 | Page instructions/metadata never authority or code | Pending |
 | DIF-01 | Same frozen corpus/normalized Linux CEF output | Pending |
-| LP-01 | Proven restricted Linux-native worker methods only | Pending exact 1.0.2 phase |
-| LP-02 | Unsupported dispatch refusal and owned isolation | Pending exact 1.0.2 phase |
+| LP-01 | Proven restricted Linux-native worker methods only | Actual1.0.2 diagnostics c774; public admission pending |
+| LP-02 | Unsupported dispatch refusal and owned isolation | One context/page limit; single managed session passed; public pending |
 | WEB-01 | Native grant plus actual private-world API gate | Pending |
 | WEB-02 | Bounded untrusted tools, no grant expansion, unknown fence | Pending |
 | DOC-01 | Linux guarantees/limits/API/CLI examples verified | Pending |
@@ -318,3 +318,16 @@ plugins, actual factory and native codec-test gates, explicit linked GIF ABI,
 system-codec provenance and truthful AppImage requirements. Fedora44 replaces
 the EOL40 build row; Ubuntu22 remains. Distro-container build/package execution
 is pending. No codec binary, third-party repository or privileged helper is added.
+
+## Trusted runtime projection source checkpoint
+
+Root881f066b includes the common tested runtime_mode projection. The Linux
+native host now selects offscreen only from its existing trusted headless launch
+flag, otherwise windowed, and propagates the same value into outbound authorized
+MCP configuration. There is no request-body setter. Unknown modes fail closed;
+no-CEF has no callable script routes. This is source wiring, not a shipping
+native relink/MCP/CLI success claim. Those actual gates remain pending.
+
+The independent actual Lightpanda phase is complete at diagnostic scope; see
+lightpanda-analysis.md for all four revisions, failed expectations and measured
+limits. No public reader/WebMCP/pixel profile was enabled.

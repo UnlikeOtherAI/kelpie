@@ -45,6 +45,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
   if(impl_->started) { ResizeBrowserHost(width,height); return true; }
   DesktopApp::Config runtime;
   runtime.platform=Platform::kLinux; runtime.app_name="kelpie"; runtime.app_version=KELPIE_LINUX_VERSION;
+  runtime.runtime_mode=impl_->config.headless ? "offscreen" : "windowed";
   runtime.port=impl_->config.port; runtime.bind_host="127.0.0.1";
   runtime.control_token=impl_->profile.token(); runtime.device_id=impl_->device.Collect().id;
   runtime.start_stdio_mcp=impl_->config.mcp_stdio; runtime.device_info_provider=impl_.get();
@@ -98,6 +99,7 @@ bool LinuxApp::AttachBrowserHost(std::uintptr_t,int width,int height) {
       [this](const std::string& method,const json& target) { return impl_->desktop.mcp_server().GuardDispatch(method,target); },
       [this](const json& request,const TabLease& job_lease,const connect::Executor::Authorization& authorize) {
         DesktopMcpServer::Config config; config.platform=Platform::kLinux; config.engine="chromium";
+        config.runtime_mode=impl_->config.headless ? "offscreen" : "windowed";
         config.screenshot_base64_limit=kAccountScreenshotBase64Limit;
         return impl_->desktop.mcp_server().HandleBrowserRequestAuthorized(request,config,authorize,job_lease);
       });
