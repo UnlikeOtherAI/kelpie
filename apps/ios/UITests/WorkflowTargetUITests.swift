@@ -144,8 +144,6 @@ extension WorkflowCaptureUITests {
         }
         let result = try await playback.value
         XCTAssertEqual(result["success"] as? Bool, true, WorkflowCaptureProbe.errorCode(result))
-        XCTAssertNotNil(pointer, "A live pointer frame must be visible in the native window")
-        XCTAssertNotNil(marker, "A live marker frame must be visible in the native window")
         let manifest = try XCTUnwrap((result["artifacts"] as? [Body])?.first)
         let bytes = try await probe.bytes(manifest, run: try XCTUnwrap(result["runId"] as? String))
         let attachment = XCTAttachment(data: bytes, uniformTypeIdentifier: "com.compuserve.gif")
@@ -157,6 +155,8 @@ extension WorkflowCaptureUITests {
         contact.name = "Decoded native pointer journey GIF contact sheet"
         contact.lifetime = .keepAlways
         add(contact)
+        XCTAssertNotNil(pointer, "A live pointer frame must be visible in the native window")
+        XCTAssertNotNil(marker, "A live marker frame must be visible in the native window")
     }
 
     @MainActor
