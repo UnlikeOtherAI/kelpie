@@ -40,6 +40,29 @@ existing authenticated run-owner and browser-grant checks. Discovery still filte
 out any endpoint the selected native router does not implement. Other native
 platforms and renderer bindings do not advertise this workflow surface yet.
 
+## Version 1 status
+
+An owner-authorized `get-script-status` query succeeds with `success:true`,
+`supportedVersions` (a bounded unique positive-integer list including1),
+`playing` and `state`. States are `idle`, `running`, `finalizing`,
+`completed`, `failed` and `aborted`. Running/finalizing require a runId and
+playing:true; finalizing keeps Stop/status active until all work retires.
+Terminal states require a runId, playing:false and runSuccess (true for completed,
+false for failed/aborted). Terminal failures use a fixed safe `runError`, never
+a top-level error: the query itself succeeded, allowing MCP callers to recover
+partial artifact IDs. Status never returns outputs or secret literals.
+
+Optional progress fields are actionIndex,totalActions,elapsedMs,totalDurationMs,
+abortRequested. Optional metadata includes artifacts (at most1002),mayHaveCompleted,
+inputGuarantee,targetGuarantee. The portable strict response schema is
+`scriptStatusV1Schema`. Missing runId may return bounded latest terminal metadata
+only for the same current owner; otherwise it returns safe idle. Another owner's
+run is never revealed.
+
+Legacy status retains its separate unmarked envelope. While legacy playback owns
+the browser, strict v1 admission can refuse the missing marker. When legacy ends,
+v1 support/status must recover automatically without clearing runtime state.
+
 ## Native session preflight
 
 Without `sessionId`, a native workflow uses the current authenticated browser grant and pinned tab. A supplied ID must resolve to an existing owner-bound native session and tab grant. Native bindings without that resolver refuse with `SESSION_UNSUPPORTED` before target resolution, navigation, admission or input; they never ignore the ID or create a parallel session. This code is preserved through direct and generic MCP with a fixed safe message. Explicit completion uncertainty remains `mayHaveCompleted:true`; a timeout never proves a definite refusal.
