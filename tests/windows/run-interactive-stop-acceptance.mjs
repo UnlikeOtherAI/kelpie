@@ -8,15 +8,28 @@ import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 import {nativeMarkerVerified} from "./native-window-evidence.mjs";
 import {dirname,join,resolve,isAbsolute} from "node:path";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
-const [exe,cli,uia,outputRoot,privateRoot,mode="stop",wgcHelper,markerValidator]=process.argv.slice(2);
+const [exe,cli,uia,outputRoot,privateRoot,mode="stop",wgcHelper,markerValidator,identityManifest]=process.argv.slice(2);
 assert.ok(mode==="stop"||mode==="capture"||mode==="wgc");
 if(!privateRoot||![exe,cli,uia,outputRoot,privateRoot].every(isAbsolute))throw Error("Provide absolute candidate, CLI, UIA client, evidence and private roots");
-if(mode==="wgc")assert.ok(wgcHelper&&markerValidator&&isAbsolute(wgcHelper)&&isAbsolute(markerValidator));
-const output=resolve(outputRoot),home=resolve(privateRoot),alias="capture-uia-session1-9333";
+if(mode==="wgc")assert.ok(wgcHelper&&markerValidator&&identityManifest&&[wgcHelper,markerValidator,identityManifest].every(isAbsolute));
+const baseline={source:"9333ff507ec91d06d86e338b1d2d9378daca2ac5",
+  exeSha256:"54c8be31e003853947182c9461755bf4e7be5f91a2c64fcfb97ed5da1a32d755",
+  dllSha256:"27a474291206310a64e17cce27f6f9c50836af55b997b275d5f31e0fc71bca8c",
+  cliSha256:"831dd89b45aa3186efb8978d3da6ff7e9d8ec7f832ca7519bc152c0dc58e71dd"};
+let build=baseline,manifestHash;
+if(identityManifest){
+  assert.ok(isAbsolute(identityManifest));
+  const bytes=await readFile(identityManifest);assert.ok(bytes.length<=16384);
+  build=JSON.parse(bytes.toString("utf8"));assert.deepEqual(Object.keys(build).sort(),Object.keys(baseline).sort());
+  assert.match(build.source,/^[a-f0-9]{40}$/);
+  for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(build[key],/^[a-f0-9]{64}$/);
+  manifestHash=createHash("sha256").update(bytes).digest("hex");
+}
+const output=resolve(outputRoot),home=resolve(privateRoot),alias="capture-uia-session1-"+build.source.slice(0,8);
 const cliHome=join(home,"cli-home"),profile=join(home,"profile");
 const execute=promisify(execFile),deadline=new AbortController();
 const timer=setTimeout(()=>deadline.abort(),120000);timer.unref();
-const report={source:"9333ff507ec91d06d86e338b1d2d9378daca2ac5",checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
+const report={source:build.source,buildIdentity:build,buildIdentityManifestSha256:manifestHash,checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
 let launched=false,readiness,pending,outputCreated=false;
 const child=async(command,args,extra={})=>execute(command,args,{windowsHide:true,timeout:15000,maxBuffer:2097152,...extra});
 const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);
@@ -40,9 +53,9 @@ try {
  report.hashes={exe:await hash(exe),dll:await hash(join(dirname(exe),"kelpie.dll")),cliEntry:await hash(cli),uiaClient:await hash(uia),testAction:await hash(testFile),uiaSource:await hash(join(dirname(testFile),"ScriptStopAutomation.cs"))};
  if(mode==="wgc")report.hashes={...report.hashes,wgcHelper:await hash(wgcHelper),markerValidator:await hash(markerValidator)};
  report.cliSource="e71364364db94a6212f556aa7b5ca9efb09ac003";
- assert.equal(report.hashes.cliEntry,"831dd89b45aa3186efb8978d3da6ff7e9d8ec7f832ca7519bc152c0dc58e71dd");
- assert.equal(await hash(exe),"54c8be31e003853947182c9461755bf4e7be5f91a2c64fcfb97ed5da1a32d755");
- assert.equal(await hash(join(dirname(exe),"kelpie.dll")),"27a474291206310a64e17cce27f6f9c50836af55b997b275d5f31e0fc71bca8c");
+ assert.equal(report.hashes.cliEntry,build.cliSha256);
+ assert.equal(await hash(exe),build.exeSha256);
+ assert.equal(await hash(join(dirname(exe),"kelpie.dll")),build.dllSha256);
  await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
  const launchStarted=new Date().toISOString();
  const launch=await publicCli(["browser","launch",alias,"--port","28420"]);assert.equal(launch.success,true);launched=true;
