@@ -42,7 +42,7 @@ test("startup log classification retains fixed labels without raw diagnostics",(
 test("privacy fixtures use bounded focus transitions and valid inline scripts",async()=>{
  const fixture=await startFixture();
  try{
-  for(const route of ["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete"]){
+  for(const route of ["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"]){
    const html=await (await fetch(fixture.url+route)).text();
    new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)[1]);
    assert.ok(html.includes('const privacyMode='+JSON.stringify(route)));

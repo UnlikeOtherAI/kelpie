@@ -11,7 +11,7 @@ export async function startFixture() {
    res.writeHead(202).end();return;
   }
   const mode=url.pathname;
-  const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete"].includes(mode)?mode:"";
+  const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
   const title=mode==="/secret"||privacyMode?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):"Hosted Mac fixture";
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
   const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
@@ -42,6 +42,7 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
+  document.querySelector('#submit')?.addEventListener('click',()=>{if(privacyMode==='/known-url')history.replaceState(null,'','/known-url-changed')});
   document.querySelector('#replace')?.addEventListener('pointerdown',event=>{event.currentTarget.replaceChildren(document.createElement('span'))});
   document.querySelector('#readonly')?.addEventListener('focus',event=>{event.target.readOnly=true});
   document.querySelector('#focus-privacy')?.addEventListener('focus',event=>{
