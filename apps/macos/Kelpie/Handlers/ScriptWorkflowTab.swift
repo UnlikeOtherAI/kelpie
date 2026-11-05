@@ -115,11 +115,9 @@ final class ScriptWorkflowTab {
             throw error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WEBVIEW_ERROR", mayHaveCompleted: mutates)
         }
         do { try await check() } catch {
-            if mutates { uncertain?() }
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: mutates)
         }
         guard before == document else {
-            if mutates { uncertain?() }
             throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
         }
         return value

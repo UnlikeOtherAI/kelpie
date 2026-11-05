@@ -192,7 +192,6 @@ final class ScriptWorkflowActions {
         try requireOK(result)
         if discardMedia { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
         do { try await check() } catch {
-            uncertain()
             throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
         }
     }
