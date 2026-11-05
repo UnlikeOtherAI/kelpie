@@ -14,6 +14,18 @@ describe("strict authored workflows", () => {
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif"], fps: 31 } }).success).toBe(false);
     expect(scriptV1Schema.safeParse({ ...script, capture: { formats: ["gif", "gif"] } }).success).toBe(false);
   });
+  it("uses a faster pointer default while preserving explicit durations", () => {
+    const pointer = scriptV1Schema.parse({ ...script, pointer: { enabled: true } }).pointer!;
+    expect(pointer).toEqual({ enabled: true, curve: "s", durationMs: 350, easing: "ease-in-out" });
+    for (const durationMs of [0, 500, 2400]) {
+      expect(scriptV1Schema.parse({ ...script, pointer: { enabled: true, curve: "c", durationMs } }).pointer)
+        .toMatchObject({ curve: "c", durationMs });
+    }
+    const motion = { from: { x: 0, y: 0 }, to: { x: 300, y: 0 }, curve: pointer.curve };
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(0, pointer.durationMs))).toEqual(motion.from);
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(350, pointer.durationMs))).toEqual(motion.to);
+    expect(scriptPointerPosition(motion, scriptTimelineProgress(175, pointer.durationMs)).x).toBeCloseTo(150);
+  });
   it("binds declared values once and rejects missing, undeclared and incorrectly typed inputs", () => {
     const raw = { ...script, inputs: { user: { type: "string" } }, actions: [{ action: "fill", target: { label: "Name" }, text: { input: "user" } }] };
     expect(bindScriptInputs(raw, { user: "Ada" }).actions[0]).toMatchObject({ text: "Ada" });
@@ -33,6 +45,12 @@ describe("strict authored workflows", () => {
     expect(scriptArtifactRequestSchema.parse({ runId: "run", artifactId: "gif" })).toMatchObject({ offset: 0, length: 262144 });
     for (const length of [0, -1, 1.5, 1048577]) expect(scriptArtifactRequestSchema.safeParse({ runId: "r", artifactId: "a", length }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ target: { x: 5, y: 10 }, key: "private", dispatch: true, edit: { action: "fill", text: "x" } }).success).toBe(false);
+    const post = { target: { selector: "#edit" }, key: "private", token: "t1", postMutation: true };
+    expect(scriptTargetRequestSchema.safeParse(post).success).toBe(true);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, token: undefined }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, dispatch: true }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, observe: true }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...post, edit: { action: "fill", text: "x" } }).success).toBe(false);
   });
 });
 describe("deterministic presentation", () => {

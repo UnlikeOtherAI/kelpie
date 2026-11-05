@@ -8,7 +8,7 @@ import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
 const [exe,cli,privateRoot,evidenceRoot,manifestFile,mode="full"]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,evidenceRoot,manifestFile].every(value=>value&&isAbsolute(value)));
-assert.ok(mode==="alias-only"||mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
+assert.ok(mode==="motion"||mode==="g08"||mode==="alias-only"||mode==="edit-diagnostic"||mode==="edit-regression"||mode==="full"||mode==="fixture"||(mode==="privacy-focus"||mode==="privacy-regression"));
 const execute=promisify(execFile),tests=dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(await readFile(manifestFile,"utf8"));
 for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(manifest[key],/^[a-f0-9]{64}$/);
@@ -61,7 +61,11 @@ try{
  const expectedVersion=/project\(kelpie_windows VERSION ([0-9.]+)/.exec(cmakeSource)?.[1];
  assert.ok(expectedVersion);assert.equal(nativeInfo.version,expectedVersion);report.nativeVersion=nativeInfo.version;
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
- if(mode==="alias-only"){
+ if(mode==="motion"){
+  await childCase("native clipped geometry and motion media","run-geometry-media-acceptance.mjs",[readinessFile,join(evidenceRoot,"geometry"),"motion"],{KELPIE_CAPTURE_SOURCE:manifest.source});
+ }else if(mode==="g08"){
+  await childCase("shared G08 fixture through Windows HTTP", "run-g08-acceptance.mjs", [readinessFile,join(evidenceRoot,"g08"),identityFile]);
+ }else if(mode==="alias-only"){
   await childCase("public alias CLI and stdio MCP","run-alias-cli-acceptance.mjs",[cli,alias,cliHome,readinessFile,join(evidenceRoot,"alias")],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }else if(mode==="edit-diagnostic" || mode==="edit-regression"){
   await childCase("post-edit privacy and focus viewport diagnostic","probe-post-edit-sensitivity.mjs",[readinessFile,join(evidenceRoot,"post-edit.json"),mode==="edit-regression"?"expect-fixed":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
@@ -86,20 +90,20 @@ try{
  ])await childCase(name,file,[readinessFile,join(evidenceRoot,output),...(expectation?[expectation]:[])],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }
 }catch(error){
- report.checks.push({name:"owned API flow",passed:false,error:error.message});process.exitCode=1;
+ report.checks.push({name:"owned API flow",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;
 }finally{
  await writeFile(join(evidenceRoot,"flow-report.json"),JSON.stringify(report,null,2));
  if(launched){
   try{assert.equal((await publicCli(["browser","stop",alias])).success,true);
    if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
    report.cleanup="public-cli-closed";}
-  catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message});process.exitCode=1;}
+  catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;}
  }
  if(running){
   const finalStore=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));
   try{await access(readinessFile);report.readinessAbsent=false;}catch{report.readinessAbsent=true;}
   report.aliasRunningAbsent=!finalStore.running[alias];
-  const cleanup=await ps("$p=Get-Process -Id "+running.pid+" -ErrorAction SilentlyContinue;$s=Get-NetTCPConnection -State Listen -LocalPort 28420 -ErrorAction SilentlyContinue;[pscustomobject]@{processAbsent=($null -eq $p);socketAbsent=($null -eq $s);otherOwnerPreserved=($null -ne (Get-Process -Id 52960 -ErrorAction SilentlyContinue))}|ConvertTo-Json");
+  const cleanup=await ps("$p=Get-Process -Id "+running.pid+" -ErrorAction SilentlyContinue;$s=Get-NetTCPConnection -State Listen -LocalPort 28420 -ErrorAction SilentlyContinue;[pscustomobject]@{processAbsent=($null -eq $p);socketAbsent=($null -eq $s)}|ConvertTo-Json");
   report.cleanupProof=cleanup;
   if(!Object.values(cleanup).every(Boolean)||!report.readinessAbsent||!report.aliasRunningAbsent)process.exitCode=1;
  }

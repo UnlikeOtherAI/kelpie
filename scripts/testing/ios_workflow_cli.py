@@ -24,13 +24,44 @@ def invoke(args, timeout=60):
     return json.loads(result.stdout)
 
 
+def timeout_metadata(error):
+    if not isinstance(error, subprocess.TimeoutExpired):
+        return {}
+    stdout = error.stdout or b""
+    stderr = error.stderr or b""
+    report = {"stdoutBytes": len(stdout), "stderrBytes": len(stderr)}
+    if len(stdout) > 2 * 1024 * 1024:
+        return report
+    try:
+        body = json.loads(stdout)
+        if not isinstance(body, dict):
+            return report
+        result = body.get("result", body)
+        if not isinstance(result, dict):
+            return report
+        if isinstance(result.get("success"), bool):
+            report["resultSuccess"] = result["success"]
+        if result.get("state") in ("running", "finalizing", "completed", "failed", "aborted"):
+            report["resultState"] = result["state"]
+        if isinstance(result.get("artifacts"), list):
+            report["artifactCount"] = len(result["artifacts"])
+        if isinstance(body.get("downloaded"), list):
+            report["downloadCount"] = len(body["downloaded"])
+        code = result.get("error", {}).get("code")
+        if isinstance(code, str) and re.fullmatch("[A-Z0-9_]{1,80}", code):
+            report["resultErrorCode"] = code
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return report
+
+
 def run_fixture(tab: str, evidence: Path):
     if not re.fullmatch(r"[0-9A-Fa-f-]{36}", tab):
         raise ValueError("Invalid fixture tab ID")
     evidence.mkdir(parents=True, exist_ok=False)
     paired = invoke(["pair", "--client-name", "Hosted CLI workflow", "--timeout-ms", "35000"])
-    if paired.get("success") is not True:
-        raise ValueError("CLI pairing refused")
+    if paired.get("success") is not True or paired.get("scope") != "persistent" or paired.get("persisted") is not True:
+        raise ValueError("CLI pairing did not persist the exact-socket grant")
     recipe = {"version": 1, "tabId": tab, "inputs": {"entry": {"type": "string"}}, "actions": [
         {"action": "fill", "target": {"label": "Entry"}, "text": {"input": "entry"}},
         {"action": "tap", "target": {"role": "button", "name": "Submit"}},
@@ -42,7 +73,26 @@ def run_fixture(tab: str, evidence: Path):
     inputs_path = evidence / "inputs.json"
     recipe_path.write_text(json.dumps(recipe))
     inputs_path.write_text(json.dumps({"entry": "Hosted typed input"}))
-    played = invoke(["script", "run", str(recipe_path), "--inputs", str(inputs_path), "--output", str(evidence / "downloads")])
+    try:
+        played = invoke(["script", "run", str(recipe_path), "--inputs", str(inputs_path), "--output", str(evidence / "downloads")])
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        # Keep only byte counts and fixed result metadata, never the captured output itself.
+        report = {"status": "unavailable", **timeout_metadata(error)}
+        # Read-only status only: preserve bounded metadata without output values or credentials.
+        try:
+            status = invoke(["script", "status", "--pinned"], timeout=10)
+            for key in ("state", "playing", "actionIndex", "totalActions", "elapsedMs", "runSuccess", "mayHaveCompleted"):
+                value = status.get(key)
+                if isinstance(value, (bool, int)) or (key == "state" and value in ("idle", "running", "finalizing", "completed", "failed", "aborted")):
+                    report[key] = value
+            code = status.get("runError", {}).get("code")
+            if isinstance(code, str) and re.fullmatch("[A-Z0-9_]{1,80}", code):
+                report["errorCode"] = code
+            report["status"] = "observed"
+        except (OSError, ValueError, AttributeError, RuntimeError, subprocess.SubprocessError):
+            pass
+        (evidence / "status-on-failure.json").write_text(json.dumps(report, indent=2))
+        raise
     result = played["result"]
     if not result["success"] or result["outputs"].get("page") != "Count 1":
         raise ValueError("CLI workflow outcome did not match the click")

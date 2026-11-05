@@ -27,12 +27,20 @@ extension WorkflowCaptureUITests {
             try await Task.sleep(nanoseconds: 100_000_000)
             zoomed = try await pinchMetrics(tab, selector: "#zoom")
         }
-        XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), initialScale * 1.3)
-        XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(zoomed["layoutWidth"] as? Double))
         let pinch = XCTAttachment(screenshot: viewport.screenshot())
         pinch.name = "Actual native pinch before the partially visible Edge button tap"
         pinch.lifetime = .keepAlways
         add(pinch)
+        let metrics = XCTAttachment(data: try JSONSerialization.data(withJSONObject: ["initial": initial, "zoomed": zoomed],
+                                                                     options: [.sortedKeys]),
+                                    uniformTypeIdentifier: "public.json")
+        metrics.name = "Native pinch viewport metrics before assertions"
+        metrics.lifetime = .keepAlways
+        add(metrics)
+        XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), initialScale * 1.3)
+        // WebKit can report innerWidth equal to the zoomed visual width; compare the
+        // same visual viewport before and after the actual gesture instead.
+        XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(initial["width"] as? Double))
 
         let tapped = try await probe.call("kelpie_play_script", [
             "version": 1, "tabId": tab,

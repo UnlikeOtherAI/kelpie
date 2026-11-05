@@ -61,9 +61,9 @@ on:
         type: boolean
         default: false
       native_workflow_scope:
-        description: Select the full corpus or the focused navigation diagnostic
+        description: Select the full corpus or a focused diagnostic
         type: choice
-        options: [full, navigation]
+        options: [full, navigation, diagnostics]
         default: full
 
 permissions:
@@ -73,7 +73,7 @@ jobs:
   build:
     name: Build iOS (simulator)
     runs-on: ${{ inputs.native_workflow_tests && 'macos-26' || 'macos-15' }}
-    timeout-minutes: ${{ inputs.native_workflow_tests && 85 || 45 }}
+    timeout-minutes: ${{ inputs.native_workflow_tests && 150 || 45 }}
     env:
       KELPIE_RUNTIME_TESTS: ${{ inputs.native_workflow_tests && '1' || '0' }}
     steps:
@@ -196,6 +196,21 @@ jobs:
           GOMAXPROCS: 1
         run: pnpm --filter @unlikeotherai/kelpie build
 
+      - name: Use Node 24 for capture evidence
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation'
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24
+
+      - name: Install media verification tools
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation'
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            brew install ffmpeg
+          fi
+          ffmpeg -version
+          ffprobe -version
+
       - name: Run paired iPhone and iPad capture journeys
         if: inputs.native_workflow_tests
         env:
@@ -203,6 +218,9 @@ jobs:
           KELPIE_IOS_TEST_SCOPE: ${{ inputs.native_workflow_scope || 'full' }}
         run: |
           python3 -m unittest discover -s scripts/testing -p test_ios_workflow_driver.py
+          if [[ "$KELPIE_IOS_TEST_SCOPE" != navigation ]]; then
+            node --test scripts/testing/ios_g08_scene.test.mjs
+          fi
           python3 scripts/testing/ios-workflow-acceptance.py
 
       - name: Keep simulator results and media

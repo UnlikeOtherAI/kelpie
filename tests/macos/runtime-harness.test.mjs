@@ -49,6 +49,10 @@ test("privacy fixtures use bounded focus transitions and valid inline scripts",a
    assert.ok(html.includes("performance.now()+5500"));
    assert.ok(html.includes("request.open('POST','/events',false)"));
    assert.ok(!html.includes("value:event.target.value"));
+   if(route==="/known-url"){
+    assert.ok(html.includes("addEventListener('pointerdown',()=>{if(privacyMode==='/known-url'){send({type:'known-mid-transition'},true);history.replaceState"));
+    assert.ok(!html.includes("addEventListener('click',()=>{if(privacyMode==='/known-url')history.replaceState"));
+   }
   }
  }finally{await fixture.close();}
 });

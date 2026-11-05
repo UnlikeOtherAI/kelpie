@@ -64,7 +64,7 @@ try{
  phase="chromium";await runEngine(client,fixture,"chromium",report);
  report.corpusPassed=true;
 }catch(error){
- report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;report.childExitAtFailure=childExit;process.exitCode=1;
+ report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;report.childExitAtFailure=childExit;report.childAliveAtFailure=!childExited&&child.exitCode===null&&child.signalCode===null;process.exitCode=1;
  if(["launch","listeners"].includes(phase)){
   try{report.bootstrap=await bootstrapDiagnostics({pid:child.pid,executable,started,privateDir});}
   catch{report.bootstrapDiagnosticError="BOOTSTRAP_DIAGNOSTICS_FAILED";}

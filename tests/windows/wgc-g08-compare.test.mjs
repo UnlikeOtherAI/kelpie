@@ -1,0 +1,7 @@
+import test from "node:test";import assert from "node:assert/strict";import {compareMeasuredPhases,compareWgcExport} from "./wgc-g08-compare.mjs";
+function result(shift=0){return {provenance:{source:"a".repeat(40),runId:"b".repeat(48),documentId:"doc",curve:"c",width:640,height:277},analysis:{passed:true,pointerStartMs:0,markerStartMs:0,radiusBiasPx:0,endpointOffset:{x:0,y:0}},samples:Array.from({length:61},(_,i)=>({timeMs:i*50,pointer:{x:i+shift,y:10},marker:{count:30,alpha:.5,radius:30}}))};}
+test("compares only real bounded brackets after independent passes",()=>{const same=compareMeasuredPhases(result(),result());assert.equal(same.pointerRmsPx,0);assert.ok(same.pointerSamples>=15);assert.throws(()=>compareMeasuredPhases(result(),result(20)),/POINTER_MISMATCH/);const bad=result();bad.analysis.passed=false;assert.throws(()=>compareMeasuredPhases(result(),bad),/PASS_REQUIRED/);const sparse=result();sparse.samples=sparse.samples.filter((_,i)=>i%12===0);assert.throws(()=>compareMeasuredPhases(result(),sparse),/INSUFFICIENT_EVIDENCE/);});
+
+test("rejects mismatched provenance and marker drift",()=>{const a=result(),b=result();b.provenance.documentId="other";assert.throws(()=>compareMeasuredPhases(a,b),/PROVENANCE_MISMATCH/);b.provenance.documentId="doc";for(const sample of b.samples)sample.marker.alpha=.9;assert.throws(()=>compareMeasuredPhases(a,b),/MARKER_MISMATCH/);});
+
+test("canonical wrapper refuses authored pass claims",()=>{assert.throws(()=>compareWgcExport(result(),result(),{curve:"c"}),/Invalid G08 configuration/);});

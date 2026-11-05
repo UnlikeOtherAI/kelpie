@@ -4,15 +4,20 @@ import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture
 import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
+import {runG08} from "./runtime-g08.mjs";
+import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
- let authorityRun,foreignToken;
+ let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
- catch(error){checks.push({name,passed:false,code:error.code??"CHECK_FAILED"});throw error;}}
+ catch(error){
+  const diagnostic=name==="semantic-label-export"?{stage:semanticStage,...errorFacts(error),
+   tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
+  checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
   await client.tap("browser.action.more",more);
@@ -39,23 +44,35 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(direct.supportedVersions?.includes(1)&&generic.supportedVersions?.includes(1),"STRICT_CAPABILITY_MISSING");
   return {direct:true,generic:true};
  });
+ await check("public-navigation-from-start-page",async()=>{
+  const result=await client.api("navigate",{tabId,url:fixture.url+"/"});
+  requireTrue(result.success,"PUBLIC_NAVIGATION");
+  await waitFor(()=>fixture.events.find(e=>e.type==="document"&&e.path==="/"));
+  return {success:true};
+ });
  await load();
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
+  semanticStage="direct-play";
   const result=await client.direct("kelpie_play_script",{...base,capture,actions:[
    {action:"fill",target:{label:"Draft message"},text:"Synthetic written"},
    {action:"type",target:{label:"Draft message"},text:" more"},
    {action:"click",target:{role:"button",name:"Submit"}},
    {action:"output",name:"title",source:"title"},
    {action:"extract",name:"catalogue",params:{scope:"#catalogue",fields:[{name:"tea",selector:"h3",source:"text",multiple:true}],metadata:true}}]});
+  semanticPlay=playFacts(result);
+  semanticStage="validate-output";
   requireTrue(result.success,"SEMANTIC_WORKFLOW");
   const field=result.outputs?.catalogue?.fields?.[0];
   requireTrue(field?.status==="ok"&&field.values.join("|")==="Green tea|Black tea"&&field.provenance.selector==="h3","STRUCTURED_EXTRACTION_PROVENANCE");
+  semanticStage="fixture-event";
   const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="submit"));
   requireTrue(event.hit==="submit"&&!event.trusted&&Math.abs(event.x-(event.rect.left+event.rect.right)/2)<2&&Math.abs(event.y-(event.rect.top+event.rect.bottom)/2)<2,"SEMANTIC_CENTER");
   authorityRun=result;
+  semanticStage="artifact-download";
   const artifacts=await client.download(result,engine+"-main");
   requireTrue(new Set(artifacts.map(a=>a.mimeType)).size===3,"ALL_FORMATS");
+  semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
  await check("observation-and-readiness-public-entry",async()=>{
@@ -158,8 +175,32 @@ export async function runEngine(client,fixture,engine,report) {
  });
  for(const formats of [["gif","video"],["gif","video","screenshots"]])await check("low-fps-navigation-marker-"+formats.length,async()=>{
   await load();
+  const begin=fixture.events.length;
   const result=await client.api("play-script",{...base,capture:{...capture,formats,fps:1},actions:[
    {action:"click",target:{role:"link",name:"Next document"}},{action:"wait",ms:1200}]});
+  if(!result.success){
+   const codes=new Set(["AUTHORIZATION_REVOKED","BUSY","CAPTURE_ADMISSION_FAILED","CAPTURE_AFTER_ACTION_FAILED",
+    "CAPTURE_BYTE_LIMIT","CAPTURE_DOCUMENT_CHANGED","CAPTURE_DOCUMENT_UNAVAILABLE","CAPTURE_DURATION_LIMIT",
+    "CAPTURE_FAILED","CAPTURE_STOPPED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_VIEWPORT_UNAVAILABLE",
+    "CAPTURE_VIEWPORT_UNSTABLE","DOCUMENT_CHANGED","INPUT_INTERRUPTED","INPUT_UNCERTAIN","INVALID_PARAM",
+    "INVALID_SCRIPT","INVALID_TARGET","NAVIGATION_FAILED","OBSERVATION_FAILED","OUTPUT_BUDGET_EXCEEDED",
+    "OUTPUT_REDACTION_FAILED","RECORDING_IN_PROGRESS","RENDERER_CHANGED","SCRIPT_ABORTED","SCRIPT_UNAVAILABLE",
+    "SENSITIVE_CAPTURE_REFUSED","STALE_TARGET","TAB_CHANGED","TAB_NOT_ACTIVE","TAB_NOT_FOUND","TAB_NOT_VISIBLE",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_INTERACTABLE","TARGET_OBSCURED",
+    "TARGET_OUTSIDE_VIEWPORT","TARGET_QUERY_LIMIT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR",
+    "WORKFLOW_FAILED"]);
+   const events=fixture.events.slice(begin);
+   const failure={engine,formats:formats.length,code:codes.has(result.error?.code)?result.error.code:"OTHER",
+    mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
+    clickObserved:events.some(e=>e.type==="click"&&e.target==="next"),
+    nextDocumentObserved:events.some(e=>e.type==="document"&&e.path==="/next"),play:playFacts(result)};
+   (report.lowFpsFailures??=[]).push(failure);
+   try{
+    const artifacts=await client.download(result,engine+"-lowfps-failure");
+    failure.downloaded=artifacts.map(a=>({mimeType:a.mimeType,partial:a.partial,byteLength:a.byteLength,sha256:a.sha256}));
+    failure.decode=artifacts.filter(a=>a.mimeType!=="image/png").map(a=>inspectMedia(a));
+   }catch(error){failure.downloadError=errorFacts(error);}
+  }
   requireTrue(result.success,"LOW_FPS_NAVIGATION");
   const artifacts=await client.download(result,engine+"-lowfps"),movies=artifacts.filter(a=>a.mimeType!=="image/png");
   requireTrue(movies.length===2,"LOW_FPS_FORMATS");
@@ -179,5 +220,6 @@ export async function runEngine(client,fixture,engine,report) {
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
  });
  await runSafety({client,fixture,engine,base,capture,check,play,load});
+ await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
 }

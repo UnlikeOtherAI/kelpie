@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import java.io.ByteArrayOutputStream
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -41,6 +42,25 @@ class HandlerContext(
     }
 
     @Volatile var scriptForeground = true
+
+    private val captureSceneGeneration = AtomicLong()
+    val scriptCaptureSceneGeneration: Long get() = captureSceneGeneration.get()
+
+    @Volatile var scriptCaptureScene = false
+        set(value) {
+            if (field != value) {
+                field = value
+                captureSceneGeneration.incrementAndGet()
+            }
+        }
+
+    @Volatile var scriptCaptureActionMode = false
+        set(value) {
+            if (field != value) {
+                field = value
+                captureSceneGeneration.incrementAndGet()
+            }
+        }
     val scriptOverlay =
         com.kelpie.browser.automation
             .ScriptOverlay()
@@ -88,14 +108,17 @@ class HandlerContext(
     var isIn3DInspector: Boolean
         get() = _isIn3DInspector.value
         set(value) {
+            if (_isIn3DInspector.value != value) captureSceneGeneration.incrementAndGet()
             _isIn3DInspector.value = value
         }
 
     fun requestPanel(panel: String) {
+        if (_activePanel.value != panel) captureSceneGeneration.incrementAndGet()
         _activePanel.value = panel
     }
 
     fun clearPanel() {
+        if (_activePanel.value != null) captureSceneGeneration.incrementAndGet()
         _activePanel.value = null
     }
 

@@ -4,9 +4,10 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { runG08 } from './android-native-g08.mjs';
 
 const execute = promisify(execFile);
-const [root, folder, port] = process.argv.slice(2);
+const [root, folder, port, profile, revision, binarySHA256] = process.argv.slice(2);
 const cli = resolve(root, 'packages/cli/bin/kelpie.js');
 async function command(name, args) {
   const { stdout } = await execute(process.execPath, [cli, '--device', '127.0.0.1',
@@ -65,3 +66,4 @@ await writeFile(join(folder, 'cli-report.json'), JSON.stringify({
   success: true, transport: 'authenticated public CLI', runId: run.runId,
   sha256: artifact.sha256, byteLength: bytes.length, sourceRevision: process.env.GITHUB_SHA,
 }, null, 2) + '\n');
+await runG08({ command, folder, tabId: bridge.tabId, profile, revision, binarySHA256 });

@@ -483,3 +483,117 @@ scrubs earlier outputs, and executes no later action. Without capture the edit
 may finish and earlier outputs are still scrubbed. Existing concrete helper
 failures retain priority. Four authored oninput autocomplete/password ×
 capture/no-capture cases cover this boundary; native execution remains pending.
+## G08 hosted adapter (source only)
+
+The hosted authenticated CLI bridge now runs the shared white fixture separately
+for C and S on each profile, retaining ordered fixture facts, full GIF/MP4
+downloads, hashes, frame timestamps and the shared streaming verifier result.
+The fixture binds host loopback and the emulator reaches it through 10.0.2.2.
+The native bridge remains active through both runs. This is authored integration,
+not a device, decoded-pixel or native-overlay acceptance result. Failure reports
+and partial evidence remain retained; the shared verifier determines pass/fail.
+
+## Hosted b927 evidence intake
+
+Run41977011583 froze b927cb999509e25e3c85f3012620713b736dc73a.
+The retained archive SHA-256 is
+ac21e8b780352a36858cb0fd4d3d42b493741fdcb70ddb6318f23415130169fc.
+Both phone and tablet ran27 cases with6 failures; both separate CLI runs failed
+the PNG size assertion. Old c71 denominators and this failure remain preserved.
+The b927 artifact MCP error and focus-time privacy cases predate integrated
+follow-up fixes and need final-source replay, not a retrospective pass.
+
+The noisy page's retained DOM state confirms drawn random canvas data; the phone
+native screenshot is 5165243 bytes while the exported640x1304 PNG is a blank
+6146-byte white image. The pinch export independently failed its red page
+underlay check. ScriptCapture draws the WebView into a software bitmap; the
+evidence points to missing hardware-composited WebView content. This remains
+a production capture blocker pending a fenced compositor capture and replay.
+
+Both native marker tests failed while their retained five-action play reply
+succeeded. The rejected phone screenshot shows the finished browser without
+recording chrome. The test waits for Compose idle both before and inside its live animation
+sampling loop. Those waits can defer screenshots until the marker disappears.
+The source removes both waits for this probe; bounded native
+screenshots and main-thread geometry sampling remain. It requires replay.
+The separate native Stop test completed with partial GIF/MP4 and SCRIPT_ABORTED
+in this run; this is b927-only evidence, not a final-source acceptance claim.
+
+## Compositor replacement (source only)
+
+Strict capture now requests the exact certified visible WebView rectangle from
+the parent Window after a WebView visual-state callback and committed-frame
+callback. It rechecks current grant, document, scene generation, dimensions,
+scale, window focus and bounds before and after the copy. Timeout or cancellation
+quarantines one private bitmap until the late PixelCopy callback recycles it;
+no later copy is admitted while it remains outstanding. The live
+marker already belongs to the sampled frame and is never painted a second time.
+The existing Stop control uses a separate non-focusable Popup, and recording
+hides other browser sheets. Rounded staged viewports remove clipping while recording so the complete page
+rectangle can be certified; API28 fails closed pending a verified frame fence. New native tests
+cover uncertified-scene refusal and Stop exclusion, alongside the existing
+noise PNG and pinched underlay cases. Compilation and device replay are pending.
+
+Focused Maxis source check: after one formatting-only preliminary failure,
+ktlintFormat, ktlintCheck, compileDebugKotlin, compileDebugAndroidTestKotlin
+and ScriptPixelCopyGateTest3/3 passed in4m40s. It used a fresh writable Gradle
+home, separately copied read-only modules-2 seed, one CPU and2GiB heap. Existing
+unrelated warnings remain. No emulator, native screenshot, media replay, API28,
+or signed release was exercised by this check.
+
+## Scene and geometry follow-up (source only)
+
+The scene predicate explicitly tracks inspector, tab overview, address editing
+and menu, sheets, welcome, pairing and queued panel requests. Native action modes
+and direct inspector/panel transitions invalidate a monotonic generation before
+any frame can publish. Browser chrome is unmounted during recording; its transient
+state remains uncertified until disposal. PixelCopy bounds use the full view
+matrix and admit only fully visible positive uniform scale with pixel-aligned
+edges. Rotation, skew, nonuniform scale and fractional boundaries fail closed.
+AndroidX cases exercise tab-overview/address entry and restoration, action-mode
+and inspector/panel generation, a pixel-aligned scaled owned view with
+nonuniform rejection, and tablet stage screenshot restoration across success,
+abort and failure. These are authored cases, not native pass claims.
+Hosted run42006190219 at b2bcb247 failed lintDebug before the native job: lint
+could not propagate the API29 guard into the frame callback. Follow-up cffe3a96
+isolates the guarded callback in an annotated Q-only method. Historical run
+remains failed; the integrated rerun must establish lint and device behavior.
+Maxis follow-up check: online ktlintFormat/Check, lintDebug, main and
+AndroidTest Kotlin compilation, and targeted gate/scene JVM tests4/4 passed
+in2m25s with one CPU and2GiB heap. Previous offline lint dependency and
+AndroidTest import failures remain recorded in scene-geometry-check.log and
+scene-geometry-online.log. Device cases remain authored, not executed.
+
+Hosted42007603401 at65fe4866ac7c4f0c4f43b240cfecb41471c0239f: build/lint
+passed; phone30/33 and tablet29/33 failed overall. Both focus-time privacy
+cases published three captures and returned raw, URI and form synthetic literals
+unredacted; this is a release-blocking leak. Both combined-marker tests failed
+initial CAPTURE_VIEW_UNAVAILABLE; tablet low-FPS navigation failed with
+SCRIPT_DOCUMENT_CHANGED. Phone low-FPS navigation passed. Both profiles
+reconstructed large nonblank PNGs and completed CLI baseline downloads;
+native Stop returned SCRIPT_ABORTED with partial GIF/MP4 on both. Phone G08
+exceeded its old18s capture deadline with316 dropped frames; tablet's G08
+reached download but the runner lacked ffprobe. Artifact13406619597 SHA-256
+0fec30a6a11a7b1658926a94cd81a46cd702b42ef0ae7d126a81d05662bf2cb1 remains
+retained with the original failures.
+
+Focus fixture follow-up records only focus/active-element booleans, event
+count, bounded type/autocomplete categories and a fixed JNI expression hash
+before existing assertions. It does not record input values. These authored
+diagnostics have not run on a device.
+
+
+The user approved Android 10 (API 29) as the minimum supported OS on 5 November
+2026. Earlier API 28 refusal records remain historical; final-source phone and
+tablet acceptance, including privacy and scene evidence, remains open.
+
+Hosted run `42015326445` at `ee22cb800fa1ccd2f2ff587d99fb26b41a24fa47`
+recorded three failures in each 39-case profile: two focus-sensitive privacy
+cases and the native Submit-marker probe. The focus facts show
+`document.hasFocus() == false` before and after the edit, zero focus events,
+and `activeElement` set to the input; the generated expression included the
+refusal policy. The edit proceeded without the focus handler and exposed the
+synthetic literal in earlier output. Low-FPS navigation passed on both.
+The CLI baseline retrieved decoded multichunk PNGs, but G08 C hit the 26-second
+limit on both (phone 20 frames/471 dropped; tablet 38/456); G08 S did not run.
+These outcomes do not establish native privacy or dense motion acceptance.

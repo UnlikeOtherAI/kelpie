@@ -98,7 +98,7 @@ final class ScriptPresentation {
     func move(to end: CGPoint, options: [String: Any], check: () async throws -> Void) async throws {
         guard options["enabled"] as? Bool == true else { try await check(); return }
         let start = pointer ?? CGPoint(x: max(0, end.x - 100), y: max(0, end.y - 70))
-        let duration = Double(options["durationMs"] as? Int ?? 500)
+        let duration = Double(options["durationMs"] as? Int ?? 350)
         let began = ProcessInfo.processInfo.systemUptime
         repeat {
             try await check()

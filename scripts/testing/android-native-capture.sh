@@ -133,7 +133,7 @@ for profile in phone tablet; do
   verify_device
   printf 'profile=%s phase=cli\n' "$profile"
   # Start a fresh native fixture; the real CLI requests its own persistent grant.
-  timeout 5m adb -s "$serial" shell am instrument -w -r \
+  timeout 15m adb -s "$serial" shell am instrument -w -r \
     -e class com.kelpie.browser.automation.ScriptCliBridgeTest \
     -e sourceRevision "$revision" -e deviceClass "$profile" \
     com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
@@ -149,7 +149,7 @@ for profile in phone tablet; do
   if [[ "$bridge_ready" == true ]]; then
     adb -s "$serial" forward tcp:18420 tcp:8420
     set +e
-    node "$root/scripts/testing/android-native-cli.mjs" "$root" "$dir" 18420 > "$dir/cli-driver.log" 2>&1
+    node "$root/scripts/testing/android-native-cli.mjs" "$root" "$dir" 18420 "$profile" "$revision" "$(sha256sum "$app" | cut -d ' ' -f1)" > "$dir/cli-driver.log" 2>&1
     cli_exit=$?
     set -e
     # Test coordination only: never a credential or product-state repair.

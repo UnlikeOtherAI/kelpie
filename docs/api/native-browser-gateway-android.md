@@ -179,3 +179,24 @@ renderer retirement, final output redaction, and capture privacy classification.
 Active owned runs return empty artifact lists and ARTIFACT_NOT_READY on valid
 chunk requests; unknown or foreign runs return ARTIFACT_NOT_FOUND. Safe terminal
 artifacts from earlier runs remain downloadable during a later active run.
+
+Android capture samples the owned window's committed WebView rectangle with
+PixelCopy. The native marker is part of that committed scene and is not drawn a
+second time. The existing Stop control is in a separate non-focusable window.
+Capture checks scene generation, focus, full visibility, geometry, document and
+authority around a WebView visual-state and compositor-frame fence. A timed-out
+or cancelled PixelCopy cannot publish; its one bounded bitmap
+remains quarantined until the native callback recycles it. Subsequent copies
+fail closed until that callback retires. Android 10 (API 29) is the minimum
+supported OS, providing the frame-commit API used by this path.
+A staged tablet viewport temporarily removes its rounded clipping during capture
+to provide the complete rectangular WebView scene. Native device replay is pending.
+
+Recording scene certification accounts for the inspector, tab overview, address
+editing/menu, open sheets, welcome state, pairing prompt, pending panel requests
+and native action modes. Entering or leaving a panel, inspector or action mode
+invalidates the scene generation even if it changes back before a copy completes.
+The WebView rectangle admits positive, axis-aligned uniform view transforms when
+the mapped bounds are pixel-aligned and completely visible; other transforms and
+fractional boundaries fail closed to avoid sampling neighboring window pixels.
+These checks require native phone/tablet replay before acceptance.

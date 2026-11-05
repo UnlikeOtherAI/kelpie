@@ -139,7 +139,7 @@ class ScriptActions(
         overlay.viewport(visualWidth, visualHeight, oldDocument, number(visual, "offsetLeft"), number(visual, "offsetTop"))
         val pointer = objectMap(run.script["pointer"])
         if (pointer["enabled"] == true) {
-            val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 500.0
+            val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 350.0
             overlay.move(
                 ScriptOverlay.Pointer(
                     pointerX.coerceIn(0.0, width),
@@ -176,6 +176,17 @@ class ScriptActions(
         // The same object/token/document/geometry is checked atomically after
         // movie admission and synchronous focus/default handlers.
         mutationInFlight = true
+        if (edit) {
+            val focused =
+                withContext(Dispatchers.Main.immediate) {
+                    validOnMain() && view.hasWindowFocus() && view.requestFocus()
+                }
+            if (!focused) {
+                // A focus handler may have run without a classifiable callback.
+                consumeSensitivity(action, true)
+                throw ScriptFailure("INPUT_UNCERTAIN", true)
+            }
+        }
         val done = resolve(action, token, dispatch = !edit, edit = edit)
         guard()
         mutationInFlight = false

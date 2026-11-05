@@ -3,6 +3,8 @@ import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {createHash,randomUUID} from "node:crypto";
 import {nativeWindowFixtureExpression} from "./native-window-fixture.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
+import {safeCliFailure} from "./safe-cli-failure.mjs";
+import {parseWgcStages} from "./wgc-stage-timing.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {fileURLToPath} from "node:url";
@@ -12,7 +14,7 @@ import {finishNativeWindowEvidence} from "./native-window-completion.mjs";
 import {dirname,join,resolve,isAbsolute} from "node:path";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 const [exe,cli,uia,outputRoot,privateRoot,mode="stop",wgcHelper,markerValidator,identityManifest]=process.argv.slice(2);
-assert.ok(mode==="stop"||mode==="capture"||mode==="wgc");
+assert.ok(mode==="stop"||mode==="capture"||mode==="wgc"||mode==="probe");
 if(!privateRoot||![exe,cli,uia,outputRoot,privateRoot].every(isAbsolute))throw Error("Provide absolute candidate, CLI, UIA client, evidence and private roots");
 if(mode==="wgc")assert.ok(wgcHelper&&markerValidator&&identityManifest&&[wgcHelper,markerValidator,identityManifest].every(isAbsolute));
 const baseline={source:"9333ff507ec91d06d86e338b1d2d9378daca2ac5",
@@ -35,7 +37,7 @@ const timer=setTimeout(()=>deadline.abort(),120000);timer.unref();
 const report={source:build.source,buildIdentity:build,buildIdentityManifestSha256:manifestHash,checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
 let launched=false,readiness,pending,running,wgcCaptureDirectory,wgcSceneFile,outputCreated=false;
 const child=async(command,args,extra={})=>execute(command,args,{windowsHide:true,timeout:15000,maxBuffer:2097152,...extra});
-const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);
+const publicCli=async args=>{try{return JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const automation=async args=>JSON.parse((await child(uia,args,{signal:deadline.signal,timeout:10000})).stdout);
 const api=async(method,body={},cleanup=false)=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
@@ -44,6 +46,9 @@ const api=async(method,body={},cleanup=false)=>{
  return {status:response.status,value:await response.json()};
 };
 const save=()=>outputCreated?writeFile(join(output,"report.json"),JSON.stringify(report,null,2)):Promise.resolve();
+const stageStart=()=>{report.phaseStartedAt=new Date().toISOString();report.phaseStartMs=performance.now();};
+const stageDone=()=>{(report.stageTimings??=[]).push({stage:report.phase,elapsedMs:performance.now()-report.phaseStartMs,completedAt:new Date().toISOString()});};
+function safeUiaFailure(error){const stderr=String(error.stderr??"").trim();const known=new Map([["InvalidOperationException: Candidate executable/session identity mismatch","identity-mismatch"],["InvalidOperationException: Candidate start-time identity mismatch","start-time-mismatch"],["InvalidOperationException: Exactly one visible owned target window is required","main-window-count"],["InvalidOperationException: Owned window class unavailable","window-class-unavailable"],["InvalidOperationException: Owned window changed during pin","window-changed"],["InvalidOperationException: Unable to enumerate owned windows","enumeration-failed"]]);const match=/^(InvalidOperationException|ArgumentException|Win32Exception|ElementNotAvailableException|TimeoutException):/.exec(stderr);return {category:known.get(stderr)??"other-or-empty",exceptionClass:match?.[1]??null};}
 try {
  await mkdir(output,{recursive:false});outputCreated=true;await mkdir(home,{recursive:false});await mkdir(cliHome);
  const session=await automation(["session"]);assert.equal(session.sessionId,1);
@@ -59,17 +64,18 @@ try {
  assert.equal(report.hashes.cliEntry,build.cliSha256);
  assert.equal(await hash(exe),build.exeSha256);
  assert.equal(await hash(join(dirname(exe),"kelpie.dll")),build.dllSha256);
- await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
- const launchStarted=new Date().toISOString();
+ report.phase="cli-register";await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
+ report.phase="cli-launch";const launchStarted=new Date().toISOString();
  const launch=await publicCli(["browser","launch",alias,"--port","28420"]);assert.equal(launch.success,true);launched=true;
- const store=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));running=store.running[alias];
+ report.phase="cli-running-store";const store=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));running=store.running[alias];
  assert.equal(running.port,28420);assert.equal(resolve(running.readinessFile),join(profile,"readiness.json"));
- readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
- const identity=await automation(["pin",String(running.pid),exe,launchStarted]);
- const sockets=(await child(join(process.env.WINDIR,"System32","netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/)
+ report.phase="readiness-match";readiness=JSON.parse(await readFile(running.readinessFile,"utf8"));assert.equal(readiness.launchId,running.launchId);
+ report.phase="uia-process-pin";stageStart();const identity=await automation(["pin",String(running.pid),exe,launchStarted]);stageDone();report.identity={...identity,launchId:readiness.launchId,port:28420};
+ report.phase="listener-identity";stageStart();const sockets=(await child(join(process.env.WINDIR,"System32","netstat.exe"),["-ano","-p","tcp"])).stdout.split(/\r?\n/)
    .map(line=>line.trim().split(/\s+/)).filter(parts=>parts[1]==="127.0.0.1:28420"&&parts[3]==="LISTENING");
- assert.ok(sockets.length>0);assert.ok(sockets.every(parts=>Number(parts[4])===running.pid));
- assert.equal((await api("get-device-info")).value.success,true);
+ assert.ok(sockets.length>0);assert.ok(sockets.every(parts=>Number(parts[4])===running.pid));stageDone();
+ report.phase="device-info";stageStart();assert.equal((await api("get-device-info")).value.success,true);stageDone();
+ if(mode==="probe"){report.checks.push({name:"interactive launch, exact pin, listener and device info",passed:true});}else{
  report.identity={...identity,launchId:readiness.launchId,port:28420};
  report.phase="fixture-navigation";
  assert.equal((await api("navigate",{url:"about:blank"})).value.success,true,"FIXTURE_NAVIGATION_FAILED");
@@ -123,11 +129,11 @@ try {
    report.phase="native-wgc-capture";
    const captureBegan=performance.now();report.captureTiming={requestedAt:new Date().toISOString(),workflowElapsedMs:current.elapsedMs};
    try {
-   report.wgc=JSON.parse((await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
-     {signal:deadline.signal,timeout:10000})).stdout);
+   const captured=await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
+     {signal:deadline.signal,timeout:10000});report.wgc=JSON.parse(captured.stdout);report.wgcStages=parseWgcStages(captured.stderr);
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
    assert.equal(report.wgc.windowHandle,window.windowHandle);
-   }catch(error){report.wgcFailure={error:error.message,stderr:String(error.stderr??"").slice(0,8192)};}
+   }catch(error){report.wgcFailure={error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false,stages:parseWgcStages(error.stderr),stderr:String(error.stderr??"").slice(0,8192)};}
    finally{report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;}
    await save();
  }
@@ -183,8 +189,10 @@ try {
    const passed=report.nativeWindowPixels.stop&&report.nativeWindowPixels.marker;
    report.checks.push({name:mode==="wgc"?"owned WGC presentation marker and separate native Stop pixels":"owned PrintWindow Stop and marker pixels",passed,...(passed?{}:{error:report.wgcFailure?.error??report.terminalEvidenceFailure?.error??"NATIVE_SPATIAL_VALIDATION_FAILED"})});if(!passed)process.exitCode=1;
  }
+ }
 } catch(error) {
- report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.message});process.exitCode=1;
+ if(report.phase==="uia-process-pin")report.uiaFailure=safeUiaFailure(error);
+ report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.safeDetails?"CLI_FAILED":"INTERACTIVE_CHECK_FAILED",stage:report.phase??"setup",code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,kind:error.name??"Error",elapsedMs:report.phaseStartMs?performance.now()-report.phaseStartMs:null,...error.safeDetails});process.exitCode=1;
 } finally {
  if(launched){
    if(pending&&readiness){try{await api("abort-script",{},true);await awaitBounded(pending,5000);}catch(error){report.pendingCleanup=error.message;}}
@@ -192,7 +200,7 @@ try {
      const closed=await publicCli(["browser","stop",alias]);assert.equal(closed.success,true);
      if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
      report.cleanup="supported-cli-closed";
-   }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message});process.exitCode=1;}
+   }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message,code:error.code??null,signal:error.signal??null,killed:error.killed??false});process.exitCode=1;}
  }
  clearTimeout(timer);await save();
 }

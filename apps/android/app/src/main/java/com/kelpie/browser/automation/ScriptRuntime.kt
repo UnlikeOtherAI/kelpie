@@ -1,6 +1,7 @@
 package com.kelpie.browser.automation
 
 import android.content.Context
+import android.os.Build
 import android.webkit.WebView
 import com.kelpie.browser.ai.openai.OpenAIJson
 import com.kelpie.browser.handlers.HandlerContext
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -58,6 +60,11 @@ class ScriptRuntime(
                     )?.let(OpenAIJson::toMap) ?: throw ScriptFailure("INVALID_SCRIPT")
             if (validated["valid"] != true) throw ScriptFailure("INVALID_SCRIPT")
             val script = ScriptPreflight.admit(objectMap(validated["script"]))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                (script["capture"] != null || ScriptPreflight.actions(script).any { it["action"] == "screenshot" })
+            ) {
+                throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+            }
             val capture = objectMap(script["capture"])
             if ("video" in (capture["formats"] as? List<*>).orEmpty() && !runCatching { ScriptVideoEncoder.available() }.getOrDefault(false)) {
                 throw ScriptFailure("CAPTURE_VIDEO_UNAVAILABLE")
@@ -162,8 +169,12 @@ class ScriptRuntime(
             "inputGuarantee" to "synthetic-coordinate",
             "supportedActions" to ScriptPreflight.supportedActions.toList().sorted(),
             "captureFormats" to (
-                listOf("gif", "screenshots") +
-                    if (runCatching { ScriptVideoEncoder.available() }.getOrDefault(false)) listOf("video") else emptyList()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    emptyList()
+                } else {
+                    listOf("gif", "screenshots") +
+                        if (runCatching { ScriptVideoEncoder.available() }.getOrDefault(false)) listOf("video") else emptyList()
+                }
             ),
             "nativeSessions" to false,
             "webMcp" to mapOf("available" to false, "reason" to "No registered real API and explicit host grant"),
@@ -206,6 +217,18 @@ class ScriptRuntime(
                     }
                 }
             settleLayout(view)
+            if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
+                try {
+                    withTimeout(5_000) {
+                        while (!ctx.scriptCaptureScene) {
+                            runner.guard()
+                            delay(16)
+                        }
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+                }
+            }
             val settings =
                 objectMap(run.script["capture"]).ifEmpty {
                     mapOf(
@@ -217,7 +240,18 @@ class ScriptRuntime(
                     )
                 }
             if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
-                capture = ScriptCapture(run, view, ctx.scriptOverlay, settings, runner::document, runner::guard)
+                capture =
+                    ScriptCapture(run, view, {
+                        if (ctx.scriptCaptureScene &&
+                            !ctx.scriptCaptureActionMode &&
+                            !ctx.isIn3DInspector &&
+                            ctx.activePanel.value == null
+                        ) {
+                            ctx.scriptCaptureSceneGeneration
+                        } else {
+                            -1L
+                        }
+                    }, settings, runner::document, runner::guard)
                 capture.start(CoroutineScope(kotlin.coroutines.coroutineContext))
             }
             val steps = ScriptPreflight.actions(run.script)

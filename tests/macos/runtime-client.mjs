@@ -3,6 +3,7 @@ import {writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
 import {listenerState} from "./runtime-ownership.mjs";
+import {artifactFacts,errorFacts,toolEnvelopeFacts} from "./runtime-diagnostics.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 export const delay=ms=>new Promise(r=>setTimeout(r,ms));
 export class Failure extends Error { constructor(code){super(code);this.code=code;} }
@@ -40,7 +41,9 @@ export class Client {
   return response.value;
  }
  async tool(name,args={},reveal=false,options={}){
+  this.toolFacts=null;
   const {value}=await this.request("/mcp",{jsonrpc:"2.0",id:++this.counter,method:"tools/call",params:{name,arguments:args}},{...options,reveal});
+  this.toolFacts=toolEnvelopeFacts(value);
   requireTrue(!value.error,"MCP_ERROR");
   const result=JSON.parse(value.result.content.find(x=>x.type==="text").text);
   return result.ok===true?result.value:result.ok===false?{success:false,error:result.error}:result;
@@ -82,11 +85,23 @@ export class Client {
   requireTrue(typeof run.runId==="string","RUN_ID_MISSING");
   const records=[];
   for(const raw of run.artifacts??[]){
+   this.artifactFacts=artifactFacts(raw);
    const item=scriptArtifactSchema.parse(raw);const extension={"image/png":"png","image/gif":"gif","video/mp4":"mp4"}[item.mimeType];
    const file=path.join(this.out,label+"-"+this.artifacts.length+"."+extension);let offset=0;const chunks=[];
    requireTrue(item.byteLength<=64*1024*1024,"ARTIFACT_LIMIT");
    while(offset<item.byteLength){
-    const chunk=scriptArtifactChunkSchema.parse(await this.api("get-script-artifact",{runId:run.runId,artifactId:item.id,offset,length:262144}));
+    const rawChunk=await this.api("get-script-artifact",{runId:run.runId,artifactId:item.id,offset,length:262144});
+    this.chunkFacts=artifactFacts(rawChunk);
+    if(rawChunk?.success===false){
+     // Read-only same-owner probes classify transport consistency; the original failure still fails the run.
+     const args={runId:run.runId,artifactId:item.id,offset,length:262144};
+     this.protocolFacts={http:this.chunkFacts};
+     for(const [label,generic] of [["directMCP",false],["genericMCP",true]]){
+      try{this.protocolFacts[label]=artifactFacts(await this.direct("kelpie_get_script_artifact",args,generic));}
+      catch(error){this.protocolFacts[label]={exception:errorFacts(error)};}
+     }
+    }
+    const chunk=scriptArtifactChunkSchema.parse(rawChunk);
     requireTrue(chunk.runId===run.runId&&chunk.artifactId===item.id&&chunk.offset===offset&&chunk.sha256===item.sha256&&chunk.mimeType===item.mimeType&&chunk.byteLength===item.byteLength,"CHUNK_IDENTITY");
     const bytes=Buffer.from(chunk.data,"base64");requireTrue(bytes.length>0&&chunk.nextOffset===offset+bytes.length,"CHUNK_OFFSET");
     chunks.push(bytes);offset=chunk.nextOffset;requireTrue(chunk.eof===(offset===item.byteLength),"CHUNK_EOF");

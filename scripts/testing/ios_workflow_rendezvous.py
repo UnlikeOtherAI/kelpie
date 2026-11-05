@@ -9,6 +9,7 @@ class HostedCLIRendezvous:
     def __init__(self, nonce):
         self.tab = None
         self.outcome = "pending"
+        self.verified = False
         self.lock = threading.Lock()
         owner = self
 
@@ -44,6 +45,12 @@ class HostedCLIRendezvous:
                     if not 1 <= count <= 128:
                         return self.reply(400, {})
                     value = json.loads(self.rfile.read(count))
+                    if value == {"verified": True}:
+                        with owner.lock:
+                            if owner.outcome != "standard-passed" or owner.verified:
+                                return self.reply(409, {})
+                            owner.verified = True
+                        return self.reply(202, {"accepted": True})
                     if set(value) != {"tabId"}:
                         return self.reply(400, {})
                     tab = str(uuid.UUID(value["tabId"])).upper()
@@ -65,6 +72,14 @@ class HostedCLIRendezvous:
     def current_tab(self):
         with self.lock:
             return self.tab
+
+    def standard_passed(self):
+        with self.lock:
+            self.outcome = "standard-passed"
+
+    def standard_verified(self):
+        with self.lock:
+            return self.verified
 
     def finish(self, succeeded):
         with self.lock:

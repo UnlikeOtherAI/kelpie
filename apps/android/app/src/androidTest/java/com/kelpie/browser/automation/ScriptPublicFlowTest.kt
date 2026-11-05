@@ -53,10 +53,17 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                 val result: JSONObject
                 try {
                     val pending = executor.submit<JSONObject> { client.call("play-script", script) }
-                    awaitRecordingUi(pending)
-                    val deadline = System.nanoTime() + 5_000_000_000L
-                    while (!client.call("get-script-status").optBoolean("playing") && System.nanoTime() < deadline) Thread.sleep(30)
-                    Thread.sleep(550)
+                    // Drive the test clock until recording composition and the
+                    // first capture admit an action; do not wait for animation idle.
+                    val deadline = System.nanoTime() + 10_000_000_000L
+                    var admitted = false
+                    while (!admitted && !pending.isDone && System.nanoTime() < deadline) {
+                        ui.mainClock.advanceTimeByFrame()
+                        val status = client.call("get-script-status")
+                        admitted = status.optBoolean("playing") && status.has("actionIndex")
+                        if (!admitted) Thread.sleep(20)
+                    }
+                    assertTrue("Recording never admitted its first action", admitted)
                     val screen = captureBlueMarker()
                     File(evidence, "native-active-overlay.png").outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     screen.recycle()

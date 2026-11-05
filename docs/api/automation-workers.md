@@ -95,12 +95,21 @@ return ISOLATION_UNAVAILABLE before creating or using any shared context, in
 both the SDK and public worker factory. This refuses an unverified storage mode;
 it never substitutes borrowed/default storage.
 
-The minimal navigation inventory verified through the built production stdio CLI is tabs.list/tabs.close,
-tab.goto/tab.url/tab.title/tab.back/tab.forward/tab.reload. tabs.new and the
-snapshot/extract/status/ready reader family remain unadmitted publicly. Passing
-a limited fixed-reader diagnostic does not establish the full reader contract.
-The seven-case production stdio corpus passed for exact 1.0.2 with one isolated session/tab; no visual/input/WebMCP
-support is inferred from these diagnostics.
+The verified 1.0.2 isolated profile includes navigation/lifecycle methods
+tabs.list, tabs.close, tab.goto, tab.url, tab.title, tab.back, tab.forward and
+tab.reload. It also permits an operator to explicitly select the fixed readers
+tab.snapshot, tab.extract, tab.status and tab.ready after verification. All four
+remain absent when the operator list is empty. The bounded real-binary public
+stdio corpus covers privacy, scoped and budgeted observations, nested/missing/
+ambiguous extraction, publisher provenance and readiness refusals. A snapshot's
+references are descriptive in this profile: tab.click, tab.type and locator
+operations are not admitted. DOM viewport facts are not evidence of rendered
+geometry or pixels. Status reports network and error information as unavailable.
+
+tabs.new, shared/concurrent sessions, input and WebMCP remain unavailable for
+this tested profile. Selecting the candidate names does not independently verify
+another Lightpanda version, endpoint or deployment. Inspect capabilities and
+retain the operator-enforced resource and network boundary.
 
 No canonical screenshot, visual geometry, pointer motion, tap effect, GIF or video
 capture is available from this backend. Its upstream text-layout images are not

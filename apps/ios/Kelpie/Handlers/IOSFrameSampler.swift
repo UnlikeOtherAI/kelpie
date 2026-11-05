@@ -125,11 +125,107 @@ final class IOSFrameSampler {
         }
     }
 
+    static func diagnostic(_ reason: String) {
+        #if DEBUG
+        print("[WorkflowCapture] reason=" + reason)
+        #endif
+    }
+
+    // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
+    private func pinViewport(_ viewport: IOSWorkflowTab.Viewport, generation: String) throws {
+        try requirePinnedNativeViewport(viewport)
+        if let initial, initialDocument == generation {
+            let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
+            if documentResize {
+                Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
+                Self.geometryDiagnostic(before: initial, after: viewport)
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+            }
+        }
+        if initialDocument != generation {
+            initial = viewport
+            initialDocument = generation
+        }
+    }
+
+    private func requirePinnedNativeViewport(_ viewport: IOSWorkflowTab.Viewport) throws {
+        guard let initial else { return }
+        guard initial.bounds == viewport.bounds, initial.pixelRatio == viewport.pixelRatio else {
+            Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
+            Self.geometryDiagnostic(before: initial, after: viewport)
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+        }
+    }
+
+    private static func resizeReason(initial: IOSWorkflowTab.Viewport, viewport: IOSWorkflowTab.Viewport) -> String {
+        if initial.bounds != viewport.bounds { return "native-bounds" }
+        if initial.pixelRatio != viewport.pixelRatio { return "pixel-ratio" }
+        if initial.layout != viewport.layout { return "layout-size" }
+        if initial.visible.size != viewport.visible.size { return "visible-size" }
+        return "scale"
+    }
+
+    private static func geometryDiagnostic(before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport) {
+        #if DEBUG
+        func values(_ viewport: IOSWorkflowTab.Viewport) -> [CGFloat] {
+            [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
+             viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio]
+        }
+        let first = values(before), second = values(after)
+        guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
+        func encode(_ values: [CGFloat]) -> String {
+            values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }.joined(separator: ",")
+        }
+        print("[WorkflowCaptureGeometry] before=" + encode(first) + " after=" + encode(second))
+        #endif
+    }
+
+    #if DEBUG
+    private static func nativeInsets(_ view: WKWebView) -> [CGFloat] {
+        let safe = view.safeAreaInsets
+        let adjusted = view.scrollView.adjustedContentInset
+        let content = view.scrollView.contentInset
+        let window = view.window?.safeAreaInsets ?? .zero
+        return [safe.top, safe.bottom, adjusted.top, adjusted.bottom, content.top, content.bottom,
+                window.top, window.bottom, CGFloat(view.scrollView.contentInsetAdjustmentBehavior.rawValue)]
+    }
+
+    private static func insetsDiagnostic(before: [CGFloat], after: [CGFloat]) {
+        guard before.count == 9, after.count == 9,
+              (before + after).allSatisfy({ $0.isFinite && abs($0) <= 10_000 }) else { return }
+        func encode(_ values: [CGFloat]) -> String {
+            values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }.joined(separator: ",")
+        }
+        print("[WorkflowCaptureInsets] before=" + encode(before) + " after=" + encode(after))
+    }
+    #endif
+
     private func canvas(_ viewport: IOSWorkflowTab.Viewport) -> CGSize {
         let raw = viewport.bounds
         let factor = min(tab.view.contentScaleFactor, CGFloat(maxWidth) / raw.width, 1920 / raw.height)
         return CGSize(width: max(2, Int(raw.width * factor) / 2 * 2),
                       height: max(2, Int(raw.height * factor) / 2 * 2))
+    }
+
+    private func viewportForSample(generation: String, expected: String?) async throws -> IOSWorkflowTab.Viewport? {
+        if initialDocument == generation { return try await tab.viewport() }
+        let viewport = try await IOSCaptureViewportStability.wait(
+            deadline: ProcessInfo.processInfo.systemUptime + 2,
+            check: { [self] in try await check(); try checkTime() },
+            read: { [self] in
+                guard generation == tab.document else { return nil }
+                let viewport = try await tab.viewport()
+                try requirePinnedNativeViewport(viewport)
+                guard generation == tab.document else { return nil }
+                return viewport
+            }
+        )
+        guard let viewport else {
+            if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
+            dropped += 1
+            return nil
+        }
+        return viewport
     }
 
     private func sample(step: Int?, document expected: String?, prepare: (() -> Void)? = nil) async throws -> Bool {
@@ -145,17 +241,8 @@ final class IOSFrameSampler {
         try tab.requireCurrent()
         let generation = tab.document
         if let expected, expected != generation { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
-        let viewport = try await tab.viewport()
-        // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
-        if let initial {
-            let nativeResize = initial.bounds != viewport.bounds || initial.pixelRatio != viewport.pixelRatio
-            let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
-            if nativeResize || (initialDocument == generation && documentResize) { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
-        }
-        if initialDocument != generation {
-            initial = viewport
-            initialDocument = generation
-        }
+        guard let viewport = try await viewportForSample(generation: generation, expected: expected) else { return false }
+        try pinViewport(viewport, generation: generation)
         guard generation == tab.document else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
             dropped += 1
@@ -170,6 +257,9 @@ final class IOSFrameSampler {
         configuration.rect = tab.view.bounds
         configuration.snapshotWidth = NSNumber(value: Double(output.width / max(tab.view.contentScaleFactor, 1)))
         let view = tab.view
+        #if DEBUG
+        let insetsBefore = Self.nativeInsets(view)
+        #endif
         let source = try await IOSRendererDeadline.run(view: view, seconds: 3) {
             try await view.takeSnapshot(configuration: configuration)
         }
@@ -185,7 +275,14 @@ final class IOSFrameSampler {
         if after != viewport {
             let scrolled = after.bounds == viewport.bounds && after.layout == viewport.layout &&
                 after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
-            guard scrolled else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+            guard scrolled else {
+                Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))
+                Self.geometryDiagnostic(before: viewport, after: after)
+                #if DEBUG
+                Self.insetsDiagnostic(before: insetsBefore, after: Self.nativeInsets(view))
+                #endif
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+            }
             if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }
             dropped += 1
             return false

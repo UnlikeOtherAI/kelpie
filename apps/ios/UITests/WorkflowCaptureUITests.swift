@@ -1,5 +1,6 @@
 import AVFoundation
 import ImageIO
+import UIKit
 import XCTest
 
 final class WorkflowCaptureUITests: XCTestCase {
@@ -10,24 +11,9 @@ final class WorkflowCaptureUITests: XCTestCase {
 
     @MainActor
     func ready() async throws -> (WorkflowLoopbackPage, String) {
-        continueAfterFailure = false
-        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
-        app.launch()
-        XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
-        try await probe.pair(app: app)
         let fixture = try WorkflowLoopbackPage()
         let url = try await fixture.start()
-        let listing = try await probe.request("/v1/get-tabs", [:])
-        let prior = try XCTUnwrap(listing["activeTab"] as? String)
-        let created = try await probe.request("/v1/new-tab", ["url": "about:blank", "name": "Workflow UI test"])
-        let tab = try XCTUnwrap(created["tabId"] as? String)
-        addTeardownBlock { [self] in
-            let client = cleanupProbe ?? probe
-            let closed = try await client.request("/v1/close-tab", ["tabId": tab])
-            XCTAssertEqual(closed["success"] as? Bool, true)
-            if !prior.isEmpty { _ = try await client.request("/v1/switch-tab", ["tabId": prior]) }
-            _ = try await client.request("/v1/pair", method: "DELETE")
-        }
+        let tab = try await openOwnedTab(url: "about:blank")
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,
                                                                    "actions": [["action": "navigate", "url": url]]])
         guard navigated["success"] as? Bool == true else {
@@ -37,6 +23,45 @@ final class WorkflowCaptureUITests: XCTestCase {
             ])
         }
         return (fixture, tab)
+    }
+
+    @MainActor
+    func openOwnedTab(url: String) async throws -> String {
+        continueAfterFailure = false
+        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
+        app.launch()
+        XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
+        try await probe.pair(app: app)
+        let listing = try await probe.request("/v1/get-tabs", [:])
+        let prior = try XCTUnwrap(listing["activeTab"] as? String)
+        let created = try await probe.request("/v1/new-tab", ["url": url, "name": "Workflow UI test"])
+        let tab = try XCTUnwrap(created["tabId"] as? String)
+        addTeardownBlock { [self] in
+            let client = cleanupProbe ?? probe
+            let closed = try await client.request("/v1/close-tab", ["tabId": tab])
+            XCTAssertEqual(closed["success"] as? Bool, true)
+            if !prior.isEmpty { _ = try await client.request("/v1/switch-tab", ["tabId": prior]) }
+            _ = try await client.request("/v1/pair", method: "DELETE")
+        }
+        return tab
+    }
+
+    @MainActor
+    func testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray() throws {
+        func image(_ color: UIColor, small: Bool = false) throws -> CGImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20), format: format).image { renderer in
+                UIColor.white.setFill()
+                renderer.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+                color.setFill()
+                renderer.fill(small ? CGRect(x: 9, y: 9, width: 1, height: 1) : CGRect(x: 0, y: 0, width: 20, height: 20))
+            }.cgImage)
+        }
+        let faded = UIColor(red: 148.0 / 255, green: 241.0 / 255, blue: 149.0 / 255, alpha: 1)
+        XCTAssertTrue(WorkflowCaptureProbe.containsMarker(try image(faded), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(.lightGray), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(faded, small: true), minimumCoverage: 0.12))
     }
 
     @MainActor
@@ -111,7 +136,6 @@ final class WorkflowCaptureUITests: XCTestCase {
             geometry.lifetime = .keepAlways
             add(geometry)
         }
-        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
         let result = try await playback.value
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
@@ -122,6 +146,7 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
+        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
     }
 
     @MainActor
