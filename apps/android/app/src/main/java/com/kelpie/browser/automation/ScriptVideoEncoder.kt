@@ -24,6 +24,7 @@ class ScriptVideoEncoder(
     private var pending = 0
     private var ended = false
     private var lastAcceptedUs = -1L
+    val lastWrittenMs: Double get() = lastAcceptedUs / 1000.0
     var frames = 0
         private set
     var dropped = 0

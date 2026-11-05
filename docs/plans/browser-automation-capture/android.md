@@ -137,3 +137,38 @@ and metadata-only finalizing/terminal status. One intermediate173-test run faile
 because its test fixture precreated an exclusively owned directory; corrected
 fixture passed. No actual JNI link, AVC decoder, HTTP/MCP script flow, emulator,
 physical device, screenshot or installed release was exercised by this checkpoint.
+ANDROID-NATIVE-1: merged dc0648e284c46582708b2ea31431de85a9f9946a, preserved
+JNI UTF16/instrumentation drafts and froze source. pnpm bootstrap passed17.6s;
+configureCMakeDebug[x86_64] passed44s; explicit CMake --parallel1 completed115/115
+objects/links, including shipping KELPIE_LOCAL_LLM=ON. Installed default NDK25.1
+was used. Output is the task-owned x86_64 libkelpie_jni.so; logs native-1-configure
+and native-1-build remain under the task artifacts directory. SDK metadata version
+warnings and archive version probes were nonfatal. This establishes native link,
+not JNI execution, AVC decoding or public app flow acceptance.
+
+Next source checkpoint uses root419bc2ca including the Android/Chromium registry.
+Private pinned workflow readers use direct targeting with exact tab/WebView/current
+authority checks; selected targeting without get-tabs would disable canonical
+reads. Empty inputs:{} is accepted, but unresolved declarations/references refuse.
+Any resolved sensitive target refuses capture. Semantic step PNGs are pre-input;
+other step PNGs remain post-action. Movie marker phase zero stays stamped to the
+old document until every requested movie acknowledges an encoded frame and one
+requested interval passes. Then the configured animation clock starts, followed
+immediately by exact-target recheck/input. Screenshot-only and uncaptured runs have
+no added dwell. Step PNGs do not add movie samples or bypass the requested FPS.
+Raw JNI NUL/malformed UTF16 refuse; escaped JSON NUL and standard UTF8 non-BMP
+strings remain valid. Device tests cover repeated native allocation/free and these
+boundaries; their execution is still pending.
+ANDROID-COMPILE-2: root419bc2cad3a5b72d1e25a032bfb4e5a4aaaf209f plus Android
+fixes. ktlintFormat, main Kotlin/Java, all175 JVM tests and
+compileDebugAndroidTestKotlin passed (2m30s initial; final accounting/startup/test
+warning cleanup rerun1m30s, compile-2-final.log). No new Android-owned compiler
+warnings remain; existing unrelated warnings remain. Incremental shipping JNI
+with registry and UTF16/ownership fixes passed8/8 in the explicit one-job build
+(native-2-build.log). Standard UTF16 conversion rejects raw NUL/unpaired surrogates;
+RAII releases JNI characters and C ABI allocations even when conversion throws.
+Instrumentation cases are compiled, not executed: real UI pairing, direct HTTP/
+MCP status, ready/extract, independent GIF/MP4 retrieval/decode, movies-only1FPS
+navigation frame inspection, RGB/chroma/timing/min-budget video checks, UTF8/
+escaped-NUL/redactor vectors and repeated native allocation/free. No emulator,
+APK install, physical device, rendered UI screenshot or signed release was used.

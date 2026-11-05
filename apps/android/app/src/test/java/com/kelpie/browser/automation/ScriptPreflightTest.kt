@@ -45,7 +45,9 @@ class ScriptPreflightTest {
                 mapOf("action" to "fill", "target" to mapOf("selector" to "input"), "text" to mapOf("secret" to "configured")),
             ),
         )
-        refuses("UNRESOLVED_SCRIPT_INPUT", script(mapOf("action" to "wait", "ms" to 1)) + ("inputs" to emptyMap<String, Any>()))
+        val emptyDeclarations = script(mapOf("action" to "wait", "ms" to 1)) + ("inputs" to emptyMap<String, Any>())
+        assertEquals(emptyDeclarations, ScriptPreflight.admit(emptyDeclarations))
+        refuses("UNRESOLVED_SCRIPT_INPUT", script(mapOf("action" to "wait", "ms" to 1)) + ("inputs" to mapOf("name" to mapOf("type" to "string"))))
     }
 
     @Test

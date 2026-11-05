@@ -51,6 +51,7 @@ class ScriptCapture(
     private val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "KelpieCapture") }.asCoroutineDispatcher()
     private val channel = Channel<Command>(1)
     private val formats = (options["formats"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+    private val admission = ScriptMovieAdmission(formats)
     private val fps = (options["fps"] as? Number)?.toInt() ?: 15
     private val budget = ScriptMediaBudget((options["maxBytes"] as? Number)?.toLong() ?: 67_108_864)
     private val dropped = AtomicInteger()
@@ -96,8 +97,10 @@ class ScriptCapture(
             sampler =
                 scope.launch {
                     val period = 1_000_000_000L / fps
-                    var next = System.nanoTime()
+                    var next = System.nanoTime() + period
                     while (!run.stopped.get()) {
+                        val wait = next - System.nanoTime()
+                        if (wait > 0) delay((wait / 1_000_000).coerceAtLeast(1))
                         val elapsed = run.elapsedMs() - originMs
                         val max = (options["maxDurationMs"] as? Number)?.toLong() ?: 60_000
                         if (elapsed >= max) {
@@ -118,15 +121,37 @@ class ScriptCapture(
                             break
                         }
                         next += period
-                        val wait = next - System.nanoTime()
-                        if (wait > 0) {
-                            delay((wait / 1_000_000).coerceAtLeast(1))
-                        } else {
-                            dropped.addAndGet((-wait / period).toInt())
-                            next = System.nanoTime()
+                        val lag = System.nanoTime() - next
+                        if (lag >= 0) {
+                            dropped.addAndGet((lag / period + 1).toInt())
+                            next = System.nanoTime() + period
                         }
                     }
                 }
+        }
+    }
+
+    /** Hold phase zero until every movie contains the old-document frame. */
+    suspend fun holdMarker(
+        absoluteMs: Double,
+        documentId: String,
+    ) {
+        if (!admission.enabled()) return
+        while (!admission.contains(absoluteMs, documentId)) {
+            guard()
+            withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                if (document() != documentId) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
+            }
+            delay(10)
+        }
+        // Measured from acknowledged encoding, never from a queued/dropped frame.
+        val end = System.nanoTime() + 1_000_000_000L / fps
+        while (System.nanoTime() < end) {
+            guard()
+            withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                if (document() != documentId) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
+            }
+            delay(10)
         }
     }
 
@@ -195,6 +220,7 @@ class ScriptCapture(
         var video: ScriptVideoEncoder? = null
         var pending: IntArray? = null
         var pendingTime = -1.0
+        var pendingDocument = ""
         var failed: String? = null
         val documents = linkedSetOf<String>()
         try {
@@ -287,17 +313,26 @@ class ScriptCapture(
                             ),
                         )
                     }
+                    if (command.step != null) {
+                        command.ack?.complete(Unit)
+                        continue
+                    }
                     if (pendingTime < 0) originMs = frame.elapsedMs
                     val frameTime = frame.elapsedMs - originMs
-                    if (frameTime > pendingTime) {
+                    if (pendingTime < 0 || frameTime - pendingTime >= 1000.0 / fps) {
                         if (pending != null && gif?.frame(pending!!, frameTime) == false) {
                             throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
                         }
+                        if (pending != null && gif != null) admission.admit("gif", pendingTime + originMs, pendingDocument)
                         val pixels = IntArray(outputWidth * outputHeight)
                         frame.bitmap.getPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
                         if (video?.frame(pixels, frameTime) == false) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
+                        video?.let { if (it.lastWrittenMs >= 0) admission.admit("video", it.lastWrittenMs + originMs, frame.documentId) }
                         pending = if (gif != null) pixels else null
+                        pendingDocument = frame.documentId
                         pendingTime = frameTime
+                    } else {
+                        dropped.incrementAndGet()
                     }
                     command.ack?.complete(Unit)
                 } catch (failure: ScriptFailure) {

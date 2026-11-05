@@ -121,3 +121,9 @@ redacted outputs, after a current authority recheck. Artifacts have opaque owner
 grant/listener-bound IDs, bounded chunks and hashes, never arbitrary paths or URLs.
 Lightpanda stays desktop orchestration; WebMCP requires a real API and explicit
 grant. A Nessie connection alone cannot grant recording permission.
+Semantic tap/fill/type step PNGs represent the pre-input marker on the original
+document; other step PNGs represent post-action state. Movies hold marker phase
+zero until actual encoded admission and one requested sample interval, then start
+the configured animation before exact target recheck and input. Navigation clears
+the old-document overlay. Screenshots-only and uncaptured scripts have no extra
+marker dwell. PNG steps never force movie frames above the requested FPS.
