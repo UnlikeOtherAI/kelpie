@@ -17,7 +17,7 @@ Where the selected browser advertises script v1, HTTP `POST /v1/play-script`, CL
 }
 ```
 
-Targets are exactly one of role/name/exact, label/exact, CSS selector or explicit viewport x/y. The target must be unique, visible, eligible and unobscured. A partially clipped target uses the center of its viewport/overflow-clipped visible rectangle. The same element object, document, URL, viewport and geometry are rechecked after visual motion. A moved/replaced/obscured target refuses input. Semantic traversal is bounded; `TARGET_QUERY_LIMIT` requests a narrower target rather than silently choosing a match.
+Targets are exactly one of role/name/exact, label/exact, CSS selector or explicit viewport x/y. The target must be unique, visible, eligible and unobscured. Label text excludes input, textarea, select/options and contenteditable/textbox subtrees, so default form values and editor contents cannot become a control name. Implicit and external labels retain their public text. A partially clipped target uses the center of its viewport/overflow-clipped visible rectangle. The same element object, document, URL, viewport and geometry are rechecked after visual motion. A moved/replaced/obscured target refuses input. Semantic traversal is bounded; `TARGET_QUERY_LIMIT` requests a narrower target rather than silently choosing a match.
 
 The pointer is presentation only and does not cause hover. Native platforms report actual input guarantees; synthetic coordinate events are never described as trusted input. A mutation with uncertain completion is never retried. A synchronous page handler changing the target during a pointer sequence stops it with `mayHaveCompleted:true`.
 

@@ -147,7 +147,7 @@ describe("bounded accessible names", () => {
       elementFromPoint: () => button,
       createTreeWalker: (_root: unknown, mask: number) => {
         let visits = 0;
-        return { currentNode: button, nextNode: () => mask === 1 ? null : ++visits < 300 ? { nodeType: 1, textContent: "" } : null };
+        return { currentNode: button, nextNode: () => mask === 1 ? null : ++visits < 300 ? { nodeType: 1, getAttribute: () => null } : null };
       },
     });
     expect(resolveScriptTarget({ role: "button", name: "missing", exact: true }, "private").error).toBe("TARGET_QUERY_LIMIT");

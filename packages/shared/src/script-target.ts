@@ -66,14 +66,34 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     return right > left && bottom > top ? { x: left, y: top, width: right - left, height: bottom - top } : null;
   };
   const visible = (el: Element): boolean => visibleBox(el) !== null;
+  const privateText = (el: Element): boolean => el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ||
+    (el as HTMLElement).isContentEditable ||
+    (el.getAttribute("contenteditable") !== null && el.getAttribute("contenteditable")?.toLowerCase() !== "false") ||
+    el.getAttribute("role") === "textbox";
   const boundedText = (el: Element): string => {
+    if (privateText(el)) return "";
     const reader = document.createTreeWalker(el, 0xFFFFFFFF);
     let text = "", count = 0;
-    for (let node = reader.nextNode(); node; node = reader.nextNode()) {
+    for (let node = reader.nextNode(); node;) {
       if (++count > 256) { budget.limited = true; return ""; }
-      if (node.nodeType !== 3) continue;
-      if (text.length + (node.textContent?.length ?? 0) > 2048) { budget.limited = true; return ""; }
-      text += node.textContent ?? "";
+      if (node.nodeType === 1 && privateText(node as Element)) {
+        // Count the private boundary, then skip its whole subtree. No filter can
+        // hide an unbounded number of visited nodes from the work budget.
+        let sibling = reader.nextSibling();
+        while (!sibling && reader.parentNode()) {
+          if (++count > 256) { budget.limited = true; return ""; }
+          sibling = reader.nextSibling();
+        }
+        node = sibling;
+        continue;
+      }
+      if (node.nodeType === 3) {
+        const data = node as CharacterData;
+        if (text.length + data.length > 2048) { budget.limited = true; return ""; }
+        text += data.substringData(0, data.length);
+      }
+      node = reader.nextNode();
     }
     return text;
   };

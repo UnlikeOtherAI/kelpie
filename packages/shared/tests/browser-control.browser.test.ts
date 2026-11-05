@@ -6,6 +6,7 @@ import {
   createBrowserClient, createBrowserControlProxy, createPlaywrightBrowserBackend,
 } from "../src/browser-control/index.js";
 import type { BrowserControlBackend, BrowserTabClient } from "../src/browser-control/index.js";
+import { resolveScriptTarget } from "../src/script-target.js";
 import { fixedObservationExpression } from "../src/browser-control/observation-source.js";
 import type { BrowserExtraction, BrowserPageStatus, BrowserReadiness } from "../src/browser-control/observations.js";
 import { actOnNativeReference, rememberNativeSnapshot } from "../src/browser-control/native-reference.js";
@@ -354,6 +355,39 @@ describe("metadata source positions and scoped root fields", () => {
       }
       const escaped = ":" + String.fromCharCode(92) + "73 cope";
       await expect(page.evaluate(fixedObservationExpression("extract", { scope: "main", fields: [{ name: "reject", selector: escaped, source: "text" }] }))).rejects.toThrow("UNSUPPORTED_SELECTOR_ESCAPE");
+    } finally { await page.close(); }
+  });
+});
+
+describe("value-free semantic form labels", () => {
+  it("fills and types by implicit/external labels while excluding control/editor subtrees", async () => {
+    const page = await engine.newPage();
+    try {
+      await page.setContent('<label>Draft message<textarea id="draft">PRIVATE_LABEL_CANARY</textarea></label>' +
+        '<label for="external">External label<textarea>PRIVATE_LABEL_CANARY</textarea><select><option>PRIVATE_LABEL_CANARY</option></select>' +
+        '<span contenteditable="true">PRIVATE_LABEL_CANARY<b>PRIVATE_LABEL_CANARY</b></span></label><input id="external">' +
+        '<label>Choice<select id="choice"><option>PRIVATE_LABEL_CANARY</option></select></label>' +
+        '<div contenteditable="true" id="editor">PRIVATE_LABEL_CANARY</div><input aria-labelledby="editor" id="private">');
+      const invoke = (target: { label: string; exact: true }, token?: string, edit?: { action: "fill" | "type"; text: string }) =>
+        page.evaluate("(" + resolveScriptTarget.toString() + ")(" + JSON.stringify(target) + ',"label-regression",' +
+          JSON.stringify(token ?? null) + ",false," + JSON.stringify(edit ?? null) + ",false)");
+      for (const label of ["Draft message", "External label", "Choice"]) {
+        const observed = await invoke({ label, exact: true });
+        expect(observed).toMatchObject({ ok: true });
+        expect(JSON.stringify(observed)).not.toContain("PRIVATE_LABEL_CANARY");
+      }
+      const target = { label: "Draft message", exact: true as const };
+      const first = await invoke(target);
+      expect(await invoke(target, first.token, { action: "fill", text: "written" })).toMatchObject({ ok: true });
+      const next = await invoke(target);
+      expect(await invoke(target, next.token, { action: "type", text: "-more" })).toMatchObject({ ok: true });
+      expect(await page.locator("#draft").inputValue()).toBe("written-more");
+      expect(await invoke({ label: "PRIVATE_LABEL_CANARY", exact: true })).toMatchObject({ ok: false, error: "TARGET_NOT_FOUND" });
+      // A large private subtree is skipped, while public traversal still has its exact visit budget.
+      await page.locator("label[for=external] [contenteditable]").evaluate(el => {
+        el.replaceChildren(...Array.from({ length: 1000 }, () => document.createElement("span")));
+      });
+      expect(await invoke({ label: "External label", exact: true })).toMatchObject({ ok: true });
     } finally { await page.close(); }
   });
 });
