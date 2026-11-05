@@ -13,6 +13,10 @@ class HostedCLIRendezvous:
         owner = self
 
         class Request(BaseHTTPRequestHandler):
+            def setup(self):
+                self.request.settimeout(3)
+                super().setup()
+
             def log_message(self, *_):
                 pass
 

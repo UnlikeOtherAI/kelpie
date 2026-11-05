@@ -1,4 +1,4 @@
-"""Drive the installed CLI against the disposable, paired iOS simulator fixture."""
+"""Drive the built CLI entry point against the disposable, paired iOS simulator fixture."""
 import hashlib
 import json
 import re
