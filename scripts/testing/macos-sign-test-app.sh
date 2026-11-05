@@ -11,9 +11,15 @@ else
   test "$#" -eq 0
   test "${GITHUB_ACTIONS:-}" = true
   test "${RUNNER_OS:-}" = macOS
-  app="apps/macos/.build/Build/Products/Debug/Kelpie.app"
+  app="apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app"
 fi
 test -d "$app"
+# Runtime exercises public interfaces, not an XCTest host. Never reuse a polluted
+# build-for-testing product or repair stripped SDK test-framework resource seals.
+if find "$app" -type d \( -name '*.xctest' -o -name 'XCTest*.framework' -o -name 'XCUI*.framework' -o -name 'XCT*.framework' -o -name 'Testing.framework' \) -print -quit | grep -q .; then
+  echo 'Runtime candidate must be a clean app-only product' >&2
+  exit 2
+fi
 framework="$app/Contents/Frameworks/Chromium Embedded Framework.framework"
 # Sign nested Mach-O libraries before their containing framework and helper apps.
 while IFS= read -r -d '' library; do
@@ -24,16 +30,8 @@ while IFS= read -r -d '' helper; do
   codesign --force --sign - --timestamp=none \
     --entitlements apps/macos/KelpieHelper/KelpieHelper.entitlements "$helper"
 done < <(find "$app/Contents/Frameworks" -maxdepth 1 -type d -name '*Helper*.app' -print0)
-# build-for-testing embeds an unsigned XCTest bundle; its resource envelope
-# must be sealed before the containing app. Linker ad-hoc code signatures alone
-# do not sign that bundle's Info.plist/resources.
 while IFS= read -r -d '' library; do
   codesign --force --sign - --timestamp=none "$library"
 done < <(find "$app/Contents/MacOS" -maxdepth 1 -type f -name '*.dylib' -print0)
-if test -d "$app/Contents/PlugIns"; then
-  while IFS= read -r -d '' bundle; do
-    codesign --force --sign - --timestamp=none "$bundle"
-  done < <(find "$app/Contents/PlugIns" -maxdepth 1 -type d -name '*.xctest' -print0)
-fi
 codesign --force --sign - --timestamp=none --entitlements apps/macos/Kelpie/Kelpie.entitlements "$app"
 codesign --verify --deep --strict --verbose=2 "$app"

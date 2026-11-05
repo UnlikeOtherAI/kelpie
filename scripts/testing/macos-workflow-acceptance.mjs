@@ -19,8 +19,8 @@ if(process.argv[2]==="--preparation"){
  process.exit(0);
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
-const root=await realpath("."),app=await realpath("apps/macos/.build/Build/Products/Debug/Kelpie.app");
-requireTrue(app.startsWith(root+"/apps/macos/.build/"),"CANDIDATE_PATH");
+const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
+requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const out=path.join(root,".cache/macos-runtime/evidence"),privateDir=path.join(root,".cache/macos-runtime/private");
 await mkdir(out,{recursive:true});await mkdir(privateDir,{recursive:true,mode:0o700});
 requireTrue(listeners(28420).length===0&&listeners(8421).length===0,"OCCUPIED_LISTENER");
