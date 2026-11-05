@@ -59,6 +59,35 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testCoherentCaptureStatePreservesViewportFieldsAndDocument() throws {
+        let identity = String(repeating: "a", count: 32)
+        let bounds = CGSize(width: 900, height: 700)
+        let classic: [NSNumber] = [900, 700, 0, 0, 885, 700, 1, 2, 0, 900, 885, 700]
+        let state = try ScriptWorkflowTab.decodeCaptureState(["viewport": classic, "document": identity], bounds: bounds)
+        XCTAssertEqual(state.document, identity)
+        XCTAssertEqual(state.viewport, try ScriptWorkflowTab.decodeViewport(classic, bounds: bounds))
+        XCTAssertEqual(state.viewport.layout, CGSize(width: 900, height: 700))
+        XCTAssertEqual(state.viewport.client, CGSize(width: 885, height: 700))
+        XCTAssertEqual(state.viewport.visible, CGRect(x: 0, y: 0, width: 885, height: 700))
+        XCTAssertEqual(state.viewport.pixelRatio, 2)
+        XCTAssertEqual(state.viewport.pageOrigin, CGPoint(x: 0, y: 900))
+
+        let zoomed: [NSNumber] = [900, 700, 30, 40, 450, 350, 2, 2, 130, 240, 900, 700]
+        let clipped = try ScriptWorkflowTab.decodeCaptureState(["viewport": zoomed, "document": identity], bounds: bounds)
+        XCTAssertEqual(clipped.viewport.visible, CGRect(x: 30, y: 40, width: 450, height: 350))
+        XCTAssertEqual(clipped.viewport.scale, 2)
+        XCTAssertEqual(clipped.viewport.pageOrigin, CGPoint(x: 130, y: 240))
+        XCTAssertNotEqual(state.viewport, clipped.viewport)
+        let replacement = try ScriptWorkflowTab.decodeCaptureState(
+            ["viewport": classic, "document": String(repeating: "b", count: 32)],
+            bounds: bounds
+        )
+        XCTAssertNotEqual(state.document, replacement.document)
+        XCTAssertThrowsError(try ScriptWorkflowTab.decodeCaptureState(["viewport": classic, "document": ""], bounds: bounds))
+        XCTAssertThrowsError(try ScriptWorkflowTab.decodeCaptureState(["viewport": [1], "document": identity], bounds: bounds))
+    }
+
+    @MainActor
     func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
         let port: UInt16 = 28421
         let router = Router()

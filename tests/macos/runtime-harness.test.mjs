@@ -217,6 +217,8 @@ test("timing diagnostics accept only bounded numeric fixed labels",()=>{
  assert.deepEqual(captureTimingSignal("[WorkflowCaptureTiming] sample=movie engine=chromium ms=1,2,3,4,5"),
   {sample:"movie",engine:"chromium",stagesMs:[1,2,3,4,5]});
  assert.equal(captureTimingSignal("[WorkflowCaptureTiming] sample=movie engine=chromium ms=1,2,private,4,5"),null);
+ assert.deepEqual(captureTimingSignal("[WorkflowCaptureTiming] sample=movie engine=chromium model=coherent ms=10,20,30"),
+  {sample:"movie",engine:"chromium",model:"coherent",stagesMs:[10,20,30]});
  assert.deepEqual(pointerTimingSignal("[WorkflowPointerTiming] engine=chromium elapsed=350 updates=20 updateGap=20 draws=18 drawGap=24 complete=1"),
   {engine:"chromium",elapsedMs:350,updates:20,maxUpdateGapMs:20,draws:18,maxDrawGapMs:24,completed:true});
  assert.equal(pointerTimingSignal("[WorkflowPointerTiming] engine=private elapsed=350 updates=20 updateGap=20 draws=18 drawGap=24 complete=1"),null);

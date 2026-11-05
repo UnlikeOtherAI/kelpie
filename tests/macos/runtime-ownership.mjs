@@ -80,6 +80,8 @@ export function captureCoherenceSignal(line){
 
 // Bounded numeric timing aggregates only; no positions, content, or raw logs.
 export function captureTimingSignal(line){
+ const coherent=/^\[WorkflowCaptureTiming\] sample=(screenshot|critical|movie) engine=(webkit|chromium|other) model=coherent ms=(\d{1,5}),(\d{1,5}),(\d{1,5})$/.exec(line);
+ if(coherent)return {sample:coherent[1],engine:coherent[2],model:"coherent",stagesMs:coherent.slice(3).map(Number)};
  const match=/^\[WorkflowCaptureTiming\] sample=(screenshot|critical|movie) engine=(webkit|chromium|other) ms=(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5}),(\d{1,5})$/.exec(line);
  return match?{sample:match[1],engine:match[2],stagesMs:match.slice(3).map(Number)}:null;
 }

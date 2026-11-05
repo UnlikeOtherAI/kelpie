@@ -13,10 +13,10 @@ struct ScriptCaptureTiming {
     }
 
     func emit(sample: String, engine: String) {
-        guard durations.count == 5 else { return }
+        guard durations.count == 3 else { return }
         let renderer = ["webkit", "chromium"].contains(engine) ? engine : "other"
         let values = durations.map(String.init).joined(separator: ",")
-        print("[WorkflowCaptureTiming] sample=\(sample) engine=\(renderer) ms=\(values)")
+        print("[WorkflowCaptureTiming] sample=\(sample) engine=\(renderer) model=coherent ms=\(values)")
     }
 }
 #endif

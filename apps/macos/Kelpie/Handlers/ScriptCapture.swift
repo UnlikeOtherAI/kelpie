@@ -258,12 +258,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         try await tab.check()
         try Self.requireCurrentOverlay(overlayIsCurrent)
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
-        let viewport = try await tab.viewport()
-        #if DEBUG
-        timing?.mark()
-        #endif
-        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
-        let document = try await tab.documentIdentity()
+        let (viewport, document) = try await tab.captureState()
         #if DEBUG
         timing?.mark()
         #endif
@@ -287,7 +282,7 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         timing?.mark()
         #endif
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
-        let finalDocument = try await tab.documentIdentity()
+        let (finalViewport, finalDocument) = try await tab.captureState()
         #if DEBUG
         timing?.mark()
         #endif
@@ -297,10 +292,6 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
             #endif
             throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
         }
-        let finalViewport = try await tab.viewport()
-        #if DEBUG
-        timing?.mark()
-        #endif
         guard finalViewport == viewport else {
             #if DEBUG
             print("[WorkflowCaptureCoherence] sample=\(sample) change=viewport")
