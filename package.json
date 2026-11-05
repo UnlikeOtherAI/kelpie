@@ -4,7 +4,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint && pnpm lint:capture",
+    "lint:capture": "eslint --config scripts/testing/capture-eslint.config.mjs tests/capture tests/linux tests/macos tests/windows"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
