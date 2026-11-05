@@ -179,6 +179,13 @@ final class IOSWorkflowActions {
     }
 
     private func consumeSensitivity(_ result: Body, text: String?) {
+        #if DEBUG
+        if result["error"] as? String == "INPUT_UNCERTAIN", let reason = result["focusFailure"] as? String {
+            let known = ["document-focus", "target-focus", "identity", "viewport", "eligibility",
+                         "budget", "geometry", "hit", "sensitivity", "unknown"]
+            if known.contains(reason) { IOSFrameSampler.diagnostic("focus-" + reason) }
+        }
+        #endif
         guard result["sensitive"] as? Bool == true else { return }
         protectEditPrivacy(text: text)
     }
