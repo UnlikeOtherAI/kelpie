@@ -16,7 +16,7 @@ const api=async(method,body={})=>{
 const tabs=await api("get-tabs"),tabId=tabs.tabs.find(t=>t.active).id;
 const evaluate=async expression=>{const v=await api("evaluate",{tabId,expression});assert.equal(v.success,true);return v.result;};
 const pause=ms=>new Promise(done=>setTimeout(done,ms));
-const check=async(name,run)=>{try{checks.push({name,passed:true,detail:await run()});}catch(e){checks.push({name,passed:false,error:e.message});}};
+const check=async(name,run)=>{if(process.env.KELPIE_GEOMETRY_CASE_FILTER&&!name.includes(process.env.KELPIE_GEOMETRY_CASE_FILTER))return;try{checks.push({name,passed:true,detail:await run()});}catch(e){checks.push({name,passed:false,error:e.message});}};
 const download=async run=>{
  for(const raw of run.artifacts??[]){
   const item=scriptArtifactSchema.parse(raw),chunks=[];let offset=0;
@@ -76,6 +76,22 @@ try {
   assert.deepEqual(second.value.fields[0].values,["Next document"]);
   assert.equal(second.value.fields[0].provenance.source,"text");
   return {first:first.value,second:second.value};
+ });
+
+ await check("active script refuses public viewport resize",async()=>{
+  const before=await api("get-viewport");
+  const pending=api("play-script",{version:1,tabId,actions:[{action:"wait",ms:2000}],
+    capture:{formats:["gif","video"],fps:15,maxWidth:640,maxBytes:8388608}});
+  let status;for(let i=0;i<50;i++){status=await api("get-script-status");if(status.playing)break;await pause(20);}
+  assert.equal(status.playing,true);
+  for(const method of ["resize-viewport","reset-viewport"]){
+    const refusal=await api(method,{width:900,height:700});
+    assert.equal(refusal.success,false);assert.equal(refusal.error.code,"BUSY");
+  }
+  assert.equal((await api("abort-script",{runId:status.runId})).success,true);
+  const result=await pending;await download(result);assert.equal(result.success,false);
+  assert.deepEqual(await api("get-viewport"),before);
+  return {runId:result.runId,before,reason:"Existing public mutations serialize; no active-capture resize entry point"};
  });
 } finally {
  const report={source:process.env.KELPIE_CAPTURE_SOURCE,launchId:r.launchId,mode,checks,artifacts};
