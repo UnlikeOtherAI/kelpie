@@ -158,10 +158,15 @@ try{
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
 }catch(error){
  if(helperExit&&!report.helperExit){if(helper&&helper.exitCode===null)helper.kill();try{report.helperExit=await awaitBounded(helperExit,2000);}catch{report.helperExit={code:null,signal:null};}report.helperDiagnostic=safeWgcDiagnostic(helperError);}
+ if(fixture){try{
+  const partial=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(3000)})).json();
+  const bytes=Buffer.from(JSON.stringify(partial));if(bytes.length<=16384)await writeFile(join(outputRoot,"partial-fixture-events.json"),bytes,{flag:"wx"});
+ }catch{}}
+ const location=String(error.stack??"").match(/(?:wgc-frame-stream|wgc-g08-evaluate|wgc-g08-rgb|g08-pixels|g08-retention).mjs:\d+/)?.[0]??null;
  const errorKind=["AbortError","TimeoutError","TypeError","AssertionError","Error"].includes(error.name)?error.name:"Other";
  const message=String(error.message??"");const safe=/^(INSUFFICIENT_EVIDENCE|WGC_|G08_|OUTPUT_BUDGET|PRESENTATION_UNAVAILABLE|NO_ACTIVE_STATUS_POLL|HTTP_[0-9]{3})[A-Za-z0-9_ .:-]{0,120}$/.test(message)&&!/[a-f0-9]{24,}/i.test(message)?message:"CASE_FAILED";
  report.checks.push({name:"owned native and exported G08 case",passed:false,stage:report.phase,
-  category:error.safeDetails?.category??safe,errorKind,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
+  category:error.safeDetails?.category??safe,errorKind,location,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;
 }finally{
  monitorStop=true;if(helperTimer)clearTimeout(helperTimer);if(helper&&helper.exitCode===null)helper.kill();
