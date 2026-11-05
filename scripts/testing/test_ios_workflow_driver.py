@@ -49,6 +49,15 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         finally:
             bridge.close()
 
+    def test_capture_insets_are_bounded_numeric_only(self):
+        from ios_workflow_diagnostics import fixed_capture_insets
+        line = "[WorkflowCaptureInsets] before=0,34,0,34,0,0,0,34,0 after=0,0,0,0,0,0,0,0,0"
+        self.assertEqual(fixed_capture_insets(line), {
+            "before": [0, 34, 0, 34, 0, 0, 0, 34, 0], "after": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        })
+        self.assertIsNone(fixed_capture_insets(line.replace("0,34", "private,34")))
+        self.assertIsNone(fixed_capture_insets(line.replace("0,34", "999999,34")))
+
     def test_capture_geometry_diagnostics_are_bounded_numeric_only(self):
         from ios_workflow_diagnostics import fixed_capture_geometry
         line = "[WorkflowCaptureGeometry] before=390,800,390,800,390,800,1,3 after=390,790,390,790,390,790,1,3"
