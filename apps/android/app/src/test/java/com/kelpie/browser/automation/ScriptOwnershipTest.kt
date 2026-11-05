@@ -222,12 +222,22 @@ class ScriptOwnershipTest {
             val run = ScriptRun("first-" + first, authority(), "tab", script(), File(temporary.root, first))
             run.stop(first)
             run.stop("SCRIPT_ABORTED")
-            run.finish("SCRIPT_ABORTED", true)
+            assertEquals(first, run.stopReason.get())
+            run.finish(checkNotNull(run.stopReason.get()), true)
             val status = run.status()
             assertEquals(first, (status["runError"] as Map<*, *>)["code"])
             assertEquals(true, status["mayHaveCompleted"])
             assertEquals("failed", status["state"])
             if (first == "SENSITIVE_CAPTURE_REFUSED") assertTrue(run.discardCapture.get())
         }
+    }
+
+    @Test
+    fun concreteNavigationFailureRetainsExistingFinishPrecedence() {
+        val run = ScriptRun("concrete", authority(), "tab", script(), File(temporary.root, "concrete"))
+        run.stop("SCRIPT_ABORTED")
+        run.finish("SCRIPT_NAVIGATION_FAILED", true)
+        assertEquals("SCRIPT_NAVIGATION_FAILED", (run.status()["runError"] as Map<*, *>)["code"])
+        assertEquals(true, run.status()["mayHaveCompleted"])
     }
 }

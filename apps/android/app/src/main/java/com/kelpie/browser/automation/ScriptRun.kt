@@ -110,7 +110,7 @@ class ScriptRun(
         code: String?,
         mayHaveCompleted: Boolean,
     ) {
-        val firstCode = error ?: stopReason.get() ?: code
+        val firstCode = error ?: code ?: stopReason.get()
         error = firstCode
         uncertain = uncertain || mayHaveCompleted
         phase =
