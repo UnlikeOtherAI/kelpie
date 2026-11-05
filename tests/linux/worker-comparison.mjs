@@ -60,7 +60,7 @@ await new Promise(ok=>fixture.listen(0,"127.0.0.1",ok));
 const origin="http://127.0.0.1:"+fixture.address().port;
 const endpoint="http://127.0.0.1:"+port;
 const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
-const environment={...process.env,HOME:home,KELPIE_HOME:join(home,"kelpie"),
+const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,KELPIE_HOME:join(home,"kelpie"),
  LIGHTPANDA_DISABLE_TELEMETRY:"true",LIGHTPANDA_DISABLE_CORE_DUMP:"1"};
 const args=backend==="lightpanda"?["serve","--host","127.0.0.1","--port",String(port),"--log-level","error"]:
  ["--headless=new","--remote-debugging-address=127.0.0.1","--remote-debugging-port="+port,
