@@ -161,7 +161,7 @@ class WicGif final : public GifWriter {
     }
     centiseconds_ = boundary;
     output_.duration_ms = static_cast<double>(boundary) * 10;
-
+    ++committed_frames_;
     return true;
   }
 
@@ -187,7 +187,9 @@ class WicGif final : public GifWriter {
     return owns_file_ ? FileBytes(output_.path) : 0;
   }
 
+  std::size_t CommittedFrames() const override { return committed_frames_; }
  private:
+  std::size_t committed_frames_=0;
   void Discard() noexcept {
     FILE_DISPOSITION_INFO discard{TRUE};
     SetFileInformationByHandle(file_, FileDispositionInfo, &discard, sizeof(discard));

@@ -53,4 +53,18 @@ if(BUILD_TESTING AND WIN32)
   )
   kelpie_enable_test_assertions(kelpie_windows_script_compositor_test)
   add_test(NAME kelpie_windows_script_compositor_test COMMAND kelpie_windows_script_compositor_test)
+
+  add_executable(kelpie_windows_script_media_prefix_test
+    tests/script_media_prefix_test.cpp ${KELPIE_SCRIPT_CODEC_SOURCES})
+  target_include_directories(kelpie_windows_script_media_prefix_test PRIVATE src)
+  target_compile_definitions(kelpie_windows_script_media_prefix_test PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_link_libraries(kelpie_windows_script_media_prefix_test PRIVATE ${KELPIE_SCRIPT_SYSTEM_LIBRARIES})
+  if(MSVC)
+    target_compile_options(kelpie_windows_script_media_prefix_test PRIVATE /W4 /WX)
+  endif()
+  add_test(NAME kelpie_windows_script_media_prefix_test COMMAND ${CMAKE_COMMAND}
+    "-DTEST_EXECUTABLE=$<TARGET_FILE:kelpie_windows_script_media_prefix_test>"
+    "-DARTIFACT_ROOT=${CMAKE_CURRENT_BINARY_DIR}/script-media-prefix-artifacts"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_script_media_test.cmake")
 endif()

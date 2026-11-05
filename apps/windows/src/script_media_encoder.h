@@ -64,6 +64,9 @@ class ScriptMediaEncoder {
   // writes nothing. Service owns the PNG step manifest.
   bool WriteStepPNG(const ScriptMediaFrame& frame, const std::filesystem::path& path);
 
+  // Active-worker encoded source-frame prefix accepted by every requested movie
+  // writer (not pending raw input). PNG-only/empty capture reports zero.
+  std::size_t committed_movie_frames() const;
   std::size_t bytes_written() const;
   bool budget_exceeded() const;
 
