@@ -158,6 +158,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   for (const auto& action : actions) {
     const std::string name = action.at("action");
     if (name == "fill" || name == "type") {
+      if (action.contains("typingDelayMs")) return ErrorResponse("UNSUPPORTED_SCRIPT_ACTION", "Paced typing is not available in this native adapter");
       if (!action.at("text").is_string()) return ErrorResponse("UNRESOLVED_INPUT", "Bind inputs before native admission");
       if (action.value("sensitive", false)) { sensitive = true; redactions.push_back(action.at("text")); }
     }
