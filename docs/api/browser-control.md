@@ -197,6 +197,13 @@ register edit text, and latch media discard. See [late sensitivity](../plans/bro
 the runner must enforce session ownership, binding and sensitivity/capture policy.
 Generated Zod/native parity fixtures include duplicate capture-format refusals.
 
+For trusted native get-script-artifact execute failures, direct and generic MCP
+preserve only ARTIFACT_NOT_READY (authorized active run) and ARTIFACT_NOT_FOUND
+(opaque absent/foreign run), with fixed safe gateway messages. Native response
+messages/data are never forwarded on failure; unrelated codes remain
+COMMAND_FAILED. Existing uncertainty is retained. Platform routes still validate
+the request and owner before deciding active/terminal availability.
+
 ## Typed WebMCP seam
 
 The canonical request union includes `tab.webmcp.discover {origin,maxTools?,maxChars?}`
