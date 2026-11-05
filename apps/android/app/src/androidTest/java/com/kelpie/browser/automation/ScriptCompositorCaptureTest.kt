@@ -35,7 +35,7 @@ class ScriptCompositorCaptureTest : ScriptPublicFixture() {
                 var code: String? = null
                 instrumentation.runOnMainSync {
                     try {
-                        ScriptCompositorCapture(view) { -1L }.rectangle()
+                        ScriptCompositorCapture(view, scene = { -1L }).rectangle()
                     } catch (error: ScriptFailure) {
                         code = error.code
                     }
@@ -106,7 +106,7 @@ class ScriptCompositorCaptureTest : ScriptPublicFixture() {
                         parent.scaleX = 0.5f
                         parent.scaleY = 0.5f
                         width = view.width
-                        mappedWidth = ScriptCompositorCapture(view) { 1L }.rectangle().width()
+                        mappedWidth = ScriptCompositorCapture(view, scene = { 1L }).rectangle().width()
                     }
                     assertEquals(width / 2.0, mappedWidth.toDouble(), 1.0)
                     val script =
@@ -133,7 +133,7 @@ class ScriptCompositorCaptureTest : ScriptPublicFixture() {
                     instrumentation.runOnMainSync {
                         parent.scaleY = 0.7f
                         try {
-                            ScriptCompositorCapture(view) { 1L }.rectangle()
+                            ScriptCompositorCapture(view, scene = { 1L }).rectangle()
                         } catch (_: ScriptFailure) {
                             rejected = true
                         }

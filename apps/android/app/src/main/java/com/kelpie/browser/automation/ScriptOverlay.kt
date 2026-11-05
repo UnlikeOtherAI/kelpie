@@ -7,7 +7,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
+import com.kelpie.browser.BuildConfig
 import java.lang.ref.WeakReference
 
 /** Live native overlay and captured pixels consume this one timeline and renderer. */
@@ -43,6 +45,7 @@ class ScriptOverlay {
 
     private var pointer: Pointer? = null
     private var tap: Tap? = null
+    private var markerDrawLogged = false
     private var commentary: Commentary? = null
     private var document: String? = null
     private var viewportLeft = 0.0
@@ -85,6 +88,10 @@ class ScriptOverlay {
     @Synchronized
     fun indicate(value: Tap) {
         tap = value
+        markerDrawLogged = false
+        if (BuildConfig.DEBUG) {
+            Log.d("KelpieMarkerTiming", "stage=published nowNs=${System.nanoTime()} held=${value.held} attached=${view.get()?.isAttachedToWindow == true}")
+        }
         changed()
     }
 
@@ -115,6 +122,13 @@ class ScriptOverlay {
         now: Long,
         documentId: String?,
     ): Boolean {
+        if (BuildConfig.DEBUG && tap != null && !markerDrawLogged) {
+            markerDrawLogged = true
+            Log.d(
+                "KelpieMarkerTiming",
+                "stage=firstDraw nowNs=$now documentMatch=${documentId == document} viewportReady=${viewportWidth > 0 && viewportHeight > 0} width=$width height=$height",
+            )
+        }
         if (viewportWidth <= 0 || viewportHeight <= 0 || documentId != document) return pointer != null || tap != null
         canvas.save()
         canvas.scale((width / viewportWidth).toFloat(), (height / viewportHeight).toFloat())

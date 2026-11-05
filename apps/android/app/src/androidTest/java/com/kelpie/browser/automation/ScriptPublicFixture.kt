@@ -148,10 +148,17 @@ abstract class ScriptPublicFixture {
         }
     }
 
-    protected fun captureBlueMarker(): Bitmap {
+    protected fun captureBlueMarker(client: ScriptHttpFixture): Bitmap {
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
+        val observations = org.json.JSONArray()
+        val started = System.nanoTime()
+        var nextStatus = started
+
+        fun saveObservations() {
+            File(evidence, "native-marker-poll.json").writeText(observations.toString(2))
+        }
         while (System.nanoTime() < deadline) {
             // The live overlay invalidates while animating; waiting for Compose idle
             // here would defer the screenshot until the marker has disappeared.
@@ -164,6 +171,19 @@ abstract class ScriptPublicFixture {
             val target = submitTargetBounds(viewport)
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
+            val now = System.nanoTime()
+            if (now >= nextStatus && observations.length() < 16) {
+                val status = runCatching { client.call("get-script-status") }.getOrNull()
+                observations.put(
+                    JSONObject()
+                        .put("elapsedMs", (now - started) / 1_000_000)
+                        .put("actionIndex", status?.optInt("actionIndex", -1) ?: -1)
+                        .put("playing", status?.optBoolean("playing") ?: false)
+                        .put("targetVisible", target != null)
+                        .put("markerFound", marker != null),
+                )
+                nextStatus = now + 1_000_000_000L
+            }
             if (marker != null) {
                 val confirmedTarget = checkNotNull(target)
                 rejected?.recycle()
@@ -189,6 +209,7 @@ abstract class ScriptPublicFixture {
                         .put("centerCoverage", marker.centerCoverage)
                         .toString(2),
                 )
+                saveObservations()
                 return bitmap
             }
             rejected?.recycle()
@@ -199,6 +220,7 @@ abstract class ScriptPublicFixture {
             File(evidence, "native-marker-rejected.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             image.recycle()
         }
+        saveObservations()
         throw AssertionError("Scene-centered native Submit marker never appeared")
     }
 

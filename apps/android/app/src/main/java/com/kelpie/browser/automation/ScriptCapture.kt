@@ -51,7 +51,8 @@ class ScriptCapture(
         ) : Command
     }
 
-    private val compositor = ScriptCompositorCapture(view, scene)
+    private val diagnostics = ScriptCaptureDiagnostics()
+    private val compositor = ScriptCompositorCapture(view, scene, diagnostics)
     private val snapshotMutex = Mutex()
     private val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "KelpieCapture") }.asCoroutineDispatcher()
     private val channel = Channel<Command>(1)
@@ -190,6 +191,7 @@ class ScriptCapture(
             channel.send(Command.Finish(run.elapsedMs().toDouble(), done))
             done.await()
             worker?.join()
+            diagnostics.report()
             channel.close()
             dispatcher.close()
         }
@@ -223,7 +225,9 @@ class ScriptCapture(
                         ) {
                             throw ScriptFailure("VIEWPORT_CHANGED")
                         }
+                        val copyStarted = System.nanoTime()
                         val bitmap = compositor.copy(rect, outputWidth, outputHeight)
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.PIXEL_COPY, System.nanoTime() - copyStarted)
                         try {
                             val now = System.nanoTime()
                             guard()
@@ -325,6 +329,8 @@ class ScriptCapture(
                     break
                 }
                 command as Command.Sample
+                val encodeStarted = System.nanoTime()
+                diagnostics.record(ScriptCaptureDiagnostics.Phase.QUEUE, encodeStarted - run.startedNanos - (command.frame.elapsedMs * 1_000_000).toLong())
                 try {
                     if (failed != null) throw ScriptFailure(failed!!)
                     val frame = command.frame
@@ -389,6 +395,7 @@ class ScriptCapture(
                     run.stop(failed!!)
                     command.ack?.completeExceptionally(ScriptFailure(failed!!))
                 } finally {
+                    diagnostics.record(ScriptCaptureDiagnostics.Phase.ENCODE, System.nanoTime() - encodeStarted)
                     command.frame.bitmap.recycle()
                 }
             }
