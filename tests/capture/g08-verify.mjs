@@ -3,15 +3,19 @@ import {readFile,writeFile,stat} from "node:fs/promises";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import {spawn,spawnSync} from "node:child_process";
-import {resolve} from "node:path";
+import {resolve,join} from "node:path";
 import {consumeG08Frames} from "./g08-frame-stream.mjs";
 import {measureG08Frame} from "./g08-pixels.mjs";
 import {evaluateG08} from "./g08-timeline.mjs";
 import {validateG08PTS} from "./g08-pts.mjs";
-const [inputPath,outputPath]=process.argv.slice(2);
+import {loadG08ModelReference} from "./g08-model-reference.mjs";
+const [inputPath,outputPath,modelPath,backingDir,evidencePath]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
 assert.ok((await stat(inputPath)).size<=524288,"Input report exceeds bound");
-const input=JSON.parse(await readFile(inputPath,"utf8"));
+const inputBytes=await readFile(inputPath);
+const input=JSON.parse(inputBytes.toString("utf8"));
+const modelRequested=[modelPath,backingDir,evidencePath].some(Boolean);
+assert.ok(!modelRequested||[modelPath,backingDir,evidencePath].every(Boolean),"Provide all model evidence paths");
 assert.match(input.source,/^[a-f0-9]{40}$/);
 assert.match(input.binarySHA256,/^[a-f0-9]{64}$/);
 const runtimes=["windows-cef","linux-gtk-cef","linux-osr-cef","macos-webkit","macos-cef",
@@ -84,7 +88,14 @@ for(const item of input.cases){
         });
         await exited;assert.equal(count,artifact.timestamps.length);
       }finally{clearTimeout(timeout);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
-      entry.analysis=evaluateG08(entry.samples,config);entry.passed=true;
+      let model;
+      if(modelRequested&&artifact.mimeType==="image/gif"){
+        model=await loadG08ModelReference({manifest:modelPath,backing:join(backingDir,item.curve+"-backing-receipt.json"),observations:join(backingDir,item.curve+"-backing.jsonl"),evidence:evidencePath},
+          {input,inputSHA256:createHash("sha256").update(inputBytes).digest("hex"),item,artifact,actualPTS});
+        entry.modelEvidence={manifestSHA256:model.manifestSHA256,backingSHA256:model.backingSHA256,
+          referenceSHA256:model.referenceSHA256,scope:"instrumented candidate; encoded-visible GIF pixels only"};
+      }
+      entry.analysis=evaluateG08(entry.samples,config,model?.reference);entry.passed=true;
     }catch(error){
       entry.passed=false;entry.error=String(error.message).slice(0,1024);
       entry.confidence=entry.error.includes("INSUFFICIENT_EVIDENCE")?"insufficient":"failed";
