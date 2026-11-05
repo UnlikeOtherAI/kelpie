@@ -6,6 +6,8 @@ import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {isAbsolute,join} from "node:path";
 import {createInterface} from "node:readline";
 import {whiteBackedRGB} from "./wgc-g08-rgb.mjs";
+import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
+import {alphaControlWgcArgs} from "./wgc-alpha-control-args.mjs";
 
 const [control,wgc,ffmpeg,output,controlHash,wgcHash,revision]=process.argv.slice(2);
 assert.ok([control,wgc,ffmpeg,output].every(value=>value&&isAbsolute(value)));
@@ -29,7 +31,7 @@ try{
  const identity=JSON.parse(first.value);
  assert.equal(identity.pid,child.pid);assert.match(identity.startFileTime,/^\d+$/);assert.match(identity.hwnd,/^\d+$/);
  report.identity=identity;report.stage="wgc";
- await exec(wgc,[String(identity.pid),control,identity.startFileTime,identity.hwnd,join(output,"capture")],
+ await exec(wgc,alphaControlWgcArgs(identity,control,join(output,"capture")),
   {windowsHide:true,timeout:10000,maxBuffer:131072});
  const meta=JSON.parse(await readFile(join(output,"capture","metadata.json"),"utf8"));
  assert.equal(meta.processId,identity.pid);assert.equal(meta.windowHandle,identity.hwnd);
@@ -55,7 +57,8 @@ try{
  report.exit=await Promise.race([closed,new Promise((_,reject)=>setTimeout(()=>reject(new Error("CONTROL_EXIT_TIMEOUT")),18000))]);
  assert.equal(report.exit.code,0);report.cleanup="natural-exit";
 }catch(error){
- report.failure={stage:report.stage,category:["AssertionError","Error","TypeError"].includes(error.name)?error.name:"Other"};
+ report.failure={stage:report.stage,category:["AssertionError","Error","TypeError"].includes(error.name)?error.name:"Other",
+  ...(report.stage==="wgc"?{diagnostic:safeWgcDiagnostic(error.stderr),code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed===true}:{})};
  process.exitCode=1;
 }finally{
  if(child&&child.exitCode===null){child.kill();try{report.forcedExit=await closed;}catch{}}
