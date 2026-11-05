@@ -1,4 +1,4 @@
-/** Copies only bounded JSON data properties; never invokes getters or toJSON. */
+/** Copies bounded enumerable JSON data; never invokes getters or toJSON. */
 export function boundedWebMcpJson(
   value: unknown,
   limits: { maxBytes: number; maxDepth: number; maxProperties: number; objectOnly?: boolean },
@@ -26,9 +26,14 @@ export function boundedWebMcpJson(
     seen.add(item);
     spend("[]");
     const output: unknown[] | Record<string, unknown> = array ? [] : Object.create(null) as Record<string, unknown>;
-    for (const key of Reflect.ownKeys(item)) {
-      if (array && key === "length") continue;
-      if (typeof key !== "string" || ++properties > limits.maxProperties) throw new Error("JSON property limit");
+    const declaredLength: unknown = array ? Object.getOwnPropertyDescriptor(item, "length")?.value : undefined;
+    if (array && (typeof declaredLength !== "number" || !Number.isInteger(declaredLength) || declaredLength < 0 || declaredLength > limits.maxProperties)) throw new Error("JSON property limit");
+    // No eager Reflect.ownKeys array. Engine enumeration/proxy traps themselves
+    // remain part of the untrusted browser API boundary, not a resource sandbox.
+    for (const key in item) {
+      if (!Object.hasOwn(item, key)) continue;
+      if (++properties > limits.maxProperties) throw new Error("JSON property limit");
+      if (key.length > limits.maxBytes) throw new Error("JSON key limit");
       const descriptor = Object.getOwnPropertyDescriptor(item, key);
       if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) throw new Error("JSON data properties required");
       if (array && (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) !== (output as unknown[]).length)) throw new Error("Dense JSON array required");

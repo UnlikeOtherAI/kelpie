@@ -641,6 +641,12 @@ Signed-in clients subscribe to UOA's reusable settings WebSocket. The initial sn
 
 The CLI can expose an operator-managed external worker through `kelpie worker mcp --config <operator-json>`. It creates short-lived isolated contexts or fresh tabs in its own explicitly shared automation context, never imports human tabs/profiles/cookies, and refuses foreign or expired session handles. The restricted Lightpanda profile admits only explicitly verified methods and cannot supply canonical pixel capture. See [worker configuration and limitations](api/automation-workers.md).
 
+Managed external workers can expose canonical WebMCP discovery and invocation only after explicit operator origin/encoding configuration and an actual private-world API probe. Requests cannot grant themselves access; page metadata and results remain bounded/untrusted, and timeout uncertainty preserves the completion fence. Native app exposure requires its own trusted grant and runtime support. See [operator worker WebMCP](api/automation-workers.md#explicit-managed-webmcp-grant).
+
 ### Windows native workflow capture
 
 Windows Chromium supports strict script version1 through the existing authenticated HTTP/MCP routes when get-script-status advertises supportedVersions:[1]. The native adapter captures overlay-inclusive GIF, H.264 MP4 and PNG steps with bounded ownership-scoped artifact downloads. Semantic targets use trusted CDP coordinate input after identity/visibility rechecks; the check-to-input asynchronous gap is reported explicitly. External session IDs and unresolved input/secret references are refused before actions. Native presentation adds only the requested renderer marker/pointer/commentary and a small Stop control. Actual app-flow and native UI verification status is recorded in docs/plans/browser-automation-capture/windows.md.
+
+### Apple script media
+
+Apple script capture uses [shared bounded media helpers](api/apple-script-media.md) for GIF/PNG/H.264, sRGB overlays, byte caps and authenticated chunk retrieval. Native adapter and installed-app acceptance are tracked separately from the standalone codec checks.

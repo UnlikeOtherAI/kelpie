@@ -8,7 +8,7 @@ import { createWorkerMcpServer } from "./mcp.js";
 import { loadWorkerConfig, workerEndpoint } from "./config.js";
 
 /** Explicit operator launch authorizes one local stdio principal, not a new human account. */
-export async function startWorkerMcp(path: string): Promise<void> {
+export async function startWorkerMcp(path: string, version: string): Promise<void> {
   const config = await loadWorkerConfig(path);
   let browser;
   try { browser = await chromium.connectOverCDP(workerEndpoint(config), { timeout: 10_000 }); }
@@ -31,11 +31,12 @@ export async function startWorkerMcp(path: string): Promise<void> {
         browser, backend: config.backend, owner, authorize, options: { ...options, ttlMs },
         sharedContext: options.isolation === "shared" ? await sharedContext : undefined,
         maxTabs: config.maxTabs, verifiedLightpandaMethods: config.verifiedLightpandaMethods,
+        webMcp: config.webMcpInputEncoding && config.webMcpOrigins.length ? { origins: config.webMcpOrigins, inputEncoding: config.webMcpInputEncoding } : undefined,
         network: { boundary: config.networkBoundary, allowNavigation: (url) => origins.has(url.origin) },
       });
     },
   });
-  const server = createWorkerMcpServer(registry);
+  const server = createWorkerMcpServer(registry, version);
   let stopping: Promise<void> | undefined;
   const shutdown = (): Promise<void> => {
     if (stopping) return stopping;

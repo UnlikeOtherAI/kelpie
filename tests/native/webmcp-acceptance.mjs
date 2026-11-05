@@ -31,6 +31,7 @@ const controller = createWebMcpController({
     if (operation === "call" && !callsAllowed) throw new Error("Operator call grant absent");
   },
   evaluate(input) { return page.evaluate(webMcpPageExpression(input)); },
+  async isDocumentRetired() { return page.isClosed(); },
 });
 try {
   await page.goto(origin);
@@ -104,10 +105,21 @@ try {
       error => error.code === "TIMEOUT" && error.mayHaveCompleted);
     let busy = false;
     try { await controller.probe(origin); } catch (error) { assert.equal(error.code, "BUSY"); busy = true; }
+    await new Promise(resolve => setTimeout(resolve, 55));
+    assert.equal(await page.evaluate(() => window.fixtureCalls), 1, "Ignored-abort executor must still be mid-flight");
+    await assert.rejects(controller.probe(origin), error => error.code === "BUSY");
     await new Promise(resolve => setTimeout(resolve, 200));
-    assert.equal((await controller.probe(origin)).available, true);
-    evidence.tests.push(`Bounded result; timeout uncertain without retry; outstanding fence observed=${busy}`);
     evidence.finalCalls = await page.evaluate(() => window.fixtureCalls);
+    assert.equal(evidence.finalCalls, 2);
+    let retiredByActualReply = false;
+    try { retiredByActualReply = (await controller.probe(origin)).available; }
+    catch (error) {
+      assert.equal(error.code, "BUSY");
+      await page.close();
+      await controller.ensureIdle();
+      evidence.tests.push("Abort rejection did not retire completion; confirmed page teardown released the fence");
+    }
+    evidence.tests.push(`Bounded result; mid-flight BUSY/counter proved; no retry; actual-reply retirement=${retiredByActualReply}; initial BUSY=${busy}`);
   }
 } finally {
   await controller.dispose().catch(() => {});

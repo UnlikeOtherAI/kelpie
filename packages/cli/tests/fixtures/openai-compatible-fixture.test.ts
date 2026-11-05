@@ -108,6 +108,51 @@ function splitsInsideDataField(reads: Uint8Array[]): boolean {
   });
 }
 
+// A queued default-reader stream preserves these authored chunks. HTTP/TCP is
+// deliberately excluded from assertions about where an individual read ends.
+function protocolChunks(bytes: Buffer): Uint8Array[] {
+  const cuts = new Set([0, bytes.length]);
+  for (let index = 0; index < bytes.length; index++) {
+    if (bytes.subarray(index, index + 5).equals(Buffer.from("data:"))) cuts.add(index + 2);
+    const value = bytes[index];
+    if (value >= 0xc2 && value <= 0xf4 && (bytes[index + 1] & 0xc0) === 0x80) cuts.add(index + 1);
+    if (value === 0x0d && bytes[index + 1] === 0x0a) cuts.add(index + 1);
+  }
+  const positions = [...cuts].sort((left, right) => left - right);
+  return positions.slice(1).map((end, index) => bytes.subarray(positions[index], end));
+}
+async function readChunks(chunks: Uint8Array[]): Promise<SseRead> {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      controller.close();
+    },
+  });
+  return readSse(new Response(body));
+}
+
+describe("deterministic SSE byte boundaries", () => {
+  it.each(["\n", "\r\n"])("decodes split and coalesced input with newline %j", async (newline) => {
+    const message = { choices: [{ delta: { content: "fixture-ok", reasoning_content: "Přemýšlím 🌍" } }] };
+    const usage = { choices: [], usage: { total_tokens: 7 } };
+    const payload = Buffer.from([
+      ": keep-alive", "data: " + JSON.stringify(message), "",
+      "data: " + JSON.stringify(usage), "", "data: [DONE]", "", "",
+    ].join(newline));
+    const fragmented = protocolChunks(payload);
+    expect(Buffer.concat(fragmented)).toEqual(payload);
+    expect(fragmented.some(isPartialUtf8Tail)).toBe(true);
+    expect(splitsInsideDataField(fragmented)).toBe(true);
+    for (const chunks of [[payload], fragmented]) {
+      const parsed = await readChunks(chunks);
+      expect(parsed.reads).toEqual(chunks);
+      expect(parsed.comments).toEqual([": keep-alive"]);
+      expect(parsed.events.map(event => JSON.parse(event.data))).toEqual([message, usage]);
+      expect(parsed.done).toBe(true);
+    }
+  });
+});
+
 // --- Helpers ---
 
 const auth = { Authorization: `Bearer ${KEY}` };
@@ -208,14 +253,9 @@ describe("OpenAI-compatible protocol fixture", { timeout: 20_000 }, () => {
     expect(response.status).toBe(200);
   });
 
-  it("streams a plain answer fragmented, with comments, usage and [DONE]", async () => {
+  it("streams a plain answer with comments, usage and [DONE] over HTTP", async () => {
     const stream = await readSse(await chat(keyed, { model: MODEL, stream: true, messages: [{ role: "user", content: "hi" }] }));
     expect(stream.done).toBe(true);
-    expect(stream.reads.length).toBeGreaterThan(20);
-    // Reads may coalesce in transit, but the fixture forces cuts inside every
-    // multibyte character and every "data:", so some must survive.
-    expect(stream.reads.some((read) => isPartialUtf8Tail(read))).toBe(true);
-    expect(splitsInsideDataField(stream.reads)).toBe(true);
     expect(stream.comments).toContain(": keep-alive");
     const all = deltas(stream.events);
     expect(all[0]).toEqual({ role: "assistant" });
