@@ -118,3 +118,11 @@ These are separate allowances, not one total memory budget: native source raster
 Focused source-bound and geometry checks use scripts/testing/apple-script-snapshot.sh. Exact MacCEF scrolled/pinched native pixels, admitted-source stress and native-overlay/export comparison remain pending authorized app handoff.
 
 Verification on prerequisite 881f066b: source-limit C++ checks, pure Swift viewport/deadline checks, the durable Chrome 156 protocol regression and full Swift lint passed. Incremental core-MCP/profile dependencies rebuilt 16 targets with registry/gateway/extensions 3/3 passed; CPU/Metal/BLAS flags were retained without rebuilding llama. Tuist and the final app/XCTest build-for-testing passed. Raw source-limit helper, codec and protocol evidence remain under .cache/mac-app-build and the recorded artifact directories; no app or simulator launched.
+
+## GIF-only abort retention
+
+A Mac caller that started GIF finalization after abort previously returned false before the first frame. It now snapshots that state and permits at most 2 seconds to retain a valid prefix, matching the shared Apple invariant; a new abort during normal 45 second finalization still interrupts between frames. The existing encoder's aggregate byte checks remain authoritative. A byte-limited result, expired finalization grace and abort are classified separately; failed/aborted artifacts remain partial.
+
+Codec regression uses the actual caller policy, shared GIF encoder, full frame decode and artifact store: already-aborted grace retains three valid frames as partial, a newly arriving abort interrupts normal finalization, and the next GIF succeeds. Runtime acceptance must additionally run GIF-only capture, abort after frames are collected, retrieve and fully decode its partial GIF, then complete a fresh run without manual state repair. Native Stop and remote abort both need this flow through the pinned authenticated listener.
+
+The abort-prefix codec suite passed in .cache/apple-codec-kmPkt9 with peak private footprint 75.3 MB. ImageIO decoded every retained frame; independent FFmpeg/ffprobe fully decoded already-aborted, newly-aborted and recovered GIFs, each 3 frames at 160x90 with 0.1 second duration. This checks the production finalization policy/encoder/artifact-store seam, not native GIF-only Stop acceptance.

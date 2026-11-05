@@ -671,3 +671,5 @@ The macOS strict workflow adapter pins the authenticated listener/client grant a
 Windows release CI retains clearly labelled unsigned candidates only. Public Windows assets require agent-run Azure Public Trust signing on Minis, signature verification and an installed signed-artifact acceptance run; CI does not attach unsigned ZIPs to releases.
 
 On macOS Chromium, script capture uses the current renderer surface without clip emulation and admits only bounded native backing viewports before dispatch. Scroll origin participates in per-frame coherence while legal scrolling between samples preserves the fixed canvas. See [Apple script media](api/apple-script-media.md#macos-current-surface-admission) for the separate source, queue and output limits.
+
+Mac GIF capture retains a bounded playable prefix when abort precedes finalization, marks the result partial and keeps a newly arriving Stop responsive between frames. A subsequent run starts through the same normal admission path.
