@@ -62,6 +62,9 @@ int main() {
     if (!health) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   assert(health && health->status == 200);
+  const auto preflight = client.Options("/v1/navigate", {{"Origin", "https://evil.example"}});
+  assert(preflight && preflight->status == 405 && !preflight->has_header("Access-Control-Allow-Origin"));
+  assert(navigations == 0);
   // Slow headers and bodies expire on a total budget even while bytes arrive.
   // Another worker must continue serving ordinary local requests meanwhile.
   for (const bool partial_body : {false, true}) {

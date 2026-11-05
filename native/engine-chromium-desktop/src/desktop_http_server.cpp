@@ -177,6 +177,15 @@ bool DesktopHttpServer::Start(const Config& config) {
     impl_->active_requests = 0;
   }
   impl_->server.set_payload_max_length(config.max_body_bytes);
+  // No browser preflight grants control permission or reaches the router.
+  impl_->server.Options(R"(/.*)", [](const httplib::Request& request, httplib::Response& response) {
+    response.status = 405;
+    std::string methods = "POST";
+    if (request.path == "/health" || request.path == "/v1/pair/status") methods = "GET";
+    else if (request.path == "/v1/pair") methods = "POST, DELETE";
+    else if (request.path == "/v1/get-device-info") methods = "GET, POST";
+    response.set_header("Allow", methods);
+  });
 
   impl_->server.Get("/health", [](const httplib::Request&, httplib::Response& response) {
     Json(response, 200, {{"status", "ok"}});

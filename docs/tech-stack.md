@@ -231,6 +231,8 @@ WebView, NsdManager, PixelCopy are all Android SDK built-ins.
 
 Windows ships a CEF 152.0.6 sandbox bootstrap (`kelpie.exe`) and application DLL (`kelpie.dll`),
 with matching CEF runtime assets. The Windows application version is owned by
-`apps/windows/CMakeLists.txt` (`KELPIE_WINDOWS_VERSION`, currently `0.1.3`); it does not share
-Apple mobile version fields. The local control server is loopback-only and uses an ACL-protected
-per-launch readiness token rather than mDNS pairing.
+`apps/windows/CMakeLists.txt` (`KELPIE_WINDOWS_VERSION`); it does not share
+Apple mobile version fields. The control server accepts LAN connections, trusts localhost
+automatically and remembers an explicitly approved remote socket IP across profiles and
+restarts. Settings lists trusted computers with revocation. The ACL-protected readiness
+file remains available to local discovery clients.
