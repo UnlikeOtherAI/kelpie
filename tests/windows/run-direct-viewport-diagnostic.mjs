@@ -68,8 +68,17 @@ try{
    }
    report.casePassed=result.success===true;
   } }else try{
-  await exec(process.execPath,[join(tests,"run-script-capture-acceptance.mjs"),readinessPath,join(evidenceRoot,"native")],
-    {env:{...env,KELPIE_CAPTURE_SOURCE:manifest.source,KELPIE_CAPTURE_CASE_FILTER:"continuous GIF MP4 marker PNG semantic"},windowsHide:true,timeout:180000,maxBuffer:2097152});
+  const filters=process.env.KELPIE_CAPTURE_CASE_FILTERS
+    ? JSON.parse(process.env.KELPIE_CAPTURE_CASE_FILTERS)
+    : ["continuous GIF MP4 marker PNG semantic"];
+  assert.ok(Array.isArray(filters)&&filters.length>0&&filters.length<=6);
+  assert.ok(filters.every(filter=>typeof filter==="string"&&/^[A-Za-z0-9 ,_-]{1,100}$/.test(filter)));
+  report.caseFilters=filters;
+  for(const [index,filter] of filters.entries()){
+   const output=filters.length===1?join(evidenceRoot,"native"):join(evidenceRoot,"native-"+index);
+   await exec(process.execPath,[join(tests,"run-script-capture-acceptance.mjs"),readinessPath,output],
+     {env:{...env,KELPIE_CAPTURE_SOURCE:manifest.source,KELPIE_CAPTURE_CASE_FILTER:filter},windowsHide:true,timeout:180000,maxBuffer:2097152});
+  }
   report.casePassed=true;
  }catch(error){report.casePassed=false;report.caseExit=typeof error.code==="number"?error.code:null;}
  report.stage="close";
