@@ -203,7 +203,7 @@ otherwise stated. Its Windows production/build inputs are unchanged at
 Windows 0.1.16 is consistent in CMake, RC, device info and runtime at
 65fe4866. The final integrated revision still requires the sandboxed CEF
 rebuild/package and candidate replay, keyless signing of verified copies on
-Minis, signature/timestamp/EKU and SignTool verification, immutable upload,
+Maxis (Minis fallback), signature/timestamp/EKU and SignTool verification, immutable upload,
 then exact published-package install and runtime checks. The current candidate
 and native screenshots do not establish those release steps.
 
