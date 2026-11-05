@@ -264,8 +264,14 @@ jobs:
         run: |
           set -euo pipefail
           package_root="dist/release/${DISTRO_NAME}"
+          curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "${RUNNER_TEMP}/kelpie-moby-default.json"
+          KELPIE_SECCOMP_BASELINE="${RUNNER_TEMP}/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
+          node scripts/ci/linux-test-seccomp.mjs "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json"
+          sha256sum "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json" > "${package_root}/test-seccomp-sha256.txt"
+          docker version > "${package_root}/test-docker-version.txt"
           docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
             --security-opt no-new-privileges=true \
+            --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
             -v "${PWD}:/workspace:ro" \
             -v "${PWD}/${package_root}:/workspace/${package_root}" \
             -w /workspace "${DISTRO_IMAGE}" \
