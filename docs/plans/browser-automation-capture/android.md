@@ -656,3 +656,11 @@ navigation before playback and remains unverified. Its emulator became
 unresponsive to normal shutdown and exited at the original 30-minute Job
 watchdog (code 124); the captured runs were pulled before that failure.
 These are scoped test results, not a short-motion acceptance pass.
+The API 35 phone no-capture navigation and final tap completed with app SHA-256
+64b9f02f525ff096f891daeb5c692940472a376f2a9c92443b7b95012c594de4 and test
+SHA-256 ba7fc658b7b63bf4954a09993198a594d430c4871a8dc9e4ed7c1cce8bfa9b43.
+The native blue marker was not found. The first poll reported a visible target
+116 ms after polling began; the final marker first-draw log measured an overlay
+height of 1794 px, while the post-response WebView measured 1631 px. This
+supports investigating layout change but does not identify the exact retirement
+branch. Phone PNG/next-run and all tablet retirement cases remain open.

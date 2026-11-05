@@ -126,7 +126,7 @@ document; other step PNGs represent post-action state. Movies hold marker phase
 zero until actual encoded admission and one requested sample interval, then start
 the configured animation before exact target recheck and input. Navigation clears
 the old-document overlay. Screenshots-only and uncaptured scripts have no extra
-marker dwell. PNG steps never force movie frames above the requested FPS.
+marker dwell. Those runs retain the normal viewport and browser chrome while Stop, input blocking and orientation lock remain active. GIF and video use the immersive capture layout. PNG steps never force movie frames above the requested FPS.
 Optional `typingDelayMs` on strict fill/type is planned before the run and applies
 between Unicode scalar inputs. The first fill clears once; continuation keeps the
 original target and requires focus. Empty paced type performs no input. Privacy,

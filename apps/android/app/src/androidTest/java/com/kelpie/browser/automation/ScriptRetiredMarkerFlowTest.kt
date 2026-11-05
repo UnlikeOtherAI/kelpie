@@ -3,6 +3,8 @@ package com.kelpie.browser.automation
 import android.graphics.Bitmap
 import android.graphics.Rect
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONArray
@@ -22,6 +24,63 @@ class ScriptRetiredMarkerFlowTest : ScriptPublicFixture() {
 
     @Test
     fun pngTapRetiresAndNextRunClearsIt() = runScenario(true)
+
+    @Test
+    fun nativeStopKeepsTheNormalViewportAndRecovers() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                val view = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
+
+                fun frame(): JSONObject {
+                    val result = JSONObject()
+                    instrumentation.runOnMainSync {
+                        val point = IntArray(2)
+                        view.getLocationOnScreen(point)
+                        result
+                            .put("x", point[0])
+                            .put("y", point[1])
+                            .put("width", view.width)
+                            .put("height", view.height)
+                    }
+                    return result
+                }
+
+                val before = frame()
+                val executor = Executors.newSingleThreadExecutor()
+                try {
+                    val script = client.script(tab, client.action("wait").put("ms", 20_000))
+                    val pending = executor.submit<JSONObject> { client.request("/v1/play-script", script).second }
+                    awaitRecordingUi(pending)
+                    assertTrue(client.call("get-script-status").optBoolean("playing"))
+                    val during = frame()
+                    assertEquals(before.toString(), during.toString())
+                    val screen = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                    File(evidence, "retired-marker-native-stop.png").outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    screen.recycle()
+                    ui.onNodeWithContentDescription("Stop recording").performClick()
+                    val stopped = pending.get(30, TimeUnit.SECONDS)
+                    assertEquals("aborted", stopped.getString("state"))
+                    ui.waitForIdle()
+                    val after = frame()
+                    assertEquals(before.toString(), after.toString())
+                    File(evidence, "retired-marker-stop-frame.json").writeText(
+                        JSONObject()
+                            .put("before", before)
+                            .put("during", during)
+                            .put("after", after)
+                            .put("result", stopped)
+                            .toString(2),
+                    )
+                    assertTrue(client.call("play-script", client.script(tab, client.action("wait").put("ms", 10))).getBoolean("success"))
+                } finally {
+                    executor.shutdownNow()
+                }
+            }
+        }
+    }
 
     private fun runScenario(png: Boolean) {
         MockWebServer().use { server ->
