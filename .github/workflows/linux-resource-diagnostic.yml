@@ -59,11 +59,11 @@ jobs:
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
           git diff "${package_revision}" "${diagnostic_revision}" -- \
-            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs \
+            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs \
             > "${package_root}/resource-hook-diff.patch"
           git checkout --detach "${package_revision}"
-          for path in scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/linux/native-resource-snapshot.mjs \
+          for path in scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs tests/linux/native-resource-snapshot.mjs \
             tests/linux/navigation-resource-diagnostic.mjs \
             tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
             git show "${diagnostic_revision}:${path}" > "${path}"
