@@ -99,13 +99,24 @@ test("CLI-only source and digest inputs fail closed",async()=>{
   const section=text.split("      - name: Validate source run")[1].split("      - uses: actions/download-artifact")[0];
   const body=section.split("        run: |\n")[1].split("\n").map(line=>line.startsWith("          ")?line.slice(10):line).join("\n");
   const bash=process.platform==="win32"?"C:/Program Files/Git/bin/bash.exe":"bash";
-  const env={...process.env,SOURCE_RUN:"42102220654",CLI_ONLY:"true",EXPECTED_SOURCE:"a".repeat(40),
+  const env={...process.env,SOURCE_RUN:"42102220654",CLI_ONLY:"true",REQUIRE_IDR:"false",EXPECTED_SOURCE:"a".repeat(40),
     EXPECTED_RPM:"b".repeat(64),EXPECTED_CLI:"c".repeat(64)};
   const run=values=>spawnSync(bash,["-c",body],{env:{...env,...values}});
   assert.equal(run({}).status,0);
+  assert.notEqual(run({REQUIRE_IDR:"true"}).status,0);
   assert.notEqual(run({EXPECTED_RPM:""}).status,0);
   assert.notEqual(run({EXPECTED_SOURCE:"bad"}).status,0);
   assert.notEqual(run({EXPECTED_CLI:"C".repeat(64)}).status,0);
   assert.notEqual(run({SOURCE_RUN:"not-a-run"}).status,0);
   assert.equal(run({CLI_ONLY:"false",EXPECTED_SOURCE:"",EXPECTED_RPM:"",EXPECTED_CLI:""}).status,0);
+});
+
+test("terminal IDR check is limited to the known continuous fixture",async()=>{
+  const replay=await readFile(new URL("./verify-native-replay.mjs",import.meta.url),"utf8");
+  const resource=await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8");
+  assert.equal((workflow.match(/KELPIE_VERIFY_TERMINAL_IDR=1/g)??[]).length,2);
+  assert.match(script,/KELPIE_VERIFY_TERMINAL_IDR/);
+  assert.match(replay,/if \(requireIDR\) await run\("tests\/linux\/verify-terminal-idr\.mjs", \[continuousPath/);
+  assert.match(resource,/require_terminal_idr:/);
+  assert.match(resource,/KELPIE_VERIFY_TERMINAL_IDR="\$require_idr"/);
 });

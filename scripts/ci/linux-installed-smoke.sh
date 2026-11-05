@@ -111,6 +111,7 @@ run() {
     TMPDIR="$home/runtime" NODE_OPTIONS=--max-old-space-size=2048 \
     KELPIE_CAPTURE_SOURCE="$source_revision" KELPIE_TEST_REVISION="$test_revision" \
     KELPIE_LINUX_RESOURCE_DIAGNOSTIC="${KELPIE_LINUX_RESOURCE_DIAGNOSTIC:-0}" \
+    KELPIE_VERIFY_TERMINAL_IDR="${KELPIE_VERIFY_TERMINAL_IDR:-0}" \
     KELPIE_CLI_BUILD_REVISION="$source_revision" \
     KELPIE_LINUX_FINALIZE_FAULT=1 KELPIE_LINUX_PREINPUT_REPLACEMENT=1 \
     timeout --signal=TERM --kill-after=10 300 "$node" "$@"

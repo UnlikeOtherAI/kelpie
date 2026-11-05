@@ -34,7 +34,9 @@ assert.ok(continuous.artifacts.some(item => item.mimeType === "video/mp4"));
 const continuousPath = join(output, "continuous-media-input.json");
 await writeFile(continuousPath, JSON.stringify(continuous, null, 2));
 await run("tests/linux/verify-continuous-marker.mjs", [continuousPath, join(output, "continuous-marker-pixels.json")]);
+const requireIDR=process.env.KELPIE_VERIFY_TERMINAL_IDR==="1";
+if (requireIDR) await run("tests/linux/verify-terminal-idr.mjs", [continuousPath, join(output, "terminal-idr.json")]);
 const report = { source: media.source, testSource: launch.testSource, binarySHA256: launch.binarySHA256,
-  artifacts: media.artifacts.length, allFramesDecoded: true, continuousMarkerCenterAndFade: true };
+  artifacts: media.artifacts.length, allFramesDecoded: true, continuousMarkerCenterAndFade: true, ...(requireIDR ? { terminalIDRVerified: true } : {}) };
 await writeFile(join(output, "media-verification.json"), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report));
