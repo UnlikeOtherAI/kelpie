@@ -39,6 +39,8 @@ describe("explainCommand", () => {
     expect(output).toContain("browser launch");
     expect(output).toContain("Platforms: macos");
     expect(output).toContain("--hidden");
+    expect(output).toContain("--headless");
+    expect(output).toContain("Linux aliases on Linux");
     expect(output).toContain("Windows aliases on Windows");
     expect(output).toContain("Other hosts or alias platforms refuse");
   });
