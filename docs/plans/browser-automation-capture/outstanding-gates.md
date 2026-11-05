@@ -85,50 +85,69 @@ closing any requirement.
 
 ## Current scope supplement — 2026-11-05
 
-Integration source `e36af009` contains the current shared contract and
-platform adapter changes. Earlier rows and platform receipts preserve failures
-at their own revisions. The following are scoped checkpoints, not platform,
-nine-runtime or 432-cell acceptance.
+Source snapshot `0850bde7`; later owner reports below identify their own
+revision or run. Earlier rows and platform documents retain the historical
+failures. These are scoped checkpoints, not whole-platform acceptance.
 
-- **Shared:** the 52-case synthetic mutation receipt matrix covers genuine
-  Boolean fields, token and acknowledgement shape, and privacy outcomes.
-  Android, iOS and Mac owners report all 52 passing their actual JSON decoders
-  and validators; this does not prove a full native workflow. A final
-  integrated portable lint, build and test remains required.
-- **Paced editing:** all native adapters are integrated in source. Preserve
-  the complete attempted literal for conditional redaction; known ordinary
-  input remains visible. Unknown classification before another scalar stops
-  input. A valid final acknowledgement with later unknown privacy may finish
-  only without capture and with redaction; capture is discarded. Lost or
-  malformed acknowledgements remain uncertain and are never replayed.
-  Android's deterministic final post-ack navigation ordering case remains open.
-- **Lightpanda:** the pinned 1.0.2 optional reader's public stdio corpus
-  passed 16 cases for four explicitly selected DOM/text methods. Default deny
-  remains in force; geometry, input, capture and WebMCP are not admitted.
-  Published-package and installed-release verification remain open.
-- **Linux:** product `0c8526b8` with tests `692841e1` passed 54 native
-  CDP cases and supplements; independent decoding covered 44 artifacts and
-  126 frames. This is not dense G08, package, flavor or release acceptance.
-  The test-only instrumented `4cc334ac` capture subsequently observed
-  opaque-white backing for every mapped GIF frame. The integrated `e36af009`
-  oracle passed C and S GIF dense fits with model tail confidence limited to
-  encoded-visible pixels (19 motion and 26 marker samples each; 211 and 214
-  dropped frames). Both MP4 cases remain insufficient. The model's
-  positive-alpha palette collision prevents any physical-zero-alpha claim;
-  this instrumented result is not a production-binary or complete G08 pass.
-- **Windows:** two latest native runs each passed 53 of 54 cases, with
-  different failures; investigate and retain both receipts. Earlier G08
-  export passes and observed native spatial/Stop evidence are scoped to their
-  recorded revisions. Final integrated native timeline, fast profile,
-  recovery, signed package and installed-release checks remain open.
-- **Android:** the API 29 minimum was approved. The latest phone paced
-  corpus passed 8 of 10 cases; the other two fixture/status races are under
-  investigation. Tablet, final phone corpus, scene and dense G08 evidence
-  remain open. Earlier focus, sparse-capture and timeout failures are retained.
-- **macOS and iOS:** updated hosted runs are in progress. WK and CEF, and
-  iPhone and iPad, need separate final-source public transport, privacy,
-  geometry and G08 evidence. The receipt matrix does not replace those runs.
-- **Release:** reconcile the remaining requirements against exact source,
-  binary and evidence hashes; finish component versioning, one reviewed PR,
-  required CI, publication, signing and installed-release verification.
-  Optional native WebMCP remains unavailable unless independently proven.
+- **Shared and delivery:** the 52-case mutation-receipt matrix passed the
+  Android, iOS and Mac production decoders and validators. This does not
+  prove the full native workflow. Final integrated portable checks,
+  component versions, the single PR, publication, signing and installed
+  release verification remain open.
+- **Pointer speed:** shared normalization and the desktop, Android, iOS and
+  Mac fallback sites specify a 350 ms enabled-pointer default. Explicit
+  duration overrides remain supported; G08 intentionally requests 2400 ms.
+  Windows `a916f4db` exercised the omitted default through the public
+  workflow with 322 WGC frames and a sampled 266.7 ms endpoint bracket; this
+  is not an exact duration or dense-easing proof. Current-source omitted
+  default and native/display versus exported-output checks remain open.
+  Mac has an omitted-duration WK/CEF test awaiting native replay. iPhone,
+  iPad, Android phone and tablet still need their final-source omitted-default
+  and capture-disabled isolation evidence. Do not count explicit 400 ms or
+  2400 ms runs as default verification.
+- **Linux:** the normal `d849ee41` native corpus passed 54/54 and its
+  focused BODY overflow case. Its immediate-end marker decoder preserved a
+  strict MP4 tail failure: eight red-classified pixels in the final frame.
+  A separate instrumented `dfb` run admitted a marker-expired source frame
+  at 774.670 ms without drawing the marker; its final GIF tail classified
+  zero red pixels and MP4 four. This does not explain the earlier sample or
+  establish a codec-only cause. The original 4cc/e36 instrumented GIF
+  model analysis remains encoded-visible only; MP4 is insufficient. Warmup
+  `c202` GIF C/S passed with 279/282 dropped samples; both MP4s were
+  insufficient. Normal-source dense G08 and package/release gates remain.
+  Installed Ubuntu and Fedora previously reached 52/54 but two cases failed
+  on their initial navigation before their named assertions. Diagnostic run
+  `42082858225` never reached navigation because shared dist was missing;
+  the corrected reused-package resource run `42088123244` has completed
+  Ubuntu with 48 complete snapshots: a navigation reporting
+  `ERR_INSUFFICIENT_RESOURCES` had 2,035,712 of 67,108,864 bytes
+  available in /dev/shm before the request and 65,921,024 afterward.
+  This is evidence of pressure, not proof of the error's cause. A second
+  unsuccessful response had neither allowlisted error flag. The Fedora
+  job is still running. The observer can perturb timing.
+- **Windows:** Session 1 native CTest passed 65/65. Earlier native C/S and
+  fast-profile attempts, WGC/window and startup failures remain in the
+  platform receipts; a current-source dense C/S and omission-default proof,
+  final native/export comparison, and signed installed package remain open.
+- **Android:** API 29 minimum is approved. Phone marker and native Stop
+  recovery passed with explicit 400 ms pointer; tablet equivalents remain
+  open. Both 2400 ms dense media cases failed the strict coverage oracle.
+  Final phone/tablet privacy, paced workflows and public transport, omitted
+  350 ms and capture-disabled isolation remain separate gates.
+- **macOS:** WK run `42081421741` passed dense C MP4/GIF and S GIF;
+  S MP4 remained insufficient because its tail differed from its calibrated
+  pointer baseline. Prior `42076485229` C MP4 also had unstable baseline.
+  No same-frame raw source or marker-age evidence establishes the encoded
+  MP4 difference as a codec artifact. CEF, current native omission-default
+  and full release checks remain open.
+- **iOS:** same-scene iPhone evidence measured CSS (175,340) versus native
+  (175,402), with top/bottom insets 62/34 points; iPad measured equal
+  centers with top/bottom insets 0/20. Native projection and shared G08
+  geometry evidence are changed in source, but hosted per-device replay,
+  pinch/landscape and omitted-default proof are pending. Do not treat the
+  earlier displaced overlay or synthetic geometry checks as a native pass.
+- **Other scope:** the explicitly selected Lightpanda 1.0.2 DOM/text reader
+  passed its 16-case public stdio corpus; native visual/input/capture/WebMCP
+  remain outside that backend. Published-package verification remains open.
+  Preserve paced-edit privacy/acknowledgement gates and all original
+  failure receipts; no new pass follows from an incomplete diagnostic.
