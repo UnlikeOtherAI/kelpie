@@ -22,7 +22,7 @@ class ScriptNativeOverlay {
   DetachedMarkerAnchor anchor_;
   DetachedMarkerGeometry liveGeometry_;
   bool detachedAnchored_=false;
-  nlohmann::json shown_;
+  nlohmann::json shown_=nlohmann::json::object();
   ULONGLONG shown_at_=0;
 };
 }

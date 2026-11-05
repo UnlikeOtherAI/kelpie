@@ -80,6 +80,18 @@ if(BUILD_TESTING AND WIN32)
     target_compile_options(kelpie_windows_detached_marker_policy_test PRIVATE /W4 /WX)
   endif()
   add_test(NAME kelpie_windows_detached_marker_policy_test COMMAND kelpie_windows_detached_marker_policy_test)
+  add_executable(kelpie_windows_script_native_overlay_lifecycle_test
+    tests/script_native_overlay_lifecycle_test.cpp src/script_native_overlay.cpp src/script_frame_compositor.cpp)
+  target_include_directories(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE src)
+  target_compile_definitions(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE
+    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+  target_link_libraries(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE
+    kelpie_core_automation nlohmann_json::nlohmann_json gdiplus)
+  kelpie_enable_test_assertions(kelpie_windows_script_native_overlay_lifecycle_test)
+  if(MSVC)
+    target_compile_options(kelpie_windows_script_native_overlay_lifecycle_test PRIVATE /W4 /WX)
+  endif()
+  add_test(NAME kelpie_windows_script_native_overlay_lifecycle_test COMMAND kelpie_windows_script_native_overlay_lifecycle_test)
   add_executable(kelpie_windows_script_capture_file_identity_test
     tests/script_capture_file_identity_test.cpp src/script_artifact_store.cpp
     src/script_artifact_lifecycle.cpp src/script_native_overlay.cpp src/script_frame_compositor.cpp)
