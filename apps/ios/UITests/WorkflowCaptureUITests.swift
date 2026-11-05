@@ -98,11 +98,12 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
         var visible = false
-        var mismatch: (screen: XCUIScreenshot, target: CGRect, greenElsewhere: Bool)?
+        var mismatch: (screen: XCUIScreenshot, target: CGRect, viewport: CGRect, greenElsewhere: Bool)?
         repeat {
             let viewport = app.webViews.firstMatch
             let submit = viewport.buttons["Submit"].firstMatch
-            let target = viewport.exists && submit.exists ? submit.frame.intersection(viewport.frame) : .null
+            let viewportFrame = viewport.exists ? viewport.frame : .null
+            let target = !viewportFrame.isNull && submit.exists ? submit.frame.intersection(viewportFrame) : .null
             let screen = app.screenshot()
             if !target.isNull, WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: target, app: app.frame) {
                 let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + String(describing: target))
@@ -120,7 +121,7 @@ final class WorkflowCaptureUITests: XCTestCase {
                 let greenElsewhere = screen.image.cgImage.map { WorkflowCaptureProbe.containsMarker($0) } ?? false
                 if mismatch == nil || (target.isNull == false && mismatch?.target.isNull == true) ||
                     (greenElsewhere && mismatch?.greenElsewhere == false) {
-                    mismatch = (screen, target, greenElsewhere)
+                    mismatch = (screen, target, viewportFrame, greenElsewhere)
                 }
             }
             try await Task.sleep(nanoseconds: 70_000_000)
@@ -131,6 +132,8 @@ final class WorkflowCaptureUITests: XCTestCase {
             screenshot.lifetime = .keepAlways
             add(screenshot)
             let geometry = XCTAttachment(string: "Visible Submit frame " + String(describing: mismatch.target) +
+                ", WebView frame " + String(describing: mismatch.viewport) +
+                ", app frame " + String(describing: app.frame) +
                 ", green component elsewhere " + String(mismatch.greenElsewhere))
             geometry.name = "Failed marker target geometry"
             geometry.lifetime = .keepAlways
@@ -140,7 +143,14 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
         let geometry = try XCTUnwrap((result["outputs"] as? Body)?["tapGeometry"] as? Body)
-        XCTAssertEqual((geometry["fields"] as? [Body])?.first?["values"] as? [String], ["center"])
+        let text = try XCTUnwrap(((geometry["fields"] as? [Body])?.first?["values"] as? [String])?.first)
+        let data = Data(text.utf8)
+        let actual = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? Body)
+        let evidence = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        evidence.name = "Fixture click and visual viewport geometry"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        XCTAssertEqual(actual["centered"] as? Bool, true)
         let run = try XCTUnwrap(result["runId"] as? String)
         let manifests = try XCTUnwrap(result["artifacts"] as? [Body])
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
