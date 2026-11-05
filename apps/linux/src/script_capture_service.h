@@ -15,6 +15,7 @@ class LinuxScriptService : public std::enable_shared_from_this<LinuxScriptServic
   void Configure(DesktopApp::Config& config);
   Json Presentation(bool foreground) const;
   void Stop();
+  void RetireDetachedMarker(std::uint64_t revision);
   ScriptArtifactStore& artifacts() { return artifacts_; }
  private:
   void Show(const Json& presentation, std::function<void()> stop, std::function<bool()> valid);

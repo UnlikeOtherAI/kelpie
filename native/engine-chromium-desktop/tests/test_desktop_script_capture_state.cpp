@@ -14,7 +14,7 @@ int main() {
   assert(!kelpie::DesktopMovieEndpointRequired({{"actions",{{{"action","screenshot"}}}}}));
   assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"gif"}}}}}));
   assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"screenshots","video"}}}}}));
-  json active={{"tabId","tab"},{"generation",7},{"documentVersion","doc"},
+  json active={{"runId","run"},{"tabId","tab"},{"generation",7},{"documentVersion","doc"},
                {"marker",{{"startedMs",100.0},{"durationMs",700.0}}},
                {"pointer",true},{"commentary","text"}};
   const auto detached=kelpie::DetachedDesktopMarker(active,300.0);

@@ -228,6 +228,13 @@ LinuxScriptService::Json LinuxScriptService::Presentation(bool foreground) const
   if (hide) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
   return shown;
 }
+void LinuxScriptService::RetireDetachedMarker(std::uint64_t revision) {
+  std::lock_guard lock(mutex_);
+  if (presentation_.value("detachedMarker",false) &&
+      presentation_.value("_presentationRevision",std::uint64_t{}) == revision) {
+    presentation_ = Json{{"playing",false}}; valid_ = {};
+  }
+}
 void LinuxScriptService::Stop() {
   std::function<void()> stop;
   { std::lock_guard lock(mutex_); stop = stop_; }

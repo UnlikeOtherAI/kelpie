@@ -11,6 +11,13 @@ LinuxApp::json LinuxApp::ScriptPresentation(bool foreground) const {
 #endif
   return json::object();
 }
+void LinuxApp::RetireDetachedScriptMarker(std::uint64_t revision) {
+#if KELPIE_LINUX_HAS_CEF
+  if (impl_->scripts) impl_->scripts->RetireDetachedMarker(revision);
+#else
+  (void)revision;
+#endif
+}
 void LinuxApp::StopScript() {
 #if KELPIE_LINUX_HAS_CEF
   if (impl_->scripts) impl_->scripts->Stop();

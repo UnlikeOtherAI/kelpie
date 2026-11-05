@@ -14,9 +14,8 @@
 namespace kelpie::linuxapp {
 namespace {
 #if KELPIE_LINUX_HAS_GTK && KELPIE_LINUX_HAS_CEF
-void CompositeScriptFrame(LinuxApp& app, OffscreenFrame& frame) {
+void CompositeScriptFrame(LinuxApp& app, OffscreenFrame& frame, nlohmann::json shown) {
   ScriptFrame composed{frame.width, frame.height, frame.width * 4, 0, std::move(frame.pixels)};
-  auto shown = app.ScriptPresentation();
   if (frame.tab_id != shown.value("tabId", std::string()) || frame.generation != shown.value("generation", std::uint64_t(0))) {
     shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
   }
@@ -95,7 +94,32 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 #if KELPIE_LINUX_HAS_CEF
                      auto* top = gtk_widget_get_toplevel(widget);
                      if (frame.valid() && GTK_IS_WINDOW(top) && gtk_window_is_active(GTK_WINDOW(top))) {
-                       CompositeScriptFrame(self->app_, frame);
+                       auto shown = self->app_.ScriptPresentation();
+                       if (shown.contains("marker")) {
+                         int x=0,y=0;
+                         const bool origin=gtk_widget_translate_coordinates(widget,top,0,0,&x,&y);
+                         const int width=gtk_widget_get_allocated_width(widget), height=gtk_widget_get_allocated_height(widget);
+                         const int scale=gtk_widget_get_scale_factor(widget);
+                         const auto& marker=shown.at("marker");
+                         const bool valid_frame=frame.tab_id==shown.value("tabId",std::string()) &&
+                             frame.generation==shown.value("generation",std::uint64_t{});
+                         const auto identity=nlohmann::json::array({shown.value("runId",std::string()),shown.value("tabId",std::string()),
+                           shown.value("generation",std::uint64_t{}),shown.value("documentVersion",std::string()),
+                           marker.value("actionIndex",-1)}).dump();
+                         const bool detached=shown.value("detachedMarker",false);
+                         if (!detached && valid_frame && origin && width>0 && height>0 && scale>0) {
+                           self->marker_anchor_=identity; self->marker_x_=x; self->marker_y_=y;
+                           self->marker_width_=width; self->marker_height_=height; self->marker_scale_=scale;
+                           self->marker_frame_width_=frame.width; self->marker_frame_height_=frame.height;
+                         } else if (detached && (!valid_frame || !origin || self->marker_anchor_!=identity ||
+                             self->marker_x_!=x || self->marker_y_!=y || self->marker_width_!=width ||
+                             self->marker_height_!=height || self->marker_scale_!=scale ||
+                             self->marker_frame_width_!=frame.width || self->marker_frame_height_!=frame.height)) {
+                           self->app_.RetireDetachedScriptMarker(shown.value("_presentationRevision",std::uint64_t{}));
+                           shown.erase("marker"); self->marker_anchor_.clear();
+                         }
+                       }
+                       CompositeScriptFrame(self->app_, frame, std::move(shown));
                      }
 #endif
                      const auto& snapshot = frame.pixels;

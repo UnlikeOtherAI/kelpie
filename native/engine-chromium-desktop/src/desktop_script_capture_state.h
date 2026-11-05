@@ -27,7 +27,7 @@ inline bool DesktopMovieEndpointRequired(const nlohmann::json& script) {
   return false;
 }
 inline nlohmann::json DetachedDesktopMarker(const nlohmann::json& state, double elapsed) {
-  if (!state.contains("marker") || !state.contains("tabId") || !state.contains("generation") ||
+  if (!state.contains("runId") || !state.contains("marker") || !state.contains("tabId") || !state.contains("generation") ||
       !state.contains("documentVersion")) return {{"playing", false}};
   const auto& marker = state.at("marker");
   if (elapsed >= marker.value("startedMs", 0.0) + marker.value("durationMs", 700.0))
