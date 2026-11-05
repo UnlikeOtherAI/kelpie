@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <cstring>
+#include <cstdio>
 #include <iomanip>
 #include <sstream>
 
@@ -17,6 +18,7 @@ namespace wgc_test {
 using Clock=std::chrono::steady_clock;
 using Json=nlohmann::json;
 inline thread_local const char* Stage="initialization";
+inline void Trace(const char* stage) { std::fprintf(stderr,"WGC_STAGE %s %llu\n",stage,static_cast<unsigned long long>(GetTickCount64())); std::fflush(stderr); }
 inline void Check(HRESULT result) { winrt::check_hresult(result); }
 inline void Deadline(Clock::time_point end) {
   if(Clock::now()>=end) throw std::runtime_error("WGC_DEADLINE");
@@ -46,13 +48,14 @@ inline std::string Hash(IStream* stream) {
   return text.str();
 }
 inline Json RawFile(std::filesystem::path const& path,std::vector<BYTE> const& bytes,std::function<void()> const& fence) {
+  Trace("raw-open");
   fence();
   Microsoft::WRL::ComPtr<kelpie::windows::media::OwnedMediaStream> stream;
   stream.Attach(new kelpie::windows::media::OwnedMediaStream(path));
-  ULONG written=0;
+  Trace("raw-write"); ULONG written=0;
   Check(stream->Write(bytes.data(),static_cast<ULONG>(bytes.size()),&written));
   if(written!=bytes.size()) throw std::runtime_error("WGC_SHORT_WRITE");
-  fence();const auto hash=Hash(stream.Get());fence();Check(stream->Complete());
+  Trace("raw-hash"); fence();const auto hash=Hash(stream.Get());fence();Trace("raw-flush");Check(stream->Complete());Trace("raw-complete");
   return {{"path",Text(path)},{"sha256",hash},{"byteLength",bytes.size()}};
 }
 inline std::vector<BYTE> CopyBytes(winrt::Windows::Graphics::Imaging::SoftwareBitmap const& bitmap) {
@@ -73,6 +76,7 @@ inline std::vector<BYTE> CopyBytes(winrt::Windows::Graphics::Imaging::SoftwareBi
 }
 inline Json PngFile(std::filesystem::path const& path,int width,int height,std::vector<BYTE> const& pixels,
                     std::string const& alpha,std::function<void()> const& fence) {
+  Trace("png-open");
   fence();
   Microsoft::WRL::ComPtr<kelpie::windows::media::OwnedMediaStream> stream;
   stream.Attach(new kelpie::windows::media::OwnedMediaStream(path));
@@ -92,12 +96,12 @@ inline Json PngFile(std::filesystem::path const& path,int width,int height,std::
   Check(frame->SetSize(static_cast<UINT>(width),static_cast<UINT>(height)));
   auto outputFormat=GUID_WICPixelFormat32bppBGRA;Check(frame->SetPixelFormat(&outputFormat));
   if(outputFormat!=GUID_WICPixelFormat32bppBGRA)throw std::runtime_error("WGC_PNG_FORMAT");
-  Check(frame->WriteSource(source.Get(),nullptr));Check(frame->Commit());Check(encoder->Commit());
+  Trace("png-encode");Check(frame->WriteSource(source.Get(),nullptr));Check(frame->Commit());Check(encoder->Commit());Trace("png-encoded");
   frame.Reset();encoder.Reset();source.Reset();bitmap.Reset();factory.Reset();
-  fence();const auto hash=Hash(stream.Get());
+  Trace("png-hash");fence();const auto hash=Hash(stream.Get());
   STATSTG stat{};Check(stream->Stat(&stat,STATFLAG_NONAME));
   if(stat.cbSize.QuadPart>67108864)throw std::runtime_error("WGC_PNG_BOUND");
-  fence();Check(stream->Complete());
+  Trace("png-flush");fence();Check(stream->Complete());Trace("png-complete");
   return {{"path",Text(path)},{"sha256",hash},{"byteLength",stat.cbSize.QuadPart}};
 }
 }

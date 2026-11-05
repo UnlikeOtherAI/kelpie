@@ -118,3 +118,15 @@ and the absence of timeline evidence are preserved under
 `D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/g08-5877*`.
 The harness did not retain exit/signal details for that run; its subsequent
 diagnostic change cannot retroactively determine the cause.
+
+The next 5877 capture-free public launch and stop both succeeded under low load:
+launch took 1.581 seconds, stop 4.312 seconds, and the pinned process exited.
+The earlier failure remains unclassified; this pass does not identify its cause.
+Then the shared G08 fixture completed both C and S workflows over Windows HTTP,
+with trusted ordered event facts, verified artifact chunks and public cleanup.
+The shared oracle at `775384d7` passed C and S in both GIF and MP4 after
+independent frame decode and PTS verification; the capture reported 47 and 48
+dropped frames respectively. Reports and immutable media are under
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/g08-5877-2` and
+`g08-oracle-5877.json`. This is exported-media evidence, not native overlay
+or overall Windows acceptance.
