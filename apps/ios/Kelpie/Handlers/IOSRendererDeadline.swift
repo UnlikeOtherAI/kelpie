@@ -27,6 +27,26 @@ enum IOSRendererDeadline {
 
     private static let views = NSMapTable<WKWebView, Retirement>.weakToStrongObjects()
 
+    #if DEBUG
+    @MainActor
+    private final class TerminationObservers {
+        var callbacks: [UUID: () -> Void] = [:]
+    }
+    private static let terminationObservers = NSMapTable<WKWebView, TerminationObservers>.weakToStrongObjects()
+
+    static func observeTermination(_ view: WKWebView, callback: @escaping () -> Void) -> UUID {
+        let observers = terminationObservers.object(forKey: view) ?? TerminationObservers()
+        terminationObservers.setObject(observers, forKey: view)
+        let token = UUID()
+        observers.callbacks[token] = callback
+        return token
+    }
+
+    static func removeTerminationObserver(_ view: WKWebView, token: UUID) {
+        terminationObservers.object(forKey: view)?.callbacks.removeValue(forKey: token)
+    }
+    #endif
+
     static func isRetiring(_ view: WKWebView) -> Bool {
         views.object(forKey: view)?.pending.isEmpty == false
     }
@@ -37,6 +57,11 @@ enum IOSRendererDeadline {
     }
 
     static func rendererTerminated(_ view: WKWebView) {
+        #if DEBUG
+        let callbacks = terminationObservers.object(forKey: view)?.callbacks.values.map { $0 } ?? []
+        terminationObservers.removeObject(forKey: view)
+        for callback in callbacks { callback() }
+        #endif
         guard let retirement = views.object(forKey: view) else { return }
         for id in Array(retirement.pending.keys) { retirement.retire(id) }
     }

@@ -196,6 +196,13 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         _, full_names = DRIVER.selection("full")
         self.assertTrue(names < full_names)
 
+    def test_postedit_selection_is_one_real_ui_case(self):
+        targets, names = DRIVER.selection("postedit")
+        self.assertEqual(names, {"testPostEvaluationCallbackKeepsKeyboardClosed",
+                                 "testPreAuthorizationTimeoutAndExactViewTermination"})
+        self.assertEqual(targets, ["KelpieTests/IOSPostEvaluationProbeTests",
+                                   "KelpieUITests/WorkflowCaptureUITests/testPostEvaluationCallbackKeepsKeyboardClosed"])
+
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
             self.assertEqual(DRIVER.shutdown_owned("owned"), "verified shutdown")
