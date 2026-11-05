@@ -58,6 +58,7 @@ describe("public browser launch child lifecycle", () => {
     const child = control.child!;
     const pending = (await loadBrowserStore()).running.owned;
     expect(pending?.pid).toBe(child.pid);
+    expect(vi.mocked(console.log).mock.calls.flat().join(" ")).toContain("kill-refused");
     expect(pending?.pendingLaunch?.profileDir).toBe(profile);
     expect(child.exitCode).toBeNull();
     await once(child, "exit");

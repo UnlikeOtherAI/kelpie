@@ -8,3 +8,9 @@ test("classifies public CLI errors without retaining untrusted output",()=>{
  assert.equal(safeCliFailure({stdout:JSON.stringify({error:{code:"SYNTHETIC_SECRET",message:"SYNTHETIC_SECRET"}})}).cliErrorCode,null);
  assert.equal(safeCliFailure({killed:true,signal:"SIGTERM"}).killed,true);
 });
+
+test("retains only bounded allowlisted retirement facts",()=>{
+ const value=safeCliFailure({stdout:JSON.stringify({error:{code:"BROWSER_LAUNCH_PENDING",retirement:{outcome:"exit-wait-expired",elapsedMs:12000}}})});
+ assert.deepEqual(value.retirement,{outcome:"exit-wait-expired",elapsedMs:12000});
+ assert.equal(safeCliFailure({stdout:JSON.stringify({error:{retirement:{outcome:"SYNTHETIC_SECRET",elapsedMs:1}}})}).retirement,null);
+});
