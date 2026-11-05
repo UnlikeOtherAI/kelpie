@@ -29,10 +29,6 @@ def selection(scope):
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
-            "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
-            "testPacedCaptureWithTextInteractionDisabled",
-            "testTextInteractionPreferenceRestoresAfterStop",
-            "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
         ]
         return ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods], set(methods)
     if scope not in ("full", "navigation", "diagnostics"):
@@ -81,10 +77,7 @@ def selection(scope):
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
                 "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
-                "testPacedCaptureWithTextInteractionDisabled",
-                "testTextInteractionPreferenceRestoresAfterStop",
-                "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
-                "testPacedFocusLossStopsWithoutRetargeting",
+                            "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
                 "testPacedAcknowledgedFinalNavigationCompletesAndRedacts",

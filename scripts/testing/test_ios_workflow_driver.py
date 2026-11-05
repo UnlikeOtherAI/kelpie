@@ -69,6 +69,17 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "999999,800")))
         self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "390,0")))
 
+    def test_capture_admission_diagnostics_are_bounded(self):
+        from ios_workflow_diagnostics import fixed_admission
+        line = ("[WorkflowCaptureAdmission] first=402,874,402,812,1,62,34,0,0,0 "
+                "last=402,874,402,778,1,62,34,0,0,1 count=18")
+        self.assertEqual(fixed_admission(line), {
+            "first": [402, 874, 402, 812, 1, 62, 34, 0, 0, 0],
+            "last": [402, 874, 402, 778, 1, 62, 34, 0, 0, 1], "count": 18,
+        })
+        self.assertIsNone(fixed_admission(line.replace("count=18", "count=10001")))
+        self.assertIsNone(fixed_admission(line.replace("last=402", "last=99999")))
+
     def test_capture_xcresult_diagnostics_only_keep_fixed_enums(self):
         from ios_workflow_diagnostics import fixed_capture_events
         self.assertEqual(fixed_capture_events([
@@ -173,17 +184,13 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DRIVER.selection("unrecognized")
 
-    def test_geometry_selection_uses_only_real_target_pinch_and_keyboard_journeys(self):
+    def test_geometry_selection_uses_only_real_target_and_pinch_journeys(self):
         targets, names = DRIVER.selection("geometry")
         self.assertEqual(names, {
             "testLiveMarkerProjectionMatchesSameSceneTarget",
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
-            "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
-            "testPacedCaptureWithTextInteractionDisabled",
-            "testTextInteractionPreferenceRestoresAfterStop",
-            "testTextInteractionPreferenceStillDiscardsSensitiveCapture",
         })
         self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
         _, full_names = DRIVER.selection("full")

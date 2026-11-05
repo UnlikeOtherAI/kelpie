@@ -113,22 +113,6 @@ final class IOSWorkflowTab {
     }
 
     #if DEBUG
-    func beginTestTextInteractionScope() -> Bool? {
-        guard ProcessInfo.processInfo.arguments.contains("--test-disable-webkit-text-interaction") else { return nil }
-        let preferences = view.configuration.preferences
-        let previous = preferences.isTextInteractionEnabled
-        preferences.isTextInteractionEnabled = false
-        IOSFrameSampler.diagnostic(preferences.isTextInteractionEnabled ? "text-interaction-still-on" : "text-interaction-disabled")
-        return previous
-    }
-
-    func restoreTestTextInteraction(_ previous: Bool?) {
-        guard let previous else { return }
-        let preferences = view.configuration.preferences
-        preferences.isTextInteractionEnabled = previous
-        IOSFrameSampler.diagnostic(preferences.isTextInteractionEnabled ? "text-interaction-restored-on" : "text-interaction-restored-off")
-    }
-
     var rendererContainsFirstResponder: Bool {
         func containsResponder(_ current: UIView) -> Bool {
             current.isFirstResponder || current.subviews.contains(where: containsResponder)

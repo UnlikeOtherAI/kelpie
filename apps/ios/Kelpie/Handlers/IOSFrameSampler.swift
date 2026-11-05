@@ -202,6 +202,15 @@ final class IOSFrameSampler {
         print("[WorkflowProjection] values=" + encoded.joined(separator: ","))
     }
 
+    private static func admissionDiagnostic(first: [CGFloat], last: [CGFloat], count: CGFloat) {
+        guard first.count == 10, last.count == 10,
+              (first + last + [count]).allSatisfy({ $0.isFinite && abs($0) <= 10000 }) else { return }
+        func encode(_ values: [CGFloat]) -> String {
+            values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }.joined(separator: ",")
+        }
+        print("[WorkflowCaptureAdmission] first=" + encode(first) + " last=" + encode(last) + " count=" + String(Int(count)))
+    }
+
     private static func insetsDiagnostic(before: [CGFloat], after: [CGFloat]) {
         guard before.count == 9, after.count == 9,
               (before + after).allSatisfy({ $0.isFinite && abs($0) <= 10_000 }) else { return }
@@ -221,6 +230,16 @@ final class IOSFrameSampler {
 
     private func viewportForSample(generation: String, expected: String?) async throws -> IOSWorkflowTab.Viewport? {
         if initialDocument == generation { return try await tab.viewport() }
+        #if DEBUG
+        var admissionFirst: [CGFloat]?
+        var admissionLast: [CGFloat]?
+        var admissionCount: CGFloat = 0
+        defer {
+            if let first = admissionFirst, let last = admissionLast {
+                Self.admissionDiagnostic(first: first, last: last, count: admissionCount)
+            }
+        }
+        #endif
         let viewport = try await IOSCaptureViewportStability.wait(
             deadline: ProcessInfo.processInfo.systemUptime + 2,
             check: { [self] in try await check(); try checkTime() },
@@ -233,9 +252,17 @@ final class IOSFrameSampler {
             },
             admissible: { [self] viewport in
                 let insets = tab.view.scrollView.adjustedContentInset
-                return IOSCaptureViewportStability.matchesInsets(
+                let admitted = IOSCaptureViewportStability.matchesInsets(
                     viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
                 )
+                #if DEBUG
+                let values = [viewport.bounds.width, viewport.bounds.height, viewport.visible.width, viewport.visible.height,
+                              viewport.scale, insets.top, insets.bottom, insets.left, insets.right, admitted ? 1 : 0]
+                if admissionFirst == nil { admissionFirst = values }
+                admissionLast = values
+                admissionCount += 1
+                #endif
+                return admitted
             }
         )
         guard let viewport else {

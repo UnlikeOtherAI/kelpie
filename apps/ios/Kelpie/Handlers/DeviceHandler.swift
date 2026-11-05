@@ -188,9 +188,6 @@ struct DeviceHandler {
                 "pageZoom": wv.pageZoom,
                 "scrollView": effectiveScrollInfo
             ]
-            #if DEBUG
-            webViewInfo["textInteractionEnabled"] = wv.configuration.preferences.isTextInteractionEnabled
-            #endif
         }
 
         // HTML layer — get CSS viewport and document size via JS
