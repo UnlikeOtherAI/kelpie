@@ -87,6 +87,15 @@ class Capture final : public DesktopScriptCapture {
     }
     if (encoder_->budget_exceeded()) failure = "CAPTURE_BUDGET_EXCEEDED";
     if (encoder_->finalization_failed()) failure = "CAPTURE_FINALIZE_FAILED";
+    // Successful capture supplies every requested artifact family. Empty
+    // encoder output or publication failure cannot become nominal success.
+    if (failure.empty()) for (const auto& format : options_.at("formats")) {
+      const auto name = format.get<std::string>();
+      const std::string mime = name == "gif" ? "image/gif" : name == "video" ? "video/mp4" : "image/png";
+      const bool present = std::any_of(manifests_.begin(), manifests_.end(),
+          [&](const Json& item) { return item.value("mimeType", std::string()) == mime; });
+      if (!present) { failure = "CAPTURE_FINALIZE_FAILED"; break; }
+    }
     for (auto& item : manifests_) item["partial"] = partial || !failure.empty();
     result_ = {{"artifacts", manifests_}};
     if (!failure.empty()) result_["error"] = failure;

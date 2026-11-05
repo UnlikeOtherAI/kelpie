@@ -152,6 +152,22 @@ int main() {
       {"actualBytes", std::filesystem::file_size(video_prefix[0].path)}, {"committedPrefix", retained}};
   for (const auto& output : video_prefix) std::filesystem::remove(output.path);
   std::filesystem::remove(video_dir);
+
+  const auto fault_dir = CreatePrivateCaptureDirectory();
+  auto fault = ScriptMediaEncoder::Create(fault_dir, {"gif", "mp4"}, 10, 1048576);
+  assert(fault->AddFrame(Frame(0)) && fault->AddFrame(Frame(1)));
+  assert(fault->committed_movie_frames() == 1); // Actual picture retained by both writers.
+  std::ofstream(fault_dir / "capture.mp4") << "owned finalization collision";
+  const auto survived = fault->Finish(200);
+  assert(fault->finalization_failed() && survived.size() == 1 && survived[0].mime_type == "image/gif");
+  assert(DecodeGif(survived[0]) == 2);
+  report["postAckFinalizeFailure"] = {{"failed", true}, {"retainedGifFrames", survived[0].frame_count}};
+  for (const auto& output : survived) std::filesystem::remove(output.path);
+  std::filesystem::remove(fault_dir / "capture.mp4"); std::filesystem::remove(fault_dir);
+  const auto empty_dir = CreatePrivateCaptureDirectory();
+  auto empty = ScriptMediaEncoder::Create(empty_dir, {"gif", "mp4"}, 10, 1048576);
+  assert(empty->Finish(1).empty() && empty->finalization_failed());
+  std::filesystem::remove(empty_dir);
   for (const auto& output : outputs) std::filesystem::remove(output.path);
   for (const auto& output : partial) std::filesystem::remove(output.path);
   std::filesystem::remove(directory); std::filesystem::remove(limited_dir);

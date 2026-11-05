@@ -1,0 +1,289 @@
+name: Linux native candidates
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      force_build:
+        type: boolean
+        default: false
+      release_tag:
+        type: string
+        default: ''
+      artifact_prefix:
+        type: string
+        default: linux-native-check
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Linux build inputs
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify Linux change detection
+        run: node --test tests/linux/workflow-scope.test.mjs
+      - id: scope
+        shell: bash
+        env:
+          FORCE: ${{ inputs.force_build || github.event_name == 'workflow_dispatch' }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${FORCE}" = true ]; then
+            echo "build=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          bash scripts/ci/linux-native-scope.sh "${BASE}" "${HEAD}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
+    timeout-minutes: 45
+    name: Build Linux (${{ matrix.distro.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        distro:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+            install: |
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                apt-utils \
+                build-essential \
+                ca-certificates \
+                cmake \
+                curl \
+                dpkg-dev \
+                file \
+                git \
+                g++-12 \
+                libasound2-dev \
+                libatk-bridge2.0-dev \
+                libatk1.0-dev \
+                libavahi-client-dev \
+                libcups2-dev \
+                libdbus-1-dev \
+                libcurl4-openssl-dev \
+                libssl-dev \
+                libdrm-dev \
+                libfontconfig1-dev \
+                libgbm-dev \
+                libglib2.0-dev \
+                libgtk-3-dev \
+                libnspr4-dev \
+                libnss3-dev \
+                libpango1.0-dev \
+                libx11-dev \
+                libxcomposite-dev \
+                libxdamage-dev \
+                libxext-dev \
+                libxfixes-dev \
+                libxrandr-dev \
+                ninja-build \
+                nlohmann-json3-dev \
+                pkg-config \
+                tar \
+                xz-utils
+              bash scripts/install-linux-capture-deps.sh ubuntu
+              rm -rf /var/lib/apt/lists/*
+              export CC=gcc-12 CXX=g++-12
+            package_kind: deb
+            build_appimage: true
+          - name: fedora-44
+            image: fedora:44
+            install: |
+              dnf install -y \
+                make \
+                gcc \
+                binutils \
+                xz \
+                ca-certificates \
+                cmake \
+                curl \
+                file \
+                fontconfig-devel \
+                gcc-c++ \
+                git \
+                glib2-devel \
+                gtk3-devel \
+                libX11-devel \
+                libXcomposite-devel \
+                libXdamage-devel \
+                libXext-devel \
+                libXfixes-devel \
+                libXrandr-devel \
+                libdrm-devel \
+                mesa-libgbm-devel \
+                nlohmann-json-devel \
+                nspr-devel \
+                nss-devel \
+                pango-devel \
+                pkgconf-pkg-config \
+                avahi-devel \
+                cups-devel \
+                libcurl-devel \
+                openssl-devel \
+                dbus-devel \
+                ninja-build \
+                rpm-build \
+                tar
+              bash scripts/install-linux-capture-deps.sh fedora
+              dnf clean all
+            package_kind: rpm
+            build_appimage: false
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Build Linux packages
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+          DISTRO_INSTALL: ${{ matrix.distro.install }}
+          PACKAGE_KIND: ${{ matrix.distro.package_kind }}
+          BUILD_APPIMAGE: ${{ matrix.distro.build_appimage }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          APPIMAGETOOL_URL: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/.*KELPIE_LINUX_VERSION="\([^"]*\)".*/\1/p' apps/linux/CMakeLists.txt)"
+          [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [ -z "${RELEASE_TAG}" ]; then
+            version="${version}~candidate.${GITHUB_SHA:0:12}"
+            release_label="candidate-${GITHUB_SHA:0:12}"
+          else
+            release_label="$(printf '%s' "${RELEASE_TAG}" | sed -E 's#[^0-9A-Za-z._-]+#-#g')"
+          fi
+          package_root="dist/release/${DISTRO_NAME}"
+          mkdir -p "${package_root}"
+
+          docker pull "${DISTRO_IMAGE}"
+
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+            -e CMAKE_BUILD_PARALLEL_LEVEL=2 \
+            -e NODE_OPTIONS=--max-old-space-size=2048 \
+            -e DISTRO_NAME="${DISTRO_NAME}" \
+            -e DISTRO_INSTALL="${DISTRO_INSTALL}" \
+            -e PACKAGE_KIND="${PACKAGE_KIND}" \
+            -e BUILD_APPIMAGE="${BUILD_APPIMAGE}" \
+            -e VERSION="${version}" \
+            -e RELEASE_LABEL="${release_label}" \
+            -e APPIMAGETOOL_URL="${APPIMAGETOOL_URL}" \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            "${DISTRO_IMAGE}" \
+            bash -lc '
+              set -euo pipefail
+              eval "${DISTRO_INSTALL}"
+              curl -fsSL https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz -o /tmp/kelpie-node.tar.xz
+              tar -xJf /tmp/kelpie-node.tar.xz -C /opt
+              export PATH="/opt/node-v22.14.0-linux-x64/bin:${PATH}"
+              npm install --global pnpm@10.12.4
+
+              package_root="dist/release/${DISTRO_NAME}"
+              bundle_root="${package_root}/bundle"
+              mkdir -p "${package_root}"
+              git -c safe.directory=/workspace rev-parse HEAD > "${package_root}/source-revision.txt"
+              sha256sum pnpm-lock.yaml > "${package_root}/lock-sha256.txt"
+              bash scripts/download-cef.sh linux
+              bash scripts/check-linux-script-codecs.sh > "${package_root}/factory-provenance.txt"
+              make linux
+              ctest --test-dir apps/linux/build --verbose --output-log "${package_root}/native-checks.log" -R "^linux_script_(media|artifact)_test$"
+              sha256sum apps/linux/build/kelpie-linux apps/linux/build/libcef.so > "${package_root}/binary-sha256.txt"
+
+              bash scripts/build-linux-runtime-bundle.sh \
+                --version "${VERSION}" \
+                --build-label "${DISTRO_NAME}" \
+                --output-dir "${bundle_root}"
+
+              tar -C "${bundle_root}" -czf "${package_root}/kelpie-linux-${RELEASE_LABEL}-${DISTRO_NAME}-x86_64.tar.gz" kelpie-linux
+
+              case "${PACKAGE_KIND}" in
+                deb)
+                  bash scripts/package-linux-deb.sh \
+                    --version "${VERSION}" \
+                    --bundle-dir "${bundle_root}/kelpie-linux" \
+                    --output-dir "${package_root}"
+
+                  if [ "${BUILD_APPIMAGE}" = "true" ]; then
+                    curl -L --fail -o /tmp/appimagetool.AppImage "${APPIMAGETOOL_URL}"
+                    chmod 755 /tmp/appimagetool.AppImage
+                    rm -rf /tmp/squashfs-root
+                    (
+                      cd /tmp
+                      APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage --appimage-extract >/dev/null
+                    )
+                    test -x /tmp/squashfs-root/AppRun
+                    bash scripts/package-linux-appimage.sh \
+                      --version "${VERSION}" \
+                      --bundle-dir "${bundle_root}/kelpie-linux" \
+                      --output-dir "${package_root}" \
+                      --appimagetool "/tmp/squashfs-root/AppRun"
+                  fi
+                  ;;
+                rpm)
+                  bash scripts/package-linux-rpm.sh \
+                    --version "${VERSION}" \
+                    --bundle-dir "${bundle_root}/kelpie-linux" \
+                    --output-dir "${package_root}"
+                  ;;
+              esac
+
+              (
+                cd "${package_root}"
+                shopt -s nullglob
+                files=(*.tar.gz *.deb *.rpm *.AppImage)
+                test "${#files[@]}" -gt 0
+                sha256sum "${files[@]}" | tee checksums.txt
+              )
+              chmod -R a+rX dist/release
+            ' 2>&1 | tee "${package_root}/candidate-build.log"
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}
+          path: |
+            dist/release/${{ matrix.distro.name }}/*.tar.gz
+            dist/release/${{ matrix.distro.name }}/*.deb
+            dist/release/${{ matrix.distro.name }}/*.rpm
+            dist/release/${{ matrix.distro.name }}/*.AppImage
+            dist/release/${{ matrix.distro.name }}/*.txt
+            dist/release/${{ matrix.distro.name }}/*.log
+          if-no-files-found: warn
+
+
+  result:
+    name: Linux native check
+    if: always()
+    needs: [changes, build]
+    runs-on: ubuntu-latest
+    env:
+      DETECTION: ${{ needs.changes.result }}
+      REQUIRED: ${{ needs.changes.outputs.build }}
+      BUILD: ${{ needs.build.result }}
+    steps:
+      - shell: bash
+        run: |
+          set -euo pipefail
+          test "${DETECTION}" = success
+          if [ "${REQUIRED}" != true ]; then
+            echo "Skipped: no Linux app or native build input changed."
+          else
+            test "${BUILD}" = success
+          fi
