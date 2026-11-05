@@ -244,7 +244,7 @@ final class IOSWorkflowPresentation: NSObject {
         let value = MarkerGeometry(
             bounds: view.bounds,
             frameInWindow: view.convert(view.bounds, to: window),
-            originInWindow: view.convert(.zero, to: window),
+            originInWindow: view.convert(CGPoint.zero, to: window),
             xBasisInWindow: view.convert(CGPoint(x: 1, y: 0), to: window),
             yBasisInWindow: view.convert(CGPoint(x: 0, y: 1), to: window),
             contentOffset: view.scrollView.contentOffset,
