@@ -91,6 +91,11 @@ final class WorkflowCaptureProbe {
         return bytes
     }
 
+    static func errorCode(_ value: Body) -> String {
+        let code = (value["error"] as? Body)?["code"] as? String ?? "NONE"
+        return code.range(of: "^[A-Z0-9_]{1,80}$", options: .regularExpression) == nil ? "UNKNOWN" : code
+    }
+
     enum ProbeError: Error { case invalidChunk, pairing, listener }
 
     static func containsTargetMarker(_ screen: XCUIScreenshot, visibleTarget: CGRect, app: CGRect) -> Bool {

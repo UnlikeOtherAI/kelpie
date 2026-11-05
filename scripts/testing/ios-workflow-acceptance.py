@@ -37,6 +37,7 @@ def selection(scope):
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testNativePinchClipsTapCenterAndExportedMarker",
+                "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
