@@ -5,7 +5,9 @@ import Network
 final class WorkflowLoopbackPage {
     enum Failure: Error { case listener }
     let listener: NWListener
-    init() throws {
+    private let responseDelay: TimeInterval
+    init(responseDelay: TimeInterval = 0) throws {
+        self.responseDelay = responseDelay
         let params = NWParameters.tcp
         params.requiredInterfaceType = .loopback
         listener = try NWListener(using: params, on: .any)
@@ -82,10 +84,12 @@ final class WorkflowLoopbackPage {
         </script>
         """
         let data = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)".utf8)
-        listener.newConnectionHandler = { connection in
+        listener.newConnectionHandler = { [responseDelay] connection in
             connection.start(queue: queue)
             connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { _, _, _, _ in
-                connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                queue.asyncAfter(deadline: .now() + responseDelay) {
+                    connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                }
             }
         }
         let port: UInt16 = try await withCheckedThrowingContinuation { continuation in

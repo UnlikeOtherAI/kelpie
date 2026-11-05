@@ -192,12 +192,21 @@ final class IOSWorkflowTab {
         guard router.browserLease.begin() else { throw IOSWorkflowFailure("BUSY") }
         defer { router.browserLease.end() }
         router.invalidateAllBrowserReferences()
-        let navigationLease = try await IOSWorkflowNavigation.issue(on: view, authorize: requireMutationAuthority) {
-            context.lastNavigationError = nil
-            return view.load(URLRequest(url: url))
-        }
-        defer { ConnectDocument.reserve(view, lease: nil) }
         let end = ContinuousClock.now.advanced(by: .seconds(10))
+        let navigationLease = try await IOSWorkflowNavigation.issue(
+            on: view,
+            deadline: end,
+            authorize: {
+                try await check()
+                try await self.requireMutationAuthority()
+            },
+            isLoading: { self.view.isLoading },
+            load: {
+                self.context.lastNavigationError = nil
+                return self.view.load(URLRequest(url: url))
+            }
+        )
+        defer { ConnectDocument.reserve(view, lease: nil) }
         repeat {
             try? await Task.sleep(nanoseconds: 50_000_000)
             let version = ConnectDocument.version(view)
