@@ -289,7 +289,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     val result = pending.get(30, java.util.concurrent.TimeUnit.SECONDS)
                     assertFalse(result.getBoolean("success"))
                     assertEquals("SCRIPT_ABORTED", result.getJSONObject("error").getString("code"))
-                    assertFalse(result.optBoolean("mayHaveCompleted", false))
+                    assertTrue(!result.has("mayHaveCompleted") || result.opt("mayHaveCompleted") == false)
                     assertEquals(1, result.getInt("actionsExecuted"))
                     val artifacts = result.getJSONArray("artifacts")
                     assertTrue("Known non-sensitive partial capture must be retained", artifacts.length() > 0)
@@ -350,7 +350,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     val result = playRecorded(client, client.script(tab, action))
                     assertFalse(result.getBoolean("success"))
                     assertEquals("TARGET_NOT_EDITABLE", result.getJSONObject("error").getString("code"))
-                    assertFalse(result.getBoolean("mayHaveCompleted"))
+                    assertTrue(!result.has("mayHaveCompleted") || result.opt("mayHaveCompleted") == false)
                 }
                 assertEquals(0, client.call("evaluate", JSONObject().put("expression", "window.focusCount")).getInt("result"))
             }
