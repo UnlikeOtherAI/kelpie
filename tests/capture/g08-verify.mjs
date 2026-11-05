@@ -69,14 +69,15 @@ for(const item of input.cases){
       let stderr="";child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
       const exited=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",code=>code===0?resolve():reject(Error("Decoder failed "+code+" "+stderr)));});
       void exited.catch(()=>{}); // A stream assertion can fail before the process-close await.
-      let calibrationStart;
+      let calibrationStart,calibrationMarkerSeen=false;
       try{
         const count=await consumeG08Frames(child.stdout,artifact.width,artifact.height,(frame,index)=>{
           assert.ok(index<artifact.timestamps.length,"Decoder exceeded recorded PTS");
           const sample={timeMs:actualPTS[index]*1000,
             ...measureG08Frame(frame,artifact.width,artifact.height,marker)};
           if(calibrationStart===undefined&&sample.pointer)calibrationStart=sample.timeMs;
-          sample.calibrationCandidate=calibrationStart!==undefined&&sample.timeMs<=calibrationStart+300;
+          sample.calibrationCandidate=calibrationStart!==undefined&&!calibrationMarkerSeen&&sample.timeMs<=calibrationStart+8000;
+          if(sample.marker.alpha>.2)calibrationMarkerSeen=true;
           entry.samples.push(sample);
           const old=entry.samples[index-100];
           if(old&&!old.calibrationCandidate)delete old.marker.roi;

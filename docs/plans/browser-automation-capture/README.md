@@ -1,6 +1,7 @@
 # Browser automation and walkthrough capture
 
 This plan covers the full Lightpanda-inspired browser automation brief and the original walkthrough export request. The QA acceptance ledger records actual evidence by revision and platform. Historical independently reviewed source snapshot:5f4c4fcb, plus common privacy-oracle cbce8f97. The later coordinator snapshot and open gates are recorded in the 2026-11-05 supplement at the end of outstanding-gates.md.
+The [0c9433b9 integrated acceptance audit](integrated-audit-0c943.md) records the current finite requirements and known implementation gaps.
 The [integration branch](https://github.com/UnlikeOtherAI/kelpie/tree/codex/script-capture-integration-20261104)
 is the moving source reference; every evidence receipt retains its exact older
 binary/source identity. See outstanding-gates.md and reviewed-cells.md for current
