@@ -8,10 +8,10 @@
 
 namespace kelpie {
 namespace {
-void ViewportDiagnostic(const char* fence,const Json& before,const Json& after) {
+void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlohmann::json& after) {
   const char* enabled=std::getenv("KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS");
   if (!enabled || std::strcmp(enabled,"1")!=0) return;
-  const Json facts={{"fence",fence},{"before",ScriptCaptureViewportFacts(before)},
+  const nlohmann::json facts={{"fence",fence},{"before",ScriptCaptureViewportFacts(before)},
                     {"after",ScriptCaptureViewportFacts(after)}};
   std::fprintf(stderr,"KELPIE_CAPTURE_VIEWPORT_DIAGNOSTIC %s\n",facts.dump().c_str());
 }
