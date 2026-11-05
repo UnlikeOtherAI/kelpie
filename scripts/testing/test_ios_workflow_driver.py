@@ -49,6 +49,34 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         finally:
             bridge.close()
 
+    def test_capture_insets_are_bounded_numeric_only(self):
+        from ios_workflow_diagnostics import fixed_capture_insets
+        line = "[WorkflowCaptureInsets] before=0,34,0,34,0,0,0,34,0 after=0,0,0,0,0,0,0,0,0"
+        self.assertEqual(fixed_capture_insets(line), {
+            "before": [0, 34, 0, 34, 0, 0, 0, 34, 0], "after": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        })
+        self.assertIsNone(fixed_capture_insets(line.replace("0,34", "private,34")))
+        self.assertIsNone(fixed_capture_insets(line.replace("0,34", "999999,34")))
+
+    def test_capture_geometry_diagnostics_are_bounded_numeric_only(self):
+        from ios_workflow_diagnostics import fixed_capture_geometry
+        line = "[WorkflowCaptureGeometry] before=390,800,390,800,390,800,1,3 after=390,790,390,790,390,790,1,3"
+        self.assertEqual(fixed_capture_geometry(line), {
+            "before": [390, 800, 390, 800, 390, 800, 1, 3],
+            "after": [390, 790, 390, 790, 390, 790, 1, 3],
+        })
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "private,800")))
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "999999,800")))
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "390,0")))
+
+    def test_capture_xcresult_diagnostics_only_keep_fixed_enums(self):
+        from ios_workflow_diagnostics import fixed_capture_events
+        self.assertEqual(fixed_capture_events([
+            "prefix [WorkflowCapture] reason=observation-INVALID_ARGUMENTS",
+            "[WorkflowCapture] reason=snapshot-visible-size",
+            "[WorkflowCapture] reason=private_value",
+        ]), {"observation-INVALID_ARGUMENTS": 1, "snapshot-visible-size": 1})
+
     def test_capture_diagnostics_only_keep_fixed_reasons(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "log"
@@ -60,9 +88,29 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             self.assertEqual(output.read_text(), "[WorkflowCapture] reason=visible-size\n"
                              "[WorkflowCapture] reason=observation-BUSY\n")
 
+    def test_cli_timeout_metadata_excludes_output_values(self):
+        from ios_workflow_cli import timeout_metadata
+        payload = json.dumps({"result": {"success": True, "state": "completed",
+                                         "outputs": {"secret": "private"}, "artifacts": [{}, {}]},
+                              "downloaded": [{}, {}]}).encode()
+        report = timeout_metadata(subprocess.TimeoutExpired("script", 60, output=payload, stderr=b"private"))
+        self.assertEqual(report, {"stdoutBytes": len(payload), "stderrBytes": 7, "resultSuccess": True,
+                                  "resultState": "completed", "artifactCount": 2, "downloadCount": 2})
+        self.assertNotIn("private", json.dumps(report))
+        self.assertEqual(timeout_metadata(subprocess.TimeoutExpired("script", 60, output=b"{")),
+                         {"stdoutBytes": 1, "stderrBytes": 0})
+
+    def test_cli_rejects_process_local_pair_before_script_execution(self):
+        from ios_workflow_cli import run_fixture
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("ios_workflow_cli.invoke", return_value={"success": True, "scope": "session", "persisted": False}) as invoke:
+                with self.assertRaisesRegex(ValueError, "did not persist"):
+                    run_fixture("a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed", Path(directory) / "cli")
+                self.assertEqual(invoke.call_count, 1)
+
     def test_cli_failure_status_keeps_only_bounded_metadata(self):
         from ios_workflow_cli import run_fixture
-        responses = [{"success": True}, subprocess.TimeoutExpired("script", 60),
+        responses = [{"success": True, "scope": "persistent", "persisted": True}, subprocess.TimeoutExpired("script", 60),
                      {"state": "running", "playing": True, "actionIndex": 1,
                       "outputs": {"secret": "private"}, "runError": {"code": "SAFE_CODE", "message": "private"}}]
         with tempfile.TemporaryDirectory() as directory:
@@ -70,8 +118,8 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
                 with self.assertRaises(subprocess.TimeoutExpired):
                     run_fixture("a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed", Path(directory) / "cli")
             report = json.loads((Path(directory) / "cli/status-on-failure.json").read_text())
-            self.assertEqual(report, {"status": "observed", "state": "running", "playing": True,
-                                      "actionIndex": 1, "errorCode": "SAFE_CODE"})
+            self.assertEqual(report, {"status": "observed", "stdoutBytes": 0, "stderrBytes": 0,
+                                      "state": "running", "playing": True, "actionIndex": 1, "errorCode": "SAFE_CODE"})
             self.assertNotIn("private", json.dumps(report))
 
     def test_navigation_diagnostics_emit_only_known_fixed_events(self):

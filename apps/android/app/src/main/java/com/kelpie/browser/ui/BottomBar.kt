@@ -35,6 +35,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -68,10 +71,13 @@ fun BottomBar(
     onShare: () -> Unit,
     onShowTabs: () -> Unit,
     onExpand: () -> Unit,
+    onTransientUiChanged: (Boolean) -> Unit,
     moreContent: @Composable ColumnScope.(() -> Unit) -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    SideEffect { onTransientUiChanged(editing || more) }
+    DisposableEffect(Unit) { onDispose { onTransientUiChanged(false) } }
     val compact = isCollapsed && !editing && !more
     val height by animateDpAsState(if (compact) 34.dp else 62.dp, tween(250), label = "Toolbar height")
     val focus = LocalFocusManager.current
@@ -123,7 +129,11 @@ fun BottomBar(
                                 editing = false
                                 onNavigate(it)
                             },
-                            Modifier.widthIn(max = 620.dp).fillMaxWidth().height(44.dp),
+                            Modifier
+                                .widthIn(max = 620.dp)
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("browser-address"),
                             shape = CircleShape,
                             textStyle = MaterialTheme.typography.bodySmall,
                             onEditingChanged = {

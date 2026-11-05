@@ -15,7 +15,7 @@ class ElementStub {
 }
 function fixture(count = 1, element = new ElementStub()) {
   let hit: ElementStub | null = element;
-  const doc = { documentElement: element, createTreeWalker: (_root: unknown, mask: number) => {
+  const doc = { documentElement: element, activeElement: element, hasFocus: () => true, createTreeWalker: (_root: unknown, mask: number) => {
     let index = 0;
     return { currentNode: element, nextNode: () => mask !== 1 || ++index >= count ? null : element };
   }, elementFromPoint: () => hit };

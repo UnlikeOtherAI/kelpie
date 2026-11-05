@@ -1,5 +1,34 @@
 import AppKit
 
+/// Latches sensitive or uncertain input before later guards can replace the primary error.
+@MainActor
+final class ScriptWorkflowPrivacy {
+    private(set) var secrets: [String]
+    private(set) var discardMedia = false
+    private var knownSecrets: Set<String>
+    private let captures: Bool
+
+    init(secrets: [String], captures: Bool) {
+        self.secrets = secrets
+        knownSecrets = Set(secrets)
+        self.captures = captures
+    }
+
+    func consume(_ result: [String: Any], text: String?) {
+        guard let sensitive = result["sensitive"] as? Bool else { uncertain(text: text); return }
+        guard sensitive else {
+            if result["sensitivityKnown"] as? Bool != true { uncertain(text: text) }
+            return
+        }
+        uncertain(text: text)
+    }
+
+    func uncertain(text: String?) {
+        if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
+        if captures { discardMedia = true }
+    }
+}
+
 @MainActor
 final class ScriptWorkflowActions {
     typealias Body = [String: Any]
@@ -10,9 +39,9 @@ final class ScriptWorkflowActions {
     let check: () async throws -> Void
     var capture: ScriptCapture?
     private(set) var outputs: Body = [:]
-    private(set) var secrets: [String]
-    private var knownSecrets: Set<String>
-    private(set) var discardMedia = false
+    private let privacy: ScriptWorkflowPrivacy
+    var secrets: [String] { privacy.secrets }
+    var discardMedia: Bool { privacy.discardMedia }
 
     init(
         workflow: ScriptBoundWorkflow,
@@ -26,8 +55,7 @@ final class ScriptWorkflowActions {
         self.presentation = presentation
         self.router = router
         self.check = check
-        secrets = workflow.sensitiveValues
-        knownSecrets = Set(workflow.sensitiveValues)
+        privacy = ScriptWorkflowPrivacy(secrets: workflow.sensitiveValues, captures: workflow.capture != nil)
     }
 
     func execute(_ step: Body, index: Int) async throws {
@@ -131,31 +159,12 @@ final class ScriptWorkflowActions {
         }
     }
 
-    private func registerSecret(_ text: String?) {
-        if let text, knownSecrets.insert(text).inserted { secrets.append(text) }
-    }
-
-    private func consumeSensitivity(_ result: Body, text: String?) {
-        guard let sensitive = result["sensitive"] as? Bool else { consumeUncertainty(text: text); return }
-        guard sensitive else {
-            if result["sensitivityKnown"] as? Bool != true { consumeUncertainty(text: text) }
-            return
-        }
-        registerSecret(text)
-        if workflow.capture != nil { discardMedia = true }
-    }
-
-    private func consumeUncertainty(text: String?) {
-        registerSecret(text)
-        if workflow.capture != nil { discardMedia = true }
-    }
-
     private func interact(_ step: Body, action: String, index: Int) async throws {
         let target = step["target"] as? Body ?? [:]
         let editing = action == "type" || action == "fill"
         let text = editing ? step["text"] as? String : nil
-        let consume = { [self] (result: Body) in consumeSensitivity(result, text: text) }
-        let uncertain = { [self] in consumeUncertainty(text: text) }
+        let consume = { [privacy] (result: Body) in privacy.consume(result, text: text) }
+        let uncertain = { [privacy] in privacy.uncertain(text: text) }
         if step["sensitive"] as? Bool == true { consume(["sensitive": true]) }
         let document = tab.document
         let viewport = try await tab.viewport()

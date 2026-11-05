@@ -96,7 +96,7 @@ class KelpieNetworkService : Service() {
     }
 
     private fun ensureNotificationChannel() {
-        // minSdk is 28 — channels (added in O / 26) always exist.
+        // minSdk is 29 — channels (added in O / 26) always exist.
         val nm = getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
         val channel =

@@ -218,6 +218,9 @@ jobs:
           KELPIE_IOS_TEST_SCOPE: ${{ inputs.native_workflow_scope || 'full' }}
         run: |
           python3 -m unittest discover -s scripts/testing -p test_ios_workflow_driver.py
+          if [[ "$KELPIE_IOS_TEST_SCOPE" != navigation ]]; then
+            node --test scripts/testing/ios_g08_scene.test.mjs
+          fi
           python3 scripts/testing/ios-workflow-acceptance.py
 
       - name: Keep simulator results and media

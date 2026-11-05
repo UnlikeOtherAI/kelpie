@@ -30,7 +30,13 @@ final class WorkflowLoopbackPage {
         window.count=0;document.querySelector('button').onclick=e=>{
           const r=e.currentTarget.getBoundingClientRect(),x=(Math.max(0,r.left)+Math.min(innerWidth,r.right))/2;
           const y=(Math.max(0,r.top)+Math.min(innerHeight,r.bottom))/2;
-          document.querySelector('#geometry').textContent=Math.abs(x-e.clientX)<=1&&Math.abs(y-e.clientY)<=1?'center':'missed';
+          const v=visualViewport;
+          document.querySelector('#geometry').textContent=JSON.stringify({
+            centered:Math.abs(x-e.clientX)<=1&&Math.abs(y-e.clientY)<=1,
+            clickX:e.clientX,clickY:e.clientY,left:r.left,top:r.top,right:r.right,bottom:r.bottom,
+            viewportX:v?.offsetLeft??0,viewportY:v?.offsetTop??0,viewportWidth:v?.width??innerWidth,
+            viewportHeight:v?.height??innerHeight,viewportScale:v?.scale??1
+          });
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');

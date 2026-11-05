@@ -4,12 +4,15 @@ import { access, readFile, rm } from "node:fs/promises";
 const MAX_LOG_BYTES = 32_768;
 
 function capture(stream) {
-  let text = "";
+  let text = "", first = "";
   stream?.setEncoding("utf8");
   stream?.on("data", chunk => {
+    first = (first + chunk).slice(0, MAX_LOG_BYTES);
     text = (text + chunk).slice(-MAX_LOG_BYTES);
   });
-  return () => text;
+  const tail = () => text;
+  tail.first = () => first;
+  return tail;
 }
 
 export async function fileExists(path) {
@@ -51,7 +54,7 @@ export function startBrowser(executable, args) {
     child.once("exit", (code, signal) => resolve({ code, signal, error: undefined }));
     child.once("error", error => resolve({ code: null, signal: null, error }));
   });
-  return { child, exited, logs: () => ({ stdout: stdout(), stderr: stderr() }) };
+  return { child, exited, logs: () => ({ stdout: stdout(), stderr: stderr(), stdoutFirst: stdout.first(), stderrFirst: stderr.first() }) };
 }
 
 /** Runs an owned short-lived command with bounded output and a hard timeout. */

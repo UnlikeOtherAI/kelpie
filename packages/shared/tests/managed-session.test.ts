@@ -59,6 +59,25 @@ describe("restricted Lightpanda profile", () => {
     expect(binding.getPage).not.toHaveBeenCalled();
   });
 
+  it.each(["tab.snapshot", "tab.extract", "tab.status", "tab.ready"] as const)(
+    "requires explicit operator verification for %s without granting input or pixels", async (method) => {
+      const value = method === "tab.snapshot" ? { snapshot: { elements: [], text: "" } } : { marker: method };
+      const page = { evaluate: vi.fn(async () => value) };
+      const binding = { listTabs: vi.fn(), getPage: vi.fn(async () => page as unknown as Page) };
+      const unverified = createLightpandaBrowserBackend(binding);
+      await expect(unverified.execute(request(method, {}, "owned"))).rejects.toMatchObject({ code: "UNSUPPORTED" });
+      expect(binding.getPage).not.toHaveBeenCalled();
+      const backend = createLightpandaBrowserBackend(binding, [method]);
+      expect(backend.capabilities.methods).toContain(method);
+      backend.capabilities.methods.push("tab.screenshot");
+      await expect(backend.execute(request("tab.screenshot", {}, "owned"))).rejects.toMatchObject({ code: "UNSUPPORTED" });
+      const params = method === "tab.extract" ? { fields: [{ name: "title", selector: "h1", source: "text" }] } : {};
+      await expect(backend.execute(request(method, params, "owned"))).resolves.toEqual(
+        method === "tab.snapshot" ? { elements: [], text: "" } : { marker: method });
+      expect(page.evaluate).toHaveBeenCalledOnce();
+    },
+  );
+
   it("admits only operator-verified candidates with actual binding operations", async () => {
     const binding = { listTabs: vi.fn(async () => [{ id: "owned" }]), getPage: vi.fn() };
     const backend = createLightpandaBrowserBackend(binding, ["tabs.list"]);

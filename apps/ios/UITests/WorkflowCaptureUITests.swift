@@ -1,5 +1,6 @@
 import AVFoundation
 import ImageIO
+import UIKit
 import XCTest
 
 final class WorkflowCaptureUITests: XCTestCase {
@@ -46,6 +47,24 @@ final class WorkflowCaptureUITests: XCTestCase {
     }
 
     @MainActor
+    func testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray() throws {
+        func image(_ color: UIColor, small: Bool = false) throws -> CGImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20), format: format).image { renderer in
+                UIColor.white.setFill()
+                renderer.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+                color.setFill()
+                renderer.fill(small ? CGRect(x: 9, y: 9, width: 1, height: 1) : CGRect(x: 0, y: 0, width: 20, height: 20))
+            }.cgImage)
+        }
+        let faded = UIColor(red: 148.0 / 255, green: 241.0 / 255, blue: 149.0 / 255, alpha: 1)
+        XCTAssertTrue(WorkflowCaptureProbe.containsMarker(try image(faded), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(.lightGray), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(faded, small: true), minimumCoverage: 0.12))
+    }
+
+    @MainActor
     func testInitialOwnedHTTPNavigationLoadsFixture() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
@@ -79,11 +98,12 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
         var visible = false
-        var mismatch: (screen: XCUIScreenshot, target: CGRect, greenElsewhere: Bool)?
+        var mismatch: (screen: XCUIScreenshot, target: CGRect, viewport: CGRect, greenElsewhere: Bool)?
         repeat {
             let viewport = app.webViews.firstMatch
             let submit = viewport.buttons["Submit"].firstMatch
-            let target = viewport.exists && submit.exists ? submit.frame.intersection(viewport.frame) : .null
+            let viewportFrame = viewport.exists ? viewport.frame : .null
+            let target = !viewportFrame.isNull && submit.exists ? submit.frame.intersection(viewportFrame) : .null
             let screen = app.screenshot()
             if !target.isNull, WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: target, app: app.frame) {
                 let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + String(describing: target))
@@ -101,7 +121,7 @@ final class WorkflowCaptureUITests: XCTestCase {
                 let greenElsewhere = screen.image.cgImage.map { WorkflowCaptureProbe.containsMarker($0) } ?? false
                 if mismatch == nil || (target.isNull == false && mismatch?.target.isNull == true) ||
                     (greenElsewhere && mismatch?.greenElsewhere == false) {
-                    mismatch = (screen, target, greenElsewhere)
+                    mismatch = (screen, target, viewportFrame, greenElsewhere)
                 }
             }
             try await Task.sleep(nanoseconds: 70_000_000)
@@ -112,22 +132,31 @@ final class WorkflowCaptureUITests: XCTestCase {
             screenshot.lifetime = .keepAlways
             add(screenshot)
             let geometry = XCTAttachment(string: "Visible Submit frame " + String(describing: mismatch.target) +
+                ", WebView frame " + String(describing: mismatch.viewport) +
+                ", app frame " + String(describing: app.frame) +
                 ", green component elsewhere " + String(mismatch.greenElsewhere))
             geometry.name = "Failed marker target geometry"
             geometry.lifetime = .keepAlways
             add(geometry)
         }
-        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
         let result = try await playback.value
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
         let geometry = try XCTUnwrap((result["outputs"] as? Body)?["tapGeometry"] as? Body)
-        XCTAssertEqual((geometry["fields"] as? [Body])?.first?["values"] as? [String], ["center"])
+        let text = try XCTUnwrap(((geometry["fields"] as? [Body])?.first?["values"] as? [String])?.first)
+        let data = Data(text.utf8)
+        let actual = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? Body)
+        let evidence = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
+        evidence.name = "Fixture click and visual viewport geometry"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        XCTAssertEqual(actual["centered"] as? Bool, true)
         let run = try XCTUnwrap(result["runId"] as? String)
         let manifests = try XCTUnwrap(result["artifacts"] as? [Body])
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
+        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
     }
 
     @MainActor

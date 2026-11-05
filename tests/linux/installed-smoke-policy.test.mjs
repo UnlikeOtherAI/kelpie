@@ -7,6 +7,9 @@ test("installed smoke uses a separate bounded distro container and read-only sou
   const smoke = workflow.slice(workflow.indexOf("      - name: Verify installed Linux candidate"));
   assert.match(smoke, /docker run --rm --cpus=2 --memory=6g --pids-limit=512/);
   assert.match(smoke, /no-new-privileges=true/);
+  assert.match(smoke, /linux-test-seccomp\.mjs/);
+  assert.match(smoke, /seccomp=\$\{RUNNER_TEMP\}\/kelpie-test-seccomp\.json/);
+  assert.match(smoke, /test-seccomp-sha256\.txt/);
   assert.match(smoke, /\$\{PWD\}:\/workspace:ro/);
   assert.match(smoke, /bash scripts\/ci\/linux-installed-smoke\.sh/);
   assert.doesNotMatch(smoke, /privileged|cap-add|seccomp=unconfined|apparmor=unconfined/);

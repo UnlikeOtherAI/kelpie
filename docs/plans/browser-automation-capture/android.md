@@ -540,3 +540,60 @@ and ScriptPixelCopyGateTest3/3 passed in4m40s. It used a fresh writable Gradle
 home, separately copied read-only modules-2 seed, one CPU and2GiB heap. Existing
 unrelated warnings remain. No emulator, native screenshot, media replay, API28,
 or signed release was exercised by this check.
+
+## Scene and geometry follow-up (source only)
+
+The scene predicate explicitly tracks inspector, tab overview, address editing
+and menu, sheets, welcome, pairing and queued panel requests. Native action modes
+and direct inspector/panel transitions invalidate a monotonic generation before
+any frame can publish. Browser chrome is unmounted during recording; its transient
+state remains uncertified until disposal. PixelCopy bounds use the full view
+matrix and admit only fully visible positive uniform scale with pixel-aligned
+edges. Rotation, skew, nonuniform scale and fractional boundaries fail closed.
+AndroidX cases exercise tab-overview/address entry and restoration, action-mode
+and inspector/panel generation, a pixel-aligned scaled owned view with
+nonuniform rejection, and tablet stage screenshot restoration across success,
+abort and failure. These are authored cases, not native pass claims.
+Hosted run42006190219 at b2bcb247 failed lintDebug before the native job: lint
+could not propagate the API29 guard into the frame callback. Follow-up cffe3a96
+isolates the guarded callback in an annotated Q-only method. Historical run
+remains failed; the integrated rerun must establish lint and device behavior.
+Maxis follow-up check: online ktlintFormat/Check, lintDebug, main and
+AndroidTest Kotlin compilation, and targeted gate/scene JVM tests4/4 passed
+in2m25s with one CPU and2GiB heap. Previous offline lint dependency and
+AndroidTest import failures remain recorded in scene-geometry-check.log and
+scene-geometry-online.log. Device cases remain authored, not executed.
+
+Hosted42007603401 at65fe4866ac7c4f0c4f43b240cfecb41471c0239f: build/lint
+passed; phone30/33 and tablet29/33 failed overall. Both focus-time privacy
+cases published three captures and returned raw, URI and form synthetic literals
+unredacted; this is a release-blocking leak. Both combined-marker tests failed
+initial CAPTURE_VIEW_UNAVAILABLE; tablet low-FPS navigation failed with
+SCRIPT_DOCUMENT_CHANGED. Phone low-FPS navigation passed. Both profiles
+reconstructed large nonblank PNGs and completed CLI baseline downloads;
+native Stop returned SCRIPT_ABORTED with partial GIF/MP4 on both. Phone G08
+exceeded its old18s capture deadline with316 dropped frames; tablet's G08
+reached download but the runner lacked ffprobe. Artifact13406619597 SHA-256
+0fec30a6a11a7b1658926a94cd81a46cd702b42ef0ae7d126a81d05662bf2cb1 remains
+retained with the original failures.
+
+Focus fixture follow-up records only focus/active-element booleans, event
+count, bounded type/autocomplete categories and a fixed JNI expression hash
+before existing assertions. It does not record input values. These authored
+diagnostics have not run on a device.
+
+
+The user approved Android 10 (API 29) as the minimum supported OS on 5 November
+2026. Earlier API 28 refusal records remain historical; final-source phone and
+tablet acceptance, including privacy and scene evidence, remains open.
+
+Hosted run `42015326445` at `ee22cb800fa1ccd2f2ff587d99fb26b41a24fa47`
+recorded three failures in each 39-case profile: two focus-sensitive privacy
+cases and the native Submit-marker probe. The focus facts show
+`document.hasFocus() == false` before and after the edit, zero focus events,
+and `activeElement` set to the input; the generated expression included the
+refusal policy. The edit proceeded without the focus handler and exposed the
+synthetic literal in earlier output. Low-FPS navigation passed on both.
+The CLI baseline retrieved decoded multichunk PNGs, but G08 C hit the 26-second
+limit on both (phone 20 frames/471 dropped; tablet 38/456); G08 S did not run.
+These outcomes do not establish native privacy or dense motion acceptance.

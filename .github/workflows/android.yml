@@ -96,6 +96,12 @@ jobs:
           fi
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
+      - name: Install media verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
       - name: Build matching CLI
         run: pnpm install --frozen-lockfile && pnpm --workspace-concurrency=1 -r build
       - name: Build shipping JNI app and test APK sequentially

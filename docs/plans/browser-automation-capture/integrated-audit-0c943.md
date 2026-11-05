@@ -8,6 +8,10 @@ The [implementation map](implementation-map.md) supplies source anchors and
 durable evals. Reports and images retain their actual source and binary identities;
 neither an owner report nor this document converts unreviewed evidence to a pass.
 
+> Scope update, 5 November 2026: the user approved Android 10 (API 29) as the
+> minimum supported OS. The API 28 gap described in this frozen audit is no
+> longer a supported-OS release blocker; Android runtime acceptance remains open.
+
 ## Functional gaps and scope decisions
 
 - **Android API 28 is an implementation gap.** Android declares minSdk 28, but
@@ -129,3 +133,15 @@ and independent hashes. Owner ledgers are [Windows](windows-evidence-intake.md),
 Keep raw reports and media in owned ignored artifact directories, with the
 historical failed runs intact. The full portable test at d854c65a passed
 shared 143 and CLI 703 with one skipped; final integrated checks are still open.
+
+
+## Later restricted worker evidence
+
+A later public stdio corpus at test source `0b81b975` and candidate build
+`e94b059e` passed all 16 checks for the pinned Lightpanda 1.0.2 profile,
+including explicitly selected fixed snapshot/extract/status/ready readers.
+The default remains empty and the eight-method navigation-only profile above
+describes the earlier frozen proof, not the current candidate inventory.
+See [public intake](lightpanda-public-intake.md) for exact hashes, resource
+limits, positive/refusal coverage and teardown. No native, geometry, input,
+pixel or WebMCP support follows.

@@ -30,3 +30,6 @@ Use existing frame/decode/model helpers, not a second animation algorithm.
 Preserve dropped-frame/backpressure facts. A sparse FPS1 admission proof can
 prove source-document marker presence, but cannot establish a dense wobble curve.
 Only actual sampled outcomes can close PTR-01/02,VIS-01/02 and relevant CAP rows.
+
+See [neutral GIF palette review](g08-neutral-palette-review.md) for the
+matched controls, quantization collision and remaining MP4 limitation.

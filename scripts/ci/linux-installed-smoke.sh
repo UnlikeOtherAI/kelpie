@@ -8,7 +8,19 @@ package_root="$(realpath "$2")"
 output="$package_root/installed-smoke"
 mkdir "$output"
 stage=install
-trap 'code=$?; printf "{\"stage\":\"%s\",\"exitCode\":%s}\n" "$stage" "$code" > "$output/outcome.json"' EXIT
+cgroup_snapshot() {
+  local label="$1" file
+  {
+    for file in pids.current pids.max pids.events memory.current memory.max memory.events; do
+      if [[ -r "/sys/fs/cgroup/$file" ]]; then
+        printf '%s\n' "--- $file ---"
+        cat "/sys/fs/cgroup/$file"
+      fi
+    done
+  } > "$output/cgroup-$label.txt"
+}
+cgroup_snapshot before
+trap 'code=$?; cgroup_snapshot after || true; printf "{\"stage\":\"%s\",\"exitCode\":%s}\n" "$stage" "$code" > "$output/outcome.json"' EXIT
 
 case "$distro" in
   ubuntu-22.04)

@@ -12,7 +12,7 @@ Native renderers with no trusted input route may use the fixed atomic synthetic-
 
 Capture formats are GIF, video (MP4), and screenshots. Defaults: 15 FPS, maximum width 1280, duration 60000ms, retained bytes 67108864. Hard bounds: 30 FPS, width1920, duration300000ms, bytes268435456. Capture uses actual continuous frames with overlay composition and monotonic timestamps. Encoder backpressure drops frames rather than accumulating an unbounded queue; report dropped frames. A viewport resize stops and finalizes partial output. Abort/failure/bounds preserve valid partial artifacts.
 
-Tap defaults: color #3B82F6, radius20 CSS pixels, duration700ms, wobble and fade enabled. Visual pointer is disabled by default; enabled motion uses a deterministic S/C cubic curve, duration500ms and smoothstep ease in/out. Pointer presentation dispatches no hover or input.
+Tap defaults: color #3B82F6, radius20 CSS pixels, duration700ms, wobble and fade enabled. Visual pointer is disabled by default; enabled motion uses a deterministic S/C cubic curve, duration350ms and smoothstep ease in/out. Pointer presentation dispatches no hover or input.
 
 Artifacts return IDs, MIME type, byte length, SHA-256, dimensions and partial status, with optional duration/frame count/dropped frames/viewport/document provenance. Authenticated `get-script-artifact` uses runId/artifactId/offset/length, default chunk262144 and maximum1048576 bytes. Returned base64 chunks include offset/nextOffset/eof/type/size/hash. Never expose a device path, URL or credential as an artifact locator. The native store binds every run/status/cancel/download to the current authenticated owner and exact browser grant.
 

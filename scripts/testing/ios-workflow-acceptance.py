@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from ios_workflow_cli import run_fixture
 from ios_workflow_rendezvous import HostedCLIRendezvous
-from ios_workflow_diagnostics import export_lease_diagnostics
+from ios_workflow_diagnostics import export_lease_diagnostics, fixed_capture_events
 
 PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
 EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
@@ -33,10 +33,18 @@ def selection(scope):
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
+            targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
+                "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
+                "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
+                "testFirstCaptureWaitsForStableCompleteViewport",
+                "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
+                "testPointerDefaultAndExplicitDurationUseSharedContract",
+            ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testNativePinchClipsTapCenterAndExportedMarker",
+                "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
@@ -47,6 +55,14 @@ def selection(scope):
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
     if scope != "full":
         required.update(methods)
+        if scope == "diagnostics":
+            required.update([
+                "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
+                "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
+                "testFirstCaptureWaitsForStableCompleteViewport",
+                "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
+                "testPointerDefaultAndExplicitDurationUseSharedContract",
+            ])
     return targets, required
 
 
@@ -148,9 +164,9 @@ def failure_diagnostics(log_path, destination):
     lines = []
     with log_path.open(errors="replace") as log:
         for line in log:
-            capture = re.search(r"\[WorkflowCapture\] reason=(native-bounds|pixel-ratio|layout-size|visible-size|scale|snapshot-viewport|presentation-parent|observation-(?:BUSY|TAB_CHANGED|WEBVIEW_ERROR|UNAUTHORIZED|RECORDING_IN_PROGRESS|TIMEOUT|INVALID_PARAM|INVALID_VALUE|OTHER))\b", line)
+            capture = fixed_capture_events((line,))
             if capture:
-                lines.append("[WorkflowCapture] reason=" + capture.group(1))
+                lines.append("[WorkflowCapture] reason=" + next(iter(capture)))
                 if len(lines) >= 100:
                     break
                 continue

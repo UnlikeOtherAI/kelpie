@@ -38,7 +38,9 @@ extension WorkflowCaptureUITests {
         metrics.lifetime = .keepAlways
         add(metrics)
         XCTAssertGreaterThan(try XCTUnwrap(zoomed["scale"] as? Double), initialScale * 1.3)
-        XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(zoomed["layoutWidth"] as? Double))
+        // WebKit can report innerWidth equal to the zoomed visual width; compare the
+        // same visual viewport before and after the actual gesture instead.
+        XCTAssertLessThan(try XCTUnwrap(zoomed["width"] as? Double), try XCTUnwrap(initial["width"] as? Double))
 
         let tapped = try await probe.call("kelpie_play_script", [
             "version": 1, "tabId": tab,

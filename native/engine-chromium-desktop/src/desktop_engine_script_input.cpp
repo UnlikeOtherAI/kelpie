@@ -50,27 +50,41 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   } cleanup{impl_,lease,native_pressed,native_keys};
   Json target;
   const auto inspect = [&](bool privacy_only=false) -> BrowserControlResult {
+    const auto unknown_privacy = [&]() {
+      if (output) (*output)["inspectionUncertain"] = true;
+      return options.value("policy", Json::object()).value("refuseSensitive", false)
+        ? BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy is unknown")
+        : BrowserControlResult::Success();
+    };
     const auto remaining = RemainingTimeout(began, timeout);
-    if (remaining <= Timeout::zero()) return DeadlineExceeded();
-    char* raw = kelpie_browser_script_target_expression(options.dump().c_str());
-    if (!raw) return BrowserControlResult::Failure("INVALID_TARGET", "Shared target preflight rejected the request");
+    if (remaining <= Timeout::zero()) return privacy_only ? unknown_privacy() : DeadlineExceeded();
+    Json inspection_options = options;
+    if (privacy_only) inspection_options["postMutation"] = true;
+    char* raw = kelpie_browser_script_target_expression(inspection_options.dump().c_str());
+    if (!raw) return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("INVALID_TARGET", "Shared target preflight rejected the request");
     Json generated;
     try { generated = Json::parse(raw); } catch (...) {
       kelpie_mcp_free_string(raw);
-      return BrowserControlResult::Failure("INVALID_TARGET", "Shared target expression is unavailable");
+      return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("INVALID_TARGET", "Shared target expression is unavailable");
     }
     kelpie_mcp_free_string(raw);
     target=Json(); // A failed inspection cannot reuse an earlier classification.
     const auto read = EvaluateBrowserControl(lease, generated.at("expression").get<std::string>(), &target, remaining);
-    if(output && target.is_object() && target.value("sensitive",false)) (*output)["sensitive"]=true;
+    if(output && target.is_object() && target.contains("sensitive") && target["sensitive"].is_boolean() && target["sensitive"].get<bool>()) (*output)["sensitive"]=true;
     if(output && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
-    if (!read.ok) return read;
-    if(!ScriptTargetInspectionExplicit(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
-    if(privacy_only && !ScriptTargetInspectionUncertain(target)) {
-      // Input already completed. A changed type/rectangle cannot undo it; this
-      // final observation classifies privacy without repeating pre-input gates.
-      if(target.value("sensitive",false) && options.value("policy",Json::object()).value("refuseSensitive",false))
-        return BrowserControlResult::Failure(target.value("error",std::string("SENSITIVE_CAPTURE_REFUSED")),"Sensitive edit cannot expose captures");
+    if (!read.ok) return privacy_only ? unknown_privacy() : read;
+    if (!ScriptTargetInspectionExplicit(target))
+      return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
+    if (privacy_only) {
+      // Acknowledged mutations may navigate or change layout. Classify the
+      // retained target for privacy without reapplying pre-input gates.
+      const bool known = target.contains("sensitivityKnown") &&
+        target["sensitivityKnown"].is_boolean() && target["sensitivityKnown"].get<bool>();
+      if (!known) return unknown_privacy();
+      if (target.value("sensitive", false) && options.value("policy", Json::object()).value("refuseSensitive", false))
+        return BrowserControlResult::Failure("SENSITIVE_CAPTURE_REFUSED", "Sensitive input cannot expose captures");
+      if (!target.value("ok", false))
+        return BrowserControlResult::Failure("INPUT_UNCERTAIN", "Post-input classification failed");
       return BrowserControlResult::Success();
     }
     if (!target.value("ok", false))
@@ -114,6 +128,8 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   const auto release = send("Input.dispatchMouseEvent", released);
   if (!release.ok) return fail(release);
   native_pressed=false;
+  result = inspect(true);
+  if (!result.ok) return fail(result);
   if (type == "fill" || type == "type") {
     result = inspect();
     if (!result.ok) return fail(result);
@@ -155,7 +171,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     result=inspect(true);
     if(!result.ok) return fail(result);
   }
-  if (output) { const bool sensitive=output->value("sensitive",false); *output = {{"sensitive",sensitive},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
+  if (output) { const bool sensitive=output->value("sensitive",false), uncertain=output->value("inspectionUncertain",false); *output = {{"sensitive",sensitive},{"inspectionUncertain",uncertain},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
                          {"targetGuarantee", "rechecked-before-dispatch-with-async-gap"}}; }
   return BrowserControlResult::Success();
 }

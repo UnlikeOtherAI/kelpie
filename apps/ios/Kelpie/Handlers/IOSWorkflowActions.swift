@@ -69,7 +69,7 @@ final class IOSWorkflowActions {
     private func read(_ method: String, params: Body) async throws -> Body {
         try tab.requireCurrent()
         let document = tab.document
-        let result = await router.browserControl(["version": 1, "method": method, "tabId": tab.id, "params": params])
+        let result = await router.workflowRead(method: method, tabID: tab.id, params: params)
         try await check()
         try tab.requireCurrent()
         guard document == tab.document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
@@ -77,7 +77,9 @@ final class IOSWorkflowActions {
             #if DEBUG
             let code = (result["error"] as? Body)?["code"] as? String ?? "INVALID_VALUE"
             let known = ["BUSY", "TAB_CHANGED", "WEBVIEW_ERROR", "UNAUTHORIZED", "RECORDING_IN_PROGRESS",
-                         "TIMEOUT", "INVALID_PARAM", "INVALID_VALUE"]
+                         "TIMEOUT", "INVALID_PARAM", "INVALID_VALUE", "UNSUPPORTED", "INVALID_ARGUMENTS",
+                         "COMMAND_FAILED", "ACCESS_DENIED", "TAB_REQUIRED", "STALE_REFERENCE", "CANCELLED",
+                         "READINESS_FAILED", "EXTRACT_FAILED", "BROWSER_FAILED", "BROWSER_BUSY", "PAGE_CHANGED"]
             IOSFrameSampler.diagnostic("observation-" + (known.contains(code) ? code : "OTHER"))
             #endif
             throw IOSWorkflowFailure("OBSERVATION_FAILED")
@@ -190,7 +192,7 @@ final class IOSWorkflowActions {
         guard let options = workflow.settings["pointer"] as? Body, options["enabled"] as? Bool == true else { return }
         let origin = presentation.lastPointer ?? CGPoint(x: max(0, point.x - 100), y: max(0, point.y - 70))
         let start = ProcessInfo.processInfo.systemUptime
-        let duration = options["durationMs"] as? Double ?? 500
+        let duration = options["durationMs"] as? Double ?? 350
         let curve = options["curve"] as? String ?? "s"
         repeat {
             try await check()

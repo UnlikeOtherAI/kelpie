@@ -121,7 +121,8 @@ final class WorkflowCaptureProbe {
             ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             func green(_ pixel: Int) -> Bool {
                 let index = 4 * pixel
-                return raw[index + 1] > 155 && raw[index] < 90 && raw[index + 2] < 95
+                let red = Int(raw[index]), green = Int(raw[index + 1]), blue = Int(raw[index + 2])
+                return green > 155 && green - red > 60 && green - blue > 60
             }
             guard width >= 3, height >= 3 else { return false }
             if minimumCoverage > 0 {
