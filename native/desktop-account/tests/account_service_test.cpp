@@ -174,7 +174,9 @@ void EarlyCancellationDoesNotHang() {
       } catch(const AccountFailure&) {}
     });
     if(i%2) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::thread second_cancel([&] { login.Cancel(); });
     login.Cancel();
+    second_cancel.join();
     assert(pending.wait_for(std::chrono::seconds(3))==std::future_status::ready);
     pending.get();
   }

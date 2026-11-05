@@ -12,12 +12,22 @@ struct AccountLogin::Impl {
   std::condition_variable changed;
   std::atomic<bool> cancelled{false};
   std::atomic<bool> listener_done{false};
+  std::mutex shutdown_mutex;
+  bool stopped=false;
   bool completed=false;
   std::string code;
+  void StopListener() {
+    std::lock_guard lock(shutdown_mutex);
+    // cpp-httplib's stop() can exchange an already-closed socket when Run,
+    // Cancel and destruction overlap. Only one caller may stop a ready listener.
+    if (stopped || !server.is_running()) return;
+    stopped=true;
+    server.stop();
+  }
 };
 AccountLogin::AccountLogin() : impl_(std::make_unique<Impl>()) {}
 AccountLogin::~AccountLogin() { Cancel(); if (impl_->listener.joinable()) impl_->listener.join(); }
-void AccountLogin::Cancel() { impl_->cancelled=true; impl_->server.stop(); impl_->changed.notify_all(); }
+void AccountLogin::Cancel() { impl_->cancelled=true; impl_->StopListener(); impl_->changed.notify_all(); }
 AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesystem::path& profile,
     const std::function<bool(const std::string&)>& open) {
   using json=nlohmann::json;
@@ -34,7 +44,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
   });
 #endif
   const int port=p.server.bind_to_any_port("127.0.0.1");
-  if (port<=0 || p.cancelled) throw AccountFailure(0);
+  if (port<=0) throw AccountFailure(0);
   const std::string redirect="http://127.0.0.1:"+std::to_string(port)+"/oauth/callback";
   const auto state=RandomAccountValue(), verifier=RandomAccountValue();
   p.server.Get("/oauth/callback",[&p,state,port](const httplib::Request& req,httplib::Response& res) {
@@ -60,7 +70,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
   // stop() before listen_after_bind() becomes ready does nothing. Always finish
   // startup before honoring cancellation so destruction cannot join forever.
   while (!p.server.is_running() && !p.listener_done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  if (p.cancelled || p.listener_done) { p.server.stop(); throw AccountFailure(0); }
+  if (p.cancelled || p.listener_done) { p.StopListener(); throw AccountFailure(0); }
   // A fresh public registration picks up administrator policy edits on every login.
   const auto registration=request("/oauth/register","POST",{},json{{"client_name","Kelpie Desktop"},
       {"app_id","com.unlikeotherai.kelpie"},{"redirect_uris",{redirect}},
@@ -73,7 +83,7 @@ AccountToken AccountLogin::Run(const AccountRequest& request,const std::filesyst
     p.changed.wait_for(lock,std::chrono::minutes(5),[&p]{return p.completed||p.cancelled;});
     if (!p.completed || p.cancelled || p.code.empty()) throw AccountFailure(0);
   }
-  p.server.stop();
+  p.StopListener();
   const auto response=request("/oauth/token","POST",{},json{{"grant_type","authorization_code"},{"code",p.code},
       {"client_id",client},{"redirect_uri",redirect},{"code_verifier",verifier}}.dump(),{});
   if (p.cancelled) throw AccountFailure(403);
