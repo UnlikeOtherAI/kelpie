@@ -1,13 +1,43 @@
 #!/usr/bin/env node
 // Launch an owned Linux headless app and reuse the canonical native HTTP/MCP corpus.
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { control, waitFor } from "../windows/lib/http.mjs";
-import { startBrowser, stopBrowser, runCommand, fileExists } from "../windows/lib/process.mjs";
+import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
+
+async function runCorpus(executable, args, env, signal) {
+  const child = spawn(executable, args, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "", stderr = "", failure, killTimer;
+  child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+  child.stdout.on("data", chunk => { stdout = (stdout + chunk).slice(-32768); });
+  child.stderr.on("data", chunk => { stderr = (stderr + chunk).slice(-32768); });
+  const cancel = () => {
+    failure = new Error("Owned capture corpus cancelled");
+    child.kill("SIGTERM");
+    killTimer = setTimeout(() => child.kill("SIGKILL"), 1000);
+  };
+  const timer = setTimeout(() => {
+    failure = new Error("Owned capture corpus exceeded its deadline"); child.kill("SIGKILL");
+  }, 600000);
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    if (signal.aborted) cancel();
+    const outcome = await new Promise((resolveExit, reject) => {
+      child.once("error", reject);
+      child.once("exit", (code, signal) => resolveExit({ code, signal }));
+    });
+    if (failure) throw failure;
+    return { ...outcome, stdout, stderr };
+  } finally {
+    clearTimeout(timer); clearTimeout(killTimer);
+    signal.removeEventListener("abort", cancel);
+  }
+}
 assert.equal(process.platform, "linux");
 const [binaryArg, outputArg] = process.argv.slice(2);
 assert.ok(binaryArg && outputArg, "Provide exact native executable and fresh evidence directory");
@@ -26,8 +56,12 @@ const report = {
   headless: true, runtime, profile, checks: [],
 };
 let readiness;
+const cancellation = new AbortController();
+const cancel = () => cancellation.abort();
+process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
 try {
   readiness = await waitFor(async () => {
+    if (cancellation.signal.aborted) throw new Error("Owned native launch cancelled");
     if (browser.child.exitCode !== null || browser.child.signalCode !== null)
       throw new Error("Owned app exited before readiness");
     try {
@@ -37,9 +71,8 @@ try {
   }, "owned native readiness", 30000);
   const corpusPath = fileURLToPath(new URL("../windows/run-script-capture-acceptance.mjs", import.meta.url));
   const corpusOutput = join(output, "capture");
-  const result = await runCommand(process.execPath, [corpusPath, readinessPath, corpusOutput], {
-    env: { KELPIE_CAPTURE_PORT: String(readiness.port) }, timeoutMs: 600000,
-  });
+  const result = await runCorpus(process.execPath, [corpusPath, readinessPath, corpusOutput],
+    { KELPIE_CAPTURE_PORT: String(readiness.port) }, cancellation.signal);
   report.corpus = { code: result.code, stdout: result.stdout, stderr: result.stderr };
   const corpus = JSON.parse(await readFile(join(corpusOutput, "report.json"), "utf8"));
   report.checks = corpus.checks;
@@ -60,6 +93,7 @@ try {
       report.cleanup = "owned app exited and readiness removed";
     }
   } finally {
+    process.off("SIGTERM", cancel); process.off("SIGINT", cancel);
     await writeFile(join(output, "launch-report.json"), JSON.stringify(report, null, 2));
     await writeFile(join(output, "app-logs.json"), JSON.stringify(browser.logs(), null, 2));
     // Synthetic profile stays available for recovery and evidence inspection.

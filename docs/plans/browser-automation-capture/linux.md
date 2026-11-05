@@ -280,3 +280,24 @@ parallel workflow implementation is introduced. It records exact executable
 hash/source, preserves synthetic profiles and shuts down its owned app.
 Initial direct-HTTP continuous capture is next; discovery expansion and other
 script/cancellation/cost/package claims remain pending actual results.
+
+## First public capture result and harness recovery
+
+The994f8a45 launcher exercised compiled90eb6830 through the shared continuous
+HTTP corpus: six actions passed, the unique button received trusted input at
+visible center(119,137), extraction returned Green tea/Black tea, and eight
+GIF/MP4/PNG artifacts were downloaded through authenticated chunks and hashed.
+The app exited cleanly and removed readiness. Independent system FFmpeg/FFprobe
+decoding passed all eight artifacts: each movie had13 frames with strictly
+increasing timestamps through about3.533s; all six step PNGs decoded.
+
+The launcher then remained alive because the reused test command helper's
+Promise.race deadline timer was not cleared after child exit. Its outer bounded
+command therefore failed despite completed app checks; that failed-run history
+is preserved. The Linux launcher now owns and clears its child/deadline timers,
+with explicit signal cancellation and app cleanup. This changes test lifecycle,
+not browser state. The next run must prove clean launcher exit.
+
+A separate decoded-pixel check now crops the actual trusted target's coordinates
+and checks the requested red marker, its center and disappearance in final movie
+frames. Its source is complete; pixel success remains pending actual execution.
