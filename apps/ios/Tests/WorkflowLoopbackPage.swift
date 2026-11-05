@@ -47,6 +47,7 @@ final class WorkflowLoopbackPage {
           field.oninput=()=>{document.title='Unexpected edit'};
           if(location.pathname==='/focus-secret-password')field.onfocus=()=>{field.type='password'};
           if(location.pathname==='/focus-secret-autocomplete')field.onfocus=()=>{field.autocomplete='current-password'};
+          if(location.pathname==='/focus-secret-timeout')document.title+=' | '+String.fromCodePoint(0x1F9EA);
           if(location.pathname==='/focus-secret-timeout')field.onfocus=()=>{
             const end=performance.now()+6500;while(performance.now()<end){}
           };
@@ -65,6 +66,7 @@ final class WorkflowLoopbackPage {
         if(location.pathname.startsWith('/paced')){
           const field=document.querySelector('#entry'), events=[];
           field.value='seed';
+          if(location.pathname==='/paced-readonly')field.readOnly=true;
           const report=()=>{document.title=JSON.stringify(events)};
           field.oninput=e=>{
             events.push({data:e.data,value:field.value,at:performance.now()});
@@ -72,6 +74,16 @@ final class WorkflowLoopbackPage {
             if(location.pathname==='/paced-focus' && events.length===1)button.focus();
           };
           button.onclick=()=>{events.push({data:'LATER'});report()};
+        }
+        if(location.pathname==='/paced-final-ack'){
+          document.title='Final '+String.fromCodePoint(0x1F9EA);
+          document.querySelector('#entry').oninput=()=>{
+            const timer=setInterval(async()=>{
+              if(await (await fetch('/paced-signal')).text()==='go'){
+                clearInterval(timer);location.href='/landed';
+              }
+            },25);
+          };
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
@@ -126,7 +138,14 @@ final class WorkflowLoopbackPage {
             Self.readPath(connection, buffered: Data()) { path in
                 requestCounter.record(path)
                 queue.asyncAfter(deadline: .now() + responseDelay) {
-                    connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                    let reply: Data
+                    if path == "/paced-signal" {
+                        let body = requestCounter.count("/paced-ack") > 0 ? "go" : "wait"
+                        reply = Data("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)".utf8)
+                    } else {
+                        reply = data
+                    }
+                    connection.send(content: reply, completion: .contentProcessed { _ in connection.cancel() })
                 }
             }
         }
