@@ -122,11 +122,13 @@ try {
    wgcCaptureDirectory=join(output,"wgc-native-window");
    report.phase="native-wgc-capture";
    const captureBegan=performance.now();report.captureTiming={requestedAt:new Date().toISOString(),workflowElapsedMs:current.elapsedMs};
+   try {
    report.wgc=JSON.parse((await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,wgcCaptureDirectory],
      {signal:deadline.signal,timeout:10000})).stdout);
-   report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
    assert.equal(report.wgc.windowHandle,window.windowHandle);
+   }catch(error){report.wgcFailure={error:error.message,stderr:String(error.stderr??"").slice(0,8192)};}
+   finally{report.captureTiming.completedAt=new Date().toISOString();report.captureTiming.durationMs=performance.now()-captureBegan;}
    await save();
  }
  report.invoked=await automation(["invoke",String(running.pid),exe,identity.startTime]);
@@ -134,16 +136,27 @@ try {
  let result;
  if(mode==="wgc"){
    report.phase="terminal-evidence";
+   try {
    const evidence=await finishNativeWindowEvidence({stopInvoked:report.invoked.invoked,scene:report.scene,
      completion:pending.then(value=>{report.playResult=value.value;return value.value;}),
      readStatus:async runId=>scriptStatusV1Schema.parse((await api("get-script-status",{runId})).value),
      readClick:async()=>(await api("evaluate",{tabId,expression:"window.__nativeCaptureClick"})).value,
-     validate:async()=>JSON.parse((await child(markerValidator,[join(wgcCaptureDirectory,"metadata.json"),wgcSceneFile],
-       {signal:deadline.signal,timeout:10000})).stdout)});
+     validate:async()=>{
+       if(report.wgcFailure)return {className:"KelpieScriptPresentation",status:"capture-failed"};
+       return JSON.parse((await child(markerValidator,[join(wgcCaptureDirectory,"metadata.json"),wgcSceneFile],
+         {signal:deadline.signal,timeout:10000})).stdout);
+     }});
+
    result=evidence.result;report.scene.click=evidence.event;
    report.nativeWindowCapture={captured:[...report.nativeStopCapture.captured,evidence.validated]};
    report.nativeWindowPixels={stop:report.nativeStopCapture.captured.some(image=>image.className==="KelpieScriptStop"&&image.status==="pixels-captured"),
      marker:nativeMarkerVerified([evidence.validated])};await save();
+   }catch(error){
+     report.terminalEvidenceFailure={error:error.message};
+     result=report.playResult??(await pending).value;
+     report.nativeWindowCapture={captured:report.nativeStopCapture?.captured??[]};
+     report.nativeWindowPixels={stop:report.nativeWindowCapture.captured.some(image=>image.className==="KelpieScriptStop"&&image.status==="pixels-captured"),marker:false};
+   }
  }else result=(await pending).value;
  pending=undefined;report.playResult=result;
  assert.equal(result.success,false);assert.equal(result.aborted,true);
@@ -168,7 +181,7 @@ try {
  report.checks.push({name:"exact owned native Stop InvokePattern aborts capture and recovers",passed:true});
  if(mode!=="stop"){
    const passed=report.nativeWindowPixels.stop&&report.nativeWindowPixels.marker;
-   report.checks.push({name:mode==="wgc"?"owned WGC presentation marker and separate native Stop pixels":"owned PrintWindow Stop and marker pixels",passed});if(!passed)process.exitCode=1;
+   report.checks.push({name:mode==="wgc"?"owned WGC presentation marker and separate native Stop pixels":"owned PrintWindow Stop and marker pixels",passed,...(passed?{}:{error:report.wgcFailure?.error??report.terminalEvidenceFailure?.error??"NATIVE_SPATIAL_VALIDATION_FAILED"})});if(!passed)process.exitCode=1;
  }
 } catch(error) {
  report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.message});process.exitCode=1;
