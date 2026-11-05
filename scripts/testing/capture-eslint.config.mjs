@@ -14,6 +14,7 @@ const globals = Object.fromEntries([
 export default [{
   files: [
     "tests/capture/*.mjs",
+    "tests/linux/worker-comparison*.mjs",
     "tests/linux/{run-native-capture-acceptance,adversary-diagnostics,artifact-protocol-acceptance,finalize-fault,native-lifecycle,native-sandbox,preinput-replacement,verify-native-replay,run-g08,run-gif-pointer-model,verify-g08-backing,gif-runtime-evidence}.mjs",
     "tests/macos/runtime-*.mjs",
     "tests/windows/lib/*.mjs",

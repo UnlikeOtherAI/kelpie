@@ -1,0 +1,122 @@
+name: Opt-in same-host worker comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      prepare_only:
+        description: Record official Chromium identity without starting benchmark units
+        type: boolean
+        default: true
+      chromium_archive_sha256:
+        description: Previously reviewed Chromium archive SHA-256 (required for measurement)
+        type: string
+        default: ""
+      chromium_binary_sha256:
+        description: Previously reviewed extracted executable SHA-256 (required for measurement)
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      prepare_only:
+        type: boolean
+        default: true
+      chromium_archive_sha256:
+        type: string
+        default: ""
+      chromium_binary_sha256:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-comparison-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: Restricted same-host reader comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PREPARE_ONLY: ${{ inputs.prepare_only }}
+      CHROMIUM_ARCHIVE_SHA256: ${{ inputs.chromium_archive_sha256 }}
+      CHROMIUM_BINARY_SHA256: ${{ inputs.chromium_binary_sha256 }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+      - name: Prepare pinned test inputs outside measured units
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(id -u)" != 0 ]]
+          [[ "$PREPARE_ONLY" == true || "$PREPARE_ONLY" == false ]]
+          if [[ "$PREPARE_ONLY" == false ]]; then
+            [[ "$CHROMIUM_ARCHIVE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+            [[ "$CHROMIUM_BINARY_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          fi
+          pnpm install --frozen-lockfile
+          node --test tests/linux/worker-comparison-result.test.mjs tests/linux/worker-comparison-policy.test.mjs tests/linux/worker-comparison-listener.test.mjs tests/linux/worker-comparison-workflow.test.mjs
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/testing/test_extract_worker_chromium.py
+          node -e 'const p=require("./node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/browsers.json");const c=p.browsers.find(x=>x.name==="chromium");if(c.revision!=="1234"||c.browserVersion!=="151.0.7922.34")process.exit(1)'
+          assets="$RUNNER_TEMP/worker-ab-assets"
+          setup="$RUNNER_TEMP/worker-ab-setup"
+          mkdir -m 700 "$assets" "$setup"
+          curl --fail --location --proto '=https' --max-time 240 --max-filesize 100000000 \
+            'https://github.com/lightpanda-io/browser/releases/download/1.0.2/lightpanda-x86_64-linux' -o "$assets/lightpanda"
+          printf '%s  %s\n' 'ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e' "$assets/lightpanda" | sha256sum --check --status
+          chmod 700 "$assets/lightpanda"
+          playwright_url='https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip'
+          google_url='https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.34/linux64/chrome-linux64.zip'
+          curl --fail --location --proto '=https' --max-time 300 --max-filesize 400000000 "$playwright_url" -o "$assets/chrome.zip"
+          curl --fail --location --proto '=https' --max-time 300 --max-filesize 400000000 "$google_url" -o "$assets/chrome-google.zip"
+          archive_sha="$(sha256sum "$assets/chrome.zip" | cut -d' ' -f1)"
+          google_sha="$(sha256sum "$assets/chrome-google.zip" | cut -d' ' -f1)"
+          printf '%s\n' "$archive_sha" > "$setup/playwright-archive-sha256.txt"
+          printf '%s\n' "$google_sha" > "$setup/google-archive-sha256.txt"
+          printf '%s\n' "$playwright_url" > "$setup/playwright-source.txt"
+          printf '%s\n' "$google_url" > "$setup/google-source.txt"
+          printf '%s\n' 'Playwright registry metadata supplies no publisher SHA-256; cross-endpoint equality is not a publisher signature.' > "$setup/provenance-limits.txt"
+          [[ "$archive_sha" == "$google_sha" ]]
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/testing/extract-worker-chromium.py "$assets/chrome.zip" "$assets/chrome"
+          binary_sha="$(sha256sum "$assets/chrome/chrome-linux64/chrome" | cut -d' ' -f1)"
+          mkdir -m 700 "$assets/version-home"
+          version="$(env -i PATH="$PATH" HOME="$assets/version-home" LANG=C.UTF-8 "$assets/chrome/chrome-linux64/chrome" --version)"
+          printf '%s\n' "$binary_sha" > "$setup/chromium-binary-sha256.txt"
+          printf '%s\n' "$version" > "$setup/chromium-version.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$setup/source.txt"
+          printf '%s\n' 'ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e' > "$setup/lightpanda-sha256.txt"
+          [[ "$version" == *151.0.7922.34* ]]
+          if [[ "$PREPARE_ONLY" == false ]]; then
+            [[ "$archive_sha" == "$CHROMIUM_ARCHIVE_SHA256" ]]
+            [[ "$binary_sha" == "$CHROMIUM_BINARY_SHA256" ]]
+          fi
+      - name: Build comparison CLI and shared packages
+        if: inputs.prepare_only == false
+        shell: bash
+        run: |
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          pnpm --filter @unlikeotherai/kelpie build
+      - name: Compare in separately bounded loopback-only units
+        if: inputs.prepare_only == false
+        shell: bash
+        run: bash scripts/testing/run-worker-comparison-hosted.sh
+      - name: Retain scoped evidence and failures
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: worker-comparison-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/worker-ab-setup/
+            ${{ runner.temp }}/worker-ab-evidence/
+          if-no-files-found: warn
+          retention-days: 14

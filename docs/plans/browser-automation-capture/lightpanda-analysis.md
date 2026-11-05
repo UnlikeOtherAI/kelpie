@@ -310,3 +310,74 @@ d7ca0d84efe7f232bb508443af655790cd0d6447b56a275e47f85261c7f63267.
 An initial artifact-copy wildcard encountered the synthetic empty-home directory;
 explicit report-file transfer then succeeded with the same verified report hash.
 No corpus result was changed. No ongoing worker service remains.
+
+## Prepared same-host comparison
+
+The permanent `tests/linux/worker-comparison.mjs` corpus is prepared for
+review, not yet executed. It uses the same production worker stdio interface,
+one owned isolated session/tab and the same navigation and four fixed-reader
+assertions for both engines. It records the cold corpus and five warm samples,
+tool-call and response-byte counts, unit CPU and memory peak, and sampled
+process-tree RSS. The RSS sum is sampled every 250 ms and may double-count
+shared pages; read failures make the comparison ineligible. Startup is engine
+spawn through isolated-session readiness; fixture setup, binary hashing and
+version checks precede it. Unit memory peak includes hashing and version checks;
+the CPU delta covers the engine run and teardown. The peak is whole-unit memory, not browser
+RSS. One cold sample and five warm samples are a small distribution; nearest-
+rank p95 is the maximum of those five, not a stable population estimate.
+
+The pinned Lightpanda 1.0.2 Linux x86_64 asset must hash to
+`ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e`.
+Playwright 1.62.1's installed `browsers.json` specifies Chromium revision
+1234 and browser version 151.0.7922.34. Fedora's existing caches contained
+revisions 1208, 1223 and 1228 at preparation time, not 1234. Do not substitute
+one of those revisions. In a separate network-enabled setup stage, obtain the
+Playwright-pinned Linux Chromium archive from its registry, retain the archive
+and record its source URL and SHA-256, extract it in owned scratch, and record
+the actual executable SHA-256. The comparison rehashes both files and checks
+the executable version. An isolated hosted Linux runner may perform both arms
+on one exact host if Fedora cannot supply the pinned pair.
+
+The opt-in `.github/workflows/worker-comparison.yml` is prepared for review,
+not dispatched. Its default `prepare_only` mode downloads the pinned Linux
+Chromium archive from both the Playwright registry and Google Chrome for
+Testing, records both SHA-256 values and requires byte equality, then safely
+extracts and records the executable hash and version. Playwright's pinned
+registry metadata does not provide a publisher SHA-256; agreement between
+distribution endpoints is provenance evidence, not a publisher signature.
+The setup records the source revision, both URLs and this limitation. It does
+not start benchmark units. An explicitly enabled measurement requires the
+previously reviewed archive and executable hashes and rejects a mismatch.
+
+The existing dispatchable `lint.yml` can call the reusable workflow on the
+reviewed integration ref. Set `worker_comparison_mode` to `prepare` for
+identity preparation; the default `off` does nothing. A later reviewed
+measurement sets the mode to `execute` and supplies both
+`worker_comparison_*_sha256` inputs. The new workflow can also be dispatched
+directly once present on the default branch. Downloads and package setup occur
+before measured units; CLI and shared bundles are built only for execution.
+After a reviewed dispatch, `scripts/testing/run-worker-comparison-hosted.sh`
+runs the arms sequentially as the same non-root user in separate systemd units
+on one host: one CPU, 2 GiB, 256 tasks, 120 seconds,
+`NoNewPrivileges=yes`, `IPAddressDeny=any` and
+`IPAddressAllow=localhost`. The launcher retains active unit properties,
+exit and cgroup teardown receipts and binds the policy's main PID to each
+report. An owned host canary must be reachable over both loopback and the
+host's non-loopback address before either unit; inside each measured process,
+loopback must work and the same non-loopback connection must fail with
+permission denial. Missing or inconclusive policy/probe evidence fails closed.
+The browser is never launched with `--no-sandbox`. If the hosted systemd,
+cgroup, BPF or sandbox setup cannot enforce these conditions, preserve the
+failure; do not weaken the boundary or infer a comparison.
+
+The Lightpanda arm checks the pinned hash and version; the Chromium arm also
+requires the independently recorded archive hash. Both hash the fixture, CLI
+and shared bundle and require the exact clean source revision. The report
+matcher requires matching host binding, source, fixture, build, limits, ordered
+correctness checks and warm call counts. The matcher itself does not validate the external
+systemd policy receipt and never emits a speed ratio. Compare costs only after both
+corpora, unit policy and teardown succeed. Save all failures and refusals in
+the denominator. The four explicit Lightpanda method refusals are reported;
+shared sessions and concurrent contexts are labelled untested by this corpus
+and remain separately refused by the tested Lightpanda profile. No result
+establishes rendered pixels, input, native UI or automatic backend fallback.
