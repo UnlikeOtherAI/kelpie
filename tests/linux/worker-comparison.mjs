@@ -14,6 +14,9 @@ import {fileURLToPath} from "node:url";
 import {loadavg,release} from "node:os";
 import {promisify} from "node:util";
 import {runLightpandaReaderDiagnostics} from "./lightpanda-reader-diagnostics.mjs";
+import {probeWorkerBoundary} from "./worker-comparison-network.mjs";
+import {verifyOwnedListener} from "./worker-comparison-listener.mjs";
+import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 
 const require=createRequire(new URL("../../packages/cli/package.json",import.meta.url));
 const {Client}=require("@modelcontextprotocol/sdk/client/index.js");
@@ -25,11 +28,15 @@ if(backend==="playwright")assert.match(process.env.KELPIE_CHROMIUM_ARCHIVE_SHA25
 if(backend==="lightpanda")assert.equal(expectedHash,"ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e");
 assert.match(process.env.KELPIE_TEST_REVISION??"",/^[a-f0-9]{40}$/);
 assert.match(process.env.KELPIE_COMPARISON_ID??"",/^[a-f0-9]{64}$/);
+assert.ok(typeof process.getuid==="function"&&process.getuid()!==0,"Comparison must run as a non-root user");
 const executable=resolve(path),dir=resolve(output),exec=promisify(execFile);
 const root=fileURLToPath(new URL("../..",import.meta.url));
 assert.equal((await exec("git",["rev-parse","HEAD"],{cwd:root})).stdout.trim(),process.env.KELPIE_TEST_REVISION);
 assert.equal((await exec("git",["status","--porcelain","--untracked-files=no"],{cwd:root})).stdout.trim(),"");
 await mkdir(dir,{recursive:true,mode:0o700});
+const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
+const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,KELPIE_HOME:join(home,"kelpie"),
+ LIGHTPANDA_DISABLE_TELEMETRY:"true",LIGHTPANDA_DISABLE_CORE_DUMP:"1"};
 async function hashFile(file){const h=createHash("sha256");for await(const b of createReadStream(file))h.update(b);return h.digest("hex");}
 assert.equal(await hashFile(executable),expectedHash,"Pinned engine hash mismatch");
 if(backend==="playwright")assert.equal(await hashFile(process.env.KELPIE_CHROMIUM_ARCHIVE??""),
@@ -39,7 +46,7 @@ assert.ok(group?.startsWith("/"));const cgroup="/sys/fs/cgroup"+group;
 const [memoryMax,cpuMax,tasksMax]=await Promise.all(["memory.max","cpu.max","pids.max"].map(x=>readFile(cgroup+"/"+x,"utf8").then(v=>v.trim())));
 assert.equal(memoryMax,"2147483648");assert.equal(tasksMax,"256");
 const [quota,period]=cpuMax.split(/\s+/).map(Number);assert.equal(quota,period);
-const version=(await exec(executable,[backend==="lightpanda"?"version":"--version"],{timeout:5000})).stdout.trim();
+const version=(await exec(executable,[backend==="lightpanda"?"version":"--version"],{timeout:5000,env:environment})).stdout.trim();
 if(backend==="lightpanda")assert.equal(version,"1.0.2");
 else assert.match(version,/\b151\.0\.7922\.34\b/);
 const html=await readFile(new URL("../capture/fixture.html",import.meta.url),"utf8");
@@ -59,20 +66,20 @@ const port=reserve.address().port;await new Promise(ok=>reserve.close(ok));
 await new Promise(ok=>fixture.listen(0,"127.0.0.1",ok));
 const origin="http://127.0.0.1:"+fixture.address().port;
 const endpoint="http://127.0.0.1:"+port;
-const home=join(dir,"home");await mkdir(home,{recursive:true,mode:0o700});
-const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,KELPIE_HOME:join(home,"kelpie"),
- LIGHTPANDA_DISABLE_TELEMETRY:"true",LIGHTPANDA_DISABLE_CORE_DUMP:"1"};
 const args=backend==="lightpanda"?["serve","--host","127.0.0.1","--port",String(port),"--log-level","error"]:
  ["--headless=new","--remote-debugging-address=127.0.0.1","--remote-debugging-port="+port,
   "--user-data-dir="+join(home,"chromium"),"--no-first-run","about:blank"];
+const networkProbe=await probeWorkerBoundary(process.env.KELPIE_AB_CANARY_HOST??"",
+ Number(process.env.KELPIE_AB_CANARY_PORT),"inside");
+await writeFile(join(dir,"network-probe.json"),JSON.stringify(networkProbe),{mode:0o600,flag:"wx"});
 const hostBinding=createHash("sha256").update(await readFile("/etc/machine-id"))
  .update(process.env.KELPIE_COMPARISON_ID).digest("hex");
 const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBinding,
  comparisonId:process.env.KELPIE_COMPARISON_ID,nodeVersion:process.version,architecture:process.arch,
  kernelRelease:release(),loadBefore:loadavg(),engineVersion:version,
  engineSHA256:expectedHash,archiveSHA256:backend==="playwright"?process.env.KELPIE_CHROMIUM_ARCHIVE_SHA256:null,fixtureSHA256:createHash("sha256").update(html).update(extra).update(js).digest("hex"),
- boundary:{memoryMax,cpuMax,tasksMax},startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
- unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"whole unit including fixture, CLI and browser",
+ boundary:{memoryMax,cpuMax,tasksMax},uid:process.getuid(),pid:process.pid,networkProbe,startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
+ unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"memory peak covers the whole unit including hash/version preflight, fixture, CLI and browser; CPU covers engine run and teardown",
  startupScope:"engine spawn to isolated session ready; fixture and binary setup excluded",
  networkBoundary:"external systemd policy verification required",forcedCleanup:false};
 let engine,transport,client,failure,session;
@@ -108,8 +115,10 @@ async function check(name,fn){
  catch{report.checks.push({name,passed:false});return false;}
 }
 try{
+ const engineStarted=performance.now();
  engine=spawn(executable,args,{env:environment,stdio:"ignore"});
  engine.on("error",()=>{});
+ const engineStart=await nativeProcessStartTicks(engine.pid);assert.ok(engineStart,"ENGINE_IDENTITY_UNAVAILABLE");
  let ready=false;
  for(let n=0;n<150&&!ready;n++){
   if(engine.exitCode!==null||engine.signalCode!==null)throw Error("ENGINE_EXIT");
@@ -119,11 +128,15 @@ try{
   if(!ready)await delay(30);
  }
  assert.ok(ready,"ENGINE_NOT_READY");
+ assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
+ report.enginePid=engine.pid;report.engineStartTicks=await verifyOwnedListener(engine.pid,port,engineStart);
+ assert.equal(engine.exitCode,null);assert.equal(engine.signalCode,null);
  const methods=["tabs.list","tabs.close","tab.goto","tab.url","tab.title","tab.back","tab.forward","tab.reload",
   "tab.snapshot","tab.extract","tab.status","tab.ready"];
  const config=join(dir,"operator.json");
  await writeFile(config,JSON.stringify({version:1,backend,endpointEnv:"KELPIE_AB_ENDPOINT",allowedOrigins:[origin],
-  networkBoundary:"operator-enforced",maxSessions:1,maxTabs:1,maxTtlMs:60000,verifiedLightpandaMethods:methods}),{mode:0o600,flag:"wx"});
+  networkBoundary:"operator-enforced",maxSessions:1,maxTabs:1,maxTtlMs:60000,
+  ...(backend==="lightpanda"?{verifiedLightpandaMethods:methods}:{})}),{mode:0o600,flag:"wx"});
  const bin=join(root,"packages/cli/bin/kelpie.js");
  report.cliBundleSHA256=await hashFile(join(root,"packages/cli/dist/index.js"));
  report.sharedBundleSHA256=await hashFile(join(root,"packages/shared/dist/browser-control/managed-session.js"));
@@ -144,7 +157,7 @@ try{
  const lifecycle=request=>tool("kelpie_worker_session",{request});
  const created=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
  assert.equal(created.ok,true);session=created.value;assert.equal(session.ownedTabIds.length,1);
- report.startupMs=performance.now()-started;
+ report.startupMs=performance.now()-engineStarted;
  await check("second session refused at configured limit",async()=>{
   const second=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
   assert.equal(second.ok,false);assert.equal(second.error.code,"RESOURCE_LIMIT");

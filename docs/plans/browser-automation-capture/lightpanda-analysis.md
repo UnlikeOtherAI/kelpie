@@ -321,7 +321,8 @@ tool-call and response-byte counts, unit CPU and memory peak, and sampled
 process-tree RSS. The RSS sum is sampled every 250 ms and may double-count
 shared pages; read failures make the comparison ineligible. Startup is engine
 spawn through isolated-session readiness; fixture setup, binary hashing and
-version checks precede it. The process peak is whole-unit memory, not browser
+version checks precede it. Unit memory peak includes hashing and version checks;
+the CPU delta covers the engine run and teardown. The peak is whole-unit memory, not browser
 RSS. One cold sample and five warm samples are a small distribution; nearest-
 rank p95 is the maximum of those five, not a stable population estimate.
 
@@ -337,35 +338,44 @@ the actual executable SHA-256. The comparison rehashes both files and checks
 the executable version. An isolated hosted Linux runner may perform both arms
 on one exact host if Fedora cannot supply the pinned pair.
 
-After an explicit resource handoff, run each arm sequentially in a fresh,
-separate systemd unit on the same host, source commit, Node and CLI/shared
-build, one CPU, 2 GiB, 256 tasks and 120-second maximum. Apply
-`NoNewPrivileges=yes`, `IPAddressDeny=any` and
-`IPAddressAllow=localhost`, and independently retain the effective unit
-properties and exit/teardown receipt. The corpus verifies its cgroup CPU,
-memory and task limits; it cannot itself prove the network policy. Use a fresh
-private output directory per arm and the same random 64-hex comparison ID:
+The opt-in `.github/workflows/worker-comparison.yml` is prepared for review,
+not dispatched. Its default `prepare_only` mode downloads the pinned Linux
+Chromium archive from both the Playwright registry and Google Chrome for
+Testing, records both SHA-256 values and requires byte equality, then safely
+extracts and records the executable hash and version. Playwright's pinned
+registry metadata does not provide a publisher SHA-256; agreement between
+distribution endpoints is provenance evidence, not a publisher signature.
+The setup records the source revision, both URLs and this limitation. It does
+not start benchmark units. An explicitly enabled measurement requires the
+previously reviewed archive and executable hashes and rejects a mismatch.
 
-```text
-systemd-run --user --unit=<unique> --wait --collect \
-  --property=WorkingDirectory=<owned-committed-tree> \
-  --property=CPUQuota=100% --property=MemoryMax=2G --property=TasksMax=256 \
-  --property=RuntimeMaxSec=120 --property=NoNewPrivileges=yes \
-  --property=IPAddressDeny=any --property=IPAddressAllow=localhost \
-  env KELPIE_TEST_REVISION=<exact-commit> KELPIE_COMPARISON_ID=<same-64-hex> \
-      KELPIE_CHROMIUM_ARCHIVE=<verified-archive> \
-      KELPIE_CHROMIUM_ARCHIVE_SHA256=<archive-sha256> \
-  node tests/linux/worker-comparison.mjs <lightpanda|playwright> \
-      <verified-engine-executable> <engine-sha256> <fresh-output-directory>
-node tests/linux/worker-comparison-report.mjs <lp-report.json> <chromium-report.json>
-```
+The existing dispatchable `lint.yml` can call the reusable workflow on the
+reviewed integration ref. Set `worker_comparison_prepare` for identity
+preparation. A later reviewed measurement uses `worker_comparison_execute`
+and both `worker_comparison_*_sha256` inputs; if both booleans are set,
+preparation takes precedence. The new workflow can also be dispatched
+directly once present on the default branch. Downloads, package setup and
+build occur before the measured units.
+After a reviewed dispatch, `scripts/testing/run-worker-comparison-hosted.sh`
+runs the arms sequentially as the same non-root user in separate systemd units
+on one host: one CPU, 2 GiB, 256 tasks, 120 seconds,
+`NoNewPrivileges=yes`, `IPAddressDeny=any` and
+`IPAddressAllow=localhost`. The launcher retains active unit properties,
+exit and cgroup teardown receipts and binds the policy's main PID to each
+report. An owned host canary must be reachable over both loopback and the
+host's non-loopback address before either unit; inside each measured process,
+loopback must work and the same non-loopback connection must fail with
+permission denial. Missing or inconclusive policy/probe evidence fails closed.
+The browser is never launched with `--no-sandbox`. If the hosted systemd,
+cgroup, BPF or sandbox setup cannot enforce these conditions, preserve the
+failure; do not weaken the boundary or infer a comparison.
 
 The Lightpanda arm checks the pinned hash and version; the Chromium arm also
 requires the independently recorded archive hash. Both hash the fixture, CLI
 and shared bundle and require the exact clean source revision. The report
 matcher requires matching host binding, source, fixture, build, limits, ordered
-correctness checks and warm call counts. It does not validate the external
-network receipt and never emits a speed ratio. Compare costs only after both
+correctness checks and warm call counts. The matcher itself does not validate the external
+systemd policy receipt and never emits a speed ratio. Compare costs only after both
 corpora, unit policy and teardown succeed. Save all failures and refusals in
 the denominator. The four explicit Lightpanda method refusals are reported;
 shared sessions and concurrent contexts are labelled untested by this corpus

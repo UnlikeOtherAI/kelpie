@@ -20,10 +20,36 @@ on:
         type: string
         default: ""
 
+      worker_comparison_prepare:
+        description: Prepare Chromium identity without starting benchmark units
+        type: boolean
+        default: false
+      worker_comparison_execute:
+        description: Run the comparison using previously reviewed Chromium hashes
+        type: boolean
+        default: false
+      worker_comparison_archive_sha256:
+        description: Reviewed pinned Chromium archive SHA-256 for an opt-in comparison
+        type: string
+        default: ""
+      worker_comparison_binary_sha256:
+        description: Reviewed pinned Chromium executable SHA-256 for an opt-in comparison
+        type: string
+        default: ""
 permissions:
   contents: read
 
 jobs:
+  worker-comparison:
+    if: github.event_name == 'workflow_dispatch' && (inputs.worker_comparison_prepare || inputs.worker_comparison_execute)
+    uses: ./.github/workflows/worker-comparison.yml
+    permissions:
+      contents: read
+    with:
+      prepare_only: ${{ !inputs.worker_comparison_execute || inputs.worker_comparison_prepare }}
+      chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
+      chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
+
   linux-mux-probe:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
     uses: ./.github/workflows/linux-mux-probe.yml

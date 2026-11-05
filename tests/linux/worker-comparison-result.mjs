@@ -17,6 +17,8 @@ export function compareWorkerReceipts(a,b){
  assert.match(chromium.engineSHA256??"",/^[a-f0-9]{64}$/);
  assert.match(chromium.archiveSHA256??"",/^[a-f0-9]{64}$/);
  assert.deepEqual(a.boundary,b.boundary,"COMPARISON_BOUNDARY_MISMATCH");
+ assert.ok(Number.isSafeInteger(a.uid)&&a.uid>0&&a.uid===b.uid,"COMPARISON_USER_MISMATCH");
+ for(const r of [a,b])assert.deepEqual(r.networkProbe,{local:"connected",nonlocal:"denied"});
  assert.equal(a.eligibleForComparison,true);assert.equal(b.eligibleForComparison,true);
  assert.equal(a.forcedCleanup,false);assert.equal(b.forcedCleanup,false);
  assert.equal(a.engineExited,true);assert.equal(b.engineExited,true);
