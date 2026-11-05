@@ -6,6 +6,10 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace kelpie::linuxapp::media {
 namespace {
@@ -13,6 +17,35 @@ struct BufferDelete { void operator()(GstBuffer* value) const { if (value) gst_b
 struct SampleDelete { void operator()(GstSample* value) const { if (value) gst_sample_unref(value); } };
 using Buffer = std::unique_ptr<GstBuffer, BufferDelete>;
 using Sample = std::unique_ptr<GstSample, SampleDelete>;
+// qtmux faststart requires a seekable private spool. Its bytes are a subset of
+// the encoded packets already reserved in Budget. Never unlink a replaced file.
+class MuxScratch {
+ public:
+  explicit MuxScratch(const std::filesystem::path& directory) {
+    path_ = (directory / ".mux-XXXXXX").string();
+    fd_ = mkstemp(path_.data());
+    if (fd_ < 0) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
+    struct stat info{};
+    if (fcntl(fd_, F_SETFD, FD_CLOEXEC) || fchmod(fd_, 0600) || fstat(fd_, &info)) {
+      close(fd_); unlink(path_.c_str()); throw std::runtime_error("CAPTURE_STORAGE_FAILED");
+    }
+    device_ = info.st_dev; inode_ = info.st_ino;
+  }
+  ~MuxScratch() { Remove(); }
+  const std::string& path() const { return path_; }
+  bool Remove() {
+    if (fd_ < 0) return true;
+    close(fd_); fd_ = -1;
+    struct stat info{};
+    if (lstat(path_.c_str(), &info)) return errno == ENOENT;
+    if (!S_ISREG(info.st_mode) || info.st_dev != device_ || info.st_ino != inode_) return false;
+    return unlink(path_.c_str()) == 0 || errno == ENOENT;
+  }
+ private:
+  std::string path_;
+  int fd_ = -1;
+  dev_t device_{}; ino_t inode_{};
+};
 struct MuxState {
   std::mutex mutex;
   std::vector<std::uint8_t> bytes;
@@ -162,12 +195,14 @@ class Video final : public Writer {
     return copied;
   }
   MuxResult Mux(std::size_t limit) {
+    MuxScratch scratch(output_.path.parent_path());
     MuxState state(limit);
     auto pipeline = std::make_unique<GstPipeline>(
         "appsrc name=input format=time is-live=false block=false max-bytes=268435456 ! "
         "video/x-h264,stream-format=avc,alignment=au ! "
-        "mp4mux fragment-duration=1 streamable=false trak-timescale=1000000 ! "
+        "mp4mux name=mux faststart=true trak-timescale=1000000 ! "
         "appsink name=output sync=false async=false max-buffers=2");
+    pipeline->SetFastStartFile(scratch.path());
     gst_app_src_set_caps(pipeline->source(), caps_);
     GstAppSinkCallbacks callbacks{}; callbacks.new_sample = Collect;
     gst_app_sink_set_callbacks(pipeline->sink(), &callbacks, &state, nullptr);
@@ -182,11 +217,13 @@ class Video final : public Writer {
       completed = pipeline->Complete();
     } catch (...) {
       pipeline.reset();
+      if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
       std::lock_guard lock(state.mutex);
       if (state.overflow) return {std::move(state.bytes), true};
       throw;
     }
     pipeline.reset(); // Join streaming callbacks before consuming their result.
+    if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
     std::lock_guard lock(state.mutex);
     if (state.failed || (!completed && !state.overflow)) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     return {std::move(state.bytes), state.overflow};

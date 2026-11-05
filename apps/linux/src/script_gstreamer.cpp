@@ -63,6 +63,14 @@ void GstPipeline::Clear() {
   if (pipeline_) gst_object_unref(pipeline_);
   pipeline_ = nullptr; source_ = nullptr; sink_ = nullptr; bus_ = nullptr;
 }
+void GstPipeline::SetFastStartFile(const std::string& path) {
+  auto* mux = gst_bin_get_by_name(GST_BIN(pipeline_), "mux");
+  if (!mux) throw std::runtime_error("CAPTURE_VIDEO_UNAVAILABLE");
+  const bool supported = g_object_class_find_property(G_OBJECT_GET_CLASS(mux), "faststart-file") != nullptr;
+  if (supported) g_object_set(mux, "faststart-file", path.c_str(), nullptr);
+  gst_object_unref(mux);
+  if (!supported) throw std::runtime_error("CAPTURE_VIDEO_UNAVAILABLE");
+}
 void GstPipeline::Start() {
   if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE)
     throw std::runtime_error("CAPTURE_VIDEO_UNAVAILABLE");

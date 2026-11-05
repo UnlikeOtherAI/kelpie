@@ -2,6 +2,7 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace kelpie::linuxapp::media {
 // Fixed native element factories only. No page/model pipeline or file location.
@@ -15,6 +16,7 @@ class GstPipeline {
   GstPipeline& operator=(const GstPipeline&) = delete;
   GstAppSrc* source() const { return GST_APP_SRC(source_); }
   GstAppSink* sink() const { return GST_APP_SINK(sink_); }
+  void SetFastStartFile(const std::string& path);
   void Start();
   void Push(GstBuffer* buffer); // Transfers ownership, also on a flow failure.
   GstSample* Pull();            // Caller owns the returned sample.
