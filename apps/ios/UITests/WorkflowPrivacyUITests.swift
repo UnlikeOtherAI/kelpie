@@ -12,6 +12,41 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testUnknownTargetClassificationProtectsOnlyTheCurrentEdit() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let canary = "iOS Reflected+Canary!"
+        for captured in [false, true] {
+            var workflow: Body = [
+                "version": 1, "tabId": tab, "actions": [
+                    ["action": "navigate", "url": "http://127.0.0.1:\(port)/secret-guard"],
+                    ["action": "output", "source": "title", "name": "before"],
+                    ["action": "fill", "target": ["selector": "#missing"], "text": canary]
+                ]
+            ]
+            if captured { workflow["capture"] = ["formats": ["screenshots"]] }
+            let failed = try await probe.request("/v1/play-script", workflow)
+            XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, "TARGET_NOT_FOUND")
+            XCTAssertNotEqual(failed["mayHaveCompleted"] as? Bool, true)
+            XCTAssertTrue((failed["artifacts"] as? [Body])?.isEmpty == true)
+            let prior = try XCTUnwrap((failed["outputs"] as? Body)?["before"] as? String)
+            XCTAssertFalse(prior.contains(canary))
+            XCTAssertFalse(prior.contains("iOS%20Reflected%2bCanary!"))
+            XCTAssertFalse(prior.contains("iOS+Reflected%2bCanary%21"))
+        }
+        let ordinary = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [
+                ["action": "output", "source": "title", "name": "before"],
+                ["action": "fill", "target": ["selector": "#entry"], "text": canary]
+            ]
+        ])
+        XCTAssertEqual(ordinary["success"] as? Bool, true)
+        let unchanged = try XCTUnwrap((ordinary["outputs"] as? Body)?["before"] as? String)
+        XCTAssertTrue(unchanged.contains(canary), "Known nonsensitive input must not be blanket-redacted")
+    }
+
+    @MainActor
     private func uncertainEdit(capture: Bool) async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
