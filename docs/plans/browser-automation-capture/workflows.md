@@ -12,9 +12,17 @@
 - [ ] WLOCAL-CAP-04 Optional eased S/C pointer between resolved targets.
 - [ ] WLOCAL-CAP-05 Continuous bounded overlay-inclusive capture; playable GIF and video.
 - [ ] WLOCAL-CAP-06 Step screenshots retrievable remotely.
+- [ ] Verify no capture, an explicit screenshot without capture, screenshots-only,
+  movies-only and combined formats separately on each native runtime. Screenshot
+  paths must not add movie-only marker-expiry dwell; movie finalization must
+  retain the intended clear frame. Source review at `0b2ff349` found
+  unconditional final marker waits in the shared desktop and iOS runners;
+  corrected runtime parity is pending. Mac gates the wait on movies, while
+  Android gates marker admission on requested movie encoders. These are source
+  observations, not per-platform timing passes.
 - [ ] WLOCAL-CAP-07 Abort/time/byte bounds finalize partial outputs and release ownership.
 - [ ] WLOCAL-CAP-08 Authenticated scoped bounded artifact retrieval and integrity checks.
-- [ ] Windows on Maxis real CEF user flow, direct MCP, CLI MCP, decoded media and recovery paths; Mac follows only after this gate passes.
+- [ ] Windows on Maxis real CEF user flow, direct MCP, CLI MCP, decoded media and recovery paths. The earlier Windows-first sequencing gate is historical; the five authorized platform workstreams proceed in parallel, as described in [README.md](README.md).
 - [ ] iOS/Android parity with real flows and media inspection.
 - [ ] Windows/Linux native and MCP/CLI verification.
 - [ ] Durable semantic safety, readiness and media evals.
