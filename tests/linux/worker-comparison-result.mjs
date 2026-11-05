@@ -16,7 +16,11 @@ export function compareWorkerReceipts(a,b){
  assert.match(chromium.engineVersion,/\b151\.0\.7922\.34\b/);
  assert.match(chromium.engineSHA256??"",/^[a-f0-9]{64}$/);
  assert.match(chromium.archiveSHA256??"",/^[a-f0-9]{64}$/);
- assert.deepEqual(chromium.sandboxEvidence,{ownedRenderer:true,chromiumFlagsSafe:true,rendererSeccomp:2,additionalSeccompFilter:true,rendererNamespaceSeparated:true});
+ for(const evidence of [chromium.sandboxEvidence,chromium.sessionSandboxEvidence]){
+  assert.ok(evidence?.ownedRenderer===true&&evidence.chromiumFlagsSafe===true&&evidence.rendererSeccomp===2&&
+   evidence.additionalSeccompFilter===true&&evidence.rendererNamespaceSeparated===true&&evidence.allOwnedRenderers===true&&
+   Number.isSafeInteger(evidence.rendererCount)&&evidence.rendererCount>0,"SANDBOX_EVIDENCE_REQUIRED");
+ }
  assert.deepEqual(a.boundary,b.boundary,"COMPARISON_BOUNDARY_MISMATCH");
  assert.ok(Number.isSafeInteger(a.uid)&&a.uid>0&&a.uid===b.uid,"COMPARISON_USER_MISMATCH");
  for(const r of [a,b])assert.deepEqual(r.networkProbe,{local:"connected",nonlocal:"denied"});

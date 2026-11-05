@@ -92,7 +92,7 @@ const report={version:1,backend,source:process.env.KELPIE_TEST_REVISION,hostBind
  boundary:{memoryMax,cpuMax,tasksMax},uid:process.getuid(),pid:process.pid,networkProbe,startupMs:null,warm:[],checks:[],toolCalls:0,responseBytes:0,
  unsupported:[],notProbed:["shared sessions","concurrent contexts"],unitCostScope:"memory peak covers the whole unit including hash/version preflight, fixture, CLI and browser; CPU covers engine run and teardown",
  startupScope:"engine spawn to isolated session ready; fixture, binary setup, and separately reported sandbox validation excluded",
- networkBoundary:"external systemd policy verification required",sandboxEvidence:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
+ networkBoundary:"external systemd policy verification required",sandboxEvidence:null,sessionSandboxEvidence:null,sandboxValidationMs:0,sandboxValidationCpuUsec:0,forcedCleanup:false};
 let engine,transport,client,failure,session;
 const started=performance.now();
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
@@ -178,6 +178,12 @@ try{
  const lifecycle=request=>tool("kelpie_worker_session",{request});
  const created=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});
  assert.equal(created.ok,true);session=created.value;assert.equal(session.ownedTabIds.length,1);
+ if(backend==="playwright"){
+  const sandboxStart=performance.now(),sandboxCpu=await cpu();
+  report.sessionSandboxEvidence=await inspectOwnedChromiumSandbox(cgroup,engine.pid,engineStart);
+  report.sandboxValidationMs+=performance.now()-sandboxStart;
+  report.sandboxValidationCpuUsec+=await cpu()-sandboxCpu;
+ }
  report.startupMs=performance.now()-engineStarted-report.sandboxValidationMs;
  await check("second session refused at configured limit",async()=>{
   const second=await lifecycle({action:"create",options:{isolation:"isolated",ttlMs:60000}});

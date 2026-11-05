@@ -3,9 +3,12 @@ set -euo pipefail
 umask 077
 : "${GITHUB_WORKSPACE:?}" "${RUNNER_TEMP:?}" "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}"
 isolation_only="${KELPIE_AB_ISOLATION_ONLY:-false}"
+sandbox_only="${KELPIE_AB_SANDBOX_ONLY:-false}"
+[[ "$sandbox_only" == true || "$sandbox_only" == false ]]
+[[ "$isolation_only" != true || "$sandbox_only" != true ]]
 [[ "$isolation_only" == true || "$isolation_only" == false ]]
 # Measurement remains disabled pending private-network and sandbox review.
-if [[ "$isolation_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
+if [[ "$isolation_only" != true && "$sandbox_only" != true ]]; then echo PRIVATE_NETWORK_MEASUREMENT_NOT_APPROVED >&2; exit 1; fi
 [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-1}" =~ ^[0-9]+$ ]]
 if [[ "$isolation_only" == false ]]; then
  : "${CHROMIUM_ARCHIVE_SHA256:?}" "${CHROMIUM_BINARY_SHA256:?}"
@@ -45,6 +48,8 @@ run_arm() {
  local -a command
  if [[ "$backend" == probe ]]; then
   command=("$node" "$root/tests/linux/worker-isolation-probe.mjs" "$dir")
+ elif [[ "$backend" == sandbox ]]; then
+  command=("$node" "$root/tests/linux/worker-comparison-sandbox-smoke.mjs" "$executable" "$expected" "$dir")
  else
   command=("$node" "$root/tests/linux/worker-comparison.mjs" "$backend" "$executable" "$expected" "$dir")
  fi
@@ -108,8 +113,9 @@ run_arm() {
   --property=ControlGroup --property=Result --property=ExecMainStatus >"$dir/unit-final.txt" 2>&1 || true
  grep -Eq '^ActiveState=(inactive|failed)$' "$dir/unit-final.txt" || return 1
  [[ "$group" == "/system.slice/${unit}.service" ]] || return 1
- local procs="" events="" cgpath="/sys/fs/cgroup$group"
+ local procs="" events="" cgpath="/sys/fs/cgroup$group" retirement=absent
  if [[ -d "$cgpath" ]]; then
+  retirement=empty
   [[ -r "$cgpath/cgroup.procs" ]] || return 1
   procs="$(cat "$cgpath/cgroup.procs")" || return 1
   [[ -z "$procs" ]] || return 1
@@ -117,6 +123,10 @@ run_arm() {
   events="$(cat "$cgpath/cgroup.events")" || return 1
   [[ "$(printf '%s\n' "$events" | grep -cx 'populated 0')" == 1 ]] || return 1
  fi
+ local final_state
+ final_state="$(sed -n 's/^ActiveState=//p' "$dir/unit-final.txt")"
+ [[ "$final_state" == inactive || "$final_state" == failed ]] || return 1
+ printf '{"verified":true,"state":"%s","cgroup":"%s"}\n' "$final_state" "$retirement" >"$dir/retirement.json"
  arm_retired=1
  local observation_status=1
  [[ -s "$dir/policy-observed.json" ]] && observation_status=0
@@ -132,6 +142,10 @@ run_arm() {
 }
 if [[ "$isolation_only" == true ]]; then
  run_arm probe "" "" || failed=1
+ exit "$failed"
+fi
+if [[ "$sandbox_only" == true ]]; then
+ run_arm sandbox "$assets/chrome/chrome-linux64/chrome" "$CHROMIUM_BINARY_SHA256" || failed=1
  exit "$failed"
 fi
 run_arm lightpanda "$assets/lightpanda" ae7d01d261efb9e480e18ce3424533332883863bcf70b12a4321b5733f37e19e || failed=1

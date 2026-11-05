@@ -7,7 +7,7 @@ export function validateSandboxFacts(browser,renderer){
  assert.ok(browser.sandboxFlagsSafe&&renderer.sandboxFlagsSafe,"SANDBOX_DISABLED");
  assert.equal(renderer.seccomp,2,"SANDBOX_SECCOMP");
  assert.ok(Number.isSafeInteger(browser.filters)&&Number.isSafeInteger(renderer.filters)&&renderer.filters>browser.filters,"SANDBOX_FILTER_NOT_PROVEN");
- for(const item of [browser,renderer]){assert.match(item.userNs??"",/^user:\[\d+\]$/);assert.match(item.pidNs??"",/^pid:\[\d+\]$/);}
+ for(const item of [browser,renderer]){assert.match(item.userNs??"",/^user:\[\d+\]$/,"SANDBOX_NAMESPACE_NOT_PROVEN");assert.match(item.pidNs??"",/^pid:\[\d+\]$/,"SANDBOX_NAMESPACE_NOT_PROVEN");}
  assert.ok(renderer.userNs!==browser.userNs||renderer.pidNs!==browser.pidNs,"SANDBOX_NAMESPACE_NOT_PROVEN");
  return {ownedRenderer:true,chromiumFlagsSafe:true,rendererSeccomp:2,additionalSeccompFilter:true,rendererNamespaceSeparated:true};
 }
@@ -36,14 +36,31 @@ export async function inspectOwnedChromiumSandbox(cgroup,browserPid,startTicks){
  const pids=(await readFile(cgroup+"/cgroup.procs","utf8")).trim().split(/\s+/).filter(Boolean).map(Number);
  assert.ok(pids.length<=256&&pids.includes(browserPid),"SANDBOX_CGROUP_PROCESSES");
  const table=new Map();
- for(const pid of pids){try{const item=await facts(pid);table.set(pid,item);}catch{/* Missing observations never establish proof. */}}
+ for(const pid of pids){try{const item=await facts(pid);table.set(pid,item);}catch{throw Error("SANDBOX_PROC_UNREADABLE");}}
  const browser=table.get(browserPid);assert.ok(browser&&browser.startTicks===startTicks,"SANDBOX_BROWSER_CHANGED");
+ const ownedRenderers=[];
  for(const renderer of table.values()){
   if(!renderer.renderer)continue;
   let parent=renderer.ppid,descendant=false;
   const seen=new Set([renderer.pid]);
   while(parent&&!seen.has(parent)){if(parent===browserPid){descendant=true;break;}seen.add(parent);parent=table.get(parent)?.ppid??0;}
-  try{return validateSandboxFacts({...browser,owned:true},{...renderer,owned:true,descendant});}catch{/* Inspect other owned renderers. */}
+  ownedRenderers.push({...renderer,owned:true,descendant});
  }
- throw Error("SANDBOX_RENDERER_NOT_PROVEN");
+ return validateSandboxCollection({...browser,owned:true},ownedRenderers);
+}
+
+export function validateSandboxCollection(browser,renderers){
+ if(!renderers.length)throw Error("SANDBOX_NO_RENDERER");
+ let result;for(const renderer of renderers)result=validateSandboxFacts(browser,renderer);
+ return {...result,allOwnedRenderers:true,rendererCount:renderers.length};
+}
+export function sandboxFailureCategory(error){
+ const text=String(error?.message??"");
+ if(text.includes("SANDBOX_PROC_UNREADABLE")||["EACCES","EPERM","ENOENT"].includes(error?.code))return "proc-unreadable";
+ if(text.includes("SANDBOX_NO_RENDERER"))return "no-renderer";
+ if(text.includes("SANDBOX_DISABLED"))return "flags";
+ if(text.includes("SANDBOX_SECCOMP")||text.includes("SANDBOX_FILTER"))return "filters";
+ if(text.includes("SANDBOX_NAMESPACE"))return "namespace";
+ if(text.includes("SANDBOX_OWNERSHIP")||text.includes("SANDBOX_BROWSER")||text.includes("SANDBOX_PROCESS")||text.includes("SANDBOX_CGROUP"))return "identity";
+ return "other";
 }
