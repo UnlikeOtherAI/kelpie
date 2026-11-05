@@ -1,4 +1,5 @@
 import {execFileSync} from "node:child_process";
+import {createHash} from "node:crypto";
 import {requireTrue} from "./runtime-client.mjs";
 export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
  const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_streams","-show_frames","-of","json",item.file],{maxBuffer:16*1024*1024}));
@@ -51,4 +52,26 @@ export function inspectCurve(item,curve,scene){
  const minimum=Math.min(...normals),maximum=Math.max(...normals);
  requireTrue(curve==="s"?minimum< -8&&maximum>8:minimum> -8&&maximum>15,"CURVE_GEOMETRY");
  return {curve,pointerSamples:tracks.length,minimum,maximum,endpointError:Math.hypot(offset.x,offset.y)};
+}
+
+// Hash only a small top-left text region, away from the centered tap marker.
+export function inspectPaced(item,event){
+ const rect=event.rect,viewport=event.viewport;
+ requireTrue(rect&&viewport&&rect.width>50&&rect.height>25,"PACED_TEXT_REGION");
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,
+  "-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const stride=item.width*item.height*3;
+ requireTrue(rgb.length%stride===0&&rgb.length/stride>=4,"PACED_MEDIA_FRAMES");
+ const sx=item.width/viewport.width,sy=item.height/viewport.height;
+ const left=Math.max(0,Math.floor((rect.left+5)*sx)),right=Math.min(item.width,Math.ceil((rect.left+45)*sx));
+ const top=Math.max(0,Math.floor((rect.top+4)*sy)),bottom=Math.min(item.height,Math.ceil((rect.top+25)*sy));
+ requireTrue(right>left&&bottom>top,"PACED_TEXT_REGION");
+ const variants=new Set();
+ for(let start=0;start<rgb.length;start+=stride){
+  const digest=createHash("sha256");
+  for(let y=top;y<bottom;y++)digest.update(rgb.subarray(start+(y*item.width+left)*3,start+(y*item.width+right)*3));
+  variants.add(digest.digest("hex"));
+ }
+ requireTrue(variants.size>=3,"PACED_TEXT_FRAMES");
+ return {decodedFrames:rgb.length/stride,distinctTextRegions:variants.size};
 }
