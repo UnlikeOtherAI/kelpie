@@ -154,6 +154,12 @@ void CadenceAndPendingEndpoint() {
     const double request=safe?810:710;
     assert(!ScriptMovieFrameDue(last,request,10));
     assert((last>=700)==safe);
+    if (safe) {
+      auto observed=Frame(2); observed.elapsed_ms=request; std::fill(observed.bgra.begin(),observed.bgra.end(),255);
+      auto changed=observed; changed.bgra[0]=0;
+      assert(!encoder->MarkTerminalClear(changed));
+      assert(encoder->MarkTerminalClear(observed));
+    }
     const auto outputs=encoder->Finish(850);
     assert(!encoder->budget_exceeded() && !encoder->finalization_failed() && outputs.size()==2);
     for (const auto& output : outputs) {

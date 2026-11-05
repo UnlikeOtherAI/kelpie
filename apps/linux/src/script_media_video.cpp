@@ -1,6 +1,6 @@
 #include "script_media_internal.h"
-#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
 #include <gst/video/video-event.h>
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
 #include <chrono>
 #include <cstdio>
 #endif
@@ -75,7 +75,7 @@ GstFlowReturn Collect(GstAppSink* sink, gpointer raw) {
   gst_buffer_unmap(buffer, &mapped); return result;
 }
 
-bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps) {
+bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps, bool require_idr = false) {
   // AVC buffers can contain codec headers without a picture. Only a complete
   // length-prefixed access unit with an actual VCL NAL is source-frame evidence.
   const auto* value = gst_structure_get_value(gst_caps_get_structure(caps, 0), "codec_data");
@@ -93,7 +93,7 @@ bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps) {
     for (std::size_t index = 0; index < length_bytes; ++index) length = (length << 8) | encoded.data[offset++];
     if (!length || length > encoded.size - offset || (encoded.data[offset] & 0x80)) { valid = false; break; }
     const auto type = encoded.data[offset] & 31;
-    picture = picture || (type >= 1 && type <= 5);
+    picture = picture || (require_idr ? type == 5 : (type >= 1 && type <= 5));
     offset += length;
   }
   gst_buffer_unmap(packet, &encoded); gst_buffer_unmap(description, &config);
@@ -122,7 +122,7 @@ class Video final : public Writer {
     if (!raw_caps) throw std::runtime_error("CAPTURE_VIDEO_UNAVAILABLE");
     gst_app_src_set_caps(encoder_->source(), raw_caps); gst_caps_unref(raw_caps); encoder_->Start();
     output_.width = input.width; output_.height = input.height;
-    prepared_ = Encode(input, 0, GST_SECOND / fps_);
+    prepared_ = Encode(input, 0, GST_SECOND / fps_, false);
     if (!Admit(prepared_.get())) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
     // Prove actual first-frame encoding, AVC codec data and MP4 muxing before
     // the shared runtime can admit its first browser action.
@@ -133,7 +133,7 @@ class Video final : public Writer {
     } catch (...) { prepared_ = std::move(packets_.back()); packets_.pop_back(); throw; }
     prepared_ = std::move(packets_.back()); packets_.pop_back();
   }
-  bool Write(const ScriptFrame& input, double start_ms, double end_ms) override {
+  bool Write(const ScriptFrame& input, double start_ms, double end_ms, ScriptMediaFramePurpose purpose) override {
     if (finished_) throw std::runtime_error("CAPTURE_ALREADY_FINISHED");
     Prepare(input);
     if (stopped_) return false;
@@ -142,10 +142,12 @@ class Video final : public Writer {
     Buffer packet;
     if (prepared_) {
       packet = std::move(prepared_);
+      if (purpose == ScriptMediaFramePurpose::TerminalClear && !ContainsVclAccessUnit(packet.get(), caps_, true))
+        throw std::runtime_error("CAPTURE_ENCODING_FAILED");
       GST_BUFFER_PTS(packet.get()) = start; GST_BUFFER_DTS(packet.get()) = start;
       GST_BUFFER_DURATION(packet.get()) = std::max<GstClockTime>(1, end - start);
     } else {
-      packet = Encode(input, start, std::max<GstClockTime>(1, end - start));
+      packet = Encode(input, start, std::max<GstClockTime>(1, end - start), purpose == ScriptMediaFramePurpose::TerminalClear);
       if (!Admit(packet.get())) { stopped_ = true; ++output_.dropped_frames; return false; }
     }
     if (packets_.size() >= 36000) { budget_.exceeded = true; stopped_ = true; ++output_.dropped_frames; return false; }
@@ -182,37 +184,38 @@ class Video final : public Writer {
     if (size > budget_.limit || !budget_.Take(size + 4096)) return false;
     reserved_ += size + 4096; return true;
   }
-  Buffer Encode(const ScriptFrame& input, GstClockTime pts, GstClockTime duration) {
+  Buffer Encode(const ScriptFrame& input, GstClockTime pts, GstClockTime duration, bool force_keyframe) {
     Buffer raw(gst_buffer_new_allocate(nullptr, input.bgra.size(), nullptr));
     if (!raw || gst_buffer_fill(raw.get(), 0, input.bgra.data(), input.bgra.size()) != input.bgra.size())
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     GST_BUFFER_PTS(raw.get()) = pts; GST_BUFFER_DTS(raw.get()) = pts; GST_BUFFER_DURATION(raw.get()) = duration;
 #ifdef KELPIE_LINUX_CODEC_FORCE_TEST
     const auto index=encoded_test_index_++;
-    if (index==14) {
+    if (index==14) force_keyframe=true;
+#endif
+    if (force_keyframe) {
       auto* sinkpad=gst_element_get_static_pad(GST_ELEMENT(encoder_->sink()),"sink");
-      if (!sinkpad) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
+      if (!sinkpad) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
       const auto began=std::chrono::steady_clock::now();
+#endif
       const bool accepted=gst_pad_push_event(sinkpad,gst_video_event_new_upstream_force_key_unit(
           GST_CLOCK_TIME_NONE,TRUE,0));
       gst_object_unref(sinkpad);
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
       const auto micros=std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::steady_clock::now()-began).count();
       std::fprintf(stderr,"KELPIE_TEST_FORCE_KEYFRAME accepted=%d event_us=%lld\n",
           int(accepted),static_cast<long long>(micros));
-      if (!accepted) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
-    }
 #endif
+      if (!accepted) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+    }
     encoder_->Push(raw.release());
     Sample sample(encoder_->Pull());
     auto* sample_caps = gst_sample_get_caps(sample.get());
     auto* packet = gst_sample_get_buffer(sample.get());
-    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps))
+    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps, force_keyframe))
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
-#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
-    if (index==14 && GST_BUFFER_FLAG_IS_SET(packet,GST_BUFFER_FLAG_DELTA_UNIT))
-      throw std::runtime_error("CAPTURE_TEST_KEYFRAME_NOT_EMITTED");
-#endif
     if (!caps_) caps_ = gst_caps_ref(sample_caps);
     Buffer copied(gst_buffer_copy_deep(packet));
     if (!copied) throw std::runtime_error("CAPTURE_ENCODING_FAILED");

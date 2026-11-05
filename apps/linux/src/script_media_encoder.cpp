@@ -17,10 +17,11 @@ struct ScriptMediaEncoder::Impl {
   double first = 0, last = 0;
   int width = 0, height = 0, fps;
   bool finished = false, stopped = false, failed = false;
+  bool terminal_clear = false;
   explicit Impl(std::size_t max_bytes, int frame_rate) : budget{max_bytes}, fps(frame_rate) {}
-  bool Emit(double terminal) {
+  bool Emit(double terminal, ScriptMediaFramePurpose purpose = ScriptMediaFramePurpose::Ordinary) {
     bool accepted = true;
-    for (auto& writer : writers) if (!writer->Write(*pending, pending->elapsed_ms - first, terminal - first)) accepted = false;
+    for (auto& writer : writers) if (!writer->Write(*pending, pending->elapsed_ms - first, terminal - first, purpose)) accepted = false;
     return accepted;
   }
 };
@@ -56,7 +57,15 @@ bool ScriptMediaEncoder::AddFrame(const ScriptFrame& frame) {
     if (frame.width != state.width || frame.height != state.height) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     if (!state.Emit(frame.elapsed_ms)) { state.pending.reset(); state.stopped = true; return false; }
   }
-  state.last = frame.elapsed_ms; state.pending = frame; return true;
+  state.last = frame.elapsed_ms; state.pending = frame; state.terminal_clear=false; return true;
+}
+bool ScriptMediaEncoder::MarkTerminalClear(const ScriptFrame& observed) {
+  auto& state=*impl_;
+  if (state.finished || state.stopped || !state.pending) return false;
+  const auto& pending=*state.pending;
+  if (pending.width!=observed.width || pending.height!=observed.height ||
+      pending.stride!=observed.stride || pending.bgra!=observed.bgra) return false;
+  state.terminal_clear=true; return true;
 }
 bool ScriptMediaEncoder::WriteStepPNG(const ScriptFrame& frame, const std::filesystem::path& path) {
   auto& state = *impl_;
@@ -73,7 +82,10 @@ std::vector<ScriptMediaOutput> ScriptMediaEncoder::Finish(double terminal_elapse
   if (state.finished) return state.outputs;
   if (!std::isfinite(terminal_elapsed_ms) || terminal_elapsed_ms > 3600000 || (state.pending && terminal_elapsed_ms <= state.last))
     throw std::runtime_error("CAPTURE_TIMESTAMP_INVALID");
-  if (state.pending) { state.Emit(terminal_elapsed_ms); state.pending.reset(); }
+  if (state.pending) {
+    state.Emit(terminal_elapsed_ms, state.terminal_clear ? ScriptMediaFramePurpose::TerminalClear : ScriptMediaFramePurpose::Ordinary);
+    state.pending.reset();
+  }
   for (auto& writer : state.writers) {
     try {
       auto output = writer->Finish();

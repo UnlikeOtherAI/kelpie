@@ -230,7 +230,7 @@ if(KELPIE_LINUX_HAS_CEF)
     message(FATAL_ERROR "Linux CEF capture needs pkg-config for Cairo and GStreamer libraries")
   endif()
   pkg_check_modules(LINUX_CAPTURE_CAIRO REQUIRED IMPORTED_TARGET cairo)
-  pkg_check_modules(LINUX_CAPTURE_GST REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.20)
+  pkg_check_modules(LINUX_CAPTURE_GST REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.20 gstreamer-video-1.0>=1.20)
   add_library(kelpie_linux_script_media STATIC
     src/script_frame_compositor.cpp src/script_media_encoder.cpp
     src/script_media_gif.cpp src/script_media_video.cpp src/script_gstreamer.cpp src/script_artifact_store.cpp)
