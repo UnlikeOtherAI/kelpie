@@ -90,6 +90,7 @@ fun BrowserScreen(
     var availableTabletViewportPresets by remember { mutableStateOf(TABLET_VIEWPORT_PRESETS) }
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
     val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
+    val isMovieImmersive by scriptPlaybackState.isMovieImmersive.collectAsState()
     RecordingOrientationEffect(activity, isScriptRecording)
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
@@ -200,9 +201,10 @@ fun BrowserScreen(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
-                    .imePadding(),
+                    .imePadding()
+                    .scriptInputBlock(isScriptRecording),
         ) {
-            if (isTablet && !isScriptRecording) {
+            if (isTablet && !isMovieImmersive) {
                 TabletTabStrip(tabs, activeTabId, pageColor, { tabStore.addTab() }, tabStore::selectTab, tabStore::closeTab)
                 Box(
                     Modifier.fillMaxWidth().height(1.dp).background(
@@ -214,7 +216,7 @@ fun BrowserScreen(
                 )
             }
 
-            if (isLoading && !isScriptRecording) {
+            if (isLoading && !isMovieImmersive) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
                     modifier = Modifier.fillMaxWidth(),
@@ -240,7 +242,7 @@ fun BrowserScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
-            if (!isScriptRecording) {
+            if (!isMovieImmersive) {
                 BottomBar(
                     activity = activity,
                     currentUrl = currentUrl,
@@ -270,6 +272,7 @@ fun BrowserScreen(
                     onShowTabs = ::showTabs,
                     onExpand = { bottomBarCollapsed = false },
                     onTransientUiChanged = { chromeTransient = it },
+                    scriptActive = isScriptRecording,
                     moreContent = { dismiss ->
                         BrowserMoreMenu(
                             onDismiss = dismiss,

@@ -95,7 +95,7 @@ For regression debugging, `coordinate-diagnostics` combines hit-test samples, pa
 
 ## Scripted Video Recording
 
-Kelpie can run a whole walkthrough as one timed script instead of one command at a time. A script enters recording mode, hides the browser chrome, locks the normal controls, and leaves only a stop button visible while it plays. Actions can mix navigation, taps, typing, swipes, waits, screenshots, viewport changes, commentary pills, and element highlights. This scripted-recording surface is now aligned across Android and iOS, with the same HTTP, CLI, and MCP entry points.
+Kelpie can run a whole walkthrough as one timed script instead of one command at a time. A script locks the normal controls and provides a stop button while it plays. Movie capture hides the browser chrome; screenshots-only and uncaptured runs keep the normal viewport and chrome in place. Actions can mix navigation, taps, typing, swipes, waits, screenshots, viewport changes, commentary pills, and element highlights. This scripted-recording surface is now aligned across Android and iOS, with the same HTTP, CLI, and MCP entry points.
 
 The main use case is support and presentation work: record a few clean steps that show a customer exactly where to click, how to reach a setting, or how to complete a workflow, then hand over the resulting walkthrough video instead of writing a long email.
 
