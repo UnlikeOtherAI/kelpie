@@ -362,5 +362,24 @@ The authored phone/tablet probe sends standard two-pointer Android MotionEvents
 only to the exact visible app-owned WebView before playback. It records actual
 scale/offset/size and requires real zoom/nonzero offset, not CSS zoom or a stage
 transform. A partially visible button records the actual event and viewport; the
-test checks intersection center and decoded exported PNG marker pixels. The probe covers pre-play pinch only. Recording blocks ordinary renderer touches; iOS also locks orientation. Android currently has no matching orientation lock in MainActivity/BrowserScreen, so that parity gap is reported separately. No mid-play gesture or rotation is presented as a supported shared user flow. Common JS/CDP tests cover stale pinch-token rejection; native stale-viewport evidence remains unclaimed.
+test checks intersection center and decoded exported PNG marker pixels. The probe covers pre-play pinch only. Recording blocks ordinary renderer touches; iOS also locks orientation. Android originally had no matching orientation lock; the focused orientation checkpoint below adds production parity with iOS. No mid-play gesture or rotation is presented as a supported shared user flow. Common JS/CDP tests cover stale pinch-token rejection; native stale-viewport evidence remains unclaimed.
 This probe is authored, not yet compiled or executed on either emulator profile.
+## Recording orientation parity
+
+The browser's existing recording state now owns a thin Activity orientation effect:
+lock the current orientation during presentation and restore the exact previous
+requestedOrientation when normal finish/abort/failure changes recording state,
+or when the effect disposes. No setting, product API or visible button was added.
+Recording remains true until media/renderer/output finalization, so orientation
+restoration follows retirement rather than an early Stop acknowledgement.
+
+The authored phone/tablet case covers success, owner abort and a real missing-target
+failure. It asserts the active lock, uses standard UiAutomation device rotation,
+requires stable owned-renderer dimensions while active, then exact prior-policy
+restoration and an actual resize from the same rotation request after termination.
+This is an orientation-policy probe, not a bypass of the recording touch overlay
+or a claimed mid-play viewport failure. Device rotation is restored only as normal
+test cleanup after terminal assertions. Runtime results are not yet available.
+Official instrumentation API:
+https://developer.android.com/reference/android/app/UiAutomation#setRotation(int)
+Orientation checkpoint source-format check: exact offline ktlintFormat passed22s with affinity1/one worker/1GiB, no compile/native/emulator. Kotlin compilation and actual policy/rotation assertions remain pending hosted verification.

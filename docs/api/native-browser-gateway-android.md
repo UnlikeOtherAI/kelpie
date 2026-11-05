@@ -163,3 +163,7 @@ and exported pointer/tap overlays map using visual viewport offsets and size fro
 the same fenced resolver frame. A resize or zoom change invalidates a pending
 target before input. Playback's native overlay continues to block ordinary page
 touches. G07 hosted tests require pre-play user pinch with measured geometry changes rather than CSS transform simulations. Mid-play pinch/rotation are not presented as a supported shared mobile user route; common stale-token tests remain distinct evidence.
+Recording also locks the current native Activity orientation, matching iOS.
+Completion, abort, failure and UI disposal restore the exact previous requested
+orientation policy. Stop/status remain available while finalization holds the lock.
+No orientation setting or new endpoint is exposed.
