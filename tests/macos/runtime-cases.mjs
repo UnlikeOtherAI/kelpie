@@ -4,6 +4,7 @@ import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture
 import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
+import {runG08} from "./runtime-g08.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
@@ -45,6 +46,8 @@ export async function runEngine(client,fixture,engine,report) {
   await waitFor(()=>fixture.events.find(e=>e.type==="document"&&e.path==="/"));
   return {success:true};
  });
+ await load();
+ await check("dense-animation",()=>runG08(client,tabId,engine,report));
  await load();
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
