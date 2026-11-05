@@ -180,6 +180,26 @@ final class IOSFrameSampler {
         #endif
     }
 
+    #if DEBUG
+    private static func nativeInsets(_ view: WKWebView) -> [CGFloat] {
+        let safe = view.safeAreaInsets
+        let adjusted = view.scrollView.adjustedContentInset
+        let content = view.scrollView.contentInset
+        let window = view.window?.safeAreaInsets ?? .zero
+        return [safe.top, safe.bottom, adjusted.top, adjusted.bottom, content.top, content.bottom,
+                window.top, window.bottom, CGFloat(view.scrollView.contentInsetAdjustmentBehavior.rawValue)]
+    }
+
+    private static func insetsDiagnostic(before: [CGFloat], after: [CGFloat]) {
+        guard before.count == 9, after.count == 9,
+              (before + after).allSatisfy({ $0.isFinite && abs($0) <= 10_000 }) else { return }
+        func encode(_ values: [CGFloat]) -> String {
+            values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }.joined(separator: ",")
+        }
+        print("[WorkflowCaptureInsets] before=" + encode(before) + " after=" + encode(after))
+    }
+    #endif
+
     private func canvas(_ viewport: IOSWorkflowTab.Viewport) -> CGSize {
         let raw = viewport.bounds
         let factor = min(tab.view.contentScaleFactor, CGFloat(maxWidth) / raw.width, 1920 / raw.height)
@@ -237,6 +257,9 @@ final class IOSFrameSampler {
         configuration.rect = tab.view.bounds
         configuration.snapshotWidth = NSNumber(value: Double(output.width / max(tab.view.contentScaleFactor, 1)))
         let view = tab.view
+        #if DEBUG
+        let insetsBefore = Self.nativeInsets(view)
+        #endif
         let source = try await IOSRendererDeadline.run(view: view, seconds: 3) {
             try await view.takeSnapshot(configuration: configuration)
         }
@@ -255,6 +278,9 @@ final class IOSFrameSampler {
             guard scrolled else {
                 Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))
                 Self.geometryDiagnostic(before: viewport, after: after)
+                #if DEBUG
+                Self.insetsDiagnostic(before: insetsBefore, after: Self.nativeInsets(view))
+                #endif
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
             }
             if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }

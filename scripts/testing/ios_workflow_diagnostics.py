@@ -21,6 +21,7 @@ CAPTURE_REASONS = frozenset({
         "READINESS_FAILED", "EXTRACT_FAILED", "BROWSER_FAILED", "BROWSER_BUSY", "PAGE_CHANGED", "OTHER",
     )),
 })
+INSETS_EVENT = re.compile(r"\[WorkflowCaptureInsets\] before=([-0-9.,]+) after=([-0-9.,]+)(?:\s|$)")
 GEOMETRY_EVENT = re.compile(r"\[WorkflowCaptureGeometry\] before=([0-9.,]+) after=([0-9.,]+)(?:\s|$)")
 CAPTURE_EVENT = re.compile(r"\[WorkflowCapture\] reason=([A-Za-z_-]+)(?:\s|$)")
 EVENT = re.compile(r"\[WorkflowNavigationLease\] (invalid|wait-refused|timeout)=([a-z-]+)(?:\s|$)")
@@ -59,6 +60,21 @@ def fixed_capture_geometry(line):
     return {"before": before, "after": after}
 
 
+def fixed_capture_insets(line):
+    found = INSETS_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        before, after = ([float(number) for number in value.split(",")] for value in found.groups())
+    except ValueError:
+        return None
+    if len(before) != 9 or len(after) != 9 or not all(
+        math.isfinite(number) and abs(number) <= 10000 for number in before + after
+    ):
+        return None
+    return {"before": before, "after": after}
+
+
 def export_lease_diagnostics(result, destination):
     raw = destination.parent.parent / ("private-navigation-diagnostics-" + destination.name)
     try:
@@ -69,6 +85,7 @@ def export_lease_diagnostics(result, destination):
         events = collections.Counter()
         capture = collections.Counter()
         geometry = []
+        insets = []
         for file in raw.rglob("StandardOutputAndStandardError*.txt"):
             with file.open(errors="replace") as stream:
                 for line in stream:
@@ -77,8 +94,11 @@ def export_lease_diagnostics(result, destination):
                     observed = fixed_capture_geometry(line)
                     if observed and len(geometry) < 100:
                         geometry.append(observed)
+                    inset = fixed_capture_insets(line)
+                    if inset and len(insets) < 100:
+                        insets.append(inset)
         report = {"events": dict(sorted(events.items()))}
-        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry}
+        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets}
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {"unavailable": type(error).__name__}
         capture_report = report

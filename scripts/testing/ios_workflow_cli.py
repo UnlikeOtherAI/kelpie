@@ -60,8 +60,8 @@ def run_fixture(tab: str, evidence: Path):
         raise ValueError("Invalid fixture tab ID")
     evidence.mkdir(parents=True, exist_ok=False)
     paired = invoke(["pair", "--client-name", "Hosted CLI workflow", "--timeout-ms", "35000"])
-    if paired.get("success") is not True:
-        raise ValueError("CLI pairing refused")
+    if paired.get("success") is not True or paired.get("scope") != "persistent" or paired.get("persisted") is not True:
+        raise ValueError("CLI pairing did not persist the exact-socket grant")
     recipe = {"version": 1, "tabId": tab, "inputs": {"entry": {"type": "string"}}, "actions": [
         {"action": "fill", "target": {"label": "Entry"}, "text": {"input": "entry"}},
         {"action": "tap", "target": {"role": "button", "name": "Submit"}},
