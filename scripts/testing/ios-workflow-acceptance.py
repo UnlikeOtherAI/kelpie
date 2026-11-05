@@ -36,6 +36,7 @@ def selection(scope):
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
+                "testNativePinchClipsTapCenterAndExportedMarker",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
