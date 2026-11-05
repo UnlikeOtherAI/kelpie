@@ -53,4 +53,3 @@ for(const curve of ["c","s"])test("CSS curve amplitude is projected after model 
  const config={...base,curve,from:{x:64,y:180},to:{x:576,y:180},radius:48,scale:{x:.5,y:.5}};
  assert.equal(evaluateG08(render(config),config).passed,true);
 });
-
