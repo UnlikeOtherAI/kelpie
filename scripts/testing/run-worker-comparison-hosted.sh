@@ -73,21 +73,22 @@ run_arm() {
   else printf '%s\n' query-failed >"$dir/bpf-status.txt"; fi
  else printf '%s\n' unavailable >"$dir/bpf-status.txt"; fi
  if [[ "$active" == 1 && "$backend" == probe ]]; then
-  local pid host_ns unit_ns unit_ns_after current_pid
+  local pid host_ns unit_ns unit_ns_after current_pid address_status=failed routes4_status=failed routes6_status=failed pid_status=failed
   pid="$(sed -n 's/^ExecMainPID=//p' "$dir/policy.txt")"
   if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
    host_ns="$(readlink /proc/self/ns/net)" || host_ns=""
-   unit_ns="$(readlink "/proc/$pid/ns/net")" || unit_ns=""
+   unit_ns="$(timeout 3s sudo -n readlink "/proc/$pid/ns/net")" || unit_ns=""
    printf '%s\n' "$host_ns" >"$dir/host-netns.txt"
    printf '%s\n' "$unit_ns" >"$dir/unit-netns.txt"
-   timeout 3s sudo -n nsenter -t "$pid" -n ip -j address show >"$dir/net-address.json" || true
-   timeout 3s sudo -n nsenter -t "$pid" -n ip -j -4 route show table all >"$dir/net-routes4.json" || true
-   timeout 3s sudo -n nsenter -t "$pid" -n ip -j -6 route show table all >"$dir/net-routes6.json" || true
-   unit_ns_after="$(readlink "/proc/$pid/ns/net")" || unit_ns_after=""
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j address show >"$dir/net-address.json"; then address_status=ok; fi
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j -4 route show table all >"$dir/net-routes4.json"; then routes4_status=ok; fi
+   if timeout 3s sudo -n nsenter -t "$pid" -n ip -j -6 route show table all >"$dir/net-routes6.json"; then routes6_status=ok; fi
+   unit_ns_after="$(timeout 3s sudo -n readlink "/proc/$pid/ns/net")" || unit_ns_after=""
    printf '%s\n' "$unit_ns_after" >"$dir/unit-netns-after.txt"
-   current_pid="$(sudo -n systemctl show "$unit" --value --property=ExecMainPID)" || current_pid=""
-   [[ "$current_pid" == "$pid" ]] || rm -f "$dir/unit-netns-after.txt"
+   current_pid="$(timeout 3s sudo -n systemctl show "$unit" --value --property=ExecMainPID)" || current_pid=""
+   [[ "$current_pid" == "$pid" ]] && pid_status=ok
   fi
+  printf '{"address":"%s","routes4":"%s","routes6":"%s","pid":"%s"}\n' "$address_status" "$routes4_status" "$routes6_status" "$pid_status" >"$dir/namespace-query-status.json"
  fi
  local status=0
  wait "$launcher" || status=$?
