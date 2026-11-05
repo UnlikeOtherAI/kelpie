@@ -114,6 +114,64 @@ try {
     assert.ok(Math.abs(event.y - (event.visible.top + event.visible.bottom) / 2) <= 1);
     return { runId: result.runId, actionsExecuted: result.actionsExecuted, event };
   });
+  for (const kind of ["click", "fill"]) for (const mutation of ["replace", "url"]) {
+    await check("post-ack " + kind + " " + mutation + " succeeds and recovers", async () => {
+      await navigate();
+      const secret = "post-ack-private-value-73951";
+      const change = mutation === "replace"
+        ? "event.currentTarget.replaceWith(event.currentTarget.cloneNode(true))"
+        : "history.replaceState({},'',location.pathname+'?post-ack=1')";
+      const setup = "(()=>{document.title=" + JSON.stringify(secret) +
+        ";document.body.innerHTML=" + JSON.stringify(kind === "click"
+          ? '<button id="post-ack">Post ack</button>'
+          : '<input id="post-ack" type="text" aria-label="Post ack">') +
+        ";window.__postAckCount=0;document.querySelector('#post-ack').addEventListener(" +
+        JSON.stringify(kind === "click" ? "click" : "input") +
+        ",event=>{window.__postAckCount++;" + change + "});return true})()";
+      assert.equal((await api("evaluate", {tabId, expression:setup})).success, true);
+      const action = kind === "click" ? {action:"click",target:{selector:"#post-ack"}}
+        : {action:"fill",target:{selector:"#post-ack"},text:secret,sensitive:true};
+      const result = await api("play-script", {
+        ...workflow([{action:"output",name:"before",source:"title"},action,
+          {action:"output",name:"after",source:"title"}]),
+        ...(kind === "click" ? {capture:{formats:["screenshots"],maxWidth:640}} : {}),
+      });
+      assert.equal(result.success, true, JSON.stringify(result));
+      assert.equal((await api("evaluate", {tabId, expression:"window.__postAckCount"})).result, 1);
+      assert.ok(Object.hasOwn(result.outputs ?? {}, "after"));
+      if (kind === "fill") assert.ok(!JSON.stringify(result).includes(secret), "acknowledged edit leaked text");
+      else {
+        assert.ok(result.artifacts?.length > 0);
+        assert.ok(result.artifacts.every(item => item.partial === false));
+        await download(result);
+      }
+      assert.equal((await api("play-script", workflow([{action:"wait",ms:0}]))).success, true);
+      return {success:result.success,inputGuarantee:result.inputGuarantee};
+    });
+  }
+  await check("post-ack sensitive detached edit discards capture", async () => {
+    await navigate();
+    const setup = "(()=>{document.body.innerHTML='<input id=post-sensitive type=text>';window.__postSensitive=0;" +
+      "document.querySelector('#post-sensitive').oninput=e=>{window.__postSensitive++;e.currentTarget.type='password';e.currentTarget.remove()};return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
+    const result=await api("play-script",{...workflow([{action:"fill",target:{selector:"#post-sensitive"},text:"ordinary-input"}]),
+      capture:{formats:["screenshots"],maxWidth:640}});
+    assert.equal(result.success,false);
+    assert.equal(result.error?.code,"SENSITIVE_CAPTURE_REFUSED");
+    assert.equal(result.mayHaveCompleted,true);
+    assert.equal((await api("evaluate",{tabId,expression:"window.__postSensitive"})).result,1);
+    assert.deepEqual(result.artifacts,[]);
+    assert.equal((await api("play-script",workflow([{action:"wait",ms:0}]))).success,true);
+  });
+  await check("post-ack readonly edit remains successful", async () => {
+    await navigate();
+    const setup = "(()=>{document.body.innerHTML='<input id=post-readonly type=text>';" +
+      "document.querySelector('#post-readonly').oninput=e=>{e.currentTarget.readOnly=true};return true})()";
+    assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
+    const result=await api("play-script",workflow([{action:"fill",target:{selector:"#post-readonly"},text:"safe"}]));
+    assert.equal(result.success,true,JSON.stringify(result));
+    assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
+  });
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],
     ["Covered action", "TARGET_OBSCURED"], ["Hidden action", "TARGET_NOT_FOUND"]]) {
     await check("safe refusal " + name, async () => {
