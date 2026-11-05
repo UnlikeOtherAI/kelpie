@@ -45,8 +45,8 @@ try {
       assert.equal(result.success, true, JSON.stringify(result.error));
       const facts = await (await fetch(new URL("/events", fixture.url))).json();
       report.eventsDropped += facts.dropped;
-      assert.deepEqual(facts.events.map(fact => fact.target), ["start", "finish"]);
-      const entry = { curve, scene: { start: facts.events[0], finish: facts.events[1] }, artifacts: [] };
+      assert.deepEqual(facts.events.map(fact => fact.target), ["finish", "start", "finish"]);
+      const entry = { curve, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts: [] };
       report.cases.push(entry);
       for (const artifact of result.artifacts) {
         if (!["image/gif", "video/mp4"].includes(artifact.mimeType)) continue;
