@@ -6,6 +6,8 @@ final class WorkflowLoopbackPage {
     enum Failure: Error { case listener }
     let listener: NWListener
     private let responseDelay: TimeInterval
+    private let requestCounter = WorkflowRequestCounter()
+    func requestCount(path: String) -> Int { requestCounter.count(path) }
     init(responseDelay: TimeInterval = 0) throws {
         self.responseDelay = responseDelay
         let params = NWParameters.tcp
@@ -101,10 +103,11 @@ final class WorkflowLoopbackPage {
         }
         </script>
         """
-        let data = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)".utf8)
-        listener.newConnectionHandler = { [responseDelay] connection in
+        let data = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-store\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)".utf8)
+        listener.newConnectionHandler = { [responseDelay, requestCounter] connection in
             connection.start(queue: queue)
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { _, _, _, _ in
+            Self.readPath(connection, buffered: Data()) { path in
+                requestCounter.record(path)
                 queue.asyncAfter(deadline: .now() + responseDelay) {
                     connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
                 }
@@ -127,5 +130,26 @@ final class WorkflowLoopbackPage {
         }
         return "http://127.0.0.1:\(port)/workflow"
     }
+    private static func readPath(_ connection: NWConnection, buffered: Data, complete: @escaping @Sendable (String) -> Void) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { data, _, ended, error in
+            let accumulated = buffered + (data ?? Data())
+            guard accumulated.count <= 16384, error == nil else { connection.cancel(); return }
+            if let line = String(data: accumulated, encoding: .utf8)?.components(separatedBy: "\r\n").first,
+               accumulated.range(of: Data("\r\n".utf8)) != nil {
+                let parts = line.split(separator: " ")
+                guard parts.count >= 2, parts[1].hasPrefix("/") else { connection.cancel(); return }
+                complete(String(parts[1]))
+            } else if ended { connection.cancel() } else { readPath(connection, buffered: accumulated, complete: complete) }
+        }
+    }
+
     deinit { listener.cancel() }
+}
+
+/// Counts only complete, bounded HTTP request lines; a split TCP read cannot hide a destination load.
+private final class WorkflowRequestCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var counts: [String: Int] = [:]
+    func record(_ path: String) { lock.lock(); defer { lock.unlock() }; counts[path, default: 0] += 1 }
+    func count(_ path: String) -> Int { lock.lock(); defer { lock.unlock() }; return counts[path, default: 0] }
 }
