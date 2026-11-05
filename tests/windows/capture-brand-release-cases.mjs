@@ -9,7 +9,6 @@ export async function runBrandReleaseCases({check,navigate,api,workflow,tabId,fi
     assert.equal((await api("evaluate",{tabId,expression:setup})).success,true);
     const result=await api("play-script",{...workflow([{action:"type",target:{selector:"#brand-input"},text:"safe"}]),
       capture:{formats:["screenshots"],maxWidth:640}});
-    assert.equal(entered,true,"mouseup handler did not start");
     assert.equal(result.success,false,JSON.stringify(result));
     assert.equal(result.mayHaveCompleted,true);
     assert.deepEqual(result.artifacts,[]);
@@ -38,6 +37,7 @@ export async function runBrandReleaseCases({check,navigate,api,workflow,tabId,fi
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     assert.equal(observed?.success,true,"late operation did not retire");
+    assert.equal(entered,true,"mouseup handler did not start");
     assert.equal(result.success,false,JSON.stringify(result));
     assert.equal(result.mayHaveCompleted,true,JSON.stringify(result));
     assert.deepEqual(result.artifacts,[]);
