@@ -11,6 +11,13 @@ on:
         description: Run isolated native WK and CEF acceptance after compilation
         type: boolean
         default: false
+      runtime_scope:
+        description: Hosted runtime scope (full acceptance or focused CEF timing and marker checks)
+        type: choice
+        options:
+          - full
+          - cef-timing
+        default: full
 
 permissions:
   contents: read
@@ -183,6 +190,7 @@ jobs:
         timeout-minutes: 15
         env:
           KELPIE_HOSTED_RUNTIME: '1'
+          KELPIE_RUNTIME_SCOPE: ${{ inputs.runtime_scope || 'full' }}
         run: node scripts/testing/macos-workflow-acceptance.mjs
 
       - name: Enforce listener TXT control

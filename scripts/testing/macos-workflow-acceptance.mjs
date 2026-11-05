@@ -23,6 +23,8 @@ if(process.argv[2]==="--preparation"){
  process.exit(0);
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
+const scope=process.env.KELPIE_RUNTIME_SCOPE??"full";
+requireTrue(["full","cef-timing"].includes(scope),"RUNTIME_SCOPE");
 const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const out=path.join(root,".cache/macos-runtime/evidence"),privateDir=path.join(root,".cache/macos-runtime/private");
@@ -33,7 +35,7 @@ const hash=async file=>{const digest=createHash("sha256");for await(const bytes 
 const source=execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim();
 requireTrue(source===process.env.GITHUB_SHA,"SOURCE_REVISION_MISMATCH");
 execFileSync("git",["diff","--quiet","HEAD","--","apps/macos","native","packages/shared","tests/macos","scripts/testing"]);
-const report={source,platform:process.platform,
+const report={source,scope,platform:process.platform,
  cefFrameworkHash:await hash(path.join(app,"Contents/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework")),
  cefVersion:(await readFile("apps/macos/Frameworks/cef_include/cef_version.h","utf8")).match(/#define CEF_VERSION "([^"\n]+)"/)?.[1],
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
@@ -76,26 +78,31 @@ try{
    ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
- await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
- await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
- await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
- await independent("chromium",async()=>{
-  // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
-  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
-  await runEngine(client,fixture,"chromium",report);
- });
- await independent("cef-cli",async()=>{
-  const selected=report.engines.find(item=>item.engine==="chromium")?.checks.some(item=>item.name==="native-renderer-control"&&item.passed);
-  requireTrue(selected,"CLI_CEF_RENDERER_UNAVAILABLE");
-  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
-  report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
- });
+ if(scope==="cef-timing"){
+  await independent("chromium",()=>runEngine(client,fixture,"chromium",report,scope));
+ }else{
+  await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
+  await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
+  await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
+  await independent("chromium",async()=>{
+   // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
+   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+   await runEngine(client,fixture,"chromium",report);
+  });
+  await independent("cef-cli",async()=>{
+   const selected=report.engines.find(item=>item.engine==="chromium")?.checks.some(item=>item.name==="native-renderer-control"&&item.passed);
+   requireTrue(selected,"CLI_CEF_RENDERER_UNAVAILABLE");
+   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+   report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
+  });
+ }
  if(failures.length){
   report.phaseFailures=failures;
   phase=failures[0].phase;
   throw new Failure(failures[0].code);
  }
- report.corpusPassed=true;
+ if(scope==="full")report.corpusPassed=true;
+ else report.focusedScopePassed=true;
 }catch(error){
  report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;
  if(report.phaseFailures?.length){
