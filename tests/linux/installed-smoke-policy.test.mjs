@@ -43,4 +43,10 @@ test("package workflow shell parses before starting its build container", { skip
   assert.ok(script);
   const result=spawnSync("bash",["-n"],{input:script.split("\n").map(line=>line.startsWith("          ")?line.slice(10):line).join("\n")});
   assert.equal(result.status,0,result.stderr.toString());
+  const inner=script.split("bash -lc ")[1]?.split("' 2>&1")[0]?.slice(1);
+  assert.ok(inner);
+  const innerResult=spawnSync("bash",["-n"],{input:inner});
+  assert.equal(innerResult.status,0,innerResult.stderr.toString());
+  const broken=script.replace('awk "/^(CEF_ROOT', "awk '/^(CEF_ROOT").replace('):/ { print }" \"$cache\"', "):/ { print }' \"$cache\"");
+  assert.notEqual(spawnSync("bash",["-n"],{input:broken}).status,0);
 });
