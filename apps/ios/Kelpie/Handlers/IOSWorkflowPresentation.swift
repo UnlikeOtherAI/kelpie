@@ -201,7 +201,9 @@ final class IOSWorkflowPresentation: NSObject {
         retirementDocument = document
         retirementDeadline = deadline
         retirementInvalidated = invalidated
+        #if DEBUG
         retirementDiagnostic("began", deadline: deadline)
+        #endif
         refresh()
     }
 
@@ -265,6 +267,7 @@ final class IOSWorkflowPresentation: NSObject {
         return value
     }
 
+    #if DEBUG
     private func retirementReason(deadline: TimeInterval, retirementValid: Bool, visible: Bool) -> String {
         if ProcessInfo.processInfo.systemUptime >= deadline { return "expired" }
         if retirementDocument != tab.document { return "document" }
@@ -276,11 +279,11 @@ final class IOSWorkflowPresentation: NSObject {
     }
 
     func retirementDiagnostic(_ reason: String, deadline: TimeInterval) {
-        #if DEBUG
         let remaining = Int(max(-10000, min(10000, (deadline - ProcessInfo.processInfo.systemUptime) * 1000)))
         print("[WorkflowMarkerRetirement] reason=" + reason + " remainingMs=" + String(remaining))
-        #endif
     }
+
+    #endif
 
     @objc private func refresh() {
         synchronize()
@@ -292,8 +295,10 @@ final class IOSWorkflowPresentation: NSObject {
         let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
         if let deadline = retirementDeadline, !visible || ProcessInfo.processInfo.systemUptime >= deadline {
+            #if DEBUG
             let reason = retirementReason(deadline: deadline, retirementValid: retirementValid, visible: visible)
             retirementDiagnostic(reason, deadline: deadline)
+            #endif
             let invalidated = retirementInvalidated
             finish()
             invalidated?()

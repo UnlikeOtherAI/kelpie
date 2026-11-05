@@ -142,6 +142,10 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("STALE_TARGET")
         }
         let current = try await tab.viewport()
+        guard tab.document == document else {
+            IOSFrameSampler.diagnostic("target-document")
+            throw IOSWorkflowFailure("STALE_TARGET")
+        }
         guard viewport == current else {
             IOSFrameSampler.diagnostic("target-viewport")
             IOSFrameSampler.geometryDiagnostic(before: viewport, after: current)

@@ -208,11 +208,15 @@ final class IOSWorkflowRunner {
             while !Task.isCancelled && ProcessInfo.processInfo.systemUptime < end {
                 guard let window, tab.view.window === window, window.windowScene?.activationState == .foregroundActive,
                       tab.document == document, (try? tab.requireCurrent()) != nil else {
+                    #if DEBUG
                     presentation.retirementDiagnostic("owner", deadline: end)
+                    #endif
                     break
                 }
                 guard await grant.isCurrent() else {
+                    #if DEBUG
                     presentation.retirementDiagnostic("grant", deadline: end)
+                    #endif
                     break
                 }
                 let remaining = end - ProcessInfo.processInfo.systemUptime
