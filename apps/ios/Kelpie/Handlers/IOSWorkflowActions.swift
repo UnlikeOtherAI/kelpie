@@ -251,6 +251,9 @@ final class IOSWorkflowActions {
             )
             try requireOK(classification)
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            guard classification["sensitivityKnown"] as? Bool == true else {
+                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
             try await check()
         } catch let failure as IOSWorkflowFailure {
             throw IOSWorkflowFailure(failure.code, mayHaveCompleted: true)
