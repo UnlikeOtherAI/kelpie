@@ -14,7 +14,7 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual(navigation["success"] as? Bool, true)
         let cases: [(String, [String]?, Bool)] = [
             ("no capture", nil, false), ("automatic PNG", ["screenshots"], false),
-            ("explicit PNG", ["screenshots"], true), ("GIF", ["gif"], false),
+            ("explicit PNG", nil, true), ("GIF", ["gif"], false),
             ("video", ["video"], false), ("combined", ["screenshots", "gif", "video"], false)
         ]
         for (label, formats, explicit) in cases {
@@ -36,9 +36,14 @@ extension WorkflowCaptureUITests {
                 XCTAssertLessThan(elapsed, 4.5, label)
             }
             let artifacts = result["artifacts"] as? [Body] ?? []
-            if formats?.contains("screenshots") == true {
-                let markerPNG = try XCTUnwrap(artifacts.first { $0["mimeType"] as? String == "image/png" &&
-                    $0["actionIndex"] as? Int == 0 }, label)
+            if explicit || formats?.contains("screenshots") == true {
+                let pngs = artifacts.filter { $0["mimeType"] as? String == "image/png" }
+                if explicit {
+                    XCTAssertEqual(pngs.count, 1, label)
+                    XCTAssertEqual(pngs.first?["actionIndex"] as? Int, 1, label)
+                }
+                let index = explicit ? 1 : 0
+                let markerPNG = try XCTUnwrap(pngs.first { $0["actionIndex"] as? Int == index }, label)
                 let bytes = try await probe.bytes(markerPNG, run: try XCTUnwrap(result["runId"] as? String))
                 let source = try XCTUnwrap(CGImageSourceCreateWithData(bytes as CFData, nil))
                 let frame = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
