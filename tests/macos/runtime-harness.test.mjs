@@ -1,7 +1,7 @@
 import vm from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches} from "./runtime-ownership.mjs";
+import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -77,4 +77,10 @@ test("hosted focus requires the exact launched candidate command",()=>{
  assert.equal(processCommandMatches(candidate+"-other --port 28420",candidate),false);
  assert.equal(processCommandMatches(candidate+" --port 8420",candidate),false);
  assert.equal(processCommandMatches("/other/Kelpie --port 28420",candidate),false);
+});
+
+test("viewport diagnostics accept only bounded fixed numeric fields",()=>{
+ assert.deepEqual(viewportSignal("[WorkflowViewport] bounds=1 layout=1 visible=0 scale=1 pixel=1 widths=883.00,900.00 heights=700.00,700.00"),
+  {boundsSame:true,layoutSame:true,visibleSame:false,scaleSame:true,pixelSame:true,oldWidth:883,newWidth:900,oldHeight:700,newHeight:700});
+ assert.equal(viewportSignal("[WorkflowViewport] bounds=1 layout=1 visible=0 scale=1 pixel=1 widths=883.00,900.00 heights=700.00,700.00 secret"),null);
 });

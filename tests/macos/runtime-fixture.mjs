@@ -31,7 +31,7 @@ export async function startFixture() {
    <button id="scroll-target">Scrolled target</button>`;
   const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)};const documentId=crypto.randomUUID();let sequence=0;
   const send=(value,synchronous=false)=>{const body=JSON.stringify({
-   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight},
+   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
    if(synchronous){const request=new XMLHttpRequest();request.open('POST','/events',false);request.setRequestHeader('content-type','application/json');request.send(body);return;}
    return fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body}).catch(()=>{});};
