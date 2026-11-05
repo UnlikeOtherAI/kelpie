@@ -24,32 +24,37 @@ internal object ScriptOverlayRetirement {
         root: View,
         windowToken: IBinder,
     ) {
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try {
-                while (overlay.isRetained(retained)) {
-                    val remaining = retained.deadlineNs - System.nanoTime()
-                    if (remaining <= 0) break
-                    val timeoutMs = ((remaining + 999_999) / 1_000_000).coerceIn(1, 100)
-                    if (withTimeoutOrNull(timeoutMs) { authority.permits() } != true) break
-                    val valid =
-                        withContext(Dispatchers.Main.immediate) {
-                            overlay.isRetained(retained) &&
-                                runCatching { authority.permitsOnMain() }.getOrDefault(false) &&
-                                context.scriptForeground &&
-                                context.tabStore?.activeTabId?.value == tabId &&
-                                context.tabStore?.activeTab?.webView === view &&
-                                context.tabStore?.activeTab?.documentVersion == retained.document &&
-                                context.scriptPlaybackState?.isRecording?.value != true &&
-                                view.isAttachedToWindow && view.isShown && view.hasWindowFocus() &&
-                                view.rootView === root && view.windowToken === windowToken
-                        }
-                    if (!valid) break
-                    val delayMs = ((retained.deadlineNs - System.nanoTime()) / 1_000_000).coerceIn(1, 25)
-                    delay(delayMs)
+        val job =
+            CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+                try {
+                    while (overlay.isRetained(retained)) {
+                        val remaining = retained.deadlineNs - System.nanoTime()
+                        if (remaining <= 0) break
+                        val timeoutMs = ((remaining + 999_999) / 1_000_000).coerceIn(1, 100)
+                        if (withTimeoutOrNull(timeoutMs) { authority.permits() } != true) break
+                        val valid =
+                            withContext(Dispatchers.Main.immediate) {
+                                overlay.isRetained(retained) &&
+                                    runCatching { authority.permitsOnMain() }.getOrDefault(false) &&
+                                    context.scriptForeground &&
+                                    context.tabStore?.activeTabId?.value == tabId &&
+                                    context.tabStore?.activeTab?.webView === view &&
+                                    context.tabStore?.activeTab?.documentVersion == retained.document &&
+                                    context.scriptPlaybackState?.isRecording?.value != true &&
+                                    view.isAttachedToWindow &&
+                                    view.isShown &&
+                                    view.hasWindowFocus() &&
+                                    view.rootView === root &&
+                                    view.windowToken === windowToken
+                            }
+                        if (!valid) break
+                        val delayMs = ((retained.deadlineNs - System.nanoTime()) / 1_000_000).coerceIn(1, 25)
+                        delay(delayMs)
+                    }
+                } finally {
+                    withContext(Dispatchers.Main.immediate) { overlay.clearRetained(retained) }
                 }
-            } finally {
-                withContext(Dispatchers.Main.immediate) { overlay.clearRetained(retained) }
             }
-        }
+        overlay.installRetirementJob(retained, job)
     }
 }

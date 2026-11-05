@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import com.kelpie.browser.BuildConfig
+import kotlinx.coroutines.Job
 import java.lang.ref.WeakReference
 
 /** Live native overlay and captured pixels consume this one timeline and renderer. */
@@ -43,13 +44,20 @@ class ScriptOverlay {
         val position: String,
     )
 
-    data class RetainedTap(val generation: Long, val owner: String, val document: String, val deadlineNs: Long)
+    data class RetainedTap(
+        val generation: Long,
+        val owner: String,
+        val document: String,
+        val deadlineNs: Long,
+    )
 
     private var activeOwner: String? = null
     private var generation = 0L
     private var retainedOwner: String? = null
     private var retainedDeadlineNs = 0L
     private var retainedGuard: (() -> Boolean)? = null
+    private var retirementJob: Job? = null
+    private var retirementTimeout: Runnable? = null
     private var markerFrame: ScriptOverlayFrame? = null
     private var pointer: Pointer? = null
     private var tap: Tap? = null
@@ -116,7 +124,10 @@ class ScriptOverlay {
 
     @Synchronized
     fun clear() {
-        activeOwner = null
+        retirementJob?.cancel()
+        retirementJob = null
+        retirementTimeout?.let(main::removeCallbacks)
+        retirementTimeout = null
         generation++
         retainedOwner = null
         retainedDeadlineNs = 0L
@@ -141,16 +152,24 @@ class ScriptOverlay {
 
     @Synchronized
     fun clearOwned(owner: String) {
-        if (activeOwner == owner) clear()
+        if (activeOwner == owner) {
+            clear()
+            activeOwner = null
+        }
     }
 
     @Synchronized
     fun bindRetirementFrame(target: android.webkit.WebView) {
         markerFrame = view.get()?.let { ScriptOverlayFrame.capture(target, it) }
     }
+
     /** Keeps only the final live tap until its original deadline; never extends it. */
     @Synchronized
-    fun retainFinalTap(owner: String, now: Long, guard: () -> Boolean): RetainedTap? {
+    fun retainFinalTap(
+        owner: String,
+        now: Long,
+        guard: () -> Boolean,
+    ): RetainedTap? {
         if (activeOwner != owner) return null
         val current = tap ?: return null
         val currentDocument = document ?: return null
@@ -165,9 +184,19 @@ class ScriptOverlay {
         retainedGuard = guard
         val retained = RetainedTap(generation, owner, currentDocument, deadline)
         val delayMs = ((deadline - now + 999_999) / 1_000_000).coerceAtLeast(1)
-        main.postDelayed({ clearRetained(retained) }, delayMs)
+        val timeout = Runnable { clearRetained(retained) }
+        retirementTimeout = timeout
+        main.postDelayed(timeout, delayMs)
         changed()
         return retained
+    }
+
+    @Synchronized
+    fun installRetirementJob(
+        value: RetainedTap,
+        job: Job,
+    ) {
+        if (isRetained(value)) retirementJob = job else job.cancel()
     }
 
     @Synchronized
@@ -175,20 +204,22 @@ class ScriptOverlay {
 
     @Synchronized
     fun clearRetained(value: RetainedTap) {
-        if (isRetained(value)) clear()
+        if (isRetained(value)) clearOwned(value.owner)
     }
 
     @Synchronized
     fun clearRetainedOwner(owner: String) {
-        if (retainedOwner == owner) clear()
+        if (retainedOwner == owner) clearOwned(owner)
     }
+
     @Synchronized
     fun isAttachedView(target: View): Boolean = view.get() === target
 
     @Synchronized
     fun clearRetainedForView(target: View) {
-        if (view.get() === target && retainedOwner != null) clear()
+        if (view.get() === target) retainedOwner?.let(::clearOwned)
     }
+
     @Synchronized
     fun draw(
         canvas: Canvas,
@@ -198,8 +229,12 @@ class ScriptOverlay {
         documentId: String?,
     ): Boolean {
         if (retainedOwner != null &&
-            (now >= retainedDeadlineNs || documentId != document ||
-                markerFrame?.matches() != true || !runCatching { retainedGuard?.invoke() == true }.getOrDefault(false))
+            (
+                now >= retainedDeadlineNs ||
+                    documentId != document ||
+                    markerFrame?.matches() != true ||
+                    !runCatching { retainedGuard?.invoke() == true }.getOrDefault(false)
+            )
         ) {
             clear()
             return false
@@ -324,6 +359,7 @@ class ScriptOverlayView(
         super.onWindowVisibilityChanged(visibility)
         if (visibility != VISIBLE) overlay.clearRetainedForView(this)
     }
+
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean = recording()
 
     override fun onDraw(canvas: Canvas) {

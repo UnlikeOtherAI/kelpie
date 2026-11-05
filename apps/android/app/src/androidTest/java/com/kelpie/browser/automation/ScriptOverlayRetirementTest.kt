@@ -9,6 +9,7 @@ import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.kelpie.browser.MainActivity
+import kotlinx.coroutines.Job
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -50,8 +51,17 @@ class ScriptOverlayRetirementTest {
                 val first = overlay.retainFinalTap("first", System.nanoTime()) { true }
                 assertNotNull(first)
 
+                val oldJob = Job()
+                overlay.installRetirementJob(checkNotNull(first), oldJob)
+                overlay.clear() // navigation resets presentation, not the live run owner
+                assertTrue(oldJob.isCancelled)
+                overlay.viewport(300.0, 300.0, "next-document")
+                overlay.indicate(ScriptOverlay.Tap(50.0, 50.0, System.nanoTime(), 20.0, 5000.0, Color.RED, false, true))
+                overlay.bindRetirementFrame(renderer)
+                val afterNavigation = overlay.retainFinalTap("first", System.nanoTime()) { true }
+                assertNotNull(afterNavigation)
                 overlay.attach(newView)
-                assertFalse(overlay.isRetained(checkNotNull(first)))
+                assertFalse(overlay.isRetained(checkNotNull(afterNavigation)))
                 overlay.claimRun("second")
                 overlay.viewport(300.0, 300.0, "document")
                 overlay.indicate(ScriptOverlay.Tap(60.0, 60.0, System.nanoTime(), 20.0, 5000.0, Color.RED, false, true))

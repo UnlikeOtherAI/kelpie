@@ -348,11 +348,17 @@ class ScriptRuntime(
                         val expectedDocument = ctx.tabStore?.activeTab?.documentVersion
                         val valid: () -> Boolean = {
                             val active = ctx.tabStore?.activeTab
-                            ctx.scriptForeground && active != null && active.id == run.tabId &&
-                                active.webView === view && active.documentVersion == expectedDocument &&
+                            ctx.scriptForeground &&
+                                active != null &&
+                                active.id == run.tabId &&
+                                active.webView === view &&
+                                active.documentVersion == expectedDocument &&
                                 ctx.scriptPlaybackState?.isRecording?.value != true &&
-                                view.isAttachedToWindow && view.isShown && view.hasWindowFocus() &&
-                                view.rootView === root && view.windowToken === windowToken &&
+                                view.isAttachedToWindow &&
+                                view.isShown &&
+                                view.hasWindowFocus() &&
+                                view.rootView === root &&
+                                view.windowToken === windowToken &&
                                 runCatching { authority.permitsOnMain() }.getOrDefault(false)
                         }
                         val retained =

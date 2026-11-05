@@ -19,17 +19,29 @@ internal class ScriptOverlayFrame private constructor(
     fun matches(): Boolean =
         ViewFrame.capture(renderer)?.sameAs(rendererFrame) == true &&
             ViewFrame.capture(overlay)?.sameAs(overlayFrame) == true &&
-            renderer.scrollX == scrollX && renderer.scrollY == scrollY && renderer.scale == scale
+            renderer.scrollX == scrollX &&
+            renderer.scrollY == scrollY &&
+            renderer.scale == scale
 
     companion object {
         @Suppress("DEPRECATION")
-        fun capture(renderer: WebView, overlay: View): ScriptOverlayFrame? {
+        fun capture(
+            renderer: WebView,
+            overlay: View,
+        ): ScriptOverlayFrame? {
             val rendererFrame = ViewFrame.capture(renderer) ?: return null
             val overlayFrame = ViewFrame.capture(overlay) ?: return null
+            if (!rendererFrame.sameAs(overlayFrame)) return null
             val scale = renderer.scale
             if (!scale.isFinite() || scale <= 0f) return null
             return ScriptOverlayFrame(
-                renderer, overlay, rendererFrame, overlayFrame, renderer.scrollX, renderer.scrollY, scale,
+                renderer,
+                overlay,
+                rendererFrame,
+                overlayFrame,
+                renderer.scrollX,
+                renderer.scrollY,
+                scale,
             )
         }
     }
@@ -45,8 +57,13 @@ private class ViewFrame(
     val matrix: FloatArray,
 ) {
     fun sameAs(other: ViewFrame): Boolean =
-        root === other.root && token === other.token && width == other.width && height == other.height &&
-            screenX == other.screenX && screenY == other.screenY && matrix.contentEquals(other.matrix)
+        root === other.root &&
+            token === other.token &&
+            width == other.width &&
+            height == other.height &&
+            screenX == other.screenX &&
+            screenY == other.screenY &&
+            matrix.contentEquals(other.matrix)
 
     companion object {
         fun capture(view: View): ViewFrame? {
