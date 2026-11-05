@@ -172,7 +172,7 @@ static const void *kCEFHandlingSendEventKey = &kCEFHandlingSendEventKey;
 + (void)doMessageLoopWork {
     if (gCEFInitialized) {
 #if defined(KELPIE_HOSTED_PUMP_TEST)
-        if (HostedPumpRequested()) { RunPump(); return; }
+        if (PumpExperimentEnabled()) { RunPump(); return; }
 #endif
         cef_do_message_loop_work();
     }
