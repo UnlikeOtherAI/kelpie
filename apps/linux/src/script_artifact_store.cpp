@@ -23,9 +23,17 @@ class Descriptor {
  private:
   int fd_;
 };
-void Remove(const std::filesystem::path& path) {
-  std::error_code ignored; std::filesystem::remove(path, ignored);
+// Private directories prevent cross-user replacement. Recheck the exact published
+// inode before unlinking and preserve already-replaced files and symlinks.
+bool Remove(const std::filesystem::path& path, std::uint64_t device, std::uint64_t inode) {
+  struct stat info{};
+  if (lstat(path.c_str(), &info) != 0) return errno == ENOENT;
+  if (!S_ISREG(info.st_mode) || std::uint64_t(info.st_dev) != device ||
+      std::uint64_t(info.st_ino) != inode) return true;
+  if (unlink(path.c_str()) != 0 && errno != ENOENT) return false;
+  std::error_code ignored;
   std::filesystem::remove(path.parent_path(), ignored); // Only succeeds when empty.
+  return true;
 }
 std::string Hash(int fd) {
   std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> digest(EVP_MD_CTX_new(), EVP_MD_CTX_free);
@@ -50,6 +58,15 @@ bool Range(const nlohmann::json& body, const char* key) {
          (body[key].is_number_integer() && body[key].get<std::int64_t>() >= 0);
 }
 }
+CaptureFileIdentity InspectCaptureFile(const std::filesystem::path& path) {
+  struct stat info{};
+  if (lstat(path.c_str(), &info) || !S_ISREG(info.st_mode) || info.st_uid != getuid() ||
+      (info.st_mode & 077)) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
+  return {std::uint64_t(info.st_dev), std::uint64_t(info.st_ino)};
+}
+bool RemoveCaptureFile(const std::filesystem::path& path, const CaptureFileIdentity& identity) {
+  return Remove(path, identity.device, identity.inode);
+}
 std::filesystem::path CreatePrivateCaptureDirectory() {
   auto pattern = (std::filesystem::temp_directory_path() / "kelpie-capture-XXXXXX").string();
   if (!mkdtemp(pattern.data())) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
@@ -71,7 +88,7 @@ void WriteCaptureFile(const std::filesystem::path& path, const std::vector<std::
   if (!valid) { unlink(path.c_str()); throw std::runtime_error("CAPTURE_OUTPUT_UNAVAILABLE"); }
 }
 ScriptArtifactStore::~ScriptArtifactStore() {
-  for (const auto& [id, entry] : entries_) Remove(entry.path);
+  for (const auto& [id, entry] : entries_) Remove(entry.path, entry.device, entry.inode);
 }
 ScriptArtifactStore::Json ScriptArtifactStore::Publish(const std::filesystem::path& path,
     const std::string& mime, Json metadata, const std::string& run, const std::string& owner) {
@@ -82,24 +99,46 @@ ScriptArtifactStore::Json ScriptArtifactStore::Publish(const std::filesystem::pa
     throw std::runtime_error("CAPTURE_STORAGE_FAILED");
   metadata["id"] = NewDesktopScriptId(); metadata["mimeType"] = mime; metadata["byteLength"] = info.st_size;
   metadata["sha256"] = Hash(fd); if (!metadata.contains("partial")) metadata["partial"] = false;
-  std::lock_guard lock(mutex_); Expire();
+  std::lock_guard lock(mutex_); Expire(std::uint64_t(info.st_size));
+  std::uint64_t retained = 0;
+  for (const auto& [id, entry] : entries_) retained += entry.manifest.value("byteLength", std::uint64_t(0));
+  if (entries_.size() >= 4096 || retained > 268435456 - std::uint64_t(info.st_size))
+    throw std::runtime_error("CAPTURE_STORAGE_FULL");
   entries_.emplace(metadata["id"].get<std::string>(), Entry{path, run, owner, metadata,
       std::chrono::steady_clock::now(), std::uint64_t(info.st_dev), std::uint64_t(info.st_ino)});
   Expire(); return metadata;
 }
-void ScriptArtifactStore::Expire() {
+void ScriptArtifactStore::Expire(std::uint64_t reserve) {
   const auto now = std::chrono::steady_clock::now();
   for (auto it = entries_.begin(); it != entries_.end();) {
-    if (now - it->second.created >= std::chrono::hours(1)) { Remove(it->second.path); it = entries_.erase(it); }
-    else ++it;
+    if (it->second.revoked || now - it->second.created >= std::chrono::hours(1)) {
+      it->second.revoked = true;
+      if (Remove(it->second.path, it->second.device, it->second.inode)) it = entries_.erase(it);
+      else ++it; // Keep failed deletion owned for another cleanup attempt.
+    } else ++it;
   }
   std::uint64_t total = 0;
   for (const auto& [id, entry] : entries_) total += entry.manifest.value("byteLength", std::uint64_t(0));
-  while ((total > 268435456 || entries_.size() > 4096) && !entries_.empty()) {
+  while ((total > 268435456 - reserve || entries_.size() + (reserve != 0) > 4096) && !entries_.empty()) {
     auto oldest = std::min_element(entries_.begin(), entries_.end(), [](const auto& a, const auto& b) { return a.second.created < b.second.created; });
     total -= oldest->second.manifest.value("byteLength", std::uint64_t(0));
-    Remove(oldest->second.path); entries_.erase(oldest);
+    oldest->second.revoked = true;
+    if (!Remove(oldest->second.path, oldest->second.device, oldest->second.inode)) break;
+    entries_.erase(oldest);
   }
+}
+void ScriptArtifactStore::Discard(const std::string& run, const std::string& owner) {
+  if (run.empty() || owner.empty()) throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+  std::lock_guard lock(mutex_);
+  bool failed = false;
+  for (auto it = entries_.begin(); it != entries_.end();) {
+    auto& entry = it->second;
+    if (entry.run != run || entry.owner != owner) { ++it; continue; }
+    entry.revoked = true; // Revoke access even if physical cleanup must retry.
+    if (Remove(entry.path, entry.device, entry.inode)) it = entries_.erase(it);
+    else { failed = true; ++it; }
+  }
+  if (failed) throw std::runtime_error("CAPTURE_DISCARD_FAILED");
 }
 ScriptArtifactStore::Json ScriptArtifactStore::Read(const Json& body, const std::string& owner) {
   if (!body.is_object() || !body.contains("runId") || !body["runId"].is_string() ||
@@ -114,7 +153,7 @@ ScriptArtifactStore::Json ScriptArtifactStore::Read(const Json& body, const std:
   const auto offset = body.value("offset", std::uint64_t(0)), length = body.value("length", std::uint64_t(262144));
   if (!length || length > 1048576) return ErrorResponse("INVALID_PARAMS", "Artifact chunk exceeds range limit");
   std::lock_guard lock(mutex_); Expire(); const auto found = entries_.find(id);
-  if (owner.empty() || found == entries_.end() || found->second.run != run || found->second.owner != owner)
+  if (owner.empty() || found == entries_.end() || found->second.run != run || found->second.owner != owner || found->second.revoked)
     return ErrorResponse("ARTIFACT_NOT_FOUND", "Artifact expired or is not owned by this grant");
   const auto& entry = found->second; const auto total = entry.manifest["byteLength"].get<std::uint64_t>();
   if (offset > total) return ErrorResponse("INVALID_PARAMS", "Artifact offset is beyond end");

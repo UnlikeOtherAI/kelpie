@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import { readdir, lstat, open, writeFile } from "node:fs/promises";
+import { readdir, lstat, open, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
@@ -39,9 +39,12 @@ export async function runFinalizeFault(readiness, runtime, output) {
     assert.equal(identity.uid, process.getuid()); assert.equal(identity.mode & 0o777, 0o700);
     const collision = await open(join(directory, "capture.mp4"),
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    const collisionIdentity = await collision.stat();
     try { await collision.writeFile("synthetic finalization collision"); await collision.sync(); }
     finally { await collision.close(); }
     const result = await pending;
+    assert.equal((await lstat(join(directory, "capture.mp4"))).ino, collisionIdentity.ino);
+    assert.equal(await readFile(join(directory, "capture.mp4"), "utf8"), "synthetic finalization collision");
     assert.equal(result.success, false); assert.equal(result.error.code, "CAPTURE_FINALIZE_FAILED");
     assert.ok(result.artifacts.length > 0 && result.artifacts.every(item => item.partial));
     assert.ok(result.artifacts.some(item => item.mimeType === "image/gif"));

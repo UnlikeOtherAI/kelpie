@@ -328,7 +328,7 @@ MCP configuration. There is no request-body setter. Unknown modes fail closed;
 no-CEF has no callable script routes. This is source wiring, not a shipping
 native relink/MCP/CLI success claim. Those actual gates remain pending.
 
-The independent actual Lightpanda phase is complete at diagnostic scope; see
+The independent actual Lightpanda phase now includes seven passing production stdio cases; see
 lightpanda-analysis.md for all four revisions, failed expectations and measured
 limits. No public reader/WebMCP/pixel profile was enabled.
 
@@ -338,3 +338,30 @@ rejection for the main assertion. Cleanup awaits it for at most5 seconds before
 the launcher's owned app shutdown. Four early-rejection/cleanup regressions
 passed on Maxis using the common helper. The real Linux fault run remains
 pending the native slot; no product state was edited to manufacture recovery.
+
+## Privacy discard and identity-safe cleanup candidate
+
+The Linux adapter now wires root df3197ff's private discard(run, owner) callback.
+Late inferred-sensitive capture refusal and output-redaction failure revoke all
+published artifacts for that exact run and owner; the shared privacy latch
+survives later error replacement. Ordinary failure/abort still retains safe
+partial media. This clarifies the previously ambiguous artifact policy; no
+Linux runtime leak was reproduced or claimed by the source change.
+
+The store revokes read grants before deletion, checks the original device/inode,
+and preserves replacement files/symlinks and other owners/runs. A denied unlink
+retains revoked cleanup ownership for normal retry, while storage admission
+counts that retained data against its existing bounds. Destruction/expiry use
+the same identity check. The existing replacement regression now requires the
+replacement to survive, rather than treating a path as deletion authority.
+
+Capture cleanup now tracks only identities of successfully created outputs.
+It no longer enumerates and deletes unrelated entries in the private directory.
+The synthetic post-ACK finalization collision must retain its exact inode and
+bytes while the run returns failed status, partial GIF and successful recovery.
+Focused C++ tests cover owner/run scope, replaced inodes/symlinks, denied deletion,
+revoked access and cleanup retry. These source tests are not yet compiled.
+
+Node syntax checks and Git whitespace checks passed on Maxis. Native C++ build,
+all-frame decode and real HTTP/MCP/CLI/GTK replay remain pending the next allocated
+Linux slot; this checkpoint is explicitly an unverified native implementation.
