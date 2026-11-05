@@ -265,6 +265,7 @@ class ScriptActions(
     ): Map<String, Any?> {
         val result = rawTarget(action, token, dispatch, edit)
         if (result["ok"] != true) {
+            if (action["action"] in setOf("fill", "type") && result["mayHaveCompleted"] == true) consumeSensitivity(action, true)
             if (dispatch || edit) mutationInFlight = result["mayHaveCompleted"] == true
             throw targetFailure(result)
         }
@@ -278,10 +279,12 @@ class ScriptActions(
         edit: Boolean = false,
         observe: Boolean = false,
     ): Map<String, Any?> {
+        val editing = action["action"] in setOf("fill", "type")
         val options = mutableMapOf<String, Any?>("target" to action["target"], "key" to key)
         if (token != null) options["token"] = token
         if (dispatch) options["dispatch"] = true
         if (observe) options["observe"] = true
+        if (!observe && captures()) options["policy"] = mapOf("refuseSensitive" to true)
         if (edit) options["edit"] = mapOf("action" to action["action"], "text" to action["text"])
         val generated =
             ScriptNative.targetExpression(OpenAIJson.encode(OpenAIJson.fromAny(options)))
@@ -289,7 +292,32 @@ class ScriptActions(
         val expression =
             OpenAIJson.parseObjectOrNull(generated)?.let(OpenAIJson::toMap)?.get("expression") as? String
                 ?: throw ScriptFailure("INVALID_SCRIPT_TARGET")
-        return withTimeout(30_000) { ctx.evaluateAutomationJSON(expression, ::validOnMain) }
+        try {
+            return withTimeout(30_000) {
+                ctx.evaluateAutomationJSON(expression, ::validOnMain) { result ->
+                    // Before validity checks and retirement: a late focus handler
+                    // can make the original editing literal private.
+                    val unknown = (editing || dispatch) && result["sensitive"] !is Boolean
+                    consumeSensitivity(action, result["sensitive"] == true || unknown)
+                }
+            }
+        } catch (error: Exception) {
+            // A lost classification cannot certify the inspected edit literal.
+            if (editing || dispatch) consumeSensitivity(action, true)
+            throw error
+        }
+    }
+
+    private fun captures(): Boolean = run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }
+
+    private fun consumeSensitivity(
+        action: Map<String, Any?>,
+        sensitive: Boolean,
+    ) {
+        if (!sensitive) return
+        if (action["action"] in setOf("fill", "type")) run.redactor.add(action["text"] as String)
+        // Do not stop here: the original result retains its error/uncertainty.
+        if (captures()) run.discardCapture.set(true)
     }
 
     private fun targetFailure(result: Map<String, Any?>): ScriptFailure {
@@ -309,6 +337,7 @@ class ScriptActions(
                 "TARGET_OBSCURED",
                 "TARGET_NOT_EDITABLE",
                 "INPUT_UNCERTAIN",
+                "SENSITIVE_CAPTURE_REFUSED",
             )
         return ScriptFailure(requested?.takeIf { it in safe } ?: "TARGET_EVALUATION_FAILED", result["mayHaveCompleted"] == true)
     }

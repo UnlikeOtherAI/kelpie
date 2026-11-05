@@ -83,17 +83,24 @@ class ScriptArtifacts(
     @Synchronized
     fun manifests(partial: Boolean): List<Map<String, Any?>> = entries.values.map { it.manifest(partial) }
 
-    @Synchronized
-    fun read(
-        runId: String,
-        body: Map<String, Any?>,
-    ): Map<String, Any?> {
+    fun validateRead(body: Map<String, Any?>) {
         if (body.keys.any { it !in setOf("runId", "artifactId", "offset", "length") }) {
             throw ScriptFailure("INVALID_PARAMS")
         }
         val id = body["artifactId"] as? String ?: throw ScriptFailure("INVALID_PARAMS")
         if (id.isEmpty() || id.length > 128) throw ScriptFailure("INVALID_PARAMS")
-        val entry = entries[id] ?: throw ScriptFailure("SCRIPT_ARTIFACT_NOT_FOUND")
+        integer(body["offset"], 0, 0, Long.MAX_VALUE)
+        integer(body["length"], 262_144, 1, 1_048_576)
+    }
+
+    @Synchronized
+    fun read(
+        runId: String,
+        body: Map<String, Any?>,
+    ): Map<String, Any?> {
+        validateRead(body)
+        val id = body["artifactId"] as String
+        val entry = entries[id] ?: throw ScriptFailure("ARTIFACT_NOT_FOUND")
         val offset = integer(body["offset"], 0, 0, Long.MAX_VALUE)
         val length = integer(body["length"], 262_144, 1, 1_048_576).toInt()
         if (offset > entry.byteLength) throw ScriptFailure("SCRIPT_ARTIFACT_RANGE")

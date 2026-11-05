@@ -130,11 +130,13 @@ class HandlerContext(
     suspend fun evaluateAutomationJSON(
         script: String,
         guard: () -> Boolean,
-    ): Map<String, Any?> = parseObject(evaluateGuardedJS("JSON.stringify(($script))", guard))
+        consume: (Map<String, Any?>) -> Unit = {},
+    ): Map<String, Any?> = parseObject(evaluateGuardedJS("JSON.stringify(($script))", guard) { consume(parseObject(it)) })
 
     private suspend fun evaluateGuardedJS(
         script: String,
         guard: (() -> Boolean)?,
+        consume: ((String) -> Unit)? = null,
     ): String =
         suspendCancellableCoroutine { cont ->
             val wv = webView
@@ -148,12 +150,25 @@ class HandlerContext(
                     try {
                         check(guard?.invoke() != false) { "Tab document changed or job stopped" }
                         wv.evaluateJavascript(script) { result ->
-                            browserRetirement.complete(ticket)
+                            // Classify even a cancelled result before releasing retirement.
+                            // The consumer only retains private sensitivity provenance.
+                            val raw = result ?: "null"
+                            val failure =
+                                try {
+                                    consume?.invoke(raw)
+                                    null
+                                } catch (error: Exception) {
+                                    error
+                                } finally {
+                                    browserRetirement.complete(ticket)
+                                }
                             if (cont.isActive) {
-                                if (guard?.invoke() == false) {
+                                if (failure != null) {
+                                    cont.resumeWithException(failure)
+                                } else if (guard?.invoke() == false) {
                                     cont.resumeWithException(IllegalStateException("Tab document changed or job stopped"))
                                 } else {
-                                    cont.resume(result ?: "null")
+                                    cont.resume(raw)
                                 }
                             }
                         }
