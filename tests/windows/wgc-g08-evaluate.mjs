@@ -18,8 +18,10 @@ export async function evaluateWgcFrames(stream,config,{onProgress}={}){
   const scale={x:meta.width/config.viewport.width,y:meta.height/config.viewport.height};
   assert.ok(Math.abs(scale.x-scale.y)<.01,"WGC_GEOMETRY_MISMATCH");
   const marker={center:{x:config.to.x*scale.x,y:config.to.y*scale.y},radius:config.radius*scale.x,color:config.color};
-  const rgb=whiteBackedRGB(bgra,meta.width,meta.height,meta.alphaMode);
-  const sample={timeMs:(meta.tick100ns-origin)/10000,analysisBgraSha256:createHash("sha256").update(bgra).digest("hex"),...measureG08Frame(rgb,meta.width,meta.height,marker)};
+  // The exact owned layered overlay is premultiplied even when WGC labels its copy straight.
+  // Calibration preserves that API label; the converter rejects channels exceeding alpha.
+  const rgb=whiteBackedRGB(bgra,meta.width,meta.height,"premultiplied");
+  const sample={timeMs:(meta.tick100ns-origin)/10000,reportedAlphaMode:meta.alphaMode,analysisAlphaMode:"premultiplied",analysisBgraSha256:createHash("sha256").update(bgra).digest("hex"),...measureG08Frame(rgb,meta.width,meta.height,marker)};
   retention.push(sample);if(onProgress)onProgress({samples,frameCount:samples.length,shape});
  });
  assert.equal(count,samples.length);

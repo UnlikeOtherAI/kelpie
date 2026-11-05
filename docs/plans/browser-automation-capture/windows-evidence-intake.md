@@ -274,3 +274,22 @@ use the independent dense oracle. For de318b47, a separate retained fit on the
 original default C WGC samples passed: 350 ms RMS 6.00 CSS px versus 500 ms
 RMS 90.47 px, five intermediate positions and a 383.34 ms sampled bracket.
 The original `FAST_PROFILE_NOT_DENSE` receipt remains unchanged.
+The retained de318 dense C and S WGC runs reached the marker-opacity gate
+after the canonical path/easing gate, but both remained insufficient at
+marker onset. An independent owned layered-window calibration used partial
+red BGRA [0,0,178,178], partial green [0,89,0,89], opaque blue and clear
+patches. The exact-owner WGC deep copy reported `straight` while all 3x3
+interior raw samples retained their premultiplied input bytes at the observed
+2x DPI. Red white-backed as straight became [201,77,77], matching the failed
+observations; interpreted as premultiplied it became [255,77,77]. Green and
+opaque/clear controls corroborated the distinction.
+
+The Windows WGC numeric adapter therefore records the API alpha label and
+uses premultiplied composition only for the exact owned layered overlay,
+rejecting channels above alpha. The original raw and PNG evidence is unchanged;
+the older timeline reports remain insufficient because they did not retain
+every raw frame. Fresh runs are required for dense acceptance. The calibration
+raw SHA-256 is
+`d8e9fea696fdec1e7b3455eeb498f7cf0c8ba5eec9c141b0e3f085f01e82a7c4`,
+and the retained PNG SHA-256 is
+`7e17ebc50b0956fe91b354c2374ddd6ef7d4365f2bb4d3d1b0b32293eba75735`.
