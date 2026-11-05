@@ -18,6 +18,33 @@ to bypass that dependency. After normal integration to default,the Linux
 workflow's documented dispatch/reusable route becomes available; it cannot
 retroactively supply the required pre-PR package evidence.
 
+## Approved permanent follow-up
+
+Root approved a minimal opt-in Linux quality gate through existing default-
+registered lint.yml,whose primary version already has workflow_dispatch.
+linux_native_candidate is a boolean defaultfalse; only an explicit manual
+dispatch calls the authoritative ./linux-native.yml at the SAME selected
+ref/commit,with force_build:true,empty release_tag and candidate artifact prefix.
+Normal lint/PR/main behavior is unchanged; contents:read,no secrets inheritance
+and no publication. No build recipe is copied into lint.yml.
+
+This is a Linux-specific candidate route,not a Mac/Windows workflow workaround.
+It avoids waiting indefinitely for offline umac while respecting the dispatch
+registration rule. Root reviews the pushed wrapper before any manual dispatch.
+The Linux owner owns installed DEB/RPM ABI/sandbox smoke in the callee; existing
+build/package/codec tests alone do not close installed runtime acceptance.
+
+Official event and same-ref rules:
+[manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+and [reusable workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows).
+Focused static YAML/policy tests check defaultfalse,event guard,same-ref call,
+read-only/no-secret/no-publish boundaries and unchanged lint. No YAML parser
+was installed; GitHub's own parse/dispatch result remains part of the actual
+candidate run gate. Static wrapper policy and existing Linux scope tests passed4/4
+in8.70s under hard JobObject affinity1/Normal,2GiB,task D: TEMP/TMP; whole job
+9.478s. Evidence: linux-candidate-checks.log and policy JSON in common artifacts.
+No native/compiler/container/dispatch job was launched by these focused checks.
+
 ## Owned cache and host facts
 
 Linux owner reports only the Fedora test worktree:
