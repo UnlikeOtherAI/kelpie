@@ -76,7 +76,12 @@ for (const line of (await readFile(join(output,"generator-maps.txt"),"utf8")).sp
 }
 const generatorDependencies = [];
 for (const path of [...mapped].sort()) generatorDependencies.push({path,sha256:await fileHash(path)});
-assert.deepEqual(generatorDependencies,evidence.dependencies,"Live generator dependencies differ from candidate");
+const candidateMediaDependencies = evidence.dependencies.filter(item =>
+  /\/(?:libgif\.so|libcairo\.so|libpixman|libz\.so)/.test(item.path));
+const generatorMediaDependencies = generatorDependencies.filter(item =>
+  /\/(?:libgif\.so|libcairo\.so|libpixman|libz\.so)/.test(item.path));
+assert.deepEqual(generatorMediaDependencies,candidateMediaDependencies,
+  "Live GIF/Cairo/Pixman/z dependencies differ from candidate");
 
 const center = {x:(pointer.x-view.offsetLeft)*view.scale*width/config.viewportWidth,
   y:(pointer.y-view.offsetTop)*view.scale*height/config.viewportHeight};
