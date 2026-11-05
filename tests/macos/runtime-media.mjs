@@ -1,6 +1,6 @@
 import {execFileSync} from "node:child_process";
 import {createHash} from "node:crypto";
-import {requireTrue} from "./runtime-client.mjs";
+import {Failure,requireTrue} from "./runtime-client.mjs";
 import {fitFastPointer} from "../capture/g08-fast-profile.mjs";
 export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
  const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_streams","-show_frames","-of","json",item.file],{maxBuffer:16*1024*1024}));
@@ -111,5 +111,11 @@ export function inspectDefaultMotion(item,scene){
   if(count>=3&&maxX-minX<24&&maxY-minY<24&&Number.isFinite(time))
    tracks.push({timeMs:time,x:minX*scene.width/item.width,y:minY*scene.height/item.height});
  }
- return fitFastPointer(tracks,{from:scene.first,to:scene.second,curve:"s"});
+ try{return fitFastPointer(tracks,{from:scene.first,to:scene.second,curve:"s"});}
+ catch(error){
+  const allowed=new Set(["FAST_INVALID_CURVE","FAST_INVALID_GEOMETRY","FAST_INSUFFICIENT_PATH","FAST_INSUFFICIENT_SAMPLES",
+   "FAST_INVALID_PTS","FAST_INSUFFICIENT_ENDPOINT","FAST_INSUFFICIENT_START","FAST_INSUFFICIENT_END",
+   "FAST_INSUFFICIENT_CADENCE","FAST_INSUFFICIENT_COVERAGE","FAST_DURATION_MISMATCH"]);
+  throw new Failure(allowed.has(error?.message)?error.message:"DEFAULT_MOTION_ORACLE_FAILED");
+ }
 }
