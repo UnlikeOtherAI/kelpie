@@ -36,6 +36,7 @@ try {
  const status=await call("kelpie_get_script_status",{});assert.equal(status.success,true);assert.ok(status.supportedVersions.includes(1));
  const tabs=await api("get-tabs");const tabId=tabs.tabs.find(t=>t.active).id;
  const played=await call("kelpie_play_script",{version:1,tabId,actions:[{action:"navigate",url:fixture.url},
+ {action:"wait-ready",state:"complete",selector:"#unique",timeoutMs:10000},
  {action:"click",target:{role:"button",name:"Confirm order",exact:true}}]});
  assert.equal(played.success,true);
  report.firstWorkflow={runId:played.runId,serverEventsBeforeFlush:fixture.events.length};
