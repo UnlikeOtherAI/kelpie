@@ -11,6 +11,11 @@ export async function publicCLI(client,fixture,privateDir,engine="webkit"){
   const window=await waitFor(()=>client.find("pair.dialog.always"));
   await client.tap("pair.dialog.always",window);await pairing.result;
  }
+ // A pairing sheet may leave the hosted candidate's browser window non-key.
+ // Refocus only this PID-verified owned window before the interactive CLI recipe.
+ client.cliStage="owned-focus";
+ const focus=await client.focusOwnedBrowser();
+ client.nativeControlStage=null;
  client.cliStage="get-tabs";
  const tabs=await client.api("get-tabs");const tabId=engine==="chromium"?"chromium":tabs.activeTab;
  requireTrue(tabId,engine==="chromium"?"CLI_CEF_TAB":"CLI_WEBKIT_TAB");
@@ -40,7 +45,7 @@ export async function publicCLI(client,fixture,privateDir,engine="webkit"){
  requireTrue(new Set(decoded.map(item=>item.mimeType)).size===3,"PUBLIC_CLI_ALL_FORMATS");
  client.cliStage="mcp";
  const mcp=await cliMCP();
- return {engine,runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
+ return {engine,focus,runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
 }
 export async function inference(client,privateDir){
  const revision="499bc8821c6b12b4e53c5bffcb21ec206f212d81";
