@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {createHash} from "node:crypto";
-import {mkdir,readFile,writeFile} from "node:fs/promises";
+import {access,mkdir,readFile,writeFile} from "node:fs/promises";
 import {join,dirname,isAbsolute} from "node:path";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 
@@ -23,6 +23,9 @@ function summarize(error){
   /^Kelpie exited before publishing readiness \(exit -?\d+\)$/.test(message)?"exited-before-readiness":
   /^Kelpie failed to start:/.test(message)?"spawn-failed":
   message==="A live browser already owns this profile; attach to its alias or stop it first"?"profile-owned":
+  message==="Kelpie did not accept orderly shutdown"?"shutdown-refused":
+  message==="Kelpie did not complete orderly shutdown before the deadline"?"shutdown-deadline":
+  message==="Refusing to clear state after a different browser launch replaced readiness"?"readiness-replaced":
   data?.error?"other-cli-error":"no-cli-error-json";
  return {code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false,
   cliErrorCode:typeof data?.error?.code==="string"&&/^[A-Z_]+$/.test(data.error.code)?data.error.code:null,category};
@@ -47,9 +50,22 @@ try{
   assert.equal(info.path.replaceAll("\\","/").toLowerCase(),exe.replaceAll("\\","/").toLowerCase());
   report.identity=info;report.stage="stop";
   const stopped=await run(["browser","stop",alias],30000);
-  report.checks.push({stage:"stop",...stopped,value:undefined});assert.ok(stopped.ok);
+  report.checks.push({stage:"stop",...stopped,value:undefined});
+  if(!stopped.ok){
+   report.cleanupObservations=[];
+   for(const delayMs of [0,5000,10000]){
+    if(delayMs)await new Promise(done=>setTimeout(done,5000));
+    let readinessPresent=true;try{await access(running.readinessFile);}catch{readinessPresent=false;}
+    const probe="$p=Get-Process -Id "+info.pid+" -ErrorAction SilentlyContinue;$s=Get-NetTCPConnection -State Listen -LocalPort 28420 -ErrorAction SilentlyContinue;[pscustomobject]@{processPresent=($null -ne $p);listenerOwned=($null -ne $s -and $s.OwningProcess -eq "+info.pid+")}|ConvertTo-Json";
+    const probeEncoded=Buffer.from(probe,"utf16le").toString("base64");
+    const observed=JSON.parse((await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",probeEncoded],{env,windowsHide:true,timeout:15000})).stdout);
+    report.cleanupObservations.push({delayMs,readinessPresent,...observed});
+   }
+   report.cleanup="public-stop-failed";process.exitCode=1;
+  }else{
   report.processExit=await waitForOwnedExit({pid:info.pid,executable:exe,startTime:info.startTime});
   assert.equal(report.processExit.exited,true);report.cleanup="public-cli-closed";
+  }
  }else{report.cleanup="launch-failed";process.exitCode=1;}
 }catch(error){report.failure={stage:report.stage,...summarize(error)};process.exitCode=1;}
 finally{await writeFile(reportPath,JSON.stringify(report,null,2),{flag:"wx"});}
