@@ -804,3 +804,25 @@ This is an installed, headless container result, not physical Ubuntu desktop
 or published-release verification. The Fedora row of 42107002688 failed
 before testing while its source artifact was unavailable; it does not establish
 a Fedora runtime result.
+
+## Isolated GTK PNG-only marker transition
+
+On Fedora 44, GTK/CEF source 0fef3222ca6bdcc5aa3df12b4a6c4371b4858490
+was built with local LLM and test observation OFF. Its executable SHA-256 was
+ff97028b4b6d1fccc808a55882c30737741aa7bbe0e47b72f32b83baade0bf2c.
+Test source 27071547b2d7e46d57bd4dab4d848cacdd60c13c exercised one
+PNG-only click with a 5000 ms indicator through public HTTP in a private,
+test-owned Weston session. The click was trusted and the response completed in
+1817.84 ms. A post-response 1280×900 native compositor screenshot showed the
+red marker centered on Confirm order with no Stop button in the chrome.
+Screenshot SHA-256:
+f38e60c5636265d61e45a5d446ab09b0aa8682e6b29d68686061437c0e03eb0c.
+The exact app and compositor exited, the bounded unit became inactive and the
+unrelated Fedora process remained present.
+
+This is one isolated-Wayland PNG-only observation. It does not prove the
+marker fades to expiry, the next run suppresses it, an explicit screenshot
+without capture behaves equivalently, or a physical GNOME display. The test
+receipt's legacy invocation and pointer-duration labels incorrectly describe
+the old Stop flow; this run used no abort and disabled the pointer. The labels
+were corrected in test source feb1dc08, after this observation.
