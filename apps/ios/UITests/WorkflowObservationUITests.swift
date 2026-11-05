@@ -137,6 +137,8 @@ extension WorkflowCaptureUITests {
         let premature = range.merging(["runId": activeID]) { _, new in new }
         let notReady = try await probe.request("/v1/get-script-artifact", premature)
         XCTAssertEqual((notReady["error"] as? Body)?["code"] as? String, "ARTIFACT_NOT_READY")
+        let malformed = try await probe.request("/v1/get-script-artifact", premature.merging(["length": true]) { _, new in new })
+        XCTAssertEqual((malformed["error"] as? Body)?["code"] as? String, "INVALID_PARAM")
         let hidden = try await second.request("/v1/get-script-artifact", premature)
         XCTAssertEqual((hidden["error"] as? Body)?["code"] as? String, "ARTIFACT_NOT_FOUND")
         let older = try await probe.request("/v1/get-script-artifact", range)

@@ -21,10 +21,11 @@ final class IOSWorkflowRunner {
         let authorized = await grant?.isCurrent() ?? false
         if method == "get-script-artifact" {
             guard let grant, authorized else { return denied() }
-            if let runID, body["runId"] as? String == runID {
-                return IOSWorkflowFailure(owner == grant.owner ? "ARTIFACT_NOT_READY" : "ARTIFACT_NOT_FOUND").response
-            }
-            return ScriptArtifactStore.shared.read(body, owner: grant.owner)
+            return ScriptArtifactStore.shared.read(
+                body,
+                owner: grant.owner,
+                blockedRunID: owner == grant.owner ? runID : nil
+            )
         }
         guard Set(body.keys).isSubset(of: ["runId"]), body["runId"] == nil ||
                 (body["runId"] as? String).map({ !$0.isEmpty && $0.count <= 128 }) == true else {

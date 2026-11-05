@@ -39,6 +39,9 @@ final class WorkflowLoopbackPage {
           field.oninput=()=>{document.title='Unexpected edit'};
           if(location.pathname==='/focus-secret-password')field.onfocus=()=>{field.type='password'};
           if(location.pathname==='/focus-secret-autocomplete')field.onfocus=()=>{field.autocomplete='current-password'};
+          if(location.pathname==='/focus-secret-timeout')field.onfocus=()=>{
+            const end=performance.now()+6500;while(performance.now()<end){}
+          };
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
