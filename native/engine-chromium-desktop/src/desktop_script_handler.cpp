@@ -240,7 +240,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       const std::string code=std::string(error.what())=="OUTPUT_REDACTION_COLLISION"?"OUTPUT_REDACTION_COLLISION":"OUTPUT_REDACTION_LIMIT";
       privacy_discard.store(true);
       const bool uncertain=result.value("mayHaveCompleted",false);
-      result=ErrorResponse(code,"Named outputs could not be safely redacted"); outputs=Json::object();
+      if(result.value("success",false)) result=ErrorResponse(code,"Named outputs could not be safely redacted");
+      outputs=Json::object();
       if(uncertain) result["mayHaveCompleted"]=true;
     }
     result["outputs"] = std::move(outputs);

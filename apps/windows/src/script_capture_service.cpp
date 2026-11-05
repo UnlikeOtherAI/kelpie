@@ -107,14 +107,6 @@ class Capture final : public DesktopScriptCapture {
   double last_elapsed_=0,last_movie_frame_=-1;
 };
 }
-WindowsScriptService::WindowsScriptService(HWND viewport,HWND owner,Marshal marshal,DocumentGuard guard)
-    :viewport_(viewport),owner_(owner),marshal_(std::move(marshal)),guard_(std::move(guard)) {}
-WindowsScriptService::~WindowsScriptService() {
-  overlay_.reset();
-  for(const auto& [id,entry]:entries_) {
-    std::error_code ignored; std::filesystem::remove(entry.path,ignored); std::filesystem::remove(entry.path.parent_path(),ignored);
-  }
-}
 void WindowsScriptService::Configure(DesktopApp::Config& config) {
   auto self=shared_from_this();
   config.scripts.capture=[self](const Json& options,const std::string& run,const std::string& owner) {

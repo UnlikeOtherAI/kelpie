@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include "kelpie/desktop_app.h"
 namespace kelpie::windows {
@@ -23,6 +24,7 @@ class WindowsScriptService : public std::enable_shared_from_this<WindowsScriptSe
   void Discard(const std::string& run,const std::string& owner);
   void Show(const Json& presentation, std::function<void()> stop);
  private:
+  friend struct WindowsScriptStoreTest;
   struct Entry {
     std::filesystem::path path;
     std::string run, owner;
@@ -39,6 +41,8 @@ class WindowsScriptService : public std::enable_shared_from_this<WindowsScriptSe
   std::unique_ptr<ScriptNativeOverlay> overlay_;
 };
 BY_HANDLE_FILE_INFORMATION CaptureFileIdentity(const std::filesystem::path& path);
+std::vector<BYTE> ReadCaptureFile(const std::filesystem::path& path,const BY_HANDLE_FILE_INFORMATION& expected,
+  std::uint64_t size,std::uint64_t offset,std::uint64_t length);
 bool RemoveCaptureFile(const std::filesystem::path& path,const BY_HANDLE_FILE_INFORMATION& expected);
 std::filesystem::path CreatePrivateCaptureDirectory(const std::string& run);
 }
