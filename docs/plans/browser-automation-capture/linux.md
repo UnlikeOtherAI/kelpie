@@ -633,3 +633,8 @@ requests, unchanged URL, and clean SIGTERM exit. The Fedora VM already has an
 installed Kelpie RPM, and Ubuntu was unreachable. Fresh installed DEB/RPM
 candidate verification remains open; neither the existing Fedora package nor
 the sandbox is altered as a workaround.
+
+The offscreen harness isolation change was then exercised against the same 0d3d
+executable with deliberately invalid inherited display and session-bus variables.
+Test revision `cb520132e3b83a3fc405cf45e109a30afa5d664c` passed 36/36 cases
+and all supplements, and removed readiness on clean exit.
