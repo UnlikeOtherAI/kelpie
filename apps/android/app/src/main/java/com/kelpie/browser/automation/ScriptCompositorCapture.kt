@@ -28,6 +28,7 @@ import kotlin.math.round
 internal class ScriptCompositorCapture(
     private val view: WebView,
     private val scene: () -> Long,
+    private val diagnostics: ScriptCaptureDiagnostics = ScriptCaptureDiagnostics(),
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
@@ -112,16 +113,20 @@ internal class ScriptCompositorCapture(
     @RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun awaitCommittedFrameOnQ() {
         suspendCancellableCoroutine<Unit> { continuation ->
+            val visualStarted = System.nanoTime()
             view.postVisualStateCallback(
                 0,
                 object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.VISUAL, System.nanoTime() - visualStarted)
                         if (!continuation.isActive) return
                         if (!view.isAttachedToWindow) {
                             continuation.resumeWithException(ScriptFailure("CAPTURE_VIEW_UNAVAILABLE"))
                             return
                         }
+                        val commitStarted = System.nanoTime()
                         view.viewTreeObserver.registerFrameCommitCallback {
+                            diagnostics.record(ScriptCaptureDiagnostics.Phase.COMMIT, System.nanoTime() - commitStarted)
                             if (continuation.isActive) continuation.resume(Unit)
                         }
                         view.invalidate()
