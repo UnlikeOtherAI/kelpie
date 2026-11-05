@@ -2,18 +2,25 @@ import assert from "node:assert/strict";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {createHash} from "node:crypto";
-import {access,mkdir,readFile,writeFile} from "node:fs/promises";
+import {access,mkdir,readFile,readdir,writeFile} from "node:fs/promises";
 import {join,dirname,isAbsolute} from "node:path";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 
-const [exe,cli,privateRoot,reportPath,manifestPath]=process.argv.slice(2);
+const [exe,cli,privateRoot,reportPath,manifestPath,expectedRevision,expectedBundle]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,reportPath,manifestPath].every(p=>p&&isAbsolute(p)));
+assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);assert.match(expectedBundle??"",/^[a-f0-9]{64}$/);
 const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 const hash=async p=>createHash("sha256").update(await readFile(p)).digest("hex");
 assert.equal(await hash(exe),manifest.exeSha256);assert.equal(await hash(join(dirname(exe),"kelpie.dll")),manifest.dllSha256);
-assert.equal(await hash(cli),manifest.cliSha256);await mkdir(privateRoot,{recursive:false});
+assert.equal(await hash(cli),manifest.cliSha256);
+const files=(await readdir(dirname(cli))).filter(name=>name.endsWith(".js")).sort(),bundle=createHash("sha256");
+assert.ok(files.length>0);for(const name of files)bundle.update(name+":"+await hash(join(dirname(cli),name))+"\n");
+assert.equal(bundle.digest("hex"),expectedBundle);
 const exec=promisify(execFile);
+assert.equal((await exec("git.exe",["rev-parse","HEAD"])).stdout.trim(),expectedRevision);
+assert.equal((await exec("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");
+await mkdir(privateRoot,{recursive:false});
 const sidCommand="[Security.Principal.WindowsIdentity]::GetCurrent().User.Value";
 const sid=(await exec("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",Buffer.from(sidCommand,"utf16le").toString("base64")],{windowsHide:true,timeout:15000})).stdout.trim();
 assert.match(sid,/^S-1-[0-9-]+$/);
@@ -21,7 +28,7 @@ await exec(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inherit
 const home=join(privateRoot,"cli-home"),profile=join(privateRoot,"profile");await mkdir(home);
 const env={...process.env,USERPROFILE:privateRoot,KELPIE_HOME:home,NODE_OPTIONS:"--max-old-space-size=2048"};
 const alias="capture-launch-diagnostic-"+manifest.source.slice(0,8);
-const report={source:manifest.source,stage:"register",checks:[],cleanup:"not-started"};
+const report={source:manifest.source,testRevision:expectedRevision,cliBundleSha256:expectedBundle,stage:"register",checks:[],cleanup:"not-started"};
 const summarize = error => safeCliFailure(error);
 async function run(args,timeout){
  const started=Date.now();
