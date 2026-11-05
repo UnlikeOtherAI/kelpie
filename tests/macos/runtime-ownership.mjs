@@ -4,6 +4,14 @@ export function listenerState(owners,pid){
  return owners.length===1&&owners[0]===pid?"owned":"foreign";
 }
 
+// Keep an empty lsof result distinct from a failed process invocation.
+export function listenerProbeFailure(error){
+ const stderrPresent=typeof error?.stderr?.length==="number"&&error.stderr.length>0;
+ const outcome=error?.status===1&&!stderrPresent?"no-match":"probe-error";
+ const causes=new Set(["ENOENT","EACCES","EAGAIN","ETIMEDOUT"]);
+ return {outcome,cause:causes.has(error?.code)?error.code:"OTHER",stderrPresent};
+}
+
 // Only fixed labels leave the pre-pairing stdout parser, never the message text.
 export function startupSignal(line){
  if(line==="[KelpieApp] AppReveal start requested")return "APPREVEAL_START_REQUESTED";
