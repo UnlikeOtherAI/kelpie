@@ -157,14 +157,15 @@ final class IOSWorkflowRunner {
             isAborted: { [state = host.playbackState] in state.isAbortRequested() }
         ) ?? []
         currentArtifacts = artifacts
-        if issue == nil { issue = media?.failure ?? sampler?.failure }
         await IOSRendererDeadline.waitForRetirement(tab.view)
         await tab.resetTargets()
         await IOSRendererDeadline.waitForRetirement(tab.view)
         await host.setRecordingMode(false)
-        if host.playbackState.isAbortRequested() {
-            issue = IOSWorkflowFailure("SCRIPT_ABORTED", mayHaveCompleted: issue?.mayHaveCompleted ?? false)
-        }
+        issue = IOSWorkflowFailure.terminal(
+            action: issue,
+            capture: media?.failure ?? sampler?.failure,
+            stopRequested: host.playbackState.isAbortRequested()
+        )
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
         guard await grant.isCurrent() else { return denied() }
         return response
