@@ -37,11 +37,11 @@ export async function runG08({ command, folder, tabId, profile, revision, binary
         const eventsResponse = await fetch(fixture.url.replace('/g08', '/events'));
         assert.equal(eventsResponse.status, 200);
         facts = await eventsResponse.json();
-        if (facts.events.length < 2) await new Promise(resolveEvents => setTimeout(resolveEvents, 50));
-      } while (facts.events.length < 2 && Date.now() < eventDeadline);
+        if (facts.events.length < 3) await new Promise(resolveEvents => setTimeout(resolveEvents, 50));
+      } while (facts.events.length < 3 && Date.now() < eventDeadline);
       await writeFile(join(folder, 'g08-' + curve + '-events.json'), JSON.stringify(facts, null, 2));
       eventsDropped += facts.dropped;
-      assert.equal(facts.events.length, 2);
+      assert.equal(facts.events.length, 3);
       const artifacts = [];
       for (const mime of ['image/gif', 'video/mp4']) {
         const item = run.artifacts.find(entry => entry.mimeType === mime);
@@ -58,7 +58,7 @@ export async function runG08({ command, folder, tabId, profile, revision, binary
         const metadata = JSON.parse(probe.stdout);
         artifacts.push({ ...item, file, timestamps: metadata.frames.map(frame => Number(frame.best_effort_timestamp_time)) });
       }
-      cases.push({ curve, scene: { start: facts.events[0], finish: facts.events[1] }, artifacts });
+      cases.push({ curve, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts });
     } finally {
       await fixture.close();
     }
