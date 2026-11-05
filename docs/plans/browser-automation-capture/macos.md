@@ -126,3 +126,8 @@ A Mac caller that started GIF finalization after abort previously returned false
 Codec regression uses the actual caller policy, shared GIF encoder, full frame decode and artifact store: already-aborted grace retains three valid frames as partial, a newly arriving abort interrupts normal finalization, and the next GIF succeeds. Runtime acceptance must additionally run GIF-only capture, abort after frames are collected, retrieve and fully decode its partial GIF, then complete a fresh run without manual state repair. Native Stop and remote abort both need this flow through the pinned authenticated listener.
 
 The abort-prefix codec suite passed in .cache/apple-codec-kmPkt9 with peak private footprint 75.3 MB. ImageIO decoded every retained frame; independent FFmpeg/ffprobe fully decoded already-aborted, newly-aborted and recovered GIFs, each 3 frames at 160x90 with 0.1 second duration. This checks the production finalization policy/encoder/artifact-store seam, not native GIF-only Stop acceptance.
+
+
+## Explicit hosted runtime entry point
+
+The macOS workflow now accepts manual runtime_acceptance (default false). After the existing verified compilation, it can test-sign and launch only its own candidate on a dedicated hosted runner. The source driver and current coverage/gaps are documented in tests/macos/README.md. No local app handoff or global input is used. This tranche adds the concrete inferred-sensitive prior-output regression for both renderers and pins failure-time media disposal independently of redaction success. Hosted execution and remaining canonical coverage are pending; syntax/lint/fixture checks are not native acceptance.

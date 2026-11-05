@@ -136,8 +136,8 @@ final class ScriptWorkflowActions {
         }
         let editing = action == "type" || action == "fill"
         let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
-        if sensitive, workflow.capture != nil { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
+        if sensitive, workflow.capture != nil { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await presentation.move(to: point, options: workflow.settings["pointer"] as? Body ?? [:], check: check)
         var settings = workflow.settings["tapIndicator"] as? Body ?? [:]

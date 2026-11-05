@@ -1,0 +1,54 @@
+import {execFileSync} from "node:child_process";
+import {requireTrue} from "./runtime-client.mjs";
+export function inspectMedia(item,{marker=false,preNavigation=false}={}) {
+ const meta=JSON.parse(execFileSync("ffprobe",["-v","error","-select_streams","v:0","-show_streams","-show_frames","-of","json",item.file],{maxBuffer:16*1024*1024}));
+ const stream=meta.streams[0];requireTrue(stream?.width===item.width&&stream?.height===item.height,"MEDIA_DIMENSIONS");
+ const frames=meta.frames??[];requireTrue(frames.length>0,"MEDIA_EMPTY");
+ requireTrue(stream.width*stream.height*3*frames.length<=256*1024*1024,"DECODE_LIMIT");
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const stride=stream.width*stream.height*3;requireTrue(rgb.length===stride*frames.length,"MEDIA_FULL_DECODE");
+ let previous=-Infinity,marked=0,markedWhite=0,yellowFrames=0;
+ const times=frames.map(frame=>{const value=Number(frame.best_effort_timestamp_time??frame.pts_time??0);requireTrue(value>=previous,"MEDIA_TIMESTAMPS");previous=value;return value;});
+ for(let start=0;start<rgb.length;start+=stride){let pixels=0,white=0,yellow=0;
+  for(let p=start;p<start+stride;p+=3){
+   if(rgb[p]>180&&rgb[p+1]<140&&rgb[p+2]<150)pixels++;
+   if(rgb[p]>240&&rgb[p+1]>240&&rgb[p+2]>240)white++;
+   if(rgb[p]>230&&rgb[p+1]>200&&rgb[p+2]<170)yellow++;
+  }
+  if(pixels>20){marked++;if(white>stride/3*0.3)markedWhite++;}
+  if(yellow>stride/3*0.3)yellowFrames++;
+ }
+ if(marker)requireTrue(marked>0,"MOVIE_MARKER_MISSING");
+ if(preNavigation)requireTrue(markedWhite>0&&yellowFrames>0,"MARKER_DOCUMENT_COHERENCE");
+ return {mimeType:item.mimeType,width:stream.width,height:stream.height,decodedFrames:frames.length,timestamps:times,markerFrames:marked,markedPreNavigationFrames:markedWhite,yellowFrames};
+}
+
+export function centerPixel(item) {
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-frames:v","1","-vf","crop=1:1:iw/2:ih/2,format=rgb24","-f","rawvideo","-"],{maxBuffer:1024});
+ requireTrue(rgb.length===3,"PIXEL_DECODE");return [...rgb];
+}
+
+export function inspectCurve(item,curve,scene){
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:256*1024*1024});
+ const stride=item.width*item.height*3,tracks=[],colors=[];
+ for(let start=0;start<rgb.length;start+=stride){let minX=item.width,minY=item.height,maxX=-1,maxY=-1,count=0,colored=0;
+  for(let y=0;y<item.height;y++)for(let x=0;x<item.width;x++){
+   const p=start+(y*item.width+x)*3;
+   if(curve==="s"?rgb[p]>190&&rgb[p+1]<180&&rgb[p+2]<180:rgb[p+2]>200&&rgb[p+1]>100&&rgb[p+1]<230&&rgb[p]<180)colored++;
+   if(rgb[p]<170&&rgb[p+1]<170&&rgb[p+2]<170){count++;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+  }
+  colors.push(colored);
+  if(count>=3&&maxX-minX<24&&maxY-minY<24)tracks.push({x:minX*scene.width/item.width,y:minY*scene.height/item.height});
+ }
+ requireTrue(tracks.length>8,"CURVE_POINTER_SAMPLES");
+ requireTrue(colors.some(c=>c>20)&&colors.at(-1)===0,"CONFIGURED_MARKER_COLOR_AND_END");
+ const last=tracks.at(-1),offset={x:scene.second.x-last.x,y:scene.second.y-last.y};
+ requireTrue(Math.hypot(offset.x,offset.y)<8,"CURVE_ENDPOINT");
+ const dx=scene.second.x-scene.first.x,dy=scene.second.y-scene.first.y,d2=dx*dx+dy*dy;
+ const normals=tracks.flatMap(p=>{const x=p.x+offset.x-scene.first.x,y=p.y+offset.y-scene.first.y,along=(x*dx+y*dy)/d2;
+  return along>.08&&along<.92?[(dx*y-dy*x)/Math.sqrt(d2)]:[];});
+ requireTrue(normals.length>=5,"CURVE_INTERMEDIATE_SAMPLES");
+ const minimum=Math.min(...normals),maximum=Math.max(...normals);
+ requireTrue(curve==="s"?minimum< -8&&maximum>8:minimum> -8&&maximum>15,"CURVE_GEOMETRY");
+ return {curve,pointerSamples:tracks.length,minimum,maximum,endpointError:Math.hypot(offset.x,offset.y)};
+}
