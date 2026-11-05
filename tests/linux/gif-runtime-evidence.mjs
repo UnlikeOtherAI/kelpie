@@ -33,5 +33,8 @@ export async function writeGifRuntimeEvidence(pid, executable, source, output) {
     encoder:await fileHash(join(objects,"script_media_encoder.cpp.o")),
   };
   await writeFile(output, JSON.stringify({version:1,source,pid,binaryPath:actual,
-    binarySHA256:await fileHash(actual),mediaObjectSHA256,dependencies},null,2), {flag:"wx"});
+    binarySHA256:await fileHash(actual),mediaObjectSHA256,
+    mediaArchiveSHA256:await fileHash(join(dirname(resolve(executable)),"libkelpie_linux_script_media.a")),
+    candidateLinkMapSHA256:await fileHash(join(dirname(resolve(executable)),"kelpie-linux-link.map")),
+    dependencies},null,2), {flag:"wx"});
 }
