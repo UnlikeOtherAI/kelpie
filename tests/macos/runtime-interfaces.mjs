@@ -5,10 +5,13 @@ import {inspectMedia} from "./runtime-media.mjs";
 import {cli,cliMCP,requireTrue,waitFor} from "./runtime-client.mjs";
 export async function publicCLI(client,fixture,privateDir,engine="webkit"){
  if(engine==="webkit"){
+  client.cliStage="pair";
   const pairing=cli(["pair","--client-name","Hosted public CLI","--timeout-ms","35000"]);
+  void pairing.result.catch(()=>{});
   const window=await waitFor(()=>client.find("pair.dialog.always"));
   await client.tap("pair.dialog.always",window);await pairing.result;
  }
+ client.cliStage="get-tabs";
  const tabs=await client.api("get-tabs");const tabId=engine==="chromium"?"chromium":tabs.activeTab;
  requireTrue(tabId,engine==="chromium"?"CLI_CEF_TAB":"CLI_WEBKIT_TAB");
  const file=path.join(privateDir,"recipe-"+engine+".json"),inputs=path.join(privateDir,"inputs-"+engine+".json"),out=path.join(client.out,"cli-"+engine);
@@ -18,12 +21,15 @@ export async function publicCLI(client,fixture,privateDir,engine="webkit"){
  {action:"fill",target:{label:"Draft message"},text:{input:"draft"}},{action:"click",target:{role:"button",name:"Submit"}}]}),{flag:"wx"});
  await writeFile(inputs,JSON.stringify({draft:"Public CLI typed input"}),{flag:"wx"});
  client.pin(28420);
+ client.cliStage="run";
  const response=await cli(["script","run",file,"--inputs",inputs,"--output",out],90000).result;
  client.pin(28420);const value=response.result??response;
  requireTrue(response.downloaded?.length>0,"PUBLIC_CLI_DOWNLOADS");
  requireTrue(value.success,"PUBLIC_CLI_WORKFLOW");
+ client.cliStage="status";
  const status=await cli(["script","status","--run-id",value.runId,"--pinned"]).result;
  requireTrue(status.supportedVersions?.includes(1)&&status.runSuccess,"PUBLIC_CLI_PINNED_STATUS");
+ client.cliStage="downloads";
  const decoded=[];let total=0;
  for(const saved of response.downloaded){
   const artifact=value.artifacts.find(item=>item.id===saved.id);requireTrue(artifact,"PUBLIC_CLI_ARTIFACT_ID");
@@ -32,6 +38,7 @@ export async function publicCLI(client,fixture,privateDir,engine="webkit"){
   decoded.push(inspectMedia({...artifact,file:saved.file}));
  }
  requireTrue(new Set(decoded.map(item=>item.mimeType)).size===3,"PUBLIC_CLI_ALL_FORMATS");
+ client.cliStage="mcp";
  const mcp=await cliMCP();
  return {engine,runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
 }

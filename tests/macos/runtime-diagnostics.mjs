@@ -58,3 +58,14 @@ export function toolEnvelopeFacts(value){
  return {type:kind(value),hasError:!!value?.error,resultType:kind(value?.result),contentType:kind(content),
   contentCount:Array.isArray(content)?content.length:null,textCount:Array.isArray(content)?content.filter(item=>item?.type==="text"&&typeof item.text==="string").length:null};
 }
+// Structural and fixed-code CLI facts only: stdout/stderr may contain private values.
+export function cliExitFacts(exitCode,stdout,stderr){
+ const allowed=new Set(["DEVICE_NOT_FOUND","LOCAL_BROWSER_UNAVAILABLE","NO_DEVICES","MULTIPLE_DEVICES",
+  "UNAUTHORIZED","TIMEOUT","PAIR_ERROR","PAIR_DENIED","PAIR_TIMEOUT","SCRIPT_ABORTED","TARGET_NOT_FOUND",
+  "TAB_NOT_FOUND","TAB_NOT_ACTIVE","TAB_NOT_VISIBLE","NAVIGATION_FAILED","RECORDING_IN_PROGRESS",
+  "ARTIFACT_NOT_FOUND","ARTIFACT_NOT_READY","ARTIFACT_READ_FAILED"]);
+ let parsed;try{parsed=JSON.parse(stdout);}catch{}
+ const rawCode=parsed?.error?.code??parsed?.result?.error?.code;
+ return {exitCode:Number.isInteger(exitCode)?exitCode:null,stdoutJson:!!parsed,stderrPresent:stderr.length>0,
+  errorCode:allowed.has(rawCode)?rawCode:"OTHER"};
+}
