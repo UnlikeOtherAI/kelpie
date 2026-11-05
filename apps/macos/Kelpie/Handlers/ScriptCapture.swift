@@ -231,8 +231,9 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let document = try await tab.documentIdentity()
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
+        let documentChanged = ScriptCaptureViewport.confirmedDocumentChange(previous: previousDocument, current: document)
         if let initialViewport, !initialViewport.sameGeometry(as: viewport),
-           !initialViewport.acceptsScrollbarTransition(to: viewport, documentChanged: previousDocument != document) {
+           !initialViewport.acceptsScrollbarTransition(to: viewport, documentChanged: documentChanged) {
             #if DEBUG
             initialViewport.debugDifference(from: viewport)
             #endif

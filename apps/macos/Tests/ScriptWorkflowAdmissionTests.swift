@@ -24,6 +24,11 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
                 client: CGSize(width: client, height: 700), visible: CGRect(x: 0, y: 0, width: visible, height: 700),
                 scale: scale, pixelRatio: 1, pageOrigin: .zero)
         }
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: nil, current: "new"))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "", current: "new"))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: ""))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: "old"))
+        XCTAssertTrue(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: "new"))
         let scrollbar = viewport(client: 883, visible: 883), plain = viewport(client: 900, visible: 900)
         XCTAssertEqual(scrollbar.displayPoint(CGPoint(x: 860, y: 100)).x, 860)
         XCTAssertTrue(scrollbar.acceptsScrollbarTransition(to: plain, documentChanged: true))

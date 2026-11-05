@@ -32,6 +32,11 @@ struct ScriptCaptureViewport: Equatable {
     }
     #endif
 
+    static func confirmedDocumentChange(previous: String?, current: String) -> Bool {
+        guard let previous, !previous.isEmpty, !current.isEmpty else { return false }
+        return previous != current
+    }
+
     /// A new document may add or remove a classic scrollbar without resizing the canvas.
     func acceptsScrollbarTransition(to other: Self, documentChanged: Bool) -> Bool {
         guard documentChanged, bounds == other.bounds, layout == other.layout,
