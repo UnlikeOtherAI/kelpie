@@ -1,7 +1,7 @@
 import vm from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,startupSignal} from "./runtime-ownership.mjs";
+import {listenerState,startupSignal,navigationSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -51,4 +51,11 @@ test("privacy fixtures use bounded focus transitions and valid inline scripts",a
    assert.ok(!html.includes("value:event.target.value"));
   }
  }finally{await fixture.close();}
+});
+
+test("navigation diagnostics retain only exact native fixed labels",()=>{
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=BUSY"),"BUSY");
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR"),"NAVIGATION_ERROR");
+ assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR private-url"),null);
+ assert.equal(navigationSignal("page [WorkflowNavigation] failure=TIMEOUT"),null);
 });
