@@ -4,6 +4,7 @@ import {mkdir,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import assert from "node:assert/strict";
 import {startG08Fixture,g08Workflow} from "../../tests/capture/g08-fixture.mjs";
+import {iosG08Scene} from "./ios_g08_scene.mjs";
 const run=promisify(execFile), [tab,dir,family,binarySHA256,source]=process.argv.slice(2);
 assert.match(tab,/^[0-9A-Fa-f-]{36}$/); assert.ok(["iPhone","iPad"].includes(family));
 assert.match(binarySHA256,/^[a-f0-9]{64}$/); assert.match(source,/^[a-f0-9]{40}$/);
@@ -28,7 +29,7 @@ for(const curve of ["c","s"]){
   assert.equal(played.result.success,true);
   stage=curve+"-facts-and-probe"; await record("running");
   const facts=await(await fetch(new URL("/events",fixture.url))).json();
-  assert.equal(facts.dropped,0); assert.deepEqual(facts.events.map(e=>e.target),["start","finish"]);
+  const scene=iosG08Scene(facts);
   const artifacts=[];
   for(const manifest of played.result.artifacts){
    const downloaded=played.downloaded.find(item=>item.id===manifest.id); assert.ok(downloaded);
@@ -36,7 +37,7 @@ for(const curve of ["c","s"]){
    const p=JSON.parse((await run("ffprobe",["-v","error","-select_streams","v:0","-show_frames","-show_entries","frame=best_effort_timestamp_time:stream=width,height","-of","json",file],{timeout:30000,maxBuffer:1048576})).stdout);
    artifacts.push({...manifest,file,width:p.streams[0].width,height:p.streams[0].height,timestamps:p.frames.map(f=>Number(f.best_effort_timestamp_time))});
   }
-  report.cases.push({curve,scene:{start:facts.events[0],finish:facts.events[1]},artifacts});
+  report.cases.push({curve,scene,artifacts});
   await writeFile(join(dir,"input.json"),JSON.stringify(report,null,2));
  } finally { await fixture.close(); }
 }
