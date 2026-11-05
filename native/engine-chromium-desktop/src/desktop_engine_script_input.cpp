@@ -47,17 +47,23 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   if(output) *output=Json::object();
   const auto began = std::chrono::steady_clock::now();
   bool dispatched = false, unclassified_mutation = false, native_pressed=false, native_keys=false;
+  bool allow_non_input_privacy = false;
   struct CleanupOnExit {
     std::shared_ptr<Impl> impl; TabLease lease; bool& mouse; bool& keys;
     ~CleanupOnExit() { if(mouse || keys) QueueRelease(impl,lease); }
   } cleanup{impl_,lease,native_pressed,native_keys};
   Json target;
-  const auto inspect = [&](bool privacy_only=false) -> BrowserControlResult {
+  const auto inspect = [&](bool privacy_only=false, bool prove_non_input=false) -> BrowserControlResult {
     if (cancelled && cancelled()) {
       if (privacy_only && output) (*output)["inspectionUncertain"] = true;
       return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped");
     }
     const auto unknown_privacy = [&]() {
+      // Only the immediately acknowledged final click may consume this proof.
+      const bool allowed = allow_non_input_privacy && output &&
+        !output->value("sensitive", false) && !output->value("inspectionUncertain", false);
+      allow_non_input_privacy = false;
+      if (allowed) return BrowserControlResult::Success();
       if (output) (*output)["inspectionUncertain"] = true;
       return options.value("policy", Json::object()).value("refuseSensitive", false)
         ? BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy is unknown")
@@ -67,6 +73,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     if (remaining <= Timeout::zero()) return privacy_only ? unknown_privacy() : DeadlineExceeded();
     Json inspection_options = options;
     if (privacy_only) inspection_options["postMutation"] = true;
+    if (prove_non_input) inspection_options["proveNonInput"] = true;
     char* raw = kelpie_browser_script_target_expression(inspection_options.dump().c_str());
     if (!raw) return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("INVALID_TARGET", "Shared target preflight rejected the request");
     Json generated;
@@ -78,7 +85,7 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     target=Json(); // A failed inspection cannot reuse an earlier classification.
     const auto read = EvaluateBrowserControl(lease, generated.at("expression").get<std::string>(), &target, remaining);
     if(output && target.is_object() && target.contains("sensitive") && target["sensitive"].is_boolean() && target["sensitive"].get<bool>()) (*output)["sensitive"]=true;
-    if(output && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
+    if(output && !privacy_only && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
     if (!read.ok) return privacy_only ? unknown_privacy() : read;
     if (!ScriptTargetInspectionExplicit(target))
       return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
@@ -126,6 +133,11 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   auto result = inspect();
   if (!result.ok) return fail(result);
   const std::string type = action.value("action", std::string());
+  const auto text_field = [](const Json& value, const char* key) {
+    return value.contains(key) && value[key].is_string() ? value[key].get<std::string>() : std::string();
+  };
+  const std::string original_document = text_field(target, "documentId");
+  const std::string original_token = options.value("token", std::string());
   if ((type == "fill" || type == "type") && !target.value("editable", false))
     return BrowserControlResult::Failure("TARGET_NOT_EDITABLE", "Target is not an editable text control");
   const auto point=ScriptTargetCdpPoint(target);
@@ -136,13 +148,23 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   native_pressed=true;
   result = send("Input.dispatchMouseEvent", pressed);
   if (!result.ok) return fail(result);
-  result = inspect();
+  const bool can_prove = type == "click" || type == "tap";
+  result = inspect(false, can_prove);
   if (!result.ok) return fail(result);
+  const bool non_input_proof = can_prove && !original_document.empty() && !original_token.empty() &&
+    text_field(target, "documentId") == original_document &&
+    text_field(target, "token") == original_token &&
+    text_field(target, "sensitivityClass") == "non-input" &&
+    target.contains("sensitive") && target["sensitive"].is_boolean() && !target["sensitive"].get<bool>() &&
+    target.contains("sensitivityKnown") && target["sensitivityKnown"].is_boolean() && target["sensitivityKnown"].get<bool>() &&
+    output && !output->value("sensitive", false) && !output->value("inspectionUncertain", false);
   Json released = mouse; released["type"] = "mouseReleased";
   const auto release = send("Input.dispatchMouseEvent", released);
   if (!release.ok) return fail(release);
   native_pressed=false;
+  allow_non_input_privacy = non_input_proof;
   result = inspect(true);
+  allow_non_input_privacy = false;
   if (!result.ok) return fail(result);
   unclassified_mutation = false;
   if (type == "fill" || type == "type") {
