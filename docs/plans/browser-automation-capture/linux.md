@@ -855,3 +855,19 @@ The test app exited normally and its bounded unit retired.
 This clear/clear control did not reproduce the installed failures and cannot
 attribute them to source admission or encoder carryover. The original files,
 strict zero-pixel requirement and failed receipts remain unchanged.
+
+## Retained Linux dense motion analysis
+
+The retained normal OSR C/S recordings from source 80644c780b7177a353619701e474bf67e2c14ef8,
+ELF 606d3e0ba5e03614ed5abe3774ff6c0e4d19efd5df364568a6e315a82642f549,
+were analyzed with shared verifier 414d82af. C/GIF and S/GIF passed the dense
+decoded-pixel fit, with 19 motion samples each and pointer RMS 0.992 px and
+0.906 px respectively. The recorded capture drops were 287 for C and 278 for S.
+Both MP4 analyses remained insufficient because their final tails differed
+from the calibrated same-recording pointer baseline. Analysis SHA-256:
+c977ad9d2b7e04f37f625d289cd63414b41dc061296b43985ee58a6a268acad4.
+
+The first decoder launch failed because the isolated verifier lacked the shared
+build output; the completed run used the existing shared dist after confirming
+its source inputs matched. These results do not establish overall G08 success,
+physical GTK equivalence or the default 350 ms motion profile.
