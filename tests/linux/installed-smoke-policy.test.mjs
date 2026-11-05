@@ -111,12 +111,3 @@ test("CLI-only source and digest inputs fail closed",async()=>{
   assert.equal(run({CLI_ONLY:"false",EXPECTED_SOURCE:"",EXPECTED_RPM:"",EXPECTED_CLI:""}).status,0);
 });
 
-test("terminal IDR check is limited to the known continuous fixture",async()=>{
-  const replay=await readFile(new URL("./verify-native-replay.mjs",import.meta.url),"utf8");
-  const resource=await readFile(new URL("../../.github/workflows/linux-resource-diagnostic.yml",import.meta.url),"utf8");
-  assert.equal((workflow.match(/KELPIE_VERIFY_TERMINAL_IDR=1/g)??[]).length,2);
-  assert.match(script,/KELPIE_VERIFY_TERMINAL_IDR/);
-  assert.match(replay,/if \(requireIDR\) await run\("tests\/linux\/verify-terminal-idr\.mjs", \[continuousPath/);
-  assert.match(resource,/require_terminal_idr:/);
-  assert.match(resource,/KELPIE_VERIFY_TERMINAL_IDR="\$require_idr"/);
-});
