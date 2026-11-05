@@ -15,9 +15,9 @@ import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
-const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision]=process.argv.slice(2);
+const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,curve,expectedUiaHash,expectedWgcHash,expectedRevision,motionProfile="dense"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
-assert.ok(["c","s"].includes(curve));
+assert.ok(["c","s"].includes(curve));assert.ok(["dense","fast"].includes(motionProfile));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -31,7 +31,7 @@ const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const uiaRun=async args=>JSON.parse((await run(uia,args,10000)).stdout);
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
-const report={source:manifest.source,curve,phase:"session",checks:[],cleanup:"not-started"};
+const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
 let fixture,launched=false,running,readiness,identity,pending,pendingDone=false,helper,helperTimer,monitorStop=false,monitor;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
@@ -64,8 +64,8 @@ try{
  await run(join(process.env.WINDIR,"System32/icacls.exe"),[privateRoot,"/inheritance:r","/grant:r","*"+session.userSid+":(OI)(CI)F","*S-1-5-18:(OI)(CI)F"]);await mkdir(home);
  report.hashes={exe:await hash(exe),dll:await hash(join(dirname(exe),"kelpie.dll")),cli:await hash(cli),uia:await hash(uia),wgc:await hash(wgc)};
  assert.equal(report.hashes.uia,expectedUiaHash);assert.equal(report.hashes.wgc,expectedWgcHash);
- const revision=(await run("git.exe",["rev-parse","HEAD"])).stdout.trim();assert.equal(revision,expectedRevision);
- assert.equal((await run("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");report.testRevision=revision;
+ report.phase="revision";const revision=(await run("git.exe",["rev-parse","HEAD"])).stdout.trim();assert.equal(revision,expectedRevision);
+ report.phase="tracked-status";assert.equal((await run("git.exe",["status","--porcelain","--untracked-files=no"])).stdout.trim(),"");report.testRevision=revision;
  fixture=await startG08Fixture();report.phase="register";
  assert.equal((await cliRun(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile])).success,true);
  const started=new Date().toISOString();report.phase="launch";
@@ -83,9 +83,10 @@ try{
  const before=await tabFact(tabId);assert.equal(before.url,fixture.url);assert.equal(before.active,true);
  const facts=(await api("evaluate",{tabId,expression:"(()=>{const a=document.querySelector('#start').getBoundingClientRect(),b=document.querySelector('#finish').getBoundingClientRect();return {from:{x:a.x+a.width/2,y:a.y+a.height/2},to:{x:b.x+b.width/2,y:b.y+b.height/2},viewport:{width:innerWidth,height:innerHeight}}})()"}));
  assert.equal(facts.success,true);const scene=facts.result;
- const config={...scene,curve,pointerMs:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
+ const config={...scene,curve,pointerMs:motionProfile==="fast"?350:2400,markerMs:3000,radius:48,color:curve==="c"?"#ff0000":"#0000ff"};
  report.phase="play";
- pending=observeInFlight(api("play-script",g08Workflow(tabId,curve)).finally(()=>{pendingDone=true;}));
+ const workflow=g08Workflow(tabId,curve);workflow.pointer.durationMs=config.pointerMs;
+ pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
  for(let attempt=0;attempt<100&&!pendingDone;attempt++){
   const status=await api("get-script-status");if(status.playing){active=status;
@@ -127,13 +128,13 @@ try{
  report.phase="artifact-download";const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
  const trustedFacts={source:manifest.source,curve,frameCount:native.frameCount,
   identity:{pid:running.pid,sessionId:identity.sessionId,executable:identity.executable,startFileTime:identity.startFileTime,launchId:readiness.launchId,port:28420},
-  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success,inputGuarantee:terminal.inputGuarantee},
+  window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success,inputGuarantee:terminal.inputGuarantee,totalDurationMs:terminal.totalDurationMs},
   before,after,fixture:{url:fixture.url,pageRequests:fixture.pageRequests,...fixtureFacts},artifacts,summary};
  report.phase="provenance";
  const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
  budget.remaining-=factEvidence.length;await writeFile(join(outputRoot,"facts-observation.json"),factEvidence,{flag:"wx"});
  const provenance=verifyWgcProvenance(trustedFacts);
- const caseData={curve,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
+ const caseData={curve,profile:motionProfile,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
   provenance,facts:trustedFacts,config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});
  report.phase="complete";report.checks.push({name:"owned native and exported G08 case",passed:native.analysis?.passed===true,oracleError:native.oracleError,frameCount:native.frameCount,statusPolls});if(!native.analysis?.passed)process.exitCode=1;
