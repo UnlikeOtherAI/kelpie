@@ -680,3 +680,6 @@ Mac GIF capture retains a bounded playable prefix when abort precedes finalizati
 ### macOS inferred-sensitive workflow refusal
 
 When an edit resolves to a sensitive field, its literal is registered for run-private output redaction before any capture refusal. Earlier named outputs are scrubbed even when that edit never occurs. Sensitive-capture refusal and any output-redaction failure permanently discard that run's capture artifacts; a later failure or abort cannot restore them. Existing security or uncertain-input errors are preserved. Ordinary aborts and unrelated failures continue to retain valid partial media.
+
+
+Debug macOS builds initialize the existing AppReveal companion once per process and declare its Bonjour service. Hosted native checks use its app-owned controls alongside ordinary protected HTTP/MCP pairing.

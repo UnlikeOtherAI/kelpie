@@ -253,6 +253,9 @@ private struct BrowserCommands: Commands {
 
 @main
 struct KelpieApp: App {
+    #if DEBUG
+    private static var appRevealStartRequested = false
+    #endif
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var browserState = BrowserState()
     @StateObject private var rendererState: RendererState
@@ -309,7 +312,12 @@ struct KelpieApp: App {
         serverState.startHTTPServer(rendererState: rendererState)
         NessieConnection.shared.start(context: serverState.handlerContext)
         #if DEBUG
+        // The SDK schedules its listener asynchronously and is not idempotent.
+        // Latch before calling it: init/onAppear can both run before bind completes.
+        guard !appRevealStartRequested else { return }
         if canBind(port: 8421) {
+            appRevealStartRequested = true
+            print("[KelpieApp] AppReveal start requested")
             AppReveal.start(port: 8421)
         } else {
             print("[KelpieApp] Skipping AppReveal start because port 8421 is already in use")
