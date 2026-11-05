@@ -159,18 +159,30 @@ struct DeviceHandler {
         }
         if let wv = context.webView {
             let sv = wv.scrollView
+            var scrollInfo: [String: Any] = [
+                "contentSize": ["w": sv.contentSize.width, "h": sv.contentSize.height],
+                "contentOffset": ["x": sv.contentOffset.x, "y": sv.contentOffset.y],
+                "zoomScale": sv.zoomScale,
+                "contentInset": ["t": sv.contentInset.top, "l": sv.contentInset.left,
+                                 "b": sv.contentInset.bottom, "r": sv.contentInset.right]
+            ]
+            #if DEBUG
+            scrollInfo["pinch"] = [
+                "available": sv.pinchGestureRecognizer != nil,
+                "enabled": sv.pinchGestureRecognizer?.isEnabled == true,
+                "scrollEnabled": sv.isScrollEnabled,
+                "state": sv.pinchGestureRecognizer?.state.rawValue ?? -1,
+                "minimumScale": sv.minimumZoomScale,
+                "maximumScale": sv.maximumZoomScale
+            ]
+            #endif
             webViewInfo = [
                 "exists": true,
                 "frame": ["x": wv.frame.origin.x, "y": wv.frame.origin.y, "w": wv.frame.width, "h": wv.frame.height],
                 "bounds": ["x": wv.bounds.origin.x, "y": wv.bounds.origin.y, "w": wv.bounds.width, "h": wv.bounds.height],
                 "contentScaleFactor": wv.contentScaleFactor,
                 "pageZoom": wv.pageZoom,
-                "scrollView": [
-                    "contentSize": ["w": sv.contentSize.width, "h": sv.contentSize.height],
-                    "contentOffset": ["x": sv.contentOffset.x, "y": sv.contentOffset.y],
-                    "zoomScale": sv.zoomScale,
-                    "contentInset": ["t": sv.contentInset.top, "l": sv.contentInset.left, "b": sv.contentInset.bottom, "r": sv.contentInset.right]
-                ]
+                "scrollView": scrollInfo
             ]
         }
 

@@ -85,6 +85,14 @@ extension WorkflowCaptureUITests {
         var result: Body = [:]
         if let zoom = scroll["zoomScale"] as? Double, zoom.isFinite { result["scrollZoomScale"] = zoom }
         if let zoom = webView["pageZoom"] as? Double, zoom.isFinite { result["pageZoom"] = zoom }
+        if let pinch = scroll["pinch"] as? Body {
+            for key in ["available", "enabled", "scrollEnabled"] {
+                if let value = pinch[key] as? Bool { result[key] = value }
+            }
+            for key in ["state", "minimumScale", "maximumScale"] {
+                if let value = pinch[key] as? Double, value.isFinite { result[key] = value }
+            }
+        }
         return result
     }
 
