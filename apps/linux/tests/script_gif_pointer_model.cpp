@@ -2,6 +2,8 @@
 #include "script_frame_compositor.h"
 #include "script_media_encoder.h"
 #include <nlohmann/json.hpp>
+#include <openssl/evp.h>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -38,6 +40,17 @@ int main(int argc, char** argv) {
         throw std::runtime_error("Invalid visual viewport");
     if (visual["width"].get<double>() <= 0 || visual["height"].get<double>() <= 0 ||
         visual["scale"].get<double>() <= 0) throw std::runtime_error("Invalid visual viewport");
+    std::vector<unsigned char> backing;
+    if (config.contains("backingBGRA")) {
+      const auto encoded=config.at("backingBGRA").get<std::string>();
+      if (encoded.empty() || encoded.size()%4 || encoded.size()>30000 || width<516 || height<261)
+        throw std::runtime_error("Invalid observed backing");
+      backing.resize(encoded.size()/4*3);
+      const int decoded=EVP_DecodeBlock(backing.data(),reinterpret_cast<const unsigned char*>(encoded.data()),int(encoded.size()));
+      const auto padding=(encoded.back()=='=')+(encoded[encoded.size()-2]=='=');
+      if (decoded<0 || decoded-padding!=71*71*4) throw std::runtime_error("Invalid observed backing");
+      backing.resize(decoded-padding);
+    }
     const fs::path root(argv[2]);
     if (!fs::create_directory(root)) throw std::runtime_error("Output directory must be new");
     // Record live mappings before exit; the decoder hashes these independently.
@@ -58,6 +71,8 @@ int main(int argc, char** argv) {
         const double elapsed = i * 1000.0 / fps;
         ScriptFrame frame{width, height, width * 4, elapsed,
           std::vector<std::uint8_t>(std::size_t(width) * height * 4, 255)};
+        if (!backing.empty()) for (int row=0; row<71; ++row)
+          std::copy_n(backing.data()+row*71*4,71*4,frame.bgra.data()+std::size_t(190+row)*frame.stride+445*4);
         Json shown = {{"viewportWidth", view_width}, {"viewportHeight", view_height},
           {"visualViewport", visual}, {"elapsedMs", elapsed}, {"pointer", {{"x", x}, {"y", y}}}};
         if (name != "pointer") {
