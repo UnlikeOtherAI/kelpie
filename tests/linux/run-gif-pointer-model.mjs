@@ -1,5 +1,6 @@
 // Test-only independent decoding and identity receipt for the Linux GIF pointer model.
 import assert from "node:assert/strict";
+import { ffmpegPassthrough } from "../capture/ffmpeg-passthrough.mjs";
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
@@ -116,7 +117,7 @@ for (const item of generatedReport.cases) {
   assert.equal(pts.length,count);
   assert.ok(pts.every((v,i) => Number.isFinite(v) && (i===0 || v>pts[i-1])));
   const child = spawn("ffmpeg", ["-v","error","-threads","1","-filter_threads","1","-i",path,
-    "-map","0:v:0","-vsync","0","-f","rawvideo","-pix_fmt","rgb24","-"],
+    "-map","0:v:0",...ffmpegPassthrough("ffmpeg"),"-f","rawvideo","-pix_fmt","rgb24","-"],
     {stdio:["ignore","pipe","pipe"]});
   let stderr=""; child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
   const done=new Promise((ok,bad)=>{child.once("error",bad);child.once("close",code=>code===0?ok():bad(Error(stderr)));});
