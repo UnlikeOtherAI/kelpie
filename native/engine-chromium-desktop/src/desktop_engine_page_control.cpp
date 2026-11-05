@@ -125,7 +125,7 @@ BrowserControlResult DesktopEngine::CaptureScreenshot(TabLease lease, BrowserScr
     pending->operation=pending->session->Begin(tab->browser,"Page.captureScreenshot",*params,true,
       [weak,lease,receipt,deadline](CefRefPtr<CefBrowser> browser) {
         auto owner=weak.lock();
-        if(!owner) return false;
+        if(!owner || !owner->initialized || owner->shutting_down.load()) return false;
         auto* current=owner->FindTab(lease);
         if(!CaptureReceiptEligible(std::chrono::steady_clock::now(),deadline,
              lease.cancelled && lease.cancelled->load(),current!=nullptr,

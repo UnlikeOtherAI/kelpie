@@ -354,8 +354,8 @@ void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser> browse
     pending_.erase(it);
   }
   auto parsed=ParseProtocolResult(success, result, result_size);
-  if(operation->capture_completion_ &&
-     !CaptureCompletionApproved(parsed.ok,[&] { return operation->capture_completion_(browser); }))
+  if(parsed.ok && operation->capture_completion_ &&
+     !CaptureCompletionApproved([&] { return operation->capture_completion_(browser); }))
     parsed=Failure("CAPTURE_DOCUMENT_UNAVAILABLE","Capture completion identity is unavailable");
   Complete(operation, std::move(parsed));
 }
