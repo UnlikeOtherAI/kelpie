@@ -47,6 +47,9 @@ final class IOSWorkflowPresentation: NSObject {
     private struct MarkerGeometry: Equatable {
         let bounds: CGRect
         let frameInWindow: CGRect
+        let originInWindow: CGPoint
+        let xBasisInWindow: CGPoint
+        let yBasisInWindow: CGPoint
         let contentOffset: CGPoint
         let adjustedInsets: UIEdgeInsets
         let zoomScale: CGFloat
@@ -241,6 +244,9 @@ final class IOSWorkflowPresentation: NSObject {
         let value = MarkerGeometry(
             bounds: view.bounds,
             frameInWindow: view.convert(view.bounds, to: window),
+            originInWindow: view.convert(.zero, to: window),
+            xBasisInWindow: view.convert(CGPoint(x: 1, y: 0), to: window),
+            yBasisInWindow: view.convert(CGPoint(x: 0, y: 1), to: window),
             contentOffset: view.scrollView.contentOffset,
             adjustedInsets: view.scrollView.adjustedContentInset,
             zoomScale: view.scrollView.zoomScale,
@@ -249,7 +255,8 @@ final class IOSWorkflowPresentation: NSObject {
         )
         let values = [value.bounds.minX, value.bounds.minY, value.bounds.width, value.bounds.height,
                       value.frameInWindow.minX, value.frameInWindow.minY, value.frameInWindow.width, value.frameInWindow.height,
-                      value.contentOffset.x, value.contentOffset.y, value.adjustedInsets.top, value.adjustedInsets.bottom,
+                      value.originInWindow.x, value.originInWindow.y, value.xBasisInWindow.x, value.xBasisInWindow.y,
+                      value.yBasisInWindow.x, value.yBasisInWindow.y, value.contentOffset.x, value.contentOffset.y, value.adjustedInsets.top, value.adjustedInsets.bottom,
                       value.adjustedInsets.left, value.adjustedInsets.right, value.zoomScale, value.contentScale, value.screenScale]
         guard values.allSatisfy({ $0.isFinite && abs($0) <= 100000 }),
               value.bounds.width > 0, value.bounds.height > 0, value.zoomScale > 0,
