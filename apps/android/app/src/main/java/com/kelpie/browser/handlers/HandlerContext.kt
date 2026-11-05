@@ -41,6 +41,17 @@ class HandlerContext(
     }
 
     @Volatile var scriptForeground = true
+
+    @Volatile var scriptCaptureScene = false
+        set(value) {
+            if (field != value) {
+                field = value
+                scriptCaptureSceneGeneration++
+            }
+        }
+
+    @Volatile var scriptCaptureSceneGeneration = 0L
+        private set
     val scriptOverlay =
         com.kelpie.browser.automation
             .ScriptOverlay()
