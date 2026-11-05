@@ -94,6 +94,7 @@ final class ScriptWorkflowRunner {
     private func requireCurrent(tab: ScriptWorkflowTab, grant: ScriptRequestOwner) async throws {
         try await tab.check()
         if let failure = capture?.failure { throw ScriptWorkflowFailure(failure) }
+        try capture?.checkTime()
     }
 
     private func run(_ workflow: ScriptBoundWorkflow, tab: ScriptWorkflowTab, grant: ScriptRequestOwner, id: String) async -> Body {
