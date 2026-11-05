@@ -40,3 +40,9 @@ export function viewportSignal(line){
  const match=/^\[WorkflowViewport\] bounds=([01]) layout=([01]) visible=([01]) scale=([01]) pixel=([01]) widths=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2}) heights=(\d{1,5}\.\d{2}),(\d{1,5}\.\d{2})$/.exec(line);
  return match?{boundsSame:match[1]==="1",layoutSame:match[2]==="1",visibleSame:match[3]==="1",scaleSame:match[4]==="1",pixelSame:match[5]==="1",oldWidth:Number(match[6]),newWidth:Number(match[7]),oldHeight:Number(match[8]),newHeight:Number(match[9])}:null;
 }
+
+// Fixed native visibility guard flags only; no window identity or page data.
+export function workflowVisibilitySignal(line){
+ const match=/^\[WorkflowVisibility\] phase=(check|focus) visible=([01u]) hidden=([01u]) key=([01u]) sheet=([01u])$/.exec(line);
+ return match?{phase:match[1],visible:match[2],hidden:match[3],key:match[4],sheet:match[5]}:null;
+}
