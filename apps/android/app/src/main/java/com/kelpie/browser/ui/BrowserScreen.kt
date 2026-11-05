@@ -21,6 +21,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,8 @@ fun BrowserScreen(
     val isIn3DInspector by handlerContext.isIn3DInspectorFlow.collectAsState()
     val isScriptRecording by scriptPlaybackState.isRecording.collectAsState()
     val isMovieImmersive by scriptPlaybackState.isMovieImmersive.collectAsState()
+    var visibleProgress by remember { mutableStateOf(isLoading) }
+    if (!isScriptRecording) SideEffect { visibleProgress = isLoading }
     RecordingOrientationEffect(activity, isScriptRecording)
     var inspectorMode by remember { mutableStateOf("rotate") }
     val keyboardObserver = remember(composeView.rootView) { KeyboardObserver(composeView.rootView) }
@@ -216,7 +219,7 @@ fun BrowserScreen(
                 )
             }
 
-            if (isLoading && !isScriptRecording) {
+            if (visibleProgress && !isMovieImmersive) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
                     modifier = Modifier.fillMaxWidth(),
