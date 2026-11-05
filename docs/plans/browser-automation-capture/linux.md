@@ -945,3 +945,29 @@ The retained output was then checked directly using packet offsets, flags,
 avcC and AVC NALs; no stimulus was repeated. This is a synthetic control,
 not proof of the original installed failure's cause, and no shipping encoder
 or pixel threshold was changed.
+
+## Fedora terminal-clear candidate
+
+The normal GTK/CEF candidate at source c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2,
+ELF SHA-256 6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c,
+was built on Fedora 44 with admission and G08 observations OFF. Focused
+terminal identity, frame proof and media tests passed. A test-only injected
+force failure retained the earlier GIF and MP4 prefixes, reported failure
+and partial manifests, allowed owner-scoped retrieval and refused retrieval
+after explicit discard. This explicit discard does not prove a sensitive
+workflow automatically triggered privacy disposal.
+
+One real offscreen HTTP fixture completed a trusted click and produced six
+PNGs, one GIF and one MP4. All eight artifacts decoded; the strict marker
+center/fade/final-clear check passed. The MP4 contained 17 frames, with a
+final key-flagged AVC IDR at PTS 2.125327 s. MP4 SHA-256:
+1bee642448638c94f01cceed1ff81206d179ebfd6ca733836f4273e8a3fe9afe.
+The independent IDR, all-frame and marker receipts had SHA-256 values
+34749dbc85a338aeb3ee04646a12c756c698fc05f500301cede8eb556048a1c8,
+9c8667b9e96b36adb65784a4dfe1e380a8a47c637ed1ee0799a47921507bd2d9 and
+767476d676d153dfe4296bce372ac3b5c7109c7b57ecc17042b814d0ff882705,
+respectively. The owned app/unit retired and the unrelated Fedora process
+remained present.
+
+This is a single Fedora candidate path, not final installed Fedora or Ubuntu
+package verification. The previously failed 421022 media receipts are retained.
