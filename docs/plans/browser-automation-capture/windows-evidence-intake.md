@@ -206,3 +206,40 @@ rebuild/package and candidate replay, keyless signing of verified copies on
 Minis, signature/timestamp/EKU and SignTool verification, immutable upload,
 then exact published-package install and runtime checks. The current candidate
 and native screenshots do not establish those release steps.
+
+## Windows candidate and warmup diagnostics
+
+The unsigned d849ee41 Windows production build used the pinned sandboxed CEF
+wrapper and normal local-inference graph. Its DLL SHA-256 is
+`7a0136fc35698e9353dac31b844d90726b36466fd128ce76afd9ddb834feaf8e`;
+the pinned bootstrap EXE SHA-256 is
+`54c8be31e003853947182c9461755bf4e7be5f91a2c64fcfb97ed5da1a32d755`.
+These files are build evidence, not a signed release.
+
+The earlier a916f4db candidate passed all 65 native CTest cases in one
+interactive Windows Session 1. Its DLL SHA-256 was
+`a15c00c4d9f32a8e1516ebcd5da2db6386a0097205c88cf491689e9b26844c29`.
+The d849 rebuild includes a later shared target change, so that 65/65 result
+does not establish a full test pass for d849.
+
+On a916, the omitted-duration default C workflow completed six actions with
+trusted page events, GIF and MP4, and 322 actual owned-window WGC frames.
+Recorded native and export dimensions matched at 640x276. The final motion
+was observed from the last start frame to the first endpoint frame in a
+266.7 ms sampling bracket; this is not an exact duration measurement or a
+dense easing pass. Public stop, process exit and private alias removal passed.
+The dense oracle is intentionally not applied to the 350 ms profile.
+
+A separate a916 dense C run returned successful media and 407 real WGC
+frames, but lacked the required two exact stable pre-dispatch endpoint frames.
+Its canonical native result remains insufficient. The first d849 four-click
+warmup run reached the owned presentation and recorded 524 frames but the
+public workflow returned `CAPTURE_DURATION_EXCEEDED` at the 33 s test cap.
+Both failures and their raw reports remain preserved. A source audit found
+pointer progress uses monotonic elapsed time; the separate fixed-step wait
+loop accumulates callback/sleep overhead and is being corrected and verified.
+
+The d849 full native verification, the final warmup C/S and same-run native/export
+comparison, current parent-window and Stop imagery, signing, package and
+installed-release checks remain open. The single-listener foreign-grant limit
+recorded above is unchanged.
