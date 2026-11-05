@@ -293,3 +293,38 @@ raw SHA-256 is
 `d8e9fea696fdec1e7b3455eeb498f7cf0c8ba5eec9c141b0e3f085f01e82a7c4`,
 and the retained PNG SHA-256 is
 `7e17ebc50b0956fe91b354c2374ddd6ef7d4365f2bb4d3d1b0b32293eba75735`.
+
+The calibrated de318 native WGC C and S runs subsequently passed the unchanged
+dense path, easing and marker oracle. Their case SHA-256 values are
+`feeca5123401c2c878559662aee11602f2481e1e003e532141ab093b4f9bf1c5`
+and `e4e86ff3c977644b69a619139fec0ce9d8e4584aab779ae2a5d5acde0c89f318`.
+The separate exported GIF/MP4 oracle remained insufficient; the native pass
+does not establish export correspondence.
+
+On Maxis Session 1, the ceec9e9d LLM-on sandbox build and focused owned-window
+lifecycle and marker-policy checks passed. A real public CLI/HTTP workflow
+then completed two trusted clicks and three actions with screenshots-only
+capture in 3,918 ms. Its final actionIndex=2 PNG was downloaded with chunk
+identity, length and SHA-256 checks. A fresh WGC session started only after the
+HTTP response, against the same exact owned presentation HWND with cursor off
+and the default border. Its raw frame contained 29,124 red pixels in the target
+region (maximum alpha 135); owned UIA inspection found zero visible Stop
+controls. Public stop and alias removal passed, and the owned PID, listener,
+scheduled task and Job processes were absent.
+
+The evidence directory is
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/production/marker-transition-ceec-r1/evidence/`.
+The product DLL SHA-256 is
+`84ae1497ccf0b78929eaab2d53204995614b67c321649f6ed23e0f3abde00d40`;
+test revision is `63bc86b4f5a00c2151d882320d8e969d9407b5a0`.
+The 3,115-byte report SHA-256 is
+`f76d06b9d32801064768ec50e1ea2d079e24b9b018640fd88310efe61cebe842`,
+the 2,397-byte terminal PNG is
+`aee50ba07cb8cf461f2f756873d2e93c4f478c639118d4fe8d39e0bb21a9261d`,
+and the 10,020-byte post-response WGC PNG is
+`94a1b3c9983e0f2c45a51b04d3d79124d26f18211d888969cc313c03158f3120`.
+The 6,367,760-byte raw BGRA frame is
+`29b5c2c093bd1b199d46fc6bd116a2330f95b63c7fbcec26bf5fe961f6661c23`.
+This single transition does not establish expiry, no-capture behavior,
+resize/revocation recovery, or full Windows acceptance. The earlier c89
+fixture-ready HTTP 400 reports and their successful cleanups remain retained.
