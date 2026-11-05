@@ -40,19 +40,20 @@ class ScriptTargetCallbackFlowTest : ScriptPublicFixture() {
                         assertFalse("Known non-sensitive result must preserve ordinary partials", state.unknown())
                     }
                     // An initial click resolve/recheck has no dispatch flag, but a
-                // missing result still cannot certify capture as non-sensitive.
-                val lostClick = ScriptTargetClassification()
-                val clickGuards = AtomicInteger()
-                try {
-                    context.evaluateAutomationJSON(
-                        "({ok:false,error:'TARGET_EVALUATION_FAILED'})",
-                        { clickGuards.incrementAndGet() == 1 },
-                        lostClick::started,
-                    ) { result -> lostClick.received(result["sensitive"] as? Boolean) }
-                    throw AssertionError("Expected callback guard refusal")
-                } catch (_: IllegalStateException) {
-                    assertTrue("Lost click classification must protect capture", lostClick.unknown())
-                }                val refused = ScriptTargetClassification()
+                    // missing result still cannot certify capture as non-sensitive.
+                    val lostClick = ScriptTargetClassification()
+                    val clickGuards = AtomicInteger()
+                    try {
+                        context.evaluateAutomationJSON(
+                            "({ok:false,error:'TARGET_EVALUATION_FAILED'})",
+                            { clickGuards.incrementAndGet() == 1 },
+                            lostClick::started,
+                        ) { result -> lostClick.received(result["sensitive"] as? Boolean) }
+                        throw AssertionError("Expected callback guard refusal")
+                    } catch (_: IllegalStateException) {
+                        assertTrue("Lost click classification must protect capture", lostClick.unknown())
+                    }
+                    val refused = ScriptTargetClassification()
                     try {
                         context.evaluateAutomationJSON("({ok:true,sensitive:false})", { false }, refused::started)
                         throw AssertionError("Expected pre-evaluation refusal")
