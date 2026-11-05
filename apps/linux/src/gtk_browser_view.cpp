@@ -116,7 +116,7 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
                          } else if (detached && (!valid_frame || !origin ||
                              !self->marker_anchor_.Matches(revision,identity,{x,y,width,height,scale,frame.width,frame.height}))) {
                            self->app_.RetireDetachedScriptMarker(shown.value("_presentationRevision",std::uint64_t{}));
-                           shown.erase("marker"); self->marker_anchor_.Invalidate(identity);
+                           shown.erase("marker"); self->marker_anchor_.Invalidate(revision,identity);
                          }
                        }
                        CompositeScriptFrame(self->app_, frame, std::move(shown));
