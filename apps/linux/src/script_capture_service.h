@@ -18,6 +18,7 @@ class LinuxScriptService : public std::enable_shared_from_this<LinuxScriptServic
   ScriptArtifactStore& artifacts() { return artifacts_; }
  private:
   void Show(const Json& presentation, std::function<void()> stop);
+  std::uint64_t last_presentation_revision_=0;
   DocumentGuard guard_;
   ScriptArtifactStore artifacts_;
   mutable std::mutex mutex_;

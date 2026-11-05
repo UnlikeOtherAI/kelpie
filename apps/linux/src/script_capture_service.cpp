@@ -1,4 +1,5 @@
 #include "script_capture_service.h"
+#include "kelpie/desktop_presentation_order.h"
 #include "script_frame_compositor.h"
 #include "script_capture_cadence.h"
 #include "script_media_encoder.h"
@@ -194,14 +195,16 @@ void LinuxScriptService::Configure(DesktopApp::Config& config) {
   config.scripts.present = [self](const Json& presentation, std::function<void()> stop) { self->Show(presentation, std::move(stop)); };
 }
 void LinuxScriptService::Show(const Json& presentation, std::function<void()> stop) {
-  std::lock_guard lock(mutex_); presentation_ = presentation; stop_ = std::move(stop);
+  std::lock_guard lock(mutex_);
+  if(!AcceptDesktopPresentationRevision(presentation,last_presentation_revision_)) return;
+  presentation_ = presentation; stop_ = std::move(stop);
   shown_at_ = std::chrono::steady_clock::now();
 }
 LinuxScriptService::Json LinuxScriptService::Presentation() const {
   Json shown;
   {
     std::lock_guard lock(mutex_); shown = presentation_;
-    if (shown.value("playing", false) && !shown.value("captureLatched", false))
+    if (shown.value("playing", false))
       shown["elapsedMs"] = shown.value("elapsedMs", 0.0) +
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - shown_at_).count();
   }

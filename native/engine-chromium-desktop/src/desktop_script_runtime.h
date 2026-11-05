@@ -17,7 +17,7 @@ class DesktopScriptHandler::Impl {
   Config config;
   mutable std::mutex mutex;
   std::condition_variable changed;
-  bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false, presentation_latched=false;
+  bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false;
   std::thread::id run_thread;
   std::shared_ptr<std::atomic<bool>> abort = std::make_shared<std::atomic<bool>>(false);
   std::atomic<bool> stop_sampler{false}, privacy_discard{false};

@@ -51,8 +51,7 @@ LRESULT CALLBACK ScriptNativeOverlay::StopProc(HWND hwnd,UINT message,WPARAM wpa
   }
   if(message==WM_TIMER && self && self->shown_.value("playing",false)) {
     auto shown=self->shown_;
-    if(!shown.value("captureLatched",false))
-      shown["elapsedMs"]=shown.value("elapsedMs",0.0)+GetTickCount64()-self->shown_at_;
+    shown["elapsedMs"]=shown.value("elapsedMs",0.0)+GetTickCount64()-self->shown_at_;
     try { self->Show(shown,self->stop_); } catch(...) { KillTimer(hwnd,1); if(self->canvas_) ShowWindow(self->canvas_,SW_HIDE); if(self->stop_) self->stop_(); } return 0;
   }
   if (message==WM_COMMAND && LOWORD(wparam)==1 && HIWORD(wparam)==BN_CLICKED && self && self->stop_) { self->stop_(); return 0; }
@@ -63,8 +62,7 @@ void ScriptNativeOverlay::Show(const nlohmann::json& presentation,std::function<
   stop_=std::move(stop);
   shown_=presentation; shown_at_=GetTickCount64();
   const bool playing=presentation.value("playing",false);
-  // Keep a policy timer during a capture latch: foreground changes must hide
-  // popups even while the sampled presentation timeline remains frozen.
+  // Continue checking foreground policy while the presentation is playing.
   if(playing) SetTimer(stop_window_,1,33,nullptr);
   else KillTimer(stop_window_,1);
   const HWND foreground=GetForegroundWindow();

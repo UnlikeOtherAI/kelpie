@@ -1,23 +1,14 @@
 #include "desktop_script_runtime.h"
 #include "desktop_script_coordinates.h"
+#include "desktop_script_capture_state.h"
 #include <stdexcept>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <atomic>
 
 namespace kelpie {
 namespace {
-void PresentationTiming(double elapsed, double latch_ms) {
-  const char* enabled=std::getenv("KELPIE_PRESENTATION_TIMING_DIAGNOSTICS");
-  if (!enabled || std::strcmp(enabled,"1")!=0) return;
-  static std::atomic<unsigned> count{0};
-  const auto index=count.fetch_add(1);
-  if (index==800) std::fprintf(stderr,"KELPIE_PRESENTATION_LATCH_TRUNCATED\n");
-  if (index>=800) return;
-  std::fprintf(stderr,"KELPIE_PRESENTATION_LATCH %.3f %.3f\n",elapsed,latch_ms);
-}
 void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlohmann::json& after) {
   const char* enabled=std::getenv("KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS");
   if (!enabled || std::strcmp(enabled,"1")!=0) return;
@@ -41,7 +32,6 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   std::unique_ptr<DesktopScriptCapture> encoder;
-  const auto cancellation=abort;
   int initial_width = 0, initial_height = 0;
   Json previous_viewport;
   std::string previous_document;
@@ -87,16 +77,14 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       }
       previous_viewport=viewport; previous_document=before.tab.document_version;
-      const auto latch_start=Clock::now();
+      const DesktopPresentationOwner sample_owner{lease.id,lease.generation,before.tab.document_version};
+      // The encoder receives this snapshot while live presentation continues.
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
       {
         std::lock_guard lock(mutex);
-        if (presentation.value("documentVersion", std::string()) != before.tab.document_version) {
-          presentation.erase("marker"); presentation.erase("pointer"); presentation.erase("commentary");
-        }
-        presentation_latched=true;
-        shown = presentation; shown["elapsedMs"] = Elapsed(); shown["playing"]=true; shown["captureLatched"]=true;
+        shown=SnapshotDesktopPresentation(presentation,sample_owner);
+        shown["elapsedMs"] = Elapsed(); shown["playing"]=true;
         shown["viewportWidth"] = width; shown["viewportHeight"] = height;
         step = requested_step; index = action_index; png=requested_step_png; expected_document=requested_step_document; ticket=requested_ticket;
       }
@@ -106,16 +94,16 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       shown["documentVersion"]=before.tab.document_version;
       shown["visualViewport"]=viewport.at("visualViewport");
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
-      if(config.present) config.present(shown,[this,cancellation] { cancellation->store(true); changed.notify_all(); });
       BrowserScreenshot image;
       result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       if (before.tab.document_version != after.tab.document_version) {
-        { std::lock_guard lock(mutex); presentation.erase("marker"); presentation.erase("pointer"); presentation_latched=false; }
+        bool cleared=false;
+        { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
         ++dropped;
-        Present();
+        if(cleared) Present();
         continue;
       }
       Json after_viewport;
@@ -127,8 +115,6 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
-      { std::lock_guard lock(mutex); presentation_latched=false; }
-      PresentationTiming(frame_time,std::chrono::duration<double,std::milli>(Clock::now()-latch_start).count());
       Present();
       { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
       if (step >= 0) {
@@ -164,7 +150,6 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
     { std::lock_guard lock(mutex); if(!abort->load()) capture_error = reason; }
     partial = true;
   }
-  { std::lock_guard lock(mutex); presentation_latched=false; }
   try { Present(); } catch(...) { std::lock_guard lock(mutex); capture_error="CAPTURE_NATIVE_PRESENTATION_FAILED"; partial=true; }
   partial = partial || abort->load();
   if (encoder) {
