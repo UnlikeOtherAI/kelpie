@@ -55,7 +55,7 @@ async function download(result,item,budget){
  const bytes=Buffer.concat(chunks);assert.equal(bytes.length,item.byteLength);assert.equal(createHash("sha256").update(bytes).digest("hex"),item.sha256);
  const file=resolve(outputRoot,item.id+(item.mimeType==="image/gif"?".gif":".mp4"));
  assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=bytes.length;await writeFile(file,bytes,{flag:"wx"});
- const probe=await run(process.env.FFPROBE||"ffprobe",["-v","error","-select_streams","v:0","-show_entries","frame=best_effort_timestamp_time","-of","json",file],120000);
+ report.phase="artifact-probe";const probe=await run(process.env.FFPROBE||"ffprobe",["-v","error","-select_streams","v:0","-show_entries","frame=best_effort_timestamp_time","-of","json",file],120000);
  const timestamps=JSON.parse(probe.stdout).frames.map(frame=>Number(frame.best_effort_timestamp_time));
  assert.ok(timestamps.length>0&&timestamps.every(Number.isFinite));return {...item,runId:result.runId,file,timestamps};
 }
@@ -119,13 +119,20 @@ try{
  let used=await verifyTimelineSnapshots(summary,join(outputRoot,"native"));
  used+=(await stat(join(outputRoot,"native","summary.json"))).size;assert.ok(used<=67108864);
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));assert.equal(items.length,2);
- const budget={remaining:67108864-used-65536};assert.ok(budget.remaining>=0,"OUTPUT_BUDGET");const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
+ const budget={remaining:67108864-used-65536};assert.ok(budget.remaining>=0,"OUTPUT_BUDGET");
+ const serialSamples=native.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
+ const nativeEvidence=Buffer.from(JSON.stringify({config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount}}));
+ assert.ok(nativeEvidence.length<=budget.remaining,"OUTPUT_BUDGET");budget.remaining-=nativeEvidence.length;
+ await writeFile(join(outputRoot,"native-observation.json"),nativeEvidence,{flag:"wx"});
+ report.phase="artifact-download";const artifacts=[];for(const item of items)artifacts.push(await download(terminal,item,budget));
  const trustedFacts={source:manifest.source,curve,frameCount:native.frameCount,
   identity:{pid:running.pid,sessionId:identity.sessionId,executable:identity.executable,startFileTime:identity.startFileTime,launchId:readiness.launchId,port:28420},
   window,active:{runId:active.runId,playing:true},activeSamples,terminal:{runId:terminal.runId,success:terminal.success},
   before,after,fixture:{url:fixture.url,pageRequests:fixture.pageRequests,...fixtureFacts},artifacts,summary};
+ report.phase="provenance";
+ const factEvidence=Buffer.from(JSON.stringify(trustedFacts));assert.ok(factEvidence.length<=budget.remaining,"OUTPUT_BUDGET");
+ budget.remaining-=factEvidence.length;await writeFile(join(outputRoot,"facts-observation.json"),factEvidence,{flag:"wx"});
  const provenance=verifyWgcProvenance(trustedFacts);
- const serialSamples=native.samples.map(sample=>({...sample,marker:{...sample.marker,...(sample.marker.roi?{roi:sample.marker.roi.toString("base64")}:{})}}));
  const caseData={curve,binarySHA256:manifest.dllSha256,scene:{calibration:fixtureFacts.events[0],start:fixtureFacts.events[1],finish:fixtureFacts.events[2]},artifacts,
   provenance,facts:trustedFacts,config,native:{samples:serialSamples,analysis:native.analysis,oracleError:native.oracleError,frameCount:native.frameCount},summary};
  const bytes=Buffer.from(JSON.stringify(caseData,null,2));assert.ok(bytes.length<=budget.remaining,"OUTPUT_BUDGET");await writeFile(join(outputRoot,"case.json"),bytes,{flag:"wx"});

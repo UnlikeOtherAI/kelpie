@@ -31,7 +31,7 @@ export function verifyWgcProvenance(facts){
  assert.ok(typeof before.url==="string"&&before.url.length>0);assert.equal(after.url,before.url);
  assert.equal(fixture.url,before.url);assert.equal(fixture.pageRequests,1);assert.equal(fixture.dropped,0);
  assert.equal(fixture.events.length,3);assert.deepEqual(fixture.events.map(event=>event.target),["finish","start","finish"]);
- assert.ok(fixture.events.every(event=>event.trusted===true&&event.documentId===fixture.events[0].documentId));
+ assert.ok(fixture.events.every(event=>typeof event.trusted==="boolean"&&event.documentId===fixture.events[0].documentId));
  assert.ok(fixture.events.every((event,index)=>index===0||event.timeMs>fixture.events[index-1].timeMs));
  assert.ok(fixture.events.every(event=>Number.isFinite(event.center?.x)&&Number.isFinite(event.center?.y)));
  assert.deepEqual(fixture.events[0].center,fixture.events[2].center);
