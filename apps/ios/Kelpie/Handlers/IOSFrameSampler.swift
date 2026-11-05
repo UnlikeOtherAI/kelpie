@@ -131,6 +131,30 @@ final class IOSFrameSampler {
         #endif
     }
 
+    // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
+    private func pinViewport(_ viewport: IOSWorkflowTab.Viewport, generation: String) throws {
+        if let initial {
+            let nativeResize = initial.bounds != viewport.bounds || initial.pixelRatio != viewport.pixelRatio
+            let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
+            if nativeResize || (initialDocument == generation && documentResize) {
+                Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+            }
+        }
+        if initialDocument != generation {
+            initial = viewport
+            initialDocument = generation
+        }
+    }
+
+    private static func resizeReason(initial: IOSWorkflowTab.Viewport, viewport: IOSWorkflowTab.Viewport) -> String {
+        if initial.bounds != viewport.bounds { return "native-bounds" }
+        if initial.pixelRatio != viewport.pixelRatio { return "pixel-ratio" }
+        if initial.layout != viewport.layout { return "layout-size" }
+        if initial.visible.size != viewport.visible.size { return "visible-size" }
+        return "scale"
+    }
+
     private func canvas(_ viewport: IOSWorkflowTab.Viewport) -> CGSize {
         let raw = viewport.bounds
         let factor = min(tab.view.contentScaleFactor, CGFloat(maxWidth) / raw.width, 1920 / raw.height)
@@ -152,25 +176,7 @@ final class IOSFrameSampler {
         let generation = tab.document
         if let expected, expected != generation { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
         let viewport = try await tab.viewport()
-        // Pin dimensions, scale and zoom; scrolling may move the visible rectangle without resizing it.
-        if let initial {
-            let nativeResize = initial.bounds != viewport.bounds || initial.pixelRatio != viewport.pixelRatio
-            let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
-            if nativeResize || (initialDocument == generation && documentResize) {
-                let reason: String
-                if initial.bounds != viewport.bounds { reason = "native-bounds" }
-                else if initial.pixelRatio != viewport.pixelRatio { reason = "pixel-ratio" }
-                else if initial.layout != viewport.layout { reason = "layout-size" }
-                else if initial.visible.size != viewport.visible.size { reason = "visible-size" }
-                else { reason = "scale" }
-                Self.diagnostic(reason)
-                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
-            }
-        }
-        if initialDocument != generation {
-            initial = viewport
-            initialDocument = generation
-        }
+        try pinViewport(viewport, generation: generation)
         guard generation == tab.document else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
             dropped += 1
