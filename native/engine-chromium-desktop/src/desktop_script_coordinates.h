@@ -4,6 +4,23 @@
 #include <nlohmann/json.hpp>
 
 namespace kelpie {
+// Across-frame gutters can change visible size. Actual source dimensions are
+// independently checked by the capture adapter; within-frame metrics are exact.
+inline bool ScriptCaptureViewportCompatible(const nlohmann::json& previous,
+    const nlohmann::json& current,bool same_document) {
+  try {
+    for(const char* key:{"width","height"})
+      if(previous.at(key)!=current.at(key)) return false;
+    if(same_document) for(const char* key:{"offsetLeft","offsetTop","scale"})
+      if(previous.at("visualViewport").at(key)!=current.at("visualViewport").at(key)) return false;
+    return true;
+  }catch(const std::exception&){return false;}
+}
+// Called only after the fixed renderer inspection has been attempted.
+inline bool ScriptTargetInspectionUncertain(const nlohmann::json& value) {
+  return !value.is_object() || !value.contains("ok") || !value["ok"].is_boolean() ||
+    !value.contains("sensitive") || !value["sensitive"].is_boolean();
+}
 struct DesktopScriptCdpPoint {double x,y;};
 // CDP already applies page scale. Its viewport CSS coordinates exclude only
 // the captured visual offset; renderer-pixel and DPR transforms belong to UI.

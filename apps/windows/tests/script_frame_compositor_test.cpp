@@ -1,6 +1,7 @@
 #include "script_frame_compositor.h"
 #include "script_capture_cadence.h"
 #include <cassert>
+#include <objbase.h>
 #include <algorithm>
 using kelpie::windows::ScriptMediaFrame;
 using kelpie::windows::DrawScriptOverlay;
@@ -10,6 +11,14 @@ ScriptMediaFrame White() {
   frame.bgra.assign(160000,255); return frame;
 }
 int main() {
+  assert(SUCCEEDED(CoInitializeEx(nullptr,COINIT_MULTITHREADED)));
+  kelpie::windows::ScriptFrameSourceSize source;
+  const auto decoded=kelpie::windows::DecodeScriptFrame(
+    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAGCAYAAAD+Bd/7AAAAD0lEQVR4nGP4TwAwDAUFAPrNv0HlRvlbAAAAAElFTkSuQmCC",
+    4,0,&source);
+  assert(source.width==8 && source.height==6);
+  assert(decoded.width==4 && decoded.height==2); // Source bounds survive scaling/even rounding.
+  CoUninitialize();
   double previous=-1; int count=0;
   for(int elapsed=0;elapsed<=1000;++elapsed) {
     if(kelpie::windows::ScriptMovieFrameDue(previous,elapsed,15)) {

@@ -6,7 +6,6 @@
 #include <gdiplus.h>
 #include <algorithm>
 #include <cmath>
-#include <cmath>
 #include <stdexcept>
 #include "windows_utf.h"
 #include "kelpie/script_presentation.h"
@@ -20,7 +19,7 @@ void EnsureGdi() {
     return value; }(); (void)token;
 }
 }
-ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,double elapsed_ms) {
+ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,double elapsed_ms,ScriptFrameSourceSize* source_size) {
   if(encoded.size()>67108864) throw std::runtime_error("CAPTURE_FRAME_TOO_LARGE");
   DWORD size=0;
   if(!CryptStringToBinaryA(encoded.data(),static_cast<DWORD>(encoded.size()),CRYPT_STRING_BASE64,nullptr,&size,nullptr,nullptr))
@@ -34,6 +33,7 @@ ScriptMediaFrame DecodeScriptFrame(const std::string& encoded,int max_width,doub
   ComPtr<IWICBitmapFrameDecode> source; Check(decoder->GetFrame(0,&source));
   UINT width=0,height=0; Check(source->GetSize(&width,&height));
   if(!width||!height||width>16384||height>16384||static_cast<std::uint64_t>(width)*height>8388608) throw std::runtime_error("CAPTURE_FRAME_TOO_LARGE");
+  if(source_size) *source_size={static_cast<int>(width),static_cast<int>(height)};
   const double scale=std::min({1.0,static_cast<double>(max_width)/width,1920.0/height});
   if(width*scale<2 || height*scale<2) throw std::runtime_error("CAPTURE_VIEWPORT_UNSUPPORTED");
   ScriptMediaFrame frame; frame.width=std::max(2,static_cast<int>(width*scale)/2*2);

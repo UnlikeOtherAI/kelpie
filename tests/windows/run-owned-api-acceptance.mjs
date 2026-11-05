@@ -57,7 +57,7 @@ try{
  assert.ok(Date.parse(pinned.startTime)>=Date.parse(started)-1000);
  report.identity={...pinned,source:manifest.source,launchId:readiness.launchId,port:28420,hashes:manifest};
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
- if(mode==="privacy-focus"){
+ if(mode==="privacy-focus" || mode==="privacy-regression"){
   await childCase("late sensitivity focus diagnostic","probe-sensitive-focus.mjs",[readinessFile,join(evidenceRoot,"privacy-focus.json"),mode==="privacy-regression"?"expect-refused":"diagnostic"],{KELPIE_CAPTURE_SOURCE:manifest.source});
  }else if(mode==="fixture"){
   await childCase("native fixture preparation diagnosis","probe-script-fixture.mjs",[readinessFile,join(evidenceRoot,"fixture.json")]);

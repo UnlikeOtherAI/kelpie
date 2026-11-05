@@ -41,6 +41,7 @@ namespace kelpie {
 using namespace engine_control;
 BrowserControlResult DesktopEngine::DispatchScriptTarget(
     TabLease lease, const Json& options, const Json& action, Json* output, Timeout timeout) {
+  if(output) *output=Json::object();
   const auto began = std::chrono::steady_clock::now();
   bool dispatched = false, native_pressed=false, native_keys=false;
   struct CleanupOnExit {
@@ -59,8 +60,12 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       return BrowserControlResult::Failure("INVALID_TARGET", "Shared target expression is unavailable");
     }
     kelpie_mcp_free_string(raw);
+    target=Json(); // A failed inspection cannot reuse an earlier classification.
     const auto read = EvaluateBrowserControl(lease, generated.at("expression").get<std::string>(), &target, remaining);
+    if(output && target.is_object() && target.value("sensitive",false)) (*output)["sensitive"]=true;
+    if(output && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
     if (!read.ok) return read;
+    if(ScriptTargetInspectionUncertain(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable classification");
     if (!target.value("ok", false))
       return BrowserControlResult::Failure(target.value("error", std::string("TARGET_FAILED")), "Target preflight refused input");
     return BrowserControlResult::Success();
@@ -87,7 +92,9 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   const std::string type = action.value("action", std::string());
   if ((type == "fill" || type == "type") && !target.value("editable", false))
     return BrowserControlResult::Failure("TARGET_NOT_EDITABLE", "Target is not an editable text control");
-  const double x = target.at("x"), y = target.at("y");
+  const auto point=ScriptTargetCdpPoint(target);
+  if(!point) return fail(BrowserControlResult::Failure("TARGET_VIEWPORT_UNAVAILABLE","Captured target viewport is unavailable"));
+  const double x = point->x, y = point->y;
   const Json mouse = {{"x", x}, {"y", y}, {"button", "left"}, {"clickCount", 1}};
   Json pressed = mouse; pressed["type"] = "mousePressed";
   native_pressed=true;
@@ -137,8 +144,8 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     result = send("Input.insertText", {{"text", action.at("text")}});
     if (!result.ok) return fail(result);
   }
-  if (output) *output = {{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
-                         {"targetGuarantee", "rechecked-before-dispatch-with-async-gap"}};
+  if (output) { const bool sensitive=output->value("sensitive",false); *output = {{"sensitive",sensitive},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
+                         {"targetGuarantee", "rechecked-before-dispatch-with-async-gap"}}; }
   return BrowserControlResult::Success();
 }
 }
