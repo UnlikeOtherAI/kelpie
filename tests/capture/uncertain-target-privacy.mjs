@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 
 // The uncertainty oracle deliberately makes no zero-input or unchanged-value claim.
-export function assertUncertainTargetPrivacy({ result, status }, { secret, expectedCode }) {
+export function assertUncertainTargetPrivacy({ result, status }, { secret, expectedCode, expectedMayHaveCompleted = true }) {
   assert.ok(typeof secret === "string" && secret.length);
   assert.ok(typeof expectedCode === "string" && expectedCode.length);
   assert.equal(result.success, false);
   assert.equal(result.error?.code, expectedCode, "First concrete failure must survive privacy cleanup");
-  assert.equal(result.mayHaveCompleted, true, "Lost target result remains uncertain");
-  assert.deepEqual(result.artifacts, [], "Uncertain capture inspection must discard current media");
+  assert.equal(result.mayHaveCompleted === true, expectedMayHaveCompleted, "Preserve actual input-completion uncertainty");
+  assert.deepEqual(result.artifacts, [], "Uncertain target inspection cannot expose current media");
   assert.equal(status.success, true);
   assert.equal(status.playing, false, "Final metadata requires retired inspection");
   assert.equal(status.runSuccess, false);

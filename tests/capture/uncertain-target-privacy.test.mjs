@@ -36,3 +36,17 @@ test("running and finalizing withhold current media while prior safe run is read
     assert.throws(() => assertActiveArtifactPrivacy(value), /publish/);
   }
 });
+
+test("missing classification scrubs current edit with or without capture and preserves read-only certainty", () => {
+  for (const capture of [true, false]) {
+    for (const mayHaveCompleted of [true, false]) {
+      const value = terminal();
+      value.captureRequested = capture;
+      value.result.mayHaveCompleted = mayHaveCompleted;
+      assertUncertainTargetPrivacy(value, { ...options, expectedMayHaveCompleted: mayHaveCompleted });
+      value.result.outputs.before = encodeURIComponent(secret);
+      assert.throws(() => assertUncertainTargetPrivacy(value,
+        { ...options, expectedMayHaveCompleted: mayHaveCompleted }), /literal leaked/);
+    }
+  }
+});

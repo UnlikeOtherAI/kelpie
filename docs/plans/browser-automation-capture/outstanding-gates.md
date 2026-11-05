@@ -1,6 +1,6 @@
 # Finite outstanding gates before PR and release
 
-Snapshot: reviewed root6f10b31bb724db74042ae7a40841ce4762ffe089 plus explicitly labelled later owner reports
+Snapshot: reviewed root5f4c4fcb plus common cbce8f97 and explicitly labelled later owner reports
 received by the common reviewer. This is a closure list, not432 auto-approvals.
 Every close records exact exercised source,target binary/version,protocol,
 artifacts/hashes and actual outcome. Historical failing runs remain immutable.
@@ -22,6 +22,7 @@ Source mapping is in implementation-map.md.
 | G12 Status and action subset | WFL-01..04,RDY-02,DOC-01 | Every native runtime | Parse actual safe v1 status,failed/aborted partial artifact recovery,legacy-busy automatic admission recovery and no outputs/secrets in status. Reconcile declared supported action subsets against brief before closure; unsupported preflight cannot silently substitute for a required feature. |
 | G13 Authorized native UI evidence | UI-01,VIS-01..02 | Applicable windowed/foreground apps | CUA,VNC and arbitrary OS-input helpers remain off. Root-authorized XCUITest/Compose and scoped native accessibility instrumentation are allowed under handoff/resource grants. Android phone Stop and Windows Session1 standard UIA Stop/partial/recovery/teardown (4ec) actual subsets are reported. Authorized hosted fallback removes the blanket local handoff dependency; remaining per-device scheduling/runtime and changed-state evidence still need explicit outcomes. No offscreen local Stop claim. |
 | G14 Integrated proof/docs | DOC-01,DIF-01,all48 ID audit | Root+common | Integrate every worker history; run required final shared/CLI/native/platform checks on final source; review precise9-runtime evidence and remaining limits. Preserve typed input-guarantee differences. No blanket acceptance from ingestion or codec build. |
+| G16 Late-sensitive privacy | SEC-01,ART-01..02,WFL-05 | Every native consumer | Shared6ad/2a fixed helper and core checks passed; Windows f188 focus-autocomplete/type actual failures are preserved. Final adapters must consume classification before guard/ticket retirement; uncertain no-result target inspection registers current edit text even without capture; capture media is discarded. Current active downloads refuse ARTIFACT_NOT_READY, foreign NOT_FOUND; final scrub precedes terminal exposure. Actual fixed platform raw/URI/form and no-result replays remain pending. |
 | G15 Publish/install | REL-01,REL-02 | All affected components /root+platform owners | Bump each component's own manifest; one final integrated PR with required checks,then coordinated publication. Verify npm provenance/version/installed worker,Windows signed EXE/DLL/installer+timestamp and installed exact package,Apple signing/distribution/installation,Android signed APK/AAB phone/tablet install,and Linux DEB/RPM supported installs. Use immutable published hashes and fresh date tag; private candidates are not releases. |
 
 The CI/PR screenshot requirement applies only to materially changed rendered
