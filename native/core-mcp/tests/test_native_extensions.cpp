@@ -2,7 +2,7 @@
 #include "kelpie/mcp_registry.h"
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/browser_gateway.h"
-#include "browser_schema.h"
+#include "kelpie/browser_schema.h"
 #include "browser_contract.h"
 #include <cassert>
 #include <iostream>
