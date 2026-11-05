@@ -1,4 +1,9 @@
 #include "script_media_internal.h"
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+#include <gst/video/video-event.h>
+#include <chrono>
+#include <cstdio>
+#endif
 #include "script_artifact_store.h"
 #include "script_gstreamer.h"
 #include <algorithm>
@@ -182,12 +187,32 @@ class Video final : public Writer {
     if (!raw || gst_buffer_fill(raw.get(), 0, input.bgra.data(), input.bgra.size()) != input.bgra.size())
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     GST_BUFFER_PTS(raw.get()) = pts; GST_BUFFER_DTS(raw.get()) = pts; GST_BUFFER_DURATION(raw.get()) = duration;
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+    const auto index=encoded_test_index_++;
+    if (index==14) {
+      auto* sinkpad=gst_element_get_static_pad(GST_ELEMENT(encoder_->sink()),"sink");
+      if (!sinkpad) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
+      const auto began=std::chrono::steady_clock::now();
+      const bool accepted=gst_pad_push_event(sinkpad,gst_video_event_new_upstream_force_key_unit(
+          GST_CLOCK_TIME_NONE,TRUE,0));
+      gst_object_unref(sinkpad);
+      const auto micros=std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now()-began).count();
+      std::fprintf(stderr,"KELPIE_TEST_FORCE_KEYFRAME accepted=%d event_us=%lld\n",
+          int(accepted),static_cast<long long>(micros));
+      if (!accepted) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
+    }
+#endif
     encoder_->Push(raw.release());
     Sample sample(encoder_->Pull());
     auto* sample_caps = gst_sample_get_caps(sample.get());
     auto* packet = gst_sample_get_buffer(sample.get());
     if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps))
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+    if (index==14 && GST_BUFFER_FLAG_IS_SET(packet,GST_BUFFER_FLAG_DELTA_UNIT))
+      throw std::runtime_error("CAPTURE_TEST_KEYFRAME_NOT_EMITTED");
+#endif
     if (!caps_) caps_ = gst_caps_ref(sample_caps);
     Buffer copied(gst_buffer_copy_deep(packet));
     if (!copied) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
@@ -237,6 +262,9 @@ class Video final : public Writer {
   std::vector<Buffer> packets_;
   std::size_t reserved_ = 0;
   bool finished_ = false, stopped_ = false;
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+  std::size_t encoded_test_index_=0;
+#endif
 };
 }
 std::unique_ptr<Writer> MakeVideo(const std::filesystem::path& path, Budget& budget, int fps) {

@@ -252,6 +252,19 @@ if(KELPIE_LINUX_HAS_CEF)
     target_compile_definitions(kelpie-linux PRIVATE KELPIE_LINUX_G08_TEST_OBSERVATION=1)
   endif()
   if(BUILD_TESTING)
+    pkg_check_modules(LINUX_TEST_GST_VIDEO QUIET IMPORTED_TARGET gstreamer-video-1.0)
+    if(LINUX_TEST_GST_VIDEO_FOUND)
+    add_library(kelpie_linux_script_media_keytest STATIC EXCLUDE_FROM_ALL
+      src/script_frame_compositor.cpp src/script_media_encoder.cpp src/script_media_gif.cpp
+      src/script_media_video.cpp src/script_gstreamer.cpp src/script_artifact_store.cpp)
+    target_include_directories(kelpie_linux_script_media_keytest PUBLIC src)
+    target_compile_definitions(kelpie_linux_script_media_keytest PRIVATE KELPIE_LINUX_CODEC_FORCE_TEST=1)
+    target_link_libraries(kelpie_linux_script_media_keytest PUBLIC kelpie_core_automation kelpie_engine_chromium_desktop
+      nlohmann_json::nlohmann_json PkgConfig::LINUX_CAPTURE_CAIRO PkgConfig::LINUX_CAPTURE_GST
+      PkgConfig::LINUX_TEST_GST_VIDEO OpenSSL::Crypto GIF::GIF)
+    add_executable(linux_script_codec_keyframe_control EXCLUDE_FROM_ALL tests/script_codec_carryover_control.cpp)
+    target_link_libraries(linux_script_codec_keyframe_control PRIVATE kelpie_linux_script_media_keytest)
+    endif()
     add_executable(linux_script_codec_carryover_control tests/script_codec_carryover_control.cpp)
     target_link_libraries(linux_script_codec_carryover_control PRIVATE kelpie_linux_script_media)
     add_executable(linux_script_marker_anchor_test tests/script_marker_anchor_test.cpp)
