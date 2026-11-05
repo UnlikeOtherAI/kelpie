@@ -489,10 +489,10 @@ try {
 } finally {
   const report={source:process.env.KELPIE_CAPTURE_SOURCE,port:readiness.port,launchId:readiness.launchId,checks,artifacts};
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
-  if(resourceDiagnostic) await resourceDiagnostic.write();
   try { await fixture.close();report.cleanup="closed"; }
   catch(error) {report.cleanup="failed";checks.push({name:"fixture cleanup",passed:false,error:error.message});}
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
+  if(resourceDiagnostic) await resourceDiagnostic.write();
 }
 console.log(JSON.stringify({ passed: checks.filter(c => c.passed).length, failed: checks.filter(c => !c.passed).map(c => c.name), output }));
 if (checks.some(check => !check.passed)) process.exitCode = 1;

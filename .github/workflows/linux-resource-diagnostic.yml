@@ -22,9 +22,9 @@ jobs:
       matrix:
         distro:
           - name: ubuntu-22.04
-            image: ubuntu:22.04
+            image: ubuntu@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
           - name: fedora-44
-            image: fedora:44
+            image: fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e
     steps:
       - uses: actions/checkout@v6.0.3
         with:
@@ -58,6 +58,9 @@ jobs:
           package_revision="$(cat "${package_root}/source-revision.txt")"
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
+          git diff "${package_revision}" "${diagnostic_revision}" -- \
+            tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs \
+            > "${package_root}/resource-hook-diff.patch"
           git checkout --detach "${package_revision}"
           for path in scripts/ci/linux-installed-smoke.sh tests/linux/native-resource-snapshot.mjs \
             tests/linux/navigation-resource-diagnostic.mjs \
@@ -66,15 +69,19 @@ jobs:
           done
           printf '%s\n' "${diagnostic_revision}" > "${package_root}/resource-test-revision.txt"
           pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          test -s packages/shared/dist/index.js
           pnpm --filter @unlikeotherai/kelpie build
       - name: Run original installed package with numeric snapshots
         timeout-minutes: 15
         env:
           DISTRO_NAME: ${{ matrix.distro.name }}
           DISTRO_IMAGE: ${{ matrix.distro.image }}
+          SOURCE_RUN: ${{ inputs.source_run }}
         run: |
           set -euo pipefail
           package_root="dist/release/${DISTRO_NAME}"
+          printf 'referenceRun=42066988249\nsourceRun=%s\nimage=%s\n' "${SOURCE_RUN}" "${DISTRO_IMAGE}" > "${package_root}/resource-image.txt"
           curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "${RUNNER_TEMP}/kelpie-moby-default.json"
           KELPIE_SECCOMP_BASELINE="${RUNNER_TEMP}/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
           node scripts/ci/linux-test-seccomp.mjs "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json"
@@ -97,6 +104,8 @@ jobs:
           name: linux-resource-diagnostic-${{ matrix.distro.name }}
           path: |
             dist/release/${{ matrix.distro.name }}/resource-test-revision.txt
+            dist/release/${{ matrix.distro.name }}/resource-image.txt
+            dist/release/${{ matrix.distro.name }}/resource-hook-diff.patch
             dist/release/${{ matrix.distro.name }}/resource-diagnostic.log
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/outcome.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.txt

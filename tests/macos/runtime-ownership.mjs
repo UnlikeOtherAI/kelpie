@@ -54,3 +54,12 @@ export function workflowVisibilitySignal(line){
  const match=/^\[WorkflowVisibility\] phase=(check|focus) visible=([01u]) hidden=([01u]) key=([01u]) sheet=([01u])$/.exec(line);
  return match?{phase:match[1],visible:match[2],hidden:match[3],key:match[4],sheet:match[5]}:null;
 }
+
+// Existing HTTP listener lifecycle output, reduced to fixed labels.
+export function serverLifecycleSignal(line){
+ const match=/^\[HTTPServer\] Listening on port (\d{1,5})$/.exec(line);
+ if(match)return {state:"listening",port:match[1]==="28420"?"requested":match[1]==="8420"?"default":"other"};
+ if(line.startsWith("[HTTPServer] Listener failed:"))return {state:"failed"};
+ if(line.startsWith("[HTTPServer] Failed to create listener:"))return {state:"create-failed"};
+ return null;
+}

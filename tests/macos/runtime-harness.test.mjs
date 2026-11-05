@@ -2,7 +2,7 @@ import vm from "node:vm";
 import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 import {runIndependentPhase} from "./runtime-orchestration.mjs";
 import {cliExitFacts} from "./runtime-diagnostics.mjs";
@@ -148,4 +148,12 @@ test("listener diagnostics distinguish no match from failed lsof without raw std
  assert.deepEqual(listenerProbeFailure({status:1,stderr:"private"}),{outcome:"probe-error",cause:"OTHER",stderrPresent:true});
  assert.deepEqual(listenerProbeFailure({code:"EAGAIN"}),{outcome:"probe-error",cause:"EAGAIN",stderrPresent:false});
  assert.ok(!JSON.stringify(listenerProbeFailure({stderr:"private"})).includes("private"));
+});
+
+test("server lifecycle diagnostics retain only fixed states and requested/default port classes",()=>{
+ assert.deepEqual(serverLifecycleSignal("[HTTPServer] Listening on port 28420"),{state:"listening",port:"requested"});
+ assert.deepEqual(serverLifecycleSignal("[HTTPServer] Listening on port 8420"),{state:"listening",port:"default"});
+ assert.deepEqual(serverLifecycleSignal("[HTTPServer] Listener failed: private"),{state:"failed"});
+ assert.ok(!JSON.stringify(serverLifecycleSignal("[HTTPServer] Listener failed: private")).includes("private"));
+ assert.equal(serverLifecycleSignal("[HTTPServer] Listening on port 28420 private"),null);
 });
