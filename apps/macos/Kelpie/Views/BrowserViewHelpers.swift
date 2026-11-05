@@ -192,6 +192,7 @@ struct FloatingProgressPill: View {
 // MARK: - AppKit-backed resize handle (bypasses WebView first-responder hit-test issue)
 
 struct AppKitResizeHandle: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var panelWidth: CGFloat
     let onDragEnd: () -> Void
 
@@ -204,6 +205,7 @@ struct AppKitResizeHandle: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: ResizeHandleView, context: Context) {
+        nsView.isInteractionEnabled = isEnabled
         context.coordinator.onDragEnd = onDragEnd
     }
 
@@ -230,9 +232,14 @@ struct AppKitResizeHandle: NSViewRepresentable {
 }
 
 final class ResizeHandleView: NSView {
+    var isInteractionEnabled = true
     weak var coordinator: AppKitResizeHandle.Coordinator?
     private var trackingArea: NSTrackingArea?
     private let bar = NSView()
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        isInteractionEnabled ? super.hitTest(point) : nil
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)

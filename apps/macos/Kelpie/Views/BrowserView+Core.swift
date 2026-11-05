@@ -196,7 +196,7 @@ extension BrowserView {
             viewportState: viewportState,
             stageScale: rendererState.activeEngine == .chromium ? 1.0 : viewportState.scale,
             contentUnderlap: chromeUnderlap,
-            showsStageChrome: !serverState.isScriptRecording && viewportState.showsViewportStageChrome
+            showsStageChrome: !serverState.isScriptImmersive && viewportState.showsViewportStageChrome
         ) {
             ZStack {
                 RendererContainerView(
@@ -235,7 +235,8 @@ extension BrowserView {
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
-            .allowsHitTesting(!serverState.isScriptRecording)
         }
+        .disabled(serverState.isScriptRecording)
+        .allowsHitTesting(!serverState.isScriptRecording)
     }
 }

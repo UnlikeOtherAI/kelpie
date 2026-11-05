@@ -87,6 +87,14 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         XCTAssertThrowsError(try ScriptWorkflowTab.decodeCaptureState(["viewport": [1], "document": identity], bounds: bounds))
     }
 
+    func testOnlyMovieWorkflowsEnterImmersivePresentation() throws {
+        XCTAssertFalse(try ScriptBoundWorkflow(workflow([tap])).isImmersive)
+        XCTAssertFalse(try ScriptBoundWorkflow(workflow([["action": "screenshot"]])).isImmersive)
+        XCTAssertFalse(try ScriptBoundWorkflow(workflow([tap], ["capture": ["formats": ["screenshots"]]])).isImmersive)
+        XCTAssertTrue(try ScriptBoundWorkflow(workflow([tap], ["capture": ["formats": ["gif"]]])).isImmersive)
+        XCTAssertTrue(try ScriptBoundWorkflow(workflow([tap], ["capture": ["formats": ["video", "screenshots"]]])).isImmersive)
+    }
+
     @MainActor
     func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
         let port: UInt16 = 28421

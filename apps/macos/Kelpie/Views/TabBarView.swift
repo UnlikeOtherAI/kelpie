@@ -5,6 +5,7 @@ import SwiftUI
 // MARK: - Public NSViewRepresentable
 
 struct TabBarView: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var tabStore: TabStore
     let onNewTab: () -> Void
@@ -31,6 +32,7 @@ struct TabBarView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: TabBarContainerView, context: Context) {
+        nsView.isInteractionEnabled = isEnabled
         context.coordinator.palette = appearance.palette
         context.coordinator.onNewTab = onNewTab
         context.coordinator.onCloseTab = onCloseTab
@@ -59,6 +61,7 @@ final class TabBarCoordinator: NSObject {
     }
 
     @objc func handleAddTab() {
+        guard container?.isInteractionEnabled == true else { return }
         onNewTab()
     }
 
@@ -78,8 +81,14 @@ final class TabBarCoordinator: NSObject {
         // Add pills for new tabs
         for tab in tabStore.tabs where pillsByID[tab.id] == nil {
             let pill = TabPillView(tab: tab)
-            pill.onSelect = { [weak self] id in self?.onSelectTab(id) }
-            pill.onClose = { [weak self] id in self?.onCloseTab(id) }
+            pill.onSelect = { [weak self] id in
+                guard let self, self.container?.isInteractionEnabled == true else { return }
+                self.onSelectTab(id)
+            }
+            pill.onClose = { [weak self] id in
+                guard let self, self.container?.isInteractionEnabled == true else { return }
+                self.onCloseTab(id)
+            }
             container.scrollContent.addSubview(pill)
             pillsByID[tab.id] = pill
         }
@@ -149,6 +158,9 @@ final class TabBarCoordinator: NSObject {
 // MARK: - TabBarContainerView
 
 final class TabBarContainerView: NSView {
+    var isInteractionEnabled = true {
+        didSet { addButton.isEnabled = isInteractionEnabled }
+    }
     let scrollView = NSScrollView()
     let scrollContent = TabStripDocumentView()
     let addButton = NSButton()
@@ -156,6 +168,10 @@ final class TabBarContainerView: NSView {
     var onFrameChange: ((CGRect) -> Void)?
 
     override var isFlipped: Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        isInteractionEnabled ? super.hitTest(point) : nil
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)

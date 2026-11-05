@@ -10,6 +10,7 @@ final class ServerState: ObservableObject {
     @Published var isMDNSAdvertising = false
     @Published var ipAddress: String = "0.0.0.0"
     @Published var isScriptRecording = false
+    @Published var isScriptImmersive = false
     @Published var shellToastMessage: String?
     @Published private(set) var deviceInfo: DeviceInfo
     let viewportState = ViewportState()
@@ -167,8 +168,8 @@ final class ServerState: ObservableObject {
             context: ctx,
             router: router,
             playbackState: scriptPlaybackState,
-            setRecordingMode: { [weak self] isRecording in
-                await self?.setScriptRecording(isRecording)
+            setRecordingMode: { [weak self] isRecording, immersive in
+                await self?.setScriptRecording(isRecording, immersive: immersive)
             }
         ).register(on: router)
 
@@ -280,11 +281,13 @@ final class ServerState: ObservableObject {
         startMDNS()
     }
 
-    func setScriptRecording(_ isRecording: Bool) {
+    func setScriptRecording(_ isRecording: Bool, immersive: Bool) {
         guard self.isScriptRecording != isRecording else { return }
+        isScriptImmersive = isRecording && immersive
         self.isScriptRecording = isRecording
 
         if isRecording {
+            guard immersive else { return }
             let window = NSApplication.shared.keyWindow
             scriptRecordingWindow = window
             scriptRecordingWasFullscreen = window?.styleMask.contains(.fullScreen) ?? false
@@ -294,8 +297,7 @@ final class ServerState: ObservableObject {
             return
         }
 
-        let window = scriptRecordingWindow ?? NSApplication.shared.keyWindow
-        if let window, !scriptRecordingWasFullscreen, window.styleMask.contains(.fullScreen) {
+        if let window = scriptRecordingWindow, !scriptRecordingWasFullscreen, window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
         }
         scriptRecordingWindow = nil

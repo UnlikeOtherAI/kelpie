@@ -4,7 +4,7 @@ struct ScriptHandler {
     let context: HandlerContext
     let router: Router
     let playbackState: ScriptPlaybackState
-    let setRecordingMode: @Sendable (Bool) async -> Void
+    let setRecordingMode: @Sendable (Bool, Bool) async -> Void
 
     @MainActor
     func register(on router: Router) {
@@ -47,14 +47,14 @@ struct ScriptHandler {
         }
 
         await context.exit3DInspectorIfNeeded(notify: true)
-        await setRecordingMode(true)
+        await setRecordingMode(true, true)
         let result = await runScript(
             actions: actions,
             overlayColor: overlayColor,
             defaultWaitBetweenActions: defaultWaitBetweenActions,
             continueOnError: continueOnError
         )
-        await setRecordingMode(false)
+        await setRecordingMode(false, false)
         return result
     }
 

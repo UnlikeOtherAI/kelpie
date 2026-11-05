@@ -40,7 +40,7 @@ struct BrowserView: View {
         ZStack {
             VStack(spacing: 0) {
                 ConnectControls(compact: true)
-                if !serverState.isScriptRecording {
+                if !serverState.isScriptImmersive {
                     Group {
                         if isWindowFullscreen {
                             browserTabs.padding(.horizontal, 12)
@@ -110,6 +110,8 @@ struct BrowserView: View {
                         onSettings: { showSettings = true }
                     )
                     .fixedSize(horizontal: false, vertical: true)
+                    .disabled(serverState.isScriptRecording)
+                    .allowsHitTesting(!serverState.isScriptRecording)
                     .layoutPriority(1)
                     .zIndex(2)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -157,8 +159,10 @@ struct BrowserView: View {
                     }
 
                     // AI panel — outside the overlay ZStack so buttons are always clickable
-                    if isAIPanelOpen && !serverState.isScriptRecording, let tab = tabStore.activeTab {
+                    if isAIPanelOpen && !serverState.isScriptImmersive, let tab = tabStore.activeTab {
                         AppKitResizeHandle(panelWidth: $aiPanelWidth, onDragEnd: persistAIPanelWidth)
+                            .disabled(serverState.isScriptRecording)
+                            .allowsHitTesting(!serverState.isScriptRecording)
                         AIChatPanel(
                             aiState: aiState,
                             session: tab.chatSession,
@@ -166,9 +170,11 @@ struct BrowserView: View {
                             onClose: { isAIPanelOpen = false }
                         )
                         .frame(width: aiPanelWidth)
+                        .disabled(serverState.isScriptRecording)
+                        .allowsHitTesting(!serverState.isScriptRecording)
                     }
                 }
-                if !serverState.isScriptRecording {
+                if !serverState.isScriptImmersive {
                     BrowserLinkStatusBar(appearance: chromeAppearance, url: hoveredLinkURL)
                 }
             }
@@ -204,8 +210,8 @@ struct BrowserView: View {
         .background(
             WindowChromeBridge(
                 title: windowTitle,
-                tabs: AnyView(browserTabs),
-                showsTabs: !serverState.isScriptRecording && !isWindowFullscreen,
+                tabs: AnyView(browserTabs.disabled(serverState.isScriptRecording)),
+                showsTabs: !serverState.isScriptImmersive && !isWindowFullscreen,
                 onFullscreenChange: { isWindowFullscreen = $0 },
                 minimumWindowSize: NSSize(
                     width: viewportState.minimumWindowSize.width + (isAIPanelOpen ? 206 : 0),
@@ -330,7 +336,7 @@ struct BrowserView: View {
             showNetworkInspector = false
             showWelcome = false
             pendingInsecureURL = nil
-            isAIPanelOpen = false
+            if serverState.isScriptImmersive { isAIPanelOpen = false }
         }
     }
 }

@@ -88,7 +88,7 @@ final class ScriptWorkflowRunner {
             totalActions = workflow.steps.count
             finalizing = false
             await host.context.exit3DInspectorIfNeeded(notify: true)
-            await host.setRecordingMode(true)
+            await host.setRecordingMode(true, workflow.isImmersive)
             return await run(workflow, tab: tab, grant: grant, id: id)
         } catch { return (error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("INVALID_SCRIPT")).response }
     }
@@ -145,7 +145,7 @@ final class ScriptWorkflowRunner {
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
         await tab.resetTargets()
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
-        await host.setRecordingMode(false)
+        await host.setRecordingMode(false, false)
         if host.playbackState.isAbortRequested(), issue == nil {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
         }

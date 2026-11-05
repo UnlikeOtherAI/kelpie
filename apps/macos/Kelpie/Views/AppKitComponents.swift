@@ -4,6 +4,7 @@ import AppKit
 // MARK: - AppKit toolbar button (bypasses SwiftUI hit testing / first-responder issues)
 
 struct AppKitToolbarButton: NSViewRepresentable {
+    @Environment(\.isEnabled) private var environmentEnabled
     let systemName: String
     let accessibilityID: String
     let accessibilityLabel: String
@@ -29,7 +30,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
         nsView.setAccessibilityLabel(accessibilityLabel)
         nsView.toolTip = accessibilityLabel
         nsView.chromeTintColor = tintColor
-        nsView.isEnabled = isEnabled
+        nsView.isEnabled = isEnabled && environmentEnabled
         nsView.isButtonSelected = isSelected
         nsView.updateIcon(systemName: systemName)
     }
@@ -113,6 +114,7 @@ final class ToolbarButtonView: NSButton {
 // MARK: - AppKit segmented strip
 
 struct AppKitSegmentedStrip: NSViewRepresentable {
+    @Environment(\.isEnabled) private var environmentEnabled
     struct Item: Equatable {
         let id: String
         var title: String?
@@ -143,7 +145,7 @@ struct AppKitSegmentedStrip: NSViewRepresentable {
 
     func updateNSView(_ nsView: SegmentedStripContainerView, context: Context) {
         context.coordinator.onSelect = onSelect
-        context.coordinator.update(container: nsView, items: items, selectedID: selectedID, isEnabled: isEnabled)
+        context.coordinator.update(container: nsView, items: items, selectedID: selectedID, isEnabled: isEnabled && environmentEnabled)
     }
 
     final class Coordinator: NSObject {
@@ -447,6 +449,7 @@ final class SegmentedTooltipView: NSView {
 // cannot block it.
 
 struct AppKitInvisibleButton: NSViewRepresentable {
+    @Environment(\.isEnabled) private var environmentEnabled
     let accessibilityID: String
     let accessibilityLabel: String
     var isEnabled: Bool = true
@@ -469,7 +472,7 @@ struct AppKitInvisibleButton: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSButton, context: Context) {
         context.coordinator.action = action
-        nsView.isEnabled = isEnabled
+        nsView.isEnabled = isEnabled && environmentEnabled
         nsView.setAccessibilityIdentifier(accessibilityID)
         nsView.setAccessibilityLabel(accessibilityLabel)
     }
