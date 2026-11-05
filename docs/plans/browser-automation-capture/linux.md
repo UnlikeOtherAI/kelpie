@@ -871,3 +871,48 @@ The first decoder launch failed because the isolated verifier lacked the shared
 build output; the completed run used the existing shared dist after confirming
 its source inputs matched. These results do not establish overall G08 success,
 physical GTK equivalence or the default 350 ms motion profile.
+
+## Synthetic codec-history discriminator
+
+A separate authored-pixel control at source 315ccf89a4a745029613f019ffdd1ac703243043
+used the production Linux compositor/encoder with the original and replay
+15-frame PTS vectors, 1000×702 frames, 15 fps, GIF+MP4, six synthetic PNG
+steps and a 16 MiB shared budget. It used Fedora GStreamer 1.28.8-1.fc44 and
+OpenH264 2.6.0-3.fc44, matching the installed candidate's package receipt.
+White backing, marker history and PNG timing/byte sizes were authored controls.
+
+For each PTS vector, the clear-history and red-history controls had byte-identical
+full final BGRA frames, SHA-256
+1617f651ae97cf6ac61fc92808292d9aaf3c89feda1dab2b4d957606c6ff18ea.
+All GIF and MP4 outputs had 15 frames and zero drops; decoded MP4 PTS matched
+within 2 ms. The final decoded fixed ROI had zero red pixels in both clear
+controls and three in each red-history control. The history MP4 hashes were
+25aa26f6a2327ad9792a38c1644a3238b995985c212d4275a16cfd016e6ba627
+and d63c8003357ec58b39b632a3efe82b24252af7e3b49426e059272f92eb854ee0.
+The bounded analysis receipt SHA-256 was
+0cfea10b6fb0ad1011e458715f4b8426af3992f598e722d5b4333494bbd2fe5b.
+The control executable SHA-256 was
+657b71ba8872d631277bd116359eb32bb3f2231498bacadf1a1ac5f28e8591b0.
+
+This establishes decoded red carryover for the authored codec stimulus. It
+does not establish the cause of the earlier installed Fedora MP4 failures,
+whose same-frame source rasters were not retained. Their strict zero-pixel
+gate remains failed.
+
+## Fedora installed CLI-only replay
+
+Hosted run 42115990764 installed the exact Fedora RPM from candidate run
+42102220654, source 1a148927ad081fab54a71ba8ada95bf038c7c9ef. The RPM
+SHA-256 was 7872126627adb7e58a4d67497d578d94666dc3b7c6e12b5a3d6ff3380ed0f96e,
+installed ELF 677510849e04dbc01a96db9ac724104f9dfffc07a3dca135f29485c6a71e9989,
+and CLI archive e4020d1600a0a9701bcfc32047aaaa238c576b58a86f1915fface71fa0ca7c8d.
+The isolated, sandboxed CLI-only run passed five public checks and ten
+observations, then stopped through the public alias and removed readiness.
+Its alias report SHA-256 was
+d4955b1f6d8f26668fb2fb0a77d9d5a00c4fdb03c8048534906d01992f2c878e,
+and its outcome was cli-only-complete with exit code zero.
+
+This is separate from the failed Fedora independent-media gate; it does not
+mark the complete installed package or a published release as accepted.
+An earlier CLI-only dispatch, 42115481155, failed before runtime because the
+selector helper was absent from that owner ref, and remains preserved.
