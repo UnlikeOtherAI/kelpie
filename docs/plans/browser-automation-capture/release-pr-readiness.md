@@ -103,15 +103,18 @@ not infer the head from that review checkout. No PR exists from this audit.
 
 ## Finite final sequence,not executed
 
-1. Integrate every worker history; resolve final G07/privacy/protocol/codec/UI
-   results per runtime and keep failures. Required final shared/CLI/native/
-   platform checks must match the actual final source.
-2. Finish native changed-state images and the single PR body; attach via verified
-   Maxis gh route. One final PR only when the complete brief audit and rendered
-   flows pass. Required green checks precede repository-policy merge.
-3. Bump only affected component manifests,with independent npm/shared versions
-   and required native mirrors/build numbers. Recheck npm primary versions and
-   choose a fresh date tag. A version already on npm cannot publish changed code.
+1. Integrate every worker history and first obtain the owners' actual runtime
+   outcomes for G07/privacy/protocol/codec/UI. Keep failures and remaining gates;
+   no version bump is authorized by this read-only audit.
+2. Once those runtime prerequisites pass,bump only affected component manifests,
+   with independent npm/shared versions and required native mirrors/build
+   numbers. Integrate and push those bumps BEFORE the final fully integrated
+   checks,final PR description or PR opening. Recheck npm primary versions and
+   choose a fresh date tag; published npm versions cannot contain changed code.
+3. Run final shared/CLI/native/platform checks on that complete versioned source;
+   finish matching native changed-state images and the single PR description.
+   Only after the complete brief audit and rendered flows pass,open the one PR
+   with verified Maxis attachment route. Required green checks precede merge.
 4. Prepare signed/provenanced platform packages from the reviewed merge SHA.
    Root may create a draft date release,upload verified manually produced
    Windows/Apple assets,then publish to trigger selected CLI/Android/Linux jobs.
