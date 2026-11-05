@@ -9,11 +9,12 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /** Native H.264 only. Encoded samples are admitted before the MP4 muxer sees them. */
-class ScriptVideoEncoder(
+internal class ScriptVideoEncoder(
     private val width: Int,
     private val height: Int,
     fps: Int,
     private val budget: ScriptMediaBudget,
+    private val diagnostics: ScriptCaptureDiagnostics? = null,
     private val createFile: () -> File,
 ) {
     private val codec: MediaCodec
@@ -77,6 +78,7 @@ class ScriptVideoEncoder(
             dropped++
             return true
         }
+        val conversionStarted = System.nanoTime()
         val image = codec.getInputImage(index) ?: throw ScriptFailure("CAPTURE_VIDEO_UNAVAILABLE")
         try {
             val planes = image.planes
@@ -132,9 +134,12 @@ class ScriptVideoEncoder(
             }
         } finally {
             image.close()
+            diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_CONVERSION, System.nanoTime() - conversionStarted)
         }
         val timestamp = (elapsedMs * 1000).toLong()
+        val submitStarted = System.nanoTime()
         codec.queueInputBuffer(index, 0, width * height * 3 / 2, timestamp, 0)
+        diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_SUBMIT, System.nanoTime() - submitStarted)
         pendingDocuments[timestamp] = documentId
         pending++
         submitted++
@@ -173,6 +178,15 @@ class ScriptVideoEncoder(
     }
 
     private fun drain(final: Boolean) {
+        val started = System.nanoTime()
+        try {
+            drainCodec(final)
+        } finally {
+            diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_DRAIN, System.nanoTime() - started)
+        }
+    }
+
+    private fun drainCodec(final: Boolean) {
         val deadline = System.nanoTime() + 5_000_000_000L
         while (!ended) {
             val info = MediaCodec.BufferInfo()
