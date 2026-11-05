@@ -192,23 +192,38 @@ void LinuxScriptService::Configure(DesktopApp::Config& config) {
   };
   config.scripts.discard = [self](const std::string& run, const std::string& owner) { self->artifacts_.Discard(run, owner); };
   config.scripts.artifact = [self](const Json& request, const std::string& owner) { return self->artifacts_.Read(request, owner); };
-  config.scripts.present = [self](const Json& presentation, std::function<void()> stop) { self->Show(presentation, std::move(stop)); };
+  config.scripts.present = [self](const Json& presentation, std::function<void()> stop, std::function<bool()> valid) { self->Show(presentation, std::move(stop), std::move(valid)); };
 }
-void LinuxScriptService::Show(const Json& presentation, std::function<void()> stop) {
+void LinuxScriptService::Show(const Json& presentation, std::function<void()> stop, std::function<bool()> valid) {
   std::lock_guard lock(mutex_);
   if(!AcceptDesktopPresentationRevision(presentation,last_presentation_revision_)) return;
-  presentation_ = presentation; stop_ = std::move(stop);
+  presentation_ = presentation; stop_ = std::move(stop); valid_ = std::move(valid);
   shown_at_ = std::chrono::steady_clock::now();
 }
 LinuxScriptService::Json LinuxScriptService::Presentation() const {
   Json shown;
+  std::function<bool()> valid;
   {
-    std::lock_guard lock(mutex_); shown = presentation_;
-    if (shown.value("playing", false))
+    std::lock_guard lock(mutex_); shown = presentation_; valid = valid_;
+    if (shown.value("playing", false) || shown.value("detachedMarker", false))
       shown["elapsedMs"] = shown.value("elapsedMs", 0.0) +
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - shown_at_).count();
   }
-  if (shown.value("playing", false) && guard_ && !guard_(shown)) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
+  const bool detached = shown.value("detachedMarker", false);
+  bool hide = false;
+  if (detached) {
+    const auto& marker = shown.at("marker");
+    hide = !valid || !valid() || shown.value("elapsedMs", 0.0) >=
+        marker.value("startedMs", 0.0) + marker.value("durationMs", 700.0);
+  }
+  if (!hide && (shown.value("playing", false) || detached) && guard_ && !guard_(shown)) hide = true;
+  {
+    std::lock_guard lock(mutex_);
+    if (presentation_.value("_presentationRevision",std::uint64_t{}) != shown.value("_presentationRevision",std::uint64_t{}))
+      return Json{{"playing",false}};
+    if (hide && detached) presentation_ = Json{{"playing",false}};
+  }
+  if (hide) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
   return shown;
 }
 void LinuxScriptService::Stop() {

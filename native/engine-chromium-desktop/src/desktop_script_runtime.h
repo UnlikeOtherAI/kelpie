@@ -8,6 +8,7 @@
 #include <thread>
 
 namespace kelpie {
+struct DesktopPresentationValidity { std::mutex mutex; bool alive = true; };
 class DesktopScriptHandler::Impl {
  public:
   using Json = nlohmann::json;
@@ -15,6 +16,7 @@ class DesktopScriptHandler::Impl {
   DesktopEngine& engine;
   DesktopRouter& router;
   Config config;
+  std::shared_ptr<DesktopPresentationValidity> presentation_validity = std::make_shared<DesktopPresentationValidity>();
   mutable std::mutex mutex;
   std::condition_variable changed;
   bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false;
