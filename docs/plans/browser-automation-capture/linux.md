@@ -533,3 +533,9 @@ A durable independent verifier now combines canonical, finalization, pre-input
 and large-PNG artifacts, decodes every frame and checks dimensions/counts/times,
 then checks the completed continuous run's marker center and fade. Its source
 syntax passed; this combined decoding/pixel pass is next, not yet claimed.
+
+## GTK Stop acceptance entry point
+
+`tests/linux/run-native-alias-acceptance.mjs <binary> <packaged-cli> <new-output-directory> windowed` uses the regular CLI registration, launch, MCP/recipe and stop flows. It additionally invokes the existing native `Stop script` GTK button through standard AT-SPI `Action.DoAction`. The helper pins the executable hash, process owner and `/proc` start ticks, selects only accessibility connections owned by that exact PID, and excludes embedded document subtrees. It requires one visible, showing and enabled native button before invoking its single standard action. It sends no focus, keyboard or pointer input and does not inspect another application's UI.
+
+The runtime gate requires the existing unlocked GNOME Wayland session, successful abort/partial artifacts and recovery, followed by public CLI stop and natural process/socket/readiness retirement before the resource unit exits. Accessibility metadata is not compositor or displayed-pixel proof. At this source checkpoint the new GTK gate has only JavaScript syntax/self-review checks; actual GTK results are pending the bounded Fedora run.

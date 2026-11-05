@@ -7,20 +7,23 @@ import { mkdtemp, mkdir, readFile, writeFile, realpath, access } from "node:fs/p
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { runGtkStop } from "./gtk-stop.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
-const [binaryArg, cliArg, outputArg] = process.argv.slice(2);
+const [binaryArg, cliArg, outputArg, mode = "offscreen"] = process.argv.slice(2);
 assert.equal(process.platform, "linux");
 assert.ok(binaryArg && cliArg && outputArg);
+assert.ok(["offscreen", "windowed"].includes(mode));
+const headless = mode === "offscreen";
 const binary = resolve(binaryArg), cli = resolve(cliArg), output = resolve(outputArg);
 await mkdir(output, { recursive: false });
 const home = await mkdtemp("/tmp/kelpie-alias-"), cliHome = join(home, "cli"), profile = join(home, "profile");
 await mkdir(cliHome, { mode: 0o700 }); await mkdir(join(home, "runtime"), { mode: 0o700 });
 const env = { ...process.env, KELPIE_HOME: cliHome, TMPDIR: join(home, "runtime") };
-const alias = "linux-offscreen-acceptance";
+const alias = "linux-" + mode + "-acceptance";
 const deadline = new AbortController(), timer = setTimeout(() => deadline.abort(), 120000);
 const report = { source: process.env.KELPIE_CAPTURE_SOURCE, cliSource: process.env.KELPIE_CLI_BUILD_REVISION,
-  testSource: process.env.KELPIE_TEST_REVISION, checks: [], home, headless: true };
+  testSource: process.env.KELPIE_TEST_REVISION, checks: [], home, headless, mode };
 let launched = false, readinessPath, identity, failure;
 const command = async (args, cleanup = false) => {
   const value = await execute(process.execPath, [cli, ...args], {
@@ -37,7 +40,7 @@ try {
   assert.equal(report.cliVersion, JSON.parse(await readFile(new URL("../package.json", pathToFileURL(cli)), "utf8")).version);
   assert.equal((await command(["browser", "register", alias, "--platform", "linux", "--app-path", binary,
     "--profile-dir", profile])).success, true);
-  const launch = await command(["browser", "launch", alias, "--headless"]);
+  const launch = await command(["browser", "launch", alias, ...(headless ? ["--headless"] : [])]);
   assert.equal(launch.success, true); launched = true;
   const store = JSON.parse(await readFile(join(cliHome, "browsers.json"), "utf8")), running = store.running[alias];
   assert.ok(Number.isInteger(running.pid) && running.pid > 1);
@@ -48,10 +51,10 @@ try {
   assert.equal(ready.controlMode, "loopback");
   assert.equal(await realpath("/proc/" + running.pid + "/exe"), await realpath(binary));
   const argv = (await readFile("/proc/" + running.pid + "/cmdline", "utf8")).split("\0");
-  assert.ok(argv.includes("--headless"));
+  assert.equal(argv.includes("--headless"), headless);
   identity = await readNativeIdentity(running.pid); assert.ok(identity);
   report.identity = { ...identity, launchId: running.launchId, port: running.port,
-    readinessSchemaVersion: ready.version, actualHeadlessArgument: true };
+    readinessSchemaVersion: ready.version, actualHeadlessArgument: headless };
   const headers = { authorization: "Bearer " + ready.token, "content-type": "application/json",
     accept: "application/json, text/event-stream" };
   const request = async (path, body) => {
@@ -70,11 +73,15 @@ try {
   const schemas = JSON.parse(catalog.result.content[0].text);
   assert.equal(schemas.ok, true);
   assert.ok(schemas.value.some(tool => tool.name === "kelpie_play_script" && tool.inputSchema));
-  report.profileCatalog = { mode: "offscreen", playScriptAdvertised: true };
+  report.profileCatalog = { mode, playScriptAdvertised: true };
   const initialized = await request("/mcp", { jsonrpc: "2.0", id: 2, method: "initialize",
     params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "linux-alias-profile", version: "1" } } });
   report.nativeMcpServerInfo = initialized.result.serverInfo;
-  report.checks.push({ name: "public Linux --headless alias launch and exact native identity", passed: true });
+  report.checks.push({ name: "public Linux " + mode + " alias launch and exact native identity", passed: true });
+  if (!headless) {
+    report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal });
+    report.checks.push({ name: "native GTK Stop via exact-process AT-SPI Action", passed: true, runId: report.gtkStop.result.runId });
+  }
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const observed = join(output, "observations.json");
   await execute(process.execPath, [join(root, "tests/windows/run-observation-acceptance.mjs"), readinessPath, observed],
