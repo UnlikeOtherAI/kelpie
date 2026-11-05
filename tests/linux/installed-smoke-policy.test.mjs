@@ -99,10 +99,11 @@ test("CLI-only source and digest inputs fail closed",async()=>{
   const section=text.split("      - name: Validate source run")[1].split("      - uses: actions/download-artifact")[0];
   const body=section.split("        run: |\n")[1].split("\n").map(line=>line.startsWith("          ")?line.slice(10):line).join("\n");
   const bash=process.platform==="win32"?"C:/Program Files/Git/bin/bash.exe":"bash";
-  const env={...process.env,SOURCE_RUN:"42102220654",CLI_ONLY:"true",EXPECTED_SOURCE:"a".repeat(40),
+  const env={...process.env,SOURCE_RUN:"42102220654",CLI_ONLY:"true",REQUIRE_IDR:"false",EXPECTED_SOURCE:"a".repeat(40),
     EXPECTED_RPM:"b".repeat(64),EXPECTED_CLI:"c".repeat(64)};
   const run=values=>spawnSync(bash,["-c",body],{env:{...env,...values}});
   assert.equal(run({}).status,0);
+  assert.notEqual(run({REQUIRE_IDR:"true"}).status,0);
   assert.notEqual(run({EXPECTED_RPM:""}).status,0);
   assert.notEqual(run({EXPECTED_SOURCE:"bad"}).status,0);
   assert.notEqual(run({EXPECTED_CLI:"C".repeat(64)}).status,0);
