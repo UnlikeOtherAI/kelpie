@@ -55,6 +55,11 @@ on:
       - main
     paths: *ios_build_inputs
   workflow_dispatch:
+    inputs:
+      native_workflow_tests:
+        description: Run paired capture, CLI and MCP journeys on an existing hosted iPhone and iPad
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -62,8 +67,10 @@ permissions:
 jobs:
   build:
     name: Build iOS (simulator)
-    runs-on: macos-15
-    timeout-minutes: 45
+    runs-on: ${{ inputs.native_workflow_tests && 'macos-26' || 'macos-15' }}
+    timeout-minutes: ${{ inputs.native_workflow_tests && 85 || 45 }}
+    env:
+      KELPIE_RUNTIME_TESTS: ${{ inputs.native_workflow_tests && '1' || '0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
@@ -97,6 +104,11 @@ jobs:
           if [ ! -d vendor/AppReveal ]; then
             git clone --depth 1 https://github.com/UnlikeOtherAI/AppReveal.git vendor/AppReveal
           fi
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            revision=5d6d16d67a7cd08069f3d69c2d484249e2ed8485
+            git -C vendor/AppReveal fetch --depth 1 origin "$revision"
+            git -C vendor/AppReveal checkout --detach "$revision"
+          fi
 
       - name: Install SwiftLint
         run: brew install swiftlint
@@ -117,14 +129,20 @@ jobs:
       - name: Build native libraries for iOS simulator
         run: |
           set -euo pipefail
+          generator=(-G Xcode)
+          build_args=(--config Debug)
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            generator=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF)
+            build_args=(--parallel 1)
+          fi
           cmake -S native -B native/.build-ios-sim \
-            -G Xcode \
+            "${generator[@]}" \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphonesimulator \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
             -DKELPIE_BUILD_DESKTOP_ENGINES=OFF
-          cmake --build native/.build-ios-sim --config Debug
+          cmake --build native/.build-ios-sim "${build_args[@]}"
 
       - name: Flatten native build output to expected layout
         # Xcode generator nests outputs under per-config dirs. The iOS
@@ -149,7 +167,11 @@ jobs:
         # native .a files (also arm64 only, see CMAKE_OSX_ARCHITECTURES above).
         run: |
           set -euo pipefail
-          xcodebuild build \
+          build=(build)
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            build=(build-for-testing -jobs 1 'OTHER_SWIFT_FLAGS=$(inherited) -j1' COMPILER_INDEX_STORE_ENABLE=NO)
+          fi
+          xcodebuild "${build[@]}" \
             -project apps/ios/Kelpie.xcodeproj \
             -scheme Kelpie \
             -destination 'generic/platform=iOS Simulator' \
@@ -162,3 +184,24 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
+
+      - name: Build matching CLI
+        if: inputs.native_workflow_tests
+        env:
+          GOMAXPROCS: 1
+        run: pnpm --filter @unlikeotherai/kelpie build
+
+      - name: Run paired iPhone and iPad capture journeys
+        if: inputs.native_workflow_tests
+        env:
+          KELPIE_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 scripts/testing/ios-workflow-acceptance.py
+
+      - name: Keep simulator results and media
+        if: always() && inputs.native_workflow_tests
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ios-native-workflows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kelpie-ios-evidence
+          if-no-files-found: warn
+          retention-days: 7

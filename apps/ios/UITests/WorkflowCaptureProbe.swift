@@ -33,21 +33,32 @@ final class WorkflowCaptureProbe {
         allow.tap()
         for _ in 0..<40 {
             let status = try await request("/v1/pair/status?requestId=" + id, method: "GET")
-            if let issued = status["token"] as? String { token = issued; return }
+            if let issued = status["token"] as? String {
+                token = issued
+                let deadline = Date().addingTimeInterval(5)
+                while allow.exists, Date() < deadline { try await Task.sleep(nanoseconds: 80_000_000) }
+                XCTAssertFalse(allow.exists, "Approved pairing sheet must retire before the next app interaction")
+                return
+            }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         throw ProbeError.pairing
     }
 
     func call(_ tool: String, _ args: Body) async throws -> Body {
+        let value = try await toolValue("kelpie_extension", ["name": tool, "arguments": args])
+        return try XCTUnwrap(value as? Body)
+    }
+
+    func toolValue(_ name: String, _ arguments: Body) async throws -> Any {
         let response = try await request("/mcp", ["jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": [
-            "name": "kelpie_extension", "arguments": ["name": tool, "arguments": args]
+            "name": name, "arguments": arguments
         ]])
         let result = try XCTUnwrap(response["result"] as? Body)
         let text = try XCTUnwrap((result["content"] as? [Body])?.first(where: { $0["type"] as? String == "text" })?["text"] as? String)
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? Body)
         XCTAssertEqual(envelope["ok"] as? Bool, true, "\(envelope["error"] ?? "")")
-        return try XCTUnwrap(envelope["value"] as? Body)
+        return try XCTUnwrap(envelope["value"])
     }
 
     func bytes(_ manifest: Body, run: String) async throws -> Data {
@@ -55,7 +66,9 @@ final class WorkflowCaptureProbe {
         let size = try XCTUnwrap(manifest["byteLength"] as? Int)
         var bytes = Data()
         while bytes.count < size {
-            let chunk = try await request("/v1/get-script-artifact", ["runId": run, "artifactId": id, "offset": bytes.count, "length": 32768])
+            let range: Body = ["runId": run, "artifactId": id, "offset": bytes.count, "length": 32768]
+            let chunk = bytes.isEmpty ? try await call("kelpie_get_script_artifact", range) :
+                try await request("/v1/get-script-artifact", range)
             XCTAssertEqual(chunk["artifactId"] as? String, id)
             XCTAssertEqual(chunk["offset"] as? Int, bytes.count)
             let new = try XCTUnwrap((chunk["data"] as? String).flatMap { Data(base64Encoded: $0) })
@@ -113,6 +126,15 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
+        if(location.pathname==='/scroll'){
+          document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
+          document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'
+        }
+        if(location.pathname==='/motion'){
+          document.documentElement.style.background='#606060';document.body.style='margin:0;background:#606060';
+          document.body.innerHTML='<button style="appearance:none;position:fixed;left:58vw;top:60vh;transform:translate(-50%,-50%);margin:0;background:#505050;color:#181818;border:0">Track</button>'
+          document.querySelector('button').onclick=()=>{document.title='Track clicked'}
+        }
         if(location.pathname==='/landed'){
           document.body.style.background='#1848D8';document.body.innerHTML='<h1 id="landed">Landed</h1>';document.title='Landed'
         }

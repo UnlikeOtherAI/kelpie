@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Run Kelpie's real workflow acceptance corpus on existing simulators on a dedicated GitHub runner."""
+import hashlib
+import json
+import os
+import plistlib
+import re
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+from ios_workflow_cli import run_fixture
+
+PRODUCTS = Path("apps/ios/.build/Build/Products").resolve()
+EVIDENCE = Path(os.environ.get("RUNNER_TEMP", ".")) / "kelpie-ios-evidence"
+BUNDLE = "com.unlikeotherai.kelpie"
+
+
+def command(*args, timeout=60):
+    return subprocess.check_output(list(map(str, args)), text=True, timeout=timeout).strip()
+
+
+def digest(path):
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def version(value):
+    return tuple(int(n) for n in re.findall(r"\d+", value))
+
+
+def select_devices(devices, sdk):
+    for runtime in sorted(devices, key=lambda key: version(key.rsplit("iOS-", 1)[-1]) if ".iOS-" in key else (), reverse=True):
+        if ".iOS-" not in runtime:
+            continue
+        number = version(runtime.rsplit("iOS-", 1)[-1])
+        if not (17,) <= number <= version(sdk):
+            continue
+        available = [d for d in devices[runtime] if d.get("isAvailable")]
+        chosen = []
+        for family, preferred in [("iPhone", "iPhone 17"), ("iPad", "iPad Air 13-inch (M4)")]:
+            matches = [d for d in available if d["name"].startswith(family)]
+            if matches:
+                device = min(matches, key=lambda d: (d["state"] != "Booted", d["name"] != preferred, d["name"]))
+                chosen.append({"family": family, "runtime": runtime, **{k: device[k] for k in ["udid", "name", "state"]}})
+        if len(chosen) == 2:
+            return chosen
+    raise RuntimeError("No existing compatible iPhone and iPad pair on one installed iOS runtime")
+
+
+def runner_config(nonce):
+    original, = PRODUCTS.glob("Kelpie_*.xctestrun")
+    data = plistlib.loads(original.read_bytes())
+    targets = [t for c in data.get("TestConfigurations", []) for t in c["TestTargets"]]
+    if not targets:
+        targets = [data.get("KelpieUITests", {})]
+    ui, = [t for t in targets if str(t.get("TestHostBundleIdentifier", "")).endswith(".uitests.xctrunner")]
+    ui.setdefault("EnvironmentVariables", {})["KELPIE_WORKFLOW_CLI_PROBE"] = nonce
+    config = PRODUCTS / ("Hosted-" + nonce + ".xctestrun")
+    config.write_bytes(plistlib.dumps(data))
+    return config, ui["TestHostBundleIdentifier"]
+
+
+def run_device(device, product_hashes):
+    udid = device["udid"]
+    folder = EVIDENCE / device["family"]
+    folder.mkdir()
+    nonce = str(uuid.uuid4())
+    config, runner = runner_config(nonce)
+    result = folder / "workflow.xcresult"
+    started_here = device["state"] != "Booted"
+    process = None
+    try:
+        if started_here:
+            command("xcrun", "simctl", "boot", udid, timeout=120)
+        command("xcrun", "simctl", "bootstatus", udid, "-b", timeout=300)
+        args = ["xcodebuild", "test-without-building", "-xctestrun", str(config), "-destination", "id=" + udid,
+                "-parallel-testing-enabled", "NO", "-maximum-concurrent-test-simulator-destinations", "1",
+                "-test-timeouts-enabled", "YES", "-default-test-execution-time-allowance", "210",
+                "-maximum-test-execution-time-allowance", "240", "-resultBundlePath", str(result),
+                "-only-testing:KelpieTests/IOSWorkflowAdmissionTests", "-only-testing:KelpieUITests/WorkflowCaptureUITests"]
+        cli_error = None
+        cli_started = False
+        # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
+        with (folder.parent.parent / (device["family"] + "-workflow-xcode.log")).open("w") as log:
+            process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
+            deadline = time.monotonic() + 24 * 60
+            while process.poll() is None and time.monotonic() < deadline:
+                if not cli_started:
+                    container = subprocess.run(["xcrun", "simctl", "get_app_container", udid, runner, "data"],
+                                               text=True, capture_output=True, timeout=15)
+                    if container.returncode == 0:
+                        inbox = Path(container.stdout.strip()) / "Documents" / ("kelpie-cli-" + nonce)
+                        if inbox.joinpath("ready").is_file():
+                            cli_started = True
+                            try:
+                                run_fixture(inbox, folder / "cli")
+                            except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+                                cli_error = type(error).__name__
+                time.sleep(1)
+            if process.poll() is None:
+                raise RuntimeError("XCTest exceeded the per-device runtime budget")
+        installed = Path(command("xcrun", "simctl", "get_app_container", udid, BUNDLE, "app"))
+        installed_hashes = {key: digest(installed / key) for key in product_hashes}
+        (folder / "installed.json").write_text(json.dumps({"device": device, "hashes": installed_hashes}, indent=2))
+        if installed_hashes != product_hashes:
+            raise RuntimeError("Installed simulator app differs from the generic build")
+        summary = command("xcrun", "xcresulttool", "get", "test-results", "summary", "--path", result)
+        (folder / "summary.json").write_text(summary)
+        tests = command("xcrun", "xcresulttool", "get", "test-results", "tests", "--path", result)
+        (folder / "tests.json").write_text(tests)
+        selected = list(Path("apps/ios/UITests").glob("Workflow*.swift")) + [Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift")]
+        required = {method for file in selected for method in re.findall(r"func (test\w+)\(", file.read_text())}
+        missing = sorted(method for method in required if method not in tests)
+        if process.returncode or not cli_started or cli_error or missing or json.loads(summary).get("failedTests", 0):
+            raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
+        return True
+    finally:
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+        if result.is_dir():
+            subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(result),
+                            "--output-path", str(folder / "attachments")], check=False, timeout=120)
+        if started_here:
+            subprocess.run(["xcrun", "simctl", "shutdown", udid], check=False, timeout=90)
+
+
+def main():
+    if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("KELPIE_RUNNER_ENVIRONMENT") != "github-hosted":
+        raise RuntimeError("This driver only runs on a disposable GitHub-hosted runner")
+    EVIDENCE.mkdir(exist_ok=False)
+    sdk = command("xcrun", "--sdk", "iphonesimulator", "--show-sdk-version")
+    inventory = json.loads(command("xcrun", "simctl", "list", "devices", "available", "-j"))["devices"]
+    devices = select_devices(inventory, sdk)
+    app = PRODUCTS / "Debug-iphonesimulator/Kelpie.app"
+    hashes = {key: digest(app / key) for key in ("Kelpie", "Kelpie.debug.dylib") if (app / key).exists()}
+    if "Kelpie" not in hashes:
+        raise RuntimeError("The simulator executable is missing")
+    revision = command("git", "rev-parse", "HEAD")
+    if revision != os.environ["GITHUB_SHA"]:
+        raise RuntimeError("Checkout and dispatched revision differ")
+    report = {"revision": revision, "sourceTree": command("git", "rev-parse", "HEAD^{tree}"),
+              "appReveal": command("git", "-C", "vendor/AppReveal", "rev-parse", "HEAD"),
+              "xcode": command("xcodebuild", "-version"), "sdk": sdk, "devices": devices, "hashes": hashes,
+              "imageVersion": os.environ.get("ImageVersion"), "outcomes": {}}
+    path = EVIDENCE / "report.json"
+    path.write_text(json.dumps(report, indent=2))
+    for device in sorted(devices, key=lambda item: item["state"] != "Booted"):
+        try:
+            passed = run_device(device, hashes)
+            report["outcomes"][device["family"]] = {"passed": passed}
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+            report["outcomes"][device["family"]] = {"passed": False, "error": str(error)[:512]}
+        path.write_text(json.dumps(report, indent=2))
+        print(device["family"], json.dumps(report["outcomes"][device["family"]]), flush=True)
+    return int(not all(value["passed"] for value in report["outcomes"].values()))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
