@@ -8,7 +8,7 @@ import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-network.mjs";
 import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
-import {inspectOwnedChromiumSandbox,sandboxFailureCategory} from "./worker-comparison-sandbox.mjs";
+import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 import {classifySpawnError,createBoundedStderr} from "./worker-comparison-launch-diagnostic.mjs";
 const [binary,expected,output]=process.argv.slice(2);
@@ -30,7 +30,7 @@ for(let n=0;n<300&&!ready;n++){
 assert.ok(ready,"PRIVATE_NETWORK_NOT_VERIFIED");
 const group=(await readFile("/proc/self/cgroup","utf8")).split("\n").find(x=>x.startsWith("0::"))?.slice(3);
 assert.ok(group?.startsWith("/"));
-const cgroup="/sys/fs/cgroup"+group,delay=ms=>new Promise(ok=>setTimeout(ok,ms));
+const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
 const env={PATH:process.env.PATH??"/usr/bin:/bin",HOME:home,LANG:"C.UTF-8"};
 let browser,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
 const stderr=createBoundedStderr();
@@ -49,10 +49,16 @@ try{
  category="identity";
  startTicks=await nativeProcessStartTicks(browser.pid);
  assert.ok(startTicks,"SANDBOX_BROWSER_ID");
- for(let attempt=0;attempt<80&&!evidence;attempt++){
+ await writeFile(join(dir,"browser-identity.json"),JSON.stringify({pid:browser.pid,startTicks,unitPid:process.pid,nonce:process.env.KELPIE_COMPARISON_ID}),{mode:0o600,flag:"wx"});
+ category="host-audit-timeout";
+ for(let attempt=0;attempt<400&&!evidence;attempt++){
   if(browser.exitCode!==null||browser.signalCode!==null)break;
-  try{evidence=await inspectOwnedChromiumSandbox(cgroup,browser.pid,startTicks);}
-  catch(error){const next=sandboxFailureCategory(error);if(next!=="no-renderer"||category==="identity")category=next;await delay(100);}
+  try{const result=JSON.parse(await readFile(join(dir,"host-sandbox-result.json"),"utf8"));
+   if(validHostSandboxHandoff(result,browser.pid,startTicks,process.pid,process.env.KELPIE_COMPARISON_ID)){
+    if(result.ok)evidence=result.evidence;else {category=result.category;break;}
+   }
+  }catch{/* Host audit is pending. */}
+  if(!evidence)await delay(100);
  }
  if(!evidence)throw Error("SMOKE_SANDBOX_NOT_PROVEN");
  await writeFile(join(dir,"report.json"),JSON.stringify({pid:process.pid,uid:process.getuid(),networkProbe,
