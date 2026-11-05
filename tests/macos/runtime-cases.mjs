@@ -175,8 +175,32 @@ export async function runEngine(client,fixture,engine,report) {
  });
  for(const formats of [["gif","video"],["gif","video","screenshots"]])await check("low-fps-navigation-marker-"+formats.length,async()=>{
   await load();
+  const begin=fixture.events.length;
   const result=await client.api("play-script",{...base,capture:{...capture,formats,fps:1},actions:[
    {action:"click",target:{role:"link",name:"Next document"}},{action:"wait",ms:1200}]});
+  if(!result.success){
+   const codes=new Set(["AUTHORIZATION_REVOKED","BUSY","CAPTURE_ADMISSION_FAILED","CAPTURE_AFTER_ACTION_FAILED",
+    "CAPTURE_BYTE_LIMIT","CAPTURE_DOCUMENT_CHANGED","CAPTURE_DOCUMENT_UNAVAILABLE","CAPTURE_DURATION_LIMIT",
+    "CAPTURE_FAILED","CAPTURE_STOPPED","CAPTURE_VIEWPORT_CHANGED","CAPTURE_VIEWPORT_UNAVAILABLE",
+    "CAPTURE_VIEWPORT_UNSTABLE","DOCUMENT_CHANGED","INPUT_INTERRUPTED","INPUT_UNCERTAIN","INVALID_PARAM",
+    "INVALID_SCRIPT","INVALID_TARGET","NAVIGATION_FAILED","OBSERVATION_FAILED","OUTPUT_BUDGET_EXCEEDED",
+    "OUTPUT_REDACTION_FAILED","RECORDING_IN_PROGRESS","RENDERER_CHANGED","SCRIPT_ABORTED","SCRIPT_UNAVAILABLE",
+    "SENSITIVE_CAPTURE_REFUSED","STALE_TARGET","TAB_CHANGED","TAB_NOT_ACTIVE","TAB_NOT_FOUND","TAB_NOT_VISIBLE",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_INTERACTABLE","TARGET_OBSCURED",
+    "TARGET_OUTSIDE_VIEWPORT","TARGET_QUERY_LIMIT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR",
+    "WORKFLOW_FAILED"]);
+   const events=fixture.events.slice(begin);
+   const failure={engine,formats:formats.length,code:codes.has(result.error?.code)?result.error.code:"OTHER",
+    mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
+    clickObserved:events.some(e=>e.type==="click"&&e.target==="next"),
+    nextDocumentObserved:events.some(e=>e.type==="document"&&e.path==="/next"),play:playFacts(result)};
+   (report.lowFpsFailures??=[]).push(failure);
+   try{
+    const artifacts=await client.download(result,engine+"-lowfps-failure");
+    failure.downloaded=artifacts.map(a=>({mimeType:a.mimeType,partial:a.partial,byteLength:a.byteLength,sha256:a.sha256}));
+    failure.decode=artifacts.filter(a=>a.mimeType!=="image/png").map(a=>inspectMedia(a));
+   }catch(error){failure.downloadError=errorFacts(error);}
+  }
   requireTrue(result.success,"LOW_FPS_NAVIGATION");
   const artifacts=await client.download(result,engine+"-lowfps"),movies=artifacts.filter(a=>a.mimeType!=="image/png");
   requireTrue(movies.length===2,"LOW_FPS_FORMATS");
