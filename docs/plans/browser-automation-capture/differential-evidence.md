@@ -23,7 +23,7 @@ Existing version1 reports remain valid. New native records add:
 - runtimeMode: windowed or offscreen (stub/worker stay separate);
 - protocol: http,mcp-direct,mcp-generic,cli.
 
-These join requirement/platform/renderer/kind/revision in evidence identity,
+These join requirement/platform/renderer/kind/revision/binary/version in evidence identity,
 allowing phone/tablet and protocol outcomes to coexist. Renderer uses canonical
 engine names (webkit/chromium); source/binary lineage identifies the actual
 WebKit/CEF/Android binding.

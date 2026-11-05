@@ -27,7 +27,8 @@ export function validateEvidence(report) {
     if (record.runtimeMode !== undefined) assert.ok(["windowed", "offscreen", "stub", "worker"].includes(record.runtimeMode), "Invalid runtime mode");
     if (record.protocol !== undefined) assert.ok(["http", "mcp-direct", "mcp-generic", "cli"].includes(record.protocol), "Invalid protocol");
     const identity = [record.requirement, record.platform, record.renderer, record.deviceClass ?? "unspecified",
-      record.runtimeMode ?? "unspecified", record.kind, record.protocol ?? "unspecified", record.revision].join(":");
+      record.runtimeMode ?? "unspecified", record.kind, record.protocol ?? "unspecified", record.revision,
+      record.binarySha256 ?? "unspecified", record.installedVersion ?? "unspecified"].join(":");
     assert.ok(!identities.has(identity), "Duplicate evidence identity");
     identities.add(identity);
     if (record.status === "blocked") nonempty(record.blocker, "blocker");

@@ -40,6 +40,7 @@ test("phone/tablet and GTK/OSR evidence coexist; unmarked/stub/worker evidence c
   assert.equal(validateEvidence({ version: 1, records }).records, 7);
   assert.equal(nativeCoverage({ version: 1, records }).unclassifiedRecords, 3);
   assert.throws(() => validateEvidence({ version: 1, records: [base, base] }));
+  assert.equal(validateEvidence({ version: 1, records: [base, { ...base, binarySha256: "d".repeat(64) }] }).records, 2);
 });
 test("artifact ingestion verifies bytes independently and refuses changed/missing/outside files", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "capture-native-coverage-"));

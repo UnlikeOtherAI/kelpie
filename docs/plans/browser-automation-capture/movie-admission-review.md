@@ -50,9 +50,18 @@ movies-only fps1 navigation still remain acceptance gates.
 
 ## Windows and other runtimes
 
-Windows owner is preparing typed internal committed-prefix counters/ACK; no new
-frozen source was provided for this review yet. The earlier real fps1 movie
-marker omission remains the motivating regression until the new final artifacts
-prove closure. Linux reuses desktop code but needs its own GTK/OSR outcomes and
+Read-only Windows audit used immutable staged tree
+aaba23cccfef22d6db40729473a8aa5603fbaf90 overdc0648. Critical codec/service/
+sampler/action paths only were inspected; status/key drafts were outside scope.
+GIF count advances after complete source-image writes; H.264 count advances after
+retained compressed WriteSample, never raw ProcessInput. The minimum prefix drains
+a bounded18-entry FIFO of marker/action/document metadata. Held progress0 keeps
+post-request frames on the same marker; exact ACK plus10s/cancel/error gating
+precedes animation reset and exact native target dispatch. Final video drain
+rejects leftover timings; finalization failures propagate and discard the failed
+format rather than becoming nominal success. No new source blocker was found.
+The source prefix/decode tests assert raw-first-pending and final decoded counts,
+but this reviewer did not run them. The earlier real fps1 movie marker omission
+remains open until final actual marker-pixel/document artifacts prove closure. Linux reuses desktop code but needs its own GTK/OSR outcomes and
 sandbox proof; Mac requires its own renderer/codec path. No platform inherits a
 runtime or UI pass from another platform's source or codec result.
