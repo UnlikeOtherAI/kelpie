@@ -129,11 +129,16 @@ final class IOSWorkflowActions {
 
     private func interact(_ step: Body, action: String, index: Int) async throws {
         let target = step["target"] as? Body ?? [:]
+        let editing = action == "type" || action == "fill"
+        let plan = workflow.pacedPlans[index]
+        let emptyPacedType = plan.map { !$0.clearFirst && $0.scalars.isEmpty } == true
+        if editing && !emptyPacedType {
+            try tab.focusForEditing()
+            try await check()
+        }
         let document = tab.document
         let viewport = try await tab.viewport()
-        let editing = action == "type" || action == "fill"
         let text = editing ? step["text"] as? String : nil
-        let plan = workflow.pacedPlans[index]
         let consume = { [self] (result: Body) in
             consumeSensitivity(result, text: text)
         }
@@ -253,8 +258,11 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
         }
         do {
-            if tab.document != context.document { context.missing() }
+            if result["sensitivityKnown"] as? Bool != true || tab.document != context.document { context.missing() }
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            try IOSPacedTypingExecutor.requireKnownSensitivity(
+                result["sensitivityKnown"] as? Bool, hasContinuation: !final
+            )
             try await check()
             #if DEBUG
             if final { try await waitForTestFinalNavigation(context: context) }

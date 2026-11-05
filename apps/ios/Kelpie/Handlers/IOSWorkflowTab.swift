@@ -82,6 +82,13 @@ final class IOSWorkflowTab {
         }
     }
 
+    func focusForEditing() throws {
+        try requireCurrent()
+        guard view.window != nil, view.becomeFirstResponder() else {
+            throw IOSWorkflowFailure("INPUT_NOT_AVAILABLE")
+        }
+    }
+
     private func requireMutationAuthority() async throws {
         guard await grant.isCurrent() else { throw IOSWorkflowFailure("AUTHORIZATION_REVOKED") }
         guard !Task.isCancelled, !playback.isAbortRequested() else { throw IOSWorkflowFailure("SCRIPT_ABORTED") }

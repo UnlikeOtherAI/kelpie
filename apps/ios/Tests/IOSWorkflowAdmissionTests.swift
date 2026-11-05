@@ -269,10 +269,16 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     @MainActor
     func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() {
         let valid: Body = ["ok": true, "sensitive": false, "sensitivityKnown": true,
-                           "mayHaveCompleted": true, "token": "t1"]
+                           "mayHaveCompleted": true, "token": "t1", "inputGuarantee": "synthetic-coordinate"]
         XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t1"))
+        var unknown = valid
+        unknown["sensitivityKnown"] = false
+        XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(unknown, token: "t1"))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t2"))
-        for key in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted", "token"] {
+        var wrongGuarantee = valid
+        wrongGuarantee["inputGuarantee"] = "trusted"
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(wrongGuarantee, token: "t1"))
+        for key in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted", "token", "inputGuarantee"] {
             var malformed = valid
             malformed.removeValue(forKey: key)
             XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(malformed, token: "t1"))
