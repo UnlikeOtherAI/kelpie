@@ -7,6 +7,7 @@
 #include "kelpie/response_helpers.h"
 #include "desktop_input_planner.h"
 #include "desktop_script_redaction.h"
+#include "desktop_script_result.h"
 #include <iomanip>
 #include <set>
 #include <algorithm>
@@ -281,10 +282,13 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     {std::lock_guard lock(mutex);artifacts=Json::array();}
   }
   if (!capture_error.empty()) {
-    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") result=ErrorResponse(capture_error,"Capture ended at a native limit or failure");
-    else result["captureError"]=capture_error;
+    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") {
+      result=ReplaceScriptErrorPreservingUncertainty(result,capture_error,"Capture ended at a native limit or failure");
+    } else result["captureError"]=capture_error;
   }
-  if(grant_revoked.load()) result=ErrorResponse("AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  if(grant_revoked.load()) {
+    result=ReplaceScriptErrorPreservingUncertainty(result,"AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  }
   if (abort->load()) { result["success"] = false; result["aborted"] = true; }
   result["runId"] = run_id; result["totalDurationMs"] = Elapsed();
   result["inputGuarantee"] = "trusted-coordinate";
