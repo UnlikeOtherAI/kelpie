@@ -130,12 +130,14 @@ class HandlerContext(
     suspend fun evaluateAutomationJSON(
         script: String,
         guard: () -> Boolean,
+        started: () -> Unit = {},
         consume: (Map<String, Any?>) -> Unit = {},
-    ): Map<String, Any?> = parseObject(evaluateGuardedJS("JSON.stringify(($script))", guard) { consume(parseObject(it)) })
+    ): Map<String, Any?> = parseObject(evaluateGuardedJS("JSON.stringify(($script))", guard, started) { consume(parseObject(it)) })
 
     private suspend fun evaluateGuardedJS(
         script: String,
         guard: (() -> Boolean)?,
+        started: () -> Unit = {},
         consume: ((String) -> Unit)? = null,
     ): String =
         suspendCancellableCoroutine { cont ->
@@ -149,6 +151,7 @@ class HandlerContext(
                 if (cont.isActive) {
                     try {
                         check(guard?.invoke() != false) { "Tab document changed or job stopped" }
+                        started()
                         wv.evaluateJavascript(script) { result ->
                             // Classify even a cancelled result before releasing retirement.
                             // The consumer only retains private sensitivity provenance.

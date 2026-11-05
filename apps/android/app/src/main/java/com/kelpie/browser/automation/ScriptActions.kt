@@ -265,7 +265,7 @@ class ScriptActions(
     ): Map<String, Any?> {
         val result = rawTarget(action, token, dispatch, edit)
         if (result["ok"] != true) {
-            if (action["action"] in setOf("fill", "type") && result["mayHaveCompleted"] == true) consumeSensitivity(action, true)
+            if (action["action"] in setOf("fill", "type") && result["mayHaveCompleted"] == true && result["sensitive"] !is Boolean) consumeSensitivity(action, true)
             if (dispatch || edit) mutationInFlight = result["mayHaveCompleted"] == true
             throw targetFailure(result)
         }
@@ -292,18 +292,20 @@ class ScriptActions(
         val expression =
             OpenAIJson.parseObjectOrNull(generated)?.let(OpenAIJson::toMap)?.get("expression") as? String
                 ?: throw ScriptFailure("INVALID_SCRIPT_TARGET")
+        val classification = ScriptTargetClassification()
         try {
             return withTimeout(30_000) {
-                ctx.evaluateAutomationJSON(expression, ::validOnMain) { result ->
+                ctx.evaluateAutomationJSON(expression, ::validOnMain, classification::started) { result ->
                     // Before validity checks and retirement: a late focus handler
                     // can make the original editing literal private.
-                    val unknown = (editing || dispatch) && result["sensitive"] !is Boolean
+                    classification.received(result["sensitive"] as? Boolean)
+                    val unknown = (editing || dispatch) && classification.unknown()
                     consumeSensitivity(action, result["sensitive"] == true || unknown)
                 }
             }
         } catch (error: Exception) {
             // A lost classification cannot certify the inspected edit literal.
-            if (editing || dispatch) consumeSensitivity(action, true)
+            if ((editing || dispatch) && classification.unknown()) consumeSensitivity(action, true)
             throw error
         }
     }

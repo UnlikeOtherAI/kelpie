@@ -462,3 +462,9 @@ and a prior terminal download during a new run. JVM ownership cases exercise a
 known current artifact ID in both active phases and privacy discard afterward.
 These additions have not been compiled or run on a device in this checkpoint.
 The c71 hosted failure denominators above remain unchanged.
+The classification fallback is scoped to an actually started fixed evaluation
+without explicit Boolean metadata. A decoded sensitive:false followed by a
+document/abort guard failure preserves ordinary partial capture and does not
+register the editing literal. A pre-evaluation refusal also leaves provenance
+unchanged. New JVM vectors and a real-WebView callback guard regression cover
+these boundaries; they are authored but not yet compiled/run.
