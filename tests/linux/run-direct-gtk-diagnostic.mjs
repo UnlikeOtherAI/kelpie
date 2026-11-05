@@ -26,7 +26,7 @@ const worktree = await realpath(process.cwd()), parent = await realpath(resolve(
 const parentRelative = relative(worktree, parent);
 assert.ok(parentRelative !== ".." && !parentRelative.startsWith(".." + sep) && !isAbsolute(parentRelative));
 await mkdir(output, { recursive: false, mode: 0o700 });
-const runtime = await mkdtemp(join(output, ".private-runtime-"));
+const runtime = await mkdtemp(join(parent, ".private-runtime-"));
 const profile = join(runtime, "profile");
 await mkdir(profile, { mode: 0o700 });
 const readinessPath = join(profile, "readiness.json");
