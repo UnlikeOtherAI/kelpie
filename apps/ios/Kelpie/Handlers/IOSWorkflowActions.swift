@@ -242,14 +242,7 @@ final class IOSWorkflowActions {
     private func requireMutationAcknowledgement(
         _ result: Body, token: String, missing: () -> Void
     ) throws {
-        if IOSPacedTypingExecutor.jsonBoolean(result["ok"]) == false {
-            guard result["error"] is String,
-                  IOSPacedTypingExecutor.jsonBoolean(result["mayHaveCompleted"]) != nil else {
-                missing()
-                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
-            }
-            try requireOK(result)
-        }
+        if IOSPacedTypingExecutor.isRefusal(result) { try requireOK(result) }
         guard IOSPacedTypingExecutor.isAcknowledgement(result, token: token) else {
             missing()
             throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)

@@ -283,6 +283,8 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         refusal["mayHaveCompleted"] = false
         XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
         refusal["mayHaveCompleted"] = true
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        refusal["error"] = ""
         XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: nil))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: ""))

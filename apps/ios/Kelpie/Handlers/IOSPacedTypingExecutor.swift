@@ -17,11 +17,16 @@ enum IOSPacedTypingExecutor {
             body["inputGuarantee"] as? String == "synthetic-coordinate"
     }
 
+    static func isRefusal(_ body: [String: Any]) -> Bool {
+        guard let error = body["error"] as? String, !error.isEmpty else { return false }
+        return jsonBoolean(body["ok"]) == false && jsonBoolean(body["mayHaveCompleted"]) != nil &&
+            jsonBoolean(body["sensitive"]) != nil && jsonBoolean(body["sensitivityKnown"]) != nil
+    }
+
     static func needsPrivacyLatch(_ body: [String: Any], token: String?) -> Bool {
-        if isAcknowledgement(body, token: token) { return false }
-        let refusedBeforeInput = jsonBoolean(body["ok"]) == false && jsonBoolean(body["mayHaveCompleted"]) == false &&
-            body["error"] is String && hasKnownSensitivity(body)
-        return !refusedBeforeInput
+        if jsonBoolean(body["sensitive"]) == true { return true }
+        guard isAcknowledgement(body, token: token) || isRefusal(body) else { return true }
+        return !hasKnownSensitivity(body)
     }
 
     static func hasKnownSensitivity(_ body: [String: Any]) -> Bool {
