@@ -1,5 +1,6 @@
 import AVFoundation
 import ImageIO
+import UIKit
 import XCTest
 
 final class WorkflowCaptureUITests: XCTestCase {
@@ -43,6 +44,24 @@ final class WorkflowCaptureUITests: XCTestCase {
             _ = try await client.request("/v1/pair", method: "DELETE")
         }
         return tab
+    }
+
+    @MainActor
+    func testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray() throws {
+        func image(_ color: UIColor, small: Bool = false) throws -> CGImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20), format: format).image { renderer in
+                UIColor.white.setFill()
+                renderer.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+                color.setFill()
+                renderer.fill(small ? CGRect(x: 9, y: 9, width: 1, height: 1) : CGRect(x: 0, y: 0, width: 20, height: 20))
+            }.cgImage)
+        }
+        let faded = UIColor(red: 148.0 / 255, green: 241.0 / 255, blue: 149.0 / 255, alpha: 1)
+        XCTAssertTrue(WorkflowCaptureProbe.containsMarker(try image(faded), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(.lightGray), minimumCoverage: 0.12))
+        XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(faded, small: true), minimumCoverage: 0.12))
     }
 
     @MainActor
@@ -117,7 +136,6 @@ final class WorkflowCaptureUITests: XCTestCase {
             geometry.lifetime = .keepAlways
             add(geometry)
         }
-        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
         let result = try await playback.value
         XCTAssertEqual(result["success"] as? Bool, true, "\(result["error"] ?? "")")
         XCTAssertEqual((result["outputs"] as? Body)?["documentTitle"] as? String, "Count 1")
@@ -128,6 +146,7 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertEqual(manifests.filter { $0["mimeType"] as? String == "image/png" }.count, steps.count)
         XCTAssertEqual(Set(manifests.compactMap { $0["mimeType"] as? String }), ["image/png", "image/gif", "video/mp4"])
         for manifest in manifests { try await inspect(manifest, run: run) }
+        XCTAssertTrue(visible, "Expected a connected green marker at the visible Submit button center")
     }
 
     @MainActor
