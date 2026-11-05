@@ -81,7 +81,11 @@ enum WorkflowMotionFrames {
         let left = -(lateral.min() ?? 0), right = lateral.max() ?? 0
         let marked = frames.filter { $0.indicatorWidth > 0 }
         let firstColor = try XCTUnwrap(marked.first)
-        XCTAssertGreaterThan(firstColor.colorStrength, 190)
+        // Magenta #F000AA on neutral gray at the 0.7 baseline has an ideal
+        // red-minus-green difference of 168; GIF palette quantization and a
+        // first sampled fade frame may vary it slightly.
+        XCTAssertGreaterThanOrEqual(firstColor.colorStrength, 145)
+        XCTAssertLessThanOrEqual(firstColor.colorStrength, 180)
         if curve == "s" {
             XCTAssertGreaterThan(min(left, right), 0.018, "An S curve must pass on both sides of its chord")
             let strong = marked.filter { $0.colorStrength > 110 }

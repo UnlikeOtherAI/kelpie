@@ -35,6 +35,7 @@ def selection(scope):
         if scope == "diagnostics":
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
+                "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
