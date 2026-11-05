@@ -167,3 +167,10 @@ Recording also locks the current native Activity orientation, matching iOS.
 Completion, abort, failure and UI disposal restore the exact previous requested
 orientation policy. Stop/status remain available while finalization holds the lock.
 No orientation setting or new endpoint is exposed.
+The native acceptance driver refuses local/self-hosted execution and preexisting
+proposed emulator serials/ports. Device commands and cleanup require the spawned
+process generation, SDK executable, AVD name and port to match; emulator console
+termination additionally checks the actual AVD identity. Seven-day reports retain
+failed test counts as well as passes. Original fixture HTTP errors and tiny
+negative capture images are retained before assertions; no pairing replies or
+credential stores are collected.
