@@ -67,7 +67,7 @@ request a duration within that bound. Session and tab limits each range from 1 t
 16, default 4. Expiration rejects further operations and closes owned resources.
 
 Isolated mode creates a fresh browser context with service workers blocked and
-downloads disabled. Shared mode uses a fresh automation context created by this
+downloads disabled. Playwright shared mode uses a fresh automation context created by this
 worker process; its sessions share that explicit context's cookies/storage.
 Existing CDP/default/human contexts and pages are never enumerated or imported.
 Each session owns only its newly created tabs, and popups are not promoted into
@@ -88,13 +88,28 @@ the adapter's conservative candidate inventory. The default list is empty, so
 only documentation/capabilities are available until verification admits methods.
 A method is never enabled by editing a model request or public capability result.
 
+
+For the tested 1.0.2 binary, diagnostics observed one context and one page at a
+time. Use maxSessions: 1 and maxTabs: 1, and isolated sessions only. Shared sessions
+return ISOLATION_UNAVAILABLE before creating or using any shared context, in
+both the SDK and public worker factory. This refuses an unverified storage mode;
+it never substitutes borrowed/default storage.
+
+The minimal navigation inventory under verification is tabs.list/tabs.close,
+tab.goto/tab.url/tab.title/tab.back/tab.forward/tab.reload. tabs.new and the
+snapshot/extract/status/ready reader family remain unadmitted publicly. Passing
+a limited fixed-reader diagnostic does not establish the full reader contract.
+The final production stdio corpus is a separate gate; no visual/input/WebMCP
+support is inferred from these diagnostics.
+
 No canonical screenshot, visual geometry, pointer motion, tap effect, GIF or video
 capture is available from this backend. Its upstream text-layout images are not
 real browser pixels. Do not import human cookies/profiles or attach a model-chosen
 endpoint as a compatibility workaround. There is no automatic backend fallback.
 
 The [Lightpanda analysis](../plans/browser-automation-capture/lightpanda-analysis.md)
-records exact upstream revisions and the pending real binary/correctness corpus.
+records exact upstream revisions and the bounded real-binary diagnostics, including
+failures and pending production acceptance.
 Passing protocol or mock tests alone does not establish compatibility.
 
 ## Experimental WebMCP controller

@@ -18,6 +18,7 @@ class ScriptActions(
     private val router: Router,
     private val view: WebView,
     private val observation: BrowserGatewaySession,
+    private val prepareInput: suspend (Int, Double, String) -> Unit,
 ) {
     private val gateway = checkNotNull(ctx.browserGateway)
     private val overlay = ctx.scriptOverlay
@@ -37,6 +38,7 @@ class ScriptActions(
             }
             if (ctx.scriptPlaybackState?.isAbortRequested() == true) stop("SCRIPT_ABORTED")
         }
+        if (run.captureExpired()) stop("CAPTURE_DURATION_LIMIT")
         if (run.elapsedMs() > 300_000) stop("SCRIPT_DURATION_LIMIT")
         if (run.stopped.get()) throw ScriptFailure(run.stopReason.get() ?: "SCRIPT_ABORTED", mutationInFlight)
     }
@@ -58,13 +60,16 @@ class ScriptActions(
         } while (System.nanoTime() < end)
     }
 
-    suspend fun execute(action: Map<String, Any?>) {
+    suspend fun execute(
+        action: Map<String, Any?>,
+        index: Int,
+    ) {
         guard()
         when (action["action"]) {
             "wait" -> pause(number(action, "ms").toLong())
             "wait-ready" -> ready(action)
             "assert" -> assertion(action)
-            "click", "tap", "fill", "type" -> interact(action)
+            "click", "tap", "fill", "type" -> interact(action, index)
             "navigate" -> navigate(action)
             "scroll" ->
                 gateway.scriptLease(run.tabId, view, true, ::guard) {
@@ -105,63 +110,71 @@ class ScriptActions(
         guard()
     }
 
-    private suspend fun interact(action: Map<String, Any?>) =
-        gateway.scriptLease(run.tabId, view, true, ::guard) {
-            val resolved = resolve(action)
-            val x = number(resolved, "x")
-            val y = number(resolved, "y")
-            val width = number(resolved, "viewportWidth")
-            val height = number(resolved, "viewportHeight")
-            val token = resolved["token"] as? String ?: throw ScriptFailure("TARGET_EVALUATION_FAILED")
-            val edit = action["action"] in setOf("fill", "type")
-            val sensitive = action["sensitive"] == true || resolved["sensitive"] == true
-            if (edit && sensitive) {
-                run.redactor.add(action["text"] as String)
-                if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
-                    throw ScriptFailure("SENSITIVE_CAPTURE")
-                }
+    private suspend fun interact(
+        action: Map<String, Any?>,
+        index: Int,
+    ) = gateway.scriptLease(run.tabId, view, true, ::guard) {
+        val resolved = resolve(action)
+        val x = number(resolved, "x")
+        val y = number(resolved, "y")
+        val width = number(resolved, "viewportWidth")
+        val height = number(resolved, "viewportHeight")
+        val token = resolved["token"] as? String ?: throw ScriptFailure("TARGET_EVALUATION_FAILED")
+        val edit = action["action"] in setOf("fill", "type")
+        val sensitive = action["sensitive"] == true || resolved["sensitive"] == true
+        if (sensitive) {
+            if (edit) run.redactor.add(action["text"] as String)
+            if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
+                throw ScriptFailure("SENSITIVE_CAPTURE")
             }
-            overlay.viewport(width, height, document())
-            val pointer = objectMap(run.script["pointer"])
-            if (pointer["enabled"] == true) {
-                val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 500.0
-                overlay.move(
-                    ScriptOverlay.Pointer(
-                        pointerX.coerceIn(0.0, width),
-                        pointerY.coerceIn(0.0, height),
-                        x,
-                        y,
-                        System.nanoTime(),
-                        duration,
-                        pointer["curve"] != "c",
-                    ),
-                )
-                pause(duration.toLong())
-            }
-            guard()
-            // The same object/token/document/geometry is checked atomically again
-            // after visual movement and synchronous focus/default handlers.
-            mutationInFlight = true
-            val done = resolve(action, token, dispatch = !edit, edit = edit)
-            guard()
-            mutationInFlight = false
-            pointerX = x
-            pointerY = y
-            val tap = objectMap(run.script["tapIndicator"])
-            overlay.indicate(
-                ScriptOverlay.Tap(
+        }
+        val oldDocument = document()
+        overlay.viewport(width, height, oldDocument)
+        val pointer = objectMap(run.script["pointer"])
+        if (pointer["enabled"] == true) {
+            val duration = (pointer["durationMs"] as? Number)?.toDouble() ?: 500.0
+            overlay.move(
+                ScriptOverlay.Pointer(
+                    pointerX.coerceIn(0.0, width),
+                    pointerY.coerceIn(0.0, height),
                     x,
                     y,
                     System.nanoTime(),
-                    (tap["radius"] as? Number)?.toDouble() ?: 20.0,
-                    (tap["durationMs"] as? Number)?.toDouble() ?: 700.0,
-                    Color.parseColor(tap["color"] as? String ?: "#3B82F6"),
-                    tap["wobble"] != false,
-                    tap["fade"] != false,
+                    duration,
+                    pointer["curve"] != "c",
                 ),
             )
-            if (done["inputGuarantee"] != "synthetic-coordinate") throw ScriptFailure("TARGET_EVALUATION_FAILED", true)
+            pause(duration.toLong())
         }
+        guard()
+        val tap = objectMap(run.script["tapIndicator"])
+        val movies = (objectMap(run.script["capture"])["formats"] as? List<*>).orEmpty().any { it == "gif" || it == "video" }
+        val marker =
+            ScriptOverlay.Tap(
+                x,
+                y,
+                System.nanoTime(),
+                (tap["radius"] as? Number)?.toDouble() ?: 20.0,
+                (tap["durationMs"] as? Number)?.toDouble() ?: 700.0,
+                Color.parseColor(tap["color"] as? String ?: "#3B82F6"),
+                tap["wobble"] != false,
+                tap["fade"] != false,
+                held = movies,
+            )
+        overlay.indicate(marker)
+        prepareInput(index, (marker.start - run.startedNanos) / 1_000_000.0, oldDocument)
+        if (movies) overlay.indicate(marker.copy(start = System.nanoTime(), held = false))
+        guard()
+        // The same object/token/document/geometry is checked atomically after
+        // movie admission and synchronous focus/default handlers.
+        mutationInFlight = true
+        val done = resolve(action, token, dispatch = !edit, edit = edit)
+        guard()
+        mutationInFlight = false
+        pointerX = x
+        pointerY = y
+        if (done["inputGuarantee"] != "synthetic-coordinate") throw ScriptFailure("TARGET_EVALUATION_FAILED", true)
+    }
 
     private suspend fun navigate(action: Map<String, Any?>) =
         gateway.scriptLease(run.tabId, view, true, ::guard) {

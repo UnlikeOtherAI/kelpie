@@ -22,6 +22,7 @@ class GtkBrowserView {
   GtkWidget* frame_ = nullptr;
   GtkWidget* canvas_ = nullptr;
   GtkWidget* label_ = nullptr;
+  GtkWidget* stop_ = nullptr;
   bool attached_ = false;
 #if KELPIE_LINUX_HAS_GTK
   void ConnectKeyboard();

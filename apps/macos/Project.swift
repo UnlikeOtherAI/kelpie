@@ -161,6 +161,7 @@ let kelpieApp = Target.target(
             "SWIFT_OBJC_BRIDGING_HEADER": "Kelpie/Kelpie-Bridging-Header.h",
             "HEADER_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/Kelpie/Renderer",
+                "$(PROJECT_DIR)/Kelpie/AI/Llama",
                 "$(PROJECT_DIR)/../../native/core-state/include",
                 "$(PROJECT_DIR)/../../native/core-connect/include",
                 "$(PROJECT_DIR)/../../native/core-protocol/include",
@@ -168,7 +169,8 @@ let kelpieApp = Target.target(
                 "$(PROJECT_DIR)/../../native/core-mcp/include",
                 "$(PROJECT_DIR)/../../native/core-ai/include",
                 "$(PROJECT_DIR)/Frameworks/cef_include",
-                "$(PROJECT_DIR)/vendor/llama.cpp/include",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-src/include",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-src/ggml/include",
             ]),
             "LIBRARY_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/../../native/.build/core-state",
@@ -177,7 +179,11 @@ let kelpieApp = Target.target(
                 "$(PROJECT_DIR)/../../native/.build/core-automation",
                 "$(PROJECT_DIR)/../../native/.build/core-mcp",
                 "$(PROJECT_DIR)/../../native/.build/core-ai",
-                "$(PROJECT_DIR)/vendor/llama.cpp/lib",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-build/src",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-build/ggml/src",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-build/ggml/src/ggml-cpu",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-build/ggml/src/ggml-metal",
+                "$(PROJECT_DIR)/../../native/.build/_deps/kelpie_llama-build/ggml/src/ggml-blas",
             ]),
             "FRAMEWORK_SEARCH_PATHS": .array([
                 "$(PROJECT_DIR)/Frameworks",

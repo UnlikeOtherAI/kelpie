@@ -46,14 +46,25 @@ void TestRegistryFiltering() {
   const auto macos_tools = registry.tools_for_platform(kelpie::Platform::kMacos);
   const auto windows_tools = registry.tools_for_platform(kelpie::Platform::kWindows);
   const auto linux_tools = registry.tools_for_platform(kelpie::Platform::kLinux);
-  assert(linux_tools.size() == 114);
+  assert(linux_tools.size() == 118);
   for (const auto& tool : linux_tools) assert(ContainsTool(windows_tools, tool.name));
   for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
     assert(ContainsTool(windows_tools, name));
-    assert(!ContainsTool(linux_tools, name));
-    assert(!ContainsTool(ios_tools, name));
-    assert(!ContainsTool(android_tools, name));
-    assert(!ContainsTool(macos_tools, name));
+    assert(ContainsTool(linux_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kLinux, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kLinux, "webkit"));
+    assert(ContainsTool(ios_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kIos, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "gecko"));
+    assert(ContainsTool(android_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kAndroid, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "webkit"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "gecko"));
+    assert(ContainsTool(macos_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kMacos, "webkit"));
+    assert(registry.is_tool_available(name, kelpie::Platform::kMacos, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kMacos, "gecko"));
     assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "webkit"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "gecko"));
@@ -62,6 +73,20 @@ void TestRegistryFiltering() {
   assert(play != windows_tools.end());
   assert(play->availability.requires_ui);
   assert(!play->availability.allowed_headless);
+  for (const auto& tool : ios_tools) if (tool.http_endpoint == "play-script" ||
+      tool.http_endpoint == "abort-script" || tool.http_endpoint == "get-script-status" ||
+      tool.http_endpoint == "get-script-artifact") {
+    assert(tool.availability.platforms == std::vector<kelpie::Platform>{kelpie::Platform::kIos});
+    assert(tool.availability.engines == kelpie::StringList{"webkit"});
+    assert(tool.availability.requires_ui); assert(!tool.availability.allowed_headless);
+  }
+  for (const auto& tool : android_tools) if (tool.http_endpoint == "play-script" ||
+      tool.http_endpoint == "abort-script" || tool.http_endpoint == "get-script-status" ||
+      tool.http_endpoint == "get-script-artifact") {
+    assert(tool.availability.platforms == std::vector<kelpie::Platform>{kelpie::Platform::kAndroid});
+    assert(tool.availability.engines == kelpie::StringList{"chromium"});
+    assert(tool.availability.requires_ui); assert(!tool.availability.allowed_headless);
+  }
   const auto webkit_tools = registry.tools_for_engine("webkit");
   const auto chromium_tools = registry.tools_for_engine("chromium");
 
@@ -69,11 +94,11 @@ void TestRegistryFiltering() {
   // is the regression this guards, and `<= all_tools.size()` cannot see it.
   // Update these deliberately when the catalogue changes.
   assert(all_tools.size() == 128);
-  assert(ios_tools.size() == 121);
-  assert(android_tools.size() == 121);
-  assert(macos_tools.size() == 118);
+  assert(ios_tools.size() == 125);
+  assert(android_tools.size() == 125);
+  assert(macos_tools.size() == 122);
   assert(windows_tools.size() == 118);
-  assert(webkit_tools.size() == 124);
+  assert(webkit_tools.size() == 128);
   assert(chromium_tools.size() == 128);
 
   for (const auto* name : {"kelpie_bookmarks_create_folder", "kelpie_bookmarks_update", "kelpie_bookmarks_move"}) {
@@ -122,6 +147,8 @@ void TestCapabilitiesClassification() {
   const auto ios_webkit = registry.get_capabilities(kelpie::Platform::kIos, "webkit");
   assert(ContainsString(ios_webkit.supported, "navigate"));
   assert(ContainsString(ios_webkit.partial, "show-keyboard"));
+  for (const auto* endpoint : {"play-script", "abort-script", "get-script-status", "get-script-artifact"})
+    assert(ContainsString(ios_webkit.partial, endpoint));
   assert(ContainsString(ios_webkit.partial, "set-renderer"));
   assert(!ContainsString(ios_webkit.unsupported, "show-keyboard"));
 
@@ -132,6 +159,38 @@ void TestCapabilitiesClassification() {
   assert(ContainsString(macos_chromium.supported, "navigate"));
   assert(ContainsString(macos_chromium.partial, "set-renderer"));
   assert(ContainsString(macos_chromium.unsupported, "show-keyboard"));
+}
+
+void TestWorkflowRuntimeProfiles() {
+  const kelpie::McpRegistry registry;
+  using P = kelpie::Platform;
+  for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
+    assert(registry.is_tool_available(name,P::kLinux,"chromium","windowed"));
+    assert(registry.is_tool_available(name,P::kLinux,"chromium","offscreen"));
+    assert(!registry.is_tool_available(name,P::kLinux,"webkit","offscreen"));
+    assert(!registry.is_tool_available(name,P::kLinux,"chromium","forged"));
+    for (P platform : {P::kIos,P::kAndroid,P::kWindows,P::kMacos})
+      assert(!registry.is_tool_available(name,platform,"chromium","offscreen"));
+    for (const auto& mode : {"windowed","offscreen"}) {
+      const auto tools=registry.tools_for_platform(P::kLinux,mode);
+      const auto tool=std::find_if(tools.begin(),tools.end(),[&](const auto& item){return item.name==name;});
+      assert(tool!=tools.end());
+      assert(tool->availability.requires_ui==(std::string(mode)=="windowed"));
+      assert(tool->availability.allowed_headless==(std::string(mode)=="offscreen"));
+    }
+    const auto mac=registry.tools_for_platform(P::kMacos);
+    const auto tool=std::find_if(mac.begin(),mac.end(),[&](const auto& item){return item.name==name;});
+    assert(tool!=mac.end() && tool->availability.requires_ui && !tool->availability.allowed_headless);
+  }
+  assert(registry.tools_for_platform(P::kLinux,"forged").empty());
+  const auto windowed=registry.get_capabilities(P::kLinux,"chromium");
+  const auto offscreen=registry.get_capabilities(P::kLinux,"chromium","offscreen");
+  for (const auto* endpoint : {"play-script","abort-script","get-script-status","get-script-artifact"}) {
+    assert(ContainsString(windowed.partial,endpoint));
+    assert(ContainsString(offscreen.supported,endpoint));
+  }
+  const auto invalid=registry.get_capabilities(P::kLinux,"chromium","forged");
+  assert(invalid.supported.empty() && invalid.partial.empty());
 }
 
 void TestCApi() {
@@ -147,6 +206,15 @@ void TestCApi() {
   assert(ios_tools[0].contains("mutates"));
   assert(ios_tools[0]["method"] == ios_tools[0]["http_endpoint"]);
   assert(ios_tools[0].contains("availability"));
+  for (const auto& tool : ios_tools) if (tool["method"] == "play-script" ||
+      tool["method"] == "abort-script" || tool["method"] == "get-script-status" ||
+      tool["method"] == "get-script-artifact") {
+    assert(tool["availability"]["engines"] == json::array({"webkit"}));
+    assert(tool["availability"]["platforms"] == json::array({"ios"}));
+    assert(tool["availability"]["requires_ui"] == true);
+    assert(tool["availability"]["allowed_headless"] == false);
+    assert(tool["mutates"] == (tool["method"] == "play-script" || tool["method"] == "abort-script"));
+  }
 
   assert(kelpie_mcp_registry_is_available(registry, "kelpie_show_keyboard", KELPIE_PLATFORM_IOS,
                                             "webkit") == 1);
@@ -178,6 +246,7 @@ int main() {
     TestRegistryFiltering();
     TestAvailabilityChecks();
     TestCapabilitiesClassification();
+    TestWorkflowRuntimeProfiles();
     TestCApi();
     return 0;
   } catch (const std::exception& exception) {

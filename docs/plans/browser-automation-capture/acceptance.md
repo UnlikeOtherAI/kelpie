@@ -7,6 +7,7 @@ Owner: common contracts/CLI and acceptance (/observations).
 Source worktree: Maxis `D:/Worktrees/kelpie/capture-observations-20261104`.
 The former QA worktree remains read-only; iOS implementation now belongs to /acceptance.
 See [architecture review](architecture-review.md), [resource ledger](resources.md),
+[independent mobile source review](mobile-source-review.md),
 and [fixture instructions](../../../tests/capture/README.md).
 
 ## Gates and evidence
@@ -14,11 +15,19 @@ and [fixture instructions](../../../tests/capture/README.md).
 The latest user direction authorizes parallel implementation by per-platform owners;
 the earlier Windows-first execution gate is historical and no longer blocks other
 platform source work. Resource slots still come from the coordinator. Computer Use,
-VNC, custom desktop-input helpers and native UI driving remain explicitly off.
+VNC, CUA and custom OS/desktop-input helpers remain explicitly off. Root-authorized
+standard XCUITest/Compose and scoped native accessibility instrumentation
+(Windows UIA/Linux AT-SPI where authorized) may exercise native app controls and
+capture app screenshots under its assigned simulator/emulator handoff and resource
+slot; that authorization does not grant arbitrary desktop control.
 Machine-interface evidence and native UI evidence must remain distinct.
 Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
-separate cells. A platform without the capability must return a documented
+separate cells. Linux GTK and Linux CEF offscreen/OSR are distinct runtime cells;
+noCEF stub and external workers remain separate evidence. See
+[differential ingestion](differential-evidence.md) and
+[critical movie admission review](movie-admission-review.md).
+A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
 
 Every row below starts **pending**. To close it, append an evidence record to the
@@ -67,7 +76,7 @@ and symbols exist. Every implementation owner must replace this with landed path
 | TGT-05 | Advertised input guarantee matches event trust | native | fixture event.isTrusted | Record synthetic vs trusted honestly for each renderer | N |
 | PTR-01 | Optional C and S paths are nonlinear with exact endpoints and ease-in/out | workflows/native | sampled pointer positions/timestamps | Play both curves; smooth visible travel arrives at target | N |
 | PTR-02 | Deterministic numeric motion model matches native display and composited media | workflows/native | same seed/options + frame timestamps | Compare displayed pointer to exported frames | N |
-| VIS-01 | Color/radius/opacity settings produce requested marker pixels | workflows/native | contrasting palette and white fixture | Inspect PNG/GIF/MP4; correct center and color | N |
+| VIS-01 | Configured color/radius and fade alpha timeline produce requested marker pixels | workflows/native | contrasting palette and white fixture | Inspect PNG/GIF/MP4; correct center and color | N |
 | VIS-02 | Wobble and fade change over time and end cleanly | workflows/native | early/middle/late decoded frames | Observe wobble then fade; no stuck overlay | N |
 | CAP-01 | Script emits real animated GIF, playable MP4 and per-step PNGs | native/workflows | header + decode + playback | Download exports and open all; animation and every step visible | N T |
 | CAP-02 | GIF has valid loop count, frame count/delays and fixed dimensions | native | decoded GIF metadata | Play repeated loop; elapsed duration matches timeline tolerance | N |
@@ -81,7 +90,7 @@ and symbols exist. Every implementation owner must replace this with landed path
 | ART-02 | Downloads/status/cancel enforce current auth owner and revocation | native | same/different/revoked grant, listener restart | A succeeds; B/revoked client refused; no existence/body leak | N T |
 | ART-03 | Chunk integers/size/range/path traversal and unbounded reads rejected | native/workflows | malformed ID/range/length and concurrent requests | Strict errors, bounded response, no filesystem access | N T |
 | ART-04 | Manifest identifies MIME,size,hash,partial,timing and document provenance | native/workflows | reassembled file digest | Independent hash matches; partial/error never called complete | N T |
-| SEC-01 | Secrets absent from structured outputs, errors, logs and manifests | all | secret input refs and canaries | Review redacted response/logs; no tokens/secret values | N B L T |
+| SEC-01 | Secrets absent from structured outputs, errors, logs and manifests | all | secret input refs and canaries | Review raw native responses/logs; no tokens/secret values; late inferred-sensitive refusal scrubs earlier outputs and latches all-capture discard,including redaction-error replacement | N B L T |
 | SEC-02 | Page instructions/JSON-LD do not become agent authority or executable input | observations/workflows | fixture malicious instruction | Treat as untrusted text; no credentials/external action | N B L |
 | DIF-01 | Shared fixture corpus compares normalized public semantics across renderers | acceptance | differential assertion | Record native and backend outputs at same fixture revision; explain differences | N B L |
 | LP-01 | Restricted Lightpanda advertises only proven DOM methods | desktop_backend | capability audit | No screenshot/layout/pointer/native-input promise | L T |
@@ -115,6 +124,14 @@ and symbols exist. Every implementation owner must replace this with landed path
 8. Run the exact corpus independently on each native renderer under its assigned
    coordinator resource slot; other platforms do not wait for Windows acceptance.
    Restricted Lightpanda refusal evidence remains distinct from native support.
+
+VIS-01/VIS-02/CAP-01/CAP-02/CAP-03 additionally require a movies-only low-FPS
+navigation flow (including fps1) with every GIF/MP4 frame decoded. A tap marker
+must appear on the correct pre-navigation document in each requested movie
+format; a correct step PNG alone cannot close this gate. Pre-input held-marker
+dwell is separately recorded from configured animation duration. Preserve the
+FPS cap, cancellable bounds and final exact-target recheck; screenshots-only/no
+capture must not inherit an unnecessary movie-admission delay.
 
 The initial ledger author ran no flows at creation. Later source/core/headless and exported-media results are recorded in the linked implementation/review/platform ledgers; they do not automatically promote any native cell to passed. UI/Stop verification remains blocked by the user hold.
 

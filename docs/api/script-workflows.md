@@ -23,13 +23,14 @@ The pointer is presentation only and does not cause hover. Native platforms repo
 
 Typed actions include navigation, click/tap, fill/type, press-key, scroll, timed wait, bounded wait-ready, assertions, screenshots, commentary, named output and bounded extraction. The platform may support only a subset. Version1 rejects unknown actions, arbitrary JavaScript and continue-on-error.
 
-Capture continuously samples rendered frames and composites the same markers/pointer used in the live presentation. Defaults are15 FPS, width1280, duration60000ms and retained bytes67108864; maxima are30 FPS, width1920, duration300000ms and bytes268435456. Encoder backpressure drops frames, preserves elapsed timing and reports counts. Resize stops recording with partial output. Abort, failure and resource limits finalize valid partial artifacts.
+Capture continuously samples rendered frames and composites the same markers/pointer used in the live presentation. Defaults are15 FPS, width1280, duration60000ms and retained bytes67108864; maxima are30 FPS, width1920, duration300000ms and bytes268435456. Encoder backpressure drops frames, preserves elapsed timing and reports counts. Resize stops recording with partial output. Abort, ordinary failure and resource limits finalize valid partial artifacts. Privacy refusals are an exception: when a sensitive DOM target is recognized during capture, all capture artifacts from that run are discarded, including earlier frames. Output-redaction failure also discards capture. The privacy-discard decision is latched independently of later error replacement; it cannot be undone by finalization, abort or a redaction error.
 
 Each artifact manifest contains `id,mimeType,byteLength,sha256,partial,width,height`, optionally duration, frame count, dropped frames, action index and viewport/document provenance. Video MIME is `video/mp4`; GIF and step PNGs use `image/gif` and `image/png`.
 
 ## Native MCP discovery
 
-Windows Chromium registers `kelpie_play_script`, `kelpie_abort_script`,
+Windows Chromium, iOS WebKit, Android Chromium, macOS WebKit/Chromium and
+Linux Chromium register `kelpie_play_script`, `kelpie_abort_script`,
 `kelpie_get_script_status`, and `kelpie_get_script_artifact` in the native catalogue.
 Playback requires the native app renderer and presentation/Stop factory. A hidden
 normal app is supported; this does not advertise pure headless-backend playback.
@@ -37,8 +38,16 @@ Their schemas come from the shared generated contract and work through direct to
 calls or `kelpie_extension` with the same names. Playback and abort are mutations;
 status and artifact reads remain available to read-only sessions, subject to the
 existing authenticated run-owner and browser-grant checks. Discovery still filters
-out any endpoint the selected native router does not implement. Other native
-platforms and renderer bindings do not advertise this workflow surface yet.
+out any endpoint the selected native router does not implement. iOS/WebKit and
+Android/Chromium expose UI-required, non-headless profiles for all four tools. Windows retains its existing Chromium
+profile; iOS Chromium/Gecko and Windows WebKit/Gecko refuse. Mac's compiled profiles
+are windowed and UI-required. Linux uses an explicit trusted native runtime mode:
+windowed/GTK requires UI; offscreen/OSR permits only its supported machine path
+without local UI claims. The mode defaults to windowed, rejects unknown values
+and cannot be supplied in HTTP/MCP bodies. Legacy C API catalogue queries retain
+windowed projection. A profile never creates missing no-CEF routes. See the
+[profile verification record](../plans/browser-automation-capture/runtime-profiles.md). Registry presence establishes a
+compiled binding, not actual capture/Stop/media acceptance.
 
 ## Version 1 status
 
@@ -91,7 +100,7 @@ The named output retains canonical field status, bounds, metadata authority and 
 
 See the [walkthrough recipe](../examples/workflows/submit-walkthrough.json) and [extraction recipe](../examples/workflows/extract-products.json); adapt tab IDs and page selectors explicitly before running.
 
-Resolved secret steps carry `sensitive:true` as non-secret provenance on the wire. Native and host result handling redact actual marked values, including reflected URL/title/output strings. Password/current-password/new-password DOM targets are sensitive even if the caller omitted the marker. The marker never grants access or changes authentication.
+Resolved secret steps carry `sensitive:true` as non-secret provenance on the wire. Native and host result handling redact actual marked values, including reflected URL/title/output strings. Password/current-password/new-password DOM targets are sensitive even if the caller omitted the marker. Once an edit target is recognized as sensitive, its text is registered for redaction before any capture refusal, so earlier named outputs are scrubbed too. Strict privacy refusal uses `SENSITIVE_CAPTURE_REFUSED`. A privacy refusal or output-redaction failure discards every capture artifact from the run; ordinary failures retain valid partials. The marker never grants access or changes authentication.
 
 Downloads pin the exact authenticated socket and credential for all chunks, refuse redirects/re-pairing/alternate sockets, bound streamed responses and aggregate retained bytes, and compare every chunk with the original run/artifact identity and manifest. Failed or interrupted transfers delete only the exclusive temporary file this transfer created; existing files and symlinks are never replaced. A transport failure during playback has uncertain completion: inspect status before starting another run.
 Strict version 1 playback first reads `get-script-status` on the pinned authenticated socket and requires `success: true` with an explicit `supportedVersions: [1]`. Older browsers must be updated: missing, invalid, or refused support returns `UNSUPPORTED_SCRIPT_VERSION` before any playback, with no legacy fallback. Unversioned scripts retain legacy behavior.

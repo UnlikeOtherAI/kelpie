@@ -16,3 +16,5 @@
 #include "kelpie/mcp_c_api.h"
 
 #endif
+
+#import "CEFBridge+ScriptCapture.h"

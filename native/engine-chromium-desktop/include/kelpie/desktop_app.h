@@ -61,6 +61,8 @@ class DesktopApp {
     DesktopScriptHandler::Config scripts;
     // Shell-specific services register before HTTP/MCP can dispatch requests.
     std::function<void(DesktopRouter&)> register_handlers;
+    // Trusted native launch mode, never accepted from HTTP/MCP bodies.
+    std::string runtime_mode = "windowed";
   };
 
   DesktopApp();

@@ -129,16 +129,18 @@ final class IOSWorkflowActions {
         }
         let editing = action == "type" || action == "fill"
         let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
-        if sensitive, workflow.capture != nil { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
+        if sensitive, workflow.capture != nil { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width
         try requireOK(try await tab.target(target, token: token))
-        let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings) }
+        let hold = sampler?.recordsMotion == true
+        let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
         if let sampler {
-            try await sampler.step(workflow.stepScreenshots ? index : nil, document: document, prepare: mark)
+            try await sampler.markBeforeInput(workflow.stepScreenshots ? index : nil, document: document, prepare: mark)
+            if hold { presentation.beginMarkerAnimation() }
         } else { mark() }
         try await check()
         let current = try await tab.viewport()

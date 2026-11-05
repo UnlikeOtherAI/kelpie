@@ -4,7 +4,7 @@ import WebKit
 /// One in-flight WebKit viewport sample. Every accepted frame carries its request-time overlay and document stamp.
 @MainActor
 final class IOSFrameSampler {
-    typealias Receiver = (CGImage, TimeInterval, Int?, String, IOSWorkflowTab.Viewport) throws -> Void
+    typealias Receiver = (CGImage, TimeInterval, Int?, String, IOSWorkflowTab.Viewport) throws -> Bool
     private let tab: IOSWorkflowTab
     private let presentation: IOSWorkflowPresentation
     private let check: () async throws -> Void
@@ -19,6 +19,7 @@ final class IOSFrameSampler {
     private var busy = false
     private var stopping = false
     private var stepPending = false
+    private var lastAdmitted = false
     private var lastRequest: TimeInterval?
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var ticker: Task<Void, Never>?
@@ -43,6 +44,7 @@ final class IOSFrameSampler {
         startTime = ProcessInfo.processInfo.systemUptime
     }
 
+    var recordsMotion: Bool { continuous }
     var elapsed: TimeInterval { min(duration, ProcessInfo.processInfo.systemUptime - startTime) }
 
     func start() async throws {
@@ -51,18 +53,37 @@ final class IOSFrameSampler {
         ticker = Task { @MainActor [weak self] in await self?.periodic() }
     }
 
-    func step(_ index: Int?, document: String? = nil, prepare: (() -> Void)? = nil) async throws {
+    @discardableResult
+    func step(_ index: Int?, document: String? = nil, prepare: (() -> Void)? = nil) async throws -> Bool {
         stepPending = true
         defer { stepPending = false }
         while busy { await withCheckedContinuation { waiters.append($0) } }
         if let failure { throw failure }
         guard !stopping else { throw IOSWorkflowFailure("CAPTURE_STOPPED") }
-        if !continuous, index == nil { prepare?(); return }
-        if continuous, let lastRequest {
-            let delay = lastRequest + 1.0 / Double(fps) - ProcessInfo.processInfo.systemUptime
-            if delay > 0 { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
-        }
+        if !continuous, index == nil { prepare?(); return true }
+        if continuous, let lastRequest { try await wait(until: lastRequest + 1.0 / Double(fps), document: document) }
         while !(try await sample(step: index, document: document, prepare: prepare)) { try checkTime() }
+        return lastAdmitted
+    }
+
+    /// Require actual admission by every requested encoder. A rejected video frame cannot authorize the input.
+    /// A full interval measured after acknowledgement also gives the held frame its requested duration.
+    func markBeforeInput(_ index: Int?, document: String, prepare: @escaping () -> Void) async throws {
+        var accepted = try await step(index, document: document, prepare: prepare)
+        guard continuous else { return }
+        while !accepted { accepted = try await step(nil, document: document) }
+        try await wait(until: ProcessInfo.processInfo.systemUptime + 1.0 / Double(fps), document: document)
+    }
+
+    private func wait(until deadline: TimeInterval, document: String?) async throws {
+        repeat {
+            try await check()
+            try checkTime()
+            if let document, tab.document != document { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            if remaining <= 0 { return }
+            try await Task.sleep(nanoseconds: UInt64(min(0.05, remaining) * 1_000_000_000))
+        } while true
     }
 
     func stop() async {
@@ -177,7 +198,7 @@ final class IOSFrameSampler {
             state.draw(in: render.cgContext, size: output)
         }
         guard let frame = image.cgImage else { throw IOSWorkflowFailure("CAPTURE_FRAME_FAILED") }
-        try receive(frame, max(0, state.time - startTime), step, generation, viewport)
+        lastAdmitted = try receive(frame, max(0, state.time - startTime), step, generation, viewport)
         return true
     }
 }

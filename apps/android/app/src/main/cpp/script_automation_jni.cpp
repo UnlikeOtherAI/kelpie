@@ -1,7 +1,9 @@
 #include <jni.h>
 #include <codecvt>
 #include <locale>
+#include <memory>
 #include <string>
+#include <stdexcept>
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/script_presentation.h"
@@ -12,16 +14,34 @@ std::string Input(JNIEnv* env, jstring value) {
   if (!value) return {};
   const auto* chars = env->GetStringChars(value, nullptr);
   if (!chars) return {};
-  const std::u16string text(reinterpret_cast<const char16_t*>(chars),
+  const auto release_chars = [env, value](const jchar* held) {
+    env->ReleaseStringChars(value, held);
+  };
+  std::unique_ptr<const jchar, decltype(release_chars)> held(chars, release_chars);
+  const std::u16string text(reinterpret_cast<const char16_t*>(held.get()),
                             env->GetStringLength(value));
-  env->ReleaseStringChars(value, chars);
+  held.reset();
+  // C ABI requests are NUL terminated; reject raw NUL, not a truncated prefix.
+  // Escaped JSON NUL remains valid and round-trips through standard UTF-8.
+  if (text.find(char16_t{0}) != std::u16string::npos)
+    throw std::invalid_argument("SCRIPT_JSON_NUL");
+  for (size_t i = 0; i < text.size(); ++i) {
+    const auto value = text[i];
+    if (value >= 0xd800 && value <= 0xdbff) {
+      if (++i >= text.size() || text[i] < 0xdc00 || text[i] > 0xdfff)
+        throw std::invalid_argument("SCRIPT_JSON_UTF16");
+    } else if (value >= 0xdc00 && value <= 0xdfff) {
+      throw std::invalid_argument("SCRIPT_JSON_UTF16");
+    }
+  }
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
   return converter.to_bytes(text);
 }
 jstring Output(JNIEnv* env, char* owned, void (*release)(char*) = kelpie_mcp_free_string) {
   if (!owned) return nullptr;
-  const std::string text(owned);
-  release(owned);
+  std::unique_ptr<char, void (*)(char*)> held(owned, release);
+  const std::string text(held.get());
+  held.reset();
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
   const auto value = converter.from_bytes(text);
   return env->NewString(reinterpret_cast<const jchar*>(value.data()),

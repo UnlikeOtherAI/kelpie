@@ -4,11 +4,13 @@ import com.kelpie.browser.network.errorResponse
 import com.kelpie.browser.network.successResponse
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -84,24 +86,28 @@ class OpenAIInference(
         contextProvider: suspend (String) -> String?,
     ): Map<String, Any?> {
         val progress = AgentProgress()
-        val job = scope.async { runCatchingErrors(request, dispatcher, contextProvider, progress) }
+        val job = scope.async(start = CoroutineStart.LAZY) { runCatchingErrors(request, dispatcher, contextProvider, progress) }
         running += job
+        // Register before any transport can run; completion owns retirement.
+        job.invokeOnCompletion { running -= job }
         try {
+            currentCoroutineContext().ensureActive()
+            job.start()
             return job.await()
         } catch (e: CancellationException) {
             if (job.isCancelled && currentCoroutineContext().isActive) {
+                // A terminal response means provider cleanup has actually retired.
+                job.join()
                 return failureResponse(OpenAIException(OpenAIErrorCode.INFERENCE_CANCELLED, "The request was cancelled"), progress)
             }
             job.cancel()
             throw e
-        } finally {
-            running -= job
         }
     }
 
     /** Cancels every in-flight openai request. Returns how many were cancelled. */
     fun cancelAll(): Int {
-        val snapshot = running.filter { it.isActive }
+        val snapshot = running.filter { !it.isCompleted && !it.isCancelled }
         snapshot.forEach { it.cancel(CancellationException("Cancelled by ai-cancel")) }
         return snapshot.size
     }

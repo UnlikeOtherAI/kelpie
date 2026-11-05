@@ -10,9 +10,9 @@ using json = nlohmann::json;
 void Accept(std::string_view endpoint, json arguments) {
   assert(kelpie::ValidateBrowserJson(kelpie::NativeExtensionInputSchema(endpoint), &arguments));
 }
-void ScriptRegistryForwarding() {
+void ScriptRegistryForwarding(int platform) {
   auto registry = kelpie_mcp_registry_create();
-  char* encoded = kelpie_mcp_registry_tools_for_platform(registry, KELPIE_PLATFORM_WINDOWS);
+  char* encoded = kelpie_mcp_registry_tools_for_platform(registry, platform);
   assert(encoded);
   const json extensions = json::parse(encoded);
   kelpie_mcp_free_string(encoded);
@@ -38,6 +38,12 @@ void ScriptRegistryForwarding() {
     for (const auto& tool : extensions) if (tool["name"] == call.first) {
       found = true; assert(tool["method"] == endpoint); assert(tool["mutates"] == mutates);
       assert(tool["inputSchema"] == kelpie::NativeExtensionInputSchema(endpoint));
+      if (platform != KELPIE_PLATFORM_WINDOWS) {
+        assert(tool["availability"]["requires_ui"] == true);
+        assert(tool["availability"]["allowed_headless"] == false);
+        assert(tool["availability"]["engines"] == (platform == KELPIE_PLATFORM_MACOS
+          ? json::array({"webkit", "chromium"}) : json::array({platform == KELPIE_PLATFORM_IOS ? "webkit" : "chromium"})));
+      }
       assert(!tool["inputSchema"]["properties"].contains("values"));
       assert(!tool["inputSchema"]["properties"].contains("secretEnv"));
     }
@@ -48,6 +54,11 @@ void ScriptRegistryForwarding() {
     assert(step["method"] == endpoint); assert(step["mutates"] == mutates);
     assert(gateway.Advance({{"success", true}, {"runId", "r"}})["response"]["result"]["isError"] == false);
   }
+  auto denied = gateway.BeginMcp(rpc(calls[0].first, calls[0].second));
+  assert(denied["kind"] == "authorize");
+  denied = gateway.Advance({{"success", false}});
+  assert(denied["kind"] == "complete");
+  assert(denied.dump().find("ACCESS_DENIED") != std::string::npos);
   kelpie::BrowserGateway read_only({{"nativeMethods", methods}, {"extensions", extensions}, {"allowActions", false}, {"requireAuthorization", false}});
   const auto visible = read_only.Extensions(nullptr);
   assert(visible.size() == 2);
@@ -124,7 +135,11 @@ void ScriptSessionPreflightErrors() {
 }
 int main() {
   ScriptSessionPreflightErrors();
-  ScriptRegistryForwarding();
+  ScriptRegistryForwarding(KELPIE_PLATFORM_WINDOWS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_IOS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_ANDROID);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_MACOS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_LINUX);
   const kelpie::McpRegistry registry;
   for (const auto& tool : registry.all_tools()) {
     const auto schema = kelpie::NativeExtensionInputSchema(tool.http_endpoint);

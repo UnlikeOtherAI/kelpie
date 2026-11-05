@@ -149,4 +149,14 @@ class ScriptOwnershipTest {
         assertFalse(status.containsKey("currentActionName"))
         assertFalse(status.containsKey("phase"))
     }
+
+    @Test
+    fun captureDeadlineUsesCapturedOriginAndClearsWithPrivateState() {
+        val run = ScriptRun("deadline", authority(), "tab", script(), File(temporary.root, "deadline"), startedNanos = System.nanoTime() - 1_000_000_000L)
+        assertFalse(run.captureExpired())
+        run.startCapture(0.0, 100)
+        assertTrue(run.captureExpired())
+        run.clearPrivate()
+        assertFalse(run.captureExpired())
+    }
 }

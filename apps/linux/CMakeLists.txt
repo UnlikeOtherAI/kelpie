@@ -87,6 +87,7 @@ endif()
 
 add_executable(kelpie-linux
   src/main.cpp
+  src/linux_script_api.cpp
 
   src/headless_shell.cpp
   src/gui_shell.cpp
@@ -221,7 +222,30 @@ if(BUILD_TESTING)
 endif()
 
 if(KELPIE_LINUX_HAS_CEF)
-  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp)
+  find_package(OpenSSL REQUIRED)
+  find_package(GIF REQUIRED)
+  if(NOT PkgConfig_FOUND)
+    message(FATAL_ERROR "Linux CEF capture needs pkg-config for Cairo and GStreamer libraries")
+  endif()
+  pkg_check_modules(LINUX_CAPTURE_CAIRO REQUIRED IMPORTED_TARGET cairo)
+  pkg_check_modules(LINUX_CAPTURE_GST REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.20)
+  add_library(kelpie_linux_script_media STATIC
+    src/script_frame_compositor.cpp src/script_media_encoder.cpp
+    src/script_media_gif.cpp src/script_media_video.cpp src/script_gstreamer.cpp src/script_artifact_store.cpp)
+  target_include_directories(kelpie_linux_script_media PUBLIC src)
+  target_link_libraries(kelpie_linux_script_media PUBLIC kelpie_core_automation kelpie_engine_chromium_desktop
+    nlohmann_json::nlohmann_json PkgConfig::LINUX_CAPTURE_CAIRO PkgConfig::LINUX_CAPTURE_GST OpenSSL::Crypto GIF::GIF)
+  target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp src/script_capture_service.cpp)
+  target_link_libraries(kelpie-linux PRIVATE kelpie_linux_script_media)
+  if(BUILD_TESTING)
+    foreach(test script_media_test script_artifact_test)
+      add_executable(linux_${test} tests/${test}.cpp)
+      target_link_libraries(linux_${test} PRIVATE kelpie_linux_script_media)
+      target_compile_options(linux_${test} PRIVATE -UNDEBUG)
+      add_test(NAME linux_${test} COMMAND linux_${test})
+      set_tests_properties(linux_${test} PROPERTIES TIMEOUT 30)
+    endforeach()
+  endif()
 else()
   target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_browser_gateway.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)
   if(BUILD_TESTING)

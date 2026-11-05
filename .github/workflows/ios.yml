@@ -2,8 +2,43 @@ name: iOS
 
 on:
   pull_request:
-    paths:
+    paths: &ios_build_inputs
       - 'apps/ios/**'
+      # Cross-project source globs linked by apps/ios/Project.swift.
+      - 'apps/macos/Kelpie/AI/OpenAICompatible/**/*.swift'
+      - 'apps/macos/Kelpie/Account/AccountBookmarks.swift'
+      - 'apps/macos/Kelpie/Account/UOAAccount.swift'
+      - 'apps/macos/Kelpie/Account/UOAAuthorization.swift'
+      - 'apps/macos/Kelpie/Account/UOALoginWebView.swift'
+      - 'apps/macos/Kelpie/Account/UOAPresentation.swift'
+      - 'apps/macos/Kelpie/Account/UOASession.swift'
+      - 'apps/macos/Kelpie/Account/UOASettingsStream.swift'
+      - 'apps/macos/Kelpie/Account/UOATransport.swift'
+      - 'apps/macos/Kelpie/Browser/AddressInput.swift'
+      - 'apps/macos/Kelpie/Browser/BookmarkNode.swift'
+      - 'apps/macos/Kelpie/Browser/BookmarkStore.swift'
+      - 'apps/macos/Kelpie/Browser/BookmarkTree.swift'
+      - 'apps/macos/Kelpie/Browser/NetworkTrafficPersistence.swift'
+      - 'apps/macos/Kelpie/Browser/PartitionMap.swift'
+      - 'apps/macos/Kelpie/Browser/PartitionValidator.swift'
+      - 'apps/macos/Kelpie/Connect/**/*.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptArtifactStore.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptCaptureBudget.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptCaptureError.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptGIFEncoder.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptImageEncoder.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptOutputRedaction.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptOverlayDrawing.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptVideoSegmentSink.swift'
+      - 'apps/macos/Kelpie/Handlers/ScriptVideoWriter.swift'
+      - 'apps/macos/Kelpie/Handlers/Snapshot3DBridge.swift'
+      - 'apps/macos/Kelpie/Network/AccountPairingAuthorization.swift'
+      - 'apps/macos/Kelpie/Network/BrowserControlGateway.swift'
+      - 'apps/macos/Kelpie/Network/Router\+BrowserControl.swift'
+      - 'apps/macos/Kelpie/Network/ScriptGatewayPolicy.swift'
+      - 'apps/macos/Kelpie/Storage/SecretStore.swift'
+      - 'apps/macos/Kelpie/Views/BrowserChromeAppearance.swift'
+      - 'apps/macos/Kelpie/Views/BrowserChromeSampler.swift'
       - 'native/**'
       - 'packages/shared/**'
       - 'scripts/native/**'
@@ -11,25 +46,20 @@ on:
       - 'pnpm-workspace.yaml'
       - 'package.json'
       - '.github/actions/browser-contract/**'
+      - '.github/workflows/ios.yml'
       - '.mise.toml'
       - '.swiftlint.yml'
       - 'Makefile'
   push:
     branches:
       - main
-    paths:
-      - 'apps/ios/**'
-      - 'native/**'
-      - 'packages/shared/**'
-      - 'scripts/native/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - '.github/actions/browser-contract/**'
-      - '.mise.toml'
-      - '.swiftlint.yml'
-      - 'Makefile'
+    paths: *ios_build_inputs
   workflow_dispatch:
+    inputs:
+      native_workflow_tests:
+        description: Run paired capture, CLI and MCP journeys on an existing hosted iPhone and iPad
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,11 +67,31 @@ permissions:
 jobs:
   build:
     name: Build iOS (simulator)
-    runs-on: macos-15
-    timeout-minutes: 45
+    runs-on: ${{ inputs.native_workflow_tests && 'macos-26' || 'macos-15' }}
+    timeout-minutes: ${{ inputs.native_workflow_tests && 85 || 45 }}
+    env:
+      KELPIE_RUNTIME_TESTS: ${{ inputs.native_workflow_tests && '1' || '0' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
+      - name: Check shared Swift source path filters
+        run: |
+          ruby -ryaml - <<'RUBY'
+          workflow = YAML.safe_load(File.read('.github/workflows/ios.yml', encoding: 'UTF-8'), aliases: true)
+          events = workflow.fetch('on') { workflow.fetch(true) }
+          manifest = File.read('apps/ios/Project.swift', encoding: 'UTF-8')
+          # This job builds the application target. Unit-test-only Mac sources do not affect that product.
+          app = manifest.split('let kelpieTests = Target.target(', 2).first
+          inputs = app.scan(/\.glob\((?:pattern:\s*)?"\.\.\/macos\/([^"]+)"/).flatten
+          expected = inputs.map { |path| 'apps/macos/' + path.gsub('+') { '\+' } }.sort
+          abort 'No shared Swift sources found in the iOS project' if expected.empty?
+          %w[pull_request push].each do |event|
+            paths = events.fetch(event).fetch('paths')
+            abort "iOS #{event} must trigger on its workflow changes" unless paths.include?('.github/workflows/ios.yml')
+            actual = paths.select { |path| path.start_with?('apps/macos/') }.sort
+            abort "iOS #{event} filters differ from Project.swift: #{(expected - actual) + (actual - expected)}" unless expected == actual
+          end
+          RUBY
       - uses: ./.github/actions/browser-contract
 
       - name: Install mise (tuist)
@@ -53,6 +103,11 @@ jobs:
           mkdir -p vendor
           if [ ! -d vendor/AppReveal ]; then
             git clone --depth 1 https://github.com/UnlikeOtherAI/AppReveal.git vendor/AppReveal
+          fi
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            revision=5d6d16d67a7cd08069f3d69c2d484249e2ed8485
+            git -C vendor/AppReveal fetch --depth 1 origin "$revision"
+            git -C vendor/AppReveal checkout --detach "$revision"
           fi
 
       - name: Install SwiftLint
@@ -74,14 +129,20 @@ jobs:
       - name: Build native libraries for iOS simulator
         run: |
           set -euo pipefail
+          generator=(-G Xcode)
+          build_args=(--config Debug)
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            generator=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF)
+            build_args=(--parallel 1)
+          fi
           cmake -S native -B native/.build-ios-sim \
-            -G Xcode \
+            "${generator[@]}" \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphonesimulator \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
             -DKELPIE_BUILD_DESKTOP_ENGINES=OFF
-          cmake --build native/.build-ios-sim --config Debug
+          cmake --build native/.build-ios-sim "${build_args[@]}"
 
       - name: Flatten native build output to expected layout
         # Xcode generator nests outputs under per-config dirs. The iOS
@@ -106,7 +167,11 @@ jobs:
         # native .a files (also arm64 only, see CMAKE_OSX_ARCHITECTURES above).
         run: |
           set -euo pipefail
-          xcodebuild build \
+          build=(build)
+          if [[ "$KELPIE_RUNTIME_TESTS" == 1 ]]; then
+            build=(build-for-testing -jobs 1 'OTHER_SWIFT_FLAGS=$(inherited) -j1' COMPILER_INDEX_STORE_ENABLE=NO)
+          fi
+          xcodebuild "${build[@]}" \
             -project apps/ios/Kelpie.xcodeproj \
             -scheme Kelpie \
             -destination 'generic/platform=iOS Simulator' \
@@ -119,3 +184,24 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
+
+      - name: Build matching CLI
+        if: inputs.native_workflow_tests
+        env:
+          GOMAXPROCS: 1
+        run: pnpm --filter @unlikeotherai/kelpie build
+
+      - name: Run paired iPhone and iPad capture journeys
+        if: inputs.native_workflow_tests
+        env:
+          KELPIE_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 scripts/testing/ios-workflow-acceptance.py
+
+      - name: Keep simulator results and media
+        if: always() && inputs.native_workflow_tests
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ios-native-workflows-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kelpie-ios-evidence
+          if-no-files-found: warn
+          retention-days: 7

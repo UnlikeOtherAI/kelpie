@@ -33,7 +33,7 @@ class DesktopMcpServer::Impl {
     json methods=json::array(),extensions=json::array();
     if(router) for(const auto& method:router->RegisteredMethods()) if(router->IsCallable(method)) methods.push_back(method);
     if(registry && router) for(const auto& tool:registry->all_tools()) {
-      if(!SupportsPlatform(tool.availability,config.platform) || !SupportsEngine(tool.availability,config.engine) || !router->IsCallable(tool.http_endpoint)) continue;
+      if(!SupportsRuntime(tool.availability,config.platform,config.engine,config.runtime_mode) || !router->IsCallable(tool.http_endpoint)) continue;
       extensions.push_back({{"name",tool.name},{"method",tool.http_endpoint},{"description",tool.description},
         {"inputSchema",NativeExtensionInputSchema(tool.http_endpoint)},{"mutates",NativeExtensionMutates(tool.http_endpoint)}});
     }

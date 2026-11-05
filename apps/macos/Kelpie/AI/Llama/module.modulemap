@@ -1,0 +1,4 @@
+module llama [system] {
+    header "KelpieLlama.h"
+    export *
+}

@@ -57,6 +57,7 @@ final class IOSWorkflowPresentation: NSObject {
     private var clock: CADisplayLink?
     private var pointer: CGPoint?
     private var marker: ScriptOverlayMarker?
+    private var markerHeld = false
     private var note: Note?
     private var generation: String
     private var latched: State?
@@ -93,8 +94,9 @@ final class IOSWorkflowPresentation: NSObject {
         refresh()
     }
 
-    func mark(at point: CGPoint, radius: CGFloat, settings: [String: Any]) {
+    func mark(at point: CGPoint, radius: CGFloat, settings: [String: Any], held: Bool) {
         synchronize()
+        markerHeld = held
         marker = ScriptOverlayMarker(
             point: point,
             started: ProcessInfo.processInfo.systemUptime,
@@ -105,6 +107,26 @@ final class IOSWorkflowPresentation: NSObject {
             fade: settings["fade"] as? Bool ?? true
         )
         refresh()
+    }
+
+    func beginMarkerAnimation() {
+        synchronize()
+        guard markerHeld, let marker else { return }
+        self.marker = restarted(marker, at: ProcessInfo.processInfo.systemUptime)
+        markerHeld = false
+        refresh()
+    }
+
+    private func restarted(_ marker: ScriptOverlayMarker, at time: TimeInterval) -> ScriptOverlayMarker {
+        ScriptOverlayMarker(
+            point: marker.point,
+            started: time,
+            duration: marker.duration,
+            radius: marker.radius,
+            color: marker.color,
+            wobble: marker.wobble,
+            fade: marker.fade
+        )
     }
 
     func show(_ action: [String: Any]) {
@@ -160,12 +182,13 @@ final class IOSWorkflowPresentation: NSObject {
     }
 
     private func current() -> State {
-        State(
+        let now = ProcessInfo.processInfo.systemUptime
+        return State(
             size: tab.view.bounds.size,
             pointer: pointer,
-            marker: marker,
+            marker: markerHeld ? marker.map { restarted($0, at: now) } : marker,
             note: note,
-            time: ProcessInfo.processInfo.systemUptime,
+            time: now,
             document: generation
         )
     }

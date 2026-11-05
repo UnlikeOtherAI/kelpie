@@ -137,3 +137,150 @@ and metadata-only finalizing/terminal status. One intermediate173-test run faile
 because its test fixture precreated an exclusively owned directory; corrected
 fixture passed. No actual JNI link, AVC decoder, HTTP/MCP script flow, emulator,
 physical device, screenshot or installed release was exercised by this checkpoint.
+ANDROID-NATIVE-1: merged dc0648e284c46582708b2ea31431de85a9f9946a, preserved
+JNI UTF16/instrumentation drafts and froze source. pnpm bootstrap passed17.6s;
+configureCMakeDebug[x86_64] passed44s; explicit CMake --parallel1 completed115/115
+objects/links, including shipping KELPIE_LOCAL_LLM=ON. Installed default NDK25.1
+was used. Output is the task-owned x86_64 libkelpie_jni.so; logs native-1-configure
+and native-1-build remain under the task artifacts directory. SDK metadata version
+warnings and archive version probes were nonfatal. This establishes native link,
+not JNI execution, AVC decoding or public app flow acceptance.
+
+Next source checkpoint uses root419bc2ca including the Android/Chromium registry.
+Private pinned workflow readers use direct targeting with exact tab/WebView/current
+authority checks; selected targeting without get-tabs would disable canonical
+reads. Empty inputs:{} is accepted, but unresolved declarations/references refuse.
+Any resolved sensitive target refuses capture. Semantic step PNGs are pre-input;
+other step PNGs remain post-action. Movie marker phase zero stays stamped to the
+old document until every requested movie acknowledges an encoded frame and one
+requested interval passes. Then the configured animation clock starts, followed
+immediately by exact-target recheck/input. Screenshot-only and uncaptured runs have
+no added dwell. Step PNGs do not add movie samples or bypass the requested FPS.
+Raw JNI NUL/malformed UTF16 refuse; escaped JSON NUL and standard UTF8 non-BMP
+strings remain valid. Device tests cover repeated native allocation/free and these
+boundaries; their execution is still pending.
+ANDROID-COMPILE-2: root419bc2cad3a5b72d1e25a032bfb4e5a4aaaf209f plus Android
+fixes. ktlintFormat, main Kotlin/Java, all175 JVM tests and
+compileDebugAndroidTestKotlin passed (2m30s initial; final accounting/startup/test
+warning cleanup rerun1m30s, compile-2-final.log). No new Android-owned compiler
+warnings remain; existing unrelated warnings remain. Incremental shipping JNI
+with registry and UTF16/ownership fixes passed8/8 in the explicit one-job build
+(native-2-build.log). Standard UTF16 conversion rejects raw NUL/unpaired surrogates;
+RAII releases JNI characters and C ABI allocations even when conversion throws.
+Instrumentation cases are compiled, not executed: real UI pairing, direct HTTP/
+MCP status, ready/extract, independent GIF/MP4 retrieval/decode, movies-only1FPS
+navigation frame inspection, RGB/chroma/timing/min-budget video checks, UTF8/
+escaped-NUL/redactor vectors and repeated native allocation/free. No emulator,
+APK install, physical device, rendered UI screenshot or signed release was used.
+ANDROID-EMULATOR-1 source preparation: real public flow coverage now also includes
+zero-action preflight refusals, generic/direct MCP discovery and calls, native Stop
+partial finalization plus next-run recovery, foreign-owner status/abort/artifact
+denial and revocation, scoped value-free snapshots, nested/missing/ambiguous
+extraction, publisher metadata, immediate readiness and unavailable diagnostics.
+The existing Stop square has the accessible name Stop recording. MP4 keeps a
+bounded four-input PTS-to-captured-document map; encoded acknowledgements never
+borrow the current sample's document. Phone and tablet task-owned AVDs are approved
+for sequential headless execution using installed API35 google_apis x86_64, at
+most two cores/four GiB each. No profile has booted yet. The new cases still require
+compilation/package and actual execution before any acceptance row can be marked.
+ANDROID-EMULATOR-1 package checkpoint: ktlintFormat, all175 JVM tests,
+assembleDebug and assembleDebugAndroidTest passed on Maxis (final incremental
+39s, emulator-1-package-final.log). The initial2m50s run built the app but found a
+Kotlin test-helper visibility error after common fixture extraction; making that
+test helper public fixed it. APK is intentionally x86_64 only; the arm64 missing
+library packaging note is not an ARM64 verification result. Shipping JNI/local
+inference remains enabled. Verified copies are under packages/emulator-1:
+
+- app-debug.apk: 86743669 bytes, SHA-256 887f5ce4d234fd34d97150bd155434a60a6b868c640599733f523d976263bddd
+- app-debug-androidTest.apk: 2468146 bytes, SHA-256 aa12b6dd506d8173e8ea45875c84226f799d80581991cbe6dd5b6df500ef8cf5
+
+No emulator/device test has run at this checkpoint. Source and docs are committed
+before installation; later entries identify exact profile/serial and source.
+Phone run1: committed ca498e21, Pixel7 API35 google_apis x86_64,
+emulator-5584,1080x2400/density420; native Android window in a headless emulator
+host (not a headless browser engine). APK hashes match the package checkpoint.
+Initial detached launch ended with SSH; retaining the SSH process owner kept the
+approved emulator alive. WHPX was operational. Both packages required adb -t
+because the injected-ABI debug manifest is test-only; no other package/device was
+overwritten. Native instrumentation ran11 tests:6 passed,5 failed. Raw output is
+phone-instrumentation-1.log; adb exit0 does not mean tests passed.
+
+Passed: JNI validation/numerics; non-BMP/escaped-NUL/raw-NUL conversion and100
+redactor allocation/free rounds; movies-only1FPS semantic navigation with complete
+authenticated chunk/hash reconstruction and every-frame GIF/MP4 old-document
+marker checks; foreign-owner denial/revocation and new-run recovery; visible
+native Stop with playable partial movies/new-run recovery; native H264 RGB,
+dimensions, timestamps, duration and early finalization. Low-FPS artifacts had
+five actual frames each,320x602, and8 reported drops; GIF duration13090ms and MP4
+13085.606ms. Decoded GIF and MP4 marker frames were also visually inspected.
+These counts describe this constrained emulator run, not a guaranteed throughput.
+
+Failures: the test expected unlabelled div text in a semantic snapshot and a
+heading ahead of a prioritized button at maxElements1; both assumptions conflict
+with the shared reader. Schema discovery omitted required names. Shared redaction
+scrubs/preserves unknown dynamic keys rather than dropping them, so pageSource's
+synthetic value must be asserted masked. The1024-byte single-frame AVC test
+produced no file but did not exhaust budget: nonblocking startup input admission
+could discard its only frame. First input now waits a bounded interval or refuses;
+non-budget empty finalization cannot report success. Captured-origin deadlines
+now gate actions and post-draw frame admission, with terminal timestamps capped
+independently of codec finalization time. New deadline and padded-width decoder
+regressions are pending the next package/device replay.
+
+Raw exports and decoded frames are preserved in phone-evidence-1. Only the task
+phone emulator was shut down normally after this bounded run; AVD data was kept.
+Tablet is still unbooted. The five failures remain unaccepted until replay passes.
+Phone replay package: source fixes and fixture corrections passed ktlintFormat,
+all176 JVM tests and both debug APK assemblies (2m35s,
+emulator-1-replay-package.log); the final test-only contract/retention refinement
+passed21s (emulator-1-replay-test-final.log). Href extraction is asserted as the
+raw source attribute, matching the shared reader. Tests now retain AVC color media
+and decoded frames, check padded-width RGB at center/corners, and compare both
+shared curve branches. Native UI evidence waits for actual blue marker pixels.
+MCP tests explicitly inspect the canonical ok/value envelope. Instrumentation has
+not replayed yet. Verified copies under packages/emulator-2:
+
+- app-debug.apk SHA-256 34fed03d6a3f6ac28a39239a4b9006d8c2e32bdc73ad0e1f3fc9f9b5c00b4126
+- app-debug-androidTest.apk SHA-256 3e7afbd84d575552cfd8005e464b86a8739b03ad0631e112f3d0231725866529
+Phone replay2: source80e7f7cd, same phone profile/serial and emulator-2 APKs.
+Twelve instrumentation tests ran: ten passed, two failed
+(phone-instrumentation-2.log,43.677s). Passing cases include the bounded first AVC
+input, padded78x50 RGB decode, movie deadline interruption before a later click,
+combined PNG/GIF/MP4 exports, private ready/extract and direct/generic MCP.
+Raw exports are preserved in phone-evidence-2 and phone-codec-evidence-2.
+
+One failure retained an absolute-href assertion despite the documented raw-href
+contract; the multiline fixture assertion is now corrected. The Stop failure
+reported VIEWPORT_CHANGED. Native screenshot inspection found the Compose test
+clock had not committed the approved pairing dialog or recording chrome before
+the test clicked Stop. That click drove pending layout and changed the viewport.
+Tests now wait for pairing-dialog removal and native recording semantics before
+status polling or Stop. The forensic screenshot is not accepted final UI evidence.
+No viewport guard was weakened. Both corrections await replay. The phone emulator
+was shut down normally, preserving data; tablet remains unbooted.
+
+Pending source regressions additionally cover screenshots-only maxDuration during
+a wait followed by an unexecuted click; same-document private target token
+retirement; semantic fill/type; ambiguous/disabled/covered targets; mixed HTTP,
+direct MCP and generic MCP artifact chunks; and generic MCP abort/recovery.
+A single private resolver namespace replaces per-run page properties: each action
+starts with a fresh no-token resolution and dispatches only its returned token,
+under existing serialized renderer retirement.
+
+Hosted Android CI41950362604 at28426edc failed testReleaseUnitTest:
+OpenAIEndpointServiceTest.cancelReturnsInferenceCancelled,176 tests/one failure.
+Debug JVM and shipping ARM64/x86_64 native graph tasks completed in that run;
+the required overall check failed. The eager coroutine can enter the transport
+before cancellation registration. A deterministic unconfined-transport regression
+and queued/cancelled-scope lifecycle cases are staged. The fix and public local
+endpoint cancel/retirement/recovery test still require execution. No CI rerun or
+successful final-revision claim is implied.
+Inference lifecycle checkpoint: the old-ordering deterministic case failed exactly
+expected1/actual0 at transport entry (4m4s); inference-old-ordering.log and XML
+are preserved independently of Gradle's reports. The lazy-register-before-start
+fix passed ktlintFormat plus focused Debug19/19 and Release19/19 tests in4m10s
+(inference-lifecycle-fixed.log). Cases include transport-entry cancellation,
+queued-before-start cancellation, already-cancelled scope and worker cleanup.
+The run used one worker, in-process Kotlin,2GiB heap/two logical processors,
+without native/package/emulator jobs. Public device cancellation/recovery remains
+pending; this result does not replace the failed hosted CI or final full checks.

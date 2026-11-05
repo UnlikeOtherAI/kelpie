@@ -32,7 +32,8 @@ final class Router: @unchecked Sendable {
         bypassRecordingGate: Bool = false,
         browserGatewayDispatch: Bool = false
     ) async -> (statusCode: Int, json: [String: Any]) {
-        if let owner = browserReferenceOwner, !browserGatewayDispatch {
+        let workflowAdmission = ScriptGatewayPolicy.independent(method: method, body: body)
+        if let owner = browserReferenceOwner, !browserGatewayDispatch, !workflowAdmission {
             guard owner.browserLease.begin() else {
                 return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
             }
@@ -44,12 +45,11 @@ final class Router: @unchecked Sendable {
             return (200, await browserControl(body))
         }
         let mutatingMethod = isBrowserMutation(method: method)
-        let workflowAdmission = method == "play-script" && body["version"] != nil
-        let workflowControl = ["get-script-status", "abort-script", "get-script-artifact"].contains(method)
+        let workflowControl = ScriptGatewayPolicy.controls.contains(method)
         if mutatingMethod, !workflowControl, let view = handlerContext?.webView, IOSRendererDeadline.isRetiring(view) {
             return (409, IOSWorkflowFailure("BUSY").response)
         }
-        let legacyMutation = !workflowAdmission && !workflowControl && !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
+        let legacyMutation = !workflowAdmission && !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
         if legacyMutation, browserLease.begin() == false {
             return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
         }
