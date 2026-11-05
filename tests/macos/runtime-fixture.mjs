@@ -12,7 +12,8 @@ export async function startFixture() {
   }
   const mode=url.pathname;
   const privacyMode=["/focus-password","/focus-autocomplete","/focus-url","/focus-delay","/input-autocomplete","/known-url"].includes(mode)?mode:"";
-  const title=mode==="/secret"||privacyMode?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):"Hosted Mac fixture";
+  const pacedMode=["/paced","/paced-blur","/paced-replace","/paced-sensitive"].includes(mode)?mode:"";
+  const title=mode==="/secret"||privacyMode||pacedMode==="/paced-sensitive"?canary+" | "+encodeURIComponent(canary)+" | "+new URLSearchParams({v:canary}).toString().slice(2):mode==="/paced"?"Paced A😀e fixture":"Hosted Mac fixture";
   const motion=mode==="/motion",bands=mode==="/bands",next=mode==="/next";
   const body=motion?'<button id="first" aria-label="First"></button><button id="second" aria-label="Second"></button>':
    bands?"":next?'<h1>Next native document</h1>':`
@@ -29,9 +30,9 @@ export async function startFixture() {
    <button id="moving">Moving</button><button id="start">Start motion</button>
    <section id="catalogue"><h3>Green tea</h3><h3>Black tea</h3></section>
    <button id="scroll-target">Scrolled target</button>`;
-  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)};const documentId=crypto.randomUUID();let sequence=0;
+  const script=`(()=>{const privacyMode=${JSON.stringify(privacyMode)},pacedMode=${JSON.stringify(pacedMode)};const documentId=crypto.randomUUID();let sequence=0;
   const send=(value,synchronous=false)=>{const body=JSON.stringify({
-   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight},
+   documentId,sequence:++sequence,path:location.pathname,time:performance.now(),...value,scrollX,scrollY,viewport:{width:innerWidth,height:innerHeight,clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,pixelRatio:devicePixelRatio},
    visual:{pageX:visualViewport.pageLeft,pageY:visualViewport.pageTop,width:visualViewport.width,height:visualViewport.height,scale:visualViewport.scale}});
    if(synchronous){const request=new XMLHttpRequest();request.open('POST','/events',false);request.setRequestHeader('content-type','application/json');request.send(body);return;}
    return fetch('/events',{method:'POST',headers:{'content-type':'application/json'},body}).catch(()=>{});};
@@ -42,6 +43,18 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
+  for(const id of ['entry','focus-privacy']){
+   const field=document.getElementById(id);
+   field?.addEventListener('focus',()=>{if(pacedMode)send({type:'paced-focus',target:id},true)});
+   field?.addEventListener('input',event=>{
+    if(!pacedMode)return;
+    const value=event.target,rect=value.getBoundingClientRect();
+    send({type:'paced-input',target:id,length:value.value.length,rect:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}},true);
+    if(id==='entry'&&pacedMode==='/paced-blur')value.blur();
+    if(id==='entry'&&pacedMode==='/paced-replace')value.replaceWith(value.cloneNode(true));
+    if(id==='focus-privacy'&&pacedMode==='/paced-sensitive')value.autocomplete='current-password';
+   });
+  }
   document.querySelector('#submit')?.addEventListener('pointerdown',()=>{if(privacyMode==='/known-url'){send({type:'known-mid-transition'},true);history.replaceState(null,'','/known-url-changed')}});
   document.querySelector('#submit')?.addEventListener('click',()=>{if(privacyMode==='/known-url')send({type:'known-final-click'},true)});
   document.querySelector('#replace')?.addEventListener('pointerdown',event=>{event.currentTarget.replaceChildren(document.createElement('span'))});

@@ -17,6 +17,18 @@ struct ScriptCaptureViewport: Equatable {
                 y: (css.y - visible.minY) * bounds.height / visible.height)
     }
 
+    #if DEBUG
+    func debugDifference(from other: Self) {
+        func flag(_ value: Bool) -> Int { value ? 1 : 0 }
+        let widths = String(format: "%.2f,%.2f", Double(visible.width), Double(other.visible.width))
+        let heights = String(format: "%.2f,%.2f", Double(visible.height), Double(other.visible.height))
+        let comparison = "bounds=\(flag(bounds == other.bounds)) layout=\(flag(layout == other.layout)) " +
+            "visible=\(flag(visible.size == other.visible.size)) scale=\(flag(scale == other.scale)) " +
+            "pixel=\(flag(pixelRatio == other.pixelRatio))"
+        print("[WorkflowViewport] \(comparison) widths=\(widths) heights=\(heights)")
+    }
+    #endif
+
     /// Legal scrolling/panning between frames does not change the recording canvas.
     func sameGeometry(as other: Self) -> Bool {
         bounds == other.bounds && layout == other.layout && visible.size == other.visible.size &&

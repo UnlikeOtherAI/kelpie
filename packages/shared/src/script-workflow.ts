@@ -107,6 +107,8 @@ const targetRequestBase = {
   token: z.string().min(1).max(128).optional(),
 };
 export const scriptTargetRequestSchema = z.union([
+  z.object({ ...targetRequestBase, token: z.string().min(1).max(128), proveNonInput: z.literal(true),
+    dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
   z.object({ ...targetRequestBase, token: z.string().min(1).max(128), postMutation: z.literal(true),
     dispatch: z.literal(false).optional(), observe: z.literal(false).optional() }).strict(),
   z.object({ ...targetRequestBase, dispatch: z.literal(true), observe: z.literal(false).optional() }).strict(),
