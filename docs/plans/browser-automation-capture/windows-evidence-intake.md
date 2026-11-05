@@ -355,3 +355,34 @@ owned-process retirement passed. The report SHA-256 is
 the fast-profile input and result SHA-256 is
 `63facb3535652e8dcfc3bfbc345dbd9ac3d33f7aae8f7ac09f2baa24cf541651`.
 Both runs used test revision `cc303fe271e6e1abda3c0b9c1d1f9600e0669907`.
+
+
+The normal completion-receipt candidate 5fc5f353 was built on Maxis with
+CEF and local LLM enabled. Its DLL SHA-256 is
+`be132690a0c8fff25decbfc5a3175d41f50254ca0683ff71d08f49adf9d78f35`.
+The focused capture-state and DevTools protocol tests passed. A separate
+Session 1 real HTTP/MCP safety session passed five selected checks: both
+navigation-marker formats, target replacement with recovery, MCP abort with
+recovery, and sensitive-target capture refusal. Public close exited normally,
+the readiness file was absent, and the owned PID, listener, task and Job
+processes retired. The 622-byte diagnostic report SHA-256 is
+`50c82ccc4d3a3503d553b34ef3f5c3ed5a3338202cc786f0c5c77748af7177fb`.
+These checks are not a cadence or release pass.
+
+The separate 736a0453 test-hook build forced a real navigation after screenshot
+completion and before the pinned viewport read. Its fixed checkpoint events
+were navigation, torn-frame drop and new-frame admission. An independently
+decoded ROI from the actual generic old screenshot was red [255,0,0], while
+the downloaded final action PNG ROI was blue [0,0,255]; a public recovery run
+passed. Public close, readiness cleanup and exact owned-process retirement
+also passed. The test-hook DLL SHA-256 is
+`f5b584165e32d9db4156a2f68249551601a48d19468e4b1ec713e07efe77b247`;
+it is not a normal candidate or release artifact. The 640-byte report
+SHA-256 is
+`c218711f48062a8e0f0c2a36632c7561bcf76ec101fe853fa19c6f378d98eb94`.
+The 6,545-byte old control PNG SHA-256 is
+`d07f014e9e127dad44d4fd3f0f102d84c71c1c3670ce07f6f601b36767cfe0ac`;
+the 1,391-byte final PNG SHA-256 is
+`3da13d45e7c01d5662e3a4738e1aefce0a49115c91f7d71eb6a302049eb1106b`.
+Actual replacement and shutdown at this checkpoint and matched normal-build
+cadence comparison remain open.
