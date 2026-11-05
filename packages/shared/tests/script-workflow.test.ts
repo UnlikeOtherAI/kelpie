@@ -58,6 +58,10 @@ describe("strict authored workflows", () => {
     const post = { target: { selector: "#edit" }, key: "private", token: "t1", postMutation: true };
     expect(scriptTargetRequestSchema.safeParse(post).success).toBe(true);
     expect(scriptTargetRequestSchema.safeParse({ ...post, token: undefined }).success).toBe(false);
+    const brand = { target: { selector: "#link" }, key: "private", token: "t1", proveNonInput: true };
+    expect(scriptTargetRequestSchema.safeParse(brand).success).toBe(true);
+    expect(scriptTargetRequestSchema.safeParse({ ...brand, token: undefined }).success).toBe(false);
+    expect(scriptTargetRequestSchema.safeParse({ ...brand, dispatch: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, dispatch: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, observe: true }).success).toBe(false);
     expect(scriptTargetRequestSchema.safeParse({ ...post, edit: { action: "fill", text: "x" } }).success).toBe(false);
