@@ -1,6 +1,8 @@
 #include "desktop_script_runtime.h"
 #include "kelpie/desktop_script_owner.h"
 #include "kelpie/browser_gateway_c_api.h"
+#include "kelpie/browser_schema.h"
+#include "kelpie/native_extension_schema.h"
 #include "kelpie/mcp_c_api.h"
 #include "kelpie/response_helpers.h"
 #include "desktop_input_planner.h"
@@ -59,12 +61,15 @@ void DesktopScriptHandler::Register() {
   impl_->router.Register("get-script-artifact", [this](const Json& body) {
     const auto owner = ScopedDesktopScriptOwner::Current();
     if (owner.empty() || !impl_->config.revalidate || !impl_->config.revalidate(owner) || !impl_->config.artifact) return ErrorResponse("SCRIPT_OWNER_REQUIRED", "Authenticated script owner is required");
+    Json arguments=body;
+    if(!ValidateBrowserJson(NativeExtensionInputSchema("get-script-artifact"),&arguments))
+      return ErrorResponse("INVALID_PARAMS","Artifact request does not match the canonical schema");
     {
       std::lock_guard lock(impl_->mutex);
-      if(impl_->running && owner==impl_->owner && body.value("runId",std::string())==impl_->run_id)
+      if(impl_->running && owner==impl_->owner && arguments.value("runId",std::string())==impl_->run_id)
         return ErrorResponse("ARTIFACT_NOT_READY","Run artifacts become available after terminal privacy checks");
     }
-    return impl_->config.artifact(body, owner);
+    return impl_->config.artifact(arguments, owner);
   });
 }
 double DesktopScriptHandler::Impl::Elapsed() const {

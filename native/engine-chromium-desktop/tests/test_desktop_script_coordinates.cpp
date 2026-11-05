@@ -4,9 +4,11 @@
 
 int main(){
   assert(kelpie::ScriptTargetInspectionUncertain(nullptr));
+  assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","STALE_TARGET"}}));
+  assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false}}));
   assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false}}));
   assert(!kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",true},{"error","TARGET_MOVED"}}));
-  assert(!kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"error","TARGET_NOT_FOUND"}}));
+  assert(!kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"sensitivityKnown",true},{"error","TARGET_NOT_FOUND"}}));
   nlohmann::json viewport={{"width",1042},{"height",662},{"visualViewport",{
     {"offsetLeft",0},{"offsetTop",0},{"width",1042},{"height",662},{"scale",1}}}};
   auto gutter=viewport;gutter["visualViewport"]["width"]=1027;

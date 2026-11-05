@@ -65,9 +65,10 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     if(output && target.is_object() && target.value("sensitive",false)) (*output)["sensitive"]=true;
     if(output && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
     if (!read.ok) return read;
-    if(ScriptTargetInspectionUncertain(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable classification");
+    if(!ScriptTargetInspectionExplicit(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
     if (!target.value("ok", false))
       return BrowserControlResult::Failure(target.value("error", std::string("TARGET_FAILED")), "Target preflight refused input");
+    if(ScriptTargetInspectionUncertain(target)) return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable classification");
     return BrowserControlResult::Success();
   };
   const auto send = [&](const std::string& method, const Json& params) -> BrowserControlResult {
@@ -143,6 +144,9 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
     native_keys=false;
     result = send("Input.insertText", {{"text", action.at("text")}});
     if (!result.ok) return fail(result);
+    // The trusted input handler may change sensitivity before returning.
+    result=inspect();
+    if(!result.ok) return fail(result);
   }
   if (output) { const bool sensitive=output->value("sensitive",false); *output = {{"sensitive",sensitive},{"trusted", true}, {"inputGuarantee", "trusted-coordinate"},
                          {"targetGuarantee", "rechecked-before-dispatch-with-async-gap"}}; }
