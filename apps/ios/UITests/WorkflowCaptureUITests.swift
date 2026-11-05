@@ -59,7 +59,7 @@ final class WorkflowCaptureUITests: XCTestCase {
             let target = viewport.exists && submit.exists ? submit.frame.intersection(viewport.frame) : .null
             let screen = app.screenshot()
             if !target.isNull, WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: target, app: app.frame) {
-                let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + NSStringFromCGRect(target))
+                let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + String(describing: target))
                 geometry.name = "Native marker target geometry"
                 geometry.lifetime = .keepAlways
                 add(geometry)
