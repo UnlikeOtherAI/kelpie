@@ -3,7 +3,7 @@ import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
-import {Client,Failure,requireTrue,listeners,waitFor} from "../../tests/macos/runtime-client.mjs";
+import {Client,Failure,requireTrue,listeners,waitFor,delay} from "../../tests/macos/runtime-client.mjs";
 import {startFixture} from "../../tests/macos/runtime-fixture.mjs";
 import {publicCLI,inference} from "../../tests/macos/runtime-interfaces.mjs";
 import {runEngine} from "../../tests/macos/runtime-cases.mjs";
@@ -39,6 +39,10 @@ finally{
  try{const pgid=Number(execFileSync("/bin/ps",["-o","pgid=","-p",String(child.pid)],{encoding:"utf8"}).trim());
   if(pgid===child.pid)process.kill(-pgid,"SIGTERM");else report.cleanup="OWNED_PROCESS_GROUP_MISMATCH";
  }catch{report.cleanup="OWNED_CHILD_ALREADY_EXITED";}
+ const end=Date.now()+10000;
+ while(Date.now()<end&&(listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
+ if(listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_LISTENER_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
+ else report.ownedListenersReleased=true;
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
  report.appLogBytes=appLogBytes;
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));

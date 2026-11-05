@@ -21,7 +21,7 @@ export class Client {
  async request(route,body={},options={}){
   const port=options.reveal?8421:28420;this.pin(port);
   const headers={"content-type":"application/json",accept:"application/json, text/event-stream"};
-  if(options.token??this.token)headers.authorization="Bearer "+(options.token??this.token);
+  if(!options.reveal&&(options.token??this.token))headers.authorization="Bearer "+(options.token??this.token);
   const response=await fetch("http://127.0.0.1:"+port+route,{method:options.method??"POST",headers,
    body:options.method==="GET"?undefined:JSON.stringify(body),signal:AbortSignal.timeout(options.timeout??365000),redirect:"error"});
   const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));}
