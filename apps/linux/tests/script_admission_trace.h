@@ -17,7 +17,7 @@ inline void WriteAdmissionTrace(const nlohmann::json& row) {
   if (!row.is_object() || row.size()>16) throw std::runtime_error("CAPTURE_TEST_OBSERVATION_FAILED");
   static const std::set<std::string> allowed={"phase","elapsedMs","markerStartMs","markerDurationMs",
     "markerAgeMs","hasMarker","previousMovieMs","due","committedBefore","committedAfter",
-    "actionIndex","stepPng","gifFrames","videoFrames","gifDropped","videoDropped"};
+    "actionIndex","stepPng","admittedIndex","gifFrames","videoFrames","gifDropped","videoDropped"};
   for (const auto& item : row.items()) {
     if (!allowed.contains(item.key())) throw std::runtime_error("CAPTURE_TEST_OBSERVATION_FAILED");
     if (!item.value().is_number() || !std::isfinite(item.value().get<double>()))
