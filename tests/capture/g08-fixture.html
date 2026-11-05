@@ -1,0 +1,23 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>G08 blank animation fixture</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}
+button{position:absolute;top:50%;transform:translate(-50%,-50%);width:80px;height:60px;
+ border:0;padding:0;background:#fff;color:#fff;outline:none;appearance:none;
+ -webkit-tap-highlight-color:transparent}
+#start{left:25%}#finish{left:75%}
+</style>
+<button id="start" aria-label="G08 Start"></button>
+<button id="finish" aria-label="G08 Finish"></button>
+<script>
+const documentId=String(Date.now())+"-"+Math.random().toString(36).slice(2);
+for(const id of ["start","finish"])document.getElementById(id).addEventListener("click",event=>{
+ const box=event.currentTarget.getBoundingClientRect(),view=visualViewport;
+ const fact={documentId,target:id,trusted:event.isTrusted,timeMs:performance.now(),
+   center:{x:box.x+box.width/2,y:box.y+box.height/2},
+   viewport:{width:innerWidth,height:innerHeight},
+   visualViewport:view?{offsetLeft:view.offsetLeft,offsetTop:view.offsetTop,width:view.width,height:view.height,scale:view.scale}:null};
+ void fetch("/events",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(fact)}).catch(()=>{});
+});
+</script>
