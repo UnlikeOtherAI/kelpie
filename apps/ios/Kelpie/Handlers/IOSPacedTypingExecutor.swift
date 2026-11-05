@@ -1,26 +1,32 @@
+import CoreFoundation
 import Foundation
 
 /// Sequences already-planned scalars; each mutation callback owns the renderer fences.
 @MainActor
 enum IOSPacedTypingExecutor {
+    static func jsonBoolean(_ value: Any?) -> Bool? {
+        guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+
     static func isAcknowledgement(_ body: [String: Any], token: String?) -> Bool {
         guard let token, !token.isEmpty else { return false }
-        return body["ok"] as? Bool == true && (body["error"] == nil || body["error"] is NSNull) &&
-            body["sensitive"] is Bool && body["sensitivityKnown"] is Bool &&
-            body["mayHaveCompleted"] as? Bool == true && body["token"] as? String == token &&
+        return jsonBoolean(body["ok"]) == true && (body["error"] == nil || body["error"] is NSNull) &&
+            jsonBoolean(body["sensitive"]) != nil && jsonBoolean(body["sensitivityKnown"]) != nil &&
+            jsonBoolean(body["mayHaveCompleted"]) == true && body["token"] as? String == token &&
             body["inputGuarantee"] as? String == "synthetic-coordinate"
     }
 
     static func needsPrivacyLatch(_ body: [String: Any], token: String?) -> Bool {
         if isAcknowledgement(body, token: token) { return false }
-        let refusedBeforeInput = body["ok"] as? Bool == false && body["mayHaveCompleted"] as? Bool == false &&
+        let refusedBeforeInput = jsonBoolean(body["ok"]) == false && jsonBoolean(body["mayHaveCompleted"]) == false &&
             body["error"] is String && hasKnownSensitivity(body)
         return !refusedBeforeInput
     }
 
     static func hasKnownSensitivity(_ body: [String: Any]) -> Bool {
-        body["sensitive"] as? Bool == true ||
-            (body["sensitive"] as? Bool == false && body["sensitivityKnown"] as? Bool == true)
+        jsonBoolean(body["sensitive"]) == true ||
+            (jsonBoolean(body["sensitive"]) == false && jsonBoolean(body["sensitivityKnown"]) == true)
     }
 
     static func requireKnownSensitivity(_ known: Bool?, hasContinuation: Bool) throws {

@@ -267,7 +267,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
-    func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() {
+    func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() throws {
         let valid: Body = ["ok": true, "sensitive": false, "sensitivityKnown": true,
                            "mayHaveCompleted": true, "token": "t1", "inputGuarantee": "synthetic-coordinate"]
         XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t1"))
@@ -296,6 +296,17 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         var wrongGuarantee = valid
         wrongGuarantee["inputGuarantee"] = "trusted"
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(wrongGuarantee, token: "t1"))
+        let malformedValues = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data("[1,0,\"true\",null]".utf8)) as? [Any]
+        )
+        for field in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted"] {
+            for value in malformedValues {
+                var malformed = valid
+                malformed[field] = value
+                XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(malformed, token: "t1"))
+                XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(malformed, token: "t1"))
+            }
+        }
         for key in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted", "token", "inputGuarantee"] {
             var malformed = valid
             malformed.removeValue(forKey: key)

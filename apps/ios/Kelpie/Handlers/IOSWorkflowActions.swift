@@ -120,10 +120,10 @@ final class IOSWorkflowActions {
     }
 
     private func requireOK(_ result: Body) throws {
-        guard result["ok"] as? Bool == true else {
+        guard IOSPacedTypingExecutor.jsonBoolean(result["ok"]) == true else {
             // The isolated-world fixed target function supplies these diagnostic enums.
             throw IOSWorkflowFailure(result["error"] as? String ?? "TARGET_FAILED",
-                                     mayHaveCompleted: result["mayHaveCompleted"] as? Bool == true)
+                                     mayHaveCompleted: IOSPacedTypingExecutor.jsonBoolean(result["mayHaveCompleted"]) == true)
         }
     }
 
@@ -152,7 +152,7 @@ final class IOSWorkflowActions {
                 target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
             )
             try requireOK(preflight)
-            guard preflight["editable"] as? Bool == true else { throw IOSWorkflowFailure("TARGET_NOT_EDITABLE") }
+            guard IOSPacedTypingExecutor.jsonBoolean(preflight["editable"]) == true else { throw IOSWorkflowFailure("TARGET_NOT_EDITABLE") }
             try await check()
             guard tab.document == document, viewport == (try await tab.viewport()) else {
                 throw IOSWorkflowFailure("STALE_TARGET")
@@ -242,8 +242,9 @@ final class IOSWorkflowActions {
     private func requireMutationAcknowledgement(
         _ result: Body, token: String, missing: () -> Void
     ) throws {
-        if result["ok"] as? Bool == false {
-            guard result["error"] is String, result["mayHaveCompleted"] is Bool else {
+        if IOSPacedTypingExecutor.jsonBoolean(result["ok"]) == false {
+            guard result["error"] is String,
+                  IOSPacedTypingExecutor.jsonBoolean(result["mayHaveCompleted"]) != nil else {
                 missing()
                 throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
             }
@@ -382,7 +383,7 @@ final class IOSWorkflowActions {
             }
         }
         #endif
-        guard result["sensitive"] as? Bool == true else { return }
+        guard IOSPacedTypingExecutor.jsonBoolean(result["sensitive"]) == true else { return }
         protectEditPrivacy(text: text)
     }
 
