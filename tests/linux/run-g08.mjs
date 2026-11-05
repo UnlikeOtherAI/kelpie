@@ -15,7 +15,7 @@ const ready = JSON.parse(await readFile(readinessFile, "utf8"));
 assert.equal(ready.controlMode, "loopback");
 const source = process.env.KELPIE_CAPTURE_SOURCE;
 const binarySHA256 = createHash("sha256").update(await readFile(binaryFile)).digest("hex");
-const report = { source, binarySHA256, runtime, eventsDropped: 0, cases: [] };
+const report = { source, testSource: process.env.KELPIE_TEST_REVISION ?? source, binarySHA256, runtime, eventsDropped: 0, cases: [] };
 const api = async (method, body = {}) => {
   const response = await fetch(`http://127.0.0.1:${ready.port}/v1/${method}`, {
     method: "POST", headers: { authorization: `Bearer ${ready.token}`, "content-type": "application/json" },
