@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 /// A first frame is admitted only after the complete renderer viewport settles.
 @MainActor
@@ -31,13 +31,14 @@ struct IOSCaptureViewportStability {
     static func matchesInsets(
         _ viewport: IOSWorkflowTab.Viewport, top: CGFloat, bottom: CGFloat, left: CGFloat = 0, right: CGFloat = 0
     ) -> Bool {
-        let native = viewport.bounds
-        guard native.width > 0, native.height > 0, viewport.visible.width > 0,
-              [top, bottom, left, right].allSatisfy({ $0.isFinite && $0 >= 0 }),
-              top + bottom < native.height, left + right < native.width else { return false }
-        let ratio = viewport.visible.width / (native.width - left - right)
-        let expectedHeight = (native.height - top - bottom) * ratio
-        return expectedHeight.isFinite && abs(viewport.visible.height - expectedHeight) <= max(1, ratio)
+        guard top.isFinite, bottom.isFinite, top >= 0, bottom >= 0, top + bottom < viewport.bounds.height,
+              let content = IOSWorkflowTab.contentRect(
+                  bounds: viewport.bounds,
+                  insets: UIEdgeInsets(top: top, left: left, bottom: bottom, right: right),
+                  visible: viewport.visible.size
+              ) else { return false }
+        let pixelAllowance = content.width / viewport.visible.width
+        return content.maxY >= viewport.bounds.height - bottom - pixelAllowance
     }
 
     mutating func observe(_ viewport: IOSWorkflowTab.Viewport, at time: TimeInterval, admissible: Bool = true) -> Bool {
