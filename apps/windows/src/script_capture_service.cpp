@@ -7,9 +7,23 @@
 #include <set>
 #include <deque>
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <atomic>
+#include <windows.h>
 
 namespace kelpie::windows {
 namespace {
+void PresentationQueueTiming(double elapsed, double queue_ms, bool latched) {
+  char enabled[2]{};
+  if (GetEnvironmentVariableA("KELPIE_PRESENTATION_TIMING_DIAGNOSTICS",enabled,2)!=1 || enabled[0]!='1') return;
+  if (!latched && queue_ms < 10.0) return;
+  static std::atomic<unsigned> count{0};
+  const auto index=count.fetch_add(1);
+  if (index==800) std::fprintf(stderr,"KELPIE_PRESENTATION_QUEUE_TRUNCATED\n");
+  if (index>=800) return;
+  std::fprintf(stderr,"KELPIE_PRESENTATION_QUEUE %.3f %.3f %d\n",elapsed,queue_ms,latched ? 1 : 0);
+}
 class Capture final : public DesktopScriptCapture {
  public:
   Capture(std::shared_ptr<WindowsScriptService> service,const Json& options,std::string run,std::string owner)
@@ -122,7 +136,11 @@ void WindowsScriptService::Configure(DesktopApp::Config& config) {
 }
 void WindowsScriptService::Show(const Json& presentation,std::function<void()> stop) {
   auto self=shared_from_this();
-  if(!marshal_([self,presentation,stop=std::move(stop)]() mutable {
+  const bool trace=PresentationTimingEnabled();
+  const auto queued=trace ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+  if(!marshal_([self,presentation,queued,trace,stop=std::move(stop)]() mutable {
+    const auto queue_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-queued).count();
+    PresentationQueueTiming(presentation.value("elapsedMs",0.0),queue_ms,presentation.value("captureLatched",false));
     try {
     if(!self->overlay_) self->overlay_=std::make_unique<ScriptNativeOverlay>(self->viewport_,self->owner_);
     auto shown=presentation;

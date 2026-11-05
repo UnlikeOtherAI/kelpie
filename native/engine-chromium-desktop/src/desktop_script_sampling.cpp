@@ -5,9 +5,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <atomic>
 
 namespace kelpie {
 namespace {
+void PresentationTiming(double elapsed, double latch_ms) {
+  const char* enabled=std::getenv("KELPIE_PRESENTATION_TIMING_DIAGNOSTICS");
+  if (!enabled || std::strcmp(enabled,"1")!=0) return;
+  static std::atomic<unsigned> count{0};
+  const auto index=count.fetch_add(1);
+  if (index==800) std::fprintf(stderr,"KELPIE_PRESENTATION_LATCH_TRUNCATED\n");
+  if (index>=800) return;
+  std::fprintf(stderr,"KELPIE_PRESENTATION_LATCH %.3f %.3f\n",elapsed,latch_ms);
+}
 void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlohmann::json& after) {
   const char* enabled=std::getenv("KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS");
   if (!enabled || std::strcmp(enabled,"1")!=0) return;
@@ -77,6 +87,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
       }
       previous_viewport=viewport; previous_document=before.tab.document_version;
+      const auto latch_start=Clock::now();
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
       {
@@ -117,6 +128,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
       { std::lock_guard lock(mutex); presentation_latched=false; }
+      PresentationTiming(frame_time,std::chrono::duration<double,std::milli>(Clock::now()-latch_start).count());
       Present();
       { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
       if (step >= 0) {
