@@ -21,6 +21,7 @@ struct ToolRuntimeProfile {
   std::vector<std::string> engines;
   bool requires_ui = true;
   bool allowed_headless = false;
+  std::string runtime_mode = "windowed";
 };
 
 struct ToolAvailability {

@@ -32,6 +32,8 @@ class DesktopMcpServer {
     // capture unchanged; a limit retakes an oversized capture as JPEG and fails
     // SCREENSHOT_TOO_LARGE when no quality fits (see kelpie/screenshot_fit.h).
     std::size_t screenshot_base64_limit = 0;
+    // Trusted native host mode. Existing callers remain windowed.
+    std::string runtime_mode = "windowed";
   };
 
   DesktopMcpServer();

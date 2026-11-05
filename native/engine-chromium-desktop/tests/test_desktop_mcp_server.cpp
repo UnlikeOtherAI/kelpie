@@ -11,7 +11,41 @@
 #include "kelpie/desktop_router.h"
 #include "kelpie/mcp_registry.h"
 
+void TestTrustedWorkflowModes() {
+  using Json=nlohmann::json;
+  const kelpie::McpRegistry registry;
+  for(const auto& mode:{"windowed","offscreen","forged"}) {
+    kelpie::DesktopRouter router;
+    int calls=0;
+    router.Register("get-script-status",[&](const Json&) { ++calls; return Json{{"success",true}}; });
+    kelpie::DesktopMcpServer server; server.SetRouter(&router); server.SetRegistry(&registry);
+    kelpie::DesktopMcpServer::Config config;
+    config.platform=kelpie::Platform::kLinux; config.engine="chromium"; config.runtime_mode=mode;
+    for(bool generic:{false,true}) {
+      const auto rpc=[&](Json body) {
+        Json arguments=generic?Json{{"name","kelpie_get_script_status"},{"arguments",body}}:body;
+        return Json{{"jsonrpc","2.0"},{"id",1},{"method","tools/call"},
+          {"params",{{"name",generic?"kelpie_extension":"kelpie_get_script_status"},{"arguments",arguments}}}};
+      };
+      const auto result=server.HandleRequest(rpc(Json::object()),config);
+      if(std::string(mode)=="forged") { assert(result["error"]["code"]==-32601); continue; }
+      assert(result["result"]["isError"]==false);
+      const auto forged=server.HandleRequest(rpc({{"runtime_mode","offscreen"}}),config);
+      assert(forged["error"]["code"]==-32602);
+    }
+    assert(calls==(std::string(mode)=="forged"?0:2));
+  }
+  // A catalogue profile never invents routes in a stub/no-CEF host.
+  kelpie::DesktopRouter absent; kelpie::DesktopMcpServer server;
+  server.SetRouter(&absent); server.SetRegistry(&registry);
+  kelpie::DesktopMcpServer::Config config; config.runtime_mode="offscreen";
+  const auto result=server.HandleRequest({{"jsonrpc","2.0"},{"id",1},{"method","tools/call"},
+    {"params",{{"name","kelpie_get_script_status"},{"arguments",Json::object()}}}},config);
+  assert(result["error"]["code"]==-32601);
+}
+
 int main() {
+  TestTrustedWorkflowModes();
   kelpie::DesktopRouter router;
   // This is the Windows desktop callable catalogue. Keeping the endpoint list
   // here makes registry/handler drift fail tools/list instead of advertising a placeholder.
