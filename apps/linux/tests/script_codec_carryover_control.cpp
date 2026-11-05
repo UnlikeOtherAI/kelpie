@@ -25,7 +25,7 @@ int main(int argc,char** argv) {
       const auto name=std::string(timing ? "replay-" : "original-")+(history ? "history" : "clear");
       const auto dir=root/name;
       if (!std::filesystem::create_directory(dir)) return 4;
-      auto encoder=ScriptMediaEncoder::Create(dir,{"mp4"},15,67108864);
+      auto encoder=ScriptMediaEncoder::Create(dir,{"gif","mp4"},15,16777216);
       for (std::size_t i=0;i<pts[timing].size();++i) {
         const double elapsed=pts[timing][i]*1000.0;
         ScriptFrame frame{1000,702,4000,elapsed,std::vector<std::uint8_t>(1000*702*4,255)};
@@ -42,12 +42,18 @@ int main(int argc,char** argv) {
           if (!raw) return 5;
         }
         if (!encoder->AddFrame(frame)) return 6;
+        if (i<6 && !encoder->WriteStepPNG(frame,dir/("step-"+std::to_string(i)+".png"))) return 9;
       }
       const auto outputs=encoder->Finish(pts[timing].back()*1000.0+125.0);
-      if (outputs.size()!=1 || outputs[0].mime_type!="video/mp4" ||
-          outputs[0].frame_count!=15 || outputs[0].dropped_frames!=0) return 7;
-      std::cout<<name<<" "<<outputs[0].path<<" "<<outputs[0].frame_count<<" "
-               <<outputs[0].dropped_frames<<"\n";
+      if (outputs.size()!=2) return 7;
+      bool gif=false,video=false;
+      for (const auto& output : outputs) {
+        if (output.frame_count!=15 || output.dropped_frames!=0) return 7;
+        gif |= output.mime_type=="image/gif"; video |= output.mime_type=="video/mp4";
+        std::cout<<name<<" "<<output.mime_type<<" "<<output.path<<" "<<output.frame_count<<" "
+                 <<output.dropped_frames<<"\n";
+      }
+      if (!gif || !video) return 7;
     }
   } catch (const std::exception& error) { std::cerr<<error.what()<<"\n";return 8; }
 }
