@@ -14,7 +14,7 @@ class ScriptNavigationGuardTest {
         var guards = 0
         val error =
             runCatching {
-                recheckNavigationGuard(
+                recheckNavigationGuard<Unit>(
                     stopRequested = { true },
                     guard = {
                         guards++
@@ -36,7 +36,7 @@ class ScriptNavigationGuardTest {
     fun rejectedCallbackPreservesRevocationAndUnrelatedFailureIsNotRechecked() = runBlocking {
         val revoked =
             runCatching {
-                recheckNavigationGuard(
+                recheckNavigationGuard<Unit>(
                     stopRequested = { true },
                     guard = { throw ScriptFailure("SCRIPT_AUTHORIZATION_REVOKED", true) },
                     operation = { throw WebViewGuardRejected() },
@@ -47,7 +47,7 @@ class ScriptNavigationGuardTest {
         var unstoppedGuards = 0
         val unstopped =
             runCatching {
-                recheckNavigationGuard(
+                recheckNavigationGuard<Unit>(
                     stopRequested = { false },
                     guard = { unstoppedGuards++ },
                     operation = { throw rejected },
@@ -59,7 +59,7 @@ class ScriptNavigationGuardTest {
         var guards = 0
         val actual =
             runCatching {
-                recheckNavigationGuard(
+                recheckNavigationGuard<Unit>(
                     stopRequested = { true },
                     guard = { guards++ },
                     operation = { throw original },
