@@ -46,3 +46,34 @@ local Minis test mirror at exact086d6070 for core/stub checks only. Existing VS1
 CMake4 toolchain was found; initial configure hit a quoted-policy-flag issue,
 not a source failure. Corrected reruns were blocked before child creation by
 fresh local load. Later fresh guards permitted configure/build at CPU29/49% and41/50%, with more than22GiB available. Exact086d noCEF/noLLM four-target build succeeded; CTest4/4 passed2.13s at CPU53/33% free22,993,996KiB. See runtime-profiles.md for exact commands and scope. No shipping native runtime acceptance follows from this stub check.
+
+## Later coordinator snapshot — 2026-11-05
+
+The coordinator identifies integration revision `4592d4a4` as the current
+snapshot for this supplement. The rows below update the working status; the
+older rows and their failures remain historical evidence at their own revisions.
+No row grants a whole-platform or 432-cell pass.
+
+- **Windows:** all four C/S GIF/MP4 G08 exports passed on the reported
+  `5877` runtime with the `775384d7` oracle. Final native WGC and
+  start/stop verification remain open.
+- **Linux:** the reported pump candidate passed 36 native checks and its
+  supplements. The coordinator viewed and hashed the `0d3d` Wayland After
+  image (`e538...`; receipt `0b1579...`): a 1280×900 native window with
+  the overlay and Stop visible. RPM install and complete G08 evidence remain
+  open. The marker/pointer overlap controls do not justify a blanket pixel
+  tolerance; preserve the earlier GIF and MP4 failures.
+- **Mac:** full runtime run `42006708868` remains a gate; WK and CEF need
+  separately reviewed outcomes.
+- **iOS:** diagnostic run `42006716721` remains a gate; iPhone and iPad
+  need separately reviewed outcomes.
+- **Android:** full run `42006190219`, API 28 behavior and native scene proof
+  remain gates; earlier partial phone/tablet results are not full acceptance.
+- **Shared and delivery:** five persistent-token CLI tests timed out in the
+  full run and again in a serial three-file retry. Exact-case investigation is
+  pending. Final component versions, the single PR, required checks, release
+  publication and installed-release verification remain open.
+
+Run identifiers identify evidence to inspect, not a claim that the run passed.
+The coordinator must reconcile newer results and exact artifact hashes before
+closing any requirement.
