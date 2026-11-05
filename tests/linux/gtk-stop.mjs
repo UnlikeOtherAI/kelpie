@@ -16,9 +16,9 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
   const isolated = Boolean(captureShown);
   const privateAction = isolated && env.KELPIE_PRIVATE_ATSPI_ACTION === "1";
   const fixture = await startCaptureFixture();
-  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated && !privateAction ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
+  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: env.KELPIE_GTK_DETACHED === "1" ? "PNG-only completion with isolated compositor capture" : isolated && !privateAction ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
     display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim",
-    pointerDuration: env.KELPIE_GTK_DEFAULT_POINTER === "1" ? "omitted" : 300, artifacts: [] };
+    pointerDuration: env.KELPIE_GTK_DETACHED === "1" ? "disabled" : env.KELPIE_GTK_DEFAULT_POINTER === "1" ? "omitted" : 300, artifacts: [] };
   let pending, timeline;
   const api = async (method, body = {}) => {
     const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
