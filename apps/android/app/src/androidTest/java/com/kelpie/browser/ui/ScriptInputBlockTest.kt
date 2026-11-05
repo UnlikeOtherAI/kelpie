@@ -44,19 +44,19 @@ class ScriptInputBlockTest {
         ui.runOnUiThread {
             ui.activity.setContent {
                 Column {
-                Box(Modifier.size(100.dp).scriptInputBlock(active.value)) {
-                    Box(
-                        Modifier
-                            .size(100.dp)
-                            .focusRequester(requester)
-                            .onKeyEvent {
-                                keyEvents++
-                                true
-                            }.focusable()
-                            .clickable { chromeClicks++ },
-                    ) { Text("Browser control") }
-                }
-                Box(Modifier.size(100.dp).clickable { stopClicks++ }) { Text("Stop") }
+                    Box(Modifier.size(100.dp).scriptInputBlock(active.value)) {
+                        Box(
+                            Modifier
+                                .size(100.dp)
+                                .focusRequester(requester)
+                                .onKeyEvent {
+                                    keyEvents++
+                                    true
+                                }.focusable()
+                                .clickable { chromeClicks++ },
+                        ) { Text("Browser control") }
+                    }
+                    Box(Modifier.size(100.dp).clickable { stopClicks++ }) { Text("Stop") }
                 }
             }
         }
