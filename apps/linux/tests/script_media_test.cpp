@@ -4,6 +4,7 @@
 #include "script_gstreamer.h"
 #include "kelpie/base64.h"
 #include <gif_lib.h>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
@@ -91,10 +92,52 @@ void HeldMarker() {
   DrawScriptOverlay(frame, shown);
   assert(frame.bgra[center] == 255 && frame.bgra[center + 2] == 255);
 }
+
+void VisualViewportPixels() {
+  const auto blank = [] { return ScriptFrame{200, 200, 800, 0, std::vector<std::uint8_t>(200 * 200 * 4, 255)}; };
+  const auto bounds = [](const ScriptFrame& frame, int x, int y, int diameter) {
+    int left = frame.width, right = -1, top = frame.height, bottom = -1;
+    for (int row = 0; row < frame.height; ++row) for (int column = 0; column < frame.width; ++column) {
+      const auto* pixel = frame.bgra.data() + (row * frame.width + column) * 4;
+      if (pixel[2] > 200 && pixel[1] < 150 && pixel[0] < 150) {
+        left = std::min(left, column); right = std::max(right, column);
+        top = std::min(top, row); bottom = std::max(bottom, row);
+      }
+    }
+    assert(right > left && bottom > top);
+    assert(std::abs((left + right) / 2.0 - x) <= 1 && std::abs((top + bottom) / 2.0 - y) <= 1);
+    assert(std::abs(right - left + 1 - diameter) <= 2 && std::abs(bottom - top + 1 - diameter) <= 2);
+  };
+  nlohmann::json shown{{"viewportWidth", 100}, {"viewportHeight", 100}, {"elapsedMs", 0},
+      {"marker", {{"x", 25}, {"y", 25}, {"radius", 10}, {"color", "#FF0000"},
+          {"startedMs", 0}, {"durationMs", 700}, {"wobble", false}, {"fade", false}}}};
+  auto baseline = blank(); DrawScriptOverlay(baseline, shown); bounds(baseline, 50, 50, 40);
+  shown["visualViewport"] = {{"offsetLeft", 10}, {"offsetTop", 5}, {"width", 50}, {"height", 50}, {"scale", 2}};
+  auto zoomed = blank(); DrawScriptOverlay(zoomed, shown); bounds(zoomed, 60, 80, 80);
+  shown["visualViewport"] = {{"offsetLeft", 0}, {"offsetTop", 0}, {"width", 90}, {"height", 90}, {"scale", 1}};
+  auto gutter = blank(); DrawScriptOverlay(gutter, shown); assert(gutter.bgra == baseline.bgra);
+  shown.erase("marker");
+  shown["commentary"] = {{"text", "Native capture"}, {"position", "top"}, {"startedMs", 0}, {"durationMs", 1000}};
+  auto note = blank(); DrawScriptOverlay(note, shown);
+  shown["visualViewport"] = {{"offsetLeft", 10}, {"offsetTop", 5}, {"width", 50}, {"height", 50}, {"scale", 2}};
+  auto panned_note = blank(); DrawScriptOverlay(panned_note, shown); assert(note.bgra == panned_note.bgra);
+  shown["visualViewport"]["scale"] = 0;
+  bool refused = false;
+  try { DrawScriptOverlay(panned_note, shown); }
+  catch (const std::runtime_error& error) { refused = std::string(error.what()) == "CAPTURE_VIEWPORT_CHANGED"; }
+  assert(refused);
+}
+
 void PNG() {
   auto frame = Frame(0);
   const auto png = EncodeScriptPNG(frame);
-  auto scaled = DecodeScriptFrame(kelpie::Base64Encode(png), 32, 10);
+  ScriptFrameSourceSize source;
+  auto scaled = DecodeScriptFrame(kelpie::Base64Encode(png), 32, 10, &source);
+  assert(source.width == 64 && source.height == 48);
+  const auto alternate_png = EncodeScriptPNG(Frame(0, 65, 49));
+  auto alternate = DecodeScriptFrame(kelpie::Base64Encode(alternate_png), 32, 10, &source);
+  assert(source.width == 65 && source.height == 49);
+  assert(alternate.width == scaled.width && alternate.height == scaled.height);
   assert(scaled.width == 32 && scaled.height == 24 && scaled.elapsed_ms == 10);
   const auto center = (scaled.height / 2 * scaled.width + scaled.width / 2) * 4;
   assert(scaled.bgra[center + 2] > 200 && scaled.bgra[center] < 120);
@@ -106,7 +149,7 @@ void PNG() {
 }
 }
 int main() {
-  PNG(); HeldMarker();
+  PNG(); HeldMarker(); VisualViewportPixels();
   const auto directory = CreatePrivateCaptureDirectory();
   const auto info = media::ScriptGstRuntimeInfo();
   auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 10, 1048576);

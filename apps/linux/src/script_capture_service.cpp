@@ -34,7 +34,11 @@ class Capture final : public DesktopScriptCapture {
     std::filesystem::remove(directory_, ignored); // Preserve unrelated collision files.
   }
   DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
-    auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed);
+    ScriptFrameSourceSize source_size;
+    auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed, &source_size);
+    if (source_size_.width && (source_size_.width != source_size.width || source_size_.height != source_size.height))
+      throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+    source_size_ = source_size;
     if (width_ && (width_ != frame.width || height_ != frame.height)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_ = frame.width; height_ = frame.height; last_elapsed_ = elapsed;
     DrawScriptOverlay(frame, shown);
@@ -113,6 +117,7 @@ class Capture final : public DesktopScriptCapture {
   std::unique_ptr<ScriptMediaEncoder> encoder_;
   std::set<std::filesystem::path> retained_;
   std::map<std::filesystem::path, CaptureFileIdentity> owned_;
+  ScriptFrameSourceSize source_size_;
   int width_ = 0, height_ = 0;
   double last_elapsed_ = 0, last_movie_frame_ = -1;
   std::deque<DesktopScriptFrameAdmission> movie_markers_;

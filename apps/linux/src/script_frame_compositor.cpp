@@ -42,7 +42,8 @@ std::uint32_t Word(const std::uint8_t* p) {
   return (std::uint32_t(p[0]) << 24) | (std::uint32_t(p[1]) << 16) | (std::uint32_t(p[2]) << 8) | p[3];
 }
 }
-ScriptFrame DecodeScriptFrame(const std::string& encoded, int max_width, double elapsed_ms) {
+ScriptFrame DecodeScriptFrame(const std::string& encoded, int max_width, double elapsed_ms,
+                              ScriptFrameSourceSize* source_size) {
   if (encoded.empty() || encoded.size() > 67108864 || encoded.size() % 4 || max_width < 2 || max_width > 4096 ||
       !std::isfinite(elapsed_ms)) throw std::runtime_error("CAPTURE_DECODE_FAILED");
   std::vector<std::uint8_t> bytes(encoded.size() / 4 * 3);
@@ -64,6 +65,7 @@ ScriptFrame DecodeScriptFrame(const std::string& encoded, int max_width, double 
   if (cairo_surface_status(source.get()) != CAIRO_STATUS_SUCCESS ||
       cairo_image_surface_get_width(source.get()) != int(width) || cairo_image_surface_get_height(source.get()) != int(height))
     throw std::runtime_error("CAPTURE_DECODE_FAILED");
+  if (source_size) *source_size = {int(width), int(height)};
   const double scale = std::min({1.0, double(max_width) / width, 1920.0 / height});
   if (width * scale < 2 || height * scale < 2) throw std::runtime_error("CAPTURE_VIEWPORT_UNSUPPORTED");
   ScriptFrame frame;
@@ -80,10 +82,28 @@ ScriptFrame DecodeScriptFrame(const std::string& encoded, int max_width, double 
 }
 void DrawScriptOverlay(ScriptFrame& frame, const nlohmann::json& shown) {
   auto surface = FrameSurface(frame); Context cr(cairo_create(surface.get()), cairo_destroy);
-  const double width = std::max(1.0, shown.value("viewportWidth", double(frame.width)));
-  const double height = std::max(1.0, shown.value("viewportHeight", double(frame.height)));
+  const double width = shown.value("viewportWidth", double(frame.width));
+  const double height = shown.value("viewportHeight", double(frame.height));
+  if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0)
+    throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
   cairo_scale(cr.get(), frame.width / width, frame.height / height);
   const double elapsed = shown.value("elapsedMs", frame.elapsed_ms);
+  const auto view = shown.value("visualViewport", nlohmann::json::object());
+  const double visual_scale = view.value("scale", 1.0);
+  const double offset_x = view.value("offsetLeft", 0.0), offset_y = view.value("offsetTop", 0.0);
+  if (!std::isfinite(visual_scale) || visual_scale <= 0 || !std::isfinite(offset_x) || !std::isfinite(offset_y) ||
+      !std::isfinite(frame.width / width * visual_scale) || !std::isfinite(frame.height / height * visual_scale))
+    throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+  if (shown.contains("visualViewport"))
+    for (const auto* field : {"width", "height"}) {
+      const double dimension = view.value(field, 0.0);
+      if (!std::isfinite(dimension) || dimension <= 0) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+    }
+  // Source frames include classic scrollbars. Scale by the full layout bounds,
+  // then zoom/translate target geometry; visualViewport.width excludes gutters.
+  cairo_save(cr.get()); cairo_scale(cr.get(), visual_scale, visual_scale);
+  cairo_translate(cr.get(), -offset_x, -offset_y);
+
   if (shown.contains("pointer")) {
     const auto& p = shown["pointer"]; const double x = p.value("x", 0.0), y = p.value("y", 0.0);
     cairo_move_to(cr.get(), x, y); cairo_line_to(cr.get(), x + 5, y + 19);
@@ -106,6 +126,7 @@ void DrawScriptOverlay(ScriptFrame& frame, const nlohmann::json& shown) {
       cairo_fill(cr.get());
     }
   }
+  cairo_restore(cr.get()); // Commentary remains pinned to the viewport UI.
   if (shown.contains("commentary")) {
     const auto& note = shown["commentary"];
     if (elapsed - note.value("startedMs", elapsed) < note.value("durationMs", 3000.0)) {
