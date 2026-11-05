@@ -258,11 +258,10 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
         }
         do {
-            if result["sensitivityKnown"] as? Bool != true || tab.document != context.document { context.missing() }
+            let known = IOSPacedTypingExecutor.hasKnownSensitivity(result)
+            if !known || tab.document != context.document { context.missing() }
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
-            try IOSPacedTypingExecutor.requireKnownSensitivity(
-                result["sensitivityKnown"] as? Bool, hasContinuation: !final
-            )
+            try IOSPacedTypingExecutor.requireKnownSensitivity(known, hasContinuation: !final)
             try await check()
             #if DEBUG
             if final { try await waitForTestFinalNavigation(context: context) }
@@ -319,7 +318,7 @@ final class IOSWorkflowActions {
         try requireOK(classification)
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
         try IOSPacedTypingExecutor.requireKnownSensitivity(
-            classification["sensitivityKnown"] as? Bool, hasContinuation: !final
+            IOSPacedTypingExecutor.hasKnownSensitivity(classification), hasContinuation: !final
         )
     }
 

@@ -4,9 +4,15 @@ import Foundation
 @MainActor
 enum IOSPacedTypingExecutor {
     static func isAcknowledgement(_ body: [String: Any], token: String?) -> Bool {
-        body["ok"] as? Bool == true && body["sensitive"] is Bool &&
-            body["sensitivityKnown"] is Bool && body["mayHaveCompleted"] as? Bool == true &&
-            body["token"] as? String == token && body["inputGuarantee"] as? String == "synthetic-coordinate"
+        guard let token, !token.isEmpty else { return false }
+        return body["ok"] as? Bool == true && (body["error"] == nil || body["error"] is NSNull) &&
+            body["sensitive"] is Bool && body["sensitivityKnown"] is Bool &&
+            body["mayHaveCompleted"] as? Bool == true && body["token"] as? String == token &&
+            body["inputGuarantee"] as? String == "synthetic-coordinate"
+    }
+
+    static func hasKnownSensitivity(_ body: [String: Any]) -> Bool {
+        body["sensitive"] as? Bool == true || body["sensitivityKnown"] as? Bool == true
     }
 
     static func requireKnownSensitivity(_ known: Bool?, hasContinuation: Bool) throws {
