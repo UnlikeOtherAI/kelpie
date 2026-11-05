@@ -132,16 +132,18 @@ for profile in phone tablet; do
 
   verify_device
   printf 'profile=%s phase=cli\n' "$profile"
+  # Give each run a unique fixture mailbox; preserve earlier evidence.
+  bridge_id="${profile}-$(cat /proc/sys/kernel/random/uuid)"
   # Start a fresh native fixture; the real CLI requests its own persistent grant.
   timeout 15m adb -s "$serial" shell am instrument -w -r \
-    -e class com.kelpie.browser.automation.ScriptCliBridgeTest \
+    -e class com.kelpie.browser.automation.ScriptCliBridgeTest -e bridgeId "$bridge_id" \
     -e sourceRevision "$revision" -e deviceClass "$profile" \
     com.kelpie.browser.test/androidx.test.runner.AndroidJUnitRunner \
     > "$dir/cli-instrumentation.log" 2>&1 &
   bridge_pid=$!
   bridge_ready=false
   for _ in $(seq 1 60); do
-    if adb -s "$serial" pull /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-bridge.json "$dir/cli-bridge.json" >/dev/null 2>&1; then bridge_ready=true; break; fi
+    if adb -s "$serial" pull /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-bridge-$bridge_id.json "$dir/cli-bridge.json" >/dev/null 2>&1; then bridge_ready=true; break; fi
     kill -0 "$bridge_pid" 2>/dev/null || break
     sleep 1
   done
@@ -154,7 +156,7 @@ for profile in phone tablet; do
     set -e
     # Test coordination only: never a credential or product-state repair.
     printf 'complete:%s\n' "$cli_exit" > "$dir/cli-finish.txt"
-    adb -s "$serial" push "$dir/cli-finish.txt" /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-finish.txt > /dev/null
+    adb -s "$serial" push "$dir/cli-finish.txt" /sdcard/Android/data/com.kelpie.browser/files/script-acceptance/cli-finish-$bridge_id.txt > /dev/null
     adb -s "$serial" forward --remove tcp:18420
   fi
   set +e

@@ -39,10 +39,13 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
+                "testDefaultPointerMotionUsesShorterNativeTiming",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
@@ -62,6 +65,8 @@ def selection(scope):
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
+                "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
             ])
     return targets, required
 

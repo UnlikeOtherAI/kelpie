@@ -4,3 +4,5 @@ test("retains only allowlisted helper failures and clocks",()=>{const r=safeWgcD
 test("retains fixed stage names containing digits",()=>{assert.equal(safeWgcDiagnostic("WGC_API_FAILURE stage=d3d11-device-create -1").apiStage,"d3d11-device-create");});
 
 test("drops unrecognized API stage data",()=>{const r=safeWgcDiagnostic("WGC_API_FAILURE stage=secret-token-123 -1");assert.equal(r.error,"WGC_API_FAILURE");assert.equal(r.apiStage,null);assert.ok(!JSON.stringify(r).includes("secret-token-123"));});
+
+test("reports a hidden owned window without labelling it an identity mismatch",()=>{assert.equal(safeWgcDiagnostic("WGC_WINDOW_HIDDEN").error,"WGC_WINDOW_HIDDEN");});

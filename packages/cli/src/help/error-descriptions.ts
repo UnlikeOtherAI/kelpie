@@ -14,6 +14,7 @@ export const errorDescriptions: Record<string, string> = {
   BROWSER_NOT_REGISTERED: "The named local browser alias does not exist.",
   APP_NOT_INSTALLED: "Kelpie.app could not be found at the expected path.",
   BROWSER_LAUNCH_FAILED: "The local Kelpie app could not be launched successfully.",
+  BROWSER_LAUNCH_PENDING: "A prior local launch may still be running; retry after its process exits.",
   DEVICE_NOT_FOUND: "No discovered device matched the requested identifier.",
   NO_DEVICES: "No devices matched the discovery or filter criteria.",
   NO_DIALOG: "No JavaScript dialog is currently open.",

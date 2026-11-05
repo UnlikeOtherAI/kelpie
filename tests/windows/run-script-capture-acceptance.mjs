@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { captureMcp } from "./capture-mcp.mjs";
+import { downloadArtifacts } from "./capture-artifact-download.mjs";
 import { startCaptureFixture } from "../capture/fixture-server.mjs";
 import { startArtifactProtocolFixture } from "../capture/artifact-protocol-fixture.mjs";
-import { scriptArtifactSchema, scriptArtifactChunkSchema, scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
+import { scriptStatusV1Schema } from "../../packages/shared/dist/index.js";
 
 const [readinessPath, outputPath] = process.argv.slice(2);
 if (!readinessPath || !outputPath) throw new Error("Provide private readiness path and fresh evidence directory");
@@ -29,50 +30,13 @@ async function api(method, body = {}) {
   if(method==="get-script-status" && value.success) scriptStatusV1Schema.parse(value);
   return value;
 }
-async function mcp(method, body = {}, generic = true) {
-  const response = await fetch("http://127.0.0.1:" + readiness.port + "/mcp", {
-    method: "POST", headers: { authorization: "Bearer " + readiness.token, "content-type": "application/json",
-      accept: "application/json, text/event-stream" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call",
-      params: generic ? { name: "kelpie_extension", arguments: { name: method, arguments: body } } : {name:method,arguments:body} }),
-    signal: AbortSignal.timeout(360000),
-  });
-  const envelope = await response.json();
-  assert.equal(envelope.error, undefined);
-  const wrapped = JSON.parse(envelope.result.content[0].text);
-  const value=wrapped.ok ? wrapped.value : { success: false, error: wrapped.error };
-  if(method==="kelpie_get_script_status" && value.success) scriptStatusV1Schema.parse(value);
-  return value;
-}
+const mcp = (method, body = {}, generic = true) => captureMcp(readiness, method, body, generic);
 async function check(name, run) {
   if(process.env.KELPIE_CAPTURE_CASE_FILTER && !name.includes(process.env.KELPIE_CAPTURE_CASE_FILTER)) return;
   try { const detail = await run(); checks.push({ name, passed: true, detail }); }
   catch (error) { checks.push({ name, passed: false, error: error.message }); }
 }
-async function download(run) {
-  assert.equal(typeof run.runId, "string");
-  for (const raw of run.artifacts ?? []) {
-    const manifest = scriptArtifactSchema.parse(raw);
-    const chunks = []; let offset = 0;
-    while (offset < manifest.byteLength) {
-      const chunk = scriptArtifactChunkSchema.parse(await api("get-script-artifact", {
-        runId: run.runId, artifactId: manifest.id, offset, length: 262144,
-      }));
-      assert.equal(chunk.runId, run.runId); assert.equal(chunk.artifactId, manifest.id);
-      assert.equal(chunk.offset, offset); assert.equal(chunk.sha256, manifest.sha256);
-      const bytes = Buffer.from(chunk.data, "base64");
-      assert.equal(chunk.nextOffset, offset + bytes.length); assert.ok(bytes.length > 0);
-      chunks.push(bytes); offset = chunk.nextOffset;
-      assert.equal(chunk.eof, offset === manifest.byteLength);
-    }
-    const bytes = Buffer.concat(chunks);
-    assert.equal(bytes.length, manifest.byteLength);
-    assert.equal(createHash("sha256").update(bytes).digest("hex"), manifest.sha256);
-    const extension = { "image/png": "png", "image/gif": "gif", "video/mp4": "mp4" }[manifest.mimeType];
-    await writeFile(resolve(output, manifest.id + "." + extension), bytes);
-    artifacts.push({ runId: run.runId, ...manifest });
-  }
-}
+const download = run => downloadArtifacts(run, { api, output, artifacts });
 let tabId;
 const workflow = actions => ({ version: 1, tabId, actions });
 const click = name => ({ action: "click", target: { role: "button", name, exact: true } });

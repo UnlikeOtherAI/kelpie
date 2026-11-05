@@ -108,7 +108,7 @@ export async function getDevice(
 async function getBrowserAliasDevice(query: string): Promise<DiscoveredDevice | undefined> {
   const store = await loadBrowserStore();
   const running = store.running[query];
-  if (!running) {
+  if (!running || running.pendingLaunch) {
     return undefined;
   }
 

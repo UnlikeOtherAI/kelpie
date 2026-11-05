@@ -3,11 +3,11 @@ package com.kelpie.browser.automation
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.webkit.WebView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -51,7 +50,8 @@ class ScriptCapture(
         ) : Command
     }
 
-    private val compositor = ScriptCompositorCapture(view, scene)
+    private val diagnostics = ScriptCaptureDiagnostics()
+    private val compositor = ScriptCompositorCapture(view, scene, diagnostics)
     private val snapshotMutex = Mutex()
     private val dispatcher = Executors.newSingleThreadExecutor { Thread(it, "KelpieCapture") }.asCoroutineDispatcher()
     private val channel = Channel<Command>(1)
@@ -127,7 +127,11 @@ class ScriptCapture(
                                 run.stop(failure.code)
                                 break
                             }
+                        } catch (cancelled: CancellationException) {
+                            diagnostics.failure(ScriptCaptureDiagnostics.Failure.SAMPLER_CANCELLED)
+                            throw cancelled
                         } catch (_: Exception) {
+                            diagnostics.failure(ScriptCaptureDiagnostics.Failure.SAMPLER_EXCEPTION)
                             run.stop("CAPTURE_FAILED")
                             break
                         }
@@ -190,6 +194,7 @@ class ScriptCapture(
             channel.send(Command.Finish(run.elapsedMs().toDouble(), done))
             done.await()
             worker?.join()
+            diagnostics.report()
             channel.close()
             dispatcher.close()
         }
@@ -199,53 +204,51 @@ class ScriptCapture(
         snapshotMutex.withLock {
             guard()
             withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-                try {
-                    withTimeout(5_000) {
+                withCaptureDeadline(5_000, { diagnostics.failure(ScriptCaptureDiagnostics.Failure.SNAPSHOT_TIMEOUT) }) {
+                    guard()
+                    @Suppress("DEPRECATION")
+                    val scale = view.scale
+                    if (view.width != initialWidth || view.height != initialHeight || scale != initialScale) {
+                        throw ScriptFailure("VIEWPORT_CHANGED")
+                    }
+                    val before = document()
+                    val sceneGeneration = scene()
+                    val rect = compositor.rectangle()
+                    compositor.awaitCommittedFrame()
+                    guard()
+                    if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
+                    if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
+                    @Suppress("DEPRECATION")
+                    val committedScale = view.scale
+                    if (view.width != initialWidth ||
+                        view.height != initialHeight ||
+                        committedScale != initialScale ||
+                        compositor.rectangle() != rect
+                    ) {
+                        throw ScriptFailure("VIEWPORT_CHANGED")
+                    }
+                    val copyStarted = System.nanoTime()
+                    val bitmap = compositor.copy(rect, outputWidth, outputHeight)
+                    diagnostics.record(ScriptCaptureDiagnostics.Phase.PIXEL_COPY, System.nanoTime() - copyStarted)
+                    try {
+                        val now = System.nanoTime()
                         guard()
                         @Suppress("DEPRECATION")
-                        val scale = view.scale
-                        if (view.width != initialWidth || view.height != initialHeight || scale != initialScale) {
-                            throw ScriptFailure("VIEWPORT_CHANGED")
-                        }
-                        val before = document()
-                        val sceneGeneration = scene()
-                        val rect = compositor.rectangle()
-                        compositor.awaitCommittedFrame()
-                        guard()
+                        val copiedScale = view.scale
                         if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
                         if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
-                        @Suppress("DEPRECATION")
-                        val committedScale = view.scale
                         if (view.width != initialWidth ||
                             view.height != initialHeight ||
-                            committedScale != initialScale ||
+                            copiedScale != initialScale ||
                             compositor.rectangle() != rect
                         ) {
                             throw ScriptFailure("VIEWPORT_CHANGED")
                         }
-                        val bitmap = compositor.copy(rect, outputWidth, outputHeight)
-                        try {
-                            val now = System.nanoTime()
-                            guard()
-                            @Suppress("DEPRECATION")
-                            val copiedScale = view.scale
-                            if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
-                            if (scene() != sceneGeneration) throw ScriptFailure("CAPTURE_VIEW_UNAVAILABLE")
-                            if (view.width != initialWidth ||
-                                view.height != initialHeight ||
-                                copiedScale != initialScale ||
-                                compositor.rectangle() != rect
-                            ) {
-                                throw ScriptFailure("VIEWPORT_CHANGED")
-                            }
-                            Frame(bitmap, (now - run.startedNanos) / 1_000_000.0, before)
-                        } catch (error: Throwable) {
-                            bitmap.recycle()
-                            throw error
-                        }
+                        Frame(bitmap, (now - run.startedNanos) / 1_000_000.0, before)
+                    } catch (error: Throwable) {
+                        bitmap.recycle()
+                        throw error
                     }
-                } catch (_: TimeoutCancellationException) {
-                    throw ScriptFailure("CAPTURE_FAILED")
                 }
             }
         }
@@ -325,6 +328,8 @@ class ScriptCapture(
                     break
                 }
                 command as Command.Sample
+                val encodeStarted = System.nanoTime()
+                diagnostics.record(ScriptCaptureDiagnostics.Phase.QUEUE, encodeStarted - run.startedNanos - (command.frame.elapsedMs * 1_000_000).toLong())
                 try {
                     if (failed != null) throw ScriptFailure(failed!!)
                     val frame = command.frame
@@ -361,13 +366,19 @@ class ScriptCapture(
                     }
                     val frameTime = frame.elapsedMs - originMs
                     if (pendingTime < 0 || frameTime - pendingTime >= 1000.0 / fps) {
-                        if (pending != null && gif?.frame(pending!!, frameTime) == false) {
-                            throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
-                        }
+                        val gifStarted = System.nanoTime()
+                        val gifAccepted = pending == null || gif?.frame(pending!!, frameTime) != false
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.GIF, System.nanoTime() - gifStarted)
+                        if (!gifAccepted) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
                         if (pending != null && gif != null) admission.admit("gif", pendingTime + originMs, pendingDocument)
                         val pixels = IntArray(outputWidth * outputHeight)
+                        val pixelsStarted = System.nanoTime()
                         frame.bitmap.getPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
-                        if (video?.frame(pixels, frameTime, frame.documentId) == false) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.PIXEL_READ, System.nanoTime() - pixelsStarted)
+                        val videoStarted = System.nanoTime()
+                        val videoAccepted = video?.frame(pixels, frameTime, frame.documentId) != false
+                        diagnostics.record(ScriptCaptureDiagnostics.Phase.VIDEO, System.nanoTime() - videoStarted)
+                        if (!videoAccepted) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
                         video?.let { encoder ->
                             encoder.lastWrittenDocument?.let { writtenDocument ->
                                 admission.admit("video", encoder.lastWrittenMs + originMs, writtenDocument)
@@ -389,6 +400,7 @@ class ScriptCapture(
                     run.stop(failed!!)
                     command.ack?.completeExceptionally(ScriptFailure(failed!!))
                 } finally {
+                    diagnostics.record(ScriptCaptureDiagnostics.Phase.ENCODE, System.nanoTime() - encodeStarted)
                     command.frame.bitmap.recycle()
                 }
             }

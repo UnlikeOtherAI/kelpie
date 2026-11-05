@@ -19,7 +19,7 @@ Source mapping is in implementation-map.md.
 | G09 Owner and uncertain completion | OWN-02,WFL-05,ART-02,SEC-02,RDY-02 | Every native runtime +managed workers | Validate foreign/revoked/rotated/listener grants,provided native sessionId zero-action refusal,late callback fence,abort/status responsiveness and next-run recovery without manual state clearing. Keep known completed earlier steps distinct from uncertain failed step. |
 | G10 Managed worker and LP | OWN-01,LP-01,LP-02,DIF-01 | Backend/LP scope,not native UI /desktop_backend+root | Managed Chromium production proof already exists. Four actual pinned1.0.2 diagnostics ran under enforced unit/egress; one-context/page limit and sequential storage reset proved,prior failures retained. Owner reports7/7 public production stdio at9a301405,8 navigation/lifecycle methods and41 calls. Reportd7ca0d84... independently copied/hashed and teardown checked; close only that restricted navigation/lifecycle stage; corrected reader snapshot proof and any broader task/cost comparison remain separate. No visual/input/WebMCP inheritance. |
 | G11 Optional WebMCP scope | WEB-01,WEB-02,SEC-02,DOC-01 | Managed positive path;native defaults off | Preserve actual Chromium151 private-world/grant/API/protocol evidence. Native support stays unavailable until exact trusted session/origin/document grant,API probe,encoding and completion-unknown fence land and run. A native refusal is not positive WebMCP evidence; final docs must state implemented scope. |
-| G12 Status and action subset | WFL-01..04,RDY-02,DOC-01 | Every native runtime | Parse actual safe v1 status,failed/aborted partial artifact recovery,legacy-busy automatic admission recovery and no outputs/secrets in status. Reconcile declared supported action subsets against brief before closure; unsupported preflight cannot silently substitute for a required feature. |
+| G12 Status and action subset | WFL-01..04,RDY-02,DOC-01 | Every native runtime | Parse actual safe v1 status,failed/aborted partial artifact recovery,legacy-busy automatic admission recovery and no outputs/secrets in status. Verify the documented action matrix and native preflight refusals; required fill/type behavior remains a separate gate. |
 | G13 Authorized native UI evidence | UI-01,VIS-01..02 | Applicable windowed/foreground apps | CUA,VNC and arbitrary OS-input helpers remain off. Root-authorized XCUITest/Compose and scoped native accessibility instrumentation are allowed under handoff/resource grants. Android phone Stop and Windows Session1 standard UIA Stop/partial/recovery/teardown (4ec) actual subsets are reported. Authorized hosted fallback removes the blanket local handoff dependency; remaining per-device scheduling/runtime and changed-state evidence still need explicit outcomes. No offscreen local Stop claim. |
 | G14 Integrated proof/docs | DOC-01,DIF-01,all48 ID audit | Root+common | Integrate every worker history; run required final shared/CLI/native/platform checks on final source; review precise9-runtime evidence and remaining limits. Preserve typed input-guarantee differences. No blanket acceptance from ingestion or codec build. |
 | G16 Late-sensitive privacy | SEC-01,ART-01..02,WFL-05 | Every native consumer | Shared6ad/2a fixed helper and core checks passed; Windows f188 focus-autocomplete/type actual failures are preserved. Final adapters must consume classification before guard/ticket retirement; uncertain no-result target inspection registers current edit text even without capture; capture media is discarded. Current active downloads refuse ARTIFACT_NOT_READY, foreign NOT_FOUND; final scrub precedes terminal exposure. Actual fixed platform raw/URI/form and no-result replays remain pending. |
@@ -82,3 +82,38 @@ No row grants a whole-platform or 432-cell pass.
 Run identifiers identify evidence to inspect, not a claim that the run passed.
 The coordinator must reconcile newer results and exact artifact hashes before
 closing any requirement.
+
+## Current scope supplement - 2026-11-05
+
+This supplement supersedes the earlier working snapshot without removing its
+historical failures. Integration has advanced through `15cc0dc4` and remains
+in progress. A reported subset is not a platform or full-matrix pass.
+
+- **Lightpanda:** the pinned 1.0.2 optional reader tranche passed its bounded
+  public stdio corpus (16 cases) and was accepted for the four explicitly
+  selected DOM/text reader methods. The default remains deny; geometry, input,
+  capture and WebMCP are not admitted. The published package and installed
+  release still require verification.
+- **Android:** API 29 minimum is user-approved. The owner reports 7/7 local
+  phone privacy cases after the focus fix; tablet, hosted full corpus, actual
+  scene and dense G08 evidence remain separate gates. Earlier API 35 focus
+  failures and sparse capture results are retained.
+- **Linux:** the a05 real-CDP corpus passed 40/42, including all six new
+  post-ack cases. Two cross-document capture cases remain refused because
+  old-realm sensitivity is unknown. No classification is inferred from the
+  new document. GTK/OSR, installed RPM, dense G08 and release acceptance
+  require their own final integrated evidence. The deterministic GIF model
+  generator and provenance checks are under development.
+- **Windows:** prior four C/S GIF/MP4 export results and the coordinator's
+  native spatial/Stop observations are scoped evidence at their recorded
+  revisions. Final native timeline and the 350 ms profile remain open; later
+  launch/readiness failures are preserved. The launch lifecycle fix and
+  exact installed release verification remain open.
+- **macOS and iOS:** WK/CEF and iPhone/iPad need separate final-source runtime,
+  privacy, G08 and public transport evidence; earlier hosted or build subsets
+  do not establish full acceptance.
+- **Shared and release:** the 350 ms default and final-event privacy changes
+  require regenerated native bindings and platform replays on the integrated
+  source. Final portable checks, component versions, one reviewed PR, release
+  publication and installed signed/package verification remain open. No
+  nine-runtime or 432-cell completion is asserted.

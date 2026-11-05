@@ -374,7 +374,7 @@ On macOS this applies to the staged viewport only, not the native window. A name
 
 ## Device Info
 
-Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., on-screen keyboard control is mobile-only; renderer switching is macOS-only).
+Get comprehensive metadata: device ID, name, model, platform, OS version, screen dimensions, pixel ratio, network address, port, app version. Query what capabilities each device supports (e.g., on-screen keyboard control is mobile-only; renderer switching is macOS-only). On iOS and Android, device capabilities include the supported typed-workflow actions and capture formats, allowing clients to avoid unavailable operations such as standalone `press-key`.
 
 ## Toast Messages
 
@@ -461,7 +461,7 @@ The GUI listens only on loopback. Each launch writes a current-user ACL-protecte
 file at `<profile-dir>/readiness.json`; it holds the bound port and per-launch bearer token. Public device discovery reports only `127.0.0.1`, the actual bound port, and loopback MCP transport.
 `kelpie browser register <name> --platform windows --app-path <Kelpie.exe> --profile-dir <absolute>`
 creates an alias, `kelpie browser launch <name>` starts it, and `kelpie --browser <name> mcp`
-provides a token-free stdio bridge for local development agents and local Nessie executors.
+provides a token-free stdio bridge for local development agents and local Nessie executors. If launch readiness fails, the CLI retires the exact child; when retirement cannot be confirmed it preserves a pending launch and blocks alias reuse until the process is absent.
 `kelpie browser stop <name>` requests orderly app shutdown and clears its alias state only after
 that launch removes readiness. Windows home, native toast, and fullscreen are callable through
 HTTP and MCP. Account-based remote browser control uses the separate authenticated

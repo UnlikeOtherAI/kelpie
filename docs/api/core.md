@@ -896,7 +896,7 @@ All fields are best-effort — if a value is unavailable on the platform, it ret
 ### `getCapabilities`
 Get which API methods this browser instance supports. Enables capability negotiation — the CLI or LLM can check before sending commands that may not be available on a given platform/version.
 
-Named viewport preset support appears in the capability map as `viewportPresets`.
+Named viewport preset support appears in the capability map as `viewportPresets`. On iOS and Android, `scriptWorkflow` reports supported typed actions, capture formats and native-session availability; `video` is listed when iOS AVAssetWriter accepts representative H.264 settings or Android finds an AVC encoder.
 
 ```json
 POST /v1/get-capabilities

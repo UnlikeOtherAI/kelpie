@@ -44,3 +44,6 @@ The pinned ArtifactSigning.Client preparation/download and an actual signing aut
 The published artifact and installed signed acceptance remain pending. This audit does not choose a version, publish a release or change the other task's installed app.
 
 Root selected Windows0.1.16 for the final integrated candidate. Fresh origin/main195eb90fa5df47291a75e8d165c72fc2f825e3c9 inspection confirmed all four Windows mirrors0.1.15 before this bump. Only CMake project, RC numeric/string versions, device info and runtime Windows versions changed. Compilation/public replay remains pending; this is not a signed or published release. f1880.1.15 evidence and archived EXE/DLL are preserved. No signing, upload or install has occurred.
+
+
+The coordinator prepared the existing pinned Microsoft ArtifactSigning.Client 1.0.146 on Minis under the release-tools cache. The archive SHA-256 is 7761e5d8f31e54b764da21d33cd8b0a2940e1b05526c7dfcb5e94b0431426f70; its x64 Azure.CodeSigning.Dlib.dll Authenticode signature is valid for Microsoft Corporation. This preparation did not sign or publish any Kelpie artifact.

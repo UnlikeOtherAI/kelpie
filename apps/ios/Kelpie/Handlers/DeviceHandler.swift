@@ -1,3 +1,4 @@
+import AVFoundation
 import UIKit
 import WebKit
 
@@ -303,10 +304,18 @@ struct DeviceHandler {
         return successResponse([
             "version": deviceInfo.version,
             "platform": "ios",
+            "scriptWorkflow": IOSBoundWorkflow.deviceCapabilities(videoAvailable: videoAvailable()),
             "supported": supported,
             "partial": Array(partial).sorted(),
             "unsupported": Array(unsupported).sorted()
         ])
+    }
+
+    private func videoAvailable() -> Bool {
+        let writer = AVAssetWriter(contentType: .mpeg4Movie)
+        return writer.canApply(outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 640, AVVideoHeightKey: 480
+        ], forMediaType: .video)
     }
 
     private func viewportPresetPayload(_ preset: TabletViewportPreset) -> [String: Any] {

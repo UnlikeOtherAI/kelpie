@@ -4,3 +4,5 @@ test("binds owned run and native artifact provenance without treating page ID as
 test("rejects document, run, HWND and navigation ambiguity",()=>{for(const mutate of [f=>f.artifacts[1].documentId="other",f=>f.terminal.runId="b".repeat(48),f=>f.summary.windowHandle="999",f=>f.fixture.pageRequests=2,f=>f.after.tabId="other",f=>f.frameCount=189,f=>f.summary.cursorCapture=true,f=>f.activeSamples[0].runId="b".repeat(48),f=>f.fixture.events[0].center={x:1,y:1}]){const f=facts();mutate(f);assert.throws(()=>verifyWgcProvenance(f));}});
 
 test("requires trusted desktop events and terminal input guarantee",()=>{const f=facts();f.fixture.events[0].trusted=false;assert.throws(()=>verifyWgcProvenance(f));f.fixture.events[0].trusted=true;f.terminal.inputGuarantee="synthetic-coordinate";assert.throws(()=>verifyWgcProvenance(f));});
+
+test("accepts a fenced natural hide without inventing a closed event",()=>{const f=facts();f.summary.naturalItemClosure=false;f.summary.endReason="window-hidden";assert.equal(verifyWgcProvenance(f).runId,f.active.runId);});

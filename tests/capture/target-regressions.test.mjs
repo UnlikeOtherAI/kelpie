@@ -138,6 +138,7 @@ test("focus viewport resize prevents value mutation", () => {
   const first = resolveScriptTarget({ selector: "#target" }, "acceptance");
   const result = resolveScriptTarget({ selector: "#target" }, "acceptance", first.token, false, { action: "fill", text: "must-not-write" });
   assert.equal(result.ok, false);
+  assert.equal(result.focusFailure, "viewport");
   assert.equal(result.mayHaveCompleted, true);
   assert.equal(f.element.value, "");
 });
@@ -211,9 +212,26 @@ test("unfocused document refuses editing even when activeElement is the target",
   const first = resolveScriptTarget({ selector: "#target" }, "focus-check");
   const result = resolveScriptTarget({ selector: "#target" }, "focus-check", first.token, false, { action: "fill", text: "PRIVATE_CANARY" });
   assert.equal(document.activeElement, f.element);
+  assert.equal(result.focusFailure, "document-focus");
   assert.equal(result.error, "INPUT_UNCERTAIN");
   assert.equal(result.mayHaveCompleted, true);
   assert.equal(result.sensitivityKnown, false);
+  assert.equal(f.element.value, "");
+  assert.deepEqual(f.element.events, []);
+});
+test("paced continuation refuses focus drift without refocusing or writing", () => {
+  const f = fixture(new Input());
+  let focusCalls = 0;
+  f.element.onFocus = () => { focusCalls++; };
+  const first = resolveScriptTarget({ selector: "#target" }, "pace-focus");
+  document.activeElement = new Input();
+  const result = resolveScriptTarget({ selector: "#target" }, "pace-focus", first.token,
+    false, { action: "type", text: "x", requireFocused: true });
+  assert.equal(result.error, "INPUT_UNCERTAIN");
+  assert.equal(result.sensitivityKnown, false);
+  assert.equal(result.mayHaveCompleted, true);
+  assert.equal(focusCalls, 0);
+  assert.equal(result.focusFailure, "target-focus");
   assert.equal(f.element.value, "");
   assert.deepEqual(f.element.events, []);
 });

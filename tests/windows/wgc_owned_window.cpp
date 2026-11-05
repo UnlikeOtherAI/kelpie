@@ -21,9 +21,14 @@ namespace {
 using namespace wgc_test;
 using namespace winrt::Windows::Graphics::Capture;
 using namespace winrt::Windows::Graphics::Imaging;
+bool OwnedWindowVisible(DWORD actualPid,DWORD expectedPid,bool hasClass,std::wstring const& name,bool visible) {
+  if(actualPid!=expectedPid||!hasClass||name!=L"KelpieScriptPresentation")
+    throw std::runtime_error("WGC_WINDOW_IDENTITY_MISMATCH");
+  return visible;
+}
 struct Owner {
   DWORD pid;std::wstring executable;std::uint64_t creation;HWND window;
-  void Verify() const {
+  bool VerifyWindow() const {
     DWORD selfSession=0,targetSession=0,windowPid=0;
     if(!ProcessIdToSessionId(GetCurrentProcessId(),&selfSession)||selfSession!=1||
        !ProcessIdToSessionId(pid,&targetSession)||targetSession!=1)
@@ -39,9 +44,11 @@ struct Owner {
       throw std::runtime_error("WGC_PROCESS_IDENTITY_MISMATCH");
     GetWindowThreadProcessId(window,&windowPid);
     wchar_t klass[128]{};
-    if(windowPid!=pid||!IsWindowVisible(window)||!GetClassNameW(window,klass,128)||
-       std::wstring(klass)!=L"KelpieScriptPresentation")
-      throw std::runtime_error("WGC_WINDOW_IDENTITY_MISMATCH");
+    const bool hasClass=GetClassNameW(window,klass,128)!=0;
+    return OwnedWindowVisible(windowPid,pid,hasClass,klass,IsWindowVisible(window)!=FALSE);
+  }
+  void Verify() const {
+    if(!VerifyWindow())throw std::runtime_error("WGC_WINDOW_HIDDEN");
   }
 };
 struct State {
@@ -222,6 +229,17 @@ int wmain(int argc,wchar_t** argv) {
     if(argc==2&&std::wstring(argv[1])==L"self-test-buffer"){std::cout<<BufferSelfTest().dump()<<std::endl;return 0;}
     if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-stream"){std::cout<<TimelineStreamSelfTest().dump()<<std::endl;return 0;}
     if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-writer"){std::cout<<TimelineWriterSelfTest().dump()<<std::endl;return 0;}
+    if(argc==2&&std::wstring(argv[1])==L"self-test-window-state"){
+      if(!OwnedWindowVisible(7,7,true,L"KelpieScriptPresentation",true)||
+         OwnedWindowVisible(7,7,true,L"KelpieScriptPresentation",false))throw std::runtime_error("WGC_SELFTEST_WINDOW");
+      bool refused=false;try{OwnedWindowVisible(8,7,true,L"KelpieScriptPresentation",false);}catch(std::runtime_error const&){refused=true;}
+      if(!refused)throw std::runtime_error("WGC_SELFTEST_WINDOW");
+      refused=false;try{OwnedWindowVisible(7,7,true,L"OtherClass",false);}catch(std::runtime_error const&){refused=true;}
+      if(!refused)throw std::runtime_error("WGC_SELFTEST_WINDOW");
+      refused=false;try{OwnedWindowVisible(7,7,false,L"",false);}catch(std::runtime_error const&){refused=true;}
+      if(!refused)throw std::runtime_error("WGC_SELFTEST_WINDOW");
+      std::cout<<Json({{"ownedVisible",true},{"ownedHidden",true},{"foreignRefused",true}}).dump()<<std::endl;return 0;
+    }
     if(argc==7&&std::wstring(argv[1])==L"timeline"){
       Owner owner{static_cast<DWORD>(std::stoul(argv[2])),argv[3],std::stoull(argv[4]),
         reinterpret_cast<HWND>(static_cast<std::uintptr_t>(std::stoull(argv[5])))};

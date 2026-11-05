@@ -1,7 +1,7 @@
 import vm from "node:vm";
 import test from "node:test";
 import assert from "node:assert/strict";
-import {listenerState,startupSignal,navigationSignal} from "./runtime-ownership.mjs";
+import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -62,4 +62,19 @@ test("navigation diagnostics retain only exact native fixed labels",()=>{
  assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR"),"NAVIGATION_ERROR");
  assert.equal(navigationSignal("[WorkflowNavigation] failure=NAVIGATION_ERROR private-url"),null);
  assert.equal(navigationSignal("page [WorkflowNavigation] failure=TIMEOUT"),null);
+});
+
+test("edit focus diagnostics accept only fixed state flags",()=>{
+ assert.deepEqual(editFocusSignal("[WorkflowEditFocus] phase=before key=1 responder=0 doc=0 body=1 target=0"),
+  {phase:"before",key:"1",responder:"0",documentFocused:"0",activeBody:"1",targetFocused:"0"});
+ assert.equal(editFocusSignal("[WorkflowEditFocus] phase=before key=1 responder=0 doc=0 body=1 target=0 secret"),null);
+ assert.equal(editFocusSignal("page [WorkflowEditFocus] phase=before key=1 responder=0 doc=0 body=1 target=0"),null);
+});
+
+test("hosted focus requires the exact launched candidate command",()=>{
+ const candidate="/work/apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app/Contents/MacOS/Kelpie";
+ assert.equal(processCommandMatches(candidate+" --port 28420\n",candidate),true);
+ assert.equal(processCommandMatches(candidate+"-other --port 28420",candidate),false);
+ assert.equal(processCommandMatches(candidate+" --port 8420",candidate),false);
+ assert.equal(processCommandMatches("/other/Kelpie --port 28420",candidate),false);
 });

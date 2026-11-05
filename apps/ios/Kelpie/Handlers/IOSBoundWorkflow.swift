@@ -10,6 +10,18 @@ struct IOSBoundWorkflow {
     static let capabilities: Body = [
         "success": true, "supportedVersions": [1], "inputGuarantee": "synthetic-coordinate"
     ]
+    static func deviceCapabilities(videoAvailable: Bool) -> Body {
+        [
+            "supportedVersions": [1],
+            "inputGuarantee": "synthetic-coordinate",
+            "supportedActions": actions.sorted(),
+            "captureFormats": ["gif", "screenshots"] + (videoAvailable ? ["video"] : []),
+            "nativeSessions": false,
+            "webMcp": ["available": false, "reason": "No registered real API and explicit host grant"],
+            "lightpanda": ["available": false, "reason": "Desktop orchestration backend"]
+        ]
+    }
+
     let settings: Body
     let steps: [Body]
     let tabID: String
@@ -34,7 +46,7 @@ struct IOSBoundWorkflow {
                 throw IOSWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION")
             }
             if action == "fill" || action == "type" {
-                guard let value = step["text"] as? String else { throw IOSWorkflowFailure("UNRESOLVED_INPUT") }
+                let value = try Self.editText(step)
                 if step["sensitive"] as? Bool == true { secrets.append(value) }
             }
             if action == "output" || action == "extract" {
@@ -65,6 +77,13 @@ struct IOSBoundWorkflow {
         } else {
             capture = nil
         }
+    }
+
+    private static func editText(_ step: Body) throws -> String {
+        // Until paced editing is wired, never silently execute this as an atomic edit.
+        guard step["typingDelayMs"] == nil else { throw IOSWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION") }
+        guard let value = step["text"] as? String else { throw IOSWorkflowFailure("UNRESOLVED_INPUT") }
+        return value
     }
 
     static func json(_ body: Body) -> String? {
