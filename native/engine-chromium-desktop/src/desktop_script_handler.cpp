@@ -35,6 +35,7 @@ DesktopScriptHandler::~DesktopScriptHandler() {
   RequestLocalAbort();
   std::lock_guard lock(impl_->presentation_validity->mutex);
   impl_->presentation_validity->alive = false;
+  impl_->presentation_validity->revalidate = {};
 }
 void DesktopScriptHandler::RequestLocalAbort() {
   std::lock_guard lock(impl_->mutex);
@@ -316,16 +317,15 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     hidden=presentation; hidden["_presentationRevision"]=NextPresentationRevision();
   }
   const std::weak_ptr<DesktopPresentationValidity> validity = presentation_validity;
-  const auto check_grant = config.revalidate;
   const auto presentation_owner = owner;
   const auto cancellation = abort;
   const auto revoked = std::make_shared<std::atomic<bool>>(false);
-  auto valid = [validity,check_grant,presentation_owner,cancellation,revoked] {
+  auto valid = [validity,presentation_owner,cancellation,revoked] {
     const auto gate=validity.lock();
     if (!gate) return false;
     std::lock_guard lock(gate->mutex);
-    if (!gate->alive || cancellation->load() || revoked->load() || !check_grant) return false;
-    try { if (check_grant(presentation_owner)) return true; } catch (...) {}
+    if (!gate->alive || cancellation->load() || revoked->load() || !gate->revalidate) return false;
+    try { if (gate->revalidate(presentation_owner)) return true; } catch (...) {}
     revoked->store(true);
     return false;
   };

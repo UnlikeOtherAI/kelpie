@@ -8,7 +8,10 @@
 #include <thread>
 
 namespace kelpie {
-struct DesktopPresentationValidity { std::mutex mutex; bool alive = true; };
+struct DesktopPresentationValidity {
+  std::mutex mutex; bool alive = true;
+  std::function<bool(const std::string&)> revalidate;
+};
 class DesktopScriptHandler::Impl {
  public:
   using Json = nlohmann::json;
@@ -30,7 +33,9 @@ class DesktopScriptHandler::Impl {
   int action_index = -1, requested_step = -1, completed_step = -1;
   std::string requested_step_document;
   std::uint64_t requested_ticket=0, completed_ticket=0;
-  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {}
+  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {
+    presentation_validity->revalidate = config.revalidate;
+  }
   Json Play(const Json& body);
   Json Status(const Json& body);
   Json Abort(const Json& body);
