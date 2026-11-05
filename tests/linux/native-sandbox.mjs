@@ -67,9 +67,12 @@ try {
       return typeof value.port === "number" && typeof value.token === "string" && value.token.length ? value : false;
     } catch (error) { if (error?.code === "ENOENT") return false; throw error; }
   }, "owned native readiness", 30000);
+  const tabs = (await control(readiness, "get-tabs")).tabs;
+  assert.ok(tabs.length > 0);
+  const tabId = tabs.find(tab => tab.active)?.id ?? tabs[0].id;
   const canonical = async (method, params = {}) => {
     const response = await rawRequest({ port: readiness.port, path: "/v1/browser-control",
-      headers: bearerHeaders(readiness.token), body: JSON.stringify({ version: 1, method, params }) });
+      headers: bearerHeaders(readiness.token), body: JSON.stringify({ version: 1, method, params, tabId }) });
     assert.equal(response.status, 200); return response.json;
   };
   const snapshot = await waitFor(async () => {
@@ -90,9 +93,7 @@ try {
   if (process.env.KELPIE_TEST_ARTIFACT_DIR) {
     await mkdir(process.env.KELPIE_TEST_ARTIFACT_DIR, { recursive: true });
     await writeFile(join(process.env.KELPIE_TEST_ARTIFACT_DIR, "headless-native.png"), png);
-  }  const tabs = (await control(readiness, "get-tabs")).tabs;
-  assert.ok(tabs.length > 0);
-  report.device = await control(readiness, "get-device-info");
+  }  report.device = await control(readiness, "get-device-info");
   report.checks.push("Real loaded fixture snapshot, native PNG pixels and authenticated HTTP");
   const renderers = await waitFor(async () => {
     const result = [];
