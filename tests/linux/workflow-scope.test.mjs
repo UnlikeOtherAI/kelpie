@@ -34,7 +34,7 @@ test("native CI builds real Linux graph changes and refuses failed diffs", () =>
     for (const path of ["apps/linux/src/fixture.cpp", "native/core-mcp/src/fixture.cpp",
       "packages/shared/src/browser-control/fixture.ts", "scripts/check-linux-script-codecs.sh",
       ".github/workflows/linux-native.yml", "pnpm-lock.yaml", "packages/shared/scripts/build.mjs",
-      "packages/shared/tsconfig.build.json", "tsconfig.base.json", "scripts/ci/linux-native-scope.sh"]) {
+      "packages/shared/tsconfig.build.json", "tsconfig.base.json", "scripts/ci/linux-native-scope.sh", "scripts/ci/linux-installed-smoke.sh"]) {
       head = commit(path, "Linux build input");
       assert.equal(changed(base, head), "build=true", path); base = head;
     }
