@@ -100,9 +100,17 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertEqual(timeout_metadata(subprocess.TimeoutExpired("script", 60, output=b"{")),
                          {"stdoutBytes": 1, "stderrBytes": 0})
 
+    def test_cli_rejects_process_local_pair_before_script_execution(self):
+        from ios_workflow_cli import run_fixture
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("ios_workflow_cli.invoke", return_value={"success": True, "scope": "session", "persisted": False}) as invoke:
+                with self.assertRaisesRegex(ValueError, "did not persist"):
+                    run_fixture("a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed", Path(directory) / "cli")
+                self.assertEqual(invoke.call_count, 1)
+
     def test_cli_failure_status_keeps_only_bounded_metadata(self):
         from ios_workflow_cli import run_fixture
-        responses = [{"success": True}, subprocess.TimeoutExpired("script", 60),
+        responses = [{"success": True, "scope": "persistent", "persisted": True}, subprocess.TimeoutExpired("script", 60),
                      {"state": "running", "playing": True, "actionIndex": 1,
                       "outputs": {"secret": "private"}, "runError": {"code": "SAFE_CODE", "message": "private"}}]
         with tempfile.TemporaryDirectory() as directory:

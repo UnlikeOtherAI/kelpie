@@ -15,7 +15,9 @@ extension WorkflowCaptureUITests {
         let path = "/" + nonce
         let ready = try await bridge.request(path, ["tabId": tab])
         XCTAssertEqual(ready["accepted"] as? Bool, true)
-        let approval = XCUIApplication().buttons["Yes, once"]
+        // Each host CLI command is a separate process, so the disposable test client
+        // needs a persistent exact-socket grant rather than a process-local session.
+        let approval = XCUIApplication().buttons["Always allow"]
         XCTAssertTrue(approval.waitForExistence(timeout: 45))
         approval.tap()
         let deadline = Date().addingTimeInterval(720)
