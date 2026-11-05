@@ -32,9 +32,13 @@ final class WorkflowLoopbackPage {
           document.title='Count '+(++window.count)
         }
         const button=document.querySelector('button');
-        if(location.pathname==='/secret-guard'){
+        if(location.pathname==='/secret-guard'||location.pathname.startsWith('/focus-secret-')){
           document.title='iOS Reflected+Canary! | iOS%20Reflected%2bCanary! | iOS+Reflected%2bCanary%21';
-          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'}
+          document.querySelector('input[type=password]').oninput=()=>{document.title='Unexpected edit'};
+          const field=document.querySelector('#entry');
+          field.oninput=()=>{document.title='Unexpected edit'};
+          if(location.pathname==='/focus-secret-password')field.onfocus=()=>{field.type='password'};
+          if(location.pathname==='/focus-secret-autocomplete')field.onfocus=()=>{field.autocomplete='current-password'};
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';

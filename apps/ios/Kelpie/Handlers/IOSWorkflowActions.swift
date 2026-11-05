@@ -11,6 +11,7 @@ final class IOSWorkflowActions {
     var sampler: IOSFrameSampler?
     private(set) var outputs: Body = [:]
     private(set) var secrets: [String]
+    private(set) var discardMedia = false
 
     init(
         workflow: IOSBoundWorkflow,
@@ -122,20 +123,26 @@ final class IOSWorkflowActions {
         let target = step["target"] as? Body ?? [:]
         let document = tab.document
         let viewport = try await tab.viewport()
-        let found = try await tab.target(target)
+        let editing = action == "type" || action == "fill"
+        let text = editing ? step["text"] as? String : nil
+        let consume = { [self] (result: Body) in
+            consumeSensitivity(result, text: text)
+        }
+        if step["sensitive"] as? Bool == true { consume(["sensitive": true]) }
+        let found = try await tab.target(target, refuseSensitive: workflow.capture != nil, consume: consume)
         try requireOK(found)
         guard let token = found["token"] as? String, let x = found["x"] as? Double, let y = found["y"] as? Double else {
             throw IOSWorkflowFailure("INVALID_TARGET")
         }
-        let editing = action == "type" || action == "fill"
-        let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
-        if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
-        if sensitive, workflow.capture != nil { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let point = viewport.displayPoint(CGPoint(x: x, y: y))
         try await movePointer(to: point)
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width
-        try requireOK(try await tab.target(target, token: token))
+        try requireOK(try await tab.target(
+            target, token: token, refuseSensitive: workflow.capture != nil, consume: consume
+        ))
+        if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let hold = sampler?.recordsMotion == true
         let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
         if let sampler {
@@ -146,9 +153,23 @@ final class IOSWorkflowActions {
         let current = try await tab.viewport()
         guard tab.document == document, viewport == current else { throw IOSWorkflowFailure("STALE_TARGET") }
         let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
-        let result = try await tab.target(target, token: token, dispatch: !editing, edit: edit)
+        let result = try await tab.target(
+            target,
+            token: token,
+            dispatch: !editing,
+            edit: edit,
+            refuseSensitive: workflow.capture != nil,
+            consume: consume
+        )
         try requireOK(result)
+        if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
         do { try await check() } catch { throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true) }
+    }
+
+    private func consumeSensitivity(_ result: Body, text: String?) {
+        guard result["sensitive"] as? Bool == true else { return }
+        if let text, !secrets.contains(text) { secrets.append(text) }
+        if workflow.capture != nil { discardMedia = true }
     }
 
     private func movePointer(to point: CGPoint) async throws {
