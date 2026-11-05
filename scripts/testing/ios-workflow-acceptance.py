@@ -59,6 +59,7 @@ def selection(scope):
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
                 "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
+                "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
                 "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
