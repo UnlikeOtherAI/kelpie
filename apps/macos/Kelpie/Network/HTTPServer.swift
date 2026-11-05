@@ -41,6 +41,9 @@ final class HTTPServer: @unchecked Sendable {
     private let lock = NSLock()
     private var listener: NWListener?
     private var bonjourService: NWListener.Service?
+    private var bonjourSuppressed = false
+    private var bonjourRecoveryAttempted = false
+    private var stopped = false
     var onBonjourStateChange: ((Bool) -> Void)? {
         get { lock.withLock { _onBonjourStateChange } }
         set { lock.withLock { _onBonjourStateChange = newValue } }
@@ -86,6 +89,7 @@ final class HTTPServer: @unchecked Sendable {
     ) {
         lock.lock()
         defer { lock.unlock() }
+        guard !stopped, !bonjourSuppressed else { return }
         bonjourService = NWListener.Service(name: name, type: type, txtRecord: txtRecord)
         #if DEBUG
         print("[WorkflowListener] event=service-update")
@@ -103,23 +107,23 @@ final class HTTPServer: @unchecked Sendable {
             return
         }
 
+        lock.lock()
+        guard !stopped, listener == nil else { lock.unlock(); return }
         let newListener: NWListener
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
             newListener = try NWListener(using: params, on: endpointPort)
         } catch {
+            lock.unlock()
             print("[HTTPServer] Failed to create listener: \(error)")
             onBonjourStateChange?(false)
             return
         }
-
-        lock.lock()
         listener = newListener
-        let svc = bonjourService
-        lock.unlock()
-
+        let svc = bonjourSuppressed ? nil : bonjourService
         let incarnation = scriptListener.start()
+        lock.unlock()
         newListener.service = svc
         newListener.serviceRegistrationUpdateHandler = { [weak self] change in
             guard let self, self.scriptListener.incarnation == incarnation else { return }
@@ -138,8 +142,8 @@ final class HTTPServer: @unchecked Sendable {
         newListener.newConnectionHandler = { [weak self] connection in
             self?.handleConnection(connection, listener: incarnation)
         }
-        newListener.stateUpdateHandler = { [weak self] state in
-            guard let self, self.scriptListener.incarnation == incarnation else { return }
+        newListener.stateUpdateHandler = { [weak self, weak newListener] state in
+            guard let self, let newListener, self.scriptListener.incarnation == incarnation else { return }
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
@@ -147,13 +151,14 @@ final class HTTPServer: @unchecked Sendable {
                 self.onReady?()
             case .failed(let error):
                 #if DEBUG
-                let facts = Self.listenerErrorFacts(error)
+                let facts = HTTPListenerFailure.facts(error)
                 print("[WorkflowListener] event=failed domain=\(facts.domain) code=\(facts.code)")
                 #endif
                 self.scriptListener.stop(incarnation)
                 print("[HTTPServer] Listener failed: \(error)")
                 self.onBonjourStateChange?(false)
                 self.onStateChange?(false)
+                self.recoverBonjourFailure(error, failedListener: newListener)
             case .cancelled:
                 self.scriptListener.stop(incarnation)
                 self.onBonjourStateChange?(false)
@@ -162,24 +167,31 @@ final class HTTPServer: @unchecked Sendable {
                 break
             }
         }
+        lock.lock()
+        guard !stopped, listener === newListener else { lock.unlock(); newListener.cancel(); return }
         newListener.start(queue: .global(qos: .userInitiated))
+        lock.unlock()
     }
 
-    #if DEBUG
-    private static func listenerErrorFacts(_ error: NWError) -> (domain: String, code: Int) {
-        switch error {
-        case .posix(let code): return ("posix", Int(code.rawValue))
-        case .dns(let code): return ("dns", Int(code))
-        case .tls(let code): return ("tls", Int(code))
-        case .wifiAware: return ("other", 0)
-        @unknown default: return ("other", 0)
-        }
+    private func recoverBonjourFailure(_ error: NWError, failedListener: NWListener) {
+        guard HTTPListenerFailure.isRecoverableBonjour(error) else { return }
+        lock.lock()
+        guard !stopped, !bonjourRecoveryAttempted, listener === failedListener else { lock.unlock(); return }
+        bonjourRecoveryAttempted = true
+        bonjourSuppressed = true
+        listener = nil
+        bonjourService = nil
+        lock.unlock()
+        failedListener.service = nil
+        failedListener.cancel()
+        // One same-port recovery only; the old listener's grant incarnation is retired.
+        start()
     }
-    #endif
 
     func stop() {
-        scriptListener.stop()
         lock.lock()
+        stopped = true
+        scriptListener.stop()
         let current = listener
         listener = nil
         bonjourService = nil
@@ -248,7 +260,7 @@ final class HTTPServer: @unchecked Sendable {
         let bodyStart = headerEnd.upperBound
         let bodyReceived = accumulated.distance(from: bodyStart, to: accumulated.endIndex)
 
-        switch parseContentLength(headerString) {
+        switch HTTPContentLength.parse(headerString) {
         case .valid(let contentLength):
             if contentLength > Self.maxBodyBytes {
                 send413BodyAndClose(connection: connection)
@@ -277,28 +289,6 @@ final class HTTPServer: @unchecked Sendable {
         case .malformed:
             send400AndClose(connection: connection, message: "Malformed Content-Length")
         }
-    }
-
-    private enum ContentLengthParseResult {
-        case valid(Int)
-        case missing
-        case malformed
-    }
-
-    /// Strictly parses the `Content-Length` header. Rejects negatives,
-    /// non-integer values, and trailing garbage. RFC 7230 §3.3.2 requires
-    /// a non-negative decimal — `Int("-1")` parses successfully and used to
-    /// pass through as a body-size of -1, making `bodyReceived >= -1` always
-    /// true and short-circuiting the read loop.
-    private func parseContentLength(_ headers: String) -> ContentLengthParseResult {
-        for line in headers.components(separatedBy: "\r\n") where line.lowercased().hasPrefix("content-length:") {
-            let value = line.dropFirst("content-length:".count).trimmingCharacters(in: .whitespaces)
-            guard !value.isEmpty, value.allSatisfy({ $0.isASCII && $0.isNumber }), let parsed = Int(value) else {
-                return .malformed
-            }
-            return .valid(parsed)
-        }
-        return .missing
     }
 
     private func send408AndClose(connection: NWConnection) {
