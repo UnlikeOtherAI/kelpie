@@ -642,3 +642,15 @@ The omitted-duration 350 ms motion, 500 ms control, capture-disabled isolation,
 full public corpus and inference cancellation remain open on both device
 classes. The explicit 400 ms marker and 2400 ms dense runs are not substitutes.
 These local runs do not establish final signed-release acceptance.
+
+On the API 35 phone, an omitted-duration G08 run using app SHA-256
+`3a9664189db0351ee34fa01e4747392169c714e230e770aaf3aab097b3400984`
+and test APK SHA-256
+`c6ce5d92d25c8cab70f14a4ee97152cfc4caf8fa715fbffd6a0d516e698a7e5d`
+completed with native screenrecord plus GIF/MP4 downloads. The screenrecord
+contained only three interior final-move samples, including a 157 ms gap;
+the shared fitter rejected it as insufficient. The explicit 500 ms control
+had seven interior native samples and was rejected as a 350 ms fit; its
+exports were also insufficient. The capture-disabled control timed out in
+navigation before playback and remains unverified. These are scoped test
+results, not a short-motion acceptance pass.
