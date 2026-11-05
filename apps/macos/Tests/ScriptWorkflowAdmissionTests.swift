@@ -136,6 +136,13 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
         let unknown: Body = ["ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(known))
         XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown))
+        var uncertaintyCount = 0
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, editing: false) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 0)
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, editing: true) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
+        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(nil, editing: false) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
         for malformed: Any? in [nil, "missing", [:], ["ok": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": false, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
                                 ["ok": true, "error": "bad", "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],

@@ -230,6 +230,7 @@ final class ScriptWorkflowActions {
             dispatch: !editing,
             edit: edit,
             refuseSensitive: workflow.capture != nil,
+            allowFinalMutationDocumentChange: true,
             consume: consume,
             uncertain: uncertain
         )

@@ -152,8 +152,6 @@ final class ScriptWorkflowTab {
             guard acceptChangedDocument?(value) == true else {
                 throw ScriptWorkflowFailure("DOCUMENT_CHANGED", mayHaveCompleted: mutates)
             }
-            // The old realm acknowledged input, but later classification in the new realm is unknown.
-            uncertain?()
         }
         return value
     }
@@ -205,13 +203,26 @@ final class ScriptWorkflowTab {
             mutates: dispatch || edit != nil,
             consume: { value in Self.consumeTargetResult(value, mutates: dispatch || edit != nil, consume: consume, uncertain: uncertain) },
             uncertain: uncertain,
-            acceptChangedDocument: { value in allowFinalMutationDocumentChange && Self.isAcknowledgedMutation(value) }
+            acceptChangedDocument: { value in
+                allowFinalMutationDocumentChange && Self.acceptAcknowledgedDocumentChange(
+                    value, editing: edit != nil, uncertain: uncertain
+                )
+            }
         ) as? Body else {
             uncertain?()
             throw ScriptWorkflowFailure(dispatch || edit != nil ? "INPUT_UNCERTAIN" : "TARGET_FAILED",
                                         mayHaveCompleted: dispatch || edit != nil)
         }
         return result
+    }
+
+    static func acceptAcknowledgedDocumentChange(
+        _ value: Any?, editing: Bool, uncertain: (@MainActor () -> Void)?
+    ) -> Bool {
+        guard isAcknowledgedMutation(value) else { return false }
+        // A changed realm makes subsequent edit privacy classification unknown.
+        if editing { uncertain?() }
+        return true
     }
 
     static func isAcknowledgedMutation(_ value: Any?) -> Bool {
