@@ -148,7 +148,10 @@ abstract class ScriptPublicFixture {
         }
     }
 
-    protected fun captureBlueMarker(client: ScriptHttpFixture, geometry: JSONObject): Bitmap {
+    protected fun captureBlueMarker(
+        client: ScriptHttpFixture,
+        geometry: JSONObject,
+    ): Bitmap {
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
@@ -287,7 +290,10 @@ abstract class ScriptPublicFixture {
     }
 
     /** Project DOM CSS coordinates through the exact owned WebView's native transform. */
-    private fun submitTargetBounds(view: android.webkit.WebView, geometry: JSONObject): android.graphics.Rect? {
+    private fun submitTargetBounds(
+        view: android.webkit.WebView,
+        geometry: JSONObject,
+    ): android.graphics.Rect? {
         var target: android.graphics.Rect? = null
         instrumentation.runOnMainSync {
             if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) return@runOnMainSync
@@ -309,10 +315,15 @@ abstract class ScriptPublicFixture {
             matrix.getValues(values)
             val sx = values[android.graphics.Matrix.MSCALE_X]
             val sy = values[android.graphics.Matrix.MSCALE_Y]
-            if (!matrix.isAffine || sx <= 0f || sy <= 0f || kotlin.math.abs(sx / sy - 1f) > 0.02f ||
+            if (!matrix.isAffine ||
+                sx <= 0f ||
+                sy <= 0f ||
+                kotlin.math.abs(sx / sy - 1f) > 0.02f ||
                 kotlin.math.abs(values[android.graphics.Matrix.MSKEW_X]) > 0.0001f ||
                 kotlin.math.abs(values[android.graphics.Matrix.MSKEW_Y]) > 0.0001f
-            ) return@runOnMainSync
+            ) {
+                return@runOnMainSync
+            }
             val origin = floatArrayOf(0f, 0f)
             matrix.mapPoints(origin)
             matrix.mapRect(rect)
@@ -324,10 +335,13 @@ abstract class ScriptPublicFixture {
             val rootLocation = IntArray(2)
             view.rootView.getLocationOnScreen(rootLocation)
             visible.offset(rootLocation[0], rootLocation[1])
-            val projected = android.graphics.Rect(
-                kotlin.math.floor(rect.left.toDouble()).toInt(), kotlin.math.floor(rect.top.toDouble()).toInt(),
-                kotlin.math.ceil(rect.right.toDouble()).toInt(), kotlin.math.ceil(rect.bottom.toDouble()).toInt(),
-            )
+            val projected =
+                android.graphics.Rect(
+                    kotlin.math.floor(rect.left.toDouble()).toInt(),
+                    kotlin.math.floor(rect.top.toDouble()).toInt(),
+                    kotlin.math.ceil(rect.right.toDouble()).toInt(),
+                    kotlin.math.ceil(rect.bottom.toDouble()).toInt(),
+                )
             if (visible.contains(projected)) target = projected
         }
         return target
