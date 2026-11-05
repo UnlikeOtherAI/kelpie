@@ -9,7 +9,9 @@ struct TimelineCapture {
   GraphicsCaptureItem item{nullptr};Direct3D11CaptureFramePool pool{nullptr};
   GraphicsCaptureSession session{nullptr};winrt::event_token frameEvent{},closedEvent{};
   std::shared_ptr<TimelineState> state=std::make_shared<TimelineState>();
+  std::mutex stopMutex;bool stopped=false;
   void Stop() noexcept {
+    std::lock_guard stopLock(stopMutex);if(stopped)return;stopped=true;
     {std::lock_guard lock(state->mutex);state->cancelled=true;state->changed.notify_all();}
     try{if(pool&&frameEvent.value)pool.FrameArrived(frameEvent);}catch(...){}frameEvent={};
     try{if(item&&closedEvent.value)item.Closed(closedEvent);}catch(...){}closedEvent={};
@@ -18,6 +20,14 @@ struct TimelineCapture {
     try{if(pool)pool.Close();}catch(...){}pool=nullptr;item=nullptr;
   }
   ~TimelineCapture(){Stop();}
+};
+struct TimelineDeadline {
+  std::mutex mutex;std::condition_variable changed;bool cancelled=false;std::thread thread;
+  TimelineDeadline(TimelineCapture& capture,Clock::time_point deadline):thread([this,&capture,deadline]{
+    std::unique_lock lock(mutex);if(!changed.wait_until(lock,deadline,[this]{return cancelled;})){lock.unlock();capture.Stop();}
+  }){}
+  void Cancel() noexcept {{std::lock_guard lock(mutex);cancelled=true;changed.notify_all();}if(thread.joinable())thread.join();}
+  ~TimelineDeadline(){Cancel();}
 };
 struct TimelinePacket {Json header;std::vector<BYTE> pixels;};
 struct TimelineWriter {
@@ -111,7 +121,7 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   });
   capture.closedEvent=capture.item.Closed([state](auto const&,auto const&){std::lock_guard lock(state->mutex);if(!state->cancelled){state->closed=true;state->changed.notify_one();}});
   std::vector<TimelineSnapshot> snapshots;std::string alpha;std::uint64_t lastTick=0,accepted=0,rateSkipped=0;int nextSnapshot=0;
-  const double sampleTimes[3]={5.0,13.0,21.0};capture.session.StartCapture();
+  const double sampleTimes[3]={5.0,13.0,21.0};captureFence();const auto sessionBegan=Clock::now();capture.session.StartCapture();TimelineDeadline deadlineGuard(capture,captureEnd);
   while(Clock::now()<captureEnd&&accepted<520){
     Direct3D11CaptureFrame frame{nullptr};std::uint64_t receipt=0;
     {std::unique_lock lock(state->mutex);state->changed.wait_until(lock,captureEnd,[&]{return state->latest||state->error||state->closed;});
@@ -147,7 +157,9 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   }
   bool naturalClosure=false;{std::lock_guard lock(state->mutex);naturalClosure=state->closed;}
   const std::string endReason=naturalClosure?"item-closed":accepted>=520?"frame-limit":"capture-deadline";
-  capture.Stop();writer.Stop();teardownFence();
+  capture.Stop();const auto sessionEnded=Clock::now();deadlineGuard.Cancel();writer.Stop();teardownFence();
+  const auto sessionMs=std::chrono::duration_cast<std::chrono::milliseconds>(sessionEnded-sessionBegan).count();
+  if(sessionMs>26000)throw std::runtime_error("WGC_SESSION_DURATION_BOUND");
   if(writer.failed)throw std::runtime_error("WGC_STREAM_FAILED");
   Json saved=Json::array();std::uint64_t persisted=0;
   for(std::size_t index=0;index<snapshots.size();++index){
@@ -163,7 +175,7 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   }
   Json summary={{"processId",owner.pid},{"startFileTime",std::to_string(owner.creation)},{"windowHandle",std::to_string(reinterpret_cast<std::uintptr_t>(owner.window))},{"className","KelpieScriptPresentation"},{"accepted",accepted},{"written",writer.written},{"writerReplaced",writer.replaced},
     {"poolReplaced",state->replaced},{"rateSkipped",rateSkipped},{"width",size.Width},{"height",size.Height},{"analysisWidth",width},
-    {"analysisHeight",height},{"alphaMode",alpha},{"snapshots",saved},{"naturalItemClosure",naturalClosure},{"endReason",endReason},{"sessionClosedBeforeEncoding",true}};
+    {"analysisHeight",height},{"alphaMode",alpha},{"snapshots",saved},{"naturalItemClosure",naturalClosure},{"endReason",endReason},{"sessionDurationMs",sessionMs},{"cursorCapture",false},{"secondaryWindows",false},{"borderRequired",true},{"framePoolBuffers",2},{"memoryLimitBytes",134217728},{"sessionClosedBeforeEncoding",true}};
   const auto text=summary.dump(2);if(text.size()>4096)throw std::runtime_error("WGC_OUTPUT_BOUND");std::vector<BYTE> bytes(text.begin(),text.end());RawFile(output/"summary.json",bytes,teardownFence);
   return summary;
 }

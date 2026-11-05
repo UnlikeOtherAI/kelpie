@@ -12,6 +12,14 @@ export function verifyWgcProvenance(facts){
  assert.equal(summary.processId,identity.pid);assert.equal(summary.startFileTime,identity.startFileTime);
  assert.equal(summary.windowHandle,window.windowHandle);assert.equal(summary.className,window.className);
  assert.equal(summary.sessionClosedBeforeEncoding,true);
+ assert.equal(summary.cursorCapture,false);assert.equal(summary.secondaryWindows,false);assert.equal(summary.borderRequired,true);
+ assert.equal(summary.framePoolBuffers,2);assert.equal(summary.memoryLimitBytes,134217728);
+ assert.ok(Number.isInteger(summary.sessionDurationMs)&&summary.sessionDurationMs>=0&&summary.sessionDurationMs<=26000);
+ assert.ok(Number.isInteger(summary.accepted)&&summary.accepted>=0&&summary.accepted<=520);
+ assert.ok(Number.isInteger(summary.written)&&summary.written>=0&&summary.written<=summary.accepted);
+ assert.equal(facts.frameCount,summary.written,"WGC_STREAM_COUNT_MISMATCH");
+ for(const key of ["writerReplaced","poolReplaced","rateSkipped"])assert.ok(Number.isInteger(summary[key])&&summary[key]>=0);
+ assert.ok(["item-closed","frame-limit","capture-deadline"].includes(summary.endReason));
  assert.match(active.runId,/^[a-f0-9]{48}$/);assert.equal(active.playing,true);
  assert.equal(terminal.runId,active.runId);assert.equal(terminal.success,true);
  assert.ok(typeof before.tabId==="string"&&before.tabId.length>0);assert.equal(after.tabId,before.tabId);
@@ -23,6 +31,7 @@ export function verifyWgcProvenance(facts){
  assert.ok(fixture.events.every((event,index)=>index===0||event.timeMs>fixture.events[index-1].timeMs));
  assert.ok(Array.isArray(artifacts)&&artifacts.length===2);
  assert.deepEqual(artifacts.map(item=>item.mimeType).sort(),["image/gif","video/mp4"]);
+ assert.equal(summary.analysisWidth,artifacts[0].width);assert.equal(summary.analysisHeight,artifacts[0].height);
  const doc=artifacts[0].documentId;assert.ok(typeof doc==="string"&&doc.length>0);
  for(const artifact of artifacts){
   assert.equal(artifact.runId,active.runId);assert.equal(artifact.documentId,doc);assert.equal(artifact.partial,false);
