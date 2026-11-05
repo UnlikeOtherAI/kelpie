@@ -8,6 +8,86 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
 
     @MainActor
+    func testStepOverlayKeepsAdmissionTimeAcrossSlowSnapshot() throws {
+        let marker = ScriptOverlayMarker(
+            point: CGPoint(x: 25, y: 25),
+            started: 100,
+            duration: 0.7,
+            radius: 12,
+            color: ScriptOverlayDrawing.color("#F54242"),
+            wobble: false,
+            fade: false
+        )
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: 100))
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: marker.started)) // Held at its admission time.
+        XCTAssertNil(ScriptPresentation.exposedMarker(marker, time: 101))
+        let admitted = ScriptPresentation.Frame(
+            viewport: CGSize(width: 50, height: 50), pointer: nil, marker: marker, commentary: nil, time: 100
+        )
+        let later = ScriptPresentation.Frame(
+            viewport: CGSize(width: 50, height: 50), pointer: nil, marker: marker, commentary: nil, time: 101
+        )
+        func alpha(_ frame: ScriptPresentation.Frame) throws -> UInt8 {
+            let context = try XCTUnwrap(CGContext(
+                data: nil,
+                width: 50,
+                height: 50,
+                bitsPerComponent: 8,
+                bytesPerRow: 200,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            frame.draw(in: context, size: CGSize(width: 50, height: 50))
+            let bytes = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+            return bytes[(25 * 50 + 25) * 4 + 3]
+        }
+        XCTAssertGreaterThan(try alpha(admitted), 0)
+        XCTAssertEqual(try alpha(later), 0)
+        // The same immutable admission is used even when the renderer returns after its live marker expired.
+        XCTAssertGreaterThan(try alpha(admitted), 0)
+    }
+
+    @MainActor
+    func testStepOverlayRejectsDocumentChangeAfterAdmission() throws {
+        var sameDocumentAndGeometry = true
+        let current = { sameDocumentAndGeometry }
+        XCTAssertNoThrow(try ScriptCapture.requireCurrentOverlay(current))
+        sameDocumentAndGeometry = false
+        XCTAssertThrowsError(try ScriptCapture.requireCurrentOverlay(current)) { error in
+            XCTAssertEqual((error as? ScriptWorkflowFailure)?.code, "CAPTURE_DOCUMENT_CHANGED")
+        }
+    }
+
+    @MainActor
+    func testCoherentCaptureStatePreservesViewportFieldsAndDocument() throws {
+        let identity = String(repeating: "a", count: 32)
+        let bounds = CGSize(width: 900, height: 700)
+        let classic: [NSNumber] = [900, 700, 0, 0, 885, 700, 1, 2, 0, 900, 885, 700]
+        let state = try ScriptWorkflowTab.decodeCaptureState(["viewport": classic, "document": identity], bounds: bounds)
+        XCTAssertEqual(state.document, identity)
+        XCTAssertEqual(state.viewport, try ScriptWorkflowTab.decodeViewport(classic, bounds: bounds))
+        XCTAssertEqual(state.viewport.layout, CGSize(width: 900, height: 700))
+        XCTAssertEqual(state.viewport.client, CGSize(width: 885, height: 700))
+        XCTAssertEqual(state.viewport.visible, CGRect(x: 0, y: 0, width: 885, height: 700))
+        XCTAssertEqual(state.viewport.pixelRatio, 2)
+        XCTAssertEqual(state.viewport.pageOrigin, CGPoint(x: 0, y: 900))
+
+        let zoomed: [NSNumber] = [900, 700, 30, 40, 450, 350, 2, 2, 130, 240, 900, 700]
+        let clipped = try ScriptWorkflowTab.decodeCaptureState(["viewport": zoomed, "document": identity], bounds: bounds)
+        XCTAssertEqual(clipped.viewport.visible, CGRect(x: 30, y: 40, width: 450, height: 350))
+        XCTAssertEqual(clipped.viewport.scale, 2)
+        XCTAssertEqual(clipped.viewport.pageOrigin, CGPoint(x: 130, y: 240))
+        XCTAssertNotEqual(state.viewport, clipped.viewport)
+        let replacement = try ScriptWorkflowTab.decodeCaptureState(
+            ["viewport": classic, "document": String(repeating: "b", count: 32)],
+            bounds: bounds
+        )
+        XCTAssertNotEqual(state.document, replacement.document)
+        XCTAssertThrowsError(try ScriptWorkflowTab.decodeCaptureState(["viewport": classic, "document": ""], bounds: bounds))
+        XCTAssertThrowsError(try ScriptWorkflowTab.decodeCaptureState(["viewport": [1], "document": identity], bounds: bounds))
+    }
+
+    @MainActor
     func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
         let port: UInt16 = 28421
         let router = Router()

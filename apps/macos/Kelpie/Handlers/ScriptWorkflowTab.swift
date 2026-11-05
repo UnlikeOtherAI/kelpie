@@ -187,17 +187,49 @@ final class ScriptWorkflowTab {
         return value
     }
 
+    private static let viewportExpression = """
+    (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
+    v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
+    v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY,
+    document.documentElement.clientWidth,document.documentElement.clientHeight]})()
+    """
+
+    private var documentIdentityExpression: String {
+        """
+        (()=>{const key='\(key)_document';let state=globalThis[key];
+        if(!state||state.document!==document){const bytes=new Uint32Array(4);crypto.getRandomValues(bytes);
+        state={document,id:Array.from(bytes,v=>v.toString(16).padStart(8,'0')).join('')};globalThis[key]=state}
+        return state.id})()
+        """
+    }
+
     func viewport() async throws -> Viewport {
-        guard let values = try await fixed("""
-        (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
-        v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio,v?.pageLeft??scrollX,v?.pageTop??scrollY,
-        document.documentElement.clientWidth,document.documentElement.clientHeight]})()
-        """) as? [NSNumber], values.count == 12 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        try Self.decodeViewport(try await fixed(Self.viewportExpression), bounds: renderer.scriptViewportRect.size)
+    }
+
+    /// The private world returns both values in one renderer turn, before or after the native snapshot.
+    func captureState() async throws -> (viewport: Viewport, document: String) {
+        let expression = "({viewport:\(Self.viewportExpression),document:\(documentIdentityExpression)})"
+        let result = try await fixed(expression)
+        return try Self.decodeCaptureState(result, bounds: renderer.scriptViewportRect.size)
+    }
+
+    static func decodeCaptureState(_ raw: Any?, bounds: CGSize) throws -> (viewport: Viewport, document: String) {
+        guard let body = raw as? Body, let document = body["document"] as? String, document.count == 32 else {
+            throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_UNAVAILABLE")
+        }
+        return (try decodeViewport(body["viewport"], bounds: bounds), document)
+    }
+
+    static func decodeViewport(_ raw: Any?, bounds: CGSize) throws -> Viewport {
+        guard let values = raw as? [NSNumber], values.count == 12 else {
+            throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
+        }
         let parts = values.map { CGFloat($0.doubleValue) }
-        let bounds = renderer.scriptViewportRect.size
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0, parts[4] > 0, parts[5] > 0,
-              parts[6] > 0, parts[7] > 0, parts[10] > 0, parts[11] > 0, bounds.width > 0, bounds.height > 0 else { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+              parts[6] > 0, parts[7] > 0, parts[10] > 0, parts[11] > 0, bounds.width > 0, bounds.height > 0 else {
+            throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
+        }
         return Viewport(
             bounds: bounds,
             layout: CGSize(width: parts[0], height: parts[1]),
@@ -306,16 +338,6 @@ final class ScriptWorkflowTab {
                 (expectedToken.map { !isAcknowledgedMutation(body, token: $0) } ?? true))) {
             uncertain?()
         }
-    }
-
-    func documentIdentity() async throws -> String {
-        guard let value = try await fixed("""
-        (()=>{const key='\(key)_document';let state=globalThis[key];
-        if(!state||state.document!==document){const bytes=new Uint32Array(4);crypto.getRandomValues(bytes);
-        state={document,id:Array.from(bytes,v=>v.toString(16).padStart(8,'0')).join('')};globalThis[key]=state}
-        return state.id})()
-        """) as? String, value.count == 32 else { throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_UNAVAILABLE") }
-        return value
     }
 
     func output(_ source: String) async throws -> String {

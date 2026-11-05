@@ -158,3 +158,49 @@ historical failures. No row claims whole-platform acceptance.
   and DEBUG callback probe `42096878949` are pending device outcomes.
   Projection, pinch, omitted-default, both public device corpora and release
   verification remain open.
+
+## Later evidence checkpoint - 2026-11-05
+
+Integration `417641154c72fcc75730458589490269dd001dd8`; each result
+below retains its own product and test revision. Earlier failures are not
+reclassified, and these checkpoints do not establish platform acceptance.
+
+- **Windows:** omitted-duration C live pointer evidence remains as previously
+  recorded. For product `54c` (binary SHA-256 begins `c0311849`) and
+  harness `1ec35e15`, the Maxis split diagnostic recorded 227 samples,
+  two outputs per action and cleanup. Median pre-navigation, pre-work,
+  screenshot, post-navigation, post-viewport and encoder times were 0.245,
+  1.103, 27.081, 47.045, 1.127 and 5.642 ms. Diagnostic SHA-256:
+  `c59c8c22a8c561667bf642bfc6b18303dd58c2131dc750b76c15ceb7ea10e3e0`.
+  This is not a dense export pass.
+- **Linux:** Ubuntu installed source
+  `1a148927ad081fab54a71ba8ada95bf038c7c9ef`, test source
+  `45d841a5535123a6b3ff176e57aeded6cd014b43`, run `42107002688`,
+  passed 54 native cases, decoded 44 artifacts, passed the continuous-marker
+  check and five public CLI checks with ten observations, and cleaned up.
+  See [Linux evidence](linux.md); this does not prove a published install or
+  physical desktop. Fedora run `42102220654` decoded both 15/15-frame MP4
+  streams, but final marker analysis retained 2/11 red-classified pixels;
+  same-frame source attribution is unavailable.
+- **macOS:** WK `421018`/`c102` passed one combined fast case with seven
+  samples and a 70 ms maximum gap. In rerun `421059`/`16c3`, both WK
+  fast cases were insufficient and CEF failed its edge check before timing;
+  report SHA-256 begins `6e89d59e`. Focused hosted run `42110244904`
+  at `41764115`, with immutable step-PNG and final live-marker candidate,
+  is pending; source alone is not a pass.
+- **iOS:** geometry `421062`/`dd53` passed 5/7 on each device, including
+  three units and live center. iPhone scrollable pinch passed; the original
+  pinch target was fully outside its fixture and paired navigation returned
+  `NAVIGATION_BUSY`. iPad paired MCP and decode passed, but both pinch
+  scales remained 1. Keyboard `421038`/`d0a7` returned
+  `CAPTURE_VIEWPORT_CHANGED` on both devices after only the first input:
+  iPhone observed zoom 1.455 and offset, iPad an owned keyboard frame. No
+  safe production exception is established. Marker candidate
+  `42110055424`/`f2a8a255` is pending.
+- **Android:** same-device no-capture host recording measured an omitted
+  duration span of 369 ms with 350/500 fits 10.88/34.31 px, and explicit
+  500 ms span of 442 ms with fits 13.62/13.02 px. Both failed the strict
+  9 px fit criterion. No product clock change or console replay is inferred.
+
+Final per-platform formats, privacy, Stop and recovery, the integrated PR,
+release publication and actual installed-artifact checks remain open.

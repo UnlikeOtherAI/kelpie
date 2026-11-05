@@ -8,6 +8,7 @@ final class ScriptWorkflowRunner {
     private var owner: String?
     private var started: TimeInterval = 0
     private var capture: ScriptCapture?
+    private var markerRetiree: ScriptMarkerRetiree?
     private var actionIndex = 0
     private var totalActions = 0
     private var finalizing = false
@@ -77,6 +78,8 @@ final class ScriptWorkflowRunner {
             let admitted = host.playbackState.start(totalActions: workflow.steps.count, continueOnError: false, holdSession: true)
             host.router.browserLease.end()
             guard admitted else { throw ScriptWorkflowFailure("RECORDING_IN_PROGRESS") }
+            markerRetiree?.stop()
+            markerRetiree = nil
             let id = UUID().uuidString
             runID = id
             owner = grant.owner
@@ -142,17 +145,55 @@ final class ScriptWorkflowRunner {
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
         await tab.resetTargets()
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
-        presentation?.stop()
         await host.setRecordingMode(false)
         if host.playbackState.isAbortRequested(), issue == nil {
             issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
         }
+        let retiringMarker: ScriptMarkerRetiree?
+        if let presentation, issue == nil, capture?.hasMovies != true,
+           let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
+           let window = presentation.markerWindow, let geometry = presentation.markerGeometry,
+           let document = presentation.markerDocument {
+            presentation.keepMarkerOnly()
+            let retiree = ScriptMarkerRetiree(
+                presentation: presentation, tab: tab, window: window, end: end, geometry: geometry, document: document
+            )
+            markerRetiree = retiree
+            retiringMarker = retiree
+        } else {
+            #if DEBUG
+            debugSkippedRetiree(issue: issue, presentation: presentation)
+            #endif
+            presentation?.stop()
+            retiringMarker = nil
+        }
         if issue != nil { artifacts = artifacts.map { $0.merging(["partial": true]) { _, new in new } } }
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
         host.playbackState.releaseHeldSession()
-        guard await grant.isCurrent() else { return denied() }
+        guard await grant.isCurrent() else {
+            retiringMarker?.stop()
+            return denied()
+        }
         return response
     }
+
+    #if DEBUG
+    private func debugSkippedRetiree(issue: ScriptWorkflowFailure?, presentation: ScriptPresentation?) {
+        let reason: String
+        if issue != nil {
+            reason = "issue"
+        } else if capture?.hasMovies == true {
+            reason = "movie"
+        } else if presentation?.markerEnd == nil {
+            reason = "marker"
+        } else if (presentation?.markerEnd ?? 0) <= ProcessInfo.processInfo.systemUptime {
+            reason = "expired"
+        } else {
+            reason = "identity"
+        }
+        print("[WorkflowRetiree] event=skipped reason=\(reason)")
+    }
+    #endif
 
     private func finish(id: String, owner runOwner: String, issue: ScriptWorkflowFailure?, outputs: Body, artifacts: [Body]) -> Body {
         if let issue { _ = host.playbackState.finishFatalFailure(code: issue.code, message: "Workflow stopped") } else { _ = host.playbackState.finishSuccess() }

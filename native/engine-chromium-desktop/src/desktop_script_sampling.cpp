@@ -60,6 +60,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const auto timing_start=stage_timing.Now();
       BrowserNavigationState before, after;
       auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
+      const auto timing_pre_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       Json viewport;
       result = engine.EvaluateBrowserControl(lease, viewport_expression, &viewport, std::chrono::seconds(2));
@@ -103,6 +104,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const auto timing_screenshot=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
+      const auto timing_post_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       if (before.tab.document_version != after.tab.document_version) {
         bool cleared=false;
@@ -119,7 +121,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       }
       const auto timing_post=stage_timing.Now();
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
-      stage_timing.Add(frame_time,timing_start,timing_pre,timing_screenshot,timing_post,stage_timing.Now());
+      stage_timing.Add(frame_time,timing_start,timing_pre_nav,timing_pre,timing_screenshot,timing_post_nav,timing_post,stage_timing.Now());
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
       Present();

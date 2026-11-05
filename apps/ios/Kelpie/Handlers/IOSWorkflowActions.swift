@@ -126,8 +126,30 @@ final class IOSWorkflowActions {
     private func requireOK(_ result: Body) throws {
         guard IOSPacedTypingExecutor.jsonBoolean(result["ok"]) == true else {
             // The isolated-world fixed target function supplies these diagnostic enums.
+            #if DEBUG
+            if let code = result["error"] as? String, ["STALE_TARGET", "TARGET_MOVED", "TARGET_NOT_FOUND"].contains(code) {
+                IOSFrameSampler.diagnostic("target-refusal-" + code)
+            }
+            #endif
             throw IOSWorkflowFailure(result["error"] as? String ?? "TARGET_FAILED",
                                      mayHaveCompleted: IOSPacedTypingExecutor.jsonBoolean(result["mayHaveCompleted"]) == true)
+        }
+    }
+
+    private func requireStableTarget(document: String, viewport: IOSWorkflowTab.Viewport) async throws {
+        guard tab.document == document else {
+            IOSFrameSampler.diagnostic("target-document")
+            throw IOSWorkflowFailure("STALE_TARGET")
+        }
+        let current = try await tab.viewport()
+        guard tab.document == document else {
+            IOSFrameSampler.diagnostic("target-document")
+            throw IOSWorkflowFailure("STALE_TARGET")
+        }
+        guard viewport == current else {
+            IOSFrameSampler.diagnostic("target-viewport")
+            IOSFrameSampler.geometryDiagnostic(before: viewport, after: current)
+            throw IOSWorkflowFailure("STALE_TARGET")
         }
     }
 
@@ -158,9 +180,7 @@ final class IOSWorkflowActions {
             try requireOK(preflight)
             guard IOSPacedTypingExecutor.jsonBoolean(preflight["editable"]) == true else { throw IOSWorkflowFailure("TARGET_NOT_EDITABLE") }
             try await check()
-            guard tab.document == document, viewport == (try await tab.viewport()) else {
-                throw IOSWorkflowFailure("STALE_TARGET")
-            }
+            try await requireStableTarget(document: document, viewport: viewport)
             if workflow.stepScreenshots { _ = try await sampler?.step(index, document: document) }
             return
         }
@@ -178,9 +198,7 @@ final class IOSWorkflowActions {
         if editing {
             try tab.focusForEditing()
             try await check()
-            guard tab.document == document, viewport == (try await tab.viewport()) else {
-                throw IOSWorkflowFailure("STALE_TARGET")
-            }
+            try await requireStableTarget(document: document, viewport: viewport)
         }
         let hold = sampler?.recordsMotion == true
         let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
@@ -189,8 +207,7 @@ final class IOSWorkflowActions {
             if hold { presentation.beginMarkerAnimation() }
         } else { mark() }
         try await check()
-        let current = try await tab.viewport()
-        guard tab.document == document, viewport == current else { throw IOSWorkflowFailure("STALE_TARGET") }
+        try await requireStableTarget(document: document, viewport: viewport)
         if let plan {
             let context = PacedTarget(
                 target: target,

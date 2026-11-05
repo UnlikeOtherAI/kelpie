@@ -147,7 +147,8 @@ bool WindowsApp::InitializeDesktopRuntime() {
   script_capture_=std::make_shared<WindowsScriptService>(browser_view_->hwnd(),shell_->hwnd(),
       [this](std::function<bool()> task) { return native_control_.Invoke(std::move(task),std::chrono::seconds(2)); },
       [this](const json& shown) {
-        if(!shown.value("playing",false) || !shown.contains("documentVersion")) return true;
+        if(!shown.value("playing",false) && !shown.value("detachedMarker",false)) return true;
+        if(!shown.contains("documentVersion")) return false;
         if(!desktop_app_ || !shown.contains("tabId") || !shown.contains("generation")) return false;
         TabLease lease; lease.id=shown.at("tabId"); lease.generation=shown.at("generation");
         lease.document_version=shown.at("documentVersion"); lease.require_active=true;

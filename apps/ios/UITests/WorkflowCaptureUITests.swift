@@ -15,6 +15,7 @@ final class WorkflowCaptureUITests: XCTestCase {
         let fixture = try WorkflowLoopbackPage()
         let url = try await fixture.start()
         let tab = try await openOwnedTab(url: "about:blank")
+        try await waitForBlankFixtureAdmission(tab: tab)
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,
                                                                    "actions": [["action": "navigate", "url": url]]])
         guard navigated["success"] as? Bool == true else {
@@ -24,6 +25,44 @@ final class WorkflowCaptureUITests: XCTestCase {
             ])
         }
         return (fixture, tab)
+    }
+
+    @MainActor
+    private func waitForBlankFixtureAdmission(tab: String) async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 10
+        var stableSince: TimeInterval?
+        var last: Body = [:]
+        repeat {
+            let listing = try await probe.request("/v1/get-tabs", [:])
+            let selected = (listing["tabs"] as? [Body])?.first { $0["id"] as? String == tab }
+            let active = listing["activeTab"] as? String == tab
+            let loading = selected?["isLoading"] as? Bool
+            let ready = try await probe.request("/v1/browser-control", [
+                "version": 1, "tabId": tab, "method": "tab.ready", "params": ["state": "complete"]
+            ])
+            let url = try await probe.request("/v1/browser-control", [
+                "version": 1, "tabId": tab, "method": "tab.url", "params": [:]
+            ])
+            let complete = ready["ok"] as? Bool == true && (ready["value"] as? Body)?["ready"] as? Bool == true
+            let blank = url["ok"] as? Bool == true && url["value"] as? String == "about:blank"
+            last = ["active": active, "loadingKnown": loading != nil, "loading": loading ?? true,
+                    "complete": complete, "blank": blank]
+            let now = ProcessInfo.processInfo.systemUptime
+            if active && loading == false && complete && blank {
+                if let stableSince, now - stableSince >= 0.2 { return }
+                if stableSince == nil { stableSince = now }
+            } else {
+                stableSince = nil
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: last, options: [.sortedKeys]),
+                                       uniformTypeIdentifier: "public.json")
+        attachment.name = "Blank fixture admission facts"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        throw NSError(domain: "WorkflowFixtureAdmission", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Blank tab did not reach stable read-only readiness"])
     }
 
     @MainActor

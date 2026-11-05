@@ -22,7 +22,7 @@ class WindowsScriptService : public std::enable_shared_from_this<WindowsScriptSe
                const std::string& run, const std::string& owner);
   Json Read(const Json& body, const std::string& owner);
   void Discard(const std::string& run,const std::string& owner);
-  void Show(const Json& presentation, std::function<void()> stop);
+  void Show(const Json& presentation, std::function<void()> stop, std::function<bool()> valid);
  private:
   friend struct WindowsScriptStoreTest;
   struct Entry {

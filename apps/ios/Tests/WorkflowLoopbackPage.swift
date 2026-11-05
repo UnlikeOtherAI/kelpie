@@ -118,11 +118,22 @@ final class WorkflowLoopbackPage {
             width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight});
           const position=()=>{
             const v=viewport();
-            edge.style.left=Math.min(innerWidth-150,v.x+v.width-50)+'px';
-            edge.style.top=(v.y+v.height/2-40)+'px';
+            if(!edge.style.left)edge.style.left='0px';
+            if(!edge.style.top)edge.style.top='0px';
+            // Fixed-element CSS positions and DOMRects can have different origins after native pinch.
+            // Calibrate against the actual DOMRect, without dispatching input.
+            for(let i=0;i<3;i++){
+              const rect=edge.getBoundingClientRect();
+              const dx=(v.x+v.width-50)-rect.left,dy=(v.y+v.height/2-40)-rect.top;
+              if(Math.abs(dx)<0.5&&Math.abs(dy)<0.5)break;
+              edge.style.left=(parseFloat(edge.style.left)+dx)+'px';
+              edge.style.top=(parseFloat(edge.style.top)+dy)+'px';
+            }
             const rect=edge.getBoundingClientRect();
+            const visibleWidth=Math.max(0,Math.min(v.x+v.width,rect.right)-Math.max(v.x,rect.left));
+            const visibleHeight=Math.max(0,Math.min(v.y+v.height,rect.bottom)-Math.max(v.y,rect.top));
             metrics.textContent=JSON.stringify({...v,clicks,edgeLeft:rect.left,edgeTop:rect.top,
-              edgeWidth:rect.width,edgeHeight:rect.height});
+              edgeWidth:rect.width,edgeHeight:rect.height,visibleWidth,visibleHeight});
           };
           visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
           edge.onclick=e=>{

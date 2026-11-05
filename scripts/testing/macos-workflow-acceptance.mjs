@@ -2,7 +2,7 @@
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {StringDecoder} from "node:string_decoder";
-import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal} from "../../tests/macos/runtime-ownership.mjs";
+import {startupSignal,navigationSignal,editFocusSignal,viewportSignal,workflowVisibilitySignal,serverLifecycleSignal,listenerTransitionSignal,captureCoherenceSignal,captureTimingSignal,pointerTimingSignal,retireeSignal} from "../../tests/macos/runtime-ownership.mjs";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
@@ -23,6 +23,8 @@ if(process.argv[2]==="--preparation"){
  process.exit(0);
 }
 requireTrue(process.env.KELPIE_HOSTED_RUNTIME==="1","DEDICATED_HOSTED_RUNNER_REQUIRED");
+const scope=process.env.KELPIE_RUNTIME_SCOPE??"full";
+requireTrue(["full","cef-timing"].includes(scope),"RUNTIME_SCOPE");
 const root=await realpath("."),app=await realpath("apps/macos/.build-runtime/Build/Products/Debug/Kelpie.app");
 requireTrue(app.startsWith(root+"/apps/macos/.build-runtime/"),"CANDIDATE_PATH");
 const out=path.join(root,".cache/macos-runtime/evidence"),privateDir=path.join(root,".cache/macos-runtime/private");
@@ -33,13 +35,13 @@ const hash=async file=>{const digest=createHash("sha256");for await(const bytes 
 const source=execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim();
 requireTrue(source===process.env.GITHUB_SHA,"SOURCE_REVISION_MISMATCH");
 execFileSync("git",["diff","--quiet","HEAD","--","apps/macos","native","packages/shared","tests/macos","scripts/testing"]);
-const report={source,platform:process.platform,
+const report={source,scope,platform:process.platform,
  cefFrameworkHash:await hash(path.join(app,"Contents/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework")),
  cefVersion:(await readFile("apps/macos/Frameworks/cef_include/cef_version.h","utf8")).match(/#define CEF_VERSION "([^"\n]+)"/)?.[1],
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
-const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[];
+const startupSignals=[],navigationSignals=[],editFocusSignals=[],viewportSignals=[],workflowVisibilitySignals=[],serverLifecycleSignals=[],listenerTransitionSignals=[],captureCoherenceSignals=[],captureTimingSignals=[],pointerTimingSignals=[],retireeSignals=[];
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
@@ -56,6 +58,9 @@ for(const stream of [child.stdout,child.stderr]){
    const server=serverLifecycleSignal(line);if(server&&serverLifecycleSignals.length<32)serverLifecycleSignals.push({phase,...server});
    const transition=listenerTransitionSignal(line);if(transition&&listenerTransitionSignals.length<32)listenerTransitionSignals.push({phase,...transition});
    const coherence=captureCoherenceSignal(line);if(coherence&&captureCoherenceSignals.length<32)captureCoherenceSignals.push({phase,...coherence});
+   const captureTiming=captureTimingSignal(line);if(captureTiming&&captureTimingSignals.length<128)captureTimingSignals.push({phase,...captureTiming});
+   const pointerTiming=pointerTimingSignal(line);if(pointerTiming&&pointerTimingSignals.length<32)pointerTimingSignals.push({phase,...pointerTiming});
+   const retiree=retireeSignal(line);if(retiree&&retireeSignals.length<32)retireeSignals.push({phase,...retiree});
   }
  });
 }
@@ -74,26 +79,31 @@ try{
    ...(error.code==="LISTENER_IDENTITY"?{listenerFailure:client.listenerFailure}:{}),
   }));
  }
- await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
- await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
- await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
- await independent("chromium",async()=>{
-  // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
-  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
-  await runEngine(client,fixture,"chromium",report);
- });
- await independent("cef-cli",async()=>{
-  const selected=report.engines.find(item=>item.engine==="chromium")?.checks.some(item=>item.name==="native-renderer-control"&&item.passed);
-  requireTrue(selected,"CLI_CEF_RENDERER_UNAVAILABLE");
-  await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
-  report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
- });
+ if(scope==="cef-timing"){
+  await independent("chromium",()=>runEngine(client,fixture,"chromium",report,scope));
+ }else{
+  await independent("webkit",()=>runEngine(client,fixture,"webkit",report));
+  await independent("cli",async()=>{report.publicCLI=await publicCLI(client,fixture,privateDir);});
+  await independent("inference",async()=>{report.inference=await inference(client,privateDir);});
+  await independent("chromium",async()=>{
+   // Never reset a failed workflow: wait until its own playback and listener ownership are settled.
+   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+   await runEngine(client,fixture,"chromium",report);
+  });
+  await independent("cef-cli",async()=>{
+   const selected=report.engines.find(item=>item.engine==="chromium")?.checks.some(item=>item.name==="native-renderer-control"&&item.passed);
+   requireTrue(selected,"CLI_CEF_RENDERER_UNAVAILABLE");
+   await waitFor(async()=>client.ready()&&(await client.api("get-script-status")).playing===false,30000);
+   report.cefCLI=await publicCLI(client,fixture,privateDir,"chromium");
+  });
+ }
  if(failures.length){
   report.phaseFailures=failures;
   phase=failures[0].phase;
   throw new Failure(failures[0].code);
  }
- report.corpusPassed=true;
+ if(scope==="full")report.corpusPassed=true;
+ else report.focusedScopePassed=true;
 }catch(error){
  report.failure=error.code??"HOSTED_RUNTIME_FAILED";report.phaseAtFailure=phase;
  if(report.phaseFailures?.length){
@@ -121,13 +131,13 @@ finally{
   }
   const end=Date.now()+10000;
   while(Date.now()<end&&(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
-  if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
+  if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;report.focusedScopePassed=false;process.exitCode=1;}
   else {report.ownedListenersReleased=true;report.ownedChildExited=true;}
  }else report.cleanup="NO_CHILD_SPAWNED";
  child.stdout?.destroy();child.stderr?.destroy();child.unref();
  report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
- report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;report.workflowVisibilitySignals=workflowVisibilitySignals;report.serverLifecycleSignals=serverLifecycleSignals;report.listenerTransitionSignals=listenerTransitionSignals;report.captureCoherenceSignals=captureCoherenceSignals;
+ report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;report.editFocusSignals=editFocusSignals;report.viewportSignals=viewportSignals;report.workflowVisibilitySignals=workflowVisibilitySignals;report.serverLifecycleSignals=serverLifecycleSignals;report.listenerTransitionSignals=listenerTransitionSignals;report.captureCoherenceSignals=captureCoherenceSignals;report.captureTimingSignals=captureTimingSignals;report.pointerTimingSignals=pointerTimingSignals;report.retireeSignals=retireeSignals;
  report.artifacts=client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }

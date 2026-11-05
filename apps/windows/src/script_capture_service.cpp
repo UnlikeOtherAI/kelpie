@@ -119,20 +119,24 @@ void WindowsScriptService::Configure(DesktopApp::Config& config) {
   };
   config.scripts.discard=[self](const std::string& run,const std::string& owner) { self->Discard(run,owner); };
   config.scripts.artifact=[self](const Json& body,const std::string& owner) { return self->Read(body,owner); };
-  config.scripts.present=[self](const Json& presentation,std::function<void()> stop) { self->Show(presentation,std::move(stop)); };
+  config.scripts.present=[self](const Json& presentation,std::function<void()> stop,std::function<bool()> valid) { self->Show(presentation,std::move(stop),std::move(valid)); };
 }
-void WindowsScriptService::Show(const Json& presentation,std::function<void()> stop) {
+void WindowsScriptService::Show(const Json& presentation,std::function<void()> stop,std::function<bool()> valid) {
   auto self=shared_from_this();
-  if(!marshal_([self,presentation,stop=std::move(stop)]() mutable {
+  if(!marshal_([self,presentation,stop=std::move(stop),valid=std::move(valid)]() mutable {
     try {
     if(!AcceptDesktopPresentationRevision(presentation,self->last_presentation_revision_)) return true;
-    if(!self->overlay_) self->overlay_=std::make_unique<ScriptNativeOverlay>(self->viewport_,self->owner_);
+    if(!self->overlay_) self->overlay_=std::make_unique<ScriptNativeOverlay>(self->viewport_,self->owner_,self->guard_);
     auto shown=presentation;
-    if(self->guard_ && !self->guard_(shown)) {
+    if(!shown.value("detachedMarker",false) && self->guard_ && !self->guard_(shown)) {
       shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
     }
-    self->overlay_->Show(shown,std::move(stop)); return true;
-    } catch(...) { return false; }
+    self->overlay_->Show(shown,std::move(stop),std::move(valid)); return true;
+    } catch(...) {
+      if(self->overlay_ && presentation.value("detachedMarker",false))
+        self->overlay_->RetireIfRevision(presentation.value("_presentationRevision",std::uint64_t{}));
+      return false;
+    }
   })) throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
 }
 }
