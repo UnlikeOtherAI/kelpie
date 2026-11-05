@@ -20,6 +20,7 @@ final class ScriptCapture {
     private var sampling = false
     private var criticalPending = false
     private var stopped = false
+    private var stoppedAt: Double?
     private var started = ProcessInfo.processInfo.systemUptime
     private var nextSlot = 0
     private var initialViewport: ScriptWorkflowTab.Viewport?
@@ -96,12 +97,18 @@ final class ScriptCapture {
                                   "viewport": viewport.metadata, "documentId": document]))
     }
 
-    func finish(partial: Bool, discard: Bool = false) async -> [[String: Any]] {
+    /// Stop admitting work immediately; join the existing task after renderer retirement.
+    func stopSampling() {
+        if stoppedAt == nil { stoppedAt = now }
         stopped = true
         frameTask?.cancel()
+    }
+
+    func finish(partial: Bool, discard: Bool = false) async -> [[String: Any]] {
+        stopSampling()
         await frameTask?.value
         frameTask = nil
-        let end = min(max(now, 1 / Double(fps)), maximumDuration)
+        let end = min(max(stoppedAt ?? now, 1 / Double(fps)), maximumDuration)
         var candidates = screenshots.map { ($0.0, "image/png", $0.1) }
         if let writer {
             do {
@@ -199,6 +206,7 @@ final class ScriptCapture {
         droppedFrames += max(0, slot - nextSlot)
         nextSlot = slot + 1
         let (image, _, _) = try await frame()
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         let timestamp = now
         guard timestamp <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         var accepted = true
@@ -222,17 +230,21 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         try await tab.check()
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         if let initialViewport, !initialViewport.sameGeometry(as: viewport) { throw ScriptWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
         initialViewport = viewport
         let document = try await tab.documentIdentity()
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         if let firstDocument {
             if firstDocument != document { sameDocument = false }
         } else { firstDocument = document }
         let maximumWidth = options["maxWidth"] as? Int ?? 1280
         let source = try await tab.snapshot(maximumPixels: CGSize(width: maximumWidth, height: 1920), viewport: viewport)
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         guard try await tab.documentIdentity() == document, try await tab.viewport() == viewport else {
             throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
         }
+        guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
         var rect = CGRect(origin: .zero, size: source.size)
         guard let image = source.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { throw ScriptCaptureError.image }
         let scale = min(Double(maximumWidth) / Double(image.width), 1920 / Double(image.height), 1)

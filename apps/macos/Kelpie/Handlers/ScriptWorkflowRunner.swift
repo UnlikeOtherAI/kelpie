@@ -126,6 +126,7 @@ final class ScriptWorkflowRunner {
             }
         } catch { issue = error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
+        capture?.stopSampling()
         // Late decoded metadata must retire before scrub/disposal becomes observable.
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
         var discardCapture = actions?.discardMedia == true || issue?.code == "SENSITIVE_CAPTURE_REFUSED"
