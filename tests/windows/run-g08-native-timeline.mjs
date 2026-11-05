@@ -9,7 +9,7 @@ import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/sha
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
 import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
-import {acceptPresentation,presentationNotVisible} from "./wgc-presentation-identity.mjs";
+import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
 import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
@@ -97,7 +97,7 @@ try{
  }
  assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");assert.equal(window.className,"KelpieScriptPresentation");
  report.phase="capture";report.active={runId:active.runId,playing:true};report.window=window;await save();
- helper=spawn(wgc,["timeline",String(running.pid),exe,identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
+ helper=spawn(wgc,["timeline",String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"native")],{env,windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let helperError="";helper.stderr.on("data",chunk=>{if(helperError.length<8192)helperError+=chunk.toString().slice(0,8192-helperError.length);});
  const helperExit=new Promise((done,reject)=>{helper.once("error",reject);helper.once("close",(code,signal)=>done({code,signal}));});void helperExit.catch(()=>{});
  helperTimer=setTimeout(()=>helper.kill(),35000);
