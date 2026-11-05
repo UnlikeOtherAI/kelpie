@@ -17,7 +17,8 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
   const privateAction = isolated && env.KELPIE_PRIVATE_ATSPI_ACTION === "1";
   const fixture = await startCaptureFixture();
   const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated && !privateAction ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
-    display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim", artifacts: [] };
+    display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim",
+    pointerDuration: env.KELPIE_GTK_DEFAULT_POINTER === "1" ? "omitted" : 300, artifacts: [] };
   let pending;
   const api = async (method, body = {}) => {
     const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
@@ -54,7 +55,7 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
       { action: "wait", ms: 30000 },
       { action: "click", target: { role: "button", name: "Confirm order", exact: true } },
     ], capture: { formats: ["gif", "video", "screenshots"], fps: 5, maxWidth: 640, maxBytes: 8388608, maxDurationMs: 40000 },
-    pointer: { enabled: true, curve: "s", durationMs: 300, easing: "ease-in-out" },
+    pointer: { enabled: true, curve: "s", ...(env.KELPIE_GTK_DEFAULT_POINTER === "1" ? {} : { durationMs: 300 }), easing: "ease-in-out" },
     tapIndicator: { color: "#FF0000", radius: 24, durationMs: 5000, wobble: true, fade: true } }));
     report.event = await wait(() => fixture.events.find(event => event.type === "click" && event.target === "unique"),
       "Trusted native click after encoded marker admission", 20000);
