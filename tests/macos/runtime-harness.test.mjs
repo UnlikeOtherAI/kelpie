@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {listenerState} from "./runtime-ownership.mjs";
 import {startFixture,canary} from "./runtime-fixture.mjs";
 test("fixture reflection is synthetic, encoded, and events never contain input values",async()=>{
  const fixture=await startFixture();
@@ -20,4 +21,11 @@ test("fixture rejects oversized event bodies without retaining them",async()=>{
   const response=await fetch(fixture.url+"/events",{method:"POST",body:"x".repeat(16385)});
   assert.equal(response.status,413);assert.equal(fixture.events.length,0);
  }finally{await fixture.close();}
+});
+
+test("startup waits only for missing listeners, never foreign or ambiguous owners",()=>{
+ assert.equal(listenerState([],123),"missing");
+ assert.equal(listenerState([123],123),"owned");
+ assert.equal(listenerState([456],123),"foreign");
+ assert.equal(listenerState([123,456],123),"foreign");
 });

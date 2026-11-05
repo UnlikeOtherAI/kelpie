@@ -1,3 +1,7 @@
+import {writeFile} from "node:fs/promises";
+import path from "node:path";
+import {startArtifactProtocolFixture} from "../capture/artifact-protocol-fixture.mjs";
+import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
@@ -13,6 +17,8 @@ export async function runEngine(client,fixture,engine,report) {
   const id="browser.renderer."+engine,window=await waitFor(()=>client.find(id));
   await client.tap(id,window);
   await waitFor(async()=>{const value=await client.api("get-renderer");return value.engine===engine;});
+  const resized=await client.api("resize-viewport",{width:900,height:700});
+  requireTrue(resized.success,"NATIVE_VIEWPORT_RESIZE");
   return await client.screenshot(engine+"-renderer");
  });
  const tabs=await client.api("get-tabs");
@@ -64,6 +70,25 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(!status.success&&!abort.success&&!status.artifacts&&!status.outputs&&!chunk.success&&!chunk.data,"FOREIGN_OWNER_ACCESS");
   return {genericPlay:true,foreignStatusDenied:true,foreignAbortDenied:true,foreignArtifactDenied:true};
  });
+ await check("three-protocol-multichunk-artifact",async()=>{
+  const large=await startArtifactProtocolFixture();
+  try{
+   const navigated=await play([{action:"navigate",url:large.url},{action:"wait-ready",state:"complete",selector:"img"},{action:"wait",ms:500}]);
+   requireTrue(navigated.success,"ARTIFACT_FIXTURE_READY");
+   const status=await client.api("browser-control",{version:1,method:"tab.status",tabId,params:{}});
+   requireTrue(status.ok&&status.value.viewport.width>=512&&status.value.viewport.height>=512,"ARTIFACT_FIXTURE_VIEWPORT");
+   const value=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"],maxWidth:1280},actions:[{action:"screenshot"}]});
+   requireTrue(value.success,"ARTIFACT_FIXTURE_CAPTURE");
+   const artifact=value.artifacts.find(a=>a.mimeType==="image/png"&&a.byteLength>262*1024);
+   requireTrue(artifact,"ARTIFACT_MULTICHUNK_SIZE");
+   const verified=await verifyArtifactProtocols({runId:value.runId,artifact,
+    http:async(method,body,options)=>(await client.request("/v1/"+method,body,options)).value,
+    mcp:(name,args,options)=>client.tool(name,args,false,options)});
+   const file=path.join(client.out,engine+"-three-protocol.png");await writeFile(file,verified.bytes,{flag:"wx"});
+   return {...verified.report,fixtureSha256:large.fixtureSha256,decoded:inspectMedia({...artifact,file})};
+  }finally{await large.close();}
+ });
+ await load();
  await check("ambiguity-obscured-disabled",async()=>{
   const results=[];
   for(const name of ["Duplicate","Covered","Disabled"]){

@@ -1,6 +1,7 @@
 // Dedicated hosted runner only. No global input, simulator, or existing app attachment.
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
+import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
 import {Client,Failure,requireTrue,listeners,waitFor,delay} from "../../tests/macos/runtime-client.mjs";
@@ -14,8 +15,13 @@ const out=path.join(root,".cache/macos-runtime/evidence"),privateDir=path.join(r
 await mkdir(out,{recursive:true});await mkdir(privateDir,{recursive:true,mode:0o700});
 requireTrue(listeners(28420).length===0&&listeners(8421).length===0,"OCCUPIED_LISTENER");
 const executable=path.join(app,"Contents/MacOS/Kelpie");
-const hash=async file=>createHash("sha256").update(await readFile(file)).digest("hex");
-const report={source:execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim(),platform:process.platform,
+const hash=async file=>{const digest=createHash("sha256");for await(const bytes of createReadStream(file))digest.update(bytes);return digest.digest("hex");};
+const source=execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim();
+requireTrue(source===process.env.GITHUB_SHA,"SOURCE_REVISION_MISMATCH");
+execFileSync("git",["diff","--quiet","HEAD","--","apps/macos","native","packages/shared","tests/macos","scripts/testing"]);
+const report={source,platform:process.platform,
+ cefFrameworkHash:await hash(path.join(app,"Contents/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework")),
+ cefVersion:(await readFile("apps/macos/Frameworks/cef_include/cef_version.h","utf8")).match(/#define CEF_VERSION "([^"\n]+)"/)?.[1],
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client;
@@ -24,7 +30,7 @@ for(const stream of [child.stdout,child.stderr])stream.on("data",bytes=>{appLogB
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
  report.pid=child.pid;client=new Client(child.pid,out);
- await waitFor(()=>{client.pin(28420);client.pin(8421);return true;},30000);
+ await waitFor(()=>client.ready(),30000);
  client.token=await client.pair("Hosted Mac acceptance");
  fixture=await startFixture();
  await runEngine(client,fixture,"webkit",report);

@@ -2,6 +2,7 @@ import {execFileSync,spawn} from "node:child_process";
 import {writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
+import {listenerState} from "./runtime-ownership.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 export const delay=ms=>new Promise(r=>setTimeout(r,ms));
 export class Failure extends Error { constructor(code){super(code);this.code=code;} }
@@ -17,13 +18,15 @@ export async function waitFor(run,ms=10000){
 }
 export class Client {
  constructor(pid,out){this.pid=pid;this.out=out;this.token=null;this.secrets=[];this.artifacts=[];this.counter=0;}
- pin(port){const owners=listeners(port);requireTrue(owners.length===1&&owners[0]===this.pid,"LISTENER_IDENTITY");}
+ pin(port){requireTrue(listenerState(listeners(port),this.pid)==="owned","LISTENER_IDENTITY");}
+ ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
+  requireTrue(!states.includes("foreign"),"LISTENER_IDENTITY");return states.every(state=>state==="owned");}
  async request(route,body={},options={}){
   const port=options.reveal?8421:28420;this.pin(port);
   const headers={"content-type":"application/json",accept:"application/json, text/event-stream"};
   if(!options.reveal&&(options.token??this.token))headers.authorization="Bearer "+(options.token??this.token);
   const response=await fetch("http://127.0.0.1:"+port+route,{method:options.method??"POST",headers,
-   body:options.method==="GET"?undefined:JSON.stringify(body),signal:AbortSignal.timeout(options.timeout??365000),redirect:"error"});
+   body:options.method==="GET"?undefined:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(options.timeout??365000)]):AbortSignal.timeout(options.timeout??365000),redirect:"error"});
   const pieces=[];let size=0;for await(const bytes of response.body){size+=bytes.length;if(size>32*1024*1024)throw new Failure("RESPONSE_LIMIT");pieces.push(Buffer.from(bytes));}
   let text=Buffer.concat(pieces).toString("utf8");
   this.pin(port);
@@ -35,8 +38,8 @@ export class Client {
   if(method==="get-script-status"&&response.value.success)scriptStatusV1Schema.parse(response.value);
   return response.value;
  }
- async tool(name,args={},reveal=false){
-  const {value}=await this.request("/mcp",{jsonrpc:"2.0",id:++this.counter,method:"tools/call",params:{name,arguments:args}},{reveal});
+ async tool(name,args={},reveal=false,options={}){
+  const {value}=await this.request("/mcp",{jsonrpc:"2.0",id:++this.counter,method:"tools/call",params:{name,arguments:args}},{...options,reveal});
   requireTrue(!value.error,"MCP_ERROR");
   const result=JSON.parse(value.result.content.find(x=>x.type==="text").text);
   return result.ok===true?result.value:result.ok===false?{success:false,error:result.error}:result;
