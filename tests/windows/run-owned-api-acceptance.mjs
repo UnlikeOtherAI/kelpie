@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {readFile,writeFile,mkdir,access} from "node:fs/promises";
@@ -73,7 +74,9 @@ try{
 }finally{
  await writeFile(join(evidenceRoot,"flow-report.json"),JSON.stringify(report,null,2));
  if(launched){
-  try{assert.equal((await publicCli(["browser","stop",alias])).success,true);report.cleanup="public-cli-closed";}
+  try{assert.equal((await publicCli(["browser","stop",alias])).success,true);
+   if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
+   report.cleanup="public-cli-closed";}
   catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message});process.exitCode=1;}
  }
  if(running){
