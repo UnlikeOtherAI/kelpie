@@ -1,18 +1,22 @@
 # Resources, access and release audit
 
-Recorded 2026-11-04. Current user gate: Windows on Maxis first; Mac only after Windows acceptance. Earlier Mac access notes below are historical. This is a coordination snapshot, not a resource reservation.
+Updated 2026-11-05; older inventory entries remain historical. Current user direction: finish all native platforms through
+separate platform owners in parallel, subject to coordinator workload slots. The
+earlier Windows-first/Mac-first gates below are historical. Computer Use is OFF;
+no CUA, VNC, desktop-input helper or native UI driving is authorized. This is a
+coordination snapshot, not a resource reservation.
 Only the coordinator grants workload slots. ChatterBox tools were unavailable;
 directed coordinator messages carry resource changes. A later supported local MCP fallback was found, but registration failed; see below.
 
 | Host | State / evidence | Work allowed |
 |---|---|---|
-| Maxis | SSH IPv4 works; Node present; ffmpeg/ffprobe absent from current PATH | workflows owns MAXIS-PORTABLE-1, maximum two workers; observations install finished; other heavy work held |
-| Mac dictator | DNS failed from this session; IPv4 SSH works | builds/servers/browser launches held by coordinator |
-| Ubuntu umac | coordinator reports unreachable | no jobs |
+| Maxis | COMMON-11 final preflight CPU42–45%, free21,912,252KiB; all own jobs ended | COMMON-PORTABLE-11 released after integrated lint/build/shared142/CLI694/browser30/core2 checks; refresh load/RAM before new jobs |
+| Mac dictator | Historical DNS failure; IPv4 SSH works; platform owners provide current load/build evidence | Mac/iOS work uses coordinator-granted slots; no desktop input |
+| Ubuntu umac | Earlier coordinator reachability failure is historical | Android owner reports actual host/resource evidence; no general portable workloads |
 | FedoraMaxis | bounded Linux-only verification target | no general development jobs |
-| Minis | local CUA available | UI access inventory only so far |
+| Minis | Lightweight client/artifact verification host | Computer Use OFF; no remote heavy builds |
 
-Coordinator reports Mac load 27-49 on 10 CPUs, 31 GB used and 32 GB swap.
+Historical inventory: coordinator reported Mac load27–49 on10 CPUs,31GB used and32GB swap; this is not a current reservation or host-load measurement.
 Read-only inventory found one DeviceHub PID 545, Kelpie PID 12718 in the
 `favorites-tree` worktree, and existing Android scrcpy/emulator work. These are
 other owners' processes; coordinate before replacing any Kelpie instance or

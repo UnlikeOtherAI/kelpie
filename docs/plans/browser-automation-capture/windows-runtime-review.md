@@ -105,3 +105,71 @@ Required real native cases are switching foreground during fade and an in-flight
 snapshot latch, owner minimize/restore, a modal over the renderer, and returning
 to Kelpie without activation or Z-order theft. Preserve the frozen first compile;
 apply and test the fix afterward. No CUA, UI action or test was performed here.
+
+## Committed Windows runtime review
+
+Reviewed commit: 8423d7df8b4fa21b7e3c2b8ec24cfd3a9e4b4f64,
+base9b939695ed276130e3b5d78463712a02f6f5c84d. This supersedes frozen tree e1f96def;
+recording/runtime implementation differs only by trailing blank-line cleanup.
+Review was read-only. No app, browser, build, test or Computer Use was started.
+
+| Prior finding | Source at this checkpoint | Remaining evidence |
+|---|---|---|
+| WIN-01 admission race | TryScriptAdmission holds the persistent mutex across running-state admission; router rechecks Allows after GuardDispatch | Actual competing request orderings and late pending completion |
+| WIN-02 displayed/exported time | presentation_latched withholds later display updates during Screenshot; policy timer stays active | Native display/frame correspondence and slow screenshot timing; no simultaneous OS-screen claim |
+| WIN-03 cadence/drops | Fractional steady-clock interval and skipped-slot accounting replace integer cadence | Burst step tickets may bypass nominal movie cadence; owner question below |
+| WIN-04 document provenance | Plan explicitly defines movie documentId as initial generation, PNG as sampled generation | Public API wording and actual navigation/torn-frame corpus |
+| WIN-05 duration/finalization | Pre-acquisition duration check and one in-flight frame; run retains ownership through sampler/finalization | Measured in-flight/finalization grace and responsive abort/next run |
+| WIN-06 retention | Private directory, bounded total storage, one-hour lazy expiry on Publish/Read/shutdown documented | Expiry/cleanup/recovery actual service flow |
+| WIN-07 grant freshness | Listener-incarnation revalidate callback before actions and sampled frames; shutdown closes admission | Actual listener/revocation/late callback behavior |
+| WIN-08 output copy | Fixed output reader refuses >16,384 characters before returning across bridge | Real large-output refusal and secret cases |
+| WIN-09 foreground policy | Timer remains active while latched; Show checks foreground, modal/disabled owner and minimization, uses no-Z-order flags | Actual foreground/modal/minimize/restore UI tests remain blocked by user Computer Use hold |
+
+New source finding WIN-10 / SEC-01: Encoded emits uppercase percent triplets and
+Scrubber::Text uses byte-exact comparisons. Secret a b+! is scrubbed in
+a%20b%2B! but survives in equivalent a%20b%2b!; form a+b%2b%21 has the same problem.
+The Windows owner received the exact case and a focused mixed/lowercase percent-hex
+regression request. Treat percent hex digits case-insensitively without folding
+ordinary secret text. This is a deterministic source finding; no native app
+failure was reproduced by this reviewer. SEC-01 remains open.
+
+WIN-03 source/evidence question: requested_step>=0 wakes before the next cadence
+slot, then Capture::AddFrame feeds all frames into GIF/MP4 before optional PNG.
+A zero-wait burst can exceed requested movie fps despite the fractional timer.
+The owner was asked to enforce/coalesce the declared movie rate while retaining
+step PNG evidence, or document and measure a bounded mandatory-frame policy.
+This is not yet a measured native failure.
+
+SESSION_UNSUPPORTED preflight is present for every supplied external sessionId,
+before admission/target/navigation. Absent ID uses existing authenticated local
+grant plus pinned tab. No body-selected authority or parallel allocator is created.
+The generic script MCP path builds a transient gateway from the same registry,
+strict generated schema and callable-router filtering before bypassing the long
+persistent mutex. Native owner/CAPI tests exercise this owner-context plumbing;
+they do not establish actual CEF playback or media acceptance.
+
+The owner reports a shipping build and owner/redaction/compositor/codec tests.
+Those reports do not close native HTTP/MCP/CLI capture, media-decode artifact
+lineage, UI or installed-release requirements. Common registry checkpoint07beb
+and main merge9b939695 were separately verified; no extra Windows build was run here.
+
+### Follow-up evidence: matcher, cadence and exported pixels
+
+The Windows owner committed percent-triplet-only mixed/lower-hex matching at
+cda68d21d5cc92495854a3607350fc0067912f20; the focused native matcher test passed.
+Root integrated that checkpoint and movie cadence fix at
+cdf0a7fbdfed2afb94fb1f56222da725ef204a88. Shared redactor lift
+9f752a56335a15e1662016dc6db934a79adba7b5 passed public C ABI and no-CEF desktop
+delegation tests2/2. These source/unit results close the identified matcher
+algorithm defect, not actual-app SEC-01 acceptance or final FPS measurement.
+
+Root independently inspected exported8423 pixels using local view_image, without
+Computer Use: the confirm-order PNG showed the red marker centered on Confirm
+order with the pointer; a later sampled frame showed the marker gone on the same
+fixture document a9695709. The files and owner cross-host-decode-report.json are
+under C:/Users/ondre/.codex/worktrees/capture-windows-client-20261104/.cache/capture-evidence/native-8423/.
+The owner report records eleven artifact hashes/byte lengths and full
+single-thread GIF/MP4/PNG decode/timing. Root's visual observation is separate
+reviewer evidence; it does not prove the local native overlay or Stop control.
+Two owner-flow assertions and encoded-secret/FPS retests remained pending at
+that observation. Computer Use remains OFF.

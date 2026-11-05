@@ -73,4 +73,4 @@ looping, duration and partial-state metadata. Verify authenticated chunk downloa
 from another client/process against independent file hashes.
 
 
-The first native gate is Windows CEF on Maxis. Mac verification follows only after that gate passes. Fixed-reader source regressions use Node 24: node --test --test-concurrency=1 tests/capture/target-regressions.test.mjs. The initial 7c597780 contract fails four of these checks; see the workflow review ledger. A source regression pass still requires the corresponding real-renderer flow.
+The current user-authorized rollout proceeds in parallel through separate Windows, macOS, iOS, Android and Linux owners. The earlier Windows-first gate is historical. Computer Use, VNC and desktop-input helpers remain OFF; record real supported machine-interface evidence separately from blocked native UI/Stop verification. Fixed-reader source regressions use Node 24: node --test --test-concurrency=1 tests/capture/target-regressions.test.mjs. The initial 7c597780 contract fails four of these checks; see the workflow review ledger. A source regression pass still requires the corresponding real-renderer flow.

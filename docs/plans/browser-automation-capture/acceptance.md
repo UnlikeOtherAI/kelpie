@@ -3,14 +3,20 @@
 Status: implementation and real-device evidence pending. This ledger does not certify a release.
 The [landed implementation map](implementation-map.md) links canonical IDs to exact source symbols, durable evals, reviewed source checkpoints and remaining native evidence.
 Base reviewed: `b6784ff723b27da4096fdd8d9227f2a00dfc9084`.
-Owner: acceptance. Source worktree: Maxis `D:/Worktrees/kelpie/capture-evals-20261104`.
+Owner: common contracts/CLI and acceptance (/observations).
+Source worktree: Maxis `D:/Worktrees/kelpie/capture-observations-20261104`.
+The former QA worktree remains read-only; iOS implementation now belongs to /acceptance.
 See [architecture review](architecture-review.md), [resource ledger](resources.md),
 and [fixture instructions](../../../tests/capture/README.md).
 
 ## Gates and evidence
 
-Windows on Maxis must pass the complete native CEF user flow before work resumes on macOS, iOS, Android,
-and Linux. Each renderer must be named: macOS WebKit and Chromium are
+The latest user direction authorizes parallel implementation by per-platform owners;
+the earlier Windows-first execution gate is historical and no longer blocks other
+platform source work. Resource slots still come from the coordinator. Computer Use,
+VNC, custom desktop-input helpers and native UI driving remain explicitly off.
+Machine-interface evidence and native UI evidence must remain distinct.
+Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
 separate cells. A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
@@ -106,10 +112,11 @@ and symbols exist. Every implementation owner must replace this with landed path
    Run another successful workflow without clearing state by hand.
 7. Try another session and revoked grant against status/cancel/download. Confirm
    stale refs, uncertain mutation and Nessie durable pins retain existing behavior.
-8. Repeat the exact corpus on each native renderer only after Windows passes.
+8. Run the exact corpus independently on each native renderer under its assigned
+   coordinator resource slot; other platforms do not wait for Windows acceptance.
    Restricted Lightpanda refusal evidence remains distinct from native support.
 
-No test or manual flow has been run for this ledger yet.
+The initial ledger author ran no flows at creation. Later source/core/headless and exported-media results are recorded in the linked implementation/review/platform ledgers; they do not automatically promote any native cell to passed. UI/Stop verification remains blocked by the user hold.
 
 ## Canonical ID crosswalk
 This ledger is the sole definition of acceptance IDs. Earlier planning/checklist

@@ -18,9 +18,9 @@ This plan covers the full Lightpanda-inspired browser automation brief and the o
 
 1. Audit existing gateway/play-script and agree portable target, capture, workflow and artifact contracts.
 2. Implement observation, extraction, status/readiness and diagnostics in the canonical gateway.
-3. Extend play-script with strict workflows and native capture. Windows on Maxis end-to-end is the first acceptance gate. Mac follows only after Windows completes.
-4. Implement identical contract on iOS/Android together and Windows/Linux; advertise only implemented capabilities.
-5. Exercise every capability through real UI, direct MCP and CLI forwarding. Durable cross-platform conformance evals supplement real-device evidence.
+3. Extend play-script with strict workflows and native capture across the five user-authorized per-platform workstreams in parallel. The earlier Windows-first gate remains historical evidence, not a current dependency.
+4. Keep iOS/Android contracts aligned and implement Windows/Linux/macOS bindings; advertise only implemented, verified capabilities.
+5. Exercise every capability through real supported HTTP, direct/generic MCP and CLI forwarding. Computer Use, VNC and desktop-input helpers are currently OFF; native UI/Stop evidence remains explicitly blocked until the user lifts that hold. Durable cross-platform conformance evals supplement real-device evidence.
 6. Evaluate optional backend and WebMCP boundaries without weakening native browser guarantees.
 7. Audit every ID, docs, affected releases and installed published artifacts. Coordinator owns the integrated PR and release cycle.
 
@@ -32,6 +32,6 @@ The pointer is visual, independent of the OS cursor. Capture continuously sample
 
 Secret references resolve only on the authorized host. Secret values stay out of progress, manifests and error messages. Page content and declared page tools remain untrusted. Unsupported capabilities fail explicitly.
 
-See [workflows checklist](workflows.md). QA owns the master acceptance checklist.
+See [workflows checklist](workflows.md). The common-contracts owner maintains the master acceptance checklist and per-platform evidence; platform owners supply exact exercised revisions and artifacts.
 
 The canonical IDs and evidence requirements are in [acceptance.md](acceptance.md). Local workflow authoring items use WLOCAL identifiers; historical family ranges above are scope categories, not a second acceptance ledger.
