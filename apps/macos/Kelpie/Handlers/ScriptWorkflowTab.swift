@@ -216,7 +216,14 @@ final class ScriptWorkflowTab {
                 return await router.handle(method: "navigate", body: ["url": url, "tabId": id], bypassRecordingGate: true, browserGatewayDispatch: true).json
             }
         )
-        guard response["success"] as? Bool == true else { throw ScriptWorkflowFailure("NAVIGATION_FAILED", mayHaveCompleted: true) }
+        guard response["success"] as? Bool == true else {
+            #if DEBUG
+            let code = (response["error"] as? Body)?["code"] as? String ?? ""
+            let allowed: Set<String> = ["BUSY", "NAVIGATION_ERROR", "TIMEOUT", "NO_WEBVIEW", "TAB_NOT_FOUND", "INVALID_URL", "RECORDING_IN_PROGRESS"]
+            print("[WorkflowNavigation] failure=" + (allowed.contains(code) ? code : "UNCLASSIFIED"))
+            #endif
+            throw ScriptWorkflowFailure("NAVIGATION_FAILED", mayHaveCompleted: true)
+        }
         try await check()
     }
 

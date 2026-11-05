@@ -2,7 +2,7 @@
 import {spawn,execFileSync} from "node:child_process";
 import {mkdir,writeFile,readFile,realpath} from "node:fs/promises";
 import {StringDecoder} from "node:string_decoder";
-import {startupSignal} from "../../tests/macos/runtime-ownership.mjs";
+import {startupSignal,navigationSignal} from "../../tests/macos/runtime-ownership.mjs";
 import {createReadStream} from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
@@ -38,16 +38,17 @@ const report={source,platform:process.platform,
  executableHash:await hash(executable),debugLibraryHash:await hash(path.join(app,"Contents/MacOS/Kelpie.debug.dylib")),
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client,phase="launch",childExit=null,stopping=false;const started=Date.now();
-const startupSignals=[];
+const startupSignals=[],navigationSignals=[];
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"],env:{...process.env,NSUnbufferedIO:"YES"}});
 let childExited=false;child.once("exit",(code,signal)=>{childExited=true;childExit={code,signal,during:stopping?"cleanup":"runtime"};});
 for(const stream of [child.stdout,child.stderr]){
  const decoder=new StringDecoder("utf8");let text="";
  stream.on("data",bytes=>{
-  appLogBytes+=bytes.length;if(!["launch","listeners"].includes(phase))return;
+  appLogBytes+=bytes.length;
   text=(text+decoder.write(bytes)).slice(-16384);let index;
   while((index=text.indexOf("\n"))>=0){const line=text.slice(0,index).trim();text=text.slice(index+1);
-   const signal=startupSignal(line);if(signal&&!startupSignals.includes(signal))startupSignals.push(signal);
+   if(["launch","listeners"].includes(phase)){const signal=startupSignal(line);if(signal&&!startupSignals.includes(signal))startupSignals.push(signal);}
+   const navigation=navigationSignal(line);if(navigation&&navigationSignals.length<32)navigationSignals.push(navigation);
   }
  });
 }
@@ -87,7 +88,7 @@ finally{
  child.stdout?.destroy();child.stderr?.destroy();child.unref();
  report.childExit=childExit;report.readiness=client?.readiness??[];
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
- report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;
+ report.appLogBytes=appLogBytes;report.startupSignals=startupSignals;report.navigationSignals=navigationSignals;
  report.artifacts=client?.artifacts??[];
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
 }
