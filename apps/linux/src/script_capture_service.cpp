@@ -1,6 +1,10 @@
 #include "script_capture_service.h"
 #include "script_frame_compositor.h"
+#include "script_capture_cadence.h"
 #include "script_media_encoder.h"
+#ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+#include "../tests/script_admission_trace.h"
+#endif
 #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
 #include "../tests/g08_backing_observation.h"
 #endif
@@ -50,7 +54,12 @@ class Capture final : public DesktopScriptCapture {
     DrawScriptOverlay(frame, shown);
     DesktopScriptFrameAdmission committed;
     // Step PNG requests share samples but must not increase movie frame rate.
-    if (last_movie_frame_ < 0 || elapsed - last_movie_frame_ + .000001 >= 1000.0 / options_.value("fps", 15)) {
+    const bool movie_due=ScriptMovieFrameDue(last_movie_frame_,elapsed,options_.value("fps", 15));
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    const double previous_movie=last_movie_frame_;
+    const auto committed_before=encoder_->committed_movie_frames();
+    #endif
+    if (movie_due) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
       #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
       WriteG08Backing(backing); ++observed_frames_;
@@ -76,6 +85,17 @@ class Capture final : public DesktopScriptCapture {
       }
       last_movie_frame_ = elapsed;
     }
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    if (AdmissionTraceEnabled()) {
+      const bool has_marker=shown.contains("marker");
+      const double start=has_marker ? shown.at("marker").value("startedMs",elapsed) : -1;
+      const double duration=has_marker ? shown.at("marker").value("durationMs",700.0) : -1;
+      WriteAdmissionTrace({{"phase",0},{"elapsedMs",elapsed},{"hasMarker",int(has_marker)},
+        {"markerStartMs",start},{"markerDurationMs",duration},{"markerAgeMs",has_marker ? elapsed-start : -1},
+        {"previousMovieMs",previous_movie},{"due",int(movie_due)},{"committedBefore",committed_before},
+        {"committedAfter",encoder_->committed_movie_frames()},{"actionIndex",index},{"stepPng",int(step)}});
+    }
+    #endif
     if (step && screenshots_) {
       const auto path = directory_ / ("step-" + std::to_string(index) + ".png");
       if (!encoder_->WriteStepPNG(frame, path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
@@ -93,6 +113,18 @@ class Capture final : public DesktopScriptCapture {
     std::vector<ScriptMediaOutput> outputs;
     try { outputs = encoder_->Finish(std::max(last_elapsed_ + 1, terminal)); }
     catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    if (AdmissionTraceEnabled()) {
+      std::size_t gif_frames=0, video_frames=0, gif_dropped=0, video_dropped=0;
+      for (const auto& output : outputs) {
+        if (output.mime_type=="image/gif") { gif_frames=output.frame_count; gif_dropped=output.dropped_frames; }
+        if (output.mime_type=="video/mp4") { video_frames=output.frame_count; video_dropped=output.dropped_frames; }
+      }
+      WriteAdmissionTrace({{"phase",1},{"elapsedMs",terminal},{"gifFrames",gif_frames},{"videoFrames",video_frames},
+        {"gifDropped",gif_dropped},{"videoDropped",video_dropped},
+        {"committedAfter",encoder_->committed_movie_frames()}});
+    }
+    #endif
     for (const auto& output : outputs) {
       try {
         owned_.emplace(output.path, InspectCaptureFile(output.path));

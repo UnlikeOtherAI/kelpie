@@ -2,16 +2,19 @@ import {execFileSync,spawn} from "node:child_process";
 import {writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
-import {listenerState,processCommandMatches} from "./runtime-ownership.mjs";
+import {listenerState,listenerProbeFailure,processCommandMatches} from "./runtime-ownership.mjs";
 import {artifactFacts,errorFacts,toolEnvelopeFacts,cliExitFacts} from "./runtime-diagnostics.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 export const delay=ms=>new Promise(r=>setTimeout(r,ms));
 export class Failure extends Error { constructor(code){super(code);this.code=code;} }
 export function requireTrue(ok,code){if(!ok)throw new Failure(code);}
-export function listeners(port){
- try{return [...new Set(execFileSync("/usr/sbin/lsof",["-nP","-iTCP:"+port,"-sTCP:LISTEN","-t"],{encoding:"utf8"}).trim().split(/\s+/).filter(Boolean).map(Number))];}
- catch{return [];}
+export function probeListeners(port){
+ try{
+  const owners=[...new Set(execFileSync("/usr/sbin/lsof",["-nP","-iTCP:"+port,"-sTCP:LISTEN","-t"],{encoding:"utf8"}).trim().split(/\s+/).filter(Boolean).map(Number))];
+  return {owners,outcome:"success",cause:"OTHER",stderrPresent:false};
+ }catch(error){return {owners:[],...listenerProbeFailure(error)};}
 }
+export function listeners(port){return probeListeners(port).owners;}
 export async function waitFor(run,ms=10000){
  const end=Date.now()+ms;let last;
  do{try{const result=await run();if(result)return result;}catch(e){if(e.code==="LISTENER_IDENTITY")throw e;last=e;}await delay(100);}while(Date.now()<end);
@@ -20,8 +23,9 @@ export async function waitFor(run,ms=10000){
 export class Client {
  constructor(pid,out,executable){this.pid=pid;this.out=out;this.executable=executable;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
  pin(port){
-  const owners=listeners(port),state=listenerState(owners,this.pid);
-  if(state!=="owned")this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:owners.length};
+  const probe=probeListeners(port),state=listenerState(probe.owners,this.pid);
+  if(state!=="owned")this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:probe.owners.length,
+   probeOutcome:probe.outcome,probeCause:probe.cause,probeStderrPresent:probe.stderrPresent};
   requireTrue(state==="owned","LISTENER_IDENTITY");
  }
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));

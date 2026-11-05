@@ -66,6 +66,8 @@ export function cliExitFacts(exitCode,stdout,stderr){
   "ARTIFACT_NOT_FOUND","ARTIFACT_NOT_READY","ARTIFACT_READ_FAILED"]);
  let parsed;try{parsed=JSON.parse(stdout);}catch{}
  const rawCode=parsed?.error?.code??parsed?.result?.error?.code;
+ const result=parsed?.result??parsed;
+ const actionsExecuted=Number.isInteger(result?.actionsExecuted)&&result.actionsExecuted>=0&&result.actionsExecuted<=1000?result.actionsExecuted:null;
  return {exitCode:Number.isInteger(exitCode)?exitCode:null,stdoutJson:!!parsed,stderrPresent:stderr.length>0,
-  errorCode:allowed.has(rawCode)?rawCode:"OTHER"};
+  errorCode:allowed.has(rawCode)?rawCode:"OTHER",actionsExecuted,mayHaveCompleted:result?.mayHaveCompleted===true};
 }

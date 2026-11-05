@@ -28,6 +28,7 @@ CAPTURE_REASONS = frozenset({
 })
 INSETS_EVENT = re.compile(r"\[WorkflowCaptureInsets\] before=([-0-9.,]+) after=([-0-9.,]+)(?:\s|$)")
 GEOMETRY_EVENT = re.compile(r"\[WorkflowCaptureGeometry\] before=([0-9.,]+) after=([0-9.,]+)(?:\s|$)")
+PROJECTION_EVENT = re.compile(r"\[WorkflowProjection\] values=([-0-9.,]+)(?:\s|$)")
 ENCODE_EVENT = re.compile(r"\[WorkflowCaptureEncode\] elapsedMs=([0-9]+)(?:\s|$)")
 CAPTURE_EVENT = re.compile(r"\[WorkflowCapture\] reason=([A-Za-z_-]+)(?:\s|$)")
 EVENT = re.compile(r"\[WorkflowNavigationLease\] (invalid|wait-refused|timeout)=([a-z-]+)(?:\s|$)")
@@ -66,6 +67,19 @@ def fixed_capture_geometry(line):
     return {"before": before, "after": after}
 
 
+def fixed_projection(line):
+    found = PROJECTION_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        values = [float(value) for value in found[1].split(",")]
+    except ValueError:
+        return None
+    if len(values) != 17 or not all(math.isfinite(value) and abs(value) <= 10000 for value in values):
+        return None
+    return values
+
+
 def fixed_capture_encode(line):
     found = ENCODE_EVENT.search(line)
     if not found:
@@ -101,6 +115,7 @@ def export_lease_diagnostics(result, destination):
         geometry = []
         insets = []
         encodes = []
+        projections = []
         for file in raw.rglob("StandardOutputAndStandardError*.txt"):
             with file.open(errors="replace") as stream:
                 for line in stream:
@@ -115,8 +130,11 @@ def export_lease_diagnostics(result, destination):
                     encode = fixed_capture_encode(line)
                     if encode is not None and len(encodes) < 1000:
                         encodes.append(encode)
+                    projection = fixed_projection(line)
+                    if projection is not None and len(projections) < 1000:
+                        projections.append(projection)
         report = {"events": dict(sorted(events.items()))}
-        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets, "encodeMs": encodes}
+        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets, "encodeMs": encodes, "projections": projections}
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {"unavailable": type(error).__name__}
         capture_report = report
