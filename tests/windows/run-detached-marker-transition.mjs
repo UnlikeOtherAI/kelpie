@@ -124,6 +124,7 @@ try{
  const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
+ assert.equal(fixtureFacts.events[0].documentId,fixtureFacts.events[1].documentId);
  report.fixture={trustedClicks:fixtureFacts.events.length,pageRequests:fixture.pageRequests};
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));
  if(mode==="no-capture") assert.equal(items.length,0);
