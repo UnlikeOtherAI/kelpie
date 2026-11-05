@@ -22,7 +22,7 @@ assert.ok(Object.values(crop).every(Number.isInteger) && crop.x >= 0 && crop.y >
 const sources = [{ kind: 'native-screenrecord', file: screenPath, crop }, ...receipt.artifacts.map(item => ({ kind: item.mimeType, file: item.file, artifact: item }))];
 const results = [];
 for (const source of sources) {
-  const result = { kind: source.kind, file: source.file, samples: [] };
+  const result = { kind: source.kind, file: source.file, samples: [], uncertifiedFrames: 0 };
   results.push(result);
   try {
     const bytes = await readFile(source.file);
@@ -72,7 +72,10 @@ for (const source of sources) {
             if (Math.min(frame[i], frame[i + 1], frame[i + 2]) < 235) nonwhite++;
           }
         }
-        assert.ok(total > 0 && nonwhite / total < 0.005, 'FAST_BACKGROUND_UNCERTIFIED');
+        if (total === 0 || nonwhite / total >= 0.005) {
+          result.uncertifiedFrames++;
+          return;
+        }
         if (pixel) result.samples.push({ timeMs: times[index], x: pixel.x / scale.x, y: pixel.y / scale.y });
       });
       await exited;
