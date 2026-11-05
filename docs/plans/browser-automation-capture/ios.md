@@ -104,3 +104,34 @@ On 5 November 2026 the project declared `com.unlikeotherai.kelpie`, team `59S95D
 A reproducible simulator archive needs its own source version, hash, publication and install check on an authorized compatible simulator. A device archive needs an appropriate distribution identity/profile or an authorized managed signing path and a compatible physical install target.
 
 See the [public workflow contract](../../api/script-workflows.md) for the CLI, versioned actions, artifact retrieval and host secret binding.
+
+## Hosted mobile check: 42125528359
+
+The hosted `mobilecheck` run exercised revision
+`9d88078c736e203f1d03a5d50273f6810906ddb7` on an iPhone 17 and an
+iPad Air 13-inch (M4), both iOS 26.5, with Xcode 26.6. The iPhone passed
+14 of 15 selected methods and the iPad passed 12 of 15; all required methods
+were present and both simulators were verified shut down. The retained artifact
+is [ios-native-workflows-9d88078c](https://github.com/UnlikeOtherAI/kelpie/actions/runs/42125528359).
+
+On both devices, the delayed-navigation Stop control returned
+`SCRIPT_ABORTED` with `mayHaveCompleted: true`. The no-movie loading and
+scroll viewport controls, baseline-coordinate chrome and address blocking,
+presentation modes, marker lifetime and retirement, paired MCP click and
+decoded media, and five selected unit controls passed. The staged-tablet
+viewport control passed on iPad; its iPhone method returns before exercising a
+tablet stage. These results do not cover the full corpus, CLI, or G08.
+
+The iPhone clipped-pinch action returned `TARGET_NOT_FOUND`. Its fixture
+reported a visual-only intersection, but the button was outside the BODY
+overflow clip and the purported intersection did not hit the button. This is
+a correct refusal for that measured fixture, not proof of a visible-target
+failure; the separate scrollable pinch control passed. Both iPad pinch controls
+remained at native and visual scale 1, so neither proves pinched behavior.
+
+The iPad same-scene marker image did not contain the marker. XCTest began its
+accessibility target lookup at 1793920737.266 and retained the screenshot at
+1793920781.591, after the configured four-second marker lifetime. The click
+result was centered, but this image cannot establish live marker projection.
+The earlier 421190 run passed that same-scene control on both devices. The
+42130731818 geometry replay is separate and its outcome is not included here.
