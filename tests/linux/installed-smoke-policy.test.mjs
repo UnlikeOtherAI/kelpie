@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
 const workflow = await readFile(new URL("../../.github/workflows/linux-native.yml", import.meta.url), "utf8");
 const script = await readFile(new URL("../../scripts/ci/linux-installed-smoke.sh", import.meta.url), "utf8");
 test("installed smoke uses a separate bounded distro container and read-only source", () => {
@@ -33,4 +34,13 @@ test("supported native and packaged CLI interfaces plus independent media are ex
   assert.match(script, /timeout --signal=TERM --kill-after=10 300/);
   assert.match(workflow, /pnpm --filter @unlikeotherai\/kelpie build/);
   assert.match(workflow, /npm pack --ignore-scripts/);
+});
+
+test("package workflow shell parses before starting its build container", { skip: process.platform === "win32" }, () => {
+  const block=workflow.split("      - name: Build Linux packages")[1]?.split("      - name: Verify installed Linux candidate")[0];
+  assert.ok(block);
+  const script=block.split("        run: |\n")[1];
+  assert.ok(script);
+  const result=spawnSync("bash",["-n"],{input:script.split("\n").map(line=>line.startsWith("          ")?line.slice(10):line).join("\n")});
+  assert.equal(result.status,0,result.stderr.toString());
 });
