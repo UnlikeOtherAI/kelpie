@@ -56,6 +56,46 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testNavigationReservesAfterAuthorizationAndKeepsItsPinnedView() async throws {
+        let pinned = NSObject(), otherView = NSObject(), navigation = NSObject()
+        let initial = ConnectDocument.version(pinned)
+        defer { ConnectDocument.reserve(pinned, lease: nil) }
+        let lease = try await IOSWorkflowNavigation.issue(on: pinned, authorize: {
+            // A prior provisional callback may arrive while grant authorization is suspended.
+            await Task.yield()
+            ConnectDocument.navigated(pinned, navigation: NSObject())
+        }, load: { navigation })
+        XCTAssertNotEqual(ConnectDocument.version(pinned), initial)
+        XCTAssertTrue(lease.allowsWait(version: ConnectDocument.version(pinned), authorized: true))
+        ConnectDocument.navigated(otherView, navigation: NSObject())
+        ConnectDocument.navigated(pinned, navigation: navigation)
+        let destination = ConnectDocument.version(pinned)
+        XCTAssertTrue(lease.allowsRead(version: destination, loading: false, authorized: true))
+        XCTAssertFalse(lease.allowsRead(version: destination, loading: false, authorized: false))
+        ConnectDocument.navigated(pinned, navigation: NSObject())
+        XCTAssertFalse(lease.allowsWait(version: ConnectDocument.version(pinned), authorized: true))
+    }
+
+    @MainActor
+    func testDeniedNavigationNeverReservesOrLoadsTheView() async throws {
+        let pinned = NSObject(), navigation = NSObject()
+        let existing = ConnectNavigationLease(initial: ConnectDocument.version(pinned))
+        ConnectDocument.reserve(pinned, lease: existing)
+        ConnectDocument.issued(pinned, navigation: navigation)
+        defer { ConnectDocument.reserve(pinned, lease: nil) }
+        var loaded = false
+        do {
+            _ = try await IOSWorkflowNavigation.issue(on: pinned, authorize: {
+                throw IOSWorkflowFailure("AUTHORIZATION_REVOKED")
+            }, load: { loaded = true; return NSObject() })
+            XCTFail("Revoked authorization issued a navigation")
+        } catch let error as IOSWorkflowFailure { XCTAssertEqual(error.code, "AUTHORIZATION_REVOKED") }
+        XCTAssertFalse(loaded)
+        ConnectDocument.navigated(pinned, navigation: navigation)
+        XCTAssertTrue(existing.allowsRead(version: ConnectDocument.version(pinned), loading: false, authorized: true))
+    }
+
+    @MainActor
     func testLateMutatingRendererCallbackRetiresBeforeFurtherAdmission() async throws {
         let view = WKWebView()
         let lease = BrowserControlLease()

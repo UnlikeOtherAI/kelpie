@@ -204,6 +204,8 @@ If the requested port is already held by a stale instance, the macOS app falls b
 
 `--hidden` starts a Windows alias without showing its window, using the normal native app and authenticated readiness/PID/profile/launch-ID flow. It requires a Windows host and Windows alias; other combinations refuse before spawning. It does not enable a headless browser backend or change script capabilities. The default launch remains visible.
 
+`--headless` is separate and Linux-only: `kelpie browser launch linux-osr --headless --port 8467` forwards the existing native Linux `--headless` flag. It requires both a Linux host and Linux alias; unsupported hosts/aliases and mixed Windows `--hidden` requests refuse before port allocation or spawning. It uses the same profile, readiness/token, PID and launch-ID ownership flow and supported `browser stop` cleanup. Headless uses only capabilities advertised by the actual native offscreen runtime; it does not claim a local Stop window or visible GTK UI. No-CEF builds do not gain routes from the flag.
+
 `--port` may come before or after `launch`: both start the app on that port. A value that is not an integer from 1 to 65535 is rejected with `INVALID_PORT` rather than launching on the default.
 
 ```bash

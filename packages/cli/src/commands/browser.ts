@@ -213,6 +213,7 @@ export function registerBrowser(program: Command): void {
     .command("launch <name>")
     .option("--port <port>", "Port to use for the launched browser")
     .option("--hidden", "Start a Windows alias without showing its window (Windows host only)")
+    .option("--headless", "Start a Linux alias in its native offscreen mode (Linux host only)")
     .action(async (name: string, _opts: unknown, command: Command) => {
       const globals = program.opts<GlobalOptions>();
       const alias = await getBrowserAlias(name);
@@ -222,7 +223,12 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
-      const hidden = command.opts<{ hidden?: boolean }>().hidden === true;
+      const { hidden = false, headless = false } = command.opts<{ hidden?: boolean; headless?: boolean }>();
+      if (headless && (alias.platform !== "linux" || os.platform() !== "linux")) {
+        print({ success: false, error: { code: "PLATFORM_NOT_SUPPORTED", message: "--headless requires a Linux alias on a Linux host" } }, globals.format);
+        process.exitCode = 5;
+        return;
+      }
       if (hidden && (alias.platform !== "windows" || os.platform() !== "win32")) {
         print({ success: false, error: { code: "PLATFORM_NOT_SUPPORTED", message: "--hidden requires a Windows alias on a Windows host" } }, globals.format);
         process.exitCode = 5;
@@ -251,7 +257,7 @@ export function registerBrowser(program: Command): void {
           if (previous && await isReachable(previous.port)) {
             throw new Error("A live browser already owns this profile; attach to its alias or stop it first");
           }
-          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir], { detached: true, stdio: "ignore", ...(hidden ? { windowsHide: true } : {}) });
+          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir, ...(headless ? ["--headless"] : [])], { detached: true, stdio: "ignore", ...(hidden ? { windowsHide: true } : {}) });
           launched = true;
           child.unref();
           const readiness = await waitForReadiness(readinessFile, previous?.launchId, child);

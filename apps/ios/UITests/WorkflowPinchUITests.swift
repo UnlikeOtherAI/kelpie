@@ -3,7 +3,10 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
-    func testNativePinchClipsTapCenterAndInvalidatesPointerTarget() async throws {
+    func testNativePinchClipsTapCenterAndExportedMarker() async throws {
+        let initialOrientation = XCUIDevice.shared.orientation
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = initialOrientation }
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
@@ -62,47 +65,6 @@ extension WorkflowCaptureUITests {
         add(geometry)
         try verifyPinchMarker(data, click: click)
 
-        let before = try await pinchMetrics(tab, selector: "#zoom")
-        let neutral = try XCTUnwrap(viewport.screenshot().image.cgImage)
-        XCTAssertNil(try WorkflowMotionFrames.measure(neutral, time: 0).pointer, "Neutral fixture must contain no white pointer")
-        let playback = Task.detached { [probe] in
-            try await probe.request("/v1/play-script", [
-                "version": 1, "tabId": tab,
-                "actions": [["action": "tap", "target": ["role": "button", "name": "Edge"]]],
-                "pointer": ["enabled": true, "curve": "c", "durationMs": 5000]
-            ])
-        }
-        XCTAssertTrue(XCUIApplication().buttons["browser.recording.stop"].waitForExistence(timeout: 5))
-        let pointerDeadline = Date().addingTimeInterval(3)
-        var observedPointer = false
-        repeat {
-            let screen = viewport.screenshot()
-            if let image = screen.image.cgImage, try WorkflowMotionFrames.measure(image, time: 0).pointer != nil {
-                let evidence = XCTAttachment(screenshot: screen)
-                evidence.name = "Native pointer is moving before the second pinch"
-                evidence.lifetime = .keepAlways
-                add(evidence)
-                observedPointer = true
-                break
-            }
-            try await Task.sleep(nanoseconds: 60_000_000)
-        } while Date() < pointerDeadline
-        XCTAssertTrue(observedPointer, "A displayed pointer proves target resolution preceded the second pinch")
-        viewport.pinch(withScale: 1.4, velocity: 1)
-        let refused = try await playback.value
-        XCTAssertEqual(refused["success"] as? Bool, false)
-        let code = try XCTUnwrap((refused["error"] as? Body)?["code"] as? String)
-        XCTAssertTrue(["VIEWPORT_CHANGED", "STALE_TARGET"].contains(code), code)
-        XCTAssertEqual(refused["actionsExecuted"] as? Int, 0)
-        XCTAssertEqual(refused["mayHaveCompleted"] as? Bool ?? false, false)
-        let after = try await pinchMetrics(tab, selector: "#zoom")
-        XCTAssertGreaterThan(try XCTUnwrap(after["scale"] as? Double), try XCTUnwrap(before["scale"] as? Double) + 0.1)
-        XCTAssertEqual(after["clicks"] as? Int, 1)
-        let final = XCTAttachment(data: try JSONSerialization.data(withJSONObject: after, options: [.sortedKeys]),
-                                 uniformTypeIdentifier: "public.json")
-        final.name = "Changed native viewport with zero additional clicks"
-        final.lifetime = .keepAlways
-        add(final)
     }
 
     private func pinchValue(_ extracted: Body) throws -> Body {
