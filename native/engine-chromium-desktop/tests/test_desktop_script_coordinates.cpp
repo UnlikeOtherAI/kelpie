@@ -3,6 +3,10 @@
 #include <limits>
 
 int main(){
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false}}));
+  assert(!kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown","false"}}));
+  assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",false},{"sensitivityKnown",false}}));
+  assert(kelpie::ScriptTargetPostMutationExplicit({{"ok",true},{"sensitive",true},{"sensitivityKnown",true}}));
   assert(kelpie::ScriptTargetInspectionUncertain(nullptr));
   assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"sensitivityKnown",false},{"error","STALE_TARGET"}}));
   assert(kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false}}));

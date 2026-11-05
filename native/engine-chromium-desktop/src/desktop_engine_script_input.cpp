@@ -118,8 +118,11 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
       return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
     }
     if (privacy_only) {
-      const bool known = target.contains("sensitivityKnown") &&
-        target["sensitivityKnown"].is_boolean() && target["sensitivityKnown"].get<bool>();
+      if (!ScriptTargetPostMutationExplicit(target)) {
+        uncertain();
+        return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy classification is malformed");
+      }
+      const bool known = target["sensitivityKnown"].get<bool>();
       if (!known) {
         const bool navigated = same_tab_navigated();
         if (cancelled && cancelled()) { uncertain(); return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped"); }
