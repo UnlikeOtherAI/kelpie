@@ -47,11 +47,12 @@ int main() {
   auto moved=later;moved.x++;
   geometry.Observe(moved);assert(!geometry.Allows(later));
   geometry.Observe(later);assert(!geometry.Allows(later));
-  auto next=later;next.run="next";
+  auto next=later;next.action=3;next.revision=9;
   geometry.Observe(next);assert(geometry.Allows(next));
-  auto oldAgain=later;oldAgain.revision=9;
+  auto oldAgain=later;oldAgain.revision=10;
   geometry.Observe(oldAgain);assert(!geometry.Allows(oldAgain));
-  next.revision=10;geometry.Observe(next);assert(geometry.Allows(next));
+  next.revision=11;assert(geometry.Allows(next));
   geometry.Lose();assert(!geometry.Allows(next));
   geometry.Observe(next);assert(!geometry.Allows(next));
+  next.run="new";next.revision=12;geometry.Observe(next);assert(geometry.Allows(next));
 }

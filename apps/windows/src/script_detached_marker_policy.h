@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <vector>
 #include <nlohmann/json.hpp>
 
 namespace kelpie::windows {
@@ -26,35 +25,27 @@ inline bool SameDetachedMarkerIdentity(const DetachedMarkerAnchor& a,const Detac
 }
 class DetachedMarkerGeometry {
  public:
-  void Lose() { if(current_<entries_.size()) entries_[current_].invalid=true; }
+  void Lose() { if(pinned_) invalid_=true; }
   void Observe(const DetachedMarkerAnchor& current) {
     if(!SameDetachedMarkerAnchor(current,current)) { Lose(); return; }
     if(current.revision<lastRevision_) return;
     lastRevision_=current.revision;
-    std::size_t index=0;
-    while(index<entries_.size() && !SameDetachedMarkerIdentity(entries_[index].anchor,current)) ++index;
-    if(index==entries_.size()) {
-      // Fail closed if a long-lived service sees more distinct markers than the bounded history.
-      if(entries_.size()>=256) { current_=entries_.size(); return; }
-      entries_.push_back({current,false});
+    if(!pinned_ || current.run!=anchor_.run || current.action>anchor_.action) {
+      anchor_=current; pinned_=true; invalid_=false; return;
     }
-    current_=index;
-    auto comparable=current; comparable.revision=entries_[index].anchor.revision;
-    if(!SameDetachedMarkerAnchor(entries_[index].anchor,comparable)) entries_[index].invalid=true;
+    if(current.action<anchor_.action) return;
+    auto comparable=current; comparable.revision=anchor_.revision;
+    if(!SameDetachedMarkerAnchor(anchor_,comparable)) invalid_=true;
   }
   bool Allows(const DetachedMarkerAnchor& current) const {
-    if(current_<entries_.size() && !entries_[current_].invalid &&
-       current.revision>=lastRevision_ &&
-       SameDetachedMarkerIdentity(entries_[current_].anchor,current)) {
-      auto comparable=current; comparable.revision=entries_[current_].anchor.revision;
-      return SameDetachedMarkerAnchor(entries_[current_].anchor,comparable);
-    }
-    return false;
+    if(!pinned_ || invalid_ || current.revision<lastRevision_ ||
+       !SameDetachedMarkerIdentity(anchor_,current)) return false;
+    auto comparable=current; comparable.revision=anchor_.revision;
+    return SameDetachedMarkerAnchor(anchor_,comparable);
   }
  private:
-  struct Entry { DetachedMarkerAnchor anchor; bool invalid; };
-  std::vector<Entry> entries_;
-  std::size_t current_=0;
+  DetachedMarkerAnchor anchor_;
+  bool pinned_=false,invalid_=false;
   std::uint64_t lastRevision_=0;
 };inline bool DetachedMarkerActive(const nlohmann::json& shown) {
   try {
