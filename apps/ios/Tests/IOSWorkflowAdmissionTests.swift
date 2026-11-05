@@ -163,6 +163,22 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         withExtendedLifetime(store) {}
     }
 
+    func testPointerDefaultAndExplicitDurationUseSharedContract() throws {
+        let defaulted = try IOSBoundWorkflow(workflow([tap], ["pointer": ["enabled": true]]))
+        let normal = try XCTUnwrap(defaulted.settings["pointer"] as? Body)
+        XCTAssertEqual(normal["durationMs"] as? Int, 350)
+        XCTAssertEqual(normal["curve"] as? String, "s")
+        XCTAssertEqual(normal["easing"] as? String, "ease-in-out")
+
+        let explicit = try IOSBoundWorkflow(workflow([tap], [
+            "pointer": ["enabled": true, "curve": "c", "durationMs": 2400, "easing": "ease-in-out"]
+        ]))
+        let requested = try XCTUnwrap(explicit.settings["pointer"] as? Body)
+        XCTAssertEqual(requested["durationMs"] as? Int, 2400)
+        XCTAssertEqual(requested["curve"] as? String, "c")
+        XCTAssertEqual(requested["easing"] as? String, "ease-in-out")
+    }
+
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {
         XCTAssertEqual(try IOSBoundWorkflow(workflow([tap])).steps.count, 1)
         for session in ["unknown-session", "other-owner-session"] {
