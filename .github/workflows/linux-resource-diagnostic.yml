@@ -58,6 +58,9 @@ jobs:
           package_revision="$(cat "${package_root}/source-revision.txt")"
           [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
           git cat-file -e "${package_revision}^{commit}"
+          git diff "${package_revision}" "${diagnostic_revision}" -- \
+            tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs \
+            > "${package_root}/resource-hook-diff.patch"
           git checkout --detach "${package_revision}"
           for path in scripts/ci/linux-installed-smoke.sh tests/linux/native-resource-snapshot.mjs \
             tests/linux/navigation-resource-diagnostic.mjs \
@@ -97,6 +100,7 @@ jobs:
           name: linux-resource-diagnostic-${{ matrix.distro.name }}
           path: |
             dist/release/${{ matrix.distro.name }}/resource-test-revision.txt
+            dist/release/${{ matrix.distro.name }}/resource-hook-diff.patch
             dist/release/${{ matrix.distro.name }}/resource-diagnostic.log
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/outcome.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.txt
