@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { captureMcp } from "./capture-mcp.mjs";
+import { runFinalDwellCases } from "./capture-final-dwell-cases.mjs";
 import { runPacedCases } from "./capture-paced-cases.mjs";
 import { runBrandReleaseCases } from "./capture-brand-release-cases.mjs";
 import { downloadArtifacts } from "./capture-artifact-download.mjs";
@@ -147,6 +148,7 @@ try {
     assert.equal(result.success,true,JSON.stringify(result));
     assert.equal((await api("evaluate",{tabId,expression:"document.querySelector('#post-readonly').value"})).result,"safe");
   });
+  await runFinalDwellCases({check,navigate,api,workflow,download,click});
   await runPacedCases({check,navigate,api,workflow,download,click,tabId,fixture});
   await runBrandReleaseCases({check,navigate,api,workflow,tabId,fixture});
   for (const [name, code] of [["Duplicate action", "AMBIGUOUS_TARGET"], ["Disabled action", "TARGET_NOT_FOUND"],

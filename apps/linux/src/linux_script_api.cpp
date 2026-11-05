@@ -4,11 +4,19 @@
 #include "script_capture_service.h"
 #endif
 namespace kelpie::linuxapp {
-LinuxApp::json LinuxApp::ScriptPresentation() const {
+LinuxApp::json LinuxApp::ScriptPresentation(bool foreground) const {
+  (void)foreground;
 #if KELPIE_LINUX_HAS_CEF
-  if (impl_->scripts) return impl_->scripts->Presentation();
+  if (impl_->scripts) return impl_->scripts->Presentation(foreground);
 #endif
   return json::object();
+}
+void LinuxApp::RetireDetachedScriptMarker(std::uint64_t revision) {
+#if KELPIE_LINUX_HAS_CEF
+  if (impl_->scripts) impl_->scripts->RetireDetachedMarker(revision);
+#else
+  (void)revision;
+#endif
 }
 void LinuxApp::StopScript() {
 #if KELPIE_LINUX_HAS_CEF

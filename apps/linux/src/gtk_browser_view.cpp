@@ -14,9 +14,8 @@
 namespace kelpie::linuxapp {
 namespace {
 #if KELPIE_LINUX_HAS_GTK && KELPIE_LINUX_HAS_CEF
-void CompositeScriptFrame(LinuxApp& app, OffscreenFrame& frame) {
+void CompositeScriptFrame(LinuxApp& app, OffscreenFrame& frame, nlohmann::json shown) {
   ScriptFrame composed{frame.width, frame.height, frame.width * 4, 0, std::move(frame.pixels)};
-  auto shown = app.ScriptPresentation();
   if (frame.tab_id != shown.value("tabId", std::string()) || frame.generation != shown.value("generation", std::uint64_t(0))) {
     shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
   }
@@ -95,7 +94,32 @@ GtkBrowserView::GtkBrowserView(LinuxApp& app) : app_(app) {
 #if KELPIE_LINUX_HAS_CEF
                      auto* top = gtk_widget_get_toplevel(widget);
                      if (frame.valid() && GTK_IS_WINDOW(top) && gtk_window_is_active(GTK_WINDOW(top))) {
-                       CompositeScriptFrame(self->app_, frame);
+                       auto shown = self->app_.ScriptPresentation();
+                       if (shown.contains("marker")) {
+                         int x=0; int y=0;
+                         const bool origin=gtk_widget_translate_coordinates(widget,top,0,0,&x,&y);
+                         const int width=gtk_widget_get_allocated_width(widget);
+                         const int height=gtk_widget_get_allocated_height(widget);
+                         const int scale=gtk_widget_get_scale_factor(widget);
+                         const auto& marker=shown.at("marker");
+                         const bool valid_frame=frame.tab_id==shown.value("tabId",std::string()) &&
+                             frame.generation==shown.value("generation",std::uint64_t{});
+                         const auto identity=nlohmann::json::array({shown.value("runId",std::string()),shown.value("tabId",std::string()),
+                           shown.value("generation",std::uint64_t{}),shown.value("documentVersion",std::string()),
+                           marker.value("actionIndex",-1)}).dump();
+                         const bool detached=shown.value("detachedMarker",false);
+                         const auto revision=shown.value("_presentationRevision",std::uint64_t{});
+                         if (!detached && valid_frame && origin && width>0 && height>0 && scale>0) {
+                           self->marker_anchor_.Observe(revision,identity,{x,y,width,height,scale,frame.width,frame.height});
+                         } else if (!detached) {
+                           self->marker_anchor_.Invalidate(revision,identity);
+                         } else if (detached && (!valid_frame || !origin ||
+                             !self->marker_anchor_.Matches(revision,identity,{x,y,width,height,scale,frame.width,frame.height}))) {
+                           self->app_.RetireDetachedScriptMarker(shown.value("_presentationRevision",std::uint64_t{}));
+                           shown.erase("marker"); self->marker_anchor_.Invalidate(revision,identity);
+                         }
+                       }
+                       CompositeScriptFrame(self->app_, frame, std::move(shown));
                      }
 #endif
                      const auto& snapshot = frame.pixels;
@@ -241,8 +265,10 @@ void GtkBrowserView::Sync() {
   if (label_ == nullptr) {
     return;
   }
+  auto* top = gtk_widget_get_toplevel(frame_);
+  const bool foreground = GTK_IS_WINDOW(top) && gtk_widget_get_visible(top) && gtk_window_is_active(GTK_WINDOW(top));
+  const bool playing = app_.ScriptPresentation(foreground).value("playing", false);
   if (stop_) {
-    const bool playing = app_.ScriptPresentation().value("playing", false);
     if (playing) gtk_widget_show(stop_); else gtk_widget_hide(stop_);
   }
   if (app_.HasNativeBrowser()) {

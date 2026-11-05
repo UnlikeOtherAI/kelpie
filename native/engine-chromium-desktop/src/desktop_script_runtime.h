@@ -1,5 +1,6 @@
 #pragma once
 #include "kelpie/desktop_script_handler.h"
+#include "desktop_presentation_validity.h"
 #include "kelpie/desktop_engine.h"
 #include "kelpie/desktop_router.h"
 #include <chrono>
@@ -15,6 +16,7 @@ class DesktopScriptHandler::Impl {
   DesktopEngine& engine;
   DesktopRouter& router;
   Config config;
+  std::shared_ptr<DesktopPresentationValidity> presentation_validity;
   mutable std::mutex mutex;
   std::condition_variable changed;
   bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false;
@@ -28,7 +30,9 @@ class DesktopScriptHandler::Impl {
   int action_index = -1, requested_step = -1, completed_step = -1;
   std::string requested_step_document;
   std::uint64_t requested_ticket=0, completed_ticket=0;
-  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {}
+  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {
+    presentation_validity = std::make_shared<DesktopPresentationValidity>(config.revalidate);
+  }
   Json Play(const Json& body);
   Json Status(const Json& body);
   Json Abort(const Json& body);

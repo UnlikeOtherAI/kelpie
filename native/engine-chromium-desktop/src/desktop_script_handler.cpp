@@ -31,7 +31,10 @@ std::string NewDesktopScriptId() {
 }
 DesktopScriptHandler::DesktopScriptHandler(DesktopEngine& engine, DesktopRouter& router, Config config)
     : impl_(std::make_unique<Impl>(engine, router, std::move(config))) {}
-DesktopScriptHandler::~DesktopScriptHandler() { RequestLocalAbort(); }
+DesktopScriptHandler::~DesktopScriptHandler() {
+  RequestLocalAbort();
+  impl_->presentation_validity->Close();
+}
 void DesktopScriptHandler::RequestLocalAbort() {
   std::lock_guard lock(impl_->mutex);
   if (impl_->running) impl_->abort->store(true);
@@ -142,8 +145,8 @@ void DesktopScriptHandler::Impl::Pause(int milliseconds) {
 void DesktopScriptHandler::Impl::Present() {
   if (!config.present) return;
   Json copy; std::shared_ptr<std::atomic<bool>> cancellation;
-  { std::lock_guard lock(mutex); copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = DesktopPresentationIsPlaying(copy,running); copy["elapsedMs"]=Elapsed(); cancellation=abort; }
-  config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); });
+  { std::lock_guard lock(mutex); if (presentation.value("detachedMarker",false)) return; copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = DesktopPresentationIsPlaying(copy,running); copy["elapsedMs"]=Elapsed(); cancellation=abort; }
+  config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); }, {});
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   const std::string admitted_owner = ScopedDesktopScriptOwner::Current();
@@ -200,9 +203,10 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     std::lock_guard lock(mutex);
     if (running) return ErrorResponse("BUSY", "A script owns the browser");
     running = true; action_index=-1; owner = admitted_owner; run_id = NewDesktopScriptId(); target_key = "__kelpie_script_" + run_id;
-    run_thread = std::this_thread::get_id(); abort = std::make_shared<std::atomic<bool>>(false); stop_sampler.store(false);
+    run_thread = std::this_thread::get_id(); abort->store(true);
+    abort = std::make_shared<std::atomic<bool>>(false); stop_sampler.store(false);
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
-    capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json::object();
+    capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json{{"runId",run_id}};
     sampler_ready = false; sampler_done = false; requested_step = completed_step = -1;
     requested_ticket=completed_ticket=0; requested_step_document.clear(); grant_revoked.store(false); privacy_discard.store(false);
     status = {{"success", true}, {"playing", true}, {"runId", run_id}, {"totalActions", actions.size()}};
@@ -251,7 +255,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       result["actionsExecuted"] = index + 1;
       if(index+1<actions.size()) Pause(script.value("defaultWaitBetweenActions", 0));
     }
-    if(sampler.joinable() && !Cancelled() && result.value("success",false)) {
+    if(sampler.joinable() && DesktopMovieEndpointRequired(script) && !Cancelled() && result.value("success",false)) {
       double remaining=0;
       { std::lock_guard lock(mutex); if(presentation.contains("marker")) {
         const auto& marker=presentation["marker"];
@@ -306,10 +310,23 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   engine.EvaluateBrowserControl(lease, "delete globalThis[" + Json(target_key).dump() + "]", &ignored, std::chrono::seconds(2));
   Json hidden;
   { std::lock_guard lock(mutex);
-    presentation = {{"playing", false}};
+    presentation = result.value("success",false) && !abort->load()
+        ? DetachedDesktopMarker(presentation,Elapsed()) : Json{{"playing",false}};
     hidden=presentation; hidden["_presentationRevision"]=NextPresentationRevision();
   }
-  try { if (config.present) config.present(hidden, {}); }
+  const std::weak_ptr<DesktopPresentationValidity> validity = presentation_validity;
+  const auto presentation_owner = owner;
+  const auto cancellation = abort;
+  const auto revoked = std::make_shared<std::atomic<bool>>(false);
+  auto valid = [validity,presentation_owner,cancellation,revoked] {
+    const auto gate=validity.lock();
+    if (!gate) return false;
+    if (cancellation->load() || revoked->load()) return false;
+    if (gate->Check(presentation_owner)) return !cancellation->load() && !revoked->load();
+    revoked->store(true);
+    return false;
+  };
+  try { if (config.present) config.present(hidden, {}, valid); }
   catch(...) {
     if(result.value("success",false)) result["error"]={{"code","CAPTURE_NATIVE_PRESENTATION_FAILED"},{"message","Native presentation cleanup failed"}};
     else result["captureError"]="CAPTURE_NATIVE_PRESENTATION_FAILED";
