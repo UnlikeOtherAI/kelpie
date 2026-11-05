@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { promisify } from "node:util";
 import { startG08Fixture, g08Workflow, mapG08Scene } from "../capture/g08-fixture.mjs";
-import { applyG08MotionProfile } from "../windows/g08-motion-profile.mjs";
+import { applyG08MotionProfile } from "../capture/g08-motion-profile.mjs";
 
 const [readinessFile, binaryFile, outputArg, runtime, profile = "dense"] = process.argv.slice(2);
 assert.ok(["dense", "default"].includes(profile));

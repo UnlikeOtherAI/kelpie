@@ -5,7 +5,7 @@ import {createHash} from "node:crypto";
 import {mkdir,readFile,writeFile,access,stat} from "node:fs/promises";
 import {dirname,join,isAbsolute,resolve} from "node:path";
 import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
-import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
+import {applyG08MotionProfile} from "../capture/g08-motion-profile.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 import {evaluateWgcFrames} from "./wgc-g08-evaluate.mjs";
 import {evaluateFastWgc} from "./wgc-fast-profile.mjs";

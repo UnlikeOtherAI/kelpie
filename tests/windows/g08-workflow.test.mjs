@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {g08Workflow} from "../capture/g08-fixture.mjs";
-import {applyG08MotionProfile} from "./g08-motion-profile.mjs";
+import {applyG08MotionProfile} from "../capture/g08-motion-profile.mjs";
 import {scriptV1Schema} from "../../packages/shared/dist/index.js";
 test("shared G08 Windows requests pass the production workflow schema",()=>{
  for(const curve of ["c","s"]){
