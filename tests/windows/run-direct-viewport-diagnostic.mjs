@@ -78,6 +78,9 @@ try{
    const output=filters.length===1?join(evidenceRoot,"native"):join(evidenceRoot,"native-"+index);
    await exec(process.execPath,[join(tests,"run-script-capture-acceptance.mjs"),readinessPath,output],
      {env:{...env,KELPIE_CAPTURE_SOURCE:manifest.source,KELPIE_CAPTURE_CASE_FILTER:filter},windowsHide:true,timeout:180000,maxBuffer:2097152});
+   const caseReport=JSON.parse(await readFile(join(output,"report.json"),"utf8"));
+   assert.ok(Array.isArray(caseReport.checks)&&caseReport.checks.length>0 && caseReport.checks.every(check=>check.passed===true));
+   assert.equal(caseReport.cleanup,"closed");
   }
   report.casePassed=true;
  }catch(error){report.casePassed=false;report.caseExit=typeof error.code==="number"?error.code:null;}
