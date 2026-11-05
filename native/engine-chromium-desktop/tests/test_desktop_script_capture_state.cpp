@@ -10,6 +10,20 @@ int main() {
   assert(kelpie::DesktopPresentationIsPlaying(json::object(),true));
   assert(!kelpie::DesktopPresentationIsPlaying({{"playing",false}},true));
   assert(!kelpie::DesktopPresentationIsPlaying(json::object(),false));
+  assert(!kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"screenshots"}}}}}));
+  assert(!kelpie::DesktopMovieEndpointRequired({{"actions",{{{"action","screenshot"}}}}}));
+  assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"gif"}}}}}));
+  assert(kelpie::DesktopMovieEndpointRequired({{"capture",{{"formats",{"screenshots","video"}}}}}));
+  json active={{"tabId","tab"},{"generation",7},{"documentVersion","doc"},
+               {"marker",{{"startedMs",100.0},{"durationMs",700.0}}},
+               {"pointer",true},{"commentary","text"}};
+  const auto detached=kelpie::DetachedDesktopMarker(active,300.0);
+  assert(detached.value("detachedMarker",false) && !detached.value("playing",true));
+  assert(detached.contains("marker") && !detached.contains("pointer") && !detached.contains("commentary"));
+  assert(detached.value("elapsedMs",0.0)==300.0);
+  assert(!kelpie::DetachedDesktopMarker(active,800.0).contains("marker"));
+  active.erase("documentVersion");
+  assert(!kelpie::DetachedDesktopMarker(active,300.0).contains("marker"));
   std::uint64_t revision=0;
   assert(kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{2}}},revision));
   assert(!kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{1}}},revision));
