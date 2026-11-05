@@ -17,6 +17,7 @@ export interface ScriptTargetResult {
   visible?: boolean;
   enabled?: boolean;
   sensitive?: boolean;
+  sensitivityKnown?: boolean;
   editable?: boolean;
   focused?: boolean;
 }
@@ -43,7 +44,7 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
     return entry?.sensitive === true;
   };
   const fail = (error: string, mayHaveCompleted = false): ScriptTargetResult =>
-    ({ ok: false, error, mayHaveCompleted, sensitive: sensitivity() });
+    ({ ok: false, error, mayHaveCompleted, sensitive: sensitivity(), sensitivityKnown: entry !== undefined });
   if ((dispatch && edit) || (observe && (dispatch || edit))) return fail("INVALID_TARGET_OPERATION");
   const viewportFrame = (): VisualViewportFrame => {
     const view = window.visualViewport;
@@ -253,5 +254,5 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       hit.dispatchEvent(new MouseEvent("click", { ...options, buttons: 0 }));
     } catch { return fail("INPUT_UNCERTAIN", true); }
   }
-  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: sensitivity(), viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
+  return { ok: true, token: resolvedToken, documentId: state.documentId, x: entry.x, y: entry.y, width: entry.width, height: entry.height, visible: true, enabled: enabled(entry.element), editable: editable(entry.element), focused: document.activeElement === entry.element, sensitive: sensitivity(), sensitivityKnown: true, viewportWidth: innerWidth, viewportHeight: innerHeight, visualViewport: { offsetLeft: entry.visual.x, offsetTop: entry.visual.y, width: entry.visual.width, height: entry.visual.height, scale: entry.visual.scale }, ...((dispatch || edit) ? { inputGuarantee: "synthetic-coordinate" as const, mayHaveCompleted: true } : {}) };
 }
