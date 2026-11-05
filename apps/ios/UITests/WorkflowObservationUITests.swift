@@ -2,6 +2,63 @@ import XCTest
 
 extension WorkflowCaptureUITests {
     @MainActor
+    func testWorkflowTapExpiresPriorBrowserReferenceWithoutReplayingIt() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        func control(_ method: String, _ params: Body) async throws -> Body {
+            try await probe.request("/v1/browser-control", ["version": 1, "method": method, "tabId": tab, "params": params])
+        }
+        func buttonRef() async throws -> String {
+            let response = try await control("tab.snapshot", ["maxElements": 100])
+            let elements = try XCTUnwrap((response["value"] as? Body)?["elements"] as? [Body])
+            return try XCTUnwrap(elements.first { $0["name"] as? String == "Submit" }?["ref"] as? String)
+        }
+        let stale = try await buttonRef()
+        let result = try await probe.call("kelpie_play_script", [
+            "version": 1, "tabId": tab, "actions": [["action": "tap", "target": ["role": "button", "name": "Submit"]]]
+        ])
+        XCTAssertEqual(result["success"] as? Bool, true)
+        let refused = try await control("tab.click", ["ref": stale])
+        XCTAssertEqual((refused["error"] as? Body)?["code"] as? String, "STALE_REFERENCE")
+        XCTAssertEqual((refused["error"] as? Body)?["mayHaveCompleted"] as? Bool, false)
+        let fresh = try await buttonRef()
+        let accepted = try await control("tab.click", ["ref": fresh])
+        XCTAssertEqual(accepted["ok"] as? Bool, true)
+        let verified = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "output", "source": "title", "name": "count"]]
+        ])
+        XCTAssertEqual((verified["outputs"] as? Body)?["count"] as? String, "Count 2")
+    }
+
+    @MainActor
+    func testDiscoveredNamedControlsCancelAnOwnedHTTPPlay() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let required = ["kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"]
+        let names = try await probe.toolValue("kelpie_extensions", [:])
+        XCTAssertTrue(Set(required).isSubset(of: Set(try XCTUnwrap(names as? [String]))))
+        let schemas = try await probe.toolValue("kelpie_extension_tools", ["names": required])
+        let expanded = try XCTUnwrap(schemas as? [Body])
+        XCTAssertEqual(Set(expanded.compactMap { $0["name"] as? String }), Set(required))
+        XCTAssertTrue(expanded.allSatisfy { $0["inputSchema"] is Body })
+
+        let task = Task.detached { [probe] in
+            try await probe.request("/v1/play-script", ["version": 1, "tabId": tab, "actions": [["action": "wait", "ms": 10000]]])
+        }
+        let stop = XCUIApplication().buttons["browser.recording.stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 6))
+        let status = try await probe.toolValue("kelpie_get_script_status", [:])
+        let run = try XCTUnwrap((status as? Body)?["runId"] as? String)
+        let abort = try await probe.toolValue("kelpie_abort_script", ["runId": run])
+        XCTAssertEqual((abort as? Body)?["abortRequested"] as? Bool, true)
+        let result = try await task.value
+        XCTAssertEqual(result["state"] as? String, "aborted")
+        let recovered = try await probe.call("kelpie_get_script_status", ["runId": run])
+        XCTAssertEqual(recovered["runSuccess"] as? Bool, false)
+        XCTAssertNil(recovered["outputs"])
+    }
+
+    @MainActor
     func testRevocationStopsLaterInputAndDeniesSubsequentArtifactChunks() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
