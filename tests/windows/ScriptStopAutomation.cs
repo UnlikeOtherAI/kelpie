@@ -29,6 +29,15 @@ public static class ScriptStopAutomation {
       var started=process.StartTime.ToUniversalTime();
       if(args[0]=="pin" ? started<supplied.AddSeconds(-2) : started!=supplied)
         throw new InvalidOperationException("Candidate start-time identity mismatch");
+      if(args[0]=="pin") {
+        var windows=OwnedMainWindows(pid);
+        if(windows.Count!=1)throw new InvalidOperationException("Exactly one visible owned main window is required");
+        Print(new {processId=pid,sessionId=process.SessionId,executable=actual,
+          startTime=started.ToString("o"),startFileTime=started.ToFileTimeUtc().ToString(CultureInfo.InvariantCulture),
+          ownedWindows=windows,ownTopLevelRoots=windows.Count,matchingButtons=new List<object>(),
+          visibleInvokableButtons=0,invoked=false,captured=new List<object>()});
+        return 0;
+      }
       var owner=new PropertyCondition(AutomationElement.ProcessIdProperty,pid);
       var roots=AutomationElement.RootElement.FindAll(TreeScope.Children,owner);
       var candidates=new List<AutomationElement>();
@@ -170,6 +179,27 @@ public static class ScriptStopAutomation {
     return result;
   }
 
+  private delegate bool EnumWindowsProc(IntPtr hwnd,IntPtr state);
+  [System.Runtime.InteropServices.DllImport("user32.dll",SetLastError=true)]
+  private static extern bool EnumWindows(EnumWindowsProc callback,IntPtr state);
+  [System.Runtime.InteropServices.DllImport("user32.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode,SetLastError=true)]
+  private static extern int GetClassName(IntPtr hwnd,System.Text.StringBuilder name,int maxCount);
+  private static List<object> OwnedMainWindows(int pid) {
+    var windows=new List<object>();string failure=null;
+    EnumWindowsProc visit=delegate(IntPtr hwnd,IntPtr state) {
+      uint owner;GetWindowThreadProcessId(hwnd,out owner);
+      if(owner!=(uint)pid||!IsWindowVisible(hwnd))return true;
+      var name=new System.Text.StringBuilder(256);
+      if(GetClassName(hwnd,name,name.Capacity)==0){failure="Owned window class unavailable";return false;}
+      if(name.ToString()!="Kelpie")return true;
+      uint checkedOwner;GetWindowThreadProcessId(hwnd,out checkedOwner);
+      if(checkedOwner!=(uint)pid||!IsWindowVisible(hwnd)){failure="Owned window changed during pin";return false;}
+      windows.Add(new {className="Kelpie",processId=pid,windowHandle=unchecked((ulong)hwnd.ToInt64()).ToString(CultureInfo.InvariantCulture),offscreen=false});
+      return true;
+    };
+    if(!EnumWindows(visit,IntPtr.Zero))throw new InvalidOperationException(failure??"Unable to enumerate owned windows");
+    return windows;
+  }
   private static List<object> OwnedWindows(AutomationElementCollection roots,PropertyCondition owner,int pid) {
     var result=new List<object>();var seen=new HashSet<int>();
     var allowed=new HashSet<string>(new [] {"Kelpie","KelpieScriptStop","KelpieScriptPresentation"});
