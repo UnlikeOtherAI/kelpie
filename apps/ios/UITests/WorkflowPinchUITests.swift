@@ -17,6 +17,7 @@ extension WorkflowCaptureUITests {
         let viewport = XCUIApplication().webViews.firstMatch
         XCTAssertTrue(viewport.waitForExistence(timeout: 5))
         let initial = try await pinchMetrics(tab, selector: "#zoom")
+        let initialNative = await nativeZoomEvidence()
         let initialScale = try XCTUnwrap(initial["scale"] as? Double)
 
         // This drives WebKit's native pinch recognizer. The fixture reports the resulting visual viewport.
@@ -31,7 +32,10 @@ extension WorkflowCaptureUITests {
         pinch.name = "Actual native pinch before the partially visible Edge button tap"
         pinch.lifetime = .keepAlways
         add(pinch)
-        let metrics = XCTAttachment(data: try JSONSerialization.data(withJSONObject: ["initial": initial, "zoomed": zoomed],
+        let zoomedNative = await nativeZoomEvidence()
+        let metrics = XCTAttachment(data: try JSONSerialization.data(withJSONObject: [
+            "initial": initial, "zoomed": zoomed, "nativeBefore": initialNative, "nativeAfter": zoomedNative
+        ],
                                                                      options: [.sortedKeys]),
                                     uniformTypeIdentifier: "public.json")
         metrics.name = "Native pinch viewport metrics before assertions"
@@ -73,6 +77,15 @@ extension WorkflowCaptureUITests {
         add(geometry)
         try verifyPinchMarker(data, click: click)
 
+    }
+
+    private func nativeZoomEvidence() async -> Body {
+        guard let value = try? await probe.request("/v1/debug-screens", [:]),
+              let webView = value["webView"] as? Body, let scroll = webView["scrollView"] as? Body else { return [:] }
+        var result: Body = [:]
+        if let zoom = scroll["zoomScale"] as? Double, zoom.isFinite { result["scrollZoomScale"] = zoom }
+        if let zoom = webView["pageZoom"] as? Double, zoom.isFinite { result["pageZoom"] = zoom }
+        return result
     }
 
     private func pinchValue(_ extracted: Body) throws -> Body {

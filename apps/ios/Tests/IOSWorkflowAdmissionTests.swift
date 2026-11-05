@@ -267,7 +267,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
-    func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() {
+    func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() throws {
         let valid: Body = ["ok": true, "sensitive": false, "sensitivityKnown": true,
                            "mayHaveCompleted": true, "token": "t1", "inputGuarantee": "synthetic-coordinate"]
         XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t1"))
@@ -283,12 +283,17 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         refusal["mayHaveCompleted"] = false
         XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
         refusal["mayHaveCompleted"] = true
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        refusal["error"] = ""
         XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: nil))
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: ""))
         var contradiction = valid
         contradiction["error"] = "INPUT_UNCERTAIN"
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        contradiction["error"] = NSNull()
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(contradiction, token: "t1"))
         XCTAssertTrue(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": true, "sensitivityKnown": false]))
         XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": false, "sensitivityKnown": false]))
         XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitivityKnown": true]))
@@ -296,6 +301,17 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         var wrongGuarantee = valid
         wrongGuarantee["inputGuarantee"] = "trusted"
         XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(wrongGuarantee, token: "t1"))
+        let malformedValues = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data("[1,0,\"true\",null]".utf8)) as? [Any]
+        )
+        for field in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted"] {
+            for value in malformedValues {
+                var malformed = valid
+                malformed[field] = value
+                XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(malformed, token: "t1"))
+                XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(malformed, token: "t1"))
+            }
+        }
         for key in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted", "token", "inputGuarantee"] {
             var malformed = valid
             malformed.removeValue(forKey: key)

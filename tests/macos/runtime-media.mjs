@@ -75,3 +75,18 @@ export function inspectPaced(item,event){
  requireTrue(variants.size>=3,"PACED_TEXT_FRAMES");
  return {decodedFrames:rgb.length/stride,distinctTextRegions:variants.size};
 }
+
+export function inspectEdgeMarker(item,event){
+ const rgb=execFileSync("ffmpeg",["-v","error","-threads","1","-filter_threads","1","-i",item.file,"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","-"],{maxBuffer:16*1024*1024});
+ requireTrue(rgb.length===item.width*item.height*3,"EDGE_IMAGE_DECODE");
+ let count=0,sumX=0,sumY=0;
+ for(let y=0;y<item.height;y++)for(let x=0;x<item.width;x++){
+  const i=(y*item.width+x)*3;
+  if(rgb[i]>180&&rgb[i+1]<150&&rgb[i+2]<160){count++;sumX+=x;sumY+=y;}
+ }
+ requireTrue(count>20,"EDGE_MARKER_MISSING");
+ const actual={x:sumX/count,y:sumY/count},expected={x:event.x*item.width/event.viewport.width,y:event.y*item.height/event.viewport.height};
+ const error=Math.hypot(actual.x-expected.x,actual.y-expected.y);
+ requireTrue(error<4,"EDGE_MARKER_ALIGNMENT");
+ return {actual,expected,error,clientWidth:event.viewport.clientWidth,innerWidth:event.viewport.width};
+}

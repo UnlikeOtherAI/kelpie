@@ -6,6 +6,38 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     typealias Body = [String: Any]
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
 
+    @MainActor
+    func testEmptyPacedTypeRequiresEditableTarget() throws {
+        try ScriptWorkflowActions.requireEmptyPacedEditable(["editable": true])
+        for value: Any? in [false, nil] {
+            var target: Body = [:]
+            target["editable"] = value
+            XCTAssertThrowsError(try ScriptWorkflowActions.requireEmptyPacedEditable(target)) {
+                XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "TARGET_NOT_EDITABLE")
+            }
+        }
+    }
+
+    func testScrollbarTransitionAndProjection() {
+        func viewport(client: CGFloat, visible: CGFloat, bounds: CGFloat = 900, scale: CGFloat = 1) -> ScriptCaptureViewport {
+            ScriptCaptureViewport(bounds: CGSize(width: bounds, height: 700), layout: CGSize(width: 900, height: 700),
+                client: CGSize(width: client, height: 700), visible: CGRect(x: 0, y: 0, width: visible, height: 700),
+                scale: scale, pixelRatio: 1, pageOrigin: .zero)
+        }
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: nil, current: "new"))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "", current: "new"))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: ""))
+        XCTAssertFalse(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: "old"))
+        XCTAssertTrue(ScriptCaptureViewport.confirmedDocumentChange(previous: "old", current: "new"))
+        let scrollbar = viewport(client: 883, visible: 883), plain = viewport(client: 900, visible: 900)
+        XCTAssertEqual(scrollbar.displayPoint(CGPoint(x: 860, y: 100)).x, 860)
+        XCTAssertTrue(scrollbar.acceptsScrollbarTransition(to: plain, documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: plain, documentChanged: false))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 890), documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 900, bounds: 901), documentChanged: true))
+        XCTAssertFalse(scrollbar.acceptsScrollbarTransition(to: viewport(client: 900, visible: 900, scale: 2), documentChanged: true))
+    }
+
     private func workflow(_ steps: [Body], _ extra: Body = [:]) -> Body {
         ["version": 1, "tabId": "test-tab", "actions": steps].merging(extra) { _, new in new }
     }
@@ -93,11 +125,14 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     @MainActor
     func testMalformedCallbackLatchesPrivacyBeforeLaterGuardFailure() async {
         for captures in [true, false] {
-            for value: Any? in [nil, "malformed", [1, 2], ["sensitivityKnown": true]] {
+            for value: Any? in [nil, "malformed", [1, 2], ["sensitivityKnown": true],
+                                ["ok": true, "sensitive": false, "sensitivityKnown": true],
+                                ["ok": true, "mayHaveCompleted": false, "sensitive": false, "sensitivityKnown": true]] {
                 let privacy = ScriptWorkflowPrivacy(secrets: [], captures: captures)
                 do {
                     ScriptWorkflowTab.consumeTargetResult(
                         value,
+                        mutates: true,
                         consume: { privacy.consume($0, text: "canary") },
                         uncertain: { privacy.uncertain(text: "canary") }
                     )
@@ -128,23 +163,137 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
-    func testPacedUnknownClassificationFenceKeepsOrdinaryOutputUnredacted() throws {
+    func testCanonicalMutationReceiptAndPrivacyFixture() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("tests/capture/ack-receipt-cases.json"))
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? Body)
+        let expectedToken = try XCTUnwrap(fixture["expectedToken"] as? String)
+        let cases = try XCTUnwrap(fixture["cases"] as? [Body])
+        XCTAssertEqual(cases.count, 52)
+        for item in cases {
+            let name = try XCTUnwrap(item["name"] as? String)
+            let result = item["result"]
+            let body = result as? Body
+            let valid = body.map { ScriptWorkflowTab.hasValidMutationReceipt($0) } ?? false
+            let acknowledged = ScriptWorkflowTab.isAcknowledgedMutation(result, token: expectedToken)
+            let refused = valid && ScriptWorkflowBoolean.value(body?["ok"]) == false
+            let receipt = acknowledged ? "ack" : refused ? "refusal" : "malformed"
+            XCTAssertEqual(receipt, item["expectedReceipt"] as? String, name)
+            let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+            ScriptWorkflowTab.consumeTargetResult(
+                result, mutates: true, expectedToken: expectedToken,
+                consume: { privacy.consume($0, text: "literal") },
+                uncertain: { privacy.uncertain(text: "literal") }
+            )
+            let protected = item["expectedPrivacy"] as? String != "known-negative"
+            XCTAssertEqual(privacy.discardMedia, protected, name)
+            XCTAssertEqual(privacy.secrets, protected ? ["literal"] : [], name)
+        }
+    }
+
+    @MainActor
+    func testJSONReceiptBooleansRejectNumbersStringsAndNull() throws {
+        func decoded(_ json: String) throws -> Body {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? Body)
+        }
+        let good = try decoded(#"{"token":"expected","ok":true,"mayHaveCompleted":true,"sensitive":false,"sensitivityKnown":true,"inputGuarantee":"synthetic-coordinate"}"#)
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(good, token: "expected"))
+        var emptyError = good
+        emptyError["ok"] = false
+        emptyError["error"] = ""
+        XCTAssertFalse(ScriptWorkflowTab.hasValidMutationReceipt(emptyError))
+        for field in ["ok", "mayHaveCompleted", "sensitive", "sensitivityKnown"] {
+            for raw in ["1", "0", #""true""#, "null"] {
+                var candidate = good
+                candidate[field] = try decoded("{\"value\":\(raw)}")["value"]
+                XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(candidate, token: "expected"))
+                XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedAckShape(candidate))
+                let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+                ScriptWorkflowTab.consumeTargetResult(candidate, mutates: true, expectedToken: "expected",
+                    consume: { privacy.consume($0, text: "full literal") },
+                    uncertain: { privacy.uncertain(text: "full literal") })
+                XCTAssertEqual(privacy.secrets, ["full literal"])
+                XCTAssertTrue(privacy.discardMedia)
+            }
+        }
+        for raw in ["1", "0", #""true""#, "null"] {
+            let candidate = try decoded("{\"editable\":\(raw)}")
+            XCTAssertThrowsError(try ScriptWorkflowActions.requireEmptyPacedEditable(candidate))
+        }
+        for raw in ["1", "0", #""true""#, "null"] {
+            let privacy = ScriptWorkflowPrivacy(secrets: [], captures: true)
+            let candidate = try decoded("{\"sensitive\":false,\"sensitivityKnown\":\(raw)}")
+            privacy.consume(candidate, text: "full literal")
+            XCTAssertEqual(privacy.secrets, ["full literal"])
+            XCTAssertTrue(privacy.discardMedia)
+        }
+    }
+
+    @MainActor
+    func testFinalPacedAckDistinguishesUnknownPrivacyFromLostCallback() throws {
+        let known: Body = ["token": "expected", "inputGuarantee": "synthetic-coordinate", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": true]
+        let unknown: Body = ["token": "expected", "inputGuarantee": "synthetic-coordinate", "ok": true, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false]
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(known, token: "expected"))
+        XCTAssertTrue(ScriptWorkflowTab.isAcknowledgedMutation(unknown, token: "expected"))
+        var emptyToken = known
+        emptyToken["token"] = ""
+        XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(emptyToken, token: ""))
+        for guarantee: Any? in [nil, "other"] {
+            var invalid = known
+            invalid["inputGuarantee"] = guarantee
+            XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(invalid, token: "expected"))
+            XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedAckShape(invalid))
+        }
+        var uncertaintyCount = 0
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "expected", editing: false) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 0)
+        XCTAssertTrue(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "expected", editing: true) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
+        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(nil, token: "expected", editing: false) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
+        XCTAssertFalse(ScriptWorkflowTab.acceptAcknowledgedDocumentChange(known, token: "other", editing: true) { uncertaintyCount += 1 })
+        XCTAssertEqual(uncertaintyCount, 1)
+        let mismatched = ScriptWorkflowPrivacy(secrets: [], captures: true)
+        ScriptWorkflowTab.consumeTargetResult(known, mutates: true, expectedToken: "other",
+            consume: { mismatched.consume($0, text: "full literal") }, uncertain: { mismatched.uncertain(text: "full literal") })
+        XCTAssertEqual(mismatched.secrets, ["full literal"])
+        XCTAssertTrue(mismatched.discardMedia)
+        for malformed: Any? in [nil, "missing", [:], ["ok": true, "sensitive": false, "sensitivityKnown": false],
+                                ["ok": false, "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
+                                ["ok": true, "error": "bad", "mayHaveCompleted": true, "sensitive": false, "sensitivityKnown": false],
+                                ["ok": true, "mayHaveCompleted": false, "sensitive": false, "sensitivityKnown": true]] {
+            XCTAssertFalse(ScriptWorkflowTab.isAcknowledgedMutation(malformed, token: "expected"))
+        }
+        try ScriptWorkflowActions.requirePacedAckShape(known)
+        try ScriptWorkflowActions.requirePacedAckShape(unknown)
+        XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedAckShape(["ok": true, "sensitive": false])) {
+            let failure = $0 as? ScriptWorkflowFailure
+            XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")
+            XCTAssertEqual(failure?.mayHaveCompleted, true)
+        }
         for captures in [true, false] {
             let privacy = ScriptWorkflowPrivacy(secrets: [], captures: captures)
-            privacy.consume(["sensitive": false, "sensitivityKnown": true], text: "full literal")
+            privacy.consume(known, text: "full literal")
             XCTAssertTrue(privacy.secrets.isEmpty)
             XCTAssertFalse(privacy.discardMedia)
-            try ScriptWorkflowActions.requireKnownPacedResult(["sensitivityKnown": true])
-            for result: Body in [[:], ["sensitivityKnown": false]] {
-                privacy.consume(result, text: "full literal")
-                XCTAssertThrowsError(try ScriptWorkflowActions.requireKnownPacedResult(result)) {
+            privacy.consume(unknown, text: "full literal")
+            XCTAssertEqual(privacy.secrets, ["full literal"])
+            XCTAssertEqual(privacy.discardMedia, captures)
+            let redacted = try ScriptOutputRedaction.redact(["before": "full literal"], actions: [], secrets: privacy.secrets)
+            XCTAssertEqual(redacted["before"] as? String, "[redacted]")
+            if captures {
+                XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedClassification(unknown, hasFurther: false, discardMedia: true)) {
+                    XCTAssertEqual(($0 as? ScriptWorkflowFailure)?.code, "SENSITIVE_CAPTURE_REFUSED")
+                }
+            } else {
+                try ScriptWorkflowActions.requirePacedClassification(unknown, hasFurther: false, discardMedia: false)
+                XCTAssertThrowsError(try ScriptWorkflowActions.requirePacedClassification(unknown, hasFurther: true, discardMedia: false)) {
                     let failure = $0 as? ScriptWorkflowFailure
                     XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")
                     XCTAssertEqual(failure?.mayHaveCompleted, true)
                 }
             }
-            XCTAssertEqual(privacy.secrets, ["full literal"])
-            XCTAssertEqual(privacy.discardMedia, captures)
         }
     }
 
