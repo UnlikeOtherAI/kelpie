@@ -127,10 +127,16 @@ final class ScriptWorkflowRunner {
             }
         } catch { issue = error as? ScriptWorkflowFailure ?? ScriptWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
+        var discardCapture = issue?.code == "SENSITIVE_CAPTURE_REFUSED"
         if let actions {
-            do { outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets) } catch { issue = ScriptWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            do {
+                outputs = try ScriptOutputRedaction.redact(actions.outputs, actions: workflow.steps, secrets: actions.secrets)
+            } catch {
+                discardCapture = true
+                if issue == nil { issue = ScriptWorkflowFailure("OUTPUT_REDACTION_FAILED") }
+            }
         }
-        var artifacts = await capture?.finish(partial: issue != nil, discard: issue?.code == "SENSITIVE_CAPTURE_REFUSED") ?? []
+        var artifacts = await capture?.finish(partial: issue != nil, discard: discardCapture) ?? []
         currentArtifacts = artifacts
         if issue == nil, let failure = capture?.failure { issue = ScriptWorkflowFailure(failure) }
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
@@ -138,8 +144,8 @@ final class ScriptWorkflowRunner {
         await ScriptRendererDeadline.waitForRetirement(tab.renderer)
         presentation?.stop()
         await host.setRecordingMode(false)
-        if host.playbackState.isAbortRequested() {
-            issue = ScriptWorkflowFailure("SCRIPT_ABORTED", mayHaveCompleted: issue?.mayHaveCompleted ?? false)
+        if host.playbackState.isAbortRequested(), issue == nil {
+            issue = ScriptWorkflowFailure("SCRIPT_ABORTED")
         }
         if issue != nil { artifacts = artifacts.map { $0.merging(["partial": true]) { _, new in new } } }
         currentArtifacts = artifacts

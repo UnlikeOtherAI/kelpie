@@ -675,3 +675,8 @@ Windows release CI retains clearly labelled unsigned candidates only. Public Win
 On macOS Chromium, script capture uses the current renderer surface without clip emulation and admits only bounded native backing viewports before dispatch. Scroll origin participates in per-frame coherence while legal scrolling between samples preserves the fixed canvas. See [Apple script media](api/apple-script-media.md#macos-current-surface-admission) for the separate source, queue and output limits.
 
 Mac GIF capture retains a bounded playable prefix when abort precedes finalization, marks the result partial and keeps a newly arriving Stop responsive between frames. A subsequent run starts through the same normal admission path.
+
+
+### macOS inferred-sensitive workflow refusal
+
+When an edit resolves to a sensitive field, its literal is registered for run-private output redaction before any capture refusal. Earlier named outputs are scrubbed even when that edit never occurs. Sensitive-capture refusal and any output-redaction failure permanently discard that run's capture artifacts; a later failure or abort cannot restore them. Existing security or uncertain-input errors are preserved. Ordinary aborts and unrelated failures continue to retain valid partial media.

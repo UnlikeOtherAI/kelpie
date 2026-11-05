@@ -979,3 +979,8 @@ Response:
 The macOS strict-v1 script adapter reports synthetic-coordinate input, rejects unresolved inputs and unsupported native session IDs during full preflight, and keeps run/status/abort/artifact ownership bound to the authenticated listener incarnation. Supplied session IDs return SESSION_UNSUPPORTED before any action; no separate native session allocator is implied. Version-present invalid scripts do not enter the legacy executor. Run status is metadata-only, and final failed/aborted artifacts are marked partial. See [macOS capture scope and verification](../plans/browser-automation-capture/macos.md).
 
 On macOS, capture duration expiry is checked during every workflow wait and action even for screenshots-only capture. Stopped capture uses a separate bounded finalization grace; a long wait cannot defer expiry until the next PNG.
+
+
+### macOS inferred-sensitive workflow refusal
+
+When an edit resolves to a sensitive field, its literal is registered for run-private output redaction before any capture refusal. Earlier named outputs are scrubbed even when that edit never occurs. Sensitive-capture refusal and any output-redaction failure permanently discard that run's capture artifacts; a later failure or abort cannot restore them. Existing security or uncertain-input errors are preserved. Ordinary aborts and unrelated failures continue to retain valid partial media.
