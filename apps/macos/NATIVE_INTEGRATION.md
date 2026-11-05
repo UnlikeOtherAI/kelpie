@@ -1,76 +1,55 @@
-# macOS Native Core Integration
+# macOS native build
 
-This app now expects the shared C++ state C API to be visible to Swift through
-`Kelpie/Kelpie-Bridging-Header.h`.
+The app uses Tuist and the repository's native CMake bootstrap. Do not edit or commit generated Xcode projects, copy unidentified vendor libraries, or raise the deployment target to make a build pass.
 
-Do not hand-edit `apps/macos/Kelpie.xcodeproj/project.pbxproj`. This repo uses
-XcodeGen, so make the equivalent build-setting changes in `apps/macos/project.yml`
-and regenerate the project with `xcodegen generate`.
+## Prerequisites
 
-## 1. Build the native static libraries
+Use an Apple Silicon Mac, Xcode with a macOS26 SDK or newer, CMake, Ninja, Node20+, pnpm, mise and SwiftLint. The app deployment target remains macOS14. Tuist is pinned by the root .mise.toml.
 
-Build the native targets so Xcode has these static libraries available:
+The CI job uses the stable [GitHub macos-26 ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md), whose documented default is Xcode 26.6. The pinned CEF bootstrap is ARM64-only. The job prints its actual toolchain and refuses a different architecture.
 
-- `libkelpie_core_state.a`
-- `libkelpie_core_protocol.a`
+## Bootstrap and build
 
-`kelpie_core_state` links against `kelpie_core_protocol`, so both need to be
-linked into the macOS app target.
-
-## 2. Link the libraries into the `Kelpie` target
-
-Add both `.a` files to the macOS app target's link phase. In Xcode this is the
-equivalent of adding them to `Link Binary With Libraries`.
-
-If you are expressing this through `apps/macos/project.yml`, add the libraries to
-the `Kelpie` target instead of editing the generated `.xcodeproj` directly, then
-run:
+AppReveal is public and pinned to the committed source used by the local compiled candidate:
 
 ```sh
-xcodegen generate
+git init vendor/AppReveal
+git -C vendor/AppReveal remote add origin https://github.com/UnlikeOtherAI/AppReveal.git
+git -C vendor/AppReveal fetch --depth 1 origin 3a28e56e5e72aa2a1f0b241cac63140e5906c8b4
+git -C vendor/AppReveal checkout --detach FETCH_HEAD
+bash scripts/download-cef.sh macos
+make lint-swift
+cmake -S native -B native/.build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DKELPIE_BUILD_DESKTOP_ENGINES=OFF \
+  -DKELPIE_LOCAL_LLM=ON \
+  -DKELPIE_AI_USE_HTTPLIB=OFF \
+  -DBUILD_TESTING=ON
+cmake --build native/.build --parallel 1 --target \
+  kelpie_core_state kelpie_core_connect kelpie_core_protocol \
+  kelpie_core_automation kelpie_core_mcp kelpie_core_ai
+(cd apps/macos && mise exec -- tuist generate --no-open)
+xcodebuild -workspace apps/macos/Kelpie.xcworkspace -scheme Kelpie \
+  -configuration Debug -derivedDataPath apps/macos/.build -jobs 1 \
+  build-for-testing CODE_SIGNING_ALLOWED=NO
 ```
 
-## 3. Add the native header search path
+These are bootstrap commands for a fresh worktree; preserve an existing vendor checkout rather than overwriting it. Native configuration installs frozen pnpm dependencies and regenerates the canonical browser contract. It downloads llama source8345f333951c661d166b00e6f9362e553768f292 through the existing FetchContent definition. Darwin enables CPU, Metal and Accelerate; other platforms retain their existing defaults.
 
-Append the core-state public headers to `HEADER_SEARCH_PATHS` for the `Kelpie`
-target:
+Project.swift links the core libraries and llama/ggml outputs under native/.build. The permanent Kelpie/AI/Llama/module.modulemap exposes those pinned headers to Swift. No apps/macos/vendor/llama.cpp tree is needed. The existing CEF download script supplies framework149.0.6 and matching headers; do not reuse framework148 with those headers.
 
-```text
-$(PROJECT_DIR)/../native/core-state/include
-```
+## Scope and known diagnostics
 
-Keep the existing CEF include path. The final setting should append the new path,
-not replace the current one.
+The local macOS27 candidate passed full Swift lint, native core/inference compilation, Tuist generation and app/XCTest build-for-testing. The [hosted run 41950256231](https://github.com/UnlikeOtherAI/kelpie/actions/runs/41950256231) also passed at revision 28426edc2fe9faffefea4a3df508786d5107bc15 using Xcode 26.6 (17F113), macOS SDK 26.5, CEF 149.0.6 and native Metal/BLAS ON. The scope job took 6 seconds and the native job 8 minutes 10 seconds. This compiles XCTest without executing tests or launching Kelpie.
 
-If your static libraries live outside the default linker search locations, also add
-their output directory to `LIBRARY_SEARCH_PATHS`.
+The build emits known warnings in existing AppReveal concurrency declarations, native categories/callbacks, deprecated UI calls and script phases without output declarations. An absent optional Gecko helper also produces a warning; the checked renderer paths are WebKit and Chromium. The workflow retains build diagnostics and does not claim zero warnings or turn off diagnostics.
 
-## 4. Keep the existing Swift bridging header
+Build-for-testing compiles tests without launching an app or simulator. CODE_SIGNING_ALLOWED=NO is only a compile-check setting: it does not create a signed release or prove installed behavior. This job adds no runtime sandbox bypass, changes no mocked-keychain setting and publishes no app artifact. Runtime tests, owner-authorized app replacement, supported native UI/MCP/CLI flows, release signing, installation and inference smoke remain separate requirements.
 
-The macOS target already points at:
+## CI change scope
 
-```text
-Kelpie/Kelpie-Bridging-Header.h
-```
+The workflow always runs a small Ubuntu change detector and its regression cases. The native job runs only when that detector identifies macOS source/tests, Tuist settings, linked core libraries, shared generated-contract source/build configuration, canonical pnpm bootstrap inputs, CEF/native generators or this CI configuration. Desktop-engine-only changes are excluded because this macOS graph configures KELPIE_BUILD_DESKTOP_ENGINES=OFF. Documentation, unrelated app/CLI/admin changes and shared tests outside tsconfig.build.json do not start a native build.
 
-That file now imports both headers:
+Pull requests compare merge-base to head; main pushes compare before/after and preserve both rename endpoints. A first push checks its tree. A manual dispatch explicitly requests the build. Failed Git comparison fails detection rather than silently skipping. GitHub reports conditionally skipped jobs as successful checks, preserving required-check behavior for unrelated-only changes. See [GitHub job conditions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions).
 
-```objc
-#import "CEFBridge.h"
-#import "kelpie/state_c_api.h"
-```
-
-Do not replace the bridging header with a new file. Keep the existing CEF import
-and append the native state C API import.
-
-## 5. Regenerate and build
-
-After updating `apps/macos/project.yml`, regenerate the project and build the app:
-
-```sh
-xcodegen generate
-xcodebuild -project apps/macos/Kelpie.xcodeproj -scheme Kelpie -configuration Debug build
-```
-
-If the bridging header import fails, the usual cause is a missing
-`../native/core-state/include` entry in `HEADER_SEARCH_PATHS`.
+Reproduce the lightweight scope tests with python3 -m unittest discover -s tests/ci -p test_macos_inputs.py. The hosted compile result above covers its exact recorded revision. Later native-input changes require their own checks; installed runtime behavior remains separately tracked.

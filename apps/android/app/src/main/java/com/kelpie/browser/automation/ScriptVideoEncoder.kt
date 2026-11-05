@@ -22,6 +22,8 @@ class ScriptVideoEncoder(
     private var outputFile: File? = null
     private var track = -1
     private var pending = 0
+    private var submitted = 0
+    val submittedFrames: Int get() = submitted
     private val pendingDocuments = mutableMapOf<Long, String>()
     var lastWrittenDocument: String? = null
         private set
@@ -61,8 +63,17 @@ class ScriptVideoEncoder(
             dropped++
             return true
         }
-        val index = codec.dequeueInputBuffer(0)
+        // start() does not promise an immediately available input buffer. Never
+        // discard the sole initial frame merely because the codec is starting.
+        val first = submitted == 0
+        var index = codec.dequeueInputBuffer(if (first) 10_000 else 0)
+        val deadline = System.nanoTime() + 1_000_000_000L
+        while (first && index < 0 && System.nanoTime() < deadline) {
+            drain(false)
+            index = codec.dequeueInputBuffer(10_000)
+        }
         if (index < 0) {
+            if (first) throw ScriptFailure("CAPTURE_VIDEO_UNAVAILABLE")
             dropped++
             return true
         }
@@ -126,6 +137,7 @@ class ScriptVideoEncoder(
         codec.queueInputBuffer(index, 0, width * height * 3 / 2, timestamp, 0)
         pendingDocuments[timestamp] = documentId
         pending++
+        submitted++
         drain(false)
         return !budget.exceeded
     }
@@ -151,6 +163,7 @@ class ScriptVideoEncoder(
                 durationMs = terminalUs / 1000.0
                 muxer?.stop()
             }
+            if (frames == 0 && !budget.exceeded) throw ScriptFailure("CAPTURE_ENCODING_EMPTY")
             return outputFile?.takeIf { frames > 0 }
         } finally {
             runCatching { muxer?.release() }

@@ -46,11 +46,13 @@ void TestRegistryFiltering() {
   const auto macos_tools = registry.tools_for_platform(kelpie::Platform::kMacos);
   const auto windows_tools = registry.tools_for_platform(kelpie::Platform::kWindows);
   const auto linux_tools = registry.tools_for_platform(kelpie::Platform::kLinux);
-  assert(linux_tools.size() == 114);
+  assert(linux_tools.size() == 118);
   for (const auto& tool : linux_tools) assert(ContainsTool(windows_tools, tool.name));
   for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
     assert(ContainsTool(windows_tools, name));
-    assert(!ContainsTool(linux_tools, name));
+    assert(ContainsTool(linux_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kLinux, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kLinux, "webkit"));
     assert(ContainsTool(ios_tools, name));
     assert(registry.is_tool_available(name, kelpie::Platform::kIos, "webkit"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kIos, "chromium"));
@@ -59,7 +61,10 @@ void TestRegistryFiltering() {
     assert(registry.is_tool_available(name, kelpie::Platform::kAndroid, "chromium"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "webkit"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kAndroid, "gecko"));
-    assert(!ContainsTool(macos_tools, name));
+    assert(ContainsTool(macos_tools, name));
+    assert(registry.is_tool_available(name, kelpie::Platform::kMacos, "webkit"));
+    assert(registry.is_tool_available(name, kelpie::Platform::kMacos, "chromium"));
+    assert(!registry.is_tool_available(name, kelpie::Platform::kMacos, "gecko"));
     assert(registry.is_tool_available(name, kelpie::Platform::kWindows, "chromium"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "webkit"));
     assert(!registry.is_tool_available(name, kelpie::Platform::kWindows, "gecko"));
@@ -91,7 +96,7 @@ void TestRegistryFiltering() {
   assert(all_tools.size() == 128);
   assert(ios_tools.size() == 125);
   assert(android_tools.size() == 125);
-  assert(macos_tools.size() == 118);
+  assert(macos_tools.size() == 122);
   assert(windows_tools.size() == 118);
   assert(webkit_tools.size() == 128);
   assert(chromium_tools.size() == 128);
@@ -156,6 +161,38 @@ void TestCapabilitiesClassification() {
   assert(ContainsString(macos_chromium.unsupported, "show-keyboard"));
 }
 
+void TestWorkflowRuntimeProfiles() {
+  const kelpie::McpRegistry registry;
+  using P = kelpie::Platform;
+  for (const auto* name : {"kelpie_play_script", "kelpie_abort_script", "kelpie_get_script_status", "kelpie_get_script_artifact"}) {
+    assert(registry.is_tool_available(name,P::kLinux,"chromium","windowed"));
+    assert(registry.is_tool_available(name,P::kLinux,"chromium","offscreen"));
+    assert(!registry.is_tool_available(name,P::kLinux,"webkit","offscreen"));
+    assert(!registry.is_tool_available(name,P::kLinux,"chromium","forged"));
+    for (P platform : {P::kIos,P::kAndroid,P::kWindows,P::kMacos})
+      assert(!registry.is_tool_available(name,platform,"chromium","offscreen"));
+    for (const auto& mode : {"windowed","offscreen"}) {
+      const auto tools=registry.tools_for_platform(P::kLinux,mode);
+      const auto tool=std::find_if(tools.begin(),tools.end(),[&](const auto& item){return item.name==name;});
+      assert(tool!=tools.end());
+      assert(tool->availability.requires_ui==(std::string(mode)=="windowed"));
+      assert(tool->availability.allowed_headless==(std::string(mode)=="offscreen"));
+    }
+    const auto mac=registry.tools_for_platform(P::kMacos);
+    const auto tool=std::find_if(mac.begin(),mac.end(),[&](const auto& item){return item.name==name;});
+    assert(tool!=mac.end() && tool->availability.requires_ui && !tool->availability.allowed_headless);
+  }
+  assert(registry.tools_for_platform(P::kLinux,"forged").empty());
+  const auto windowed=registry.get_capabilities(P::kLinux,"chromium");
+  const auto offscreen=registry.get_capabilities(P::kLinux,"chromium","offscreen");
+  for (const auto* endpoint : {"play-script","abort-script","get-script-status","get-script-artifact"}) {
+    assert(ContainsString(windowed.partial,endpoint));
+    assert(ContainsString(offscreen.supported,endpoint));
+  }
+  const auto invalid=registry.get_capabilities(P::kLinux,"chromium","forged");
+  assert(invalid.supported.empty() && invalid.partial.empty());
+}
+
 void TestCApi() {
   KelpieMcpRegistryRef registry = kelpie_mcp_registry_create();
   assert(registry != nullptr);
@@ -209,6 +246,7 @@ int main() {
     TestRegistryFiltering();
     TestAvailabilityChecks();
     TestCapabilitiesClassification();
+    TestWorkflowRuntimeProfiles();
     TestCApi();
     return 0;
   } catch (const std::exception& exception) {

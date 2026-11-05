@@ -99,6 +99,15 @@ class ScriptHttpFixture : AutoCloseable {
         return JSONObject(text)
     }
 
+    fun mcpValue(
+        name: String,
+        arguments: JSONObject = JSONObject(),
+    ): JSONObject {
+        val envelope = mcp(name, arguments)
+        assertTrue("Native MCP tool refused " + name, envelope.getBoolean("ok"))
+        return envelope.getJSONObject("value")
+    }
+
     fun core(
         method: String,
         tab: String,

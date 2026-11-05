@@ -22,13 +22,24 @@ export function validateEvidence(report) {
     assert.match(record.revision, /^[0-9a-f]{40}$/i, "Use full exercised source SHA");
     assert.ok(Number.isFinite(Date.parse(record.observedAt)), "Invalid evidence date");
     assert.ok(["passed", "failed", "blocked", "pending"].includes(record.status));
-    assert.ok(["source-review", "unit", "real-interface", "manual-ui", "manual-media"].includes(record.kind));
+    assert.ok(["source-review", "unit", "real-interface", "manual-ui", "native-ui", "manual-media"].includes(record.kind));
     if (record.deviceClass !== undefined) assert.ok(["desktop", "phone", "tablet", "worker"].includes(record.deviceClass), "Invalid device class");
     if (record.runtimeMode !== undefined) assert.ok(["windowed", "offscreen", "stub", "worker"].includes(record.runtimeMode), "Invalid runtime mode");
-    if (record.protocol !== undefined) assert.ok(["http", "mcp-direct", "mcp-generic", "cli"].includes(record.protocol), "Invalid protocol");
+    if (record.protocol !== undefined) assert.ok(["http", "mcp-direct", "mcp-generic", "cli", "native-ui"].includes(record.protocol), "Invalid protocol");
+    if (record.uiDriver !== undefined) assert.ok(["uia", "xcuitest", "compose", "at-spi"].includes(record.uiDriver), "Invalid native UI driver");
+    if (record.kind === "native-ui") {
+      assert.ok(record.uiDriver, "Native UI needs its standard driver");
+      assert.equal(record.protocol, "native-ui", "Native UI is not an HTTP/MCP/CLI protocol claim");
+      const drivers = { windows: "uia", ios: "xcuitest", macos: "xcuitest", android: "compose", linux: "at-spi" };
+      assert.equal(record.uiDriver, drivers[record.platform], "Driver does not match native platform");
+      if (record.status === "passed") {
+        assert.equal(record.runtimeMode, "windowed", "Offscreen cannot claim native UI");
+        assert.ok(["desktop", "phone", "tablet"].includes(record.deviceClass), "Native UI needs device class");
+      }
+    } else assert.notEqual(record.protocol, "native-ui", "Native UI protocol needs native-ui kind");
     const identity = [record.requirement, record.platform, record.renderer, record.deviceClass ?? "unspecified",
       record.runtimeMode ?? "unspecified", record.kind, record.protocol ?? "unspecified", record.revision,
-      record.binarySha256 ?? "unspecified", record.installedVersion ?? "unspecified"].join(":");
+      record.binarySha256 ?? "unspecified", record.installedVersion ?? "unspecified", record.uiDriver ?? "unspecified"].join(":");
     assert.ok(!identities.has(identity), "Duplicate evidence identity");
     identities.add(identity);
     if (record.status === "blocked") nonempty(record.blocker, "blocker");
@@ -40,7 +51,7 @@ export function validateEvidence(report) {
       nonempty(artifact.path, "artifact path");
       assert.match(artifact.sha256, /^[0-9a-f]{64}$/i, "Artifact needs independent SHA-256");
     }
-    if (["real-interface", "manual-ui", "manual-media"].includes(record.kind)) {
+    if (["real-interface", "manual-ui", "native-ui", "manual-media"].includes(record.kind)) {
       nonempty(record.installedVersion, "installed version");
       assert.match(record.binarySha256, /^[0-9a-f]{64}$/i, "Real flow needs exact binary SHA-256");
       nonempty(record.entryPoint, "public entry point");

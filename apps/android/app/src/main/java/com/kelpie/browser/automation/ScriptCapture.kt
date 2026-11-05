@@ -204,6 +204,7 @@ class ScriptCapture(
                 canvas.restore()
                 val now = System.nanoTime()
                 overlay.draw(canvas, outputWidth, outputHeight, now, before)
+                guard() // Revalidate after native drawing, before the frame leaves Main.
                 if (before != document()) throw ScriptFailure("SCRIPT_DOCUMENT_CHANGED")
                 Frame(bitmap, (now - run.startedNanos) / 1_000_000.0, before)
             } catch (error: Exception) {
@@ -242,7 +243,8 @@ class ScriptCapture(
             for (command in channel) {
                 if (command is Command.Finish) {
                     try {
-                        val terminal = maxOf(command.terminalMs - originMs, pendingTime + 1)
+                        val limit = (options["maxDurationMs"] as? Number)?.toDouble() ?: 60_000.0
+                        val terminal = minOf(maxOf(command.terminalMs - originMs, pendingTime + 1), limit)
                         try {
                             if (pending != null) gif?.frame(pending!!, if (gif.frameCount == 0) maxOf(terminal, 10.0) else terminal)
                             gif?.finish()
@@ -317,7 +319,10 @@ class ScriptCapture(
                         command.ack?.complete(Unit)
                         continue
                     }
-                    if (pendingTime < 0) originMs = frame.elapsedMs
+                    if (pendingTime < 0) {
+                        originMs = frame.elapsedMs
+                        run.startCapture(originMs, (options["maxDurationMs"] as? Number)?.toLong() ?: 60_000)
+                    }
                     val frameTime = frame.elapsedMs - originMs
                     if (pendingTime < 0 || frameTime - pendingTime >= 1000.0 / fps) {
                         if (pending != null && gif?.frame(pending!!, frameTime) == false) {

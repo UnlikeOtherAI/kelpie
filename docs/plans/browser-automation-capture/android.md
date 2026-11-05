@@ -196,3 +196,49 @@ inference remains enabled. Verified copies are under packages/emulator-1:
 
 No emulator/device test has run at this checkpoint. Source and docs are committed
 before installation; later entries identify exact profile/serial and source.
+Phone run1: committed ca498e21, Pixel7 API35 google_apis x86_64,
+emulator-5584,1080x2400/density420; native Android window in a headless emulator
+host (not a headless browser engine). APK hashes match the package checkpoint.
+Initial detached launch ended with SSH; retaining the SSH process owner kept the
+approved emulator alive. WHPX was operational. Both packages required adb -t
+because the injected-ABI debug manifest is test-only; no other package/device was
+overwritten. Native instrumentation ran11 tests:6 passed,5 failed. Raw output is
+phone-instrumentation-1.log; adb exit0 does not mean tests passed.
+
+Passed: JNI validation/numerics; non-BMP/escaped-NUL/raw-NUL conversion and100
+redactor allocation/free rounds; movies-only1FPS semantic navigation with complete
+authenticated chunk/hash reconstruction and every-frame GIF/MP4 old-document
+marker checks; foreign-owner denial/revocation and new-run recovery; visible
+native Stop with playable partial movies/new-run recovery; native H264 RGB,
+dimensions, timestamps, duration and early finalization. Low-FPS artifacts had
+five actual frames each,320x602, and8 reported drops; GIF duration13090ms and MP4
+13085.606ms. Decoded GIF and MP4 marker frames were also visually inspected.
+These counts describe this constrained emulator run, not a guaranteed throughput.
+
+Failures: the test expected unlabelled div text in a semantic snapshot and a
+heading ahead of a prioritized button at maxElements1; both assumptions conflict
+with the shared reader. Schema discovery omitted required names. Shared redaction
+scrubs/preserves unknown dynamic keys rather than dropping them, so pageSource's
+synthetic value must be asserted masked. The1024-byte single-frame AVC test
+produced no file but did not exhaust budget: nonblocking startup input admission
+could discard its only frame. First input now waits a bounded interval or refuses;
+non-budget empty finalization cannot report success. Captured-origin deadlines
+now gate actions and post-draw frame admission, with terminal timestamps capped
+independently of codec finalization time. New deadline and padded-width decoder
+regressions are pending the next package/device replay.
+
+Raw exports and decoded frames are preserved in phone-evidence-1. Only the task
+phone emulator was shut down normally after this bounded run; AVD data was kept.
+Tablet is still unbooted. The five failures remain unaccepted until replay passes.
+Phone replay package: source fixes and fixture corrections passed ktlintFormat,
+all176 JVM tests and both debug APK assemblies (2m35s,
+emulator-1-replay-package.log); the final test-only contract/retention refinement
+passed21s (emulator-1-replay-test-final.log). Href extraction is asserted as the
+raw source attribute, matching the shared reader. Tests now retain AVC color media
+and decoded frames, check padded-width RGB at center/corners, and compare both
+shared curve branches. Native UI evidence waits for actual blue marker pixels.
+MCP tests explicitly inspect the canonical ok/value envelope. Instrumentation has
+not replayed yet. Verified copies under packages/emulator-2:
+
+- app-debug.apk SHA-256 34fed03d6a3f6ac28a39239a4b9006d8c2e32bdc73ad0e1f3fc9f9b5c00b4126
+- app-debug-androidTest.apk SHA-256 3e7afbd84d575552cfd8005e464b86a8739b03ad0631e112f3d0231725866529

@@ -124,13 +124,9 @@ the test's name. A green Windows CI run takes about 9.5 minutes, and the Windows
 jobs stop after 30. Each build stage prints a `==>` line, so a stalled job shows where it
 stopped.
 
-The ZIP contains only the CEF runtime, locales, licenses, unchanged CEF bootstrap
-kelpie.exe, and Kelpie's kelpie.dll. Packaging rejects missing RunWinMain, non-x64 DLLs,
-or absent/mismatched manifest DLL resource versions. It writes uniquely named SHA-256 and
-provenance sidecars. Signing happens after deterministic resource stamping when a
-certificate is supplied; no certificate is assumed here. Use the approved Windows
-release acceptance command documented above; CI packaging does not bypass a locally
-rejected browser launch.
+The package contains the matching CEF runtime, locales, licenses, a resource-branded copy of the verified CEF bootstrap and Kelpie DLL. Packaging checks x64, RunWinMain and version provenance. It produces a clearly labelled *-unsigned.zip with SHA-256/provenance sidecars and signing_status=unsigned. CI retains this as a windows-unsigned-candidate artifact and has no release-upload authority.
+
+Windows releases use the existing UnlikeOtherAI Azure Artifact Signing Public Trust identity on Minis, through the approved Nessie signing scripts. No PFX, copied OIDC trust or unsigned fallback is used. Preserve the unsigned candidate, sign copies after resource stamping, verify publisher/EKU/timestamp and SignTool results, then rebuild the final signed archive/checksums/provenance. The agent uploads and installs that exact signed artifact and reruns the public acceptance flow. See [Windows release readiness](plans/browser-automation-capture/windows-release-readiness.md).
 
 The shared native HTTP/MCP journey can also run against a built desktop executable:
 `node tests/native/run-control-acceptance.mjs <absolute-executable>` (add `--fallback`

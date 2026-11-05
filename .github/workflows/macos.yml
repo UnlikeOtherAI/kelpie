@@ -11,46 +11,113 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect macOS build inputs
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.scope.outputs.native }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Check dependency scope
+        id: scope
+        run: python3 scripts/ci/macos_inputs.py >> "$GITHUB_OUTPUT"
+      - name: Verify scope gate
+        run: python3 -m unittest discover -s tests/ci -p 'test_macos_inputs.py'
+
   build:
-    name: Lint + project generation
-    runs-on: macos-15
-    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    name: Build macOS (app + XCTest)
+    # The existing CEF bootstrap targets Apple Silicon; this stable image includes Xcode 26.
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APPREVEAL_REVISION: 3a28e56e5e72aa2a1f0b241cac63140e5906c8b4
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.3
 
+      - uses: ./.github/actions/browser-contract
+
       - name: Install mise (tuist)
         uses: jdx/mise-action@v4.1.0
 
-      - name: Vendor AppReveal (required by Project.swift)
+      - name: Verify hosted Apple toolchain
         run: |
           set -euo pipefail
-          mkdir -p vendor
-          if [ ! -d vendor/AppReveal ]; then
-            git clone --depth 1 https://github.com/UnlikeOtherAI/AppReveal.git vendor/AppReveal
-          fi
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          sdk_version="$(xcrun --sdk macosx --show-sdk-version)"
+          echo "macOS SDK $sdk_version"
+          test "${sdk_version%%.*}" -ge 26
+          cmake --version
+          ninja --version
+
+      - name: Vendor pinned AppReveal
+        run: |
+          set -euo pipefail
+          git init vendor/AppReveal
+          git -C vendor/AppReveal remote add origin https://github.com/UnlikeOtherAI/AppReveal.git
+          git -C vendor/AppReveal fetch --depth 1 origin "$APPREVEAL_REVISION"
+          git -C vendor/AppReveal checkout --detach FETCH_HEAD
+          test "$(git -C vendor/AppReveal rev-parse HEAD)" = "$APPREVEAL_REVISION"
 
       - name: Install SwiftLint
         run: brew install swiftlint
 
-      - name: Symlink SwiftLint to /opt/homebrew/bin
-        run: |
-          set -euo pipefail
-          mkdir -p /opt/homebrew/bin
-          if [ ! -x /opt/homebrew/bin/swiftlint ]; then
-            ln -sfn "$(command -v swiftlint)" /opt/homebrew/bin/swiftlint
-          fi
-
       - name: Lint Swift
         run: make lint-swift
+
+      - name: Bootstrap pinned CEF
+        run: bash scripts/download-cef.sh macos
+
+      - name: Build pinned native core and inference libraries
+        run: |
+          set -euo pipefail
+          cmake -S native -B native/.build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DKELPIE_BUILD_DESKTOP_ENGINES=OFF \
+            -DKELPIE_LOCAL_LLM=ON \
+            -DKELPIE_AI_USE_HTTPLIB=OFF \
+            -DBUILD_TESTING=ON
+          cmake --build native/.build --parallel 1 --target \
+            kelpie_core_state kelpie_core_connect kelpie_core_protocol \
+            kelpie_core_automation kelpie_core_mcp kelpie_core_ai
+
+      - name: Record native dependency inputs
+        run: |
+          set -euo pipefail
+          grep '^GGML_METAL:BOOL=ON$' native/.build/CMakeCache.txt
+          grep '^GGML_BLAS:BOOL=ON$' native/.build/CMakeCache.txt
+          grep '^#define CEF_VERSION ' apps/macos/Frameworks/cef_include/cef_version.h
+          shasum -a 256 native/.build/core-*/libkelpie_core_*.a \
+            "apps/macos/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework"
 
       - name: Generate Xcode project (tuist)
         working-directory: apps/macos
         run: mise exec -- tuist generate --no-open
 
-      # NOTE: Full xcodebuild is intentionally deferred. The macOS target
-      # requires the CEF framework (downloaded via scripts/download-cef.sh)
-      # and the llama.cpp vendor tree at apps/macos/vendor/llama.cpp, which
-      # is not currently committed or scripted. Re-enable the full build
-      # below once vendor bootstrap is in place - until then, lint and
-      # project-graph validation are the meaningful CI signal we have.
+      - name: Compile app and XCTest without launching
+        # This is a compile check, not signing, release, app launch or native-flow acceptance.
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/macos-ci
+          xcodebuild \
+            -workspace apps/macos/Kelpie.xcworkspace \
+            -scheme Kelpie \
+            -configuration Debug \
+            -derivedDataPath apps/macos/.build \
+            -jobs 1 \
+            build-for-testing CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee .cache/macos-ci/build.log
+
+      - name: Retain compile diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-build-diagnostics
+          path: .cache/macos-ci/build.log
+          if-no-files-found: ignore
+          retention-days: 7

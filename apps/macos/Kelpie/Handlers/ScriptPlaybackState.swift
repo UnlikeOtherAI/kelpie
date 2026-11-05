@@ -55,22 +55,32 @@ final class ScriptPlaybackState: @unchecked Sendable {
 
     private static let allowedMethodsWhileRecording: Set<String> = [
         "abort-script",
-        "get-script-status"
+        "get-script-status",
+        "get-script-artifact"
     ]
 
     private let lock = NSLock()
     private var session: Session?
+    private var holdSession = false
 
-    func start(totalActions: Int, continueOnError: Bool) -> Bool {
+    func start(totalActions: Int, continueOnError: Bool, holdSession: Bool = false) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         guard session == nil else { return false }
+        self.holdSession = holdSession
         session = Session(
             totalActions: totalActions,
             continueOnError: continueOnError,
             startedAt: Date()
         )
         return true
+    }
+
+    func releaseHeldSession() {
+        lock.lock()
+        defer { lock.unlock() }
+        session = nil
+        holdSession = false
     }
 
     func updateCurrentAction(index: Int, action: String) {
@@ -142,7 +152,7 @@ final class ScriptPlaybackState: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard let session else { return ["success": true] }
-        self.session = nil
+        if !holdSession { self.session = nil }
         if !session.issues.isEmpty {
             let count = session.issues.count
             return buildResult(
@@ -164,7 +174,7 @@ final class ScriptPlaybackState: @unchecked Sendable {
         guard let session else {
             return errorResponse(code: code, message: message)
         }
-        self.session = nil
+        if !holdSession { self.session = nil }
         return buildResult(
             success: false,
             aborted: false,
@@ -179,7 +189,7 @@ final class ScriptPlaybackState: @unchecked Sendable {
         guard let session else {
             return ["success": false, "aborted": true]
         }
-        self.session = nil
+        if !holdSession { self.session = nil }
         return buildResult(success: false, aborted: true, session: session, topLevelError: nil)
     }
 

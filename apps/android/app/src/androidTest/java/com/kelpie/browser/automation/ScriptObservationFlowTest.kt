@@ -44,7 +44,8 @@ class ScriptObservationFlowTest : ScriptPublicFixture() {
                                 .put("maxChars", 256)
                                 .put("maxElements", 1),
                         ).getJSONObject("value")
-                assertTrue(snapshot.toString().contains("Public Scope"))
+                assertEquals("button", snapshot.getJSONArray("elements").getJSONObject(0).getString("role"))
+                assertEquals("Unique action", snapshot.getJSONArray("elements").getJSONObject(0).getString("name"))
                 for (privateValue in listOf("private-input-canary", "private-textarea-canary", "private-editor-canary", "Outside Sentinel")) assertFalse(snapshot.toString().contains(privateValue))
                 assertTrue(snapshot.getBoolean("truncated"))
                 val fields =

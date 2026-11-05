@@ -41,7 +41,8 @@ void ScriptRegistryForwarding(int platform) {
       if (platform != KELPIE_PLATFORM_WINDOWS) {
         assert(tool["availability"]["requires_ui"] == true);
         assert(tool["availability"]["allowed_headless"] == false);
-        assert(tool["availability"]["engines"] == json::array({platform == KELPIE_PLATFORM_IOS ? "webkit" : "chromium"}));
+        assert(tool["availability"]["engines"] == (platform == KELPIE_PLATFORM_MACOS
+          ? json::array({"webkit", "chromium"}) : json::array({platform == KELPIE_PLATFORM_IOS ? "webkit" : "chromium"})));
       }
       assert(!tool["inputSchema"]["properties"].contains("values"));
       assert(!tool["inputSchema"]["properties"].contains("secretEnv"));
@@ -137,6 +138,8 @@ int main() {
   ScriptRegistryForwarding(KELPIE_PLATFORM_WINDOWS);
   ScriptRegistryForwarding(KELPIE_PLATFORM_IOS);
   ScriptRegistryForwarding(KELPIE_PLATFORM_ANDROID);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_MACOS);
+  ScriptRegistryForwarding(KELPIE_PLATFORM_LINUX);
   const kelpie::McpRegistry registry;
   for (const auto& tool : registry.all_tools()) {
     const auto schema = kelpie::NativeExtensionInputSchema(tool.http_endpoint);

@@ -38,6 +38,7 @@ class ScriptActions(
             }
             if (ctx.scriptPlaybackState?.isAbortRequested() == true) stop("SCRIPT_ABORTED")
         }
+        if (run.captureExpired()) stop("CAPTURE_DURATION_LIMIT")
         if (run.elapsedMs() > 300_000) stop("SCRIPT_DURATION_LIMIT")
         if (run.stopped.get()) throw ScriptFailure(run.stopReason.get() ?: "SCRIPT_ABORTED", mutationInFlight)
     }
