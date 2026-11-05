@@ -201,7 +201,7 @@ final class ScriptWorkflowActions {
         #if DEBUG
         if editing, !discardMedia { await tab.debugEditFocus("after", targetFocused: verified["focused"] as? Bool) }
         #endif
-        presentation.indicate(at: point, options: settings, hold: capture?.hasMovies == true)
+        presentation.indicate(at: point, options: settings, tab: tab, hold: capture?.hasMovies == true)
         if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
         try await capture?.ensureMarkerAdmission()
         presentation.releaseMarker()

@@ -152,9 +152,12 @@ final class ScriptWorkflowRunner {
         let retiringMarker: ScriptMarkerRetiree?
         if let presentation, issue == nil, capture?.hasMovies != true,
            let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
-           let window = tab.view.window {
+           let window = presentation.markerWindow, let geometry = presentation.markerGeometry,
+           let document = presentation.markerDocument {
             presentation.keepMarkerOnly()
-            let retiree = ScriptMarkerRetiree(presentation: presentation, tab: tab, window: window, end: end)
+            let retiree = ScriptMarkerRetiree(
+                presentation: presentation, tab: tab, window: window, end: end, geometry: geometry, document: document
+            )
             markerRetiree = retiree
             retiringMarker = retiree
         } else {

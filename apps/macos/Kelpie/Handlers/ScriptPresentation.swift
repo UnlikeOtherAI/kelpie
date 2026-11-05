@@ -30,6 +30,9 @@ final class ScriptPresentation {
     private var timer: Timer?
     private var documentObserver: NSObjectProtocol?
     private var marker: Marker?
+    private(set) weak var markerWindow: NSWindow?
+    private(set) var markerGeometry: ScriptMarkerGeometry?
+    private(set) var markerDocument: String?
     private var pointer: CGPoint?
     private var commentary: String?
     private var held = false
@@ -54,6 +57,9 @@ final class ScriptPresentation {
 
     func clear() {
         marker = nil
+        markerWindow = nil
+        markerGeometry = nil
+        markerDocument = nil
         pointer = nil
         commentary = nil
         held = false
@@ -76,7 +82,10 @@ final class ScriptPresentation {
     }
 
     /// The clock stays at zero until an actual legal movie sample contains the marker.
-    func indicate(at point: CGPoint, options: [String: Any], hold: Bool = false) {
+    func indicate(at point: CGPoint, options: [String: Any], tab: ScriptWorkflowTab, hold: Bool = false) {
+        markerWindow = tab.view.window
+        markerGeometry = markerWindow.map { ScriptMarkerGeometry(tab: tab, window: $0) }
+        markerDocument = tab.document
         heldTime = ProcessInfo.processInfo.systemUptime
         held = hold
         marker = Marker(
@@ -173,21 +182,50 @@ final class ScriptPresentation {
         ScriptOverlayDrawing.path(from: start, to: end, progress: progress, curve: curve)
     }
 
-    func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
-ScriptOverlayDrawing.draw(in: graphics, size: size, viewport: canvas.bounds.size, pointer: pointer, marker: marker, now: held ? heldTime : ProcessInfo.processInfo.systemUptime, flipped: flipped)
-        if let commentary, !commentary.isEmpty {
-            graphics.saveGState()
-            if flipped { graphics.translateBy(x: 0, y: size.height); graphics.scaleBy(x: 1, y: -1) }
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: max(12, size.width / 80)),
-                .foregroundColor: NSColor.white
-            ]
-            let line = CTLineCreateWithAttributedString(NSAttributedString(string: commentary, attributes: attributes))
-            graphics.setFillColor(CGColor(gray: 0, alpha: 0.8))
-            graphics.fill(CGRect(x: 8, y: 8, width: max(0, size.width - 16), height: 40))
-            graphics.textPosition = CGPoint(x: 16, y: 22)
-            CTLineDraw(line, graphics)
-            graphics.restoreGState()
+    struct Frame {
+        let viewport: CGSize
+        let pointer: CGPoint?
+        let marker: Marker?
+        let commentary: String?
+        let time: TimeInterval
+
+        func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
+            ScriptOverlayDrawing.draw(in: graphics, size: size, viewport: viewport, pointer: pointer, marker: marker, now: time, flipped: flipped)
+            if let commentary, !commentary.isEmpty {
+                graphics.saveGState()
+                if flipped { graphics.translateBy(x: 0, y: size.height); graphics.scaleBy(x: 1, y: -1) }
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: max(12, size.width / 80)),
+                    .foregroundColor: NSColor.white
+                ]
+                let line = CTLineCreateWithAttributedString(NSAttributedString(string: commentary, attributes: attributes))
+                graphics.setFillColor(CGColor(gray: 0, alpha: 0.8))
+                graphics.fill(CGRect(x: 8, y: 8, width: max(0, size.width - 16), height: 40))
+                graphics.textPosition = CGPoint(x: 16, y: 22)
+                CTLineDraw(line, graphics)
+                graphics.restoreGState()
+            }
+
         }
+    }
+
+    static func exposedMarker(_ marker: Marker?, time: TimeInterval) -> Marker? {
+        guard let marker, ScriptOverlayDrawing.markerIsVisible(marker, now: time) else { return nil }
+        return marker
+    }
+
+    func frame() -> Frame {
+        let time = held ? heldTime : ProcessInfo.processInfo.systemUptime
+        return Frame(
+            viewport: canvas.bounds.size,
+            pointer: pointer,
+            marker: Self.exposedMarker(marker, time: time),
+            commentary: commentary,
+            time: time
+        )
+    }
+
+    func draw(in graphics: CGContext, size: CGSize, flipped: Bool = false) {
+        frame().draw(in: graphics, size: size, flipped: flipped)
     }
 }

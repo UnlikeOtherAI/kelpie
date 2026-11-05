@@ -37,6 +37,12 @@ enum ScriptOverlayDrawing {
         return CGPoint(x: value.x, y: value.y)
     }
 
+    static func markerIsVisible(_ marker: ScriptOverlayMarker, now: TimeInterval) -> Bool {
+        guard now >= marker.started else { return false }
+        let fraction = kelpie_script_progress((now - marker.started) * 1000, marker.duration * 1000)
+        return kelpie_script_tap_presentation(fraction, marker.wobble ? 1 : 0, marker.fade ? 1 : 0).alpha > 0
+    }
+
     static func draw(
         in graphics: CGContext,
         size: CGSize,
@@ -65,7 +71,7 @@ enum ScriptOverlayDrawing {
             graphics.closePath()
             graphics.drawPath(using: .fillStroke)
         }
-        guard let marker, now >= marker.started else { return }
+        guard let marker, markerIsVisible(marker, now: now) else { return }
         let fraction = kelpie_script_progress((now - marker.started) * 1000, marker.duration * 1000)
         let state = kelpie_script_tap_presentation(fraction, marker.wobble ? 1 : 0, marker.fade ? 1 : 0)
         guard state.alpha > 0 else { return }

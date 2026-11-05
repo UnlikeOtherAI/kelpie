@@ -12,8 +12,40 @@ import {canary} from "./runtime-fixture.mjs";
 import {Failure,delay,requireTrue,waitFor,probeListeners} from "./runtime-client.mjs";
 import {waitForRendererTransition} from "./runtime-renderer-transition.mjs";
 import {inspectMedia,centerPixel,inspectCurve,inspectEdgeMarker,inspectDefaultMotion} from "./runtime-media.mjs";
+async function runDefaultMotion({client,fixture,engine,base,capture,check,load}) {
+ for(const [label,formats] of [["combined",["gif","video"]],["video-only",["video"]]])
+ await check(label==="combined"?"default-350ms-pointer-motion":"default-350ms-pointer-motion-video-only",async()=>{
+  await load("/motion");const begin=fixture.events.length;
+  const result=await client.api("play-script",{...base,pointer:{enabled:true},
+   tapIndicator:{color:"#F54242",radius:2,durationMs:100,wobble:false,fade:true},
+   capture:{...capture,formats,fps:30},actions:[
+    {action:"click",target:{role:"button",name:"First"}},{action:"wait",ms:800},
+    {action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:400}]});
+  requireTrue(result.success,"DEFAULT_MOTION_WORKFLOW");
+  const events=fixture.events.slice(begin),first=events.find(e=>e.type==="click"&&e.target==="first"),
+   second=events.find(e=>e.type==="click"&&e.target==="second");
+  requireTrue(first&&second,"DEFAULT_MOTION_EVENTS");
+  const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
+  const artifacts=await client.download(result,engine+"-default-motion-"+label);
+  requireTrue(artifacts.length===formats.length&&artifacts.every(item=>
+   formats.includes(item.mimeType==="video/mp4"?"video":item.mimeType==="image/gif"?"gif":"unknown")),"DEFAULT_MOTION_FORMATS");
+  return {formats,media:artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}))};
+ },{continueOnFailure:true});
+}
+async function runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure=false}) {
+ await check("scrollbar-right-edge-marker",async()=>{
+  await load("/edge");const begin=fixture.events.length;
+  const result=await client.api("play-script",{...base,tapIndicator:{color:"#F54242",radius:18,durationMs:700,wobble:false,fade:false},
+   capture:{...capture,formats:["screenshots"]},actions:[{action:"click",target:{role:"button",name:"Edge"}}]});
+  requireTrue(result.success,"EDGE_WORKFLOW");
+  const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="edge"));
+  const artifacts=await client.download(result,engine+"-edge");
+  const image=artifacts.find(a=>a.mimeType==="image/png");requireTrue(image,"EDGE_SCREENSHOT");
+  return inspectEdgeMarker(image,event);
+ },{continueOnFailure});
+}
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
-export async function runEngine(client,fixture,engine,report) {
+export async function runEngine(client,fixture,engine,report,scope="full") {
  let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run,{continueOnFailure=false}={}){try{const detail=await run();checks.push({name,passed:true,detail});}
@@ -70,6 +102,15 @@ export async function runEngine(client,fixture,engine,report) {
   return {success:true};
  });
  await load();
+ if(scope==="cef-timing"){
+  requireTrue(engine==="chromium","FOCUSED_RENDERER");
+  await runRetiree({client,engine,base,capture,check,load});
+  await runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure:true});
+  await runDefaultMotion({client,fixture,engine,base,capture,check,load});
+  const failed=checks.find(item=>!item.passed);
+  if(failed)throw new Failure(failed.code);
+  return;
+ }
  await check("semantic-label-export",async()=>{
   const begin=fixture.events.length;
   semanticStage="direct-play";
@@ -238,16 +279,7 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(actual.every((v,i)=>Math.abs(v-expected[i])<20),"SCROLLED_SOURCE_DESTINATION_PIXEL");
   return {sourceY,expected,actual,viewport:event.viewport,visual:event.visual,artifact:item};
  });
- await check("scrollbar-right-edge-marker",async()=>{
-  await load("/edge");const begin=fixture.events.length;
-  const result=await client.api("play-script",{...base,tapIndicator:{color:"#F54242",radius:18,durationMs:700,wobble:false,fade:false},
-   capture:{...capture,formats:["screenshots"]},actions:[{action:"click",target:{role:"button",name:"Edge"}}]});
-  requireTrue(result.success,"EDGE_WORKFLOW");
-  const event=await waitFor(()=>fixture.events.slice(begin).find(e=>e.type==="click"&&e.target==="edge"));
-  const artifacts=await client.download(result,engine+"-edge");
-  const image=artifacts.find(a=>a.mimeType==="image/png");requireTrue(image,"EDGE_SCREENSHOT");
-  return inspectEdgeMarker(image,event);
- });
+ await runEdge({client,fixture,engine,base,capture,check,load});
  for(const formats of [["gif","video"],["gif","video","screenshots"]])await check("low-fps-navigation-marker-"+formats.length,async()=>{
   await load();
   const begin=fixture.events.length;
@@ -288,24 +320,7 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(movies.length===2,"LOW_FPS_FORMATS");
   return movies.map(a=>inspectMedia(a,{marker:true,preNavigation:true}));
  });
- for(const [label,formats] of [["combined",["gif","video"]],["video-only",["video"]]])
- await check(label==="combined"?"default-350ms-pointer-motion":"default-350ms-pointer-motion-video-only",async()=>{
-  await load("/motion");const begin=fixture.events.length;
-  const result=await client.api("play-script",{...base,pointer:{enabled:true},
-   tapIndicator:{color:"#F54242",radius:2,durationMs:100,wobble:false,fade:true},
-   capture:{...capture,formats,fps:30},actions:[
-    {action:"click",target:{role:"button",name:"First"}},{action:"wait",ms:800},
-    {action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:400}]});
-  requireTrue(result.success,"DEFAULT_MOTION_WORKFLOW");
-  const events=fixture.events.slice(begin),first=events.find(e=>e.type==="click"&&e.target==="first"),
-   second=events.find(e=>e.type==="click"&&e.target==="second");
-  requireTrue(first&&second,"DEFAULT_MOTION_EVENTS");
-  const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
-  const artifacts=await client.download(result,engine+"-default-motion-"+label);
-  requireTrue(artifacts.length===formats.length&&artifacts.every(item=>
-   formats.includes(item.mimeType==="video/mp4"?"video":item.mimeType==="image/gif"?"gif":"unknown")),"DEFAULT_MOTION_FORMATS");
-  return {formats,media:artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}))};
- },{continueOnFailure:true});
+ await runDefaultMotion({client,fixture,engine,base,capture,check,load});
  for(const curve of ["s","c"])await check("movie-pointer-curve-"+curve,async()=>{
   await load("/motion");const begin=fixture.events.length;
   const result=await client.api("play-script",{...base,pointer:{enabled:true,curve,durationMs:2000,easing:"ease-in-out"},

@@ -8,6 +8,57 @@ final class ScriptWorkflowAdmissionTests: XCTestCase {
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
 
     @MainActor
+    func testStepOverlayKeepsAdmissionTimeAcrossSlowSnapshot() throws {
+        let marker = ScriptOverlayMarker(
+            point: CGPoint(x: 25, y: 25),
+            started: 100,
+            duration: 0.7,
+            radius: 12,
+            color: ScriptOverlayDrawing.color("#F54242"),
+            wobble: false,
+            fade: false
+        )
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: 100))
+        XCTAssertNotNil(ScriptPresentation.exposedMarker(marker, time: marker.started)) // Held at its admission time.
+        XCTAssertNil(ScriptPresentation.exposedMarker(marker, time: 101))
+        let admitted = ScriptPresentation.Frame(
+            viewport: CGSize(width: 50, height: 50), pointer: nil, marker: marker, commentary: nil, time: 100
+        )
+        let later = ScriptPresentation.Frame(
+            viewport: CGSize(width: 50, height: 50), pointer: nil, marker: marker, commentary: nil, time: 101
+        )
+        func alpha(_ frame: ScriptPresentation.Frame) throws -> UInt8 {
+            let context = try XCTUnwrap(CGContext(
+                data: nil,
+                width: 50,
+                height: 50,
+                bitsPerComponent: 8,
+                bytesPerRow: 200,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            frame.draw(in: context, size: CGSize(width: 50, height: 50))
+            let bytes = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+            return bytes[(25 * 50 + 25) * 4 + 3]
+        }
+        XCTAssertGreaterThan(try alpha(admitted), 0)
+        XCTAssertEqual(try alpha(later), 0)
+        // The same immutable admission is used even when the renderer returns after its live marker expired.
+        XCTAssertGreaterThan(try alpha(admitted), 0)
+    }
+
+    @MainActor
+    func testStepOverlayRejectsDocumentChangeAfterAdmission() throws {
+        var sameDocumentAndGeometry = true
+        let current = { sameDocumentAndGeometry }
+        XCTAssertNoThrow(try ScriptCapture.requireCurrentOverlay(current))
+        sameDocumentAndGeometry = false
+        XCTAssertThrowsError(try ScriptCapture.requireCurrentOverlay(current)) { error in
+            XCTAssertEqual((error as? ScriptWorkflowFailure)?.code, "CAPTURE_DOCUMENT_CHANGED")
+        }
+    }
+
+    @MainActor
     func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
         let port: UInt16 = 28421
         let router = Router()

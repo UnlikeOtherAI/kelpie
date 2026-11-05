@@ -91,10 +91,30 @@ final class ScriptCapture {
 
     func screenshot(index: Int) async throws {
         guard formats.contains("screenshots") else { throw ScriptWorkflowFailure("SCREENSHOT_UNSUPPORTED") }
+        let overlay = presentation.frame()
+        let overlayDocument = tab.document
+        let overlayView = tab.view
+        guard tab.renderer.makeView() === overlayView,
+              let overlayWindow = overlayView.window else { throw ScriptWorkflowFailure("TAB_NOT_VISIBLE") }
+        let overlayGeometry = ScriptMarkerGeometry(tab: tab, window: overlayWindow)
+        if overlay.marker != nil {
+            guard presentation.markerWindow === overlayWindow, presentation.markerDocument == overlayDocument,
+                  presentation.markerGeometry == overlayGeometry else {
+                throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
+            }
+        }
         while sampling { try await tab.check(); try await Task.sleep(nanoseconds: 5_000_000) }
         sampling = true
         defer { sampling = false }
-        let (image, viewport, document) = try await frame(sample: "screenshot")
+        let (image, viewport, document) = try await frame(
+            sample: "screenshot",
+            overlay: overlay,
+            overlayIsCurrent: {
+                self.tab.document == overlayDocument && self.tab.view === overlayView &&
+                    self.tab.renderer.makeView() === overlayView && overlayView.window === overlayWindow &&
+                    ScriptMarkerGeometry(tab: self.tab, window: overlayWindow) == overlayGeometry
+            }
+        )
         let url = directory.appendingPathComponent("step-" + String(index) + ".png")
         try ScriptImageEncoder.png(image, to: url, budget: budget)
         screenshots.append((url, ["actionIndex": index, "width": image.width, "height": image.height,
@@ -227,11 +247,16 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
         if critical, !accepted { throw ScriptWorkflowFailure("CAPTURE_ADMISSION_FAILED") }
     }
 
-    private func frame(sample: String) async throws -> (CGImage, ScriptWorkflowTab.Viewport, String) {
+    private func frame(
+        sample: String,
+        overlay: ScriptPresentation.Frame? = nil,
+        overlayIsCurrent: (() -> Bool)? = nil
+    ) async throws -> (CGImage, ScriptWorkflowTab.Viewport, String) {
         #if DEBUG
         var timing: ScriptCaptureTiming? = fps == 30 && timingSamples < 32 ? ScriptCaptureTiming() : nil
         #endif
         try await tab.check()
+        try Self.requireCurrentOverlay(overlayIsCurrent)
         guard now <= maximumDuration else { throw ScriptWorkflowFailure("CAPTURE_DURATION_LIMIT") }
         let viewport = try await tab.viewport()
         #if DEBUG
@@ -283,16 +308,21 @@ writer = try ScriptVideoWriter(url: directory.appendingPathComponent("capture.mp
             throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED")
         }
         guard !stopped else { throw ScriptWorkflowFailure("CAPTURE_STOPPED") }
+        try Self.requireCurrentOverlay(overlayIsCurrent)
         #if DEBUG
         if let timing {
             timingSamples += 1
             timing.emit(sample: sample, engine: tab.renderer.engineName)
         }
         #endif
-        return (try compose(source, maximumWidth: maximumWidth), viewport, document)
+        return (try compose(source, maximumWidth: maximumWidth, overlay: overlay), viewport, document)
     }
 
-    private func compose(_ source: NSImage, maximumWidth: Int) throws -> CGImage {
+    static func requireCurrentOverlay(_ check: (() -> Bool)?) throws {
+        guard check?() != false else { throw ScriptWorkflowFailure("CAPTURE_DOCUMENT_CHANGED") }
+    }
+
+    private func compose(_ source: NSImage, maximumWidth: Int, overlay: ScriptPresentation.Frame?) throws -> CGImage {
         var rect = CGRect(origin: .zero, size: source.size)
         guard let image = source.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { throw ScriptCaptureError.image }
         let scale = min(Double(maximumWidth) / Double(image.width), 1920 / Double(image.height), 1)
@@ -311,7 +341,7 @@ guard let graphics = CGContext(
     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
 ) else { throw ScriptCaptureError.image }
         graphics.draw(image, in: CGRect(origin: .zero, size: size))
-        presentation.draw(in: graphics, size: size)
+        if let overlay { overlay.draw(in: graphics, size: size) } else { presentation.draw(in: graphics, size: size) }
         guard let composed = graphics.makeImage() else { throw ScriptCaptureError.image }
         return composed
     }
