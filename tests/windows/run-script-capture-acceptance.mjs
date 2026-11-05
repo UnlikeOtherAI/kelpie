@@ -21,15 +21,9 @@ const fixture = await startCaptureFixture();
 const checks = [];
 const artifacts = [];
 const resourceEnabled=process.platform==="linux" && process.env.KELPIE_LINUX_RESOURCE_DIAGNOSTIC==="1";
-const resourcePid=resourceEnabled?Number(process.env.KELPIE_LINUX_RESOURCE_PID):0;
-const resourceTicks=resourceEnabled?process.env.KELPIE_LINUX_RESOURCE_START_TICKS:"";
-if(resourceEnabled) assert.ok(Number.isSafeInteger(resourcePid)&&resourcePid>1&&/^\d+$/.test(resourceTicks??""));
-const resourceObserver=resourceEnabled?await import("../linux/native-resource-snapshot.mjs"):null;
-const resourceSnapshots=[]; let resourceSequence=0;
-async function resourceSnapshot(sequence) {
-  try { return await resourceObserver.snapshotNativeResources({pid:resourcePid,startTicks:resourceTicks,sequence}); }
-  catch { return {pid:resourcePid,startTicks:resourceTicks,sequence,identityValid:false,complete:false}; }
-}
+const resourceDiagnostic=resourceEnabled?(await import("../linux/navigation-resource-diagnostic.mjs"))
+  .createNavigationResourceDiagnostic({pid:Number(process.env.KELPIE_LINUX_RESOURCE_PID),
+    startTicks:process.env.KELPIE_LINUX_RESOURCE_START_TICKS,output}):null;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function request(method, body = {}, token = readiness.token) {
   const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
@@ -39,24 +33,14 @@ async function request(method, body = {}, token = readiness.token) {
   return { status: response.status, value: await response.json() };
 }
 async function api(method, body = {}) {
-  const observe=resourceEnabled && method==="navigate";
-  const sequence=observe?resourceSequence++:0;
-  const before=observe?await resourceSnapshot(sequence):null;
-  let value;
-  try {
-    ({ value } = await request(method, body));
+  const perform=async()=>{
+    const { value }=await request(method,body);
     if(method==="get-script-status" && value.success) scriptStatusV1Schema.parse(value);
     return value;
-  } finally {
-    if(observe) {
-      const after=await resourceSnapshot(sequence);
-      const message=typeof value?.error?.message==="string"?value.error.message:"";
-      resourceSnapshots.push({sequence,before,after,responseSuccess:value?.success===true?1:value?0:-1,
-        navigationError:value?.error?.code==="NAVIGATION_ERROR"?1:0,
-        insufficientResources:message.includes("ERR_INSUFFICIENT_RESOURCES")?1:0});
-    }
-  }
+  };
+  return resourceDiagnostic?resourceDiagnostic.invoke(method,perform):perform();
 }
+
 const mcp = (method, body = {}, generic = true) => captureMcp(readiness, method, body, generic);
 async function check(name, run) {
   if(process.env.KELPIE_CAPTURE_CASE_FILTER && !name.includes(process.env.KELPIE_CAPTURE_CASE_FILTER)) return;
@@ -505,7 +489,7 @@ try {
 } finally {
   const report={source:process.env.KELPIE_CAPTURE_SOURCE,port:readiness.port,launchId:readiness.launchId,checks,artifacts};
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
-  if(resourceEnabled) await writeFile(resolve(output,"resource-diagnostics.json"),JSON.stringify({version:1,instrumented:true,snapshots:resourceSnapshots},null,2),{flag:"wx"});
+  if(resourceDiagnostic) await resourceDiagnostic.write();
   try { await fixture.close();report.cleanup="closed"; }
   catch(error) {report.cleanup="failed";checks.push({name:"fixture cleanup",passed:false,error:error.message});}
   await writeFile(resolve(output,"report.json"),JSON.stringify(report,null,2));
