@@ -151,3 +151,21 @@ The helper hashes are 247bfd425aecc614d898846fb4d1ac3deb33088448ce9e4361f91028cf
 (C++) and fbfaa6d364d68260d90dda27dc632d62485a4f479e7d083a0960c2efe1ecb780
 (C#). The 23 focused Node checks passed. This is capture-free verification;
 the public orchestration and native timeline have not yet been exercised.
+## Core-8 startup and launch failure
+
+The capture-free core-8 launcher self-test verified a 256 affinity mask,
+Normal priority, 2 GiB Job memory limit and kill-on-close flag from queried
+Job limits. A private public-CLI registration succeeded within its unchanged
+20-second bound. The actual C attempt then registered but returned a readiness
+timeout before script playback. Its exact candidate process remained alive
+without a running alias record for a period after that failure, and later
+exited without manual intervention. The task and listener were subsequently
+absent; the registered private alias and all failed receipts remain preserved.
+
+This is not evidence of an animation result. The launch failure path clears
+the running record after spawning a detached child, so a process that outlives
+readiness failure may be left without a public stop handle. The eventual exit
+does not establish orderly CLI cleanup. Correct this lifecycle invariant and
+verify recovery before treating further launch attempts as complete.
+Receipts are under D:/BuildArtifacts/kelpie/capture-windows-resume-20261105
+with prefixes core8-selftest, core8-register and g08c-a2e3-r7.
