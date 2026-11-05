@@ -24,6 +24,37 @@ def invoke(args, timeout=60):
     return json.loads(result.stdout)
 
 
+def timeout_metadata(error):
+    if not isinstance(error, subprocess.TimeoutExpired):
+        return {}
+    stdout = error.stdout or b""
+    stderr = error.stderr or b""
+    report = {"stdoutBytes": len(stdout), "stderrBytes": len(stderr)}
+    if len(stdout) > 2 * 1024 * 1024:
+        return report
+    try:
+        body = json.loads(stdout)
+        if not isinstance(body, dict):
+            return report
+        result = body.get("result", body)
+        if not isinstance(result, dict):
+            return report
+        if isinstance(result.get("success"), bool):
+            report["resultSuccess"] = result["success"]
+        if result.get("state") in ("running", "finalizing", "completed", "failed", "aborted"):
+            report["resultState"] = result["state"]
+        if isinstance(result.get("artifacts"), list):
+            report["artifactCount"] = len(result["artifacts"])
+        if isinstance(body.get("downloaded"), list):
+            report["downloadCount"] = len(body["downloaded"])
+        code = result.get("error", {}).get("code")
+        if isinstance(code, str) and re.fullmatch("[A-Z0-9_]{1,80}", code):
+            report["resultErrorCode"] = code
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return report
+
+
 def run_fixture(tab: str, evidence: Path):
     if not re.fullmatch(r"[0-9A-Fa-f-]{36}", tab):
         raise ValueError("Invalid fixture tab ID")
@@ -44,9 +75,10 @@ def run_fixture(tab: str, evidence: Path):
     inputs_path.write_text(json.dumps({"entry": "Hosted typed input"}))
     try:
         played = invoke(["script", "run", str(recipe_path), "--inputs", str(inputs_path), "--output", str(evidence / "downloads")])
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        # Keep only byte counts and fixed result metadata, never the captured output itself.
+        report = {"status": "unavailable", **timeout_metadata(error)}
         # Read-only status only: preserve bounded metadata without output values or credentials.
-        report = {"status": "unavailable"}
         try:
             status = invoke(["script", "status", "--pinned"], timeout=10)
             for key in ("state", "playing", "actionIndex", "totalActions", "elapsedMs", "runSuccess", "mayHaveCompleted"):

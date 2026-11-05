@@ -36,11 +36,14 @@ def selection(scope):
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
+                "testFirstCaptureWaitsForStableCompleteViewport",
+                "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testNativePinchClipsTapCenterAndExportedMarker",
+                "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
@@ -55,6 +58,8 @@ def selection(scope):
             required.update([
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
+                "testFirstCaptureWaitsForStableCompleteViewport",
+                "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
             ])
     return targets, required
 
