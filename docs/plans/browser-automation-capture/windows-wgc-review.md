@@ -1,6 +1,6 @@
 # Review plan: exact owned-HWND Windows Graphics Capture
 
-This is an API/SDK assessment and plan only. No WGC capture implementation, item, session or task has been created or run.
+Test-only source is implemented for review. It has not been compiled or run. No WGC item, session or task has been created. Capture requires separate reviewed-run authorization.
 
 ## Read-only findings
 
@@ -23,7 +23,7 @@ The earlier PrintWindow main image contained no marker; global red counts came f
 
 ## Bounds and failure rules
 
-Capture one item at a time with a fixed two-frame pool, at most 4096 pixels per dimension and 8,388,608 pixels. Wait at most 5 seconds for one frame; use a bounded staging texture and original frame ContentSize/row pitch. Reject size changes. No unbounded frame queue or retained history. The task remains within the existing 120-second run plus 30-second public-cleanup budget and 180-second hard limit.
+Capture one item at a time with a fixed two-frame pool, at most 4096 pixels per dimension and 8,388,608 pixels. Wait at most 5 seconds for one frame; deep-copy the frame into a bounded SoftwareBitmap and validate ContentSize/row pitch. Reject size changes. No unbounded frame queue or retained history. The task remains within the existing 120-second run plus 30-second public-cleanup budget and 180-second hard limit.
 
 Save the actual native frame without adding markers, merging another source, changing RGB/alpha heuristically or substituting exported renderer pixels. Record raw alpha statistics; preserve native transparency only if the API actually supplies it. A black/blank/unsupported frame fails. Any permission/picker requirement or access denial stops the test without interaction or an alternative capture source.
 
@@ -36,3 +36,11 @@ Before any new positive pixel claim, query the owned synthetic button rectangle 
 Require a connected red component inside that expected region, with center/extent/area consistent with the configured radius. ClearType text fringes, native chrome red pixels, a Stop-only image and an unsupported black/transparency bitmap must all fail. Keep negative fixture regressions for the real PrintWindow false positive.
 
 The current test gate fails closed unless this explicit spatial/radius component evidence exists. The WGC implementation and pixel validator need root source review and a separate run authorization. A normal capture border must disappear with the owned session; do not request borderless access.
+
+## Implemented review boundary
+
+Explicit mode wgc requires absolute helper and validator paths. ScriptStopAutomation supplies exact owned HWND descriptors and captures the Stop window separately. wgc_owned_window.cpp captures only KelpieScriptPresentation. wgc_capture_files.h writes exclusive owned files. NativeMarkerValidator.cs independently checks raw/PNG hashes and every alpha byte, then requires a connected component at the API-observed click center and configured radius. Synthetic fixtures reject wrong-center and ClearType-like fringes. WIC uses standard premultiplied-to-straight PNG conversion; raw BGRA and the API alpha mode remain unchanged. No background is synthesized.
+
+Proposed fresh task: KelpieCapture-Windows-WGC-20261105-9333ff50, no triggers, InteractiveToken/Limited, Maxis user ondre. Evidence root: D:/BuildArtifacts/kelpie/capture-windows-20261104/uia-wgc-9333. Private root: D:/Temp/capture-windows-20261104/uia-wgc-9333. Both roots and task name must be absent and port28420 free. Freeze the test revision, compiled paths and hashes before registration. Use public CLI candidate9333 with its existing EXE/DLL pins and explicit wgc mode. Export only the owned definition/result; close through public CLI, verify process/socket/readiness cleanup, and unregister only the matching task. Preserve52960 and other owners.
+
+Build requires VS C++20, SDK26100 C++/WinRT, existing nlohmann headers and the owned-file helper. Link d3d11, dxgi, windowsapp, windowscodecs, bcrypt and ole32. Compile one helper with /W4 /WX /MT; no app/CEF/llama rebuild. Compile C# clients with /warn:4 /warnaserror+ and UIAutomation/System.Drawing references as applicable. Compilation and synthetic-only checks are pending. Runtime support and native marker pixels remain unclaimed.

@@ -16,7 +16,7 @@ public static class ScriptStopAutomation {
         Print(new {sessionId=self.SessionId,user=WindowsIdentity.GetCurrent().Name,
           userSid=WindowsIdentity.GetCurrent().User.Value}); return 0;
       }
-      bool capture=args.Length==5 && args[0]=="capture";
+      bool capture=args.Length==5 && (args[0]=="capture"||args[0]=="capture-stop");
       if(!capture && (args.Length!=4 || (args[0]!="pin" && args[0]!="inspect" && args[0]!="invoke")))
         throw new InvalidOperationException("Expected mode, exact PID, executable and start time");
       if(self.SessionId!=1) throw new InvalidOperationException("UIA test requires interactive Session1");
@@ -50,7 +50,7 @@ public static class ScriptStopAutomation {
           if(available && info.IsEnabled && !info.IsOffscreen) candidates.Add(element);
         }
       }
-      var captured=capture?CaptureOwned(roots,owner,pid,args[4]):new List<object>();
+      var captured=capture?CaptureOwned(roots,owner,pid,args[4],args[0]=="capture-stop"):new List<object>();
       bool invoked=false;
       if(args[0]=="invoke") {
         if(candidates.Count!=1) throw new InvalidOperationException("Exactly one visible owned Stop InvokePattern is required");
@@ -64,7 +64,7 @@ public static class ScriptStopAutomation {
         invoked=true;
       }
       Print(new {processId=pid,sessionId=process.SessionId,executable=actual,
-        startTime=started.ToString("o"),ownTopLevelRoots=roots.Count,matchingButtons=details,
+        startTime=started.ToString("o"),startFileTime=started.ToFileTimeUtc().ToString(CultureInfo.InvariantCulture),ownedWindows=OwnedWindows(roots,owner,pid),ownTopLevelRoots=roots.Count,matchingButtons=details,
         visibleInvokableButtons=candidates.Count,invoked=invoked,captured=captured});
       return 0;
     } catch(Exception error) {
@@ -85,14 +85,14 @@ public static class ScriptStopAutomation {
   private static extern bool PrintWindow(IntPtr window,IntPtr memoryDc,uint flags);
 
   private static List<object> CaptureOwned(AutomationElementCollection roots,
-      PropertyCondition owner,int pid,string directory) {
+      PropertyCondition owner,int pid,string directory,bool stopOnly) {
     if(!Path.IsPathRooted(directory) || Directory.Exists(directory))
       throw new InvalidOperationException("Capture output must be a fresh absolute directory");
     Directory.CreateDirectory(directory);
     var result=new List<object>();
     var handles=new HashSet<int>();
     var found=new HashSet<string>();
-    var allowed=new HashSet<string>(new [] {"Kelpie","KelpieScriptStop","KelpieScriptPresentation"});
+    var allowed=stopOnly?new HashSet<string>(new [] {"KelpieScriptStop"}):new HashSet<string>(new [] {"Kelpie","KelpieScriptStop","KelpieScriptPresentation"});
     foreach(AutomationElement root in roots) {
       var elements=new List<AutomationElement>(); elements.Add(root);
       foreach(AutomationElement child in root.FindAll(TreeScope.Descendants,owner)) elements.Add(child);
@@ -167,6 +167,25 @@ public static class ScriptStopAutomation {
     }
     foreach(string className in allowed) if(!found.Contains(className))
       result.Add(new {className=className,status="not-exposed-by-owned-uia-tree"});
+    return result;
+  }
+
+  private static List<object> OwnedWindows(AutomationElementCollection roots,PropertyCondition owner,int pid) {
+    var result=new List<object>();var seen=new HashSet<int>();
+    var allowed=new HashSet<string>(new [] {"Kelpie","KelpieScriptStop","KelpieScriptPresentation"});
+    foreach(AutomationElement root in roots) {
+      var elements=new List<AutomationElement>();elements.Add(root);
+      foreach(AutomationElement child in root.FindAll(TreeScope.Descendants,owner))elements.Add(child);
+      foreach(AutomationElement element in elements) {
+        var info=element.Current;
+        if(info.ProcessId!=pid||info.NativeWindowHandle==0||!allowed.Contains(info.ClassName)||!seen.Add(info.NativeWindowHandle))continue;
+        uint windowPid;GetWindowThreadProcessId(new IntPtr(unchecked((long)(uint)info.NativeWindowHandle)),out windowPid);
+        if(windowPid!=(uint)pid)throw new InvalidOperationException("Owned HWND descriptor changed process");
+        result.Add(new {className=info.ClassName,processId=pid,
+          windowHandle=unchecked((uint)info.NativeWindowHandle).ToString(CultureInfo.InvariantCulture),
+          offscreen=info.IsOffscreen,enabled=info.IsEnabled});
+      }
+    }
     return result;
   }
   private static void Print(object value) {
