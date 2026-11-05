@@ -29,7 +29,7 @@ const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-g08-native-"+manifest.source.slice(0,8)+"-"+curve;
 const report={source:manifest.source,curve,profile:motionProfile,phase:"session",checks:[],cleanup:"not-started"};
-let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false;
+let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,capturePromise;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
@@ -64,6 +64,7 @@ try{
   await new Promise(done=>setTimeout(done,250));
  }
  try{assert.equal((await launch).success,true);launched=true;}finally{
+ if(capturePromise){try{await awaitBounded(capturePromise,12000);}catch{}}
   await writeFile(completion,"done",{flag:"wx"});
   if(observation){try{await observation;report.startupObservation=JSON.parse(await readFile(observationPath,"utf8"));}
    catch{report.startupObservation={status:"observer-failed"};}}
@@ -108,10 +109,9 @@ try{
  // A fresh capture session starts only after the HTTP response, avoiding any
  // ambiguity about old frames queued before the response.
  report.phase="post-response-capture";
- const capture=run(wgc,[String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"post-response")],10000);
- void capture.catch(()=>{});
- const stopState=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
- report.stopState={visibleInvokableButtons:stopState.visibleInvokableButtons};assert.equal(stopState.visibleInvokableButtons,0);
+ capturePromise=run(wgc,[String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"post-response")],10000);
+ void capturePromise.catch(()=>{});
+ const stopPromise=uiaRun(["inspect",String(running.pid),exe,identity.startTime]).catch(()=>null);
  const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
@@ -127,7 +127,10 @@ try{
  }
  const pngBytes=Buffer.concat(chunks);assert.equal(createHash("sha256").update(pngBytes).digest("hex"),png.sha256);
  await writeFile(join(outputRoot,"terminal.png"),pngBytes,{flag:"wx"});
- const captured=JSON.parse((await capture).stdout);
+ const stopState=await stopPromise;
+ report.stopState={visibleInvokableButtons:stopState?.visibleInvokableButtons??null};
+ assert.equal(stopState?.visibleInvokableButtons,0);
+ const captured=JSON.parse((await capturePromise).stdout);
  assert.equal(captured.processId,running.pid);assert.equal(captured.className,"KelpieScriptPresentation");
  assert.equal(captured.windowHandle,window.windowHandle);
  const pixels=await readFile(join(outputRoot,"post-response","frame.bgra"));
@@ -156,6 +159,7 @@ try{
   category:error.safeDetails?.category??safe,errorKind,location,code:typeof error.code==="number"?error.code:null,signal:error.signal??null,killed:error.killed??false});
  process.exitCode=1;
 }finally{
+ if(capturePromise){try{await awaitBounded(capturePromise,12000);}catch{}}
  if(pending&&readiness&&!pendingDone){try{await api("abort-script",{});}catch{}try{await awaitBounded(pending,5000);}catch{}}
  if(launched){try{assert.equal((await cliRun(["browser","stop",alias])).success,true);
   if(identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:identity.startTime});assert.equal(report.processExit.exited,true);}
