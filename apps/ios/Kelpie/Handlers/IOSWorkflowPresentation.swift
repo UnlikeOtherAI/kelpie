@@ -44,6 +44,16 @@ final class IOSWorkflowPresentation: NSObject {
         }
     }
 
+    private struct MarkerGeometry: Equatable {
+        let bounds: CGRect
+        let frameInWindow: CGRect
+        let contentOffset: CGPoint
+        let adjustedInsets: UIEdgeInsets
+        let zoomScale: CGFloat
+        let contentScale: CGFloat
+        let screenScale: CGFloat
+    }
+
     private final class Canvas: UIView {
         var state: State?
         override func draw(_ rect: CGRect) {
@@ -65,6 +75,7 @@ final class IOSWorkflowPresentation: NSObject {
     private var retirementDocument: String?
     private var retirementDeadline: TimeInterval?
     private var retirementInvalidated: (() -> Void)?
+    private var markerGeometry: MarkerGeometry?
 
     init(tab: IOSWorkflowTab) throws {
         self.tab = tab
@@ -104,6 +115,7 @@ final class IOSWorkflowPresentation: NSObject {
     func mark(at point: CGPoint, radius: CGFloat, settings: [String: Any], held: Bool) {
         synchronize()
         markerHeld = held
+        markerGeometry = tab.view.window.flatMap { geometry(in: $0) }
         marker = ScriptOverlayMarker(
             point: point,
             started: ProcessInfo.processInfo.systemUptime,
@@ -219,10 +231,34 @@ final class IOSWorkflowPresentation: NSObject {
         )
     }
 
+    private func geometry(in window: UIWindow) -> MarkerGeometry? {
+        guard let scene = window.windowScene else { return nil }
+        let view = tab.view
+        let value = MarkerGeometry(
+            bounds: view.bounds,
+            frameInWindow: view.convert(view.bounds, to: window),
+            contentOffset: view.scrollView.contentOffset,
+            adjustedInsets: view.scrollView.adjustedContentInset,
+            zoomScale: view.scrollView.zoomScale,
+            contentScale: view.contentScaleFactor,
+            screenScale: scene.screen.scale
+        )
+        let values = [value.bounds.minX, value.bounds.minY, value.bounds.width, value.bounds.height,
+                      value.frameInWindow.minX, value.frameInWindow.minY, value.frameInWindow.width, value.frameInWindow.height,
+                      value.contentOffset.x, value.contentOffset.y, value.adjustedInsets.top, value.adjustedInsets.bottom,
+                      value.adjustedInsets.left, value.adjustedInsets.right, value.zoomScale, value.contentScale, value.screenScale]
+        guard values.allSatisfy({ $0.isFinite && abs($0) <= 100000 }),
+              value.bounds.width > 0, value.bounds.height > 0, value.zoomScale > 0,
+              value.contentScale > 0, value.screenScale > 0 else { return nil }
+        return value
+    }
+
     @objc private func refresh() {
         synchronize()
-        let retirementValid = retirementDocument.map {
-            $0 == tab.document && retirementWindow != nil && tab.view.window === retirementWindow
+        let retirementValid = retirementDocument.map { document in
+            guard document == tab.document, let window = retirementWindow, tab.view.window === window,
+                  let pinned = markerGeometry, let current = geometry(in: window) else { return false }
+            return pinned == current
         } ?? true
         let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
             tab.view.window?.windowScene?.activationState == .foregroundActive
