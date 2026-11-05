@@ -41,7 +41,7 @@ struct IOSCaptureViewportStability {
         return content.maxY >= viewport.bounds.height - bottom - pixelAllowance
     }
 
-    enum SnapshotDecision { case coherent, discard, fenced }
+    enum SnapshotDecision: Equatable { case coherent, discard, fenced }
 
     static func snapshotDecision(
         before: IOSWorkflowTab.Viewport,
