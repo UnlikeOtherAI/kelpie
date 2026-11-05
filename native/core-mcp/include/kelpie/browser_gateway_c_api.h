@@ -14,6 +14,9 @@ char* kelpie_browser_selector_snapshot_expression(const char* options_json);
 // Strict generated v1 script schema validation; returns {valid,script?} with defaults.
 // Host-only input/secret binding resolution is not performed by this function.
 char* kelpie_browser_validate_script(const char* script_json);
+// Fully bound paced fill/type plan. Caller must keep returned scalar literals private.
+// Returns {valid,clearFirst?,typingDelayMs?,scalars?,error?}; invalid errors contain no text.
+char* kelpie_browser_script_typing_plan(const char* action_json);
 // Validates {target,key,token?,dispatch?,edit?,observe?}; returns {expression} or null.
 // The fixed private-world reader supports resolution, preflight, observation, and synthetic activation.
 char* kelpie_browser_script_target_expression(const char* options_json);

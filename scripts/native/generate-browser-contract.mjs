@@ -88,6 +88,8 @@ const targetCases = parityCases(scriptTargetRequestSchema, [
   { target: { role: 'button', name: 'Save' }, key: 'private' },
   { target: { selector: '#save' }, key: 'private', dispatch: true, token: 't1' },
   { target: { label: 'Email' }, key: 'private', edit: { action: 'fill', text: 'example' } },
+  { target: { label: 'Email' }, key: 'private', token: 't1', edit: { action: 'type', text: 'x', requireFocused: true } },
+  { target: { label: 'Email' }, key: 'private', edit: { action: 'type', text: 'x', requireFocused: 'yes' } },
   { target: { selector: '#save' }, key: 'private', postMutation: true, token: 't1' },
   { target: { selector: '#save' }, key: 'private', postMutation: true },
   { target: { selector: '#save' }, key: 'private', postMutation: true, token: 't1', dispatch: true },
