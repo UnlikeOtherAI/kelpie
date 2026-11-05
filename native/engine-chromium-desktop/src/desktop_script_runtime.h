@@ -36,7 +36,7 @@ class DesktopScriptHandler::Impl {
   bool Cancelled() const;
   void Pause(int milliseconds);
   Json Target(TabLease lease, const Json& target, const std::string& token = "", bool observe = false, bool refuse_sensitive = false);
-  Json Perform(TabLease lease, const Json& action, const Json& script, Json* outputs, std::vector<std::string>* redactions);
+  Json Perform(TabLease lease, const Json& action, const Json& script, const Json& typing_plan, Json* outputs, std::vector<std::string>* redactions);
   void Sample(TabLease lease, Json options);
   void StepScreenshot(int index, bool png, const std::string& document = "");
   double Elapsed() const;
