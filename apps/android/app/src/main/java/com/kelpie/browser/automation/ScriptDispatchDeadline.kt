@@ -21,12 +21,36 @@ internal suspend fun <T> withScriptDispatchDeadline(
         throw error
     }
 
+/** Classify the callback before authority/tab guards can suppress its body. */
+internal fun scriptDispatchReceiptWellFormed(
+    result: Map<String, Any?>,
+    token: String?,
+): Boolean =
+    when (result["ok"]) {
+        true ->
+            token != null &&
+                result["token"] == token &&
+                result["mayHaveCompleted"] == true &&
+                result["inputGuarantee"] == "synthetic-coordinate"
+        false -> result["error"] is String && result["mayHaveCompleted"] is Boolean
+        else -> false
+    }
+
+internal fun protectMalformedScriptReceipt(
+    result: Map<String, Any?>,
+    token: String?,
+    protect: () -> Unit,
+) {
+    if (!scriptDispatchReceiptWellFormed(result, token)) protect()
+}
+
 /** A success without the expected dispatch receipt is not an acknowledgement. */
 internal fun requireScriptDispatchReceipt(
     result: Map<String, Any?>,
+    token: String?,
     protectUnknown: () -> Unit,
 ) {
-    if (result["inputGuarantee"] != "synthetic-coordinate") {
+    if (result["ok"] != true || !scriptDispatchReceiptWellFormed(result, token)) {
         protectUnknown()
         throw ScriptFailure("INPUT_UNCERTAIN", true)
     }

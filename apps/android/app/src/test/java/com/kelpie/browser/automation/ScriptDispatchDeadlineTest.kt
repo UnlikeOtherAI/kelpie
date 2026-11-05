@@ -51,7 +51,7 @@ class ScriptDispatchDeadlineTest {
     @Test
     fun malformedSuccessIsNotAValidAcknowledgement() {
         var protected = false
-        val error = runCatching { requireScriptDispatchReceipt(mapOf("ok" to true)) { protected = true } }.exceptionOrNull() as ScriptFailure
+        val error = runCatching { requireScriptDispatchReceipt(mapOf("ok" to true), "expected") { protected = true } }.exceptionOrNull() as ScriptFailure
         assertEquals("INPUT_UNCERTAIN", error.code)
         assertTrue(error.mayHaveCompleted)
         assertTrue(protected)
@@ -68,4 +68,39 @@ class ScriptDispatchDeadlineTest {
             assertEquals("acknowledged", value)
             assertFalse(protected)
         }
+
+    @Test
+    fun acknowledgementMustMatchTokenAndExplicitCompletionStatus() {
+        val valid = mapOf("ok" to true, "token" to "expected", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate")
+        requireScriptDispatchReceipt(valid, "expected") { throw AssertionError("valid receipt") }
+        val invalid =
+            listOf(
+                valid - "token",
+                valid + ("token" to "other"),
+                valid - "mayHaveCompleted",
+                valid + ("mayHaveCompleted" to "true"),
+                valid + ("ok" to "true"),
+            )
+        for (receipt in invalid) {
+            var protected = false
+            val error = runCatching { requireScriptDispatchReceipt(receipt, "expected") { protected = true } }.exceptionOrNull() as ScriptFailure
+            assertEquals("INPUT_UNCERTAIN", error.code)
+            assertTrue(error.mayHaveCompleted)
+            assertTrue(protected)
+        }
+    }
+
+    @Test
+    fun malformedCallbackCanBeProtectedBeforeLaterGuardFailure() {
+        val malformed = mapOf("ok" to true, "token" to "other", "mayHaveCompleted" to true, "inputGuarantee" to "synthetic-coordinate")
+        var protected = false
+        val original = IllegalStateException("authority revoked")
+        val caught =
+            runCatching {
+                protectMalformedScriptReceipt(malformed, "expected") { protected = true }
+                throw original
+            }.exceptionOrNull()
+        assertTrue(protected)
+        assertTrue(caught === original)
+    }
 }

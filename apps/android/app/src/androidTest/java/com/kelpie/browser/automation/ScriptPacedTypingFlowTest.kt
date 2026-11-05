@@ -23,7 +23,15 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
             ScriptHttpFixture().use { client ->
                 pair(client)
                 val tab = load(client, server)
-                val title = if (mode == "sensitive") "Paced fixture AB" else "Paced fixture"
+                val title =
+                    if (mode == "sensitive") {
+                        "Paced fixture AB"
+                    } else if (mode == "lost") {
+                        "Paced fixture Z"
+                    } else {
+                        "Paced fixture"
+                    }
+                val focus = if (mode == "lost") "let end=performance.now()+32000;while(performance.now()<end){}" else ""
                 val onInput =
                     when (mode) {
                         "blur" -> "if(window.events.length===1)this.blur()"
@@ -33,7 +41,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                 server.enqueue(
                     MockResponse().setHeader("Content-Type", "text/html; charset=utf-8").setBody(
                         """<!doctype html><meta name="viewport" content="width=device-width"><title>$title</title>
-                        <label>Name<input value="old" onfocus="window.focusCount=(window.focusCount||0)+1" oninput="window.events.push({data:event.data,value:this.value,time:performance.now()});document.title=this.value;$onInput"></label>
+                        <label>Name<input value="old" onfocus="window.focusCount=(window.focusCount||0)+1;$focus" oninput="window.events.push({data:event.data,value:this.value,time:performance.now()});document.title=this.value;$onInput"></label>
                         <script>window.events=[];window.focusCount=0;</script>""",
                     ),
                 )
@@ -48,7 +56,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                         .put("text", text)
                         .put("typingDelayMs", 100)
                 val workflow =
-                    if (mode == "sensitive") {
+                    if (mode == "sensitive" || mode == "lost") {
                         client.script(tab, client.action("output").put("name", "before").put("source", "title"), edit)
                     } else if (mode == "fill") {
                         client.script(tab, edit, client.action("output").put("name", "after").put("source", "title"))
@@ -63,8 +71,8 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                             "evaluate",
                             JSONObject().put("expression", "({events:window.events,focusCount:window.focusCount,value:document.querySelector('input').value})"),
                         ).getJSONObject("result")
-                File(evidence, "paced-$mode-result.json").writeText(result.toString(2))
-                File(evidence, "paced-$mode-facts.json").writeText(facts.toString(2))
+                File(evidence, "paced-$mode-${if (capture) "capture" else "plain"}-result.json").writeText(result.toString(2))
+                File(evidence, "paced-$mode-${if (capture) "capture" else "plain"}-facts.json").writeText(facts.toString(2))
                 verify(client, result, facts)
             }
         }
@@ -123,6 +131,19 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
             assertEquals("A", facts.getString("value"))
             assertEquals(2, facts.getJSONArray("events").length())
         }
+
+    @Test
+    fun lostFinalScalarCallbackIsUncertainAndProtectsLiteral() {
+        for (capture in listOf(false, true)) {
+            runCase("lost", "type", "Z", capture) { _, result, _ ->
+                assertFalse(result.getBoolean("success"))
+                assertEquals("INPUT_UNCERTAIN", result.getJSONObject("error").getString("code"))
+                assertTrue(result.getBoolean("mayHaveCompleted"))
+                assertFalse(result.getJSONObject("outputs").getString("before").contains("Z"))
+                if (capture) assertEquals(0, result.getJSONArray("artifacts").length())
+            }
+        }
+    }
 
     @Test
     fun acknowledgedFinalScalarCanNavigateWithoutInventingInputFailure() {
@@ -233,6 +254,42 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
             val artifacts = result.getJSONArray("artifacts")
             assertTrue((0 until artifacts.length()).any { artifacts.getJSONObject(it).getString("mimeType") == "image/png" })
         }
+
+    @Test
+    fun emptyPacedTypeRejectsButtonAndReadonlyWithoutFocus() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                server.enqueue(
+                    MockResponse().setHeader("Content-Type", "text/html").setBody(
+                        """<!doctype html><meta name="viewport" content="width=device-width"><title>Empty targets</title>
+                        <button aria-label="Button" onfocus="window.focusCount++">Button</button>
+                        <label>Read only<input readonly onfocus="window.focusCount++"></label>
+                        <script>window.focusCount=0</script>""",
+                    ),
+                )
+                assertTrue(client.call("navigate", JSONObject().put("url", server.url("/empty-targets").toString())).getBoolean("success"))
+                val end = System.nanoTime() + 10_000_000_000L
+                while (client.core("tab.title", tab).optString("value") != "Empty targets" && System.nanoTime() < end) Thread.sleep(20)
+                assertEquals("Empty targets", client.core("tab.title", tab).getString("value"))
+                for (label in listOf("Button", "Read only")) {
+                    val action =
+                        client
+                            .action("type")
+                            .put("target", JSONObject().put("label", label))
+                            .put("text", "")
+                            .put("typingDelayMs", 100)
+                    val result = playRecorded(client, client.script(tab, action))
+                    assertFalse(result.getBoolean("success"))
+                    assertEquals("TARGET_NOT_EDITABLE", result.getJSONObject("error").getString("code"))
+                    assertFalse(result.getBoolean("mayHaveCompleted"))
+                }
+                assertEquals(0, client.call("evaluate", JSONObject().put("expression", "window.focusCount")).getInt("result"))
+            }
+        }
+    }
 
     @Test
     fun emptyPacedFillClearsOnce() =

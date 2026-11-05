@@ -135,7 +135,10 @@ class ScriptActions(
             }
         }
         val paced = action["__pacedPlan"] as? ScriptPacedPlan
-        if (paced != null && !paced.clearFirst && paced.scalars.isEmpty()) return@scriptLease
+        if (paced != null && !paced.clearFirst && paced.scalars.isEmpty()) {
+            if (resolved["editable"] != true) throw ScriptFailure("TARGET_NOT_EDITABLE")
+            return@scriptLease
+        }
         val oldDocument = document()
         val visual = objectMap(resolved["visualViewport"])
         val visualWidth = number(visual, "width")
@@ -334,7 +337,8 @@ class ScriptActions(
     ): Map<String, Any?> {
         val result = rawTarget(action, token, dispatch, edit, editValue = editValue, requireFocused = requireFocused)
         if (result["ok"] != true) {
-            if ((dispatch || edit) && result["error"] !is String) {
+            if ((dispatch || edit) && (result["ok"] != false || result["error"] !is String || result["mayHaveCompleted"] !is Boolean)) {
+                if (edit) consumeSensitivity(action, true)
                 mutationInFlight = true
                 throw ScriptFailure("INPUT_UNCERTAIN", true)
             }
@@ -342,7 +346,7 @@ class ScriptActions(
             throw targetFailure(result)
         }
         if (dispatch || edit) {
-            requireScriptDispatchReceipt(result) {
+            requireScriptDispatchReceipt(result, token) {
                 if (edit) consumeSensitivity(action, true)
                 mutationInFlight = true
             }
@@ -392,6 +396,7 @@ class ScriptActions(
                 }
                 val unknown = classification.unknown()
                 consumeSensitivity(action, result["sensitive"] == true || unknown)
+                if (edit) protectMalformedScriptReceipt(result, token) { consumeSensitivity(action, true) }
             }
         }
     }
