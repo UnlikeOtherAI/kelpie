@@ -20,7 +20,7 @@ class DesktopScriptHandler::Impl {
   bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false, presentation_latched=false;
   std::thread::id run_thread;
   std::shared_ptr<std::atomic<bool>> abort = std::make_shared<std::atomic<bool>>(false);
-  std::atomic<bool> stop_sampler{false};
+  std::atomic<bool> stop_sampler{false}, privacy_discard{false};
   mutable std::atomic<bool> grant_revoked{false};
   std::string owner, run_id, target_key, capture_error;
   Json status = {{"playing", false}}, terminal, presentation = Json::object(), artifacts = Json::array();

@@ -16,6 +16,8 @@ class DesktopScriptHandler {
     std::function<void()> invalidate;
     std::function<bool(const std::string&)> revalidate;
     std::function<Json(const Json&, const std::string&)> artifact;
+    // Revokes only this exact owner/run and its identity-checked owned files.
+    std::function<void(const std::string&, const std::string&)> discard;
     std::function<void(const Json&, std::function<void()>)> present;
   };
   DesktopScriptHandler(DesktopEngine& engine, DesktopRouter& router, Config config);

@@ -26,8 +26,9 @@ class Capture final : public DesktopScriptCapture {
   }
   ~Capture() override {
     std::error_code ignored;
-    for(const auto& entry:std::filesystem::directory_iterator(directory_,ignored)) if(!retained_.contains(entry.path()))
-      std::filesystem::remove(entry.path(),ignored);
+    encoder_.reset();
+    for(const auto& entry:owned_) if(!retained_.contains(entry.first))
+      RemoveCaptureFile(entry.first,entry.second);
     std::filesystem::remove(directory_,ignored);
   }
   DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image,const Json& presentation,double elapsed_ms,int index,bool step) override {
@@ -66,6 +67,7 @@ class Capture final : public DesktopScriptCapture {
     if(step&&screenshots_) {
       const auto path=directory_/("step-"+std::to_string(index)+".png");
       if(!encoder_->WriteStepPNG(frame,path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      owned_[path]=CaptureFileIdentity(path);
       manifests_.push_back(service_->Publish(path,"image/png",{{"width",frame.width},{"height",frame.height},{"actionIndex",index},{"documentId",presentation.value("documentVersion",std::string())}},run_,owner_));
       retained_.insert(path);
     }
@@ -77,6 +79,7 @@ class Capture final : public DesktopScriptCapture {
     try { outputs=encoder_->Finish(std::max(last_elapsed_+1,terminal_elapsed_ms)); }
     catch(...) { failure="CAPTURE_FINALIZE_FAILED"; try { outputs=encoder_->Finish(std::max(last_elapsed_+1,terminal_elapsed_ms)); } catch(...) {} }
     try {
+      for(const auto& output:outputs) owned_[output.path]=CaptureFileIdentity(output.path);
       for(const auto& output:outputs) {
         Json metadata={{"width",output.width},{"height",output.height},{"durationMs",output.duration_ms},
           {"frameCount",output.frame_count},{"droppedFrames",output.dropped_frames},{"partial",partial}};
@@ -96,6 +99,7 @@ class Capture final : public DesktopScriptCapture {
   std::filesystem::path directory_;
   std::unique_ptr<ScriptMediaEncoder> encoder_;
   std::set<std::filesystem::path> retained_;
+  std::map<std::filesystem::path,BY_HANDLE_FILE_INFORMATION> owned_;
   bool screenshots_=false,movies_=false;
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
   std::size_t committed_marker_frames_=0;
@@ -116,6 +120,7 @@ void WindowsScriptService::Configure(DesktopApp::Config& config) {
   config.scripts.capture=[self](const Json& options,const std::string& run,const std::string& owner) {
     return std::make_unique<Capture>(self,options,run,owner);
   };
+  config.scripts.discard=[self](const std::string& run,const std::string& owner) { self->Discard(run,owner); };
   config.scripts.artifact=[self](const Json& body,const std::string& owner) { return self->Read(body,owner); };
   config.scripts.present=[self](const Json& presentation,std::function<void()> stop) { self->Show(presentation,std::move(stop)); };
 }

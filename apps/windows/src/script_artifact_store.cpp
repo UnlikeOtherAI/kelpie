@@ -35,6 +35,39 @@ void Remove(const std::filesystem::path& path) {
   std::error_code ignored; std::filesystem::remove(path,ignored); std::filesystem::remove(path.parent_path(),ignored);
 }
 }
+BY_HANDLE_FILE_INFORMATION CaptureFileIdentity(const std::filesystem::path& path) {
+  const HANDLE file=CreateFileW(path.c_str(),FILE_READ_ATTRIBUTES,
+    FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+  if(file==INVALID_HANDLE_VALUE) throw std::runtime_error("CAPTURE_FILE_IDENTITY_FAILED");
+  BY_HANDLE_FILE_INFORMATION identity{};const bool ok=GetFileInformationByHandle(file,&identity)!=FALSE;
+  CloseHandle(file);
+  if(!ok || (identity.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)))
+    throw std::runtime_error("CAPTURE_FILE_IDENTITY_FAILED");
+  return identity;
+}
+bool RemoveCaptureFile(const std::filesystem::path& path,const BY_HANDLE_FILE_INFORMATION& expected) {
+  const HANDLE file=CreateFileW(path.c_str(),DELETE|FILE_READ_ATTRIBUTES,
+    FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+  if(file==INVALID_HANDLE_VALUE) return GetLastError()==ERROR_FILE_NOT_FOUND||GetLastError()==ERROR_PATH_NOT_FOUND;
+  BY_HANDLE_FILE_INFORMATION actual{};bool ok=GetFileInformationByHandle(file,&actual)!=FALSE;
+  const bool same=ok&&actual.dwVolumeSerialNumber==expected.dwVolumeSerialNumber&&
+    actual.nFileIndexHigh==expected.nFileIndexHigh&&actual.nFileIndexLow==expected.nFileIndexLow&&
+    actual.ftCreationTime.dwHighDateTime==expected.ftCreationTime.dwHighDateTime&&
+    actual.ftCreationTime.dwLowDateTime==expected.ftCreationTime.dwLowDateTime&&
+    !(actual.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT));
+  if(same) {FILE_DISPOSITION_INFO disposition{TRUE};ok=SetFileInformationByHandle(file,FileDispositionInfo,&disposition,sizeof(disposition))!=FALSE;}
+  CloseHandle(file);return ok; // A replacement is preserved and its capability is still revoked.
+}
+void WindowsScriptService::Discard(const std::string& run,const std::string& owner) {
+  std::lock_guard lock(mutex_);bool cleaned=true;
+  for(auto it=entries_.begin();it!=entries_.end();) {
+    if(it->second.run!=run || it->second.owner!=owner) {++it;continue;}
+    const auto entry=it->second;it=entries_.erase(it); // Revoke before attempting filesystem cleanup.
+    cleaned=RemoveCaptureFile(entry.path,entry.identity)&&cleaned;
+    std::error_code ignored;std::filesystem::remove(entry.path.parent_path(),ignored);
+  }
+  if(!cleaned) throw std::runtime_error("CAPTURE_PRIVACY_CLEANUP_FAILED");
+}
 std::filesystem::path CreatePrivateCaptureDirectory(const std::string& run) {
   HANDLE token=nullptr; DWORD size=0;
   if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token)) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
@@ -51,11 +84,12 @@ std::filesystem::path CreatePrivateCaptureDirectory(const std::string& run) {
   if(!created) throw std::runtime_error("CAPTURE_STORAGE_FAILED"); return directory;
 }
 WindowsScriptService::Json WindowsScriptService::Publish(const std::filesystem::path& path,const std::string& mime,Json metadata,const std::string& run,const std::string& owner) {
+  const auto identity=CaptureFileIdentity(path);
   const auto bytes=std::filesystem::file_size(path); if(bytes>268435456) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
   metadata["id"]=NewDesktopScriptId(); metadata["mimeType"]=mime; metadata["byteLength"]=bytes;
   metadata["sha256"]=HashFile(path); if(!metadata.contains("partial")) metadata["partial"]=false;
   std::lock_guard lock(mutex_); Expire();
-  entries_.emplace(metadata["id"].get<std::string>(),Entry{path,run,owner,metadata,std::chrono::steady_clock::now()});
+  entries_.emplace(metadata["id"].get<std::string>(),Entry{path,run,owner,metadata,identity,std::chrono::steady_clock::now()});
   Expire();
   return metadata;
 }
