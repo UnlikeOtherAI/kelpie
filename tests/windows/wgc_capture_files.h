@@ -4,6 +4,7 @@
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <wincodec.h>
+#include <MemoryBuffer.h>
 #include <functional>
 #include <bcrypt.h>
 #include <nlohmann/json.hpp>
@@ -15,6 +16,7 @@
 namespace wgc_test {
 using Clock=std::chrono::steady_clock;
 using Json=nlohmann::json;
+inline thread_local const char* Stage="initialization";
 inline void Check(HRESULT result) { winrt::check_hresult(result); }
 inline void Deadline(Clock::time_point end) {
   if(Clock::now()>=end) throw std::runtime_error("WGC_DEADLINE");
@@ -53,14 +55,14 @@ inline Json RawFile(std::filesystem::path const& path,std::vector<BYTE> const& b
   fence();const auto hash=Hash(stream.Get());fence();Check(stream->Complete());
   return {{"path",Text(path)},{"sha256",hash},{"byteLength",bytes.size()}};
 }
-struct __declspec(uuid("5B0D3235-4DBA-4D44-8656-1D0E4FD04D4F")) MemoryBytes : IUnknown {
-  virtual HRESULT __stdcall GetBuffer(BYTE** data,UINT32* capacity)=0;
-};
 inline std::vector<BYTE> CopyBytes(winrt::Windows::Graphics::Imaging::SoftwareBitmap const& bitmap) {
   using namespace winrt::Windows::Graphics::Imaging;
+  Stage="software-bitmap-lock";
   auto buffer=bitmap.LockBuffer(BitmapBufferAccessMode::Read);
   auto plane=buffer.GetPlaneDescription(0);auto reference=buffer.CreateReference();
-  BYTE* data=nullptr;UINT32 capacity=0;Check(reference.as<MemoryBytes>()->GetBuffer(&data,&capacity));
+  BYTE* data=nullptr;UINT32 capacity=0;Stage="sdk-memory-buffer-byte-access";
+  Check(reference.as<::Windows::Foundation::IMemoryBufferByteAccess>()->GetBuffer(&data,&capacity));
+  Stage="memory-buffer-copy";
   const auto width=bitmap.PixelWidth(),height=bitmap.PixelHeight();
   const std::uint64_t required=static_cast<std::uint64_t>(plane.StartIndex)+static_cast<std::uint64_t>(plane.Stride)*(height-1)+width*4ULL;
   if(plane.StartIndex<0||plane.Stride<width*4||plane.Stride>20480||required>capacity)
