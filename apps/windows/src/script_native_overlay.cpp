@@ -8,6 +8,14 @@
 
 namespace kelpie::windows {
 namespace {
+UINT ExactWindowDpi(HWND window) {
+  // The target supports Windows 7; resolve the per-window API exactly as the
+  // shell metrics do, but fail closed here when a physical DPI is unavailable.
+  using GetDpiForWindowFn=UINT(WINAPI*)(HWND);
+  static const auto getDpi=reinterpret_cast<GetDpiForWindowFn>(
+      GetProcAddress(GetModuleHandleW(L"user32.dll"),"GetDpiForWindow"));
+  return window && getDpi ? getDpi(window) : 0;
+}
 LRESULT CALLBACK CanvasProc(HWND hwnd,UINT message,WPARAM wparam,LPARAM lparam) {
   if (message==WM_NCHITTEST) return HTTRANSPARENT;
   if (message==WM_MOUSEACTIVATE) return MA_NOACTIVATE;
@@ -130,7 +138,7 @@ void ScriptNativeOverlay::Show(const nlohmann::json& presentation,std::function<
         if(detached) RetireDetached(); else liveGeometry_.Lose();
         return;
       }
-      current={origin.x,origin.y,width,height,GetDpiForWindow(viewport_),revision,
+      current={origin.x,origin.y,width,height,ExactWindowDpi(viewport_),revision,
         presentation.at("runId").get<std::string>(),presentation.at("tabId").get<std::string>(),
         presentation.at("documentVersion").get<std::string>(),presentation.at("generation").get<std::uint64_t>(),
         presentation.at("marker").at("actionIndex").get<int>()};
