@@ -10,7 +10,9 @@ struct ScriptFrame {
   double elapsed_ms = 0;
   std::vector<std::uint8_t> bgra;
 };
-ScriptFrame DecodeScriptFrame(const std::string& png_base64, int max_width, double elapsed_ms);
+struct ScriptFrameSourceSize { int width = 0, height = 0; };
+ScriptFrame DecodeScriptFrame(const std::string& png_base64, int max_width, double elapsed_ms,
+                              ScriptFrameSourceSize* source_size = nullptr);
 // The GTK viewport and exported frame use this exact native presentation path.
 void DrawScriptOverlay(ScriptFrame& frame, const nlohmann::json& presentation);
 std::vector<std::uint8_t> EncodeScriptPNG(const ScriptFrame& frame);
