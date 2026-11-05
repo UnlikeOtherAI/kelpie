@@ -293,7 +293,7 @@ class BrowserGatewayBinding(
             mapOf(
                 "nativeMethods" to listOf("get-current-url"),
                 "extensions" to emptyList<Any>(),
-                "targeting" to "selected",
+                "targeting" to "direct",
                 "fixedReader" to true,
                 "allowActions" to false,
                 "requireAuthorization" to true,
