@@ -253,6 +253,27 @@ export async function runEngine(client,fixture,engine,report) {
    tapIndicator:{color:curve==="s"?"#F54242":"#22CCFF",radius:curve==="s"?30:12,durationMs:700,wobble:curve==="s",fade:curve==="s"},
    capture:{...capture,formats:["gif","video"],fps:15},actions:[{action:"click",target:{role:"button",name:"First"}},
     {action:"wait",ms:800},{action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:800}]});
+  if(!result.success){
+   const allowed=new Set(["AUTHORIZATION_REVOKED","BUSY","CAPTURE_ADMISSION_FAILED","CAPTURE_AFTER_ACTION_FAILED",
+    "CAPTURE_ARTIFACT_FAILED","CAPTURE_BYTE_LIMIT","CAPTURE_DOCUMENT_CHANGED","CAPTURE_DURATION_LIMIT",
+    "CAPTURE_FAILED","CAPTURE_FINALIZATION_LIMIT","CAPTURE_STOPPED","CAPTURE_VIEWPORT_CHANGED",
+    "CAPTURE_VIEWPORT_UNAVAILABLE","DOCUMENT_CHANGED","INPUT_INTERRUPTED","INPUT_UNCERTAIN","INVALID_PARAM",
+    "INVALID_SCRIPT","INVALID_TARGET","RECORDING_IN_PROGRESS","RENDERER_CHANGED","SCRIPT_ABORTED",
+    "SENSITIVE_CAPTURE_REFUSED","STALE_TARGET","TAB_CHANGED","TAB_NOT_ACTIVE","TAB_NOT_VISIBLE",
+    "TARGET_FAILED","TARGET_MOVED","TARGET_NOT_FOUND","TARGET_NOT_INTERACTABLE","TARGET_OBSCURED",
+    "TARGET_OUTSIDE_VIEWPORT","TIMEOUT","UNAUTHORIZED","VIEWPORT_CHANGED","WEBVIEW_ERROR","WORKFLOW_FAILED"]);
+   const events=fixture.events.slice(begin);
+   const failure={engine,curve,code:allowed.has(result.error?.code)?result.error.code:"OTHER",
+    mayHaveCompleted:result.mayHaveCompleted===true,actionsExecuted:Number.isInteger(result.actionsExecuted)?result.actionsExecuted:null,
+    firstClicks:events.filter(e=>e.type==="click"&&e.target==="first").length,
+    secondClicks:events.filter(e=>e.type==="click"&&e.target==="second").length,play:playFacts(result)};
+   (report.motionFailures??=[]).push(failure);
+   try{
+    const artifacts=await client.download(result,engine+"-motion-failure");
+    failure.downloaded=artifacts.map(a=>({mimeType:a.mimeType,partial:a.partial,byteLength:a.byteLength,sha256:a.sha256}));
+    failure.decode=artifacts.filter(a=>a.mimeType!=="image/png").map(a=>inspectMedia(a));
+   }catch(error){failure.downloadError=errorFacts(error);}
+  }
   requireTrue(result.success,"MOTION_WORKFLOW");
   const events=fixture.events.slice(begin),first=events.find(e=>e.type==="click"&&e.target==="first"),second=events.find(e=>e.type==="click"&&e.target==="second");
   requireTrue(first&&second,"MOTION_TARGET_EVENTS");

@@ -11,6 +11,10 @@ export const namespaceRules = [
     { index: 0, value: 503447552, valueTwo: 268435456, op: "SCMP_CMP_MASKED_EQ" },
   ], includes: { arches: ["amd64"] },
   comment: "Test only: clone requires NEWUSER and excludes NEWNS, NEWCGROUP, NEWUTS and NEWIPC" },
+  { names: ["clone"], action: "SCMP_ACT_ALLOW", args: [
+    { index: 0, value: 536870929, op: "SCMP_CMP_EQ" },
+  ], includes: { arches: ["amd64"] },
+  comment: "Test only: exact CLONE_NEWPID | SIGCHLD after Chromium enters its user namespace" },
   { names: ["unshare"], action: "SCMP_ACT_ALLOW", args: [
     { index: 0, value: 2415917567, valueTwo: 0, op: "SCMP_CMP_MASKED_EQ" },
   ], includes: { arches: ["amd64"] },

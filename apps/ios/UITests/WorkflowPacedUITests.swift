@@ -32,6 +32,41 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testPacedCaptureKeepsNativeKeyboardClosedDuringEdit() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/paced"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let script: Body = [
+            "version": 1, "tabId": tab,
+            "actions": [["action": "type", "target": ["selector": "#entry"], "text": "ABCD", "typingDelayMs": 800]],
+            "capture": ["formats": ["gif"], "fps": 10, "maxWidth": 384]
+        ]
+        let playback = Task.detached { [probe] in try await probe.request("/v1/play-script", script) }
+        let application = XCUIApplication()
+        XCTAssertTrue(application.buttons["browser.recording.stop"].waitForExistence(timeout: 15))
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        let keyboardVisible = application.keyboards.firstMatch.exists
+        if keyboardVisible {
+            let screenshot = XCTAttachment(screenshot: application.screenshot())
+            screenshot.name = "Unexpected keyboard during paced capture"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        let result = try await playback.value
+        XCTAssertFalse(keyboardVisible, "Programmatic capture edits should not open the software keyboard")
+        XCTAssertEqual(result["success"] as? Bool, true, WorkflowCaptureProbe.errorCode(result))
+        let events = try await pacedEvents(tab: tab)
+        XCTAssertEqual(events.map { $0["value"] as? String }, ["seedA", "seedAB", "seedABC", "seedABCD"])
+        let manifest = try XCTUnwrap((result["artifacts"] as? [Body])?.first)
+        let bytes = try await probe.bytes(manifest, run: try XCTUnwrap(result["runId"] as? String))
+        XCTAssertGreaterThan(try WorkflowMotionFrames.decode(bytes).count, 2)
+    }
+
+    @MainActor
     func testPacedFocusLossStopsWithoutRetargeting() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }

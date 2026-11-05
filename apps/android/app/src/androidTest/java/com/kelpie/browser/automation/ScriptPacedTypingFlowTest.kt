@@ -182,7 +182,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
     }
 
     @Test
-    fun abortDuringPacedTypingStopsBeforeTheNextScalar() {
+    fun abortDuringFirstPacedInputStopsBeforeTheNextScalar() {
         MockWebServer().use { server ->
             server.start()
             ScriptHttpFixture().use { client ->
@@ -211,7 +211,7 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     java.util.concurrent.Executors
                         .newSingleThreadExecutor()
                 try {
-                    val pending = executor.submit<JSONObject> { client.call("play-script", workflow) }
+                    val pending = executor.submit<JSONObject> { client.request("/v1/play-script", workflow).second }
                     awaitRecordingUi(pending)
                     var found = false
                     val end = System.nanoTime() + 20_000_000_000L
@@ -223,10 +223,12 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     assertTrue(client.call("abort-script").getBoolean("success"))
                     val result = pending.get(30, java.util.concurrent.TimeUnit.SECONDS)
                     assertFalse(result.getBoolean("success"))
-                    assertEquals("SCRIPT_ABORTED", result.getJSONObject("error").getString("code"))
+                    val code = result.getJSONObject("error").getString("code")
+                    assertTrue(code == "SCRIPT_ABORTED" || code == "INPUT_UNCERTAIN")
                     assertTrue(result.getBoolean("mayHaveCompleted"))
                     val artifacts = result.getJSONArray("artifacts")
-                    assertTrue("Known non-sensitive partial capture must be retained", artifacts.length() > 0)
+                    // The input-event signal may precede the callback; a lost
+                    // classification can require the capture to be discarded.
                     for (i in 0 until artifacts.length()) {
                         val artifact = artifacts.getJSONObject(i)
                         assertTrue(artifact.getBoolean("partial"))
@@ -235,6 +237,70 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     val facts = client.call("evaluate", JSONObject().put("expression", "({events:window.events,value:document.querySelector('input').value})")).getJSONObject("result")
                     File(evidence, "paced-abort-result.json").writeText(result.toString(2))
                     File(evidence, "paced-abort-facts.json").writeText(facts.toString(2))
+                    assertEquals(1, facts.getJSONArray("events").length())
+                    assertEquals("A", facts.getString("value"))
+                } finally {
+                    executor.shutdownNow()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun abortAfterAcknowledgedPacedInputRetainsKnownPartialCapture() {
+        MockWebServer().use { server ->
+            server.start()
+            ScriptHttpFixture().use { client ->
+                pair(client)
+                val tab = load(client, server)
+                server.enqueue(
+                    MockResponse().setHeader("Content-Type", "text/html").setBody(
+                        """<!doctype html><meta name="viewport" content="width=device-width"><title>Known partial</title>
+                        <label>Name<input oninput="window.events.push(this.value)"></label><script>window.events=[]</script>""",
+                    ),
+                )
+                assertTrue(client.call("navigate", JSONObject().put("url", server.url("/known-partial").toString())).getBoolean("success"))
+                val ready = System.nanoTime() + 10_000_000_000L
+                while (client.core("tab.title", tab).optString("value") != "Known partial" && System.nanoTime() < ready) Thread.sleep(20)
+                assertEquals("Known partial", client.core("tab.title", tab).getString("value"))
+                val edit =
+                    client
+                        .action("type")
+                        .put("target", JSONObject().put("label", "Name"))
+                        .put("text", "A")
+                        .put("typingDelayMs", 100)
+                val pause = client.action("wait").put("ms", 30_000)
+                val workflow = client.script(tab, edit, pause).put("capture", JSONObject().put("formats", JSONArray(listOf("gif", "video", "screenshots"))).put("fps", 5).put("maxWidth", 320))
+                val executor =
+                    java.util.concurrent.Executors
+                        .newSingleThreadExecutor()
+                try {
+                    val pending = executor.submit<JSONObject> { client.request("/v1/play-script", workflow).second }
+                    awaitRecordingUi(pending)
+                    val deadline = System.nanoTime() + 30_000_000_000L
+                    var afterAck = false
+                    while (!afterAck && !pending.isDone && System.nanoTime() < deadline) {
+                        val status = client.call("get-script-status")
+                        afterAck = status.optBoolean("playing") && status.optInt("actionIndex", -1) == 1
+                        if (!afterAck) Thread.sleep(20)
+                    }
+                    assertTrue("Next action must start after the input ACK", afterAck)
+                    assertTrue(client.call("abort-script").getBoolean("success"))
+                    val result = pending.get(30, java.util.concurrent.TimeUnit.SECONDS)
+                    assertFalse(result.getBoolean("success"))
+                    assertEquals("SCRIPT_ABORTED", result.getJSONObject("error").getString("code"))
+                    assertTrue(!result.has("mayHaveCompleted") || result.opt("mayHaveCompleted") == false)
+                    assertEquals(1, result.getInt("actionsExecuted"))
+                    val artifacts = result.getJSONArray("artifacts")
+                    assertTrue("Known non-sensitive partial capture must be retained", artifacts.length() > 0)
+                    for (i in 0 until artifacts.length()) {
+                        val artifact = artifacts.getJSONObject(i)
+                        assertTrue(artifact.getBoolean("partial"))
+                        retrieve(client, result.getString("runId"), artifact)
+                    }
+                    val facts = client.call("evaluate", JSONObject().put("expression", "({events:window.events,value:document.querySelector('input').value})")).getJSONObject("result")
+                    File(evidence, "paced-post-ack-abort-result.json").writeText(result.toString(2))
+                    File(evidence, "paced-post-ack-abort-facts.json").writeText(facts.toString(2))
                     assertEquals(1, facts.getJSONArray("events").length())
                     assertEquals("A", facts.getString("value"))
                 } finally {
@@ -278,13 +344,13 @@ class ScriptPacedTypingFlowTest : ScriptPublicFixture() {
                     val action =
                         client
                             .action("type")
-                            .put("target", JSONObject().put("label", label))
+                            .put("target", if (label == "Button") JSONObject().put("role", "button").put("name", label) else JSONObject().put("label", label))
                             .put("text", "")
                             .put("typingDelayMs", 100)
                     val result = playRecorded(client, client.script(tab, action))
                     assertFalse(result.getBoolean("success"))
                     assertEquals("TARGET_NOT_EDITABLE", result.getJSONObject("error").getString("code"))
-                    assertFalse(result.getBoolean("mayHaveCompleted"))
+                    assertTrue(!result.has("mayHaveCompleted") || result.opt("mayHaveCompleted") == false)
                 }
                 assertEquals(0, client.call("evaluate", JSONObject().put("expression", "window.focusCount")).getInt("result"))
             }

@@ -3,25 +3,33 @@ import path from "node:path";
 import {createHash} from "node:crypto";
 import {inspectMedia} from "./runtime-media.mjs";
 import {cli,cliMCP,requireTrue,waitFor} from "./runtime-client.mjs";
-export async function publicCLI(client,fixture,privateDir){
- const pairing=cli(["pair","--client-name","Hosted public CLI","--timeout-ms","35000"]);
- const window=await waitFor(()=>client.find("pair.dialog.always"));
- await client.tap("pair.dialog.always",window);await pairing.result;
- const tabs=await client.api("get-tabs");const tabId=tabs.activeTab;
- requireTrue(tabId,"CLI_WEBKIT_TAB");
- const file=path.join(privateDir,"recipe.json"),inputs=path.join(privateDir,"inputs.json"),out=path.join(client.out,"cli");
+export async function publicCLI(client,fixture,privateDir,engine="webkit"){
+ if(engine==="webkit"){
+  client.cliStage="pair";
+  const pairing=cli(["pair","--client-name","Hosted public CLI","--timeout-ms","35000"]);
+  void pairing.result.catch(()=>{});
+  const window=await waitFor(()=>client.find("pair.dialog.always"));
+  await client.tap("pair.dialog.always",window);await pairing.result;
+ }
+ client.cliStage="get-tabs";
+ const tabs=await client.api("get-tabs");const tabId=engine==="chromium"?"chromium":tabs.activeTab;
+ requireTrue(tabId,engine==="chromium"?"CLI_CEF_TAB":"CLI_WEBKIT_TAB");
+ const file=path.join(privateDir,"recipe-"+engine+".json"),inputs=path.join(privateDir,"inputs-"+engine+".json"),out=path.join(client.out,"cli-"+engine);
  await mkdir(out,{recursive:true});
  await writeFile(file,JSON.stringify({version:1,tabId,inputs:{draft:{type:"string"}},capture:{formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxDurationMs:15000,maxBytes:33554432},
  actions:[{action:"navigate",url:fixture.url},{action:"wait-ready",state:"complete"},
  {action:"fill",target:{label:"Draft message"},text:{input:"draft"}},{action:"click",target:{role:"button",name:"Submit"}}]}),{flag:"wx"});
  await writeFile(inputs,JSON.stringify({draft:"Public CLI typed input"}),{flag:"wx"});
  client.pin(28420);
+ client.cliStage="run";
  const response=await cli(["script","run",file,"--inputs",inputs,"--output",out],90000).result;
  client.pin(28420);const value=response.result??response;
  requireTrue(response.downloaded?.length>0,"PUBLIC_CLI_DOWNLOADS");
  requireTrue(value.success,"PUBLIC_CLI_WORKFLOW");
+ client.cliStage="status";
  const status=await cli(["script","status","--run-id",value.runId,"--pinned"]).result;
  requireTrue(status.supportedVersions?.includes(1)&&status.runSuccess,"PUBLIC_CLI_PINNED_STATUS");
+ client.cliStage="downloads";
  const decoded=[];let total=0;
  for(const saved of response.downloaded){
   const artifact=value.artifacts.find(item=>item.id===saved.id);requireTrue(artifact,"PUBLIC_CLI_ARTIFACT_ID");
@@ -30,8 +38,9 @@ export async function publicCLI(client,fixture,privateDir){
   decoded.push(inspectMedia({...artifact,file:saved.file}));
  }
  requireTrue(new Set(decoded.map(item=>item.mimeType)).size===3,"PUBLIC_CLI_ALL_FORMATS");
+ client.cliStage="mcp";
  const mcp=await cliMCP();
- return {runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
+ return {engine,runId:value.runId,status:status.state,downloaded:true,decoded,mcp};
 }
 export async function inference(client,privateDir){
  const revision="499bc8821c6b12b4e53c5bffcb21ec206f212d81";

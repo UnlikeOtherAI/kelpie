@@ -3,7 +3,7 @@ import {writeFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import path from "node:path";
 import {listenerState,processCommandMatches} from "./runtime-ownership.mjs";
-import {artifactFacts,errorFacts,toolEnvelopeFacts} from "./runtime-diagnostics.mjs";
+import {artifactFacts,errorFacts,toolEnvelopeFacts,cliExitFacts} from "./runtime-diagnostics.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptStatusV1Schema} from "../../packages/shared/dist/index.js";
 export const delay=ms=>new Promise(r=>setTimeout(r,ms));
 export class Failure extends Error { constructor(code){super(code);this.code=code;} }
@@ -19,7 +19,11 @@ export async function waitFor(run,ms=10000){
 }
 export class Client {
  constructor(pid,out,executable){this.pid=pid;this.out=out;this.executable=executable;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
- pin(port){requireTrue(listenerState(listeners(port),this.pid)==="owned","LISTENER_IDENTITY");}
+ pin(port){
+  const owners=listeners(port),state=listenerState(owners,this.pid);
+  if(state!=="owned")this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:owners.length};
+  requireTrue(state==="owned","LISTENER_IDENTITY");
+ }
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
   if(this.readiness.at(-1)?.states.join(",")!==states.join(",")&&this.readiness.length<16)this.readiness.push({elapsedMs:Date.now()-this.began,states});
   requireTrue(!states.includes("foreign"),"LISTENER_IDENTITY");return states.every(state=>state==="owned");}
@@ -134,7 +138,11 @@ export function cli(args,timeout=45000){
  let stdout="",stderr="";const timer=setTimeout(()=>child.kill("SIGTERM"),timeout);
  child.stdout.on("data",data=>{stdout+=data;if(stdout.length>8*1024*1024)child.kill("SIGTERM");});
  child.stderr.on("data",data=>{if(stderr.length<65536)stderr+=data;});
- const result=new Promise((resolve,reject)=>{child.once("error",()=>{clearTimeout(timer);reject(new Failure("CLI_SPAWN"));});child.on("exit",code=>{clearTimeout(timer);if(code!==0)return reject(new Failure("CLI_EXIT_"+code));try{resolve(JSON.parse(stdout));}catch{reject(new Failure("CLI_JSON"));}});});
+ const result=new Promise((resolve,reject)=>{child.once("error",()=>{clearTimeout(timer);reject(new Failure("CLI_SPAWN"));});child.on("exit",code=>{clearTimeout(timer);if(code!==0){
+   const failure=new Failure("CLI_EXIT_"+code);
+   failure.cliFacts=cliExitFacts(code,stdout,stderr);
+   return reject(failure);
+  }try{resolve(JSON.parse(stdout));}catch{reject(new Failure("CLI_JSON"));}});});
  return {process:child,result};
 }
 

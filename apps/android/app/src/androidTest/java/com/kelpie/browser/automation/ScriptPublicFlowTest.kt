@@ -27,6 +27,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                 val snapshot = client.core("tab.snapshot", tab).toString()
                 assertTrue(snapshot.contains("Public fixture"))
                 assertFalse(snapshot.contains("private-form-canary"))
+                val submitGeometry = readSubmitGeometry(client)
                 val script =
                     client
                         .script(
@@ -64,7 +65,7 @@ class ScriptPublicFlowTest : ScriptPublicFixture() {
                         if (!admitted) Thread.sleep(20)
                     }
                     assertTrue("Recording never admitted its first action", admitted)
-                    val screen = captureBlueMarker(client)
+                    val screen = captureBlueMarker(client, submitGeometry)
                     File(evidence, "native-active-overlay.png").outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     screen.recycle()
                     result = pending.get(30, TimeUnit.SECONDS)

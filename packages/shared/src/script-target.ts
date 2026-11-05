@@ -97,6 +97,21 @@ export function resolveScriptTarget(target: ScriptTarget, key: string, token?: s
       const style = getComputedStyle(parent);
       if (style.visibility !== "visible" || style.display === "none" || Number(style.opacity) === 0) return null;
       if (parent !== el) {
+        // Root overflow clips the viewport, already applied above. HTML body
+        // overflow also propagates there when root overflow is visible and
+        // neither element establishes containment.
+        const root = document.documentElement;
+        if (parent === root) continue;
+        if (parent === document.body && root.localName === "html" &&
+            root.namespaceURI === "http://www.w3.org/1999/xhtml" && parent.parentElement === root) {
+          const rootStyle = getComputedStyle(root);
+          const uncontained = (value: CSSStyleDeclaration): boolean =>
+            (!value.contain || value.contain === "none") &&
+            (!value.contentVisibility || value.contentVisibility === "visible") &&
+            (!value.containerType || value.containerType === "normal");
+          if (rootStyle.overflowX === "visible" && rootStyle.overflowY === "visible" &&
+              uncontained(rootStyle) && uncontained(style)) continue;
+        }
         const clip = parent.getBoundingClientRect();
         if (["hidden", "clip", "auto", "scroll"].includes(style.overflowX)) {
           left = Math.max(left, clip.x); right = Math.min(right, clip.x + clip.width);

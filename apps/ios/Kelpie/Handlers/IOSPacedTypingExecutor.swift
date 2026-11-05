@@ -4,7 +4,7 @@ import Foundation
 /// Sequences already-planned scalars; each mutation callback owns the renderer fences.
 @MainActor
 enum IOSPacedTypingExecutor {
-    static func jsonBoolean(_ value: Any?) -> Bool? {
+    nonisolated static func jsonBoolean(_ value: Any?) -> Bool? {
         guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
         return number.boolValue
     }

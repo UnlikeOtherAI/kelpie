@@ -1,6 +1,9 @@
 #include "script_capture_service.h"
 #include "script_frame_compositor.h"
 #include "script_media_encoder.h"
+#ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+#include "../tests/g08_backing_observation.h"
+#endif
 #include "kelpie/script_presentation.h"
 #include <deque>
 #include <algorithm>
@@ -41,11 +44,17 @@ class Capture final : public DesktopScriptCapture {
     source_size_ = source_size;
     if (width_ && (width_ != frame.width || height_ != frame.height)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_ = frame.width; height_ = frame.height; last_elapsed_ = elapsed;
+    #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+    auto backing = ObserveG08Backing(frame, source_size, shown, run_, observed_frames_);
+    #endif
     DrawScriptOverlay(frame, shown);
     DesktopScriptFrameAdmission committed;
     // Step PNG requests share samples but must not increase movie frame rate.
     if (last_movie_frame_ < 0 || elapsed - last_movie_frame_ + .000001 >= 1000.0 / options_.value("fps", 15)) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+      WriteG08Backing(backing); ++observed_frames_;
+      #endif
       if (movies_) {
         DesktopScriptFrameAdmission queued;
         if (shown.contains("marker")) {
@@ -123,6 +132,9 @@ class Capture final : public DesktopScriptCapture {
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
   std::size_t committed_marker_frames_ = 0;
   bool screenshots_ = false, movies_ = false, finished_ = false;
+  #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+  std::size_t observed_frames_ = 0;
+  #endif
 };
 }
 LinuxScriptService::LinuxScriptService(DocumentGuard guard) : guard_(std::move(guard)) {}

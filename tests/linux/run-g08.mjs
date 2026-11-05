@@ -41,12 +41,13 @@ try {
         if (!loaded) await new Promise(resolve => setTimeout(resolve, 100));
       }
       assert.ok(loaded, "G08 fixture did not become ready");
-      const result = await api("play-script", g08Workflow(tabId, curve));
+      const workflow = g08Workflow(tabId, curve);
+      const result = await api("play-script", workflow);
       assert.equal(result.success, true, JSON.stringify(result.error));
       const facts = await (await fetch(new URL("/events", fixture.url))).json();
       report.eventsDropped += facts.dropped;
       assert.deepEqual(facts.events.map(fact => fact.target), ["finish", "start", "finish"]);
-      const entry = { curve, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts: [] };
+      const entry = { curve, runId: result.runId, capture: workflow.capture, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts: [] };
       report.cases.push(entry);
       for (const artifact of result.artifacts) {
         if (!["image/gif", "video/mp4"].includes(artifact.mimeType)) continue;
