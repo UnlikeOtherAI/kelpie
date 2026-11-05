@@ -30,7 +30,10 @@ noCEF stub and external workers remain separate evidence. See
 A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
 
-Every row below starts **pending**. To close it, append an evidence record to the
+Every row below starts **pending**. Explicit frozen-runtime decisions now appear in
+[reviewed requirement cells](reviewed-cells.md): sixteen Windows f188 cells and
+two restricted Lightpanda worker requirements are accepted within their stated
+scope. Automated intake does not perform acceptance. To close it, append an evidence record to the
 run report with: requirement ID; exact implementation path/symbol; exact test
 command and test name; full source SHA; installed version and binary SHA-256;
 host/OS/device/renderer; real HTTP/MCP/CLI request entry point; steps taken;

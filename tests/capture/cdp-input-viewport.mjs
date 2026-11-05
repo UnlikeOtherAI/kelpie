@@ -11,7 +11,7 @@ const browser = await chromium.launch({ headless: true, chromiumSandbox: true,
 const report = { version: 1, browser: browser.version(), stages: [], policy: [], mode: "actual CDP trusted input/pageScale/pinch; no CSS zoom or transform" };
 const deadline = setTimeout(() => { void browser.close().finally(() => process.exit(124)); }, 25000);
 try {
-  const page = await browser.newPage({ viewport: { width: 800, height: 600 }, hasTouch: true });
+  const page = await browser.newPage({ viewport: { width: 800, height: 600 }, hasTouch: true, isMobile: true });
   page.setDefaultTimeout(5000);
   const cdp = await page.context().newCDPSession(page);
   const send = async (method, params) => {
@@ -20,7 +20,7 @@ try {
       timer = setTimeout(() => reject(Error("CDP_TIMEOUT")), 3500);
     })]); } finally { clearTimeout(timer); }
   };
-  await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=4"><style>html,body{margin:0;width:800px;height:1600px}button{position:absolute;left:350px;top:80px;width:200px;height:80px}</style><button id="target" type="button">Probe</button>');
+  await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=4"><style>html,body{margin:0;width:800px;height:600px;overflow:hidden}button{position:absolute;left:350px;top:80px;width:200px;height:80px}</style><button id="target" type="button">Probe</button>');
   await page.evaluate(() => {
     globalThis.probeEvents = [];
     document.addEventListener("click", event => globalThis.probeEvents.push({
@@ -55,21 +55,44 @@ try {
   await page.waitForFunction(() => visualViewport.scale > 1.9);
   await probe("page-scale2-origin");
   await send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: true, screenWidth: 800, screenHeight: 600 });
-  report.pinchProfile = "CDP mobile device emulation; same owned browser/page";
+  report.pinchProfile = "actual mobile context,touch emulation5,raw touch; content equals layout viewport";
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
   try {
-    await send("Input.synthesizePinchGesture", { x: 300, y: 200, scaleFactor: 2, relativeSpeed: 2000, gestureSourceType: "touch" });
-    await probe("mobile-emulation-supported-pinch");
+    await page.waitForFunction(() => Math.abs(visualViewport.scale - 1) < 0.01);
+    await page.screenshot({ type: "png" });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ id: 1, x: 180, y: 180 }, { id: 2, x: 380, y: 180 }] });
+    for (let step = 1; step <= 8; step++) {
+      await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ id: 1, x: 180 - step * 8, y: 180 }, { id: 2, x: 380 + step * 8, y: 180 }] });
+      await page.waitForTimeout(20);
+    }
+    await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForTimeout(200);
+    await page.screenshot({ type: "png" });
+    await probe("mobile-raw-touch-pinch");
   } catch (error) { report.pinchUnsupported = String(error.message).slice(0, 120); }
   const after = await metrics();
   if (after.visual.offsetLeft === 0 && after.visual.offsetTop === 0) {
     try {
       await send("Emulation.setPageScaleFactor", { pageScaleFactor: 2 });
-      await send("Input.synthesizeScrollGesture", { x: 300, y: 200, xDistance: -100, yDistance: 0, speed: 1000, gestureSourceType: "touch" });
-      await probe("mobile-emulation-supported-touch-pan");
+      await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ id: 1, x: 160, y: 160 }] });
+      for (let step = 1; step <= 6; step++) {
+        await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ id: 1, x: 160 - step * 10, y: 160 - step * 8 }] });
+        await page.waitForTimeout(20);
+      }
+      await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.waitForTimeout(200);
+      await page.screenshot({ type: "png" });
+      await probe("mobile-raw-touch-pan");
     } catch (error) { report.panUnsupported = String(error.message).slice(0, 120); }
   }
   report.nonzeroVisualOffsetObserved = report.stages.some(stage => stage.frame.visual.offsetLeft !== 0 || stage.frame.visual.offsetTop !== 0);
+  const shifted = report.stages.find(stage => stage.frame.visual.offsetLeft !== 0 || stage.frame.visual.offsetTop !== 0);
+  assert.ok(shifted, "Raw touch did not produce visual pan; offset binding remains unproven");
+  assert.equal(shifted.candidates.find(c => c.name === "visual-relative").exactTrustedCenter, true);
+  assert.equal(shifted.candidates.find(c => c.name === "layout").exactTrustedCenter, false);
+  assert.equal(shifted.candidates.find(c => c.name === "visual-relative-scaled").exactTrustedCenter, false);
   const origin = report.stages[0];
   assert.equal(origin.frame.visual.scale, 2);
   assert.equal(origin.candidates.find(c => c.name === "layout").exactTrustedCenter, true);

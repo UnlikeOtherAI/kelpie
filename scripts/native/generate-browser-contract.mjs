@@ -82,6 +82,9 @@ const scriptCases = parityCases(scriptV1Schema, [
   { version: 1, tabId: 'a', actions: [{ action: 'screenshot', unexpected: true }] },
 ]);
 const targetCases = parityCases(scriptTargetRequestSchema, [
+  { target: { selector: '#edit' }, key: 'private', policy: { refuseSensitive: true } },
+  { target: { selector: '#edit' }, key: 'private', policy: { refuseSensitive: 'yes' } },
+  { target: { selector: '#edit' }, key: 'private', policy: { refuseSensitive: true, extra: true } },
   { target: { role: 'button', name: 'Save' }, key: 'private' },
   { target: { selector: '#save' }, key: 'private', dispatch: true, token: 't1' },
   { target: { label: 'Email' }, key: 'private', edit: { action: 'fill', text: 'example' } },

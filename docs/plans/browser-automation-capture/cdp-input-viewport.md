@@ -22,11 +22,30 @@ Two original reports remain immutable under common g07 artifacts:
 - cdp-input.json SHA b4c4e7a9bee70e4a4f83ea91eae9939c5bf63bcde110335a8d58734c2a9f3620.
 - cdp-input-mobile.json SHA5fa3e25820331bfbb379c47cebe265056cda0c3039866c74d670bd7374b1c69d.
 
-Supported synthetic pinch/pan commands returned but did not produce nonzero
-visual offsets in either desktop or explicit mobile-device emulation. The
-latter profile is labelled in source/report. No nonzero-offset CDP input claim
-is made; native iOS/Android real pinch evidence is separate. Do not infer a
-conversion or broaden native input from the unsuccessful gesture branches.
+The first two high-level gesture attempts returned without nonzero offsets.
+Those failures remain immutable. A third approved setup used an actual mobile
+context,touch emulation5,content equal to layout viewport (800x600,overflow
+hidden),compositor waits and raw CDP touch events. Pinch preparation screenshot
+failed and is preserved; the fallback raw single-finger pan produced actual
+visual offset54,43 at scale2 with scrollX/Y0 and visual size400x300.
+
+For shared layout center402,120: unchanged CDP402,120 produced trusted
+client456,163 on BODY; subtracting the captured offset (348,77) produced trusted
+client402,120 on the target; multiplying that relative point by scale
+(696,154) produced trustedclient750,197 on BODY. The necessary binding is
+CDP x/y = layout x/y minus SAME captured visual offset; no extra DPR/scale
+multiplication. Native Canvas/composition retains its separate pixel transform.
+Third report cdp-input-raw.json SHA-256:
+1509a77080e0f3c231bfee184632f593219561bb28b07b0602302001fae9337d.
+Job12.495s/free28,257,980KiB; every observed leaf1/Normal,2GiB,closed normally.
+No further browser attempt or native production edit followed.
+
+Pinned Chromium149 primary trace:
+[InputHandler::DispatchMouseEvent and ScaleFactor](https://github.com/chromium/chromium/blob/149.0.7827.201/content/browser/devtools/protocol/input_handler.cc#L1259)
+construct widget coordinates with browser/embedding/pinch scale already applied;
+[WebMouseEvent root transform](https://github.com/chromium/chromium/blob/149.0.7827.201/third_party/blink/common/input/web_mouse_event.cc#L30)
+divides frame scale and adds frame translation. This is consistent with the
+measured offset result; do not apply compositor scaling a second time.
 
 Each job owned one existing sandboxed browser and enforced hard affinity1/
 Normal/2GiB with30s deadline. Observed browser/GPU/renderer/conhost leaves
