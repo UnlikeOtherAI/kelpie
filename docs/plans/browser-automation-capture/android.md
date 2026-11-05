@@ -652,5 +652,7 @@ contained only three interior final-move samples, including a 157 ms gap;
 the shared fitter rejected it as insufficient. The explicit 500 ms control
 had seven interior native samples and was rejected as a 350 ms fit; its
 exports were also insufficient. The capture-disabled control timed out in
-navigation before playback and remains unverified. These are scoped test
-results, not a short-motion acceptance pass.
+navigation before playback and remains unverified. Its emulator became
+unresponsive to normal shutdown and exited at the original 30-minute Job
+watchdog (code 124); the captured runs were pulled before that failure.
+These are scoped test results, not a short-motion acceptance pass.
