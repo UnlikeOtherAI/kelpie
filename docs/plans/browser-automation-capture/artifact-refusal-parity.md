@@ -38,10 +38,18 @@ test-assert override warning remains. No owned job remains.
   result metadata is consumed before ticket completion, including canceled
   continuation. Found initial click/recheck unknown classification excluded by
   editing-or-dispatch condition; reported to owner for the narrow capture-discard
-  fix. Literal registration remains editing-only.
+  fix. Literal registration remains editing-only. Independent follow-up inspection
+  of277d522fe5783f317a3debdb5ecd9626f4482499 confirms unknown callback/catch
+  handling now covers all target stages; consumeSensitivity still registers
+  literals only for fill/type. This closes the source finding, not runtime proof.
 - Desktop81ed1727: actual focus privacy replay passed, but post-Input.insertText
   classification is absent. Root/owner are probing oninput type/autocomplete
-  transitions; no claim from focus-only coverage. Missing click classification
+  transitions; no claim from focus-only coverage. The actual diagnostic now proves
+  all four capture/no-capture by autocomplete/type cases leaked earlier raw/URI/
+  form outputs after one edit; capture cases retained two artifacts. Raw Maxis
+  native-edit-diagnostic-81ed/post-edit.json SHA-256
+  043723b80cdc9637076b9c115cab6e92ced76a5f6c6f13365bee402175094843.
+  The diagnostic exit zero is not a security pass. Missing click classification
   also needs capture discard. Target metadata preservation and structured
   unknown-result detection were reviewed; earlier027 draft lost metadata.
 - Mac current integration has startup/shared-store changes; its new sensitivity
