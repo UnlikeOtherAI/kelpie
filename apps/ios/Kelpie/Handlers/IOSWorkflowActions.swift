@@ -253,10 +253,13 @@ final class IOSWorkflowActions {
             throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
         }
         do {
+            if tab.document != context.document { context.missing() }
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
             try await check()
             #if DEBUG
             if final { try await waitForTestFinalNavigation(context: context) }
+            if tab.document != context.document { context.missing() }
+            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
             #endif
             try await inspectPacedPrivacy(context: context, final: final)
             try await check()
