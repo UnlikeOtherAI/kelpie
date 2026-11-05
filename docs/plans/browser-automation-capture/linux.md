@@ -365,3 +365,13 @@ revoked access and cleanup retry. These source tests are not yet compiled.
 Node syntax checks and Git whitespace checks passed on Maxis. Native C++ build,
 all-frame decode and real HTTP/MCP/CLI/GTK replay remain pending the next allocated
 Linux slot; this checkpoint is explicitly an unverified native implementation.
+
+## Large artifact transport acceptance candidate
+
+The real Linux launcher now invokes the common b9a458c0 artifact verifier using
+its already-owned authenticated socket and deterministic 512-pixel noise page.
+The planned native PNG must exceed 262 KiB. HTTP, the direct named MCP tool and
+the actual generic kelpie_extension wrapper must reconstruct identical bytes,
+hash, length, offsets, EOF and MIME. Callback fetches honor the supplied abort
+signal; the helper creates no app or authority. The fixture closes in finally.
+Node syntax/whitespace checks passed; real native transport execution is pending.
