@@ -76,6 +76,7 @@ final class IOSWorkflowPresentation: NSObject {
     private var retirementDeadline: TimeInterval?
     private var retirementInvalidated: (() -> Void)?
     private var markerGeometry: MarkerGeometry?
+    private weak var markerWindow: UIWindow?
 
     init(tab: IOSWorkflowTab) throws {
         self.tab = tab
@@ -115,7 +116,8 @@ final class IOSWorkflowPresentation: NSObject {
     func mark(at point: CGPoint, radius: CGFloat, settings: [String: Any], held: Bool) {
         synchronize()
         markerHeld = held
-        markerGeometry = tab.view.window.flatMap { geometry(in: $0) }
+        markerWindow = tab.view.window
+        markerGeometry = markerWindow.flatMap { geometry(in: $0) }
         marker = ScriptOverlayMarker(
             point: point,
             started: ProcessInfo.processInfo.systemUptime,
@@ -204,6 +206,8 @@ final class IOSWorkflowPresentation: NSObject {
         retirementDeadline = nil
         retirementDocument = nil
         retirementWindow = nil
+        markerWindow = nil
+        markerGeometry = nil
         clock?.invalidate()
         clock = nil
         canvas.removeFromSuperview()
@@ -256,8 +260,8 @@ final class IOSWorkflowPresentation: NSObject {
     @objc private func refresh() {
         synchronize()
         let retirementValid = retirementDocument.map { document in
-            guard document == tab.document, let window = retirementWindow, tab.view.window === window,
-                  let pinned = markerGeometry, let current = geometry(in: window) else { return false }
+            guard document == tab.document, let window = retirementWindow, markerWindow === window,
+                  tab.view.window === window, let pinned = markerGeometry, let current = geometry(in: window) else { return false }
             return pinned == current
         } ?? true
         let visible = retirementValid && (try? tab.requireCurrent()) != nil && canvas.superview === tab.view.superview &&
