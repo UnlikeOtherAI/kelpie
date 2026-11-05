@@ -18,17 +18,29 @@ extension WorkflowCaptureUITests {
         let approval = XCUIApplication().buttons["Yes, once"]
         XCTAssertTrue(approval.waitForExistence(timeout: 45))
         approval.tap()
-        let deadline = Date().addingTimeInterval(110)
+        let deadline = Date().addingTimeInterval(720)
         var outcome = "pending"
-        while outcome == "pending", Date() < deadline {
+        var verified = false
+        while outcome != "passed", outcome != "failed", Date() < deadline {
             let status = try await bridge.request(path, method: "GET")
             outcome = try XCTUnwrap(status["state"] as? String)
-            if outcome == "pending" { try await Task.sleep(nanoseconds: 200_000_000) }
+            if outcome == "standard-passed", !verified {
+                let result = try await probe.request("/v1/play-script", [
+                    "version": 1, "tabId": tab, "actions": [["action": "output", "name": "clicks", "source": "title"]]
+                ])
+                guard (result["outputs"] as? Body)?["clicks"] as? String == "Count 1" else {
+                    XCTFail("Original CLI journey did not preserve its expected title")
+                    return
+                }
+                let acknowledgment = try await bridge.request(path, ["verified": true])
+                XCTAssertEqual(acknowledgment["accepted"] as? Bool, true)
+                verified = true
+            }
+            if outcome != "passed", outcome != "failed" {
+                try await Task.sleep(nanoseconds: 200_000_000)
+            }
         }
+        XCTAssertTrue(verified, "Original CLI result was not verified")
         XCTAssertEqual(outcome, "passed")
-        let verified = try await probe.request("/v1/play-script", [
-            "version": 1, "tabId": tab, "actions": [["action": "output", "name": "clicks", "source": "title"]]
-        ])
-        XCTAssertEqual((verified["outputs"] as? Body)?["clicks"] as? String, "Count 1")
     }
 }
