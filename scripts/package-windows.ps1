@@ -147,7 +147,7 @@ try {
   # Windows PowerShell 5.1 ignores -Include alongside -LiteralPath and would match every file.
   $developmentFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in ".lib", ".pdb" }
   if ($developmentFiles) { throw "Package contains development files." }
-  $asset = Join-Path $output ("kelpie-windows-x64-" + $Version + ".zip")
+  $asset = Join-Path $output ("kelpie-windows-x64-" + $Version + "-unsigned.zip")
   New-Item -ItemType Directory -Force -Path $output | Out-Null
   Remove-Item -Force -LiteralPath $asset -ErrorAction SilentlyContinue
   Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $asset -CompressionLevel Optimal
@@ -155,6 +155,7 @@ try {
   Set-Content -LiteralPath ($asset + ".sha256") -NoNewline -Encoding ascii -Value ($assetHash + "  " + [IO.Path]::GetFileName($asset))
   @(
     "asset_sha256=$assetHash",
+    "signing_status=unsigned",
     "kelpie_dll_version=$dllVersion",
     "kelpie_dll_sha256=$((Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash.ToLowerInvariant())",
     "bootstrap_original=verified CEF bootstrap",

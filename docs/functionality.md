@@ -661,3 +661,5 @@ session IDs and unsupported mobile keyboard defaults fail before actions.
 The matching iOS binding belongs to the same integrated PR. Native relink and real
 HTTP/MCP phone/tablet acceptance remain pending; the
 [Android ledger](plans/browser-automation-capture/android.md) records exact results.
+
+Windows release CI retains clearly labelled unsigned candidates only. Public Windows assets require agent-run Azure Public Trust signing on Minis, signature verification and an installed signed-artifact acceptance run; CI does not attach unsigned ZIPs to releases.
