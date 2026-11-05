@@ -325,8 +325,9 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     if (!gate) return false;
     std::lock_guard lock(gate->mutex);
     if (!gate->alive || cancellation->load() || revoked->load() || !check_grant) return false;
-    if (!check_grant(presentation_owner)) { revoked->store(true); return false; }
-    return true;
+    try { if (check_grant(presentation_owner)) return true; } catch (...) {}
+    revoked->store(true);
+    return false;
   };
   try { if (config.present) config.present(hidden, {}, valid); }
   catch(...) {

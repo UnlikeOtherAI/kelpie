@@ -213,10 +213,12 @@ LinuxScriptService::Json LinuxScriptService::Presentation(bool foreground) const
   bool hide = false;
   if (detached) {
     const auto& marker = shown.at("marker");
-    hide = !foreground || !guard_ || !valid || !valid() || shown.value("elapsedMs", 0.0) >=
+    hide = !foreground || !guard_ || !valid || shown.value("elapsedMs", 0.0) >=
         marker.value("startedMs", 0.0) + marker.value("durationMs", 700.0);
+    if (!hide) try { hide = !valid(); } catch (...) { hide = true; }
   }
-  if (!hide && (shown.value("playing", false) || detached) && guard_ && !guard_(shown)) hide = true;
+  if (!hide && (shown.value("playing", false) || detached) && guard_)
+    try { hide = !guard_(shown); } catch (...) { hide = true; }
   {
     std::lock_guard lock(mutex_);
     if (presentation_.value("_presentationRevision",std::uint64_t{}) != shown.value("_presentationRevision",std::uint64_t{}))
