@@ -153,9 +153,9 @@ abstract class ScriptPublicFixture {
         geometry: JSONObject,
     ): Bitmap {
         // Recording can resize the WebView; measure the same fixture after admission.
-        val currentGeometry = readSubmitGeometry(client)
-        assertEquals(geometry.getString("href"), currentGeometry.getString("href"))
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
+        val currentGeometry = readSubmitGeometry(owned)
+        assertEquals(geometry.getString("href"), currentGeometry.getString("href"))
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
         val observations = org.json.JSONArray()
@@ -279,15 +279,37 @@ abstract class ScriptPublicFixture {
         return JSONObject().put("activeRootPresent", activePresent).put("windows", windows)
     }
 
+    private val submitGeometryExpression =
+        """(()=>{const b=[...document.querySelectorAll('button')],v=visualViewport;
+        if(b.length!==1||b[0].textContent!=='Submit'||!v)return null;
+        const r=b[0].getBoundingClientRect();
+        return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
+        offsetLeft:v.offsetLeft,offsetTop:v.offsetTop,width:v.width,height:v.height,href:location.href};})()"""
+
     /** Resolve the single fixture button independently of the marker renderer. */
     protected fun readSubmitGeometry(client: ScriptHttpFixture): JSONObject {
-        val expression =
-            """(()=>{const b=[...document.querySelectorAll('button')],v=visualViewport;
-            if(b.length!==1||b[0].textContent!=='Submit'||!v)return null;
-            const r=b[0].getBoundingClientRect();
-            return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
-            offsetLeft:v.offsetLeft,offsetTop:v.offsetTop,width:v.width,height:v.height,href:location.href};})()"""
-        val geometry = client.call("evaluate", JSONObject().put("expression", expression)).getJSONObject("result")
+        val geometry = client.call("evaluate", JSONObject().put("expression", submitGeometryExpression)).getJSONObject("result")
+        assertTrue(geometry.getString("href").contains("/fixture"))
+        assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
+        assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
+        return geometry
+    }
+
+    /** Read-only fixture probe bypasses the gateway's intentional recording lock. */
+    private fun readSubmitGeometry(view: android.webkit.WebView): JSONObject {
+        val value =
+            java.util.concurrent.atomic
+                .AtomicReference<String>()
+        val done = java.util.concurrent.CountDownLatch(1)
+
+        instrumentation.runOnMainSync {
+            view.evaluateJavascript(submitGeometryExpression) { result ->
+                value.set(result)
+                done.countDown()
+            }
+        }
+        check(done.await(3, java.util.concurrent.TimeUnit.SECONDS)) { "Fixture geometry callback timed out" }
+        val geometry = JSONObject(checkNotNull(value.get()))
         assertTrue(geometry.getString("href").contains("/fixture"))
         assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
         assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
