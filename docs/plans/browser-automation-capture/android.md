@@ -483,3 +483,12 @@ scrubs earlier outputs, and executes no later action. Without capture the edit
 may finish and earlier outputs are still scrubbed. Existing concrete helper
 failures retain priority. Four authored oninput autocomplete/password ×
 capture/no-capture cases cover this boundary; native execution remains pending.
+## G08 hosted adapter (source only)
+
+The hosted authenticated CLI bridge now runs the shared white fixture separately
+for C and S on each profile, retaining ordered fixture facts, full GIF/MP4
+downloads, hashes, frame timestamps and the shared streaming verifier result.
+The fixture binds host loopback and the emulator reaches it through 10.0.2.2.
+The native bridge remains active through both runs. This is authored integration,
+not a device, decoded-pixel or native-overlay acceptance result. Failure reports
+and partial evidence remain retained; the shared verifier determines pass/fail.
