@@ -122,7 +122,7 @@ fun BrowserScreen(
     DisposableEffect(sampler) { onDispose { sampler.cancel() } }
     var bottomBarCollapsed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(activeTabId) { bottomBarCollapsed = false }
+    LaunchedEffect(activeTabId) { if (!isScriptRecording) bottomBarCollapsed = false }
 
     fun showTabs() {
         tabStore.captureActivePreview()
@@ -216,7 +216,7 @@ fun BrowserScreen(
                 )
             }
 
-            if (isLoading && !isMovieImmersive) {
+            if (isLoading && !isScriptRecording) {
                 LinearProgressIndicator(
                     progress = { progress / 100f },
                     modifier = Modifier.fillMaxWidth(),
@@ -232,7 +232,7 @@ fun BrowserScreen(
                 tabletMobileStagePresetId,
                 isScriptRecording,
                 onAvailablePresets = { availableTabletViewportPresets = it },
-                onScrollDirectionChange = { bottomBarCollapsed = it == ScrollDirection.DOWN },
+                onScrollDirectionChange = { if (!isScriptRecording) bottomBarCollapsed = it == ScrollDirection.DOWN },
                 onScrolled = { activeTab?.let(sampler::request) },
                 onWebViewReady = {
                     webView = it

@@ -1,6 +1,7 @@
 package com.kelpie.browser.ui
 
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -11,6 +12,7 @@ internal fun Modifier.scriptInputBlock(active: Boolean): Modifier =
         this
     } else {
         clearAndSetSemantics { }
+            .onPreviewKeyEvent { true }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
