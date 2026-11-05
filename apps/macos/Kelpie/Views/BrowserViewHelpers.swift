@@ -232,7 +232,15 @@ struct AppKitResizeHandle: NSViewRepresentable {
 }
 
 final class ResizeHandleView: NSView {
-    var isInteractionEnabled = true
+    var isInteractionEnabled = true {
+        didSet {
+            if !isInteractionEnabled, coordinator?.dragStartX != nil {
+                coordinator?.dragStartWidth = nil
+                coordinator?.dragStartX = nil
+                NSCursor.pop()
+            }
+        }
+    }
     weak var coordinator: AppKitResizeHandle.Coordinator?
     private var trackingArea: NSTrackingArea?
     private let bar = NSView()
@@ -274,14 +282,14 @@ final class ResizeHandleView: NSView {
     override func mouseExited(with event: NSEvent) { NSCursor.pop() }
 
     override func mouseDown(with event: NSEvent) {
-        guard let coord = coordinator else { return }
+        guard isInteractionEnabled, let coord = coordinator else { return }
         coord.dragStartWidth = coord.panelWidth
         coord.dragStartX = event.locationInWindow.x
         NSCursor.resizeLeftRight.push()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let coord = coordinator,
+        guard isInteractionEnabled, let coord = coordinator,
               let startWidth = coord.dragStartWidth,
               let startX = coord.dragStartX else { return }
         let dx = startX - event.locationInWindow.x
@@ -290,13 +298,14 @@ final class ResizeHandleView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        coordinator?.dragStartWidth = nil
-        coordinator?.dragStartX = nil
-        coordinator?.onDragEnd()
+        guard let coordinator, coordinator.dragStartX != nil else { return }
+        coordinator.dragStartWidth = nil
+        coordinator.dragStartX = nil
+        if isInteractionEnabled { coordinator.onDragEnd() }
         NSCursor.pop()
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    override var acceptsFirstResponder: Bool { isInteractionEnabled }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not implemented") }

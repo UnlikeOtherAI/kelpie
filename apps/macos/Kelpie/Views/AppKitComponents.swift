@@ -27,6 +27,7 @@ struct AppKitToolbarButton: NSViewRepresentable {
 
     func updateNSView(_ nsView: ToolbarButtonView, context: Context) {
         context.coordinator.action = action
+        context.coordinator.isEnabled = isEnabled && environmentEnabled
         nsView.setAccessibilityLabel(accessibilityLabel)
         nsView.toolTip = accessibilityLabel
         nsView.chromeTintColor = tintColor
@@ -41,8 +42,9 @@ struct AppKitToolbarButton: NSViewRepresentable {
 
     final class Coordinator: NSObject {
         var action: () -> Void
+        var isEnabled = true
         init(action: @escaping () -> Void) { self.action = action }
-        @objc func handlePress() { action() }
+        @objc func handlePress() { if isEnabled { action() } }
     }
 }
 
@@ -233,6 +235,7 @@ struct AppKitSegmentedStrip: NSViewRepresentable {
 
         @objc
         private func handlePress(_ sender: SegmentedStripButton) {
+            guard sender.isEnabled else { return }
             onSelect(sender.itemID)
         }
 
@@ -472,6 +475,7 @@ struct AppKitInvisibleButton: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSButton, context: Context) {
         context.coordinator.action = action
+        context.coordinator.isEnabled = isEnabled && environmentEnabled
         nsView.isEnabled = isEnabled && environmentEnabled
         nsView.setAccessibilityIdentifier(accessibilityID)
         nsView.setAccessibilityLabel(accessibilityLabel)
@@ -480,6 +484,7 @@ struct AppKitInvisibleButton: NSViewRepresentable {
     final class Coordinator: NSObject {
         var action: () -> Void
         init(action: @escaping () -> Void) { self.action = action }
-        @objc func tapped() { action() }
+        var isEnabled = true
+        @objc func tapped() { if isEnabled { action() } }
     }
 }

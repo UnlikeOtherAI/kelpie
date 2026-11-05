@@ -97,8 +97,8 @@ extension BrowserView {
     /// Cmd+T handler. Routed per-window by `BrowserCommandRouter` so only the
     /// active window opens a new tab, never every window simultaneously.
     func handleNewTabCommand() {
-        isChromeCollapsed = false
         guard !serverState.isScriptRecording else { return }
+        isChromeCollapsed = false
         guard rendererState.activeEngine != .chromium else { return }
         let tab = tabStore.addTab()
         connectNewTab(tab)
@@ -119,6 +119,7 @@ extension BrowserView {
     }
 
     func navigate(_ urlString: String) {
+        guard !serverState.isScriptRecording else { return }
         isChromeCollapsed = false
         guard let url = URL(string: urlString) else { return }
         if url.scheme == "http" && !skipInsecureWarning {

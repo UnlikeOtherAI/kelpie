@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Reference-style navigation row. Developer tools live in the trailing popup.
 struct URLBarView: View {
+    @Environment(\.isEnabled) private var isEnabled
     @ObservedObject var appearance: BrowserChromeAppearance
     @ObservedObject var browserState: BrowserState
     @ObservedObject var rendererState: RendererState
@@ -115,6 +116,12 @@ struct URLBarView: View {
         .onAppear { syncAddress() }
         .onChange(of: browserState.currentURL) { _, _ in if !isAddressFieldFocused || urlText.isEmpty { syncAddress() } }
         .onChange(of: isStartPage) { _, _ in syncAddress() }
+        .onChange(of: isEnabled) { _, enabled in
+            guard !enabled else { return }
+            isAddressFieldFocused = false
+            showTools = false
+            showHistory = false
+        }
     }
 
     private func syncAddress() { urlText = isStartPage ? "" : browserState.currentURL }
@@ -214,6 +221,7 @@ struct URLBarView: View {
     }
 
     private func navigate() {
+        guard isEnabled else { return }
         guard let url = AddressInput.resolve(resolvedNavigationText()) else { return }
         isAddressFieldFocused = false
         onNavigate(url)
