@@ -9,6 +9,7 @@ import {startG08Fixture} from "../capture/g08-fixture.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema,scriptV1Schema} from "../../packages/shared/dist/index.js";
 import {acceptPresentation,presentationNotVisible,presentationCaptureExecutable,safeUiaFailure} from "./wgc-presentation-identity.mjs";
 import {safeCliFailure} from "./safe-cli-failure.mjs";
+import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
@@ -99,7 +100,7 @@ try{
   }
   await new Promise(done=>setTimeout(done,50));
  }
- assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");report.window=window;
+ assert.ok(active?.playing&&window,"PRESENTATION_UNAVAILABLE");report.window=window;report.active={runId:active.runId,playing:true};report.viewport=scene.viewport;
  report.phase="terminal";const terminal=await pending;
  const responseTickUpper=Math.ceil(uptime())*1000+1000;
  report.terminal={success:terminal.success===true,runId:terminal.runId,actionsExecuted:terminal.actionsExecuted,
@@ -108,9 +109,10 @@ try{
  assert.ok(terminal.totalDurationMs<7000,"PNG_RUN_WAITED_FOR_MARKER");
  // A fresh capture session starts only after the HTTP response, avoiding any
  // ambiguity about old frames queued before the response.
- report.phase="post-response-capture";
+ report.phase="post-response-capture";report.captureStartedTick=Math.floor(uptime()*1000);
  capturePromise=run(wgc,[String(running.pid),presentationCaptureExecutable(identity),identity.startFileTime,window.windowHandle,join(outputRoot,"post-response")],10000);
- void capturePromise.catch(()=>{});
+ void capturePromise.then(()=>{report.captureEndedTick=Math.floor(uptime()*1000);},
+  error=>{report.captureEndedTick=Math.floor(uptime()*1000);report.captureFailure=safeWgcDiagnostic(String(error.stderr??""));});
  const stopPromise=uiaRun(["inspect",String(running.pid),exe,identity.startTime]).catch(()=>null);
  const fixtureFacts=await(await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(5000)})).json();
  assert.equal(fixtureFacts.dropped,0);assert.equal(fixtureFacts.events.length,2);
