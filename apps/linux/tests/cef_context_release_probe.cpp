@@ -93,6 +93,10 @@ int main(int argc, char** argv) {
   CefSettings settings;
   settings.no_sandbox = false;
   settings.windowless_rendering_enabled = true;
+  const char* runtime = std::getenv("XDG_RUNTIME_DIR");
+  if (!runtime) return 5;
+  CefString(&settings.root_cache_path) = runtime;
+  CefString(&settings.cache_path) = std::string(runtime) + "/profile";
   settings.remote_debugging_port = std::atoi(port);
   if (!CefInitialize(args,settings,app,nullptr)) return 3;
   CefWindowInfo window; window.SetAsWindowless(0);
