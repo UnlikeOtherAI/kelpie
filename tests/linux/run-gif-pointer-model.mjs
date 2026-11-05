@@ -22,8 +22,12 @@ const view = config.visualViewport, pointer = config.pointer;
 assert.ok(view && pointer && [view.offsetLeft, view.offsetTop, view.width, view.height, view.scale,
   pointer.x, pointer.y].every(Number.isFinite));
 assert.ok(view.width > 0 && view.height > 0 && view.scale > 0);
+for (const name of ["LD_PRELOAD","LD_AUDIT","LD_LIBRARY_PATH"])
+  assert.equal(process.env[name],undefined,"Model process has a loader override: "+name);
 const candidateHash = await fileHash(candidatePath), generatorHash = await fileHash(generatorPath);
 assert.equal(evidence.binarySHA256, candidateHash, "Observed app differs from requested candidate");
+assert.equal(evidence.loaderOverridesAbsent,true);
+assert.equal(await fileHash(candidateEvidencePath + ".maps.txt"),evidence.mapsSHA256);
 assert.match(evidence.source, /^[a-f0-9]{40}$/);
 const source = spawnSync("git", ["rev-parse", "HEAD"], {encoding:"utf8",timeout:5000});
 assert.equal(source.status, 0);
@@ -142,7 +146,7 @@ assert.ok(entries[4].frames.every(frame=>frame.roiSHA256===model),
   "Palette-collision control is distinguishable; no ambiguity claim can be made");
 const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,testSource,
   candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,generatorPID:generated.pid,
-  candidateEvidenceSHA256:await fileHash(candidateEvidencePath),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
+  candidateEvidenceSHA256:await fileHash(candidateEvidencePath),generatorMapsSHA256:await fileHash(join(output,"generator-maps.txt")),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
   encoder:generatedReport.encoder,roi,cases:entries};
 await writeFile(join(output,"model-manifest.json"),JSON.stringify(report,null,2),{flag:"wx"});
 console.log(JSON.stringify({output,modelROI:model,cases:entries.map(({name,sha256})=>({name,sha256}))}));

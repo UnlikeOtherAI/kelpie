@@ -12,7 +12,13 @@ export async function writeGifRuntimeEvidence(pid, executable, source, output) {
   const actual = await realpath(await readlink("/proc/" + pid + "/exe"));
   const expected = await realpath(executable);
   assert.equal(actual, expected, "Observed process is not the candidate");
+  // Inspect names only; never write environment values into the evidence.
+  const environment = await readFile("/proc/" + pid + "/environ", "utf8");
+  const names = environment.split("\0").filter(Boolean).map(entry=>entry.split("=",1)[0]);
+  for (const name of ["LD_PRELOAD","LD_AUDIT","LD_LIBRARY_PATH"])
+    assert.ok(!names.includes(name), "Candidate has a loader override: " + name);
   const maps = await readFile("/proc/" + pid + "/maps", "utf8");
+  await writeFile(output + ".maps.txt", maps, {flag:"wx"});
   const paths = new Set();
   for (const line of maps.split("\n")) {
     const path = line.match(/\s(\/[^\n]+)$/)?.[1];
@@ -33,7 +39,7 @@ export async function writeGifRuntimeEvidence(pid, executable, source, output) {
     encoder:await fileHash(join(objects,"script_media_encoder.cpp.o")),
   };
   await writeFile(output, JSON.stringify({version:1,source,pid,binaryPath:actual,
-    binarySHA256:await fileHash(actual),mediaObjectSHA256,
+    binarySHA256:await fileHash(actual),mapsSHA256:digest(maps),loaderOverridesAbsent:true,mediaObjectSHA256,
     mediaArchiveSHA256:await fileHash(join(dirname(resolve(executable)),"libkelpie_linux_script_media.a")),
     candidateLinkMapSHA256:await fileHash(join(dirname(resolve(executable)),"kelpie-linux-link.map")),
     dependencies},null,2), {flag:"wx"});
