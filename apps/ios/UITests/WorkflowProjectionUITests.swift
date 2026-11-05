@@ -26,10 +26,11 @@ extension WorkflowCaptureUITests {
         let application = XCUIApplication()
         XCTAssertTrue(application.buttons["browser.recording.stop"].waitForExistence(timeout: 15))
         try await Task.sleep(nanoseconds: 2_000_000_000)
+        // Snapshot before the potentially slow accessibility hierarchy queries.
+        let screen = application.screenshot()
         let viewport = application.webViews.firstMatch
         let button = viewport.buttons["Submit"].firstMatch
         let visibleTarget = button.frame.intersection(viewport.frame)
-        let screen = application.screenshot()
         let screenshot = XCTAttachment(screenshot: screen)
         screenshot.name = "Same-scene native marker and accessible target"
         screenshot.lifetime = .keepAlways
