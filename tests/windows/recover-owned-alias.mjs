@@ -6,7 +6,7 @@ import { readFile, writeFile, access, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { waitForOwnedExit } from "./wait-for-owned-exit.mjs";
 
-const [exe, cli, privateRoot, reportPath, expectedRevision, expectedCli, expectedBundle] = process.argv.slice(2);
+const [exe, cli, privateRoot, reportPath, expectedRevision, expectedCli, expectedBundle, portText = "28420"] = process.argv.slice(2);
 assert.ok(exe && cli && privateRoot && reportPath && /^[a-f0-9]{40}$/.test(expectedRevision ?? ""));
 assert.match(expectedCli ?? "", /^[a-f0-9]{64}$/); assert.match(expectedBundle ?? "", /^[a-f0-9]{64}$/);
 const hash = async file => createHash("sha256").update(await readFile(file)).digest("hex");
@@ -20,7 +20,8 @@ const exec = promisify(execFile);
 assert.equal((await exec("git.exe", ["rev-parse", "HEAD"])).stdout.trim(), expectedRevision);
 assert.equal((await exec("git.exe", ["status", "--porcelain", "--untracked-files=no"])).stdout.trim(), "");
 const env = { ...process.env, USERPROFILE: privateRoot, KELPIE_HOME: join(privateRoot, "cli-home") };
-const alias = "capture-g08-native-5877e6fa-c", port = 28420;
+const alias = "capture-g08-native-5877e6fa-c", port = Number(portText);
+assert.ok(Number.isInteger(port) && port > 0 && port < 65536);
 const store = async () => JSON.parse(await readFile(join(env.KELPIE_HOME, "browsers.json"), "utf8"));
 const run = async args => {
   try { const result = await exec(process.execPath, [cli, ...args], { env, windowsHide: true, timeout: 45000, maxBuffer: 2097152 });
@@ -41,10 +42,10 @@ try {
   relaunchRequested = true;
   const launched = await run(["browser", "launch", alias, "--port", String(port)]); assert.equal(launched.success, true);
   active = (await store()).running[alias]; assert.ok(active?.pid && active.launchId && active.readinessFile);
-  const identity = await ps("$p=Get-Process -Id " + active.pid + ";$s=Get-NetTCPConnection -State Listen -LocalPort 28420;if($s.OwningProcess -ne $p.Id){throw 'listener mismatch'};[pscustomobject]@{pid=$p.Id;path=$p.Path;startTime=$p.StartTime.ToUniversalTime().ToString('o');sessionId=$p.SessionId}|ConvertTo-Json");
+  const identity = await ps("$p=Get-Process -Id " + active.pid + ";$s=Get-NetTCPConnection -State Listen -LocalPort " + port + ";if($s.OwningProcess -ne $p.Id){throw 'listener mismatch'};[pscustomobject]@{pid=$p.Id;path=$p.Path;startTime=$p.StartTime.ToUniversalTime().ToString('o');sessionId=$p.SessionId}|ConvertTo-Json");
   assert.equal(identity.sessionId, 1); assert.equal(identity.path.replaceAll(String.fromCharCode(92), "/").toLowerCase(), exe.replaceAll(String.fromCharCode(92), "/").toLowerCase());
   const readiness = JSON.parse(await readFile(active.readinessFile, "utf8")); assert.equal(readiness.launchId, active.launchId);
-  const response = await fetch("http://127.0.0.1:28420/v1/get-device-info", { method: "POST", headers: { authorization: "Bearer " + readiness.token, "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(10000) });
+  const response = await fetch("http://127.0.0.1:" + port + "/v1/get-device-info", { method: "POST", headers: { authorization: "Bearer " + readiness.token, "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(10000) });
   assert.equal(response.ok, true); assert.equal((await response.json()).success, true);
   report.checks.push({ name: "same alias and profile relaunched", passed: true, pid: active.pid });
   report.stage = "stop";
