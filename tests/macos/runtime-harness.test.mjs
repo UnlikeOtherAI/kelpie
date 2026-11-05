@@ -1,4 +1,5 @@
 import vm from "node:vm";
+import {request} from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {listenerState,startupSignal,navigationSignal,editFocusSignal,processCommandMatches,viewportSignal} from "./runtime-ownership.mjs";
@@ -22,6 +23,21 @@ test("fixture rejects oversized event bodies without retaining them",async()=>{
  try{
   const response=await fetch(fixture.url+"/events",{method:"POST",body:"x".repeat(16385)});
   assert.equal(response.status,413);assert.equal(fixture.events.length,0);
+ }finally{await fixture.close();}
+});
+
+test("aborted event POST does not crash or retain a partial event",async()=>{
+ const fixture=await startFixture();
+ try{
+  const pending=request(fixture.url+"/events",{method:"POST",headers:{"content-type":"application/json"}});
+  pending.on("error",()=>{});
+  pending.write('{"type":');
+  await new Promise(resolve=>setTimeout(resolve,30));
+  pending.destroy();
+  await new Promise(resolve=>setTimeout(resolve,30));
+  const response=await fetch(fixture.url+"/events",{method:"POST",body:JSON.stringify({type:"click",target:"submit"})});
+  assert.equal(response.status,202);
+  assert.deepEqual(fixture.events,[{type:"click",target:"submit"}]);
  }finally{await fixture.close();}
 });
 
