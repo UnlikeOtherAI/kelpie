@@ -7,6 +7,7 @@ test("neutral fixture serves blank named controls and bounded facts through actu
  const fixture=await startG08Fixture();
  try{
   const html=await(await fetch(fixture.url)).text();
+  assert.match(html,/data-kelpie-g08-document-id/);
   assert.equal(fixture.pageRequests,1);
   assert.match(html,/aria-label="G08 Start"><\/button>/);
   assert.match(html,/aria-label="G08 Finish"><\/button>/);

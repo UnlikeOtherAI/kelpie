@@ -11,6 +11,7 @@ import {validateG08PTS} from "./g08-pts.mjs";
 import {loadG08ModelReference} from "./g08-model-reference.mjs";
 import {hasG08Warmup} from "./g08-fixture.mjs";
 import {createG08Retention} from "./g08-retention.mjs";
+import {g08NativeGeometry} from "./g08-native-geometry.mjs";
 const [inputPath,outputPath,modelPath,backingDir,evidencePath]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
 assert.ok((await stat(inputPath)).size<=524288,"Input report exceeds bound");
@@ -64,11 +65,13 @@ for(const item of input.cases){
       assert.equal(probe.status,0,"PTS probe failed");
       const metadata=JSON.parse(probe.stdout.toString());
       const actualPTS=validateG08PTS(metadata,artifact);
-      const config={from:start.center,to:finish.center,curve:item.curve,pointerMs:2400,markerMs:3000,radius:48,
-        color:item.curve==="c"?"#ff0000":"#0000ff",warmupCalibration,
-        scale:{x:artifact.width/start.viewport.width,y:artifact.height/start.viewport.height}};
-      const marker={center:{x:finish.center.x*config.scale.x,y:finish.center.y*config.scale.y},
-        radius:48*config.scale.x,color:config.color};
+      const geometry=input.runtime.startsWith("ios-")?g08NativeGeometry(artifact,item.scene):
+        {from:start.center,to:finish.center,radius:48,
+          scale:{x:artifact.width/start.viewport.width,y:artifact.height/start.viewport.height}};
+      const config={...geometry,curve:item.curve,pointerMs:2400,markerMs:3000,
+        color:item.curve==="c"?"#ff0000":"#0000ff",warmupCalibration};
+      const marker={center:{x:config.to.x*config.scale.x,y:config.to.y*config.scale.y},
+        radius:config.radius*config.scale.x,color:config.color};
       const child=spawn(process.env.FFMPEG??"ffmpeg",["-v","error","-threads","1","-filter_threads","1",
         "-i",resolve(artifact.file),"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],
         {windowsHide:true,stdio:["ignore","pipe","pipe"]});
