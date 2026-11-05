@@ -13,7 +13,7 @@ inline nlohmann::json ObserveG08Backing(const ScriptFrame& frame, const ScriptFr
     const nlohmann::json& shown, const std::string& run, std::size_t sequence) {
   if (!std::getenv("KELPIE_G08_TEST_BACKING_PATH")) return nullptr;
   constexpr int left=445, top=190, width=71, height=71;
-  if (sequence>=600 || frame.width<left+width || frame.height<top+height || run.size()>128)
+  if (sequence>=800 || frame.width<left+width || frame.height<top+height || run.size()>128)
     throw std::runtime_error("CAPTURE_TEST_OBSERVATION_FAILED");
   std::vector<unsigned char> roi; roi.reserve(width*height*4);
   for (int y=top; y<top+height; ++y) {
