@@ -174,9 +174,10 @@ try {
   });
   await check("unsupported methods and foreign tab stay refused", async () => {
     for (const [method, params] of [
-      ["tabs.new", {}], ["tab.screenshot", {}], ["tab.snapshot", {}],
-      ["tab.extract", { fields: [{ name: "title", selector: "h1", source: "text" }] }],
-      ["tab.status", {}], ["tab.ready", {}], ["page.scroll", { deltaY: 10 }],
+      ["tabs.new", {}], ["tab.screenshot", {}],
+      ...["snapshot","extract","status","ready"].filter(kind=>!selected.includes(kind)).map(kind=>
+        ["tab."+kind,kind==="extract"?{fields:[{name:"title",selector:"h1",source:"text"}]}:{}]),
+      ["page.scroll", { deltaY: 10 }],
       ["locator.click", { locator: [{ kind: "role", role: "button", name: "No action" }] }],
       ["tab.webmcp.discover", { origin }],
     ]) {
