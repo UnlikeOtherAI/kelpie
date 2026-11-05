@@ -20,7 +20,11 @@ export function verifyWgcProvenance(facts){
  assert.equal(facts.frameCount,summary.written,"WGC_STREAM_COUNT_MISMATCH");
  for(const key of ["writerReplaced","poolReplaced","rateSkipped"])assert.ok(Number.isInteger(summary[key])&&summary[key]>=0);
  assert.ok(["item-closed","frame-limit","capture-deadline"].includes(summary.endReason));
+ assert.equal(typeof summary.naturalItemClosure,"boolean");assert.equal(summary.naturalItemClosure,summary.endReason==="item-closed");
+ assert.equal(summary.accepted,summary.written+summary.writerReplaced,"WGC_FRAME_ACCOUNTING");
  assert.match(active.runId,/^[a-f0-9]{48}$/);assert.equal(active.playing,true);
+ assert.ok(Array.isArray(facts.activeSamples)&&facts.activeSamples.length>0&&facts.activeSamples.length<=100);
+ assert.ok(facts.activeSamples.every(sample=>sample.playing===true&&sample.runId===active.runId));
  assert.equal(terminal.runId,active.runId);assert.equal(terminal.success,true);
  assert.ok(typeof before.tabId==="string"&&before.tabId.length>0);assert.equal(after.tabId,before.tabId);
  assert.equal(before.active,true);assert.equal(after.active,true);
@@ -29,6 +33,8 @@ export function verifyWgcProvenance(facts){
  assert.equal(fixture.events.length,3);assert.deepEqual(fixture.events.map(event=>event.target),["finish","start","finish"]);
  assert.ok(fixture.events.every(event=>event.trusted===true&&event.documentId===fixture.events[0].documentId));
  assert.ok(fixture.events.every((event,index)=>index===0||event.timeMs>fixture.events[index-1].timeMs));
+ assert.ok(fixture.events.every(event=>Number.isFinite(event.center?.x)&&Number.isFinite(event.center?.y)));
+ assert.deepEqual(fixture.events[0].center,fixture.events[2].center);
  assert.ok(Array.isArray(artifacts)&&artifacts.length===2);
  assert.deepEqual(artifacts.map(item=>item.mimeType).sort(),["image/gif","video/mp4"]);
  assert.equal(summary.analysisWidth,artifacts[0].width);assert.equal(summary.analysisHeight,artifacts[0].height);

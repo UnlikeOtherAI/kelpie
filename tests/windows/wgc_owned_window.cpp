@@ -221,6 +221,7 @@ int wmain(int argc,wchar_t** argv) {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     if(argc==2&&std::wstring(argv[1])==L"self-test-buffer"){std::cout<<BufferSelfTest().dump()<<std::endl;return 0;}
     if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-stream"){std::cout<<TimelineStreamSelfTest().dump()<<std::endl;return 0;}
+    if(argc==2&&std::wstring(argv[1])==L"self-test-timeline-writer"){std::cout<<TimelineWriterSelfTest().dump()<<std::endl;return 0;}
     if(argc==7&&std::wstring(argv[1])==L"timeline"){
       Owner owner{static_cast<DWORD>(std::stoul(argv[2])),argv[3],std::stoull(argv[4]),
         reinterpret_cast<HWND>(static_cast<std::uintptr_t>(std::stoull(argv[5])))};

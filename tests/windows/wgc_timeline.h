@@ -79,6 +79,19 @@ struct TimelineWriter {
   }
   ~TimelineWriter(){Stop();}
 };
+inline Json TimelineWriterSelfTest(){
+  HANDLE readRaw=nullptr,writeRaw=nullptr;if(!CreatePipe(&readRaw,&writeRaw,nullptr,4096))throw std::runtime_error("WGC_SELFTEST_PIPE");
+  winrt::handle input{readRaw},output{writeRaw};const HANDLE previous=GetStdHandle(STD_OUTPUT_HANDLE);
+  struct Restore {HANDLE handle;~Restore(){SetStdHandle(STD_OUTPUT_HANDLE,handle);}} restore{previous};
+  if(!SetStdHandle(STD_OUTPUT_HANDLE,output.get()))throw std::runtime_error("WGC_SELFTEST_PIPE");
+  TimelineWriter writer;auto packet=[] {auto p=std::make_unique<TimelinePacket>();p->header={{"tick100ns",1}};p->pixels.resize(2097152,0);return p;};
+  writer.Offer(packet());std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  writer.Offer(packet());writer.Offer(packet());
+  const auto began=Clock::now();writer.Stop();
+  const auto elapsed=std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-began).count();
+  if(!writer.done||!writer.failed||writer.replaced<1||elapsed>4000)throw std::runtime_error("WGC_SELFTEST_WRITER");
+  return {{"boundedWriter",true},{"replacements",writer.replaced},{"elapsedMs",elapsed}};
+}
 struct TimelineSnapshot {std::vector<BYTE> pixels;std::uint64_t tick=0;};
 Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   winrt::handle memoryJob{CreateJobObjectW(nullptr,nullptr)};
@@ -165,12 +178,12 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   for(std::size_t index=0;index<snapshots.size();++index){
     teardownFence();const auto stem="sample-"+std::to_string(index);
     const auto rawBytes=snapshots[index].pixels.size();
-    if(persisted+rawBytes+4096>=67108864)throw std::runtime_error("WGC_OUTPUT_BOUND");
+    if(persisted+rawBytes+4096>=67043328)throw std::runtime_error("WGC_OUTPUT_BOUND");
     auto raw=RawFile(output/(stem+".bgra"),snapshots[index].pixels,teardownFence);
-    const auto pngLimit=67108864-persisted-rawBytes-4096;
+    const auto pngLimit=67043328-persisted-rawBytes-4096;
     auto png=TimelinePngFile(output/(stem+".png"),size.Width,size.Height,snapshots[index].pixels,alpha,teardownFence,pngLimit);
     persisted+=rawBytes+png["byteLength"].get<std::uint64_t>();
-    if(persisted>67108864)throw std::runtime_error("WGC_OUTPUT_BOUND");
+    if(persisted>67043328)throw std::runtime_error("WGC_OUTPUT_BOUND");
     saved.push_back({{"tick100ns",snapshots[index].tick},{"raw",raw},{"png",png}});
   }
   Json summary={{"processId",owner.pid},{"startFileTime",std::to_string(owner.creation)},{"windowHandle",std::to_string(reinterpret_cast<std::uintptr_t>(owner.window))},{"className","KelpieScriptPresentation"},{"accepted",accepted},{"written",writer.written},{"writerReplaced",writer.replaced},
