@@ -24,8 +24,16 @@ export class Client {
  constructor(pid,out,executable){this.pid=pid;this.out=out;this.executable=executable;this.token=null;this.secrets=[];this.readiness=[];this.began=Date.now();this.artifacts=[];this.counter=0;}
  pin(port){
   const probe=probeListeners(port),state=listenerState(probe.owners,this.pid);
-  if(state!=="owned")this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:probe.owners.length,
-   probeOutcome:probe.outcome,probeCause:probe.cause,probeStderrPresent:probe.stderrPresent};
+  if(state!=="owned"){
+   this.listenerFailure={port:port===28420?"api":"app-reveal",state,ownerCount:probe.owners.length,
+    probeOutcome:probe.outcome,probeCause:probe.cause,probeStderrPresent:probe.stderrPresent,
+    stage:this.nativeControlStage??"other",lastEngine:this.lastEngine??"unknown"};
+   if(this.nativeControlStage){
+    const fallback=probeListeners(8420);
+    this.listenerFailure.defaultPort={state:listenerState(fallback.owners,this.pid),ownerCount:fallback.owners.length,
+     probeOutcome:fallback.outcome,probeCause:fallback.cause};
+   }
+  }
   requireTrue(state==="owned","LISTENER_IDENTITY");
  }
  ready(){const states=[28420,8421].map(port=>listenerState(listeners(port),this.pid));
@@ -74,13 +82,13 @@ export class Client {
    const command=execFileSync("/bin/ps",["-p",String(this.pid),"-o","command="],{encoding:"utf8"});
    requireTrue(processCommandMatches(command,this.executable),"OWNED_EXECUTABLE_IDENTITY");
   };
-  verify();
-  const window=await waitFor(()=>this.find("browser.action.more"));
-  verify();
-  const result=await this.tool("focus_window",{window_id:window},true);
+  this.nativeControlStage="focus-before";verify();
+  this.nativeControlStage="focus-find";const window=await waitFor(()=>this.find("browser.action.more"));
+  this.nativeControlStage="focus-verify";verify();
+  this.nativeControlStage="focus-request";const result=await this.tool("focus_window",{window_id:window},true);
   requireTrue(result.success===true&&result.window_id===window,"OWNED_WINDOW_FOCUS");
-  await waitFor(async()=>((await this.windows()).find(item=>item.id===window)?.isKey===true));
-  verify();
+  this.nativeControlStage="focus-key";await waitFor(async()=>((await this.windows()).find(item=>item.id===window)?.isKey===true));
+  this.nativeControlStage="focus-after";verify();
   return {candidatePathVerified:true,listenersOwned:true,keyWindow:true};
  }
  async screenshot(name){
