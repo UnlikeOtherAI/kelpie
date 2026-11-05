@@ -609,3 +609,36 @@ with matching document/viewport, but every native probe had a null accessibility
 target, so the pixel detector was not invoked. Neither result closes the motion
 or native visual acceptance gates. A sampler-finalization cancellation is a
 source-identified candidate for the failure and requires device replay.
+
+## Local phone and tablet evidence
+
+Android 10 (API 29) is the approved minimum; API 28 notes above describe
+historical candidates, not current support.
+
+On the task-owned Maxis API 35 phone and tablet, the checked debug app
+SHA-256
+`9b28f1ccc0d50a162a851a6e401ac4949e8a08e7be06a819067e532068c54a51`
+and test APK SHA-256
+`547f463081bc43d5d0fbd4b932f6e8c4aef073228e3312a0bcc7cf452c395585`
+passed the public HTTP/MCP native marker flow and the actual Stop control's
+partial-movie and next-run recovery test. The independent native screenshot
+SHA-256 values are
+`45e769b9dce669ab749a2fcbd3ed8a9e5f44301d2bf85bbd7ecf6300376a6c22`
+(phone) and
+`229eb877b5363a780accfe1dc7d7fe674eca124d3d07103132a73dcf8a524492`
+(tablet). The earlier marker attempts and startup ANR remain failed evidence;
+a later readiness-admitted phone Stop replay passed.
+
+A same-phone SwiftShader comparison of the above app and conversion candidate
+`11384080b6545dfbb08a93e35b44cfc10efa5bbd` (app SHA-256
+`ed2a086f5ccfe4c076cfac550f1f8c776ed5c9f658705f1f34b53fcb777be824`)
+passed two native codec tests for each. The C and S conversion phases averaged
+72.2 and 70.6 ms per frame before, and 55.8 and 51.9 ms after. Both captures
+still yielded about 100 frames over 28 seconds; every GIF/MP4 dense-motion
+oracle returned insufficient evidence. The previously observed sparse output
+is retained and dense acceptance remains open.
+
+The omitted-duration 350 ms motion, 500 ms control, capture-disabled isolation,
+full public corpus and inference cancellation remain open on both device
+classes. The explicit 400 ms marker and 2400 ms dense runs are not substitutes.
+These local runs do not establish final signed-release acceptance.
