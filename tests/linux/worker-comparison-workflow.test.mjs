@@ -15,6 +15,7 @@ test("hosted comparison defaults to identity preparation and explicit hashes gat
  assert.ok(input);
  const options=[...input[1].matchAll(/^\s*- (?:'([^']+)'|([^\s]+))\s*$/gm)].map(match=>match[1]??match[2]);
  assert.deepEqual(options,["off","probe","prepare","execute"]);
+ assert.match(input[1],/options:\s*\n {10}- 'off'\s*\n {10}- probe\s*\n {10}- prepare\s*\n {10}- execute/);
  const [setup,build]=workflow.split("      - name: Build comparison CLI and shared packages");
  assert.ok(build);assert.doesNotMatch(setup,/pnpm --filter @unlikeotherai\/kelpie(?:-shared)? build/);
  assert.match(build,/^\s*if: inputs\.isolation_only == false && inputs\.prepare_only == false/m);
