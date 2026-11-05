@@ -1,3 +1,5 @@
+import UIKit
+
 import XCTest
 
 extension WorkflowCaptureUITests {
@@ -90,6 +92,67 @@ extension WorkflowCaptureUITests {
         let elapsed = frames[marker].time - first.time
         XCTAssertGreaterThan(elapsed, 0.12)
         XCTAssertLessThan(elapsed, 0.5, "Default pointer movement should finish in under half a second")
+    }
+
+    @MainActor
+    func testLivePointerMarkerAndStopAppearDuringCapture() async throws {
+        let (fixture, tab) = try await ready()
+        defer { fixture.listener.cancel() }
+        let port = try XCTUnwrap(fixture.listener.port?.rawValue)
+        let navigation = try await probe.request("/v1/play-script", [
+            "version": 1, "tabId": tab, "actions": [["action": "navigate", "url": "http://127.0.0.1:\(port)/motion"]]
+        ])
+        XCTAssertEqual(navigation["success"] as? Bool, true)
+        let script: Body = [
+            "version": 1, "tabId": tab,
+            "actions": [["action": "wait", "ms": 1000], ["action": "tap", "target": ["role": "button", "name": "Track"]]],
+            "pointer": ["enabled": true, "durationMs": 2400, "curve": "c"],
+            "tapIndicator": ["color": "#F000AA", "radius": 32, "durationMs": 2200],
+            "capture": ["formats": ["gif"], "fps": 15, "maxWidth": 512]
+        ]
+        let playback = Task.detached { [probe] in try await probe.call("kelpie_play_script", script) }
+        let application = XCUIApplication()
+        let stop = application.buttons["browser.recording.stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 15))
+        let deadline = Date().addingTimeInterval(12)
+        var pointer: XCUIScreenshot?
+        var marker: XCUIScreenshot?
+        repeat {
+            let screen = application.screenshot()
+            if let image = screen.image.cgImage {
+                let crop = CGRect(x: Double(image.width) * 0.1, y: Double(image.height) * 0.1,
+                                  width: Double(image.width) * 0.8, height: Double(image.height) * 0.7).integral
+                if let center = image.cropping(to: crop), let sample = try? WorkflowMotionFrames.measure(center, time: 0) {
+                    if sample.pointer != nil && sample.indicatorWidth == 0 && pointer == nil { pointer = screen }
+                    if sample.indicatorWidth > 0 && marker == nil { marker = screen }
+                }
+            }
+            if pointer != nil && marker != nil { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        } while Date() < deadline && stop.exists
+        if let pointer {
+            let attachment = XCTAttachment(screenshot: pointer)
+            attachment.name = "Live native pointer and recording Stop"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        if let marker {
+            let attachment = XCTAttachment(screenshot: marker)
+            attachment.name = "Live native tap marker and recording Stop"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        let result = try await playback.value
+        XCTAssertEqual(result["success"] as? Bool, true, WorkflowCaptureProbe.errorCode(result))
+        XCTAssertNotNil(pointer, "A live pointer frame must be visible in the native window")
+        XCTAssertNotNil(marker, "A live marker frame must be visible in the native window")
+        let manifest = try XCTUnwrap((result["artifacts"] as? [Body])?.first)
+        let bytes = try await probe.bytes(manifest, run: try XCTUnwrap(result["runId"] as? String))
+        let attachment = XCTAttachment(data: bytes, uniformTypeIdentifier: "com.compuserve.gif")
+        attachment.name = "Live pointer journey exported GIF"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertGreaterThan(try WorkflowMotionFrames.decode(bytes).count, 2)
     }
 
     @MainActor
