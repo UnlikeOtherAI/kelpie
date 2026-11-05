@@ -256,3 +256,27 @@ gstreamer1-plugins-good RPM carries a mixed license expression including GPL
 components. No blanket LGPL claim is made for the package or machine. Selected
 factory binaries and installed RPM signatures/hashes are recorded in the
 private codec-provenance artifact; no codec binary is bundled or copied into source.
+
+## Actual headless native smoke
+
+Binary90eb6830 SHA-256
+a33a42ccdb55a5a19514ab6996ba5b643aa8f67cbfda809b0ade71812549ee35,
+exercised with harness63423c7f on Fedora44, passed loaded fixture snapshot,
+actual viewport PNG, authenticated native HTTP, MCP initialize/catalogue and
+authorized shutdown with readiness removal. Two owned renderer children had
+NoNewPrivs1, Seccomp2, nested NSpid count3 and user/network/PID namespaces
+different from the browser, with no sandbox-disabling flags. The same failed
+synthetic profile recovered without state edits. Native MCP reports its existing
+serverInfo{name:kelpie,version:1}; no release-version equivalence is inferred.
+
+At90eb6830, focused media/artifact tests passed, including held marker pixels,
+dual-writer committed prefix0..4 before finalization and5 afterwards, all-frame
+GIF/MP4 decode, private artifact admission, and a90000-byte MP4 recording limit
+that retained/finalized a five-frame1487-byte decodable prefix.
+
+The Linux launcher now reuses the integrated Windows public capture corpus via
+the actual Linux executable, authenticated HTTP/MCP and artifact chunks; no
+parallel workflow implementation is introduced. It records exact executable
+hash/source, preserves synthetic profiles and shuts down its owned app.
+Initial direct-HTTP continuous capture is next; discovery expansion and other
+script/cancellation/cost/package claims remain pending actual results.
