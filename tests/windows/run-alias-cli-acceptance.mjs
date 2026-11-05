@@ -36,8 +36,14 @@ try {
  const status=await call("kelpie_get_script_status",{});assert.equal(status.success,true);assert.ok(status.supportedVersions.includes(1));
  const tabs=await api("get-tabs");const tabId=tabs.tabs.find(t=>t.active).id;
  const played=await call("kelpie_play_script",{version:1,tabId,actions:[{action:"navigate",url:fixture.url},
+ {action:"wait-ready",state:"complete",selector:"#unique",timeoutMs:10000},
  {action:"click",target:{role:"button",name:"Confirm order",exact:true}}]});
- assert.equal(played.success,true);assert.ok(fixture.events.some(e=>e.type==="click"&&e.trusted));
+ assert.equal(played.success,true);
+ report.firstWorkflow={runId:played.runId,serverEventsBeforeFlush:fixture.events.length};
+ const flushed=await api("evaluate",{tabId,expression:"window.captureFixture.flush().then(()=>true)"});
+ assert.equal(flushed.success,true);assert.equal(flushed.result,true);
+ report.firstWorkflow.serverEventsAfterFlush=fixture.events.length;
+ assert.ok(fixture.events.some(e=>e.type==="click"&&e.trusted));
  report.checks.push({name:"public --browser alias stdio MCP workflow",passed:true,runId:played.runId});
  await api("evaluate",{tabId,expression:"document.querySelector('textarea').scrollIntoView({block:'center'});true"});
  const recipe=resolve(output,"recipe.json"),inputs=resolve(output,"inputs.json");
