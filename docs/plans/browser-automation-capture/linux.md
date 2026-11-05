@@ -768,3 +768,17 @@ report SHA-256: c6c68f7ad9192b653d61c966b316258419a1b470623c348065163e423e1b9d73
 Neither this GIF result nor the isolated screenshot proves physical GNOME
 equivalence or an overall G08 pass. Final installed packages and their own
 build options still require independent verification.
+
+A subsequent e36 private isolated-Wayland run exercised the actual visible GTK
+Stop button through its standard AT-SPI click action on a private session bus.
+The helper pinned the app PID, executable hash and start time; the action was
+acknowledged, returned SCRIPT_STOPPED with mayHaveCompleted, retained partial
+artifacts and allowed a later script. The owned app retired normally. This is
+not a physical GNOME interaction. The native Stop button and its LinuxApp
+StopScript implementation are byte-identical between the earlier 3001 Wayland
+checkpoint and e36.
+
+The isolated screenshot SHA-256 is
+d1570861b080e8bfd34e68bde1d9eb05f053f525d1a794aec98fe4a85441aa90, and the
+GTK action receipt SHA-256 is
+da5a8ace2f0df4d15b42c6c3dd1b506c8b7b2705e2cf395a191cd8ba317e0ab0.
