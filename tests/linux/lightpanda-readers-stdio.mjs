@@ -134,7 +134,7 @@ try {
     assert.equal(session.isolation, "isolated"); assert.equal(session.ownedTabIds.length, 1);
     return { shared: shared.error.code, ownedTabs: 1 };
   });
-  await check("exact navigation-only capabilities and resource refusal", async () => {
+  await check("exact admitted capabilities and resource refusal", async () => {
     const caps = await control("capabilities"); assert.equal(caps.ok, true);
     assert.deepEqual(caps.value.methods.slice().sort(), ["documentation", "capabilities", ...methods].sort());
     assert.deepEqual(caps.value.extensions, []);
