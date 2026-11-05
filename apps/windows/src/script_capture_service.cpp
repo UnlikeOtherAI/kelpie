@@ -132,7 +132,11 @@ void WindowsScriptService::Show(const Json& presentation,std::function<void()> s
       shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
     }
     self->overlay_->Show(shown,std::move(stop),std::move(valid)); return true;
-    } catch(...) { return false; }
+    } catch(...) {
+      if(self->overlay_ && presentation.value("detachedMarker",false))
+        self->overlay_->RetireIfRevision(presentation.value("_presentationRevision",std::uint64_t{}));
+      return false;
+    }
   })) throw std::runtime_error("CAPTURE_NATIVE_PRESENTATION_FAILED");
 }
 }
