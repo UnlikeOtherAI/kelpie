@@ -48,3 +48,13 @@ Memory-retention checks use task_vm_info.phys_footprint because RSS includes var
 On dictator, macOS 27.0 build 26A5378j, Swift 6.4, arm64 targeting macOS 14: the scoped eight-file SwiftLint pass had zero violations; standalone compilation had no warnings. The source-level codec suite passed GIF 400-frame decode/palette/loop/timing, 32/128-frame 1920x1080 encoding stress, aggregate-byte partial output, exclusive-file and injected-close failure, cancellation before first frame, cancellation after three valid frames and a subsequent successful GIF run. AVAssetReader passed normal 30-frame/1 s, retained 8-frame/0.266667 s prefix, one-frame 0.75 s stop, next recording 0.5 s, and 3-frame/34 s backpressure cases (997 rejected submissions). FFmpeg independently fully decoded the produced GIF, PNG and MP4 files.
 
 The final stress run measured physical footprint 17.0 MB before high-resolution encoding, 36.7 MB after 32 frames and 56.0 MB after 128 frames; whole-suite peak footprint was 72.4 MB. Artifacts and logs are ignored under .cache/apple-codec/run-14 and .cache/apple-codec/acceptance-14.log. These are codec checks, not native renderer, UI, HTTP/MCP or installed-release acceptance.
+
+## Shared output redaction binding
+
+ScriptOutputRedaction.swift is the sole Apple binding to [the portable redactor](script-redaction.md). It projects extraction action names from run-private actions, sends outputs and private known-secret values to the bounded JSON C ABI, and frees every nonnull result with kelpie_script_redaction_free_string. No matching or percent-encoding algorithm is duplicated in Swift. Only fixed invalid/limit/collision errors escape; callers never fall back to unredacted output.
+
+The binding passed scoped SwiftLint, warning-free macOS 14 compilation and actual Swift-to-C ABI vectors for typed extraction, dynamic collisions, raw/encoded case, limits and 1,000 allocations/free. It also typechecked against the iOS 16 simulator SDK target. This does not establish an installed iOS or macOS request flow. Reproduce with a coordinator slot and a read-only nlohmann 3.11.3 include directory:
+
+```sh
+NLOHMANN_JSON_INCLUDE_DIR=/path/to/pinned/include bash scripts/testing/apple-script-redaction.sh
+```
