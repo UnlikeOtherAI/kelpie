@@ -47,3 +47,6 @@ Root selected Windows0.1.16 for the final integrated candidate. Fresh origin/mai
 
 
 The coordinator prepared the existing pinned Microsoft ArtifactSigning.Client 1.0.146 on Minis under the release-tools cache. The archive SHA-256 is 7761e5d8f31e54b764da21d33cd8b0a2940e1b05526c7dfcb5e94b0431426f70; its x64 Azure.CodeSigning.Dlib.dll Authenticode signature is valid for Microsoft Corporation. This preparation did not sign or publish any Kelpie artifact.
+
+
+On Maxis, the public CLI lifecycle probe at f0e7052b used the frozen 5877 Windows candidate and CLI JavaScript bundle SHA-256 6b47995a9fc6eba32081d2ad9d6784dae9b242afa42ce7e24867d4751fd98280. Its task-owned unready child was retired; the same alias then launched the candidate, reached the owned listener and stopped through the public CLI. The report SHA-256 is 8c24c0d89d7da9280132c8590ac0f773f0a70324adcb87484edc1187a63420bd; task, both PIDs, listener and running alias were independently absent afterward. This proves that bounded lifecycle flow only, not the final integrated candidate, signed package or dense animation gates.
