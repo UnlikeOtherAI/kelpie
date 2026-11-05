@@ -60,6 +60,13 @@ final class ScriptPresentation {
         canvas.needsDisplay = true
     }
 
+    /// A completed run may leave only its noninteractive final marker until expiry.
+    func keepMarkerOnly() {
+        pointer = nil
+        commentary = nil
+        canvas.needsDisplay = true
+    }
+
     func stop() {
         timer?.invalidate()
         timer = nil
