@@ -128,3 +128,22 @@ test("validated model reference substitutes only exact tail pixels",()=>{
   }
   assert.throws(()=>evaluateG08(clean.filter((_,i)=>i%8===0),config,reference),/INSUFFICIENT/);
 });
+
+test("warmup requires a distinct later calibration marker and stable cleared pixels",()=>{
+ const config={...base,curve:"c",warmupCalibration:true};
+ const original=render(config);
+ const prefix=Array.from({length:100},(_,i)=>({
+  ...original[0],timeMs:i*50,marker:{...original[0].marker,alpha:i>=40&&i<43?.7:0}
+ }));
+ const samples=[...prefix,...original.map(s=>({...s,timeMs:s.timeMs+5000}))];
+ assert.equal(evaluateG08(samples,config).passed,true);
+ const noWarmup=structuredClone(samples);
+ for(const sample of noWarmup)if(sample.timeMs<5000)sample.marker.alpha=0;
+ assert.throws(()=>evaluateG08(noWarmup,config),/INSUFFICIENT_EVIDENCE calibration dispatch marker/);
+ const noCalibration=structuredClone(samples);
+ for(const sample of noCalibration)if(sample.timeMs>=7000&&sample.timeMs<7150)sample.marker.alpha=0;
+ assert.throws(()=>evaluateG08(noCalibration,config),/INSUFFICIENT_EVIDENCE calibration dispatch marker/);
+ const unstable=render(config).map(s=>({...s,timeMs:s.timeMs+5000}));
+ const changed=unstable.find(s=>s.timeMs===6900);changed.marker.roi=Buffer.from(changed.marker.roi);changed.marker.roi[0]^=1;
+ assert.throws(()=>evaluateG08([...prefix,...unstable],config),/unstable pre-dispatch baseline/);
+});

@@ -11,7 +11,7 @@ export async function consumeG08Frames(stream,width,height,onFrame){
       const length=Math.min(size-used,chunk.length-offset);
       chunk.copy(frame,used,offset,offset+length);used+=length;offset+=length;
       if(used===size){
-        assert.ok(count<600,"Decoded frame limit exceeded");
+        assert.ok(count<800,"Decoded frame limit exceeded");
         onFrame(frame,count++);frame=Buffer.allocUnsafe(size);used=0;
       }
     }

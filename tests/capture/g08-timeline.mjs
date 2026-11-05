@@ -17,7 +17,7 @@ export function evaluateG08(samples,config,modelReference){
   demand(config.radius>=20&&config.radius<=100,"Invalid radius");
   const map=p=>({x:p.x*scale.x,y:p.y*scale.y});
   const from=map(config.from),to=map(config.to),radius=config.radius*scale.x;
-  demand(samples.length>=50&&samples.length<=600,"INSUFFICIENT_EVIDENCE frame count");
+  demand(samples.length>=50&&samples.length<=800,"INSUFFICIENT_EVIDENCE frame count");
   demand(samples.every((s,i)=>Number.isFinite(s.timeMs)&&(i===0||s.timeMs>samples[i-1].timeMs)),"Nonmonotonic decoded PTS");
   const dx=to.x-from.x,dy=to.y-from.y,length=Math.hypot(dx,dy);
   demand(length>=120,"INSUFFICIENT_EVIDENCE path span");
@@ -32,12 +32,16 @@ export function evaluateG08(samples,config,modelReference){
   const corrected=pointers.map(s=>({...s,p:{x:s.pointer.x+offset.x,y:s.pointer.y+offset.y}}));
   const lastStart=corrected.filter(s=>s.timeMs<settled.at(-1).timeMs&&distance(s.p,from)<=2).at(-1);
   demand(lastStart,"INSUFFICIENT_EVIDENCE final motion start");
-  const calibrationMarker=samples.find(s=>s.timeMs>=initial.timeMs+pointerMs*.65&&
+  const warmupMarker=config.warmupCalibration?samples.find(s=>s.timeMs>=initial.timeMs+pointerMs*.65&&
+    s.timeMs<lastStart.timeMs&&s.marker.alpha>.2):undefined;
+  if(config.warmupCalibration)demand(warmupMarker,"INSUFFICIENT_EVIDENCE warmup dispatch marker");
+  const calibrationFloor=warmupMarker?warmupMarker.timeMs+markerMs+150:initial.timeMs+pointerMs*.65;
+  const calibrationMarker=samples.find(s=>s.timeMs>=calibrationFloor&&
     s.timeMs<lastStart.timeMs&&s.marker.alpha>.2);
   demand(calibrationMarker,"INSUFFICIENT_EVIDENCE calibration dispatch marker");
   const endpoint=settled.at(-1).pointer;
   const calibration=pointers.filter(s=>s.timeMs<calibrationMarker.timeMs&&
-    s.timeMs>=calibrationMarker.timeMs-1000&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&
+    s.timeMs>=calibrationMarker.timeMs-1000&&(!warmupMarker||s.timeMs>=calibrationFloor)&&s.pointer.x===endpoint.x&&s.pointer.y===endpoint.y&&
     s.marker.alpha<=.03&&Buffer.isBuffer(s.marker.roi));
   let reference;
   if(modelReference!==undefined){

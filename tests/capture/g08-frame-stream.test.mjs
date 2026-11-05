@@ -12,3 +12,8 @@ test("partial frames and oversized dimensions fail closed",async()=>{
  await assert.rejects(()=>consumeG08Frames(Readable.from([Buffer.alloc(11)]),2,2,()=>{}),/Incomplete/);
  await assert.rejects(()=>consumeG08Frames(Readable.from([]),641,2,()=>{}));
 });
+
+test("the bounded long fixture admits 800 frames and rejects the next",async()=>{
+ assert.equal(await consumeG08Frames(Readable.from([Buffer.alloc(800*12)]),2,2,()=>{}),800);
+ await assert.rejects(()=>consumeG08Frames(Readable.from([Buffer.alloc(801*12)]),2,2,()=>{}),/frame limit/);
+});

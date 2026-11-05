@@ -86,9 +86,13 @@ The current user-authorized rollout proceeds in parallel through separate Window
 `g08-fixture.mjs` exports `startG08Fixture({host, port})` and
 `g08Workflow(tabId, curve)`. Reserve the host resource first, start a fresh
 fixture per case, open its URL in the target renderer, and run each generated
-C and S workflow through the real supported script interface. The initial Finish click supplies a same-recording, pre-dispatch pointer-only
-baseline. The Start and final Finish clicks exercise the requested motion; retain
-the fixture's ordered calibration Finish, Start and final Finish facts, `/events` dropped count, and both GIF and MP4 downloads.
+C and S workflow through the real supported script interface. The first Finish
+click warms the pointer; after its marker clears, a second Finish click supplies
+the same-recording pre-dispatch calibration. Start and final Finish exercise
+the requested motion. Retain all four ordered facts, the `/events` dropped
+count and both GIF and MP4 downloads. `mapG08Scene(events)` validates and maps
+them to `{warmup, calibration, start, finish}`. The test-only capture bound is
+33 seconds at 20 fps; decoder and oracle limits are 800 frames.
 The fixture is white with invisible, accessible controls at 25% and 75% width.
 It records CSS geometry, document identity, viewport and event trust. Do not
 expose the unauthenticated fixture outside the bounded test network.
@@ -106,7 +110,7 @@ artifact metadata into a JSON file with this shape:
   "cases": [
     {
       "curve": "c",
-      "scene": { "calibration": {}, "start": {}, "finish": {} },
+      "scene": { "warmup": {}, "calibration": {}, "start": {}, "finish": {} },
       "artifacts": [
         { "id": "id", "mimeType": "image/gif", "file": "absolute path",
           "sha256": "<64 lowercase hex>", "byteLength": 123, "partial": false,
@@ -128,7 +132,7 @@ Node 20 or newer, the built shared package, ffmpeg and ffprobe. The verifier che
 and actual PTS, streams one RGB frame at a time, and emits per-frame measurements,
 bounded onset-fit diagnostics and failure/insufficient-evidence outcomes. The
 calibration requires at least two stable, exactly same-position frames before
-the first Finish marker appears; the
+the calibration Finish marker appears, after the warmup marker clears; the
 last frames must match their bounded RGB region exactly. A codec mismatch is
 insufficient evidence, not an allowance for residual marker pixels. It
 uses the shared presentation model and a 0.7 marker opacity baseline. Retain
