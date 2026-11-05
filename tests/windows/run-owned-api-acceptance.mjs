@@ -106,6 +106,12 @@ try{
   const cleanup=await ps("$p=Get-Process -Id "+running.pid+" -ErrorAction SilentlyContinue;$s=Get-NetTCPConnection -State Listen -LocalPort 28420 -ErrorAction SilentlyContinue;[pscustomobject]@{processAbsent=($null -eq $p);socketAbsent=($null -eq $s)}|ConvertTo-Json");
   report.cleanupProof=cleanup;
   if(!Object.values(cleanup).every(Boolean)||!report.readinessAbsent||!report.aliasRunningAbsent)process.exitCode=1;
+  else if(report.cleanup==="public-cli-closed"){
+   try{assert.equal((await publicCli(["browser","remove",alias])).success,true);
+    const removedStore=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));
+    report.aliasRegisteredAbsent=!removedStore.aliases[alias];assert.ok(report.aliasRegisteredAbsent);
+   }catch{report.aliasRegisteredAbsent=false;process.exitCode=1;}
+  }
  }
  await writeFile(join(evidenceRoot,"flow-report.json"),JSON.stringify(report,null,2));
 }
