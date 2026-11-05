@@ -7,12 +7,23 @@
 
 int main() {
   using nlohmann::json;
+  assert(kelpie::DesktopPresentationIsPlaying(json::object(),true));
+  assert(!kelpie::DesktopPresentationIsPlaying({{"playing",false}},true));
+  assert(!kelpie::DesktopPresentationIsPlaying(json::object(),false));
   std::uint64_t revision=0;
   assert(kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{2}}},revision));
   assert(!kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{1}}},revision));
   assert(!kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{2}}},revision));
   assert(!kelpie::AcceptDesktopPresentationRevision(json::object(),revision));
   assert(kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{3}}},revision));
+  json retired={{"playing",false}};
+  retired["_presentationRevision"]=std::uint64_t{4};
+  assert(kelpie::AcceptDesktopPresentationRevision(retired,revision));
+  retired["_presentationRevision"]=std::uint64_t{5}; // A late Present still remains hidden.
+  retired["playing"]=kelpie::DesktopPresentationIsPlaying(retired,true);
+  assert(kelpie::AcceptDesktopPresentationRevision(retired,revision));
+  assert(!retired["playing"].get<bool>());
+  assert(!kelpie::AcceptDesktopPresentationRevision({{"_presentationRevision",std::uint64_t{3}}},revision));
   std::mutex mutex;
   std::condition_variable changed;
   bool capturing=false, release=false;

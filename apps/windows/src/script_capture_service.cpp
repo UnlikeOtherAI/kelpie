@@ -129,7 +129,7 @@ void WindowsScriptService::Show(const Json& presentation,std::function<void()> s
     if(!self->overlay_) self->overlay_=std::make_unique<ScriptNativeOverlay>(self->viewport_,self->owner_);
     auto shown=presentation;
     if(self->guard_ && !self->guard_(shown)) {
-      shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); shown["captureLatched"]=false;
+      shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary");
     }
     self->overlay_->Show(shown,std::move(stop)); return true;
     } catch(...) { return false; }

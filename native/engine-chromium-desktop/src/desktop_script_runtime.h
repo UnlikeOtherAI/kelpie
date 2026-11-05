@@ -16,7 +16,6 @@ class DesktopScriptHandler::Impl {
   DesktopRouter& router;
   Config config;
   mutable std::mutex mutex;
-  std::mutex present_mutex;
   std::condition_variable changed;
   bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false;
   std::thread::id run_thread;

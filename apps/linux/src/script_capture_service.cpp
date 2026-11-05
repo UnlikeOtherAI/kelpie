@@ -190,7 +190,7 @@ LinuxScriptService::Json LinuxScriptService::Presentation() const {
   Json shown;
   {
     std::lock_guard lock(mutex_); shown = presentation_;
-    if (shown.value("playing", false) && !shown.value("captureLatched", false))
+    if (shown.value("playing", false))
       shown["elapsedMs"] = shown.value("elapsedMs", 0.0) +
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - shown_at_).count();
   }

@@ -142,7 +142,7 @@ void DesktopScriptHandler::Impl::Pause(int milliseconds) {
 void DesktopScriptHandler::Impl::Present() {
   if (!config.present) return;
   Json copy; std::shared_ptr<std::atomic<bool>> cancellation;
-  { std::lock_guard lock(mutex); copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = running; copy["elapsedMs"]=Elapsed(); cancellation=abort; }
+  { std::lock_guard lock(mutex); copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = DesktopPresentationIsPlaying(copy,running); copy["elapsedMs"]=Elapsed(); cancellation=abort; }
   config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); });
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {

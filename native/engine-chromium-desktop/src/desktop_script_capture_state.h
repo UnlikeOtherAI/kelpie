@@ -14,6 +14,9 @@ inline bool DesktopPresentationOwnedBy(const nlohmann::json& state, const Deskto
     state.value("generation",std::uint64_t{})==owner.generation &&
     state.value("documentVersion",std::string())==owner.document;
 }
+inline bool DesktopPresentationIsPlaying(const nlohmann::json& state, bool running) {
+  return running && state.value("playing",true);
+}
 inline void ClearDesktopPresentationContent(nlohmann::json& state) {
   state.erase("marker"); state.erase("pointer"); state.erase("commentary");
 }
