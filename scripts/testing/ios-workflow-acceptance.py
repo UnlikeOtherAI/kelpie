@@ -38,6 +38,7 @@ def selection(scope):
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
+                "testPointerDefaultAndExplicitDurationUseSharedContract",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
@@ -60,6 +61,7 @@ def selection(scope):
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
+                "testPointerDefaultAndExplicitDurationUseSharedContract",
             ])
     return targets, required
 

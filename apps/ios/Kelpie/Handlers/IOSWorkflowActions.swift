@@ -192,7 +192,7 @@ final class IOSWorkflowActions {
         guard let options = workflow.settings["pointer"] as? Body, options["enabled"] as? Bool == true else { return }
         let origin = presentation.lastPointer ?? CGPoint(x: max(0, point.x - 100), y: max(0, point.y - 70))
         let start = ProcessInfo.processInfo.systemUptime
-        let duration = options["durationMs"] as? Double ?? 500
+        let duration = options["durationMs"] as? Double ?? 350
         let curve = options["curve"] as? String ?? "s"
         repeat {
             try await check()
