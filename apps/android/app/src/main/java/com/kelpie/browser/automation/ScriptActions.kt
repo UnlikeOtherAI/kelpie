@@ -232,6 +232,7 @@ class ScriptActions(
                     throw failure
                 }
             val finalStep = index == steps.lastIndex
+            checkPacedPostMutation(last, finalStep, captures()) { consumeSensitivity(action, true) }
             val classification =
                 try {
                     rawTarget(action, token, postMutation = true)
