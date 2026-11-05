@@ -12,6 +12,16 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
+    func testPacedLostFinalCallbackProtectsLiteralWithoutCapture() async throws {
+        try await uncertainEdit(capture: false, paced: true)
+    }
+
+    @MainActor
+    func testPacedLostFinalCallbackDiscardsCapture() async throws {
+        try await uncertainEdit(capture: true, paced: true)
+    }
+
+    @MainActor
     func testUnknownTargetClassificationProtectsOnlyTheCurrentEdit() async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
@@ -47,17 +57,19 @@ extension WorkflowCaptureUITests {
     }
 
     @MainActor
-    private func uncertainEdit(capture: Bool) async throws {
+    private func uncertainEdit(capture: Bool, paced: Bool = false) async throws {
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let port = try XCTUnwrap(fixture.listener.port?.rawValue)
-        let canary = "iOS Reflected+Canary!"
-        let variants = [canary, "iOS%20Reflected%2bCanary!", "iOS+Reflected%2bCanary%21"]
+        let canary = paced ? "\u{1F9EA}" : "iOS Reflected+Canary!"
+        let variants = paced ? [canary] : [canary, "iOS%20Reflected%2bCanary!", "iOS+Reflected%2bCanary%21"]
+        var edit: Body = ["action": paced ? "type" : "fill", "target": ["selector": "#entry"], "text": canary]
+        if paced { edit["typingDelayMs"] = 1 }
         var workflow: Body = [
             "version": 1, "tabId": tab, "actions": [
                 ["action": "navigate", "url": "http://127.0.0.1:\(port)/focus-secret-timeout"],
                 ["action": "output", "source": "title", "name": "before"],
-                ["action": "fill", "target": ["selector": "#entry"], "text": canary]
+                edit
             ]
         ]
         if capture { workflow["capture"] = ["formats": ["screenshots"]] }

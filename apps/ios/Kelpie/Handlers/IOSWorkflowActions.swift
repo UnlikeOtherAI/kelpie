@@ -216,14 +216,16 @@ final class IOSWorkflowActions {
             clearFirst: plan.clearFirst,
             scalars: plan.scalars,
             delayMs: plan.delayMs,
-            apply: { [self] action, text, requireFocused in
-                try await pacedMutation(action: action, text: text, requireFocused: requireFocused, context: context)
+            apply: { [self] action, text, requireFocused, final in
+                try await pacedMutation(action: action, text: text, requireFocused: requireFocused, final: final, context: context)
             },
             wait: { [self] delay in try await wait(milliseconds: delay) }
         )
     }
 
-    private func pacedMutation(action: String, text: String, requireFocused: Bool, context: PacedTarget) async throws {
+    private func pacedMutation(
+        action: String, text: String, requireFocused: Bool, final: Bool, context: PacedTarget
+    ) async throws {
         try await check()
         guard tab.document == context.document, context.viewport == (try await tab.viewport()) else {
             throw IOSWorkflowFailure("STALE_TARGET")
@@ -232,15 +234,32 @@ final class IOSWorkflowActions {
             context.target,
             token: context.token,
             edit: ["action": action, "text": text, "requireFocused": requireFocused],
+            acceptFinalAcknowledgement: final,
             refuseSensitive: workflow.capture != nil,
             consume: context.consume,
             missingResult: context.missing
         )
         try requireOK(result)
+        guard IOSPacedTypingExecutor.isAcknowledgement(result, token: context.token) else {
+            context.missing()
+            throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+        }
         do {
             if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
             try await check()
-            let classification = try await tab.target(
+            try await inspectPacedPrivacy(context: context, final: final)
+            try await check()
+        } catch let failure as IOSWorkflowFailure {
+            throw IOSWorkflowFailure(failure.code, mayHaveCompleted: true)
+        } catch {
+            throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+        }
+    }
+
+    private func inspectPacedPrivacy(context: PacedTarget, final: Bool) async throws {
+        let classification: Body
+        do {
+            classification = try await tab.target(
                 context.target,
                 token: context.token,
                 postMutation: true,
@@ -248,15 +267,18 @@ final class IOSWorkflowActions {
                 consume: context.consume,
                 missingResult: context.missing
             )
-            try requireOK(classification)
-            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
-            try IOSPacedTypingExecutor.requireKnownSensitivity(classification["sensitivityKnown"] as? Bool)
-            try await check()
         } catch let failure as IOSWorkflowFailure {
-            throw IOSWorkflowFailure(failure.code, mayHaveCompleted: true)
-        } catch {
-            throw IOSWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true)
+            guard ["DOCUMENT_CHANGED", "WEBVIEW_ERROR", "TIMEOUT"].contains(failure.code) else { throw failure }
+            context.missing()
+            if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+            try IOSPacedTypingExecutor.requireKnownSensitivity(false, hasContinuation: !final)
+            return
         }
+        try requireOK(classification)
+        if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
+        try IOSPacedTypingExecutor.requireKnownSensitivity(
+            classification["sensitivityKnown"] as? Bool, hasContinuation: !final
+        )
     }
 
     private func registerEditLiteral(_ text: String) {

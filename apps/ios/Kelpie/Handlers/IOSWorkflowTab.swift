@@ -161,6 +161,7 @@ final class IOSWorkflowTab {
         dispatch: Bool = false,
         edit: Body? = nil,
         postMutation: Bool = false,
+        acceptFinalAcknowledgement: Bool = false,
         refuseSensitive: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
@@ -177,16 +178,27 @@ final class IOSWorkflowTab {
         guard let expression = IOSBoundWorkflow.decode(String(cString: pointer))?["expression"] as? String else {
             throw IOSWorkflowFailure("INVALID_TARGET")
         }
-        let value = try await fixed(
-            expression,
-            mutates: dispatch || edit != nil,
-            consume: { result in
-                guard let body = result as? Body, body["sensitive"] is Bool else { missingResult?(); return }
-                consume?(body)
-                if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
-            },
-            missingResult: missingResult
-        )
+        var acknowledgement: Body?
+        let value: Any?
+        do {
+            value = try await fixed(
+                expression,
+                mutates: dispatch || edit != nil,
+                consume: { result in
+                    guard let body = result as? Body, body["sensitive"] is Bool else { missingResult?(); return }
+                    consume?(body)
+                    if IOSPacedTypingExecutor.isAcknowledgement(body, token: token) {
+                        acknowledgement = body
+                    }
+                    if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
+                },
+                missingResult: missingResult
+            )
+        } catch let failure as IOSWorkflowFailure {
+            guard acceptFinalAcknowledgement, failure.code == "DOCUMENT_CHANGED", let acknowledgement else { throw failure }
+            missingResult?()
+            return acknowledgement
+        }
         guard let result = value as? Body, result["sensitive"] is Bool else {
             throw IOSWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
         }

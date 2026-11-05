@@ -40,6 +40,7 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedAcknowledgementRequiresCompleteResultAndMatchingToken",
                 "testPacedUnknownPostMutationSensitivityStops",
                 "testPacedEditsArePlannedBeforeAnyEarlierAction",
                 "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
@@ -60,6 +61,8 @@ def selection(scope):
                 "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
+                "testPacedLostFinalCallbackProtectsLiteralWithoutCapture",
+                "testPacedLostFinalCallbackDiscardsCapture",
                 "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
@@ -74,6 +77,7 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedAcknowledgementRequiresCompleteResultAndMatchingToken",
                 "testPacedUnknownPostMutationSensitivityStops",
                 "testPacedEditsArePlannedBeforeAnyEarlierAction",
                 "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
