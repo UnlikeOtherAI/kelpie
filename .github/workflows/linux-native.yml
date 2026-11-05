@@ -203,6 +203,8 @@ jobs:
               bash scripts/download-cef.sh linux
               bash scripts/check-linux-script-codecs.sh > "${package_root}/factory-provenance.txt"
               make linux
+              pnpm --filter @unlikeotherai/kelpie build
+              (cd packages/cli && npm pack --ignore-scripts --pack-destination "/workspace/${package_root}")
               ctest --test-dir apps/linux/build --verbose --output-log "${package_root}/native-checks.log" -R "^linux_script_(media|artifact)_test$"
               sha256sum apps/linux/build/kelpie-linux apps/linux/build/libcef.so > "${package_root}/binary-sha256.txt"
 
@@ -254,12 +256,30 @@ jobs:
               chmod -R a+rX dist/release
             ' 2>&1 | tee "${package_root}/candidate-build.log"
 
+      - name: Verify installed Linux candidate
+        timeout-minutes: 15
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+            --security-opt no-new-privileges=true \
+            -v "${PWD}:/workspace:ro" \
+            -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -w /workspace "${DISTRO_IMAGE}" \
+            bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
+            2>&1 | tee "${package_root}/candidate-installed-smoke.log"
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: ${{ inputs.artifact_prefix || 'linux-native-check' }}-${{ matrix.distro.name }}
           path: |
             dist/release/${{ matrix.distro.name }}/*.tar.gz
+            dist/release/${{ matrix.distro.name }}/*.tgz
+            dist/release/${{ matrix.distro.name }}/installed-smoke/
             dist/release/${{ matrix.distro.name }}/*.deb
             dist/release/${{ matrix.distro.name }}/*.rpm
             dist/release/${{ matrix.distro.name }}/*.AppImage

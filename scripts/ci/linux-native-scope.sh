@@ -13,7 +13,7 @@ changed=false
 while IFS= read -r -d "" file; do
   case "${file}" in
     *.md|*.mdx|*.rst) continue ;;
-    apps/linux/*|packaging/linux/*|packages/shared/src/*|packages/shared/scripts/build.mjs|packages/shared/package.json|packages/shared/tsconfig.build.json|tsconfig.base.json|native/core-*/*|native/desktop-account/*|native/desktop-connect/*|native/engine-chromium-desktop/*|native/CMakeLists.txt|scripts/native/generate-browser-contract.mjs|scripts/native/generate-script-presentation.mjs|scripts/build-linux-runtime-bundle.sh|scripts/package-linux-*.sh|scripts/check-linux-script-codecs.sh|scripts/install-linux-capture-deps.sh|scripts/ci/linux-native-scope.sh|scripts/download-cef.sh|Makefile|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.github/workflows/linux-native.yml)
+    apps/linux/*|packaging/linux/*|packages/shared/src/*|packages/shared/scripts/build.mjs|packages/shared/package.json|packages/shared/tsconfig.build.json|tsconfig.base.json|native/core-*/*|native/desktop-account/*|native/desktop-connect/*|native/engine-chromium-desktop/*|native/CMakeLists.txt|scripts/native/generate-browser-contract.mjs|scripts/native/generate-script-presentation.mjs|scripts/build-linux-runtime-bundle.sh|scripts/package-linux-*.sh|scripts/check-linux-script-codecs.sh|scripts/install-linux-capture-deps.sh|scripts/ci/linux-native-scope.sh|scripts/ci/linux-installed-smoke.sh|scripts/download-cef.sh|Makefile|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.github/workflows/linux-native.yml)
       changed=true ;;
   esac
 done < "${changed_files}"
