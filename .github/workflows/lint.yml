@@ -7,15 +7,94 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      linux_resource_terminal_idr:
+        description: Require terminal IDR on the known continuous fixture
+        type: boolean
+        default: false
+      linux_resource_cli_only:
+        description: Scope the prior Fedora candidate replay to installed CLI only
+        type: boolean
+        default: false
       linux_native_candidate:
         description: Build Linux ABI/package candidates for affected native source (no publication)
         type: boolean
         default: false
+      linux_mux_probe:
+        description: Compare the retained Ubuntu AVC fixture through bounded mux modes
+        type: boolean
+        default: false
+      linux_resource_expected_source:
+        description: Exact candidate source revision for CLI-only replay
+        type: string
+        default: ""
+      linux_resource_expected_rpm:
+        description: Exact RPM SHA-256 for CLI-only replay
+        type: string
+        default: ""
+      linux_resource_expected_cli:
+        description: Exact CLI archive SHA-256 for CLI-only replay
+        type: string
+        default: ""
+      linux_resource_source_run:
+        description: Prior Linux candidate run ID for numeric resource diagnosis
+        type: string
+        default: ""
 
+      worker_comparison_mode:
+        description: Probe isolation, prepare Chromium identity, or execute reviewed comparison
+        type: choice
+        options:
+          - 'off'
+          - probe
+          - sandbox
+          - prepare
+          - execute
+        default: 'off'
+      worker_comparison_archive_sha256:
+        description: Reviewed pinned Chromium archive SHA-256 for an opt-in comparison
+        type: string
+        default: ""
+      worker_comparison_binary_sha256:
+        description: Reviewed pinned Chromium executable SHA-256 for an opt-in comparison
+        type: string
+        default: ""
 permissions:
   contents: read
 
 jobs:
+  worker-comparison:
+    if: github.event_name == 'workflow_dispatch' && inputs.worker_comparison_mode != 'off'
+    uses: ./.github/workflows/worker-comparison.yml
+    permissions:
+      contents: read
+    with:
+      prepare_only: ${{ inputs.worker_comparison_mode != 'execute' }}
+      isolation_only: ${{ inputs.worker_comparison_mode == 'probe' }}
+      sandbox_only: ${{ inputs.worker_comparison_mode == 'sandbox' }}
+      chromium_archive_sha256: ${{ inputs.worker_comparison_archive_sha256 }}
+      chromium_binary_sha256: ${{ inputs.worker_comparison_binary_sha256 }}
+
+  linux-mux-probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_mux_probe
+    uses: ./.github/workflows/linux-mux-probe.yml
+    permissions:
+      contents: read
+      actions: read
+
+  linux-resource-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_resource_source_run != ''
+    uses: ./.github/workflows/linux-resource-diagnostic.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      source_run: ${{ inputs.linux_resource_source_run }}
+      cli_only: ${{ inputs.linux_resource_cli_only }}
+      require_terminal_idr: ${{ inputs.linux_resource_terminal_idr }}
+      expected_source: ${{ inputs.linux_resource_expected_source }}
+      expected_rpm: ${{ inputs.linux_resource_expected_rpm }}
+      expected_cli: ${{ inputs.linux_resource_expected_cli }}
+
   linux-native-candidate:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_native_candidate
     uses: ./.github/workflows/linux-native.yml

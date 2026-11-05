@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import java.io.ByteArrayOutputStream
 import java.util.Base64
@@ -228,22 +227,7 @@ class HandlerContext(
         return parseObject(raw)
     }
 
-    private fun parseObject(raw: String): Map<String, Any?> {
-        // WebView returns a JSON-encoded string (escaped), so we need to unescape
-        val unescaped =
-            if (raw.startsWith("\"") && raw.endsWith("\"")) {
-                json.decodeFromString<String>(raw)
-            } else {
-                raw
-            }
-        if (unescaped == "null" || unescaped.isBlank()) return emptyMap()
-        return try {
-            val element = json.parseToJsonElement(unescaped)
-            jsonElementToMap(element)
-        } catch (_: Exception) {
-            emptyMap()
-        }
-    }
+    private fun parseObject(raw: String): Map<String, Any?> = ScriptCallbackJson.parseObject(raw)
 
     suspend fun evaluateJSReturningArray(script: String): List<Map<String, Any?>> {
         val wrapped = "JSON.stringify(($script))"
@@ -258,18 +242,13 @@ class HandlerContext(
         return try {
             val element = json.parseToJsonElement(unescaped)
             if (element is kotlinx.serialization.json.JsonArray) {
-                element.map { jsonElementToMap(it) }
+                element.map { ScriptCallbackJson.toMap(it) }
             } else {
                 emptyList()
             }
         } catch (_: Exception) {
             emptyList()
         }
-    }
-
-    private fun jsonElementToMap(element: JsonElement): Map<String, Any?> {
-        if (element !is kotlinx.serialization.json.JsonObject) return emptyMap()
-        return element.jsonObject.entries.associate { (k, v) -> k to jsonElementToAny(v) }
     }
 
     suspend fun showTouchIndicator(
@@ -446,22 +425,6 @@ class HandlerContext(
             devicePixelRatio = (result["devicePixelRatio"] as? Number)?.toDouble() ?: 1.0,
         )
     }
-
-    private fun jsonElementToAny(element: JsonElement): Any? =
-        when (element) {
-            is kotlinx.serialization.json.JsonNull -> null
-            is kotlinx.serialization.json.JsonPrimitive -> {
-                when {
-                    element.isString -> element.content
-                    element.content == "true" -> true
-                    element.content == "false" -> false
-                    element.content.contains('.') -> element.content.toDoubleOrNull() ?: element.content
-                    else -> element.content.toIntOrNull() ?: element.content.toLongOrNull() ?: element.content
-                }
-            }
-            is kotlinx.serialization.json.JsonObject -> element.entries.associate { (k, v) -> k to jsonElementToAny(v) }
-            is kotlinx.serialization.json.JsonArray -> element.map { jsonElementToAny(it) }
-        }
 
     fun overlayColor(body: Map<String, Any?>): String = JSEscape.hexToRGB(body["color"] as? String)
 }

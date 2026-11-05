@@ -12,6 +12,7 @@ button{position:absolute;top:50%;transform:translate(-50%,-50%);width:80px;heigh
 <button id="finish" aria-label="G08 Finish"></button>
 <script>
 const documentId=String(Date.now())+"-"+Math.random().toString(36).slice(2);
+document.documentElement.setAttribute("data-kelpie-g08-document-id",documentId);
 for(const id of ["start","finish"])document.getElementById(id).addEventListener("click",event=>{
  const box=event.currentTarget.getBoundingClientRect(),view=visualViewport;
  const fact={documentId,target:id,trusted:event.isTrusted,timeMs:performance.now(),

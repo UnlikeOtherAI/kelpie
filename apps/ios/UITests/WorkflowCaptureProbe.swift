@@ -110,6 +110,25 @@ final class WorkflowCaptureProbe {
         return containsMarker(center, minimumCoverage: 0.12)
     }
 
+    static func containsCenteredMarker(_ screen: XCUIScreenshot, target: CGRect, app: CGRect) -> Bool {
+        guard let image = screen.image.cgImage else { return false }
+        return containsCenteredMarker(image, target: target, app: app)
+    }
+
+    static func containsCenteredMarker(_ image: CGImage, target: CGRect, app: CGRect) -> Bool {
+        guard !target.isEmpty, !app.isEmpty else { return false }
+        let xScale = CGFloat(image.width) / app.width
+        let yScale = CGFloat(image.height) / app.height
+        let offsets = [CGPoint(x: -14, y: 0), CGPoint(x: 14, y: 0), CGPoint(x: 0, y: -14), CGPoint(x: 0, y: 14)]
+        return offsets.allSatisfy { offset in
+            let rect = CGRect(x: (target.midX + offset.x - app.minX - 2) * xScale,
+                              y: (target.midY + offset.y - app.minY - 2) * yScale,
+                              width: 4 * xScale, height: 4 * yScale).integral
+            guard let crop = image.cropping(to: rect) else { return false }
+            return containsMarker(crop, minimumCoverage: 0.5)
+        }
+    }
+
     static func containsMarker(_ image: CGImage, minimumCoverage: Double = 0) -> Bool {
         let width = min(200, image.width)
         let height = max(1, width * image.height / image.width)

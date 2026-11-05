@@ -10,12 +10,33 @@ final class IOSWorkflowTab {
         let visible: CGRect
         let scale: CGFloat
         let pixelRatio: CGFloat
+        let content: CGRect
+        let fixtureDocumentID: String?
+
+        init(
+            bounds: CGSize,
+            layout: CGSize,
+            visible: CGRect,
+            scale: CGFloat,
+            pixelRatio: CGFloat,
+            content: CGRect? = nil,
+            fixtureDocumentID: String? = nil
+        ) {
+            self.bounds = bounds
+            self.layout = layout
+            self.visible = visible
+            self.scale = scale
+            self.pixelRatio = pixelRatio
+            self.content = content ?? CGRect(origin: .zero, size: bounds)
+            self.fixtureDocumentID = fixtureDocumentID
+        }
 
         var metadata: Body { ["width": layout.width, "height": layout.height] }
+        var pointsPerCSSX: CGFloat { content.width / visible.width }
 
         func displayPoint(_ css: CGPoint) -> CGPoint {
-            CGPoint(x: (css.x - visible.minX) * bounds.width / visible.width,
-                    y: (css.y - visible.minY) * bounds.height / visible.height)
+            CGPoint(x: content.minX + (css.x - visible.minX) * pointsPerCSSX,
+                    y: content.minY + (css.y - visible.minY) * content.height / visible.height)
         }
     }
 
@@ -82,6 +103,24 @@ final class IOSWorkflowTab {
         }
     }
 
+    func focusForEditing() throws {
+        try requireCurrent()
+        let accepted = view.window != nil && view.becomeFirstResponder()
+        #if DEBUG
+        IOSFrameSampler.diagnostic(accepted ? "responder-accepted" : "responder-refused")
+        #endif
+        guard accepted else { throw IOSWorkflowFailure("INPUT_NOT_AVAILABLE") }
+    }
+
+    #if DEBUG
+    var rendererContainsFirstResponder: Bool {
+        func containsResponder(_ current: UIView) -> Bool {
+            current.isFirstResponder || current.subviews.contains(where: containsResponder)
+        }
+        return containsResponder(view)
+    }
+    #endif
+
     private func requireMutationAuthority() async throws {
         guard await grant.isCurrent() else { throw IOSWorkflowFailure("AUTHORIZATION_REVOKED") }
         guard !Task.isCancelled, !playback.isAbortRequested() else { throw IOSWorkflowFailure("SCRIPT_ABORTED") }
@@ -92,6 +131,7 @@ final class IOSWorkflowTab {
     private func fixed(
         _ expression: String,
         mutates: Bool = false,
+        postEvaluationProbe: Bool = false,
         consume: (@MainActor (Any?) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
     ) async throws -> Any? {
@@ -112,7 +152,20 @@ final class IOSWorkflowTab {
                 guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
                 evaluationStarted = true
                 do {
+                    #if DEBUG
+                    let result: Any?
+                    if postEvaluationProbe && ProcessInfo.processInfo.arguments.contains("--test-post-evaluation") {
+                        let probe = IOSPostEvaluationProbe(view: view) { [self] in
+                            try await requireMutationAuthority()
+                            guard before == document else { throw IOSWorkflowFailure("DOCUMENT_CHANGED") }
+                        }
+                        result = try await probe.evaluate(expression)
+                    } else {
+                        result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    }
+                    #else
                     let result = try await BrowserControlWebKit.evaluate(expression, in: view)
+                    #endif
                     resultReceived = true
                     // Consume privacy metadata before guards and even after the caller's deadline.
                     consume?(result)
@@ -131,26 +184,68 @@ final class IOSWorkflowTab {
         return value
     }
 
+    static func fixtureID(_ candidate: String?) -> String? {
+        candidate.flatMap {
+            $0.range(of: #"^[0-9]{13}-[a-z0-9]{1,16}\z"#, options: .regularExpression) == nil ? nil : $0
+        }
+    }
+
+    static func contentRect(bounds: CGSize, insets: UIEdgeInsets, visible: CGSize) -> CGRect? {
+        let values = [bounds.width, bounds.height, insets.left, insets.right, insets.top, insets.bottom,
+                      visible.width, visible.height]
+        guard values.allSatisfy(\.isFinite), bounds.width > 0, bounds.height > 0,
+              insets.left >= 0, insets.right >= 0, insets.top >= 0, insets.bottom >= 0,
+              visible.width > 0, visible.height > 0 else { return nil }
+        let availableWidth = bounds.width - insets.left - insets.right
+        let availableHeight = bounds.height - insets.top
+        guard availableWidth > 0, availableHeight > 0 else { return nil }
+        let widthScale = availableWidth / visible.width
+        let projectedHeight = visible.height * widthScale
+        // WebKit reports CSS viewport dimensions quantized to whole CSS pixels at zoom.
+        guard projectedHeight.isFinite, projectedHeight <= availableHeight + widthScale else { return nil }
+        let scale = min(widthScale, availableHeight / visible.height)
+        return CGRect(x: insets.left, y: insets.top, width: visible.width * scale, height: visible.height * scale)
+    }
+
     func viewport() async throws -> Viewport {
+        #if DEBUG
+        let bindFixture = ProcessInfo.processInfo.arguments.contains("--test-g08-document-binding")
+        #else
+        let bindFixture = false
+        #endif
+        let suffix = bindFixture ? ",document.documentElement.getAttribute('data-kelpie-g08-document-id')" : ""
         let result = try await fixed("""
         (()=>{const v=globalThis.visualViewport;return [innerWidth,innerHeight,
         v?.offsetLeft??0,v?.offsetTop??0,v?.width??innerWidth,v?.height??innerHeight,
-        v?.scale??1,devicePixelRatio]})()
+        v?.scale??1,devicePixelRatio\(suffix)]})()
         """)
-        guard let values = result as? [NSNumber], values.count == 8 else {
+        guard let raw = result as? [Any], raw.count == (bindFixture ? 9 : 8),
+              let values = Array(raw.prefix(8)) as? [NSNumber] else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
+        let candidate = bindFixture ? raw.last as? String : nil
+        let fixtureID = Self.fixtureID(candidate)
         let parts = values.map { CGFloat($0.doubleValue) }
         guard parts.allSatisfy({ $0.isFinite }), parts[0] > 0, parts[1] > 0,
               parts[4] > 0, parts[5] > 0, view.bounds.width > 0, view.bounds.height > 0 else {
             throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE")
         }
+        let native = view.bounds.size
+        let insets = view.scrollView.adjustedContentInset
+        let insetValues = [insets.top, insets.bottom, insets.left, insets.right]
+        guard insetValues.allSatisfy({ $0.isFinite && $0 >= 0 }), insets.left + insets.right < native.width,
+              insets.top + insets.bottom < native.height else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
+        guard let content = Self.contentRect(
+            bounds: native, insets: insets, visible: CGSize(width: parts[4], height: parts[5])
+        ) else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNAVAILABLE") }
         return Viewport(
-            bounds: view.bounds.size,
+            bounds: native,
             layout: CGSize(width: parts[0], height: parts[1]),
             visible: CGRect(x: parts[2], y: parts[3], width: parts[4], height: parts[5]),
             scale: parts[6],
-            pixelRatio: parts[7]
+            pixelRatio: parts[7],
+            content: content,
+            fixtureDocumentID: fixtureID
         )
     }
 
@@ -161,6 +256,9 @@ final class IOSWorkflowTab {
         dispatch: Bool = false,
         edit: Body? = nil,
         postMutation: Bool = false,
+        acceptFinalAcknowledgement: Bool = false,
+        unknownOnFinalNavigation: Bool = true,
+        validateMutationAcknowledgement: Bool = false,
         refuseSensitive: Bool = false,
         consume: (@MainActor (Body) -> Void)? = nil,
         missingResult: (@MainActor () -> Void)? = nil
@@ -177,17 +275,30 @@ final class IOSWorkflowTab {
         guard let expression = IOSBoundWorkflow.decode(String(cString: pointer))?["expression"] as? String else {
             throw IOSWorkflowFailure("INVALID_TARGET")
         }
-        let value = try await fixed(
-            expression,
-            mutates: dispatch || edit != nil,
-            consume: { result in
-                guard let body = result as? Body, body["sensitive"] is Bool else { missingResult?(); return }
-                consume?(body)
-                if body["sensitive"] as? Bool != true, body["sensitivityKnown"] as? Bool != true { missingResult?() }
-            },
-            missingResult: missingResult
-        )
-        guard let result = value as? Body, result["sensitive"] is Bool else {
+        var acknowledgement: Body?
+        let value: Any?
+        do {
+            value = try await fixed(
+                expression,
+                mutates: dispatch || edit != nil,
+                postEvaluationProbe: edit != nil,
+                consume: { result in
+                    acknowledgement = IOSPacedTypingExecutor.consumeCallback(
+                        result,
+                        token: token,
+                        validateMutation: validateMutationAcknowledgement,
+                        consume: consume,
+                        missing: missingResult
+                    )
+                },
+                missingResult: missingResult
+            )
+        } catch let failure as IOSWorkflowFailure {
+            guard acceptFinalAcknowledgement, failure.code == "DOCUMENT_CHANGED", let acknowledgement else { throw failure }
+            if unknownOnFinalNavigation || !IOSPacedTypingExecutor.hasKnownSensitivity(acknowledgement) { missingResult?() }
+            return acknowledgement
+        }
+        guard let result = value as? Body, IOSPacedTypingExecutor.jsonBoolean(result["sensitive"]) != nil else {
             throw IOSWorkflowFailure("TARGET_FAILED", mayHaveCompleted: dispatch || edit != nil)
         }
         return result

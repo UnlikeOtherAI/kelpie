@@ -20,10 +20,17 @@ final class IOSWorkflowMedia {
     private var videoDrops = 0
     private var firstTime: Double?
     private(set) var failure: IOSWorkflowFailure?
+    #if DEBUG
+    private var geometryEvidence = IOSG08GeometryEvidence()
+    private(set) static var testEvidence: Body = [:]
+    #endif
 
     init(runID: String, owner: String, settings: Body) throws {
         self.runID = runID
         self.owner = owner
+        #if DEBUG
+        Self.testEvidence = [:]
+        #endif
         formats = Set(settings["formats"] as? [String] ?? [])
         fps = settings["fps"] as? Int ?? 15
         let limit = settings["maxBytes"] as? Int ?? 67108864
@@ -56,7 +63,29 @@ final class IOSWorkflowMedia {
     }
 
     func receive(_ image: CGImage, seconds: Double, step: Int?, document: String, viewport: IOSWorkflowTab.Viewport) throws -> Bool {
+        #if DEBUG
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            let elapsedMs = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
+            if (0...10000).contains(elapsedMs) { print("[WorkflowCaptureEncode] elapsedMs=" + String(elapsedMs)) }
+        }
+        #endif
+        #if DEBUG
+        geometryEvidence.record(document: document, viewport: viewport)
+        #endif
+        #if DEBUG
+        var stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
+        stamp["projection"] = [
+            "nativeWidth": viewport.bounds.width, "nativeHeight": viewport.bounds.height,
+            "contentX": viewport.content.minX, "contentY": viewport.content.minY,
+            "contentWidth": viewport.content.width, "contentHeight": viewport.content.height,
+            "visualX": viewport.visible.minX, "visualY": viewport.visible.minY,
+            "visualWidth": viewport.visible.width, "visualHeight": viewport.visible.height,
+            "scale": viewport.scale
+        ]
+        #else
         let stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
+        #endif
         if first.isEmpty { first = stamp; firstTime = seconds }
         let time = max(0, seconds - (firstTime ?? seconds))
         do {
@@ -92,6 +121,20 @@ final class IOSWorkflowMedia {
         } catch { throw IOSWorkflowFailure("CAPTURE_FAILED") }
     }
 
+    #if DEBUG
+    private static func recordTestEvidence(entry: Body, runID: String, projection: Any?, geometry: Any?) {
+        let args = ProcessInfo.processInfo.arguments
+        guard let id = entry["id"] as? String,
+              args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") else { return }
+        var artifacts = testEvidence["artifacts"] as? [String: Body] ?? [:]
+        var facts: Body = [:]
+        if args.contains("--test-pinch-projection"), let projection { facts["projection"] = projection }
+        if args.contains("--test-g08-document-binding"), let geometry { facts["geometry"] = geometry }
+        artifacts[id] = facts
+        testEvidence = ["runId": runID, "artifacts": artifacts]
+    }
+    #endif
+
     func finish(elapsed: Double, dropped: Int, partial: Bool, discard: Bool, isAborted: @escaping @Sendable () -> Bool) async -> [Body] {
         let alreadyAborted = isAborted()
         let deadline = ProcessInfo.processInfo.systemUptime + (alreadyAborted ? 2 : 40)
@@ -115,6 +158,9 @@ final class IOSWorkflowMedia {
                 extra["frameCount"] = video.encodedFrameCount
                 extra["durationMs"] = video.durationMs
                 extra["droppedFrames"] = videoDrops + video.rejectedFrameCount + dropped
+                #if DEBUG
+                extra["geometry"] = geometryEvidence.manifest(encodedFrames: video.encodedFrameCount)
+                #endif
                 if video.budgetExceeded { failure = IOSWorkflowFailure("CAPTURE_BUDGET_EXCEEDED") }
                 pending.append((url, "video/mp4", extra))
             } catch {
@@ -133,6 +179,9 @@ final class IOSWorkflowMedia {
                 extra["durationMs"] = result.durationMs
                 extra["frameCount"] = result.frameCount
                 extra["droppedFrames"] = dropped
+                #if DEBUG
+                extra["geometry"] = geometryEvidence.manifest(encodedFrames: result.frameCount)
+                #endif
                 if result.partial {
                     let limit = shouldContinue() ? "CAPTURE_BUDGET_EXCEEDED" : "CAPTURE_FINALIZATION_LIMIT"
                     failure = IOSWorkflowFailure(isAborted() ? "SCRIPT_ABORTED" : limit)
@@ -145,7 +194,14 @@ final class IOSWorkflowMedia {
         for (url, type, var extra) in pending {
             do {
                 extra["partial"] = partial || failure != nil || isAborted()
+                #if DEBUG
+                let projection = extra.removeValue(forKey: "projection")
+                let geometry = extra.removeValue(forKey: "geometry")
+                #endif
                 let entry = try ScriptArtifactStore.shared.add(url: url, runID: runID, mimeType: type, owner: owner, extra: extra)
+                #if DEBUG
+                Self.recordTestEvidence(entry: entry, runID: runID, projection: projection, geometry: geometry)
+                #endif
                 retained.insert(url)
                 manifests.append(entry)
             } catch { failure = IOSWorkflowFailure("ARTIFACT_REGISTRATION_FAILED") }

@@ -51,16 +51,38 @@ class ScriptPreflightTest {
     }
 
     @Test
-    fun pacedEditsRefuseBeforeAnyActionUntilNativeAdapterSupportsThem() {
-        for (kind in listOf("fill", "type")) {
-            val edit = mapOf("action" to kind, "target" to mapOf("selector" to "input"), "text" to "text")
-            assertEquals(script(edit), ScriptPreflight.admit(script(edit)))
-            refuses(
-                "UNSUPPORTED_SCRIPT_ACTION",
-                script(mapOf("action" to "wait", "ms" to 1), edit + ("typingDelayMs" to 50)) +
-                    ("capture" to mapOf("formats" to listOf("gif"))),
+    fun everyPacedEditIsPlannedBeforeAdmissionAndInvalidPlansRefuse() {
+        val actions =
+            listOf(
+                mapOf("action" to "wait", "ms" to 1),
+                mapOf("action" to "fill", "target" to mapOf("selector" to "input"), "text" to "a\uD83C\uDF0A", "typingDelayMs" to 50),
+                mapOf("action" to "type", "target" to mapOf("selector" to "input"), "text" to "b", "typingDelayMs" to 20),
             )
+        val requests = mutableListOf<Map<String, Any?>>()
+        val accepted =
+            ScriptPreflight.admit(script(*actions.toTypedArray())) { request ->
+                requests.add(request)
+                mapOf(
+                    "valid" to true,
+                    "clearFirst" to (request["action"] == "fill"),
+                    "typingDelayMs" to request["typingDelayMs"],
+                    "scalars" to if (request["action"] == "fill") listOf("a", "\uD83C\uDF0A") else listOf("b"),
+                )
+            }
+        assertEquals(2, requests.size)
+        assertEquals(setOf("action", "text", "typingDelayMs"), requests.first().keys)
+        val plans = ScriptPreflight.actions(accepted).drop(1).map { it["__pacedPlan"] as ScriptPacedPlan }
+        assertEquals(listOf("a", "\uD83C\uDF0A"), plans.first().scalars)
+        assertEquals(true, plans.first().clearFirst)
+        assertEquals(false, plans.last().clearFirst)
+        var dispatched = false
+        try {
+            ScriptPreflight.admit(script(*actions.toTypedArray())) { mapOf("valid" to false) }
+            dispatched = true
+        } catch (failure: ScriptFailure) {
+            assertEquals("INVALID_PACED_TYPING", failure.code)
         }
+        assertFalse("An invalid paced plan must refuse before any action", dispatched)
     }
 
     @Test

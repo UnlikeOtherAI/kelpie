@@ -1,5 +1,6 @@
 // Test-only independent decoding and identity receipt for the Linux GIF pointer model.
 import assert from "node:assert/strict";
+import { ffmpegPassthrough } from "../capture/ffmpeg-passthrough.mjs";
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
@@ -22,11 +23,20 @@ const view = config.visualViewport, pointer = config.pointer;
 assert.ok(view && pointer && [view.offsetLeft, view.offsetTop, view.width, view.height, view.scale,
   pointer.x, pointer.y].every(Number.isFinite));
 assert.ok(view.width > 0 && view.height > 0 && view.scale > 0);
+for (const name of ["LD_PRELOAD","LD_AUDIT","LD_LIBRARY_PATH"])
+  assert.equal(process.env[name],undefined,"Model process has a loader override: "+name);
 const candidateHash = await fileHash(candidatePath), generatorHash = await fileHash(generatorPath);
 assert.equal(evidence.binarySHA256, candidateHash, "Observed app differs from requested candidate");
+assert.equal(evidence.loaderOverridesAbsent,true);
+assert.equal(await fileHash(candidateEvidencePath + ".maps.txt"),evidence.mapsSHA256);
 assert.match(evidence.source, /^[a-f0-9]{40}$/);
 const source = spawnSync("git", ["rev-parse", "HEAD"], {encoding:"utf8",timeout:5000});
-assert.equal(source.status, 0); assert.equal(source.stdout.trim(), evidence.source);
+assert.equal(source.status, 0);
+const testSource = source.stdout.trim();
+assert.match(testSource, /^[a-f0-9]{40}$/);
+const unchanged = spawnSync("git", ["diff","--quiet",evidence.source,testSource,"--",
+  "apps/linux/src","apps/linux/CMakeLists.txt","native","packages/shared","pnpm-lock.yaml"], {timeout:10000});
+assert.equal(unchanged.status,0,"Candidate product inputs differ from model checkout");
 const mediaObjects = join(dirname(resolve(generatorPath)), "CMakeFiles/kelpie_linux_script_media.dir/src");
 const objectHashes = {
   compositor: await fileHash(join(mediaObjects, "script_frame_compositor.cpp.o")),
@@ -64,6 +74,7 @@ const output = resolve(outputPath);
 const generated = spawnSync(resolve(generatorPath), [resolve(configPath), output],
   {encoding:"utf8",timeout:120000,maxBuffer:1048576});
 assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+await writeFile(join(output,"generator-process.json"),JSON.stringify({pid:generated.pid,status:generated.status}),{flag:"wx"});
 const generatedReport = JSON.parse(await readFile(join(output, "generator.json"), "utf8"));
 assert.deepEqual(generatedReport.input, config);
 assert.equal(generatedReport.encoder.palette, "RGB332-floor");
@@ -106,7 +117,7 @@ for (const item of generatedReport.cases) {
   assert.equal(pts.length,count);
   assert.ok(pts.every((v,i) => Number.isFinite(v) && (i===0 || v>pts[i-1])));
   const child = spawn("ffmpeg", ["-v","error","-threads","1","-filter_threads","1","-i",path,
-    "-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],
+    "-map","0:v:0",...ffmpegPassthrough("ffmpeg"),"-f","rawvideo","-pix_fmt","rgb24","-"],
     {stdio:["ignore","pipe","pipe"]});
   let stderr=""; child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
   const done=new Promise((ok,bad)=>{child.once("error",bad);child.once("close",code=>code===0?ok():bad(Error(stderr)));});
@@ -134,9 +145,9 @@ for (const item of entries.slice(1,4))
   assert.ok(item.frames.some(frame=>frame.roiSHA256!==model),"A retained-marker negative is invisible");
 assert.ok(entries[4].frames.every(frame=>frame.roiSHA256===model),
   "Palette-collision control is distinguishable; no ambiguity claim can be made");
-const report={version:1,confidence:"encoded-visible-only",source:evidence.source,
-  candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,
-  candidateEvidenceSHA256:await fileHash(candidateEvidencePath),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
+const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,testSource,
+  candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,generatorPID:generated.pid,
+  candidateEvidenceSHA256:await fileHash(candidateEvidencePath),generatorMapsSHA256:await fileHash(join(output,"generator-maps.txt")),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
   encoder:generatedReport.encoder,roi,cases:entries};
 await writeFile(join(output,"model-manifest.json"),JSON.stringify(report,null,2),{flag:"wx"});
 console.log(JSON.stringify({output,modelROI:model,cases:entries.map(({name,sha256})=>({name,sha256}))}));

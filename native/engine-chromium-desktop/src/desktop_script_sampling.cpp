@@ -1,12 +1,28 @@
 #include "desktop_script_runtime.h"
 #include "desktop_script_coordinates.h"
+#include "desktop_script_capture_state.h"
+#include "desktop_capture_stage_timing.h"
 #include <stdexcept>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace kelpie {
-void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document) {
+namespace {
+void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlohmann::json& after) {
+  const char* enabled=std::getenv("KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS");
+  if (!enabled || std::strcmp(enabled,"1")!=0) return;
+  const nlohmann::json facts={{"fence",fence},{"before",ScriptCaptureViewportFacts(before)},
+                    {"after",ScriptCaptureViewportFacts(after)}};
+  std::fprintf(stderr,"KELPIE_CAPTURE_VIEWPORT_DIAGNOSTIC %s\n",facts.dump().c_str());
+}
+}
+void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document, DesktopScriptFramePurpose purpose) {
   std::unique_lock lock(mutex);
-  requested_step = index; requested_step_png=png; requested_step_document=document;
+  if (purpose==DesktopScriptFramePurpose::TerminalClear) purpose=DesktopTerminalTicketPurpose(presentation);
+  requested_step = index; requested_step_png=png; requested_step_document=document; requested_purpose=purpose;
+  requested_terminal_identity=purpose==DesktopScriptFramePurpose::TerminalClear ? DesktopTerminalMarkerIdentity(presentation) : Json(nullptr);
   const auto ticket=++requested_ticket;
   changed.notify_all();
   changed.wait_for(lock, std::chrono::seconds(10), [this, ticket] {
@@ -18,8 +34,8 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
   }
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
+  DesktopCaptureStageTiming stage_timing;
   std::unique_ptr<DesktopScriptCapture> encoder;
-  const auto cancellation=abort;
   int initial_width = 0, initial_height = 0;
   Json previous_viewport;
   std::string previous_document;
@@ -43,8 +59,10 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       if(!config.revalidate || !config.revalidate(owner)) { grant_revoked.store(true); abort->store(true); partial=true; break; }
       if (Elapsed() >= duration) throw std::runtime_error("CAPTURE_DURATION_EXCEEDED");
       const auto acquisition=Clock::now();
+      const auto timing_start=stage_timing.Now();
       BrowserNavigationState before, after;
       auto result = engine.GetNavigationState(lease, &before, std::chrono::seconds(2));
+      const auto timing_pre_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       Json viewport;
       result = engine.EvaluateBrowserControl(lease, viewport_expression, &viewport, std::chrono::seconds(2));
@@ -52,24 +70,31 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const int width = viewport.value("width", 0), height = viewport.value("height", 0);
       if (width <= 0 || height <= 0) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
       if (initial_width == 0) { initial_width = width; initial_height = height; first_document = before.tab.document_version; }
-      if (width != initial_width || height != initial_height) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      if (width != initial_width || height != initial_height) {
+        ViewportDiagnostic("initial-size",{{"width",initial_width},{"height",initial_height}},viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
       // Scrollbar gutters may change visible size without changing the surface.
       // Pan/scale remain fenced within a document, and every surface still has
       // an exact before/after five-metric check below.
       if(previous_viewport.is_object() && !ScriptCaptureViewportCompatible(previous_viewport,viewport,
-          previous_document==before.tab.document_version)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+          previous_document==before.tab.document_version)) {
+        ViewportDiagnostic("inter-frame",previous_viewport,viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
       previous_viewport=viewport; previous_document=before.tab.document_version;
+      const DesktopPresentationOwner sample_owner{lease.id,lease.generation,before.tab.document_version};
+      // The encoder receives this snapshot while live presentation continues.
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
+      DesktopScriptFramePurpose purpose=DesktopScriptFramePurpose::Ordinary; Json terminal_identity;
       {
         std::lock_guard lock(mutex);
-        if (presentation.value("documentVersion", std::string()) != before.tab.document_version) {
-          presentation.erase("marker"); presentation.erase("pointer"); presentation.erase("commentary");
-        }
-        presentation_latched=true;
-        shown = presentation; shown["elapsedMs"] = Elapsed(); shown["playing"]=true; shown["captureLatched"]=true;
+        shown=SnapshotDesktopPresentation(presentation,sample_owner);
+        shown["elapsedMs"] = Elapsed(); shown["playing"]=true;
         shown["viewportWidth"] = width; shown["viewportHeight"] = height;
         step = requested_step; index = action_index; png=requested_step_png; expected_document=requested_step_document; ticket=requested_ticket;
+        purpose=requested_purpose; terminal_identity=requested_terminal_identity;
       }
       if(step>=0 && !expected_document.empty() && expected_document!=before.tab.document_version)
         throw std::runtime_error("CAPTURE_TARGET_DOCUMENT_CHANGED");
@@ -77,29 +102,54 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       shown["documentVersion"]=before.tab.document_version;
       shown["visualViewport"]=viewport.at("visualViewport");
       const double frame_time=Elapsed(); shown["elapsedMs"]=frame_time;
-      if(config.present) config.present(shown,[this,cancellation] { cancellation->store(true); changed.notify_all(); });
+      const auto timing_pre=stage_timing.Now();
       BrowserScreenshot image;
       result = engine.Screenshot(lease, &image, std::chrono::seconds(3));
+      const auto timing_screenshot=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_FRAME_FAILED");
       result = engine.GetNavigationState(lease, &after, std::chrono::seconds(2));
+      const auto timing_post_nav=stage_timing.Now();
       if (!result.ok) throw std::runtime_error("CAPTURE_DOCUMENT_UNAVAILABLE");
       if (before.tab.document_version != after.tab.document_version) {
-        { std::lock_guard lock(mutex); presentation.erase("marker"); presentation.erase("pointer"); presentation_latched=false; }
+        bool cleared=false;
+        { std::lock_guard lock(mutex); cleared=ClearRetiredDesktopPresentation(presentation,sample_owner); }
         ++dropped;
-        Present();
+        if(cleared) Present();
         continue;
       }
       Json after_viewport;
       result = engine.EvaluateBrowserControl(lease, viewport_expression, &after_viewport, std::chrono::seconds(2));
-      if (!result.ok || after_viewport != viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
-      const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      if (!result.ok || after_viewport != viewport) {
+        ViewportDiagnostic(result.ok ? "before-after" : "after-read-failed",viewport,after_viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
+      const auto timing_post=stage_timing.Now();
+      const bool terminal=step>=0 && purpose==DesktopScriptFramePurpose::TerminalClear && encoder->SupportsTerminalClear();
+      if (terminal) {
+        if (!config.revalidate || !config.revalidate(owner)) {
+          grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+        }
+        std::lock_guard lock(mutex);
+        if (abort->load() || requested_ticket!=ticket || terminal_identity.is_null() ||
+            DesktopTerminalMarkerIdentity(presentation)!=terminal_identity ||
+            DesktopTerminalMarkerIdentity(shown)!=terminal_identity)
+          throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
+      }
+      const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png,
+          terminal ? purpose : DesktopScriptFramePurpose::Ordinary);
+      stage_timing.Add(frame_time,timing_start,timing_pre_nav,timing_pre,timing_screenshot,timing_post_nav,timing_post,stage_timing.Now());
+      if (terminal && (!config.revalidate || !config.revalidate(owner))) {
+        grant_revoked.store(true); abort->store(true); throw std::runtime_error("CAPTURE_AUTHORIZATION_REVOKED");
+      }
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
-      { std::lock_guard lock(mutex); presentation_latched=false; }
       Present();
       { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
       if (step >= 0) {
         std::lock_guard lock(mutex);
+        if (terminal && (abort->load() || requested_ticket!=ticket ||
+            DesktopTerminalMarkerIdentity(presentation)!=terminal_identity))
+          throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
         if(requested_ticket==ticket) requested_step_png=false; // Exclusive PNG path is written once.
         if(proof) {
           completed_step = step; completed_ticket=std::max(completed_ticket,ticket);
@@ -107,6 +157,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         }
         changed.notify_all();
       }
+      if (terminal) break;
       // An early milestone request does not consume a future cadence slot.
       if(acquisition>=next) next += interval;
       const auto now=Clock::now();
@@ -131,7 +182,6 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
     { std::lock_guard lock(mutex); if(!abort->load()) capture_error = reason; }
     partial = true;
   }
-  { std::lock_guard lock(mutex); presentation_latched=false; }
   try { Present(); } catch(...) { std::lock_guard lock(mutex); capture_error="CAPTURE_NATIVE_PRESENTATION_FAILED"; partial=true; }
   partial = partial || abort->load();
   if (encoder) {

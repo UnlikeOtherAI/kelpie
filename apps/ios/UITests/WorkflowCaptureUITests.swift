@@ -8,12 +8,14 @@ final class WorkflowCaptureUITests: XCTestCase {
     let probe = WorkflowCaptureProbe(port: 28429)
     var cleanupProbe: WorkflowCaptureProbe?
     private let app = XCUIApplication()
+    var testLaunchArguments: [String] = []
 
     @MainActor
     func ready() async throws -> (WorkflowLoopbackPage, String) {
         let fixture = try WorkflowLoopbackPage()
         let url = try await fixture.start()
         let tab = try await openOwnedTab(url: "about:blank")
+        try await waitForBlankFixtureAdmission(tab: tab)
         let navigated = try await probe.request("/v1/play-script", ["version": 1, "tabId": tab,
                                                                    "actions": [["action": "navigate", "url": url]]])
         guard navigated["success"] as? Bool == true else {
@@ -26,9 +28,50 @@ final class WorkflowCaptureUITests: XCTestCase {
     }
 
     @MainActor
+    private func waitForBlankFixtureAdmission(tab: String) async throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 10
+        var stableSince: TimeInterval?
+        var last: Body = [:]
+        repeat {
+            let listing = try await probe.request("/v1/get-tabs", [:])
+            let selected = (listing["tabs"] as? [Body])?.first { $0["id"] as? String == tab }
+            let active = listing["activeTab"] as? String == tab
+            let loading = selected?["isLoading"] as? Bool
+            let ready = try await probe.request("/v1/browser-control", [
+                "version": 1, "tabId": tab, "method": "tab.ready", "params": ["state": "complete"]
+            ])
+            let status = try await probe.request("/v1/browser-control", [
+                "version": 1, "tabId": tab, "method": "tab.status", "params": [:]
+            ])
+            let complete = ready["ok"] as? Bool == true && (ready["value"] as? Body)?["ready"] as? Bool == true
+            let statusValue = status["value"] as? Body
+            let observedURL = statusValue?["url"] as? String
+            let statusOK = status["ok"] as? Bool == true
+            let blank = statusOK && observedURL == "about:blank" && statusValue?["documentState"] as? String == "complete"
+            last = ["active": active, "loadingKnown": loading != nil, "loading": loading ?? true,
+                    "complete": complete, "statusOK": statusOK, "urlKnown": observedURL != nil, "blank": blank]
+            let now = ProcessInfo.processInfo.systemUptime
+            if active && loading == false && complete && blank {
+                if let stableSince, now - stableSince >= 0.2 { return }
+                if stableSince == nil { stableSince = now }
+            } else {
+                stableSince = nil
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: last, options: [.sortedKeys]),
+                                       uniformTypeIdentifier: "public.json")
+        attachment.name = "Blank fixture admission facts"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        throw NSError(domain: "WorkflowFixtureAdmission", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Blank tab did not reach stable read-only readiness"])
+    }
+
+    @MainActor
     func openOwnedTab(url: String) async throws -> String {
         continueAfterFailure = false
-        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"]
+        app.launchArguments = ["--port", String(probe.port), "-hideWelcomeCard", "YES", "-homeURL", "about:blank"] + testLaunchArguments
         app.launch()
         XCTAssertTrue(app.buttons["browser.more"].waitForExistence(timeout: 20))
         try await probe.pair(app: app)
@@ -62,6 +105,20 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(WorkflowCaptureProbe.containsMarker(try image(faded), minimumCoverage: 0.12))
         XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(.lightGray), minimumCoverage: 0.12))
         XCTAssertFalse(WorkflowCaptureProbe.containsMarker(try image(faded, small: true), minimumCoverage: 0.12))
+        func marker(offset: CGFloat) throws -> CGImage {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 100, height: 100), format: format).image { renderer in
+                UIColor.white.setFill()
+                renderer.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+                faded.setFill()
+                renderer.cgContext.fillEllipse(in: CGRect(x: 25, y: 25 + offset, width: 50, height: 50))
+            }.cgImage)
+        }
+        let target = CGRect(x: 25, y: 25, width: 50, height: 50)
+        let app = CGRect(x: 0, y: 0, width: 100, height: 100)
+        XCTAssertTrue(WorkflowCaptureProbe.containsCenteredMarker(try marker(offset: 0), target: target, app: app))
+        XCTAssertFalse(WorkflowCaptureProbe.containsCenteredMarker(try marker(offset: -20), target: target, app: app))
     }
 
     @MainActor
@@ -113,6 +170,8 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
         var visible = false
+        var pollCount = 0
+        let pollStart = Date()
         var mismatch: (screen: XCUIScreenshot, target: CGRect, viewport: CGRect, greenElsewhere: Bool)?
         repeat {
             let viewport = app.webViews.firstMatch
@@ -120,6 +179,7 @@ final class WorkflowCaptureUITests: XCTestCase {
             let viewportFrame = viewport.exists ? viewport.frame : .null
             let target = !viewportFrame.isNull && submit.exists ? submit.frame.intersection(viewportFrame) : .null
             let screen = app.screenshot()
+            pollCount += 1
             if !target.isNull, WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: target, app: app.frame) {
                 let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + String(describing: target))
                 geometry.name = "Native marker target geometry"
@@ -132,7 +192,7 @@ final class WorkflowCaptureUITests: XCTestCase {
                 visible = true
                 break
             }
-            if stop.exists {
+            if mismatch == nil || stop.exists {
                 let greenElsewhere = screen.image.cgImage.map { WorkflowCaptureProbe.containsMarker($0) } ?? false
                 if mismatch == nil || (target.isNull == false && mismatch?.target.isNull == true) ||
                     (greenElsewhere && mismatch?.greenElsewhere == false) {
@@ -149,7 +209,9 @@ final class WorkflowCaptureUITests: XCTestCase {
             let geometry = XCTAttachment(string: "Visible Submit frame " + String(describing: mismatch.target) +
                 ", WebView frame " + String(describing: mismatch.viewport) +
                 ", app frame " + String(describing: app.frame) +
-                ", green component elsewhere " + String(mismatch.greenElsewhere))
+                ", green component elsewhere " + String(mismatch.greenElsewhere) +
+                ", polls " + String(pollCount) + ", elapsed " + String(Date().timeIntervalSince(pollStart)) +
+                ", Stop visible " + String(stop.exists))
             geometry.name = "Failed marker target geometry"
             geometry.lifetime = .keepAlways
             add(geometry)

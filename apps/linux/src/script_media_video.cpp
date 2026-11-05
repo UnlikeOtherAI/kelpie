@@ -1,4 +1,10 @@
 #include "script_media_internal.h"
+#include <gst/video/video-event.h>
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#endif
 #include "script_artifact_store.h"
 #include "script_gstreamer.h"
 #include <algorithm>
@@ -6,6 +12,10 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace kelpie::linuxapp::media {
 namespace {
@@ -13,6 +23,35 @@ struct BufferDelete { void operator()(GstBuffer* value) const { if (value) gst_b
 struct SampleDelete { void operator()(GstSample* value) const { if (value) gst_sample_unref(value); } };
 using Buffer = std::unique_ptr<GstBuffer, BufferDelete>;
 using Sample = std::unique_ptr<GstSample, SampleDelete>;
+// qtmux faststart requires a seekable private spool. Its bytes are a subset of
+// the encoded packets already reserved in Budget. Never unlink a replaced file.
+class MuxScratch {
+ public:
+  explicit MuxScratch(const std::filesystem::path& directory) {
+    path_ = (directory / ".mux-XXXXXX").string();
+    fd_ = mkstemp(path_.data());
+    if (fd_ < 0) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
+    struct stat info{};
+    if (fcntl(fd_, F_SETFD, FD_CLOEXEC) || fchmod(fd_, 0600) || fstat(fd_, &info)) {
+      close(fd_); unlink(path_.c_str()); throw std::runtime_error("CAPTURE_STORAGE_FAILED");
+    }
+    device_ = info.st_dev; inode_ = info.st_ino;
+  }
+  ~MuxScratch() { Remove(); }
+  const std::string& path() const { return path_; }
+  bool Remove() {
+    if (fd_ < 0) return true;
+    close(fd_); fd_ = -1;
+    struct stat info{};
+    if (lstat(path_.c_str(), &info)) return errno == ENOENT;
+    if (!S_ISREG(info.st_mode) || info.st_dev != device_ || info.st_ino != inode_) return false;
+    return unlink(path_.c_str()) == 0 || errno == ENOENT;
+  }
+ private:
+  std::string path_;
+  int fd_ = -1;
+  dev_t device_{}; ino_t inode_{};
+};
 struct MuxState {
   std::mutex mutex;
   std::vector<std::uint8_t> bytes;
@@ -37,7 +76,7 @@ GstFlowReturn Collect(GstAppSink* sink, gpointer raw) {
   gst_buffer_unmap(buffer, &mapped); return result;
 }
 
-bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps) {
+bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps, bool require_idr = false) {
   // AVC buffers can contain codec headers without a picture. Only a complete
   // length-prefixed access unit with an actual VCL NAL is source-frame evidence.
   const auto* value = gst_structure_get_value(gst_caps_get_structure(caps, 0), "codec_data");
@@ -55,7 +94,7 @@ bool ContainsVclAccessUnit(GstBuffer* packet, GstCaps* caps) {
     for (std::size_t index = 0; index < length_bytes; ++index) length = (length << 8) | encoded.data[offset++];
     if (!length || length > encoded.size - offset || (encoded.data[offset] & 0x80)) { valid = false; break; }
     const auto type = encoded.data[offset] & 31;
-    picture = picture || (type >= 1 && type <= 5);
+    picture = picture || (require_idr ? type == 5 : (type >= 1 && type <= 5));
     offset += length;
   }
   gst_buffer_unmap(packet, &encoded); gst_buffer_unmap(description, &config);
@@ -84,7 +123,7 @@ class Video final : public Writer {
     if (!raw_caps) throw std::runtime_error("CAPTURE_VIDEO_UNAVAILABLE");
     gst_app_src_set_caps(encoder_->source(), raw_caps); gst_caps_unref(raw_caps); encoder_->Start();
     output_.width = input.width; output_.height = input.height;
-    prepared_ = Encode(input, 0, GST_SECOND / fps_);
+    prepared_ = Encode(input, 0, GST_SECOND / fps_, false);
     if (!Admit(prepared_.get())) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
     // Prove actual first-frame encoding, AVC codec data and MP4 muxing before
     // the shared runtime can admit its first browser action.
@@ -95,7 +134,7 @@ class Video final : public Writer {
     } catch (...) { prepared_ = std::move(packets_.back()); packets_.pop_back(); throw; }
     prepared_ = std::move(packets_.back()); packets_.pop_back();
   }
-  bool Write(const ScriptFrame& input, double start_ms, double end_ms) override {
+  bool Write(const ScriptFrame& input, double start_ms, double end_ms, ScriptMediaFramePurpose purpose) override {
     if (finished_) throw std::runtime_error("CAPTURE_ALREADY_FINISHED");
     Prepare(input);
     if (stopped_) return false;
@@ -103,11 +142,19 @@ class Video final : public Writer {
     const auto end = GstClockTime(std::llround(end_ms * GST_MSECOND));
     Buffer packet;
     if (prepared_) {
+      if (purpose == ScriptMediaFramePurpose::TerminalClear &&
+          (!ContainsVclAccessUnit(prepared_.get(), caps_, true) || GST_BUFFER_FLAG_IS_SET(prepared_.get(),GST_BUFFER_FLAG_DELTA_UNIT))) {
+        terminal_force_failed_=true; stopped_=true; ++output_.dropped_frames; return false;
+      }
       packet = std::move(prepared_);
       GST_BUFFER_PTS(packet.get()) = start; GST_BUFFER_DTS(packet.get()) = start;
       GST_BUFFER_DURATION(packet.get()) = std::max<GstClockTime>(1, end - start);
     } else {
-      packet = Encode(input, start, std::max<GstClockTime>(1, end - start));
+      try { packet = Encode(input, start, std::max<GstClockTime>(1, end - start), purpose == ScriptMediaFramePurpose::TerminalClear); }
+      catch (...) {
+        if (purpose != ScriptMediaFramePurpose::TerminalClear) throw;
+        terminal_force_failed_=true; stopped_=true; ++output_.dropped_frames; return false;
+      }
       if (!Admit(packet.get())) { stopped_ = true; ++output_.dropped_frames; return false; }
     }
     if (packets_.size() >= 36000) { budget_.exceeded = true; stopped_ = true; ++output_.dropped_frames; return false; }
@@ -117,8 +164,9 @@ class Video final : public Writer {
   ScriptMediaOutput Finish() override {
     if (finished_) return output_;
     if (encoder_) {
-      if (!encoder_->Complete()) throw std::runtime_error("CAPTURE_FINALIZE_FAILED");
+      const bool completed=encoder_->Complete();
       encoder_.reset();
+      if (!completed && !terminal_force_failed_) throw std::runtime_error("CAPTURE_FINALIZE_FAILED");
     }
     prepared_.reset();
     // Encoded packets are bounded independently of container overhead. If muxer
@@ -144,16 +192,41 @@ class Video final : public Writer {
     if (size > budget_.limit || !budget_.Take(size + 4096)) return false;
     reserved_ += size + 4096; return true;
   }
-  Buffer Encode(const ScriptFrame& input, GstClockTime pts, GstClockTime duration) {
+  Buffer Encode(const ScriptFrame& input, GstClockTime pts, GstClockTime duration, bool force_keyframe) {
     Buffer raw(gst_buffer_new_allocate(nullptr, input.bgra.size(), nullptr));
     if (!raw || gst_buffer_fill(raw.get(), 0, input.bgra.data(), input.bgra.size()) != input.bgra.size())
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     GST_BUFFER_PTS(raw.get()) = pts; GST_BUFFER_DTS(raw.get()) = pts; GST_BUFFER_DURATION(raw.get()) = duration;
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+    const auto index=encoded_test_index_++;
+    if (index==14) force_keyframe=true;
+#endif
+    if (force_keyframe) {
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+      if (std::getenv("KELPIE_TEST_FORCE_FAILURE")) throw std::runtime_error("CAPTURE_TEST_KEYFRAME_FAILED");
+#endif
+      auto* sinkpad=gst_element_get_static_pad(GST_ELEMENT(encoder_->sink()),"sink");
+      if (!sinkpad) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+      const auto began=std::chrono::steady_clock::now();
+#endif
+      const bool accepted=gst_pad_push_event(sinkpad,gst_video_event_new_upstream_force_key_unit(
+          GST_CLOCK_TIME_NONE,TRUE,0));
+      gst_object_unref(sinkpad);
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+      const auto micros=std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now()-began).count();
+      std::fprintf(stderr,"KELPIE_TEST_FORCE_KEYFRAME accepted=%d event_us=%lld\n",
+          int(accepted),static_cast<long long>(micros));
+#endif
+      if (!accepted) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
+    }
     encoder_->Push(raw.release());
     Sample sample(encoder_->Pull());
     auto* sample_caps = gst_sample_get_caps(sample.get());
     auto* packet = gst_sample_get_buffer(sample.get());
-    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps))
+    if (!sample_caps || !packet || !ContainsVclAccessUnit(packet, sample_caps, force_keyframe) ||
+        (force_keyframe && GST_BUFFER_FLAG_IS_SET(packet,GST_BUFFER_FLAG_DELTA_UNIT)))
       throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     if (!caps_) caps_ = gst_caps_ref(sample_caps);
     Buffer copied(gst_buffer_copy_deep(packet));
@@ -162,12 +235,14 @@ class Video final : public Writer {
     return copied;
   }
   MuxResult Mux(std::size_t limit) {
+    MuxScratch scratch(output_.path.parent_path());
     MuxState state(limit);
     auto pipeline = std::make_unique<GstPipeline>(
         "appsrc name=input format=time is-live=false block=false max-bytes=268435456 ! "
         "video/x-h264,stream-format=avc,alignment=au ! "
-        "mp4mux fragment-duration=1 streamable=false trak-timescale=1000000 ! "
+        "mp4mux name=mux faststart=true trak-timescale=1000000 ! "
         "appsink name=output sync=false async=false max-buffers=2");
+    pipeline->SetFastStartFile(scratch.path());
     gst_app_src_set_caps(pipeline->source(), caps_);
     GstAppSinkCallbacks callbacks{}; callbacks.new_sample = Collect;
     gst_app_sink_set_callbacks(pipeline->sink(), &callbacks, &state, nullptr);
@@ -182,11 +257,13 @@ class Video final : public Writer {
       completed = pipeline->Complete();
     } catch (...) {
       pipeline.reset();
+      if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
       std::lock_guard lock(state.mutex);
       if (state.overflow) return {std::move(state.bytes), true};
       throw;
     }
     pipeline.reset(); // Join streaming callbacks before consuming their result.
+    if (!scratch.Remove()) throw std::runtime_error("CAPTURE_STORAGE_FAILED");
     std::lock_guard lock(state.mutex);
     if (state.failed || (!completed && !state.overflow)) throw std::runtime_error("CAPTURE_ENCODING_FAILED");
     return {std::move(state.bytes), state.overflow};
@@ -199,7 +276,10 @@ class Video final : public Writer {
   Buffer prepared_;
   std::vector<Buffer> packets_;
   std::size_t reserved_ = 0;
-  bool finished_ = false, stopped_ = false;
+  bool finished_ = false, stopped_ = false, terminal_force_failed_ = false;
+#ifdef KELPIE_LINUX_CODEC_FORCE_TEST
+  std::size_t encoded_test_index_=0;
+#endif
 };
 }
 std::unique_ptr<Writer> MakeVideo(const std::filesystem::path& path, Budget& budget, int fps) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Independent decoded-pixel evidence for the shared continuous red-marker fixture.
 import assert from "node:assert/strict";
+import { ffmpegPassthrough } from "../capture/ffmpeg-passthrough.mjs";
 import { redMarkerPixels } from "./red-marker-pixels.mjs";
 import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -18,7 +19,7 @@ for (const item of report.artifacts) {
   const height = Math.min(item.height - top, 2 * radius + 1);
   const result = spawnSync(process.env.FFMPEG ?? "ffmpeg", ["-v", "error", "-threads", "1",
     "-i", item.file, "-vf", `format=rgb24,crop=${width}:${height}:${left}:${top}:exact=1`,
-    "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+    ...ffmpegPassthrough(process.env.FFMPEG ?? "ffmpeg"), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
   { timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.status, 0, result.stderr?.toString() ?? result.error?.message);
   const size = width * height * 3, bytes = result.stdout;

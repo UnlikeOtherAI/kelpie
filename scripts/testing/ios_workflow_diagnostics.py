@@ -12,8 +12,12 @@ STATES = frozenset({
     "missing-issued-token", "missing-callback-token", "unexpected-navigation-token", "duplicate-issue",
 })
 CAPTURE_REASONS = frozenset({
-    "native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
-    *(f"snapshot-{value}" for value in ("native-bounds", "pixel-ratio", "layout-size", "visible-size", "scale")),
+    "native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
+    "responder-accepted", "responder-refused", "responder-descendant", "responder-outside",
+    "postedit-authorized", "postedit-result", "target-document", "target-viewport",
+    "target-refusal-STALE_TARGET", "target-refusal-TARGET_MOVED", "target-refusal-TARGET_NOT_FOUND",
+    "text-interaction-still-on", "text-interaction-disabled", "text-interaction-restored-on", "text-interaction-restored-off",
+    *(f"snapshot-{value}" for value in ("native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale")),
     *(f"focus-{value}" for value in (
         "document-focus", "target-focus", "identity", "viewport", "eligibility",
         "budget", "geometry", "hit", "sensitivity", "unknown",
@@ -25,8 +29,13 @@ CAPTURE_REASONS = frozenset({
         "READINESS_FAILED", "EXTRACT_FAILED", "BROWSER_FAILED", "BROWSER_BUSY", "PAGE_CHANGED", "OTHER",
     )),
 })
+RETIREMENT_EVENT = re.compile(r"\[WorkflowMarkerRetirement\] reason=(began|expired|document|window|geometry|tab|parent|foreground|owner|grant|unknown) remainingMs=(-?[0-9]+)(?:\s|$)")
+KEYBOARD_EVENT = re.compile(r"\[WorkflowKeyboardGeometry\] phase=(will|did) values=([-0-9.,]+)(?:\s|$)")
+ADMISSION_EVENT = re.compile(r"\[WorkflowCaptureAdmission\] first=([-0-9.,]+) last=([-0-9.,]+) count=([0-9]+)(?:\s|$)")
 INSETS_EVENT = re.compile(r"\[WorkflowCaptureInsets\] before=([-0-9.,]+) after=([-0-9.,]+)(?:\s|$)")
 GEOMETRY_EVENT = re.compile(r"\[WorkflowCaptureGeometry\] before=([0-9.,]+) after=([0-9.,]+)(?:\s|$)")
+PROJECTION_EVENT = re.compile(r"\[WorkflowProjection\] values=([-0-9.,]+)(?:\s|$)")
+ENCODE_EVENT = re.compile(r"\[WorkflowCaptureEncode\] elapsedMs=([0-9]+)(?:\s|$)")
 CAPTURE_EVENT = re.compile(r"\[WorkflowCapture\] reason=([A-Za-z_-]+)(?:\s|$)")
 EVENT = re.compile(r"\[WorkflowNavigationLease\] (invalid|wait-refused|timeout)=([a-z-]+)(?:\s|$)")
 
@@ -64,6 +73,66 @@ def fixed_capture_geometry(line):
     return {"before": before, "after": after}
 
 
+def fixed_projection(line):
+    found = PROJECTION_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        values = [float(value) for value in found[1].split(",")]
+    except ValueError:
+        return None
+    if len(values) != 17 or not all(math.isfinite(value) and abs(value) <= 10000 for value in values):
+        return None
+    return values
+
+
+def fixed_capture_encode(line):
+    found = ENCODE_EVENT.search(line)
+    if not found:
+        return None
+    value = int(found[1])
+    return value if 0 <= value <= 10000 else None
+
+
+def fixed_retirement(line):
+    found = RETIREMENT_EVENT.search(line)
+    if not found:
+        return None
+    remaining = int(found[2])
+    return {"reason": found[1], "remainingMs": remaining} if -10000 <= remaining <= 10000 else None
+
+
+def fixed_keyboard_geometry(line):
+    found = KEYBOARD_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        values = [float(number) for number in found[2].split(",")]
+    except ValueError:
+        return None
+    if len(values) != 20 or not all(math.isfinite(number) and abs(number) <= 10000 for number in values):
+        return None
+    if any(value not in (0, 1) for value in values[:6]):
+        return None
+    return {"phase": found[1], "values": values}
+
+
+def fixed_admission(line):
+    found = ADMISSION_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        first, last = ([float(number) for number in value.split(",")] for value in found.groups()[:2])
+        count = int(found[3])
+    except ValueError:
+        return None
+    if len(first) != 10 or len(last) != 10 or not 1 <= count <= 10000 or not all(
+        math.isfinite(number) and abs(number) <= 10000 for number in first + last
+    ):
+        return None
+    return {"first": first, "last": last, "count": count}
+
+
 def fixed_capture_insets(line):
     found = INSETS_EVENT.search(line)
     if not found:
@@ -90,6 +159,11 @@ def export_lease_diagnostics(result, destination):
         capture = collections.Counter()
         geometry = []
         insets = []
+        encodes = []
+        projections = []
+        admissions = []
+        keyboards = []
+        retirements = []
         for file in raw.rglob("StandardOutputAndStandardError*.txt"):
             with file.open(errors="replace") as stream:
                 for line in stream:
@@ -101,8 +175,23 @@ def export_lease_diagnostics(result, destination):
                     inset = fixed_capture_insets(line)
                     if inset and len(insets) < 100:
                         insets.append(inset)
+                    encode = fixed_capture_encode(line)
+                    if encode is not None and len(encodes) < 1000:
+                        encodes.append(encode)
+                    retirement = fixed_retirement(line)
+                    if retirement and len(retirements) < 100:
+                        retirements.append(retirement)
+                    keyboard = fixed_keyboard_geometry(line)
+                    if keyboard and len(keyboards) < 100:
+                        keyboards.append(keyboard)
+                    admission = fixed_admission(line)
+                    if admission and len(admissions) < 100:
+                        admissions.append(admission)
+                    projection = fixed_projection(line)
+                    if projection is not None and len(projections) < 1000:
+                        projections.append(projection)
         report = {"events": dict(sorted(events.items()))}
-        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets}
+        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets, "encodeMs": encodes, "projections": projections, "admissions": admissions, "keyboards": keyboards, "retirements": retirements}
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {"unavailable": type(error).__name__}
         capture_report = report

@@ -1,6 +1,6 @@
 # Strict script v1 contract
 
-This is the shared contract checkpoint for native implementation. Platform discovery determines actual support; this document does not claim completed native acceptance.
+This is a historical shared-contract checkpoint for native implementation. The current public contract is [typed workflows and walkthrough exports](../../api/script-workflows.md); platform discovery determines actual support. This checkpoint does not claim completed native acceptance.
 
 The existing `play-script` endpoint accepts an opt-in `version:1` script. Unversioned legacy scripts keep their existing admission path. A v1 script requires `tabId` and ordered typed `actions`; optional fields are `name`, `sessionId`, declared `inputs`, `capture`, `tapIndicator`, `pointer`, and `defaultWaitBetweenActions`. Unknown fields, arbitrary evaluation and continue-on-error are rejected before execution.
 
@@ -8,9 +8,9 @@ Actions are navigate, click/tap, fill/type, press-key, scroll, wait, wait-ready,
 
 Targets are exactly one of role/name/exact, label/exact, selector or x/y fallback. Semantic matching is exact after whitespace normalization. The fixed resolver returns CSS-pixel center of the viewport/overflow-clipped visible rectangle, viewport size, document identity and an ephemeral target token. Rechecking requires the same element object, document/URL, viewport, geometry and unobscured hit point. No selector re-query can substitute a replacement element.
 
-Native renderers with no trusted input route may use the fixed atomic synthetic-coordinate sequence and must report that guarantee. A synchronous handler changing the target during dispatch stops the sequence and reports uncertain completion. Never retry uncertain mutations. Fill/type use the native value setter on the same editable input or textarea after focus and identity recheck; unsupported editables refuse explicitly.
+Native renderers with no trusted input route may use the fixed atomic synthetic-coordinate sequence and must report that guarantee. Before the final event, a synchronous handler changing the target stops remaining input. An acknowledged final event may navigate or replace the target; lost or failed acknowledgement remains uncertain and is never retried. Late privacy classification remains subject to the current public contract. Fill/type use the native value setter on the same editable input or textarea after focus and identity recheck; unsupported editables refuse explicitly.
 
-Capture formats are GIF, video (MP4), and screenshots. Defaults: 15 FPS, maximum width 1280, duration 60000ms, retained bytes 67108864. Hard bounds: 30 FPS, width1920, duration300000ms, bytes268435456. Capture uses actual continuous frames with overlay composition and monotonic timestamps. Encoder backpressure drops frames rather than accumulating an unbounded queue; report dropped frames. A viewport resize stops and finalizes partial output. Abort/failure/bounds preserve valid partial artifacts.
+Capture formats are GIF, video (MP4), and screenshots. Defaults: 15 FPS, maximum width 1280, duration 60000ms, retained bytes 67108864. Hard bounds: 30 FPS, width1920, duration300000ms, bytes268435456. GIF and video use actual continuous frames with overlay composition and monotonic timestamps; screenshot-only capture produces step PNGs. Encoder backpressure drops frames rather than accumulating an unbounded queue; report dropped frames. A viewport resize stops and finalizes partial output. Abort/failure/bounds preserve valid partial artifacts.
 
 Tap defaults: color #3B82F6, radius20 CSS pixels, duration700ms, wobble and fade enabled. Visual pointer is disabled by default; enabled motion uses a deterministic S/C cubic curve, duration350ms and smoothstep ease in/out. Pointer presentation dispatches no hover or input.
 

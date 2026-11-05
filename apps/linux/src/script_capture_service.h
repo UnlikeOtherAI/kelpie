@@ -13,16 +13,19 @@ class LinuxScriptService : public std::enable_shared_from_this<LinuxScriptServic
   using DocumentGuard = std::function<bool(const Json&)>;
   explicit LinuxScriptService(DocumentGuard guard);
   void Configure(DesktopApp::Config& config);
-  Json Presentation() const;
+  Json Presentation(bool foreground) const;
   void Stop();
+  void RetireDetachedMarker(std::uint64_t revision);
   ScriptArtifactStore& artifacts() { return artifacts_; }
  private:
-  void Show(const Json& presentation, std::function<void()> stop);
+  void Show(const Json& presentation, std::function<void()> stop, std::function<bool()> valid);
+  std::uint64_t last_presentation_revision_=0;
   DocumentGuard guard_;
   ScriptArtifactStore artifacts_;
   mutable std::mutex mutex_;
-  Json presentation_ = Json::object();
+  mutable Json presentation_ = Json::object();
   std::function<void()> stop_;
+  mutable std::function<bool()> valid_;
   std::chrono::steady_clock::time_point shown_at_{};
 };
 }

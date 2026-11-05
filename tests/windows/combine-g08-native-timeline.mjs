@@ -9,6 +9,7 @@ import {verifyWgcProvenance} from "./wgc-g08-provenance.mjs";
 import {verifyTimelineSnapshots} from "./wgc-case-files.mjs";
 import {compareMeasuredPhases} from "./wgc-g08-compare.mjs";
 import {evaluateG08} from "../capture/g08-timeline.mjs";
+import {mapG08Scene} from "../capture/g08-fixture.mjs";
 const [cPath,cHash,cReportHash,sPath,sHash,sReportHash,output,expectedRevision,expectedUiaHash,expectedWgcHash]=process.argv.slice(2);
 assert.ok([cPath,sPath,output].every(p=>p&&isAbsolute(p)));for(const v of [cHash,cReportHash,sHash,sReportHash])assert.match(v??"",/^[a-f0-9]{64}$/);
 assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);
@@ -24,12 +25,12 @@ async function loadCase(path,expectedCase,expectedReport,curve){
  const bytes=await readFile(path);assert.equal(digest(bytes),expectedCase);const value=JSON.parse(bytes.toString("utf8"));
  const dir=dirname(path),reportPath=join(dir,"report.json"),runReport=await readFile(reportPath);assert.equal(digest(runReport),expectedReport);
  const observed=JSON.parse(runReport.toString("utf8"));assert.equal(observed.source,value.facts.source);assert.equal(observed.curve,curve);
- assert.equal(observed.cleanup,"supported-cli-closed");assert.equal(observed.processExit?.exited,true);
+ assert.equal(observed.cleanup,"supported-cli-closed-and-removed");assert.equal(observed.processExit?.exited,true);
  assert.equal(observed.testRevision,expectedRevision);assert.equal(observed.hashes?.uia,expectedUiaHash);assert.equal(observed.hashes?.wgc,expectedWgcHash);assert.equal(observed.hashes?.dll,value.binarySHA256);
  assert.ok(observed.checks.some(check=>check.name==="owned native and exported G08 case"&&check.passed===true));
  assert.equal(value.curve,curve);assert.equal(value.profile,"dense");assert.match(value.binarySHA256,/^[a-f0-9]{64}$/);
  const provenance=verifyWgcProvenance(value.facts);assert.deepEqual(provenance,value.provenance);
- assert.deepEqual(value.scene,{calibration:value.facts.fixture.events[0],start:value.facts.fixture.events[1],finish:value.facts.fixture.events[2]});
+ assert.deepEqual(value.scene,mapG08Scene(value.facts.fixture.events));
  await verifyTimelineSnapshots(value.summary,join(dir,"native"));
  assert.deepEqual(value.summary,value.facts.summary);
  for(const item of value.artifacts){
@@ -44,7 +45,7 @@ async function loadCase(path,expectedCase,expectedReport,curve){
   return {...sample,marker};
  });
  assert.equal(samples.length,value.native.frameCount);assert.equal(samples.length,value.facts.frameCount);
- const config={...value.config,scale:{x:provenance.width/value.config.viewport.width,y:provenance.height/value.config.viewport.height}};
+ const config={...value.config,warmupCalibration:true,scale:{x:provenance.width/value.config.viewport.width,y:provenance.height/value.config.viewport.height}};
  assert.equal(config.curve,curve);assert.deepEqual(config.from,value.scene.start.center);assert.deepEqual(config.to,value.scene.finish.center);
  const analysis=evaluateG08(samples,config);
  return {value,provenance,samples,analysis};

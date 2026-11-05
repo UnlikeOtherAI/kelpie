@@ -9,7 +9,9 @@ import { join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { runGtkStop } from "./gtk-stop.mjs";
 import { captureIsolatedWayland } from "./wayland-capture.mjs";
+import { captureIsolatedTimeline } from "./wayland-timeline.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
+if (process.env.KELPIE_WESTON_STREAM) throw new Error("UNSUPPORTED_PRIVATE_WESTON_STREAM");
 const execute = promisify(execFile);
 const [binaryArg, cliArg, outputArg, mode = "offscreen"] = process.argv.slice(2);
 assert.equal(process.platform, "linux");
@@ -83,9 +85,13 @@ try {
     const captureShown = env.KELPIE_ISOLATED_WAYLAND === "1"
       ? () => captureIsolatedWayland({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
       : undefined;
+    const captureTimeline = captureShown && env.KELPIE_GTK_TIMELINE === "1"
+      ? () => captureIsolatedTimeline({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
+      : undefined;
     report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256,
-      output, env, signal: deadline.signal, captureShown });
-    report.checks.push({ name: captureShown ? "isolated GTK recording image and public HTTP abort"
+      output, env, signal: deadline.signal, captureShown, captureTimeline });
+    report.checks.push({ name: env.KELPIE_GTK_DETACHED === "1" ? "isolated GTK detached marker transition" : captureShown ? (env.KELPIE_PRIVATE_ATSPI_ACTION === "1"
+      ? "isolated GTK recording image and exact-process AT-SPI Stop" : "isolated GTK recording image and public HTTP abort")
       : "native GTK Stop via exact-process AT-SPI Action", passed: true, runId: report.gtkStop.result.runId });
   }
   const root = fileURLToPath(new URL("../../", import.meta.url));

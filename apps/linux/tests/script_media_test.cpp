@@ -1,4 +1,5 @@
 #include "script_frame_compositor.h"
+#include "script_capture_cadence.h"
 #include "script_media_encoder.h"
 #include "script_artifact_store.h"
 #include "script_gstreamer.h"
@@ -22,6 +23,10 @@ ScriptFrame Frame(int index, int width = 64, int height = 48) {
       {{"x", width / 2.0}, {"y", height / 2.0}, {"radius", 8}, {"color", "#FF0000"},
        {"startedMs", value.elapsed_ms}, {"durationMs", 700}, {"wobble", false}, {"fade", false}}}});
   return value;
+}
+void NoMuxScratch(const std::filesystem::path& directory) {
+  for (const auto& file : std::filesystem::directory_iterator(directory))
+    assert(!file.path().filename().string().starts_with(".mux-"));
 }
 std::vector<std::uint8_t> Bytes(const std::filesystem::path& path) {
   std::ifstream input(path, std::ios::binary);
@@ -128,6 +133,55 @@ void VisualViewportPixels() {
   assert(refused);
 }
 
+// Exercise the real pending-frame encoder with a skipped request. A request
+// before expiry + one interval can leave a pre-expiry frame as the tail;
+// once that deadline has passed, a skipped request implies a later admission.
+void CadenceAndPendingEndpoint() {
+  for (const bool safe : {false,true}) {
+    const auto dir=CreatePrivateCaptureDirectory();
+    auto encoder=ScriptMediaEncoder::Create(dir,{"gif","mp4"},10,1048576);
+    auto first=Frame(0); first.elapsed_ms=0;
+    assert(!encoder->MarkTerminalClear(first));
+    auto active=Frame(1); active.elapsed_ms=650;
+    assert(encoder->AddFrame(first) && encoder->AddFrame(active));
+    assert(encoder->committed_movie_frames()==1);
+    double last=650;
+    if (safe) {
+      auto clear=Frame(2); clear.elapsed_ms=750; std::fill(clear.bgra.begin(),clear.bgra.end(),255);
+      assert(ScriptMovieFrameDue(last,clear.elapsed_ms,10));
+      assert(encoder->AddFrame(clear)); last=clear.elapsed_ms;
+      assert(encoder->committed_movie_frames()==2);
+    }
+    const double request=safe?810:710;
+    assert(!ScriptMovieFrameDue(last,request,10));
+    assert((last>=700)==safe);
+    if (safe) {
+      auto observed=Frame(2); observed.elapsed_ms=request; std::fill(observed.bgra.begin(),observed.bgra.end(),255);
+      auto changed=observed; changed.bgra[0]=0;
+      assert(!encoder->MarkTerminalClear(changed));
+      assert(encoder->MarkTerminalClear(observed));
+      encoder->ClearTerminalClear();
+      assert(encoder->MarkTerminalClear(observed));
+    }
+    const auto outputs=encoder->Finish(850);
+    assert(!encoder->budget_exceeded() && !encoder->finalization_failed() && outputs.size()==2);
+    for (const auto& output : outputs) {
+      assert(output.frame_count==(safe?3u:2u));
+      if (output.mime_type=="image/gif") {
+        int error=0; auto* gif=DGifOpenFileName(output.path.c_str(),&error);
+        assert(gif && DGifSlurp(gif)==GIF_OK);
+        const auto& image=gif->SavedImages[gif->ImageCount-1];
+        const auto* palette=image.ImageDesc.ColorMap?image.ImageDesc.ColorMap:gif->SColorMap;
+        const auto color=palette->Colors[image.RasterBits[(output.height/2)*output.width+output.width/2]];
+        if (safe) assert(color.Red==255 && color.Green==255 && color.Blue==255);
+        else assert(color.Red>200 && color.Green<120);
+        assert(DGifCloseFile(gif,&error)==GIF_OK);
+      }
+      std::filesystem::remove(output.path);
+    }
+    std::filesystem::remove(dir);
+  }
+}
 void PNG() {
   auto frame = Frame(0);
   const auto png = EncodeScriptPNG(frame);
@@ -149,7 +203,7 @@ void PNG() {
 }
 }
 int main() {
-  PNG(); HeldMarker(); VisualViewportPixels();
+  PNG(); HeldMarker(); VisualViewportPixels(); CadenceAndPendingEndpoint();
   const auto directory = CreatePrivateCaptureDirectory();
   const auto info = media::ScriptGstRuntimeInfo();
   auto encoder = ScriptMediaEncoder::Create(directory, {"gif", "mp4"}, 10, 1048576);
@@ -199,10 +253,12 @@ int main() {
   const auto fault_dir = CreatePrivateCaptureDirectory();
   auto fault = ScriptMediaEncoder::Create(fault_dir, {"gif", "mp4"}, 10, 1048576);
   assert(fault->AddFrame(Frame(0)) && fault->AddFrame(Frame(1)));
+  NoMuxScratch(fault_dir); // The pre-action proof has already retired its spool.
   assert(fault->committed_movie_frames() == 1); // Actual picture retained by both writers.
   std::ofstream(fault_dir / "capture.mp4") << "owned finalization collision";
   const auto survived = fault->Finish(200);
   assert(fault->finalization_failed() && survived.size() == 1 && survived[0].mime_type == "image/gif");
+  NoMuxScratch(fault_dir); // A final artifact collision leaves no private mux spool.
   assert(DecodeGif(survived[0]) == 2);
   report["postAckFinalizeFailure"] = {{"failed", true}, {"retainedGifFrames", survived[0].frame_count}};
   for (const auto& output : survived) std::filesystem::remove(output.path);

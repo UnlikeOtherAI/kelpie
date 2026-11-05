@@ -51,12 +51,12 @@ extension BrowserView {
             tabStore: tabStore,
             browserState: browserState,
             handlerContext: serverState.handlerContext,
-            bottomClearance: serverState.isScriptRecording ? 0 : bottomBarClearance(collapsed: bottomBarCollapsed),
-            bottomViewportInsets: serverState.isScriptRecording
+            bottomClearance: serverState.isScriptImmersive ? 0 : bottomBarClearance(collapsed: bottomBarCollapsed),
+            bottomViewportInsets: serverState.isScriptImmersive
                 ? 0...0
                 : bottomBarClearance(collapsed: true)...bottomBarClearance(collapsed: false),
             onScrollDirectionChange: { direction in
-                guard !addressEditing, !showTabOverview, !isIn3DInspector else { return }
+                guard !serverState.isScriptRecording, !addressEditing, !showTabOverview, !isIn3DInspector else { return }
                 withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.2)) {
                     bottomBarCollapsed = direction == .down
                 }
@@ -73,7 +73,7 @@ extension BrowserView {
 
     @ViewBuilder
     func stagedWebViewContainer(preset: TabletViewportPreset, stageSize: CGSize) -> some View {
-        if serverState.isScriptRecording {
+        if serverState.isScriptImmersive {
             webViewContainer
                 .frame(width: stageSize.width, height: stageSize.height)
         } else {
@@ -110,12 +110,15 @@ extension BrowserView {
                     }
                     .accessibilityIdentifier("browser.viewport.close")
                 }
+                .disabled(serverState.isScriptRecording)
+                .allowsHitTesting(!serverState.isScriptRecording)
+                .accessibilityHidden(serverState.isScriptRecording)
 
                 webViewContainer
                     .frame(width: stageSize.width, height: stageSize.height)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: serverState.isScriptRecording ? 0 : 26, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        RoundedRectangle(cornerRadius: serverState.isScriptRecording ? 0 : 26, style: .continuous)
                             .stroke(Color.white.opacity(0.7), lineWidth: 1)
                     }
                     .shadow(color: .black.opacity(0.18), radius: 18, y: 8)

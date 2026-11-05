@@ -5,7 +5,7 @@ import com.kelpie.browser.BuildConfig
 
 /** Numeric, bounded diagnostics for compositor and encoder bottlenecks in debug builds. */
 internal class ScriptCaptureDiagnostics {
-    enum class Phase { VISUAL, COMMIT, PIXEL_COPY, QUEUE, ENCODE, PIXEL_READ, GIF, VIDEO }
+    enum class Phase { VISUAL, COMMIT, PIXEL_COPY, QUEUE, ENCODE, PIXEL_READ, GIF, VIDEO, VIDEO_CONVERSION, VIDEO_SUBMIT, VIDEO_DRAIN, SCHEDULE_WAIT, SCHEDULE_EXCESS }
 
     private data class Sample(
         var count: Long = 0,

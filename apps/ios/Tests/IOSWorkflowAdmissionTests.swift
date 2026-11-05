@@ -200,7 +200,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
             clearFirst: true,
             scalars: ["A", "\u{1F600}"],
             delayMs: 25,
-            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            apply: { action, text, focused, _ in events.append("\(action):\(text):\(focused)") },
             wait: { delay in events.append("wait:\(delay)") }
         )
         XCTAssertEqual(events, ["fill::false", "type:A:true", "wait:25", "type:\u{1F600}:true"])
@@ -209,19 +209,19 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
             clearFirst: false,
             scalars: ["A", "B"],
             delayMs: 25,
-            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            apply: { action, text, focused, _ in events.append("\(action):\(text):\(focused)") },
             wait: { delay in events.append("wait:\(delay)") }
         )
         XCTAssertEqual(events, ["type:A:false", "wait:25", "type:B:true"])
         events = []
         try await IOSPacedTypingExecutor.run(
             clearFirst: false, scalars: [], delayMs: 25,
-            apply: { _, _, _ in events.append("input") }, wait: { _ in events.append("wait") }
+            apply: { _, _, _, _ in events.append("input") }, wait: { _ in events.append("wait") }
         )
         XCTAssertTrue(events.isEmpty)
         try await IOSPacedTypingExecutor.run(
             clearFirst: true, scalars: [], delayMs: 25,
-            apply: { action, text, focused in events.append("\(action):\(text):\(focused)") },
+            apply: { action, text, focused, _ in events.append("\(action):\(text):\(focused)") },
             wait: { _ in events.append("wait") }
         )
         XCTAssertEqual(events, ["fill::false"])
@@ -233,7 +233,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         do {
             try await IOSPacedTypingExecutor.run(
                 clearFirst: false, scalars: ["A", "B"], delayMs: 25,
-                apply: { _, _, _ in writes += 1 }, wait: { _ in throw IOSWorkflowFailure("SCRIPT_ABORTED") }
+                apply: { _, _, _, _ in writes += 1 }, wait: { _ in throw IOSWorkflowFailure("SCRIPT_ABORTED") }
             )
             XCTFail("Stop must interrupt before the second scalar")
         } catch let failure as IOSWorkflowFailure {
@@ -245,7 +245,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         do {
             try await IOSPacedTypingExecutor.run(
                 clearFirst: false, scalars: ["A"], delayMs: 25,
-                apply: { _, _, _ in throw IOSWorkflowFailure("STALE_TARGET") }, wait: { _ in XCTFail("No wait") }
+                apply: { _, _, _, _ in throw IOSWorkflowFailure("STALE_TARGET") }, wait: { _ in XCTFail("No wait") }
             )
             XCTFail("Target refusal must stop input")
         } catch let failure as IOSWorkflowFailure {
@@ -256,7 +256,7 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         do {
             try await IOSPacedTypingExecutor.run(
                 clearFirst: false, scalars: ["A"], delayMs: 25,
-                apply: { _, _, _ in throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) },
+                apply: { _, _, _, _ in throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true) },
                 wait: { _ in XCTFail("No wait") }
             )
             XCTFail("Unknown input must not be retried")
@@ -267,10 +267,65 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
     }
 
     @MainActor
+    func testPacedAcknowledgementRequiresCompleteResultAndMatchingToken() throws {
+        let valid: Body = ["ok": true, "sensitive": false, "sensitivityKnown": true,
+                           "mayHaveCompleted": true, "token": "t1", "inputGuarantee": "synthetic-coordinate"]
+        XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t1"))
+        var unknown = valid
+        unknown["sensitivityKnown"] = false
+        XCTAssertTrue(IOSPacedTypingExecutor.isAcknowledgement(unknown, token: "t1"))
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: "t2"))
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(valid, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(valid, token: "t2"))
+        var refusal = valid
+        refusal["ok"] = false
+        refusal["error"] = "TARGET_MOVED"
+        refusal["mayHaveCompleted"] = false
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        refusal["mayHaveCompleted"] = true
+        XCTAssertFalse(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        refusal["error"] = ""
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(refusal, token: "t1"))
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: nil))
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(valid, token: ""))
+        var contradiction = valid
+        contradiction["error"] = "INPUT_UNCERTAIN"
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        contradiction["error"] = NSNull()
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(contradiction, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(contradiction, token: "t1"))
+        XCTAssertTrue(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": true, "sensitivityKnown": false]))
+        XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": false, "sensitivityKnown": false]))
+        XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitivityKnown": true]))
+        XCTAssertFalse(IOSPacedTypingExecutor.hasKnownSensitivity(["sensitive": "false", "sensitivityKnown": true]))
+        var wrongGuarantee = valid
+        wrongGuarantee["inputGuarantee"] = "trusted"
+        XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(wrongGuarantee, token: "t1"))
+        let malformedValues = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data("[1,0,\"true\",null]".utf8)) as? [Any]
+        )
+        for field in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted"] {
+            for value in malformedValues {
+                var malformed = valid
+                malformed[field] = value
+                XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(malformed, token: "t1"))
+                XCTAssertTrue(IOSPacedTypingExecutor.needsPrivacyLatch(malformed, token: "t1"))
+            }
+        }
+        for key in ["ok", "sensitive", "sensitivityKnown", "mayHaveCompleted", "token", "inputGuarantee"] {
+            var malformed = valid
+            malformed.removeValue(forKey: key)
+            XCTAssertFalse(IOSPacedTypingExecutor.isAcknowledgement(malformed, token: "t1"))
+        }
+    }
+
+    @MainActor
     func testPacedUnknownPostMutationSensitivityStops() throws {
-        try IOSPacedTypingExecutor.requireKnownSensitivity(true)
+        try IOSPacedTypingExecutor.requireKnownSensitivity(true, hasContinuation: true)
+        try IOSPacedTypingExecutor.requireKnownSensitivity(false, hasContinuation: false)
+        try IOSPacedTypingExecutor.requireKnownSensitivity(nil, hasContinuation: false)
         for known in [false, nil] as [Bool?] {
-            XCTAssertThrowsError(try IOSPacedTypingExecutor.requireKnownSensitivity(known)) { error in
+            XCTAssertThrowsError(try IOSPacedTypingExecutor.requireKnownSensitivity(known, hasContinuation: true)) { error in
                 let failure = error as? IOSWorkflowFailure
                 XCTAssertEqual(failure?.code, "INPUT_UNCERTAIN")
                 XCTAssertEqual(failure?.mayHaveCompleted, true)

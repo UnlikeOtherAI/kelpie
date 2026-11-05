@@ -69,14 +69,40 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "999999,800")))
         self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "390,0")))
 
+    def test_capture_admission_diagnostics_are_bounded(self):
+        from ios_workflow_diagnostics import fixed_admission
+        line = ("[WorkflowCaptureAdmission] first=402,874,402,812,1,62,34,0,0,0 "
+                "last=402,874,402,778,1,62,34,0,0,1 count=18")
+        self.assertEqual(fixed_admission(line), {
+            "first": [402, 874, 402, 812, 1, 62, 34, 0, 0, 0],
+            "last": [402, 874, 402, 778, 1, 62, 34, 0, 0, 1], "count": 18,
+        })
+        self.assertIsNone(fixed_admission(line.replace("count=18", "count=10001")))
+        self.assertIsNone(fixed_admission(line.replace("last=402", "last=99999")))
+
     def test_capture_xcresult_diagnostics_only_keep_fixed_enums(self):
         from ios_workflow_diagnostics import fixed_capture_events
         self.assertEqual(fixed_capture_events([
             "prefix [WorkflowCapture] reason=observation-INVALID_ARGUMENTS",
             "[WorkflowCapture] reason=snapshot-visible-size",
             "[WorkflowCapture] reason=focus-viewport",
+            "[WorkflowCapture] reason=responder-outside",
+            "[WorkflowCapture] reason=target-refusal-STALE_TARGET",
             "[WorkflowCapture] reason=focus-private_value",
-        ]), {"focus-viewport": 1, "observation-INVALID_ARGUMENTS": 1, "snapshot-visible-size": 1})
+        ]), {"focus-viewport": 1, "observation-INVALID_ARGUMENTS": 1, "responder-outside": 1,
+              "snapshot-visible-size": 1, "target-refusal-STALE_TARGET": 1})
+
+    def test_projection_diagnostics_accept_only_finite_bounded_vectors(self):
+        from ios_workflow_diagnostics import fixed_projection
+        self.assertEqual(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 17)), [1] * 17)
+        self.assertIsNone(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 16)))
+        self.assertIsNone(fixed_projection("[WorkflowProjection] values=" + ",".join(["1"] * 16 + ["10001"])))
+
+    def test_capture_encode_diagnostics_accept_only_bounded_numbers(self):
+        from ios_workflow_diagnostics import fixed_capture_encode
+        self.assertEqual(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=137"), 137)
+        self.assertIsNone(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=10001"))
+        self.assertIsNone(fixed_capture_encode("[WorkflowCaptureEncode] elapsedMs=private"))
 
     def test_capture_diagnostics_only_keep_fixed_reasons(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -158,6 +184,70 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         self.assertIn("testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat", full_names)
         with self.assertRaises(ValueError):
             DRIVER.selection("unrecognized")
+
+    def test_geometry_selection_uses_only_real_target_and_pinch_journeys(self):
+        targets, names = DRIVER.selection("geometry")
+        self.assertEqual(names, {
+            "testLiveMarkerProjectionMatchesSameSceneTarget",
+            "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+            "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchScrollableControl",
+            "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+            "testProjectionUsesInsetContentOriginAndVisualViewport",
+            "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
+        })
+        units = {"testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                 "testProjectionUsesInsetContentOriginAndVisualViewport",
+                 "testUnsettledInsetAdmissionHonorsDeadlineAndStop"}
+        self.assertEqual(set(targets), {"KelpieTests/IOSCaptureViewportTests"} |
+                         {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names - units})
+        _, full_names = DRIVER.selection("full")
+        self.assertTrue(names < full_names)
+
+    def test_postedit_selection_is_one_real_ui_case(self):
+        targets, names = DRIVER.selection("postedit")
+        self.assertEqual(names, {"testPostEvaluationCallbackKeepsKeyboardClosed",
+                                 "testPreAuthorizationTimeoutAndExactViewTermination"})
+        self.assertEqual(targets, ["KelpieTests/IOSPostEvaluationProbeTests",
+                                   "KelpieUITests/WorkflowCaptureUITests/testPostEvaluationCallbackKeepsKeyboardClosed"])
+
+    def test_keyboard_selection_and_bounded_geometry(self):
+        from ios_workflow_diagnostics import fixed_keyboard_geometry
+        targets, names = DRIVER.selection("keyboard")
+        self.assertEqual(names, {"testKeyboardGeometryForOwnedPacedCapture"})
+        self.assertEqual(targets, ["KelpieUITests/WorkflowCaptureUITests/testKeyboardGeometryForOwnedPacedCapture"])
+        values = [1, 1, 1, 1, 1, 1] + [0] * 14
+        line = "[WorkflowKeyboardGeometry] phase=will values=" + ",".join(map(str, values))
+        self.assertEqual(fixed_keyboard_geometry(line), {"phase": "will", "values": values})
+        self.assertIsNone(fixed_keyboard_geometry(line.replace("phase=will", "phase=private")))
+        self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
+        self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
+
+    def test_marker_selection_includes_both_lifetime_controls(self):
+        targets, names = DRIVER.selection("marker")
+        ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun", "testRetiredMarkerDoesNotReappearAfterTabChange",
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+              "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
+              "testNonMovieLoadingAndScrollKeepChromeGeometry"}
+        self.assertEqual(names, ui | {"testOnlyMovieFormatsSelectImmersiveLayout"})
+        self.assertEqual(set(targets), {"KelpieTests/IOSWorkflowPresentationModeTests"} |
+                         {"KelpieUITests/WorkflowCaptureUITests/" + name for name in ui})
+
+    def test_retirement_facts_are_fixed_and_bounded(self):
+        from ios_workflow_diagnostics import fixed_retirement
+        self.assertEqual(fixed_retirement("[WorkflowMarkerRetirement] reason=geometry remainingMs=250"), {
+            "reason": "geometry", "remainingMs": 250
+        })
+        self.assertIsNone(fixed_retirement("[WorkflowMarkerRetirement] reason=private remainingMs=250"))
+        self.assertIsNone(fixed_retirement("[WorkflowMarkerRetirement] reason=began remainingMs=10001"))
+
+    def test_mobilecheck_selection_is_the_exact_union(self):
+        targets, names = DRIVER.selection("mobilecheck")
+        geometry_targets, geometry_names = DRIVER.selection("geometry")
+        marker_targets, marker_names = DRIVER.selection("marker")
+        self.assertEqual(targets, geometry_targets + marker_targets)
+        self.assertEqual(names, geometry_names | marker_names)
+        self.assertEqual(len(names), 14)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

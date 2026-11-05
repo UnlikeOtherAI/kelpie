@@ -83,7 +83,16 @@ class ScriptRuntime(
             withTimeout(30_000) {
                 checkNotNull(ctx.browserGateway).scriptLease(script["tabId"] as String, view, false, { authority.requireCurrent() }) { Unit }
             }
-            if (!playback.start(ScriptPreflight.actions(script).size, false)) throw ScriptFailure("RECORDING_IN_PROGRESS")
+            val started =
+                withContext(Dispatchers.Main.immediate) {
+                    if (playback.start(ScriptPreflight.actions(script).size, false, scriptUsesMovieLayout(capture))) {
+                        ctx.scriptOverlay.clear()
+                        true
+                    } else {
+                        false
+                    }
+                }
+            if (!started) throw ScriptFailure("RECORDING_IN_PROGRESS")
             val run =
                 try {
                     store.start(authority, script)
@@ -91,6 +100,7 @@ class ScriptRuntime(
                     playback.finishFatalFailure("SCRIPT_ADMISSION_FAILED", "Script admission failed")
                     throw error
                 }
+            withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.claimRun(run.id) }
             for (action in ScriptPreflight.actions(script)) {
                 if (action["sensitive"] == true) (action["text"] as? String)?.let(run.redactor::add)
             }
@@ -133,6 +143,7 @@ class ScriptRuntime(
                 if (store.active() || legacyOwner != null) throw ScriptFailure("SCRIPT_NOT_FOUND")
                 return@safe legacy()
             }
+            ctx.scriptOverlay.clearRetainedOwner(run.id)
             if (run.active()) run.stop("SCRIPT_ABORTED")
             authority.requireCurrent()
             metadata(run)
@@ -155,6 +166,7 @@ class ScriptRuntime(
         }
 
     fun stop() {
+        ctx.scriptOverlay.clear()
         store.stopActive()
     }
 
@@ -259,7 +271,8 @@ class ScriptRuntime(
                 runner.guard()
                 run.step(index, action["action"] as String)
                 runner.execute(action, index)
-                if (action["action"] !in setOf("click", "tap", "fill", "type")) {
+                val emptyPacedType = (action["__pacedPlan"] as? ScriptPacedPlan)?.let { !it.clearFirst && it.scalars.isEmpty() } == true
+                if (action["action"] !in setOf("click", "tap", "fill", "type") || emptyPacedType) {
                     capture?.step(index, action["action"] == "screenshot")
                 }
                 runner.guard()
@@ -295,7 +308,10 @@ class ScriptRuntime(
                 } catch (_: Exception) {
                     if (failure == null) failure = ScriptFailure("SCRIPT_RETIREMENT_FAILED")
                 }
-                withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.clear() }
+                val movies = (objectMap(run.script["capture"])["formats"] as? List<*>).orEmpty().any { it == "gif" || it == "video" }
+                if (failure != null || run.stopReason.get() != null || movies) {
+                    withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.clearOwned(run.id) }
+                }
                 val safeOutputs =
                     try {
                         run.prepareOutputs()
@@ -322,6 +338,43 @@ class ScriptRuntime(
                     playback.finishFatalFailure(terminalError, "Script stopped")
                 } else {
                     playback.finishSuccess()
+                }
+                if (terminal["state"] == "completed" && terminalError == null && !movies) {
+                    val authority = run.authority
+                    withContext(Dispatchers.Main.immediate) {
+                        val overlay = ctx.scriptOverlay
+                        val windowToken = view.windowToken
+                        val root = view.rootView
+                        val expectedDocument = ctx.tabStore?.activeTab?.documentVersion
+                        val valid: () -> Boolean = {
+                            val active = ctx.tabStore?.activeTab
+                            ctx.scriptForeground &&
+                                active != null &&
+                                active.id == run.tabId &&
+                                active.webView === view &&
+                                active.documentVersion == expectedDocument &&
+                                ctx.scriptPlaybackState?.isRecording?.value != true &&
+                                view.isAttachedToWindow &&
+                                view.isShown &&
+                                view.hasWindowFocus() &&
+                                view.rootView === root &&
+                                view.windowToken === windowToken &&
+                                runCatching { authority.permitsOnMain() }.getOrDefault(false)
+                        }
+                        val retained =
+                            if (windowToken != null && expectedDocument != null) {
+                                overlay.retainFinalTap(run.id, System.nanoTime(), valid)
+                            } else {
+                                null
+                            }
+                        if (retained != null && retained.document == expectedDocument && windowToken != null) {
+                            ScriptOverlayRetirement.start(overlay, retained, authority, ctx, run.tabId, view, root, windowToken)
+                        } else {
+                            overlay.clearOwned(run.id)
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main.immediate) { ctx.scriptOverlay.clearOwned(run.id) }
                 }
                 run.clearPrivate()
                 result.complete(response)

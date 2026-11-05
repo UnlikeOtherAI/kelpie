@@ -23,16 +23,59 @@ NAVIGATION_TESTS = Path("apps/ios/Tests/IOSWorkflowNavigationTests.swift")
 
 
 def selection(scope):
+    if scope == "mobilecheck":
+        geometry_targets, geometry_names = selection("geometry")
+        marker_targets, marker_names = selection("marker")
+        return geometry_targets + marker_targets, geometry_names | marker_names
+    if scope == "marker":
+        ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
+              "testRetiredMarkerDoesNotReappearAfterTabChange",
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+              "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
+              "testNonMovieLoadingAndScrollKeepChromeGeometry"}
+        unit = {"testOnlyMovieFormatsSelectImmersiveLayout"}
+        return (["KelpieTests/IOSWorkflowPresentationModeTests"] +
+                ["KelpieUITests/WorkflowCaptureUITests/" + name for name in sorted(ui)]), ui | unit
+    if scope == "keyboard":
+        name = "testKeyboardGeometryForOwnedPacedCapture"
+        return ["KelpieUITests/WorkflowCaptureUITests/" + name], {name}
+    if scope == "postedit":
+        name = "testPostEvaluationCallbackKeepsKeyboardClosed"
+        return ["KelpieTests/IOSPostEvaluationProbeTests", "KelpieUITests/WorkflowCaptureUITests/" + name], {
+            name, "testPreAuthorizationTimeoutAndExactViewTermination"
+        }
+    if scope == "geometry":
+        methods = [
+            "testLiveMarkerProjectionMatchesSameSceneTarget",
+            "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+            "testNativePinchClipsTapCenterAndExportedMarker",
+            "testNativePinchScrollableControl",
+        ]
+        unit = {
+            "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+            "testProjectionUsesInsetContentOriginAndVisualViewport",
+            "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
+        }
+        return (["KelpieTests/IOSCaptureViewportTests"] +
+                ["KelpieUITests/WorkflowCaptureUITests/" + method for method in methods]), set(methods) | unit
     if scope not in ("full", "navigation", "diagnostics"):
         raise ValueError("Unsupported native workflow test scope")
     targets = ["KelpieTests/IOSWorkflowNavigationTests"]
     files = [NAVIGATION_TESTS]
     if scope == "full":
-        targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieUITests/WorkflowCaptureUITests"])
-        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
+        targets.extend(["KelpieTests/IOSWorkflowAdmissionTests", "KelpieTests/IOSWorkflowReceiptTests",
+                        "KelpieTests/IOSCaptureViewportTests", "KelpieTests/IOSG08GeometryTests",
+                        "KelpieTests/IOSWorkflowPresentationModeTests", "KelpieUITests/WorkflowCaptureUITests"])
+        files.extend([Path("apps/ios/Tests/IOSWorkflowAdmissionTests.swift"), Path("apps/ios/Tests/IOSWorkflowReceiptTests.swift"), Path("apps/ios/Tests/IOSCaptureViewportTests.swift"),
+                      Path("apps/ios/Tests/IOSG08GeometryTests.swift"), Path("apps/ios/Tests/IOSWorkflowPresentationModeTests.swift"), *Path("apps/ios/UITests").glob("Workflow*.swift")])
     else:
         methods = [NAVIGATION_UI_TEST, COLD_NAVIGATION_TEST]
         if scope == "diagnostics":
+            targets.append("KelpieTests/IOSCaptureViewportTests")
+            targets.append("KelpieTests/IOSG08GeometryTests")
+            targets.append("KelpieTests/IOSWorkflowPresentationModeTests")
+            targets.append("KelpieTests/IOSWorkflowReceiptTests/testCanonicalMutationReceiptMatrix")
+            targets.append("KelpieTests/IOSWorkflowReceiptTests/testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard")
             targets.extend("KelpieTests/IOSWorkflowAdmissionTests/" + name for name in [
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
@@ -40,6 +83,7 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedAcknowledgementRequiresCompleteResultAndMatchingToken",
                 "testPacedUnknownPostMutationSensitivityStops",
                 "testPacedEditsArePlannedBeforeAnyEarlierAction",
                 "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
@@ -49,18 +93,33 @@ def selection(scope):
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
                 "testCaptureLimitsRecoverAndBothPointerCurvesReachTheirTarget",
                 "testDefaultPointerMotionUsesShorterNativeTiming",
+                "testLivePointerMarkerAndStopAppearDuringCapture",
+                "testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
+                "testRetiredMarkerDoesNotReappearAfterTabChange",
+                "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+                "testNonMovieTabletStageRetainsRendererFrame",
+                "testNonMovieScriptClearsAddressFocus",
+                "testNonMovieLoadingAndScrollKeepChromeGeometry",
                 "testNativePinchClipsTapCenterAndExportedMarker",
+                "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",
                 "testLabelFillTypeAndReflectedPasswordRedaction",
                 "testFocusAutocompleteRefusalThroughMCPRedactsEarlierOutputsAndDiscardsFrames",
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
+                "testLiveMarkerProjectionMatchesSameSceneTarget",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
                 "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
-                "testPacedFocusLossStopsWithoutRetargeting",
+                "testPacedCaptureKeepsNativeKeyboardClosedDuringEdit",
+                            "testPacedFocusLossStopsWithoutRetargeting",
                 "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
                 "testPacedUnknownTargetRedactsFullLiteralButOrdinaryInputDoesNot",
+                "testPacedAcknowledgedFinalNavigationCompletesAndRedacts",
+                "testPacedAcknowledgedFinalNavigationDiscardsCapture",
+                "testPacedLostFinalCallbackProtectsLiteralWithoutCapture",
+                "testPacedLostFinalCallbackDiscardsCapture",
                 "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
+                "testPacedEmptyTypeRejectsButtonAndReadonlyTargets",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
@@ -68,12 +127,20 @@ def selection(scope):
         required.update(methods)
         if scope == "diagnostics":
             required.update([
+                "testConstantG08GeometryBindsEverySampleToBothDocuments",
+                "testOnlyMovieFormatsSelectImmersiveLayout",
+                "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                "testProjectionUsesInsetContentOriginAndVisualViewport",
+                "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
+                "testCanonicalMutationReceiptMatrix",
+                "testMalformedCallbackLatchesBeforeDocumentOrAuthorityGuard",
                 "testCaptureCleanupPreservesRegisteredAliasAndDiscardsUnpublishedFiles",
                 "testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed",
                 "testFirstCaptureWaitsForStableCompleteViewport",
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
+                "testPacedAcknowledgementRequiresCompleteResultAndMatchingToken",
                 "testPacedUnknownPostMutationSensitivityStops",
                 "testPacedEditsArePlannedBeforeAnyEarlierAction",
                 "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
@@ -234,7 +301,7 @@ def run_device(device, product_hashes, scope):
         # Xcode's human-readable diagnostics stay on the ephemeral machine. Only the xcresult and curated outputs are uploaded.
         with log_path.open("w") as log:
             process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
-            deadline = time.monotonic() + (10 if scope == "navigation" else 40) * 60
+            deadline = time.monotonic() + {"navigation": 10, "geometry": 20, "postedit": 10, "keyboard": 10, "marker": 10, "mobilecheck": 20}.get(scope, 40) * 60
             while process.poll() is None and time.monotonic() < deadline:
                 tab = handoff.current_tab()
                 if tab and not cli_started:
@@ -288,7 +355,7 @@ def run_device(device, product_hashes, scope):
             install_report["afterError"] = type(error).__name__
         (folder / "installed.json").write_text(json.dumps(install_report, indent=2))
         missing = sorted(method for method in required if method not in tests)
-        cli_required = scope != "navigation"
+        cli_required = scope not in ("navigation", "geometry", "postedit", "keyboard", "marker", "mobilecheck")
         if process.returncode or (cli_required and not cli_started) or cli_error or missing or json.loads(summary).get("failedTests", 0):
             raise RuntimeError(f"XCTest exit {process.returncode}, CLI started {cli_started}, CLI error {cli_error}, missing tests {missing}")
         if not install_verified:

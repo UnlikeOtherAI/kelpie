@@ -12,6 +12,7 @@ import { runAdversaryDiagnostics } from "./adversary-diagnostics.mjs";
 import { runPreinputReplacement } from "./preinput-replacement.mjs";
 import { runArtifactProtocolAcceptance } from "./artifact-protocol-acceptance.mjs";
 import { writeGifRuntimeEvidence } from "./gif-runtime-evidence.mjs";
+import { nativeProcessStartTicks } from "./native-resource-snapshot.mjs";
 import { startBrowser, stopBrowser, fileExists } from "../windows/lib/process.mjs";
 
 
@@ -70,6 +71,13 @@ const cancellation = new AbortController();
 const cancel = () => cancellation.abort();
 process.once("SIGTERM", cancel); process.once("SIGINT", cancel);
 try {
+  let resourceEnv = {};
+  if (process.env.KELPIE_LINUX_RESOURCE_DIAGNOSTIC === "1") {
+    const startTicks = await nativeProcessStartTicks(browser.child.pid);
+    assert.ok(startTicks, "Cannot pin owned app for resource diagnostics");
+    resourceEnv = { KELPIE_LINUX_RESOURCE_PID: String(browser.child.pid), KELPIE_LINUX_RESOURCE_START_TICKS: startTicks };
+    report.resourceIdentity = { pid: browser.child.pid, startTicks };
+  }
   readiness = await waitFor(async () => {
     if (cancellation.signal.aborted) throw new Error("Owned native launch cancelled");
     if (browser.child.exitCode !== null || browser.child.signalCode !== null)
@@ -82,7 +90,7 @@ try {
   const corpusPath = fileURLToPath(new URL("../windows/run-script-capture-acceptance.mjs", import.meta.url));
   const corpusOutput = join(output, "capture");
   const result = await runCorpus(process.execPath, [corpusPath, readinessPath, corpusOutput],
-    { KELPIE_CAPTURE_PORT: String(readiness.port) }, cancellation.signal);
+    { KELPIE_CAPTURE_PORT: String(readiness.port), ...resourceEnv }, cancellation.signal);
   report.corpus = { code: result.code, stdout: result.stdout, stderr: result.stderr };
   const corpus = JSON.parse(await readFile(join(corpusOutput, "report.json"), "utf8"));
   report.checks = corpus.checks;

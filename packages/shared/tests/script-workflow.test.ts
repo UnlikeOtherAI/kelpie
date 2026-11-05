@@ -106,7 +106,7 @@ describe("reusable workflow authoring", () => {
     ] })).toThrow("Duplicate workflow output name");
   });
   it("validates the shipped walkthrough and nested-extraction recipes", async () => {
-    for (const name of ["submit-walkthrough", "extract-products"]) {
+    for (const name of ["submit-walkthrough", "extract-products", "paced-fill"]) {
       const raw: unknown = JSON.parse(await readFile(new URL("../../../docs/examples/workflows/" + name + ".json", import.meta.url), "utf8"));
       const parsed = scriptV1Schema.parse(raw);
       expect(bindScriptInputs(parsed, parsed.inputs ? { name: "Ada" } : {}).version).toBe(1);

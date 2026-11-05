@@ -33,7 +33,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Target(
   return value;
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
-    TabLease lease, const Json& action, const Json& script, Json* outputs, std::vector<std::string>* redactions) {
+    TabLease lease, const Json& action, const Json& script, const Json& typing_plan, Json* outputs, std::vector<std::string>* redactions) {
   const std::string name = action.at("action");
   ScopedBrowserControlLease owned(lease);
   const auto failed_target = [](const Json& target) {
@@ -56,6 +56,18 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     BrowserNavigationState navigation;
     const auto observed = engine.GetNavigationState(lease, &navigation, std::chrono::seconds(2));
     if (!observed.ok) return ErrorResponse(observed.error_code, "Owned document is unavailable");
+    // Empty paced type still validates the original target and retains an
+    // explicitly requested step image, without focus, input or pacing.
+    if (name == "type" && typing_plan.is_object() && typing_plan["scalars"].empty()) {
+      resolved = Target(lease, action.at("target"), resolved.at("token"), false, capturing);
+      ingest_sensitive(resolved);
+      if (!resolved.value("ok", false)) return failed_target(resolved);
+      if (!resolved.value("editable", false)) return ErrorResponse("TARGET_NOT_EDITABLE", "Target is not an editable text control");
+      const bool png = script.contains("capture") && std::any_of(script["capture"]["formats"].begin(),
+        script["capture"]["formats"].end(), [](const Json& format) { return format == "screenshots"; });
+      if (png) StepScreenshot(action_index, true, navigation.tab.document_version);
+      return SuccessResponse();
+    }
     const double x = resolved.at("x"), y = resolved.at("y");
     Json pointer = script.value("pointer", Json::object());
     const double duration = pointer.value("enabled", false) ? pointer.value("durationMs", 350) : 0;
@@ -114,7 +126,22 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     options["policy"]={{"refuseSensitive",capturing}};
     Json output=Json::object();
     lease.document_version = navigation.tab.document_version;
-    const auto result = engine.DispatchScriptTarget(lease, options, action, &output, std::chrono::seconds(10));
+    Json native_action = action;
+    if (typing_plan.is_object()) native_action["_typingPlan"] = typing_plan;
+    const auto timeout = typing_plan.is_object() ? std::chrono::seconds(300) : std::chrono::seconds(10);
+    BrowserControlResult result;
+    try {
+      result = engine.DispatchScriptTarget(lease, options, native_action, &output, timeout, [this] { return Cancelled(); });
+    } catch (...) {
+      // An exception after a paced dispatch leaves privacy unclassified. The
+      // full literal remains in the immutable action until this point.
+      if (typing_plan.is_object()) {
+        const auto literal = action.at("text").get<std::string>();
+        if (!literal.empty()) redactions->push_back(literal);
+        if (capturing) privacy_discard.store(true);
+      }
+      throw;
+    }
     if(!result.ok && result.operation_may_have_completed) output["mayHaveCompleted"]=true;
     ingest_sensitive(output);
     if(config.invalidate) config.invalidate();

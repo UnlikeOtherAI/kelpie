@@ -85,35 +85,122 @@ closing any requirement.
 
 ## Current scope supplement - 2026-11-05
 
-This supplement supersedes the earlier working snapshot without removing its
-historical failures. Integration has advanced through `15cc0dc4` and remains
-in progress. A reported subset is not a platform or full-matrix pass.
+Source snapshot `d7f4306d`. Reports below identify the source, test or
+hosted run actually exercised; earlier rows and platform receipts preserve
+historical failures. No row claims whole-platform acceptance.
 
-- **Lightpanda:** the pinned 1.0.2 optional reader tranche passed its bounded
-  public stdio corpus (16 cases) and was accepted for the four explicitly
-  selected DOM/text reader methods. The default remains deny; geometry, input,
-  capture and WebMCP are not admitted. The published package and installed
-  release still require verification.
-- **Android:** API 29 minimum is user-approved. The owner reports 7/7 local
-  phone privacy cases after the focus fix; tablet, hosted full corpus, actual
-  scene and dense G08 evidence remain separate gates. Earlier API 35 focus
-  failures and sparse capture results are retained.
-- **Linux:** the a05 real-CDP corpus passed 40/42, including all six new
-  post-ack cases. Two cross-document capture cases remain refused because
-  old-realm sensitivity is unknown. No classification is inferred from the
-  new document. GTK/OSR, installed RPM, dense G08 and release acceptance
-  require their own final integrated evidence. The deterministic GIF model
-  generator and provenance checks are under development.
-- **Windows:** prior four C/S GIF/MP4 export results and the coordinator's
-  native spatial/Stop observations are scoped evidence at their recorded
-  revisions. Final native timeline and the 350 ms profile remain open; later
-  launch/readiness failures are preserved. The launch lifecycle fix and
-  exact installed release verification remain open.
-- **macOS and iOS:** WK/CEF and iPhone/iPad need separate final-source runtime,
-  privacy, G08 and public transport evidence; earlier hosted or build subsets
-  do not establish full acceptance.
-- **Shared and release:** the 350 ms default and final-event privacy changes
-  require regenerated native bindings and platform replays on the integrated
-  source. Final portable checks, component versions, one reviewed PR, release
-  publication and installed signed/package verification remain open. No
-  nine-runtime or 432-cell completion is asserted.
+- **Shared and release:** the 52-case mutation-receipt matrix passed Android,
+  iOS and Mac production decoders and validators. This is not full native
+  workflow proof. Final integrated portable checks, component versions, the
+  single PR, required CI, signing, publication and installed-release checks
+  remain open. Lightpanda 1.0.2's explicitly selected DOM/text reader passed
+  its 16-case public stdio corpus; published-package verification is open.
+- **Default pointer speed:** the shared schema and desktop, Android, iOS and
+  Mac fallback sites specify 350 ms when the pointer is enabled and duration
+  omitted. Explicit overrides remain supported; dense G08 intentionally uses
+  2400 ms. Windows `de318b47` omitted-duration C recorded five intermediate
+  samples and a 383.34 ms observed endpoint bracket. A separate analysis with
+  shared fitter `131031d5` measured 350/500 RMS fits of 6.00/90.47 CSS px;
+  output SHA-256 `6e7d98efaf75836d7158d4211ff856e0d281684aa26c0c040854189a05164bb2`.
+  This is scoped native evidence, not exact
+  timing or display/export parity. Linux `80644c78` omitted C/S produced
+  insufficient samples in all four GIF/MP4 fits, with 201 sampler drops per
+  run. Mac's omitted-default case did not pass in `42091168804`; current
+  hosted verification is pending. iPhone, iPad, Android phone and tablet
+  need final-source omission and capture-disabled isolation evidence.
+- **Windows:** Session 1 native CTest passed 65/65. Dense C/S at `de318b47`
+  passed path/easing analysis but both stopped at marker-onset opacity.
+  An owned known-opacity WGC control showed BGRA [0,0,178,178] retained
+  unchanged while metadata labelled it straight; treating those bytes as
+  straight produced RGB [201,77,77], while premultiplied composition produced
+  [255,77,77]. The scoped alpha-observation correction `664bb462f8a9642d35ec50111da99b5fd2cd3a62` has not
+  yet received a corrected native replay. Do not convert the prior dense
+  failures into passes. Final C/S native/export comparison and signed
+  installed-package checks remain open.
+- **Linux:** installed runs with 256 MiB shared memory cleared the prior
+  Ubuntu and Fedora navigation failures; earlier 64 MiB diagnostic samples
+  and failures remain preserved. Ubuntu hosted `42092291516`, source
+  `80644c78`, passed 54/54 native checks in original and untraced replay,
+  then both failed media verification: MP4 manifest count 15, decoded count
+  14. The retained original MP4 SHA-256 is
+  `df7a97cf8a9633f74a5906f9c63ec74b14549bd7abf1c30496a052fc2df24e4f`.
+  Both final VCL samples physically exist; the last trun lacks an explicit
+  offset and ffprobe identifies its position as the moof base. The qtmux
+  implicit-run versus FFmpeg interpretation is the current finding, not a
+  validated mux fix. The separate immediate-end marker-tail failures remain
+  open; an instrumented `4bab` expired source sample and both encoded tails
+  were clear, but do not explain earlier nonzero tails.
+- **Android:** API 29 minimum is approved. On API 35 phone and tablet,
+  `fb2` app and `b685` tests passed native marker and actual Stop,
+  partial-result and recovery flows. Conversion change `11384080` passed
+  two native codec controls and reduced C/S conversion from 72.2/70.6 to
+  55.8/51.9 ms per frame. Dense C/S in all formats remained insufficient at
+  roughly 100 frames over 28 seconds. Same-phone anchored-cadence changes
+  `1184b44f`/`2d9aa7c5`, integrated at `c1e63a6a`, produced 108/108
+  C/S frames versus 100/102 and MP4 median gaps near 258 ms versus 278/274;
+  dense evidence remains insufficient and short timing has not started.
+  Full device corpora, omitted-default
+  and capture-disabled proof, inference cancellation and signed final-source
+  replay remain separate gates; see `android.md`.
+- **macOS:** WK run `42091168804` at `9f366` passed semantic, privacy,
+  Stop, low-FPS and CLI GIF/MP4/PNG checks. Its omitted-350 case failed with
+  generic assertion and G08 was not reached; CEF switch failed at DNS
+  listener setup and CEF was not exercised. Earlier `42081421741` passed
+  WK dense C MP4/GIF and S GIF, with S MP4 insufficient. The current
+  `42095244866` includes source fixes and is still running; no pass is
+  inferred from it.
+- **iOS:** completed `42088321625` at `0850bde7` passed 3/8 on each
+  device. Both failed normal and interaction-disabled keyboard controls;
+  iPhone also failed live projection and two capture admissions, and iPad
+  failed both pinch controls and MCP marker. Same-scene iPhone evidence
+  measured CSS (175,340) and native (175,402), with top/bottom insets 62/34;
+  iPad centers matched with insets 0/20. Focused geometry run `42095635452`
+  and DEBUG callback probe `42096878949` are pending device outcomes.
+  Projection, pinch, omitted-default, both public device corpora and release
+  verification remain open.
+
+## Later evidence checkpoint - 2026-11-05
+
+Integration `417641154c72fcc75730458589490269dd001dd8`; each result
+below retains its own product and test revision. Earlier failures are not
+reclassified, and these checkpoints do not establish platform acceptance.
+
+- **Windows:** omitted-duration C live pointer evidence remains as previously
+  recorded. For product `54c` (binary SHA-256 begins `c0311849`) and
+  harness `1ec35e15`, the Maxis split diagnostic recorded 227 samples,
+  two outputs per action and cleanup. Median pre-navigation, pre-work,
+  screenshot, post-navigation, post-viewport and encoder times were 0.245,
+  1.103, 27.081, 47.045, 1.127 and 5.642 ms. Diagnostic SHA-256:
+  `c59c8c22a8c561667bf642bfc6b18303dd58c2131dc750b76c15ceb7ea10e3e0`.
+  This is not a dense export pass.
+- **Linux:** Ubuntu installed source
+  `1a148927ad081fab54a71ba8ada95bf038c7c9ef`, test source
+  `45d841a5535123a6b3ff176e57aeded6cd014b43`, run `42107002688`,
+  passed 54 native cases, decoded 44 artifacts, passed the continuous-marker
+  check and five public CLI checks with ten observations, and cleaned up.
+  See [Linux evidence](linux.md); this does not prove a published install or
+  physical desktop. Fedora run `42102220654` decoded both 15/15-frame MP4
+  streams, but final marker analysis retained 2/11 red-classified pixels;
+  same-frame source attribution is unavailable.
+- **macOS:** WK `421018`/`c102` passed one combined fast case with seven
+  samples and a 70 ms maximum gap. In rerun `421059`/`16c3`, both WK
+  fast cases were insufficient and CEF failed its edge check before timing;
+  report SHA-256 begins `6e89d59e`. Focused hosted run `42110244904`
+  at `41764115`, with immutable step-PNG and final live-marker candidate,
+  is pending; source alone is not a pass.
+- **iOS:** geometry `421062`/`dd53` passed 5/7 on each device, including
+  three units and live center. iPhone scrollable pinch passed; the original
+  pinch target was fully outside its fixture and paired navigation returned
+  `NAVIGATION_BUSY`. iPad paired MCP and decode passed, but both pinch
+  scales remained 1. Keyboard `421038`/`d0a7` returned
+  `CAPTURE_VIEWPORT_CHANGED` on both devices after only the first input:
+  iPhone observed zoom 1.455 and offset, iPad an owned keyboard frame. No
+  safe production exception is established. Marker candidate
+  `42110055424`/`f2a8a255` is pending.
+- **Android:** same-device no-capture host recording measured an omitted
+  duration span of 369 ms with 350/500 fits 10.88/34.31 px, and explicit
+  500 ms span of 442 ms with fits 13.62/13.02 px. Both failed the strict
+  9 px fit criterion. No product clock change or console replay is inferred.
+
+Final per-platform formats, privacy, Stop and recovery, the integrated PR,
+release publication and actual installed-artifact checks remain open.

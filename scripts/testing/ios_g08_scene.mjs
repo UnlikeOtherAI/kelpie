@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import {mapG08Scene} from "../../tests/capture/g08-fixture.mjs";
 
 export function iosG08Scene(facts) {
   assert.equal(facts.dropped, 0);
-  assert.deepEqual(facts.events.map(event => event.target), ["finish", "start", "finish"]);
-  return {calibration: facts.events[0], start: facts.events[1], finish: facts.events[2]};
+  return mapG08Scene(facts.events);
 }

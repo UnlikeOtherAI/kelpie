@@ -159,18 +159,34 @@ struct DeviceHandler {
         }
         if let wv = context.webView {
             let sv = wv.scrollView
+            let scrollInfo: [String: Any] = [
+                "contentSize": ["w": sv.contentSize.width, "h": sv.contentSize.height],
+                "contentOffset": ["x": sv.contentOffset.x, "y": sv.contentOffset.y],
+                "zoomScale": sv.zoomScale,
+                "contentInset": ["t": sv.contentInset.top, "l": sv.contentInset.left,
+                                 "b": sv.contentInset.bottom, "r": sv.contentInset.right]
+            ]
+            #if DEBUG
+            var inspectScrollInfo = scrollInfo
+            inspectScrollInfo["pinch"] = [
+                "available": sv.pinchGestureRecognizer != nil,
+                "enabled": sv.pinchGestureRecognizer?.isEnabled == true,
+                "scrollEnabled": sv.isScrollEnabled,
+                "state": sv.pinchGestureRecognizer?.state.rawValue ?? -1,
+                "minimumScale": sv.minimumZoomScale,
+                "maximumScale": sv.maximumZoomScale
+            ]
+            let effectiveScrollInfo = inspectScrollInfo
+            #else
+            let effectiveScrollInfo = scrollInfo
+            #endif
             webViewInfo = [
                 "exists": true,
                 "frame": ["x": wv.frame.origin.x, "y": wv.frame.origin.y, "w": wv.frame.width, "h": wv.frame.height],
                 "bounds": ["x": wv.bounds.origin.x, "y": wv.bounds.origin.y, "w": wv.bounds.width, "h": wv.bounds.height],
                 "contentScaleFactor": wv.contentScaleFactor,
                 "pageZoom": wv.pageZoom,
-                "scrollView": [
-                    "contentSize": ["w": sv.contentSize.width, "h": sv.contentSize.height],
-                    "contentOffset": ["x": sv.contentOffset.x, "y": sv.contentOffset.y],
-                    "zoomScale": sv.zoomScale,
-                    "contentInset": ["t": sv.contentInset.top, "l": sv.contentInset.left, "b": sv.contentInset.bottom, "r": sv.contentInset.right]
-                ]
+                "scrollView": effectiveScrollInfo
             ]
         }
 
@@ -215,7 +231,7 @@ struct DeviceHandler {
             }
         }
 
-        return successResponse([
+        let response: [String: Any] = [
             "screenCount": screens.count,
             "screens": screens.enumerated().map { i, screen in
                 [
@@ -238,7 +254,16 @@ struct DeviceHandler {
             "vcView": vcViewInfo,
             "webView": webViewInfo,
             "html": htmlInfo
-        ])
+        ]
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--test-g08-document-binding") || args.contains("--test-pinch-projection") {
+            var extended = response
+            extended["testCaptureEvidence"] = IOSWorkflowMedia.testEvidence
+            return successResponse(extended)
+        }
+        #endif
+        return successResponse(response)
     }
 
     @MainActor

@@ -1,4 +1,6 @@
 #include "desktop_script_runtime.h"
+#include "desktop_script_pause.h"
+#include "desktop_script_capture_state.h"
 #include "kelpie/desktop_script_owner.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/browser_schema.h"
@@ -7,6 +9,7 @@
 #include "kelpie/response_helpers.h"
 #include "desktop_input_planner.h"
 #include "desktop_script_redaction.h"
+#include "desktop_script_result.h"
 #include <iomanip>
 #include <set>
 #include <algorithm>
@@ -16,6 +19,10 @@
 #include <stdexcept>
 
 namespace kelpie {
+namespace {
+std::atomic<std::uint64_t> presentation_revision{0};
+std::uint64_t NextPresentationRevision() { return presentation_revision.fetch_add(1)+1; }
+}
 std::string NewDesktopScriptId() {
   std::random_device random;
   std::ostringstream text;
@@ -24,7 +31,10 @@ std::string NewDesktopScriptId() {
 }
 DesktopScriptHandler::DesktopScriptHandler(DesktopEngine& engine, DesktopRouter& router, Config config)
     : impl_(std::make_unique<Impl>(engine, router, std::move(config))) {}
-DesktopScriptHandler::~DesktopScriptHandler() { RequestLocalAbort(); }
+DesktopScriptHandler::~DesktopScriptHandler() {
+  RequestLocalAbort();
+  impl_->presentation_validity->Close();
+}
 void DesktopScriptHandler::RequestLocalAbort() {
   std::lock_guard lock(impl_->mutex);
   if (impl_->running) impl_->abort->store(true);
@@ -40,12 +50,12 @@ void DesktopScriptHandler::NotifyNavigation() {
   BrowserNavigationState state;
   const auto result=impl_->engine.GetNavigationState(lease,&state,std::chrono::milliseconds(1));
   if(!result.ok || state.tab.document_version==document) return;
+  bool cleared=false;
   {
     std::lock_guard lock(impl_->mutex);
-    impl_->presentation.erase("marker"); impl_->presentation.erase("pointer"); impl_->presentation.erase("commentary");
-    impl_->presentation_latched=false;
+    cleared=ClearRetiredDesktopPresentation(impl_->presentation,{lease.id,lease.generation,document});
   }
-  try { impl_->Present(); } catch(...) { RequestLocalAbort(); }
+  if(cleared) try { impl_->Present(); } catch(...) { RequestLocalAbort(); }
 }
 bool DesktopScriptHandler::IsRunning() const { std::lock_guard lock(impl_->mutex); return impl_->running; }
 bool DesktopScriptHandler::Allows(std::string_view method) const {
@@ -129,16 +139,14 @@ bool DesktopScriptHandler::Impl::Cancelled() const {
   return !capture_error.empty();
 }
 void DesktopScriptHandler::Impl::Pause(int milliseconds) {
-  for (int remaining = milliseconds; remaining > 0; remaining -= 20) {
-    if (Cancelled()) throw std::runtime_error("SCRIPT_STOPPED");
-    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(remaining, 20)));
-  }
+  PauseDesktopScript<Clock>(std::chrono::milliseconds(milliseconds),
+    [this] { return Cancelled(); }, [](auto duration) { std::this_thread::sleep_for(duration); });
 }
 void DesktopScriptHandler::Impl::Present() {
   if (!config.present) return;
   Json copy; std::shared_ptr<std::atomic<bool>> cancellation;
-  { std::lock_guard lock(mutex); if(presentation_latched) return; copy = presentation; copy["playing"] = running; copy["elapsedMs"]=Elapsed(); cancellation=abort; }
-  config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); });
+  { std::lock_guard lock(mutex); if (presentation.value("detachedMarker",false)) return; copy = presentation; copy["_presentationRevision"]=NextPresentationRevision(); copy["playing"] = DesktopPresentationIsPlaying(copy,running); copy["elapsedMs"]=Elapsed(); cancellation=abort; }
+  config.present(copy, [this,cancellation] { cancellation->store(true); changed.notify_all(); }, {});
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   const std::string admitted_owner = ScopedDesktopScriptOwner::Current();
@@ -155,11 +163,22 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   bool sensitive = false, screenshot = false;
   std::set<std::string> output_names;
   std::vector<std::string> redactions;
+  std::vector<Json> typing_plans(actions.size());
+  std::size_t plan_index = 0;
   for (const auto& action : actions) {
     const std::string name = action.at("action");
     if (name == "fill" || name == "type") {
-      if (action.contains("typingDelayMs")) return ErrorResponse("UNSUPPORTED_SCRIPT_ACTION", "Paced typing is not available in this native adapter");
       if (!action.at("text").is_string()) return ErrorResponse("UNRESOLVED_INPUT", "Bind inputs before native admission");
+      if (action.contains("typingDelayMs")) {
+        const Json request = {{"action",name},{"text",action.at("text")},{"typingDelayMs",action.at("typingDelayMs")}};
+        char* raw_plan = kelpie_browser_script_typing_plan(request.dump().c_str());
+        if (!raw_plan) return ErrorResponse("INVALID_PACED_TYPING", "Paced typing preflight failed");
+        Json plan = Json::parse(raw_plan, nullptr, false); kelpie_mcp_free_string(raw_plan);
+        if (!plan.is_object() || !plan.value("valid", false) || !plan.contains("scalars") || !plan["scalars"].is_array() ||
+            !plan.contains("typingDelayMs") || !plan["typingDelayMs"].is_number_integer())
+          return ErrorResponse("INVALID_PACED_TYPING", "Paced typing preflight failed");
+        typing_plans[plan_index] = std::move(plan);
+      }
       if (action.value("sensitive", false)) { sensitive = true; redactions.push_back(action.at("text")); }
     }
     if(name=="press-key") {
@@ -169,6 +188,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     screenshot = screenshot || name == "screenshot";
     if((name=="output" || name=="extract") && !output_names.insert(action.at("name").get<std::string>()).second)
       return ErrorResponse("DUPLICATE_OUTPUT","Named outputs must be unique");
+    ++plan_index;
   }
   if (sensitive && (script.contains("capture") || screenshot))
     return ErrorResponse("SENSITIVE_CAPTURE_REFUSED", "Secret-bearing workflows cannot capture media");
@@ -183,11 +203,12 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     std::lock_guard lock(mutex);
     if (running) return ErrorResponse("BUSY", "A script owns the browser");
     running = true; action_index=-1; owner = admitted_owner; run_id = NewDesktopScriptId(); target_key = "__kelpie_script_" + run_id;
-    run_thread = std::this_thread::get_id(); abort = std::make_shared<std::atomic<bool>>(false); stop_sampler.store(false);
+    run_thread = std::this_thread::get_id(); abort->store(true);
+    abort = std::make_shared<std::atomic<bool>>(false); stop_sampler.store(false);
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
-    capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json::object();
+    capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json{{"runId",run_id}};
     sampler_ready = false; sampler_done = false; requested_step = completed_step = -1;
-    requested_ticket=completed_ticket=0; requested_step_document.clear(); presentation_latched=false; grant_revoked.store(false); privacy_discard.store(false);
+    requested_ticket=completed_ticket=0; requested_step_document.clear(); requested_purpose=DesktopScriptFramePurpose::Ordinary; requested_terminal_identity=nullptr; grant_revoked.store(false); privacy_discard.store(false);
     status = {{"success", true}, {"playing", true}, {"runId", run_id}, {"totalActions", actions.size()}};
   }
   if(config.invalidate) config.invalidate();
@@ -217,7 +238,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
         action_index = static_cast<int>(index); status["currentAction"] = index;
         status["currentActionName"] = actions[index].at("action");
       }
-      Json response = Perform(lease, actions[index], script, &outputs, &redactions);
+      Json response = Perform(lease, actions[index], script, typing_plans[index], &outputs, &redactions);
       if(outputs.dump().size()>262144) {
         response=ErrorResponse("OUTPUT_BUDGET_EXCEEDED","Named outputs exceed the 256 KiB run budget");
         outputs=Json::object();
@@ -234,7 +255,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       result["actionsExecuted"] = index + 1;
       if(index+1<actions.size()) Pause(script.value("defaultWaitBetweenActions", 0));
     }
-    if(sampler.joinable() && !Cancelled() && result.value("success",false)) {
+    if(sampler.joinable() && DesktopMovieEndpointRequired(script) && !Cancelled() && result.value("success",false)) {
       double remaining=0;
       { std::lock_guard lock(mutex); if(presentation.contains("marker")) {
         const auto& marker=presentation["marker"];
@@ -243,7 +264,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
       if(remaining>0) Pause(static_cast<int>(std::ceil(remaining)));
       // Admit a fully faded movie endpoint without exceeding configured FPS.
       Pause(static_cast<int>(std::ceil(1000.0/script.value("capture",Json::object()).value("fps",15))));
-      StepScreenshot(action_index,false);
+      StepScreenshot(action_index,false,"",DesktopScriptFramePurpose::TerminalClear);
     }
     // Only explicitly requested terminal outputs are returned. Sensitive values never enter status.
     try { RedactScriptOutputs(outputs,actions,redactions); }
@@ -269,10 +290,13 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     {std::lock_guard lock(mutex);artifacts=Json::array();}
   }
   if (!capture_error.empty()) {
-    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") result=ErrorResponse(capture_error,"Capture ended at a native limit or failure");
-    else result["captureError"]=capture_error;
+    if(result.value("success",false) || result.value("error",Json::object()).value("code",std::string())=="SCRIPT_STOPPED") {
+      result=ReplaceScriptErrorPreservingUncertainty(result,capture_error,"Capture ended at a native limit or failure");
+    } else result["captureError"]=capture_error;
   }
-  if(grant_revoked.load()) result=ErrorResponse("AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  if(grant_revoked.load()) {
+    result=ReplaceScriptErrorPreservingUncertainty(result,"AUTHORIZATION_REVOKED","Local control grant ended before completion");
+  }
   if (abort->load()) { result["success"] = false; result["aborted"] = true; }
   result["runId"] = run_id; result["totalDurationMs"] = Elapsed();
   result["inputGuarantee"] = "trusted-coordinate";
@@ -284,8 +308,25 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   lease.cancelled.reset(); lease.deadline = Clock::now() + std::chrono::seconds(2);
   Json ignored;
   engine.EvaluateBrowserControl(lease, "delete globalThis[" + Json(target_key).dump() + "]", &ignored, std::chrono::seconds(2));
-  { std::lock_guard lock(mutex); presentation = {{"playing", false}}; }
-  try { if (config.present) config.present({{"playing", false}}, {}); }
+  Json hidden;
+  { std::lock_guard lock(mutex);
+    presentation = result.value("success",false) && !abort->load()
+        ? DetachedDesktopMarker(presentation,Elapsed()) : Json{{"playing",false}};
+    hidden=presentation; hidden["_presentationRevision"]=NextPresentationRevision();
+  }
+  const std::weak_ptr<DesktopPresentationValidity> validity = presentation_validity;
+  const auto presentation_owner = owner;
+  const auto cancellation = abort;
+  const auto revoked = std::make_shared<std::atomic<bool>>(false);
+  auto valid = [validity,presentation_owner,cancellation,revoked] {
+    const auto gate=validity.lock();
+    if (!gate) return false;
+    if (cancellation->load() || revoked->load()) return false;
+    if (gate->Check(presentation_owner)) return !cancellation->load() && !revoked->load();
+    revoked->store(true);
+    return false;
+  };
+  try { if (config.present) config.present(hidden, {}, valid); }
   catch(...) {
     if(result.value("success",false)) result["error"]={{"code","CAPTURE_NATIVE_PRESENTATION_FAILED"},{"message","Native presentation cleanup failed"}};
     else result["captureError"]="CAPTURE_NATIVE_PRESENTATION_FAILED";

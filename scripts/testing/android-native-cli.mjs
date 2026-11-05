@@ -17,6 +17,9 @@ async function command(name, args) {
   await writeFile(join(folder, name + '.json'), JSON.stringify(value, null, 2) + '\n');
   return value;
 }
+// Reject missing media tools before pairing, navigation, or playback.
+await execute("ffprobe", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
+await execute("ffmpeg", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
 const bridge = JSON.parse(await readFile(join(folder, 'cli-bridge.json'), 'utf8'));
 const paired = await command('cli-pair', ['pair', '--client-name', 'Hosted native CLI verification', '--timeout-ms', '60000']);
 assert.equal(paired.success, true);

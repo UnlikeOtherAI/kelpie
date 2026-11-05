@@ -1,5 +1,6 @@
 #pragma once
 #include "kelpie/desktop_script_handler.h"
+#include "desktop_presentation_validity.h"
 #include "kelpie/desktop_engine.h"
 #include "kelpie/desktop_router.h"
 #include <chrono>
@@ -15,9 +16,10 @@ class DesktopScriptHandler::Impl {
   DesktopEngine& engine;
   DesktopRouter& router;
   Config config;
+  std::shared_ptr<DesktopPresentationValidity> presentation_validity;
   mutable std::mutex mutex;
   std::condition_variable changed;
-  bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false, presentation_latched=false;
+  bool running = false, sampler_ready = false, sampler_done = false, requested_step_png = false;
   std::thread::id run_thread;
   std::shared_ptr<std::atomic<bool>> abort = std::make_shared<std::atomic<bool>>(false);
   std::atomic<bool> stop_sampler{false}, privacy_discard{false};
@@ -27,8 +29,12 @@ class DesktopScriptHandler::Impl {
   Clock::time_point began, deadline;
   int action_index = -1, requested_step = -1, completed_step = -1;
   std::string requested_step_document;
+  DesktopScriptFramePurpose requested_purpose=DesktopScriptFramePurpose::Ordinary;
+  Json requested_terminal_identity;
   std::uint64_t requested_ticket=0, completed_ticket=0;
-  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {}
+  Impl(DesktopEngine& e, DesktopRouter& r, Config c) : engine(e), router(r), config(std::move(c)) {
+    presentation_validity = std::make_shared<DesktopPresentationValidity>(config.revalidate);
+  }
   Json Play(const Json& body);
   Json Status(const Json& body);
   Json Abort(const Json& body);
@@ -36,9 +42,10 @@ class DesktopScriptHandler::Impl {
   bool Cancelled() const;
   void Pause(int milliseconds);
   Json Target(TabLease lease, const Json& target, const std::string& token = "", bool observe = false, bool refuse_sensitive = false);
-  Json Perform(TabLease lease, const Json& action, const Json& script, Json* outputs, std::vector<std::string>* redactions);
+  Json Perform(TabLease lease, const Json& action, const Json& script, const Json& typing_plan, Json* outputs, std::vector<std::string>* redactions);
   void Sample(TabLease lease, Json options);
-  void StepScreenshot(int index, bool png, const std::string& document = "");
+  void StepScreenshot(int index, bool png, const std::string& document = "",
+      DesktopScriptFramePurpose purpose = DesktopScriptFramePurpose::Ordinary);
   double Elapsed() const;
   void Present();
 };

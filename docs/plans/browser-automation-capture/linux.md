@@ -696,3 +696,278 @@ oracle results were insufficient on pre-dispatch pointer position. The prior
 published Fedora RPM was restored with the package manager and its package
 identity, file manifest, executable/CEF hashes, and rpm verification matched
 the pre-test snapshots.
+
+## Frozen Fedora offscreen checkpoint
+
+Fedora 44 exercised product revision 0c8526b872209af176e16f1d37792fb17a5e1781
+with test revision 692841e1c4986ffc02e40e8a07afa9d7c4c68737. The only
+difference between them is the test assertion placement; native/product build
+inputs are identical. The app ELF SHA-256 was
+dc368f394f42a5ce5595670884094b8286115f3d213347910569b5b990902e52
+and libcef.so was d6bee514adcc2ea2d6e8a450939f7a09da746f1e9b7c8275b9be61b60cd26d99.
+
+The isolated offscreen native HTTP and direct/generic MCP corpus passed 54/54,
+including all nine paced typing cases, acknowledged navigation, captured-input
+privacy refusal, pointerup replacement, late release acknowledgement and
+recovery. All configured supplements passed; the owned process exited and its
+readiness file was removed. An unrelated Fedora process on port 18425 was
+preserved. C ABI, post-mutation classification and terminal uncertainty native
+tests passed. The independent decoder validated 44 retained artifacts and 126
+frames (21 PNG, 14 GIF, 9 MP4), including continuous marker center, fade and
+clear checks.
+
+The owned evidence root is
+/home/ondre/Projects/kelpie-worktrees/capture-linux-resume-20261105/.native-artifacts/692-brand-full/.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| launch-report.json | 7b4128c9f7a26ab46b083d87b4eec4e5b0b67dcb986a7a4e445893b729410e16 |
+| media-verification.json | 3da735055e59a05fd55f772150825bc485df2d8b2257ad4cb4a729845309c96c |
+| all-frame-decode.json | 2df8f8a1b95200ab00949681d851f59521e3af1aa0b8e70394ff9f4c0dd1b67d |
+| continuous-marker-pixels.json | 00f8acefb72f4c971fa4f58241d9a918ad15cf3f024daca71ef974deae2f718a |
+
+This checkpoint does not close the full G08 easing/wobble oracle, final
+HEADLESS_ONLY and no-CEF/LLM-off runtime flavors, physical GNOME visual proof,
+Ubuntu installed-package verification, final published package installation, or
+the pending CI zygote diagnosis. The production GIF reference remains
+insufficient until its loader-binding provenance and controls are verified.
+
+## Fedora flavor and isolated-Wayland follow-up
+
+On Fedora 44, integrated revision 43f0de2b179212a5ed689b8e0c3fbe7348ca1330
+built both headless CEF and no-CEF headless flavors with local LLM OFF and G08
+observation OFF. The CEF headless app executed strict navigation through HTTP
+and direct MCP; ai-status returned NOT_FOUND. The no-CEF app refused play-script
+through HTTP (501) and MCP (-32601), returned 501 for ai-status, kept its URL
+unchanged and made zero fixture requests. Both owned processes exited cleanly.
+The CEF ELF SHA-256 was f880a0ab97b8e6a01dd52e764218ddb7342d04965e415ade562b503ae1c3ca73;
+the no-CEF ELF was 3ce790cf247af3a9277f4c56d6feece20b25ceb4bfac19b0bd74d8cadc68410f.
+These checks do not establish an LLM-enabled Linux build. Linux defaults local
+LLM OFF; the earlier 0c GTK test also explicitly configured it OFF.
+
+Revision e36af0097efa8dbfc3b1a89f03af8d38bac8f2e9 was relinked with GTK and
+CEF enabled, LLM OFF and G08 observation OFF. ELF SHA-256 was
+636caa160c812e8274b479379cf1ce3a50b85220dd9142ac40606bdddf62ecd8, with
+CEF SHA-256 d6bee514adcc2ea2d6e8a450939f7a09da746f1e9b7c8275b9be61b60cd26d99.
+A private Weston/Wayland run captured the real recording overlay, then used
+public HTTP abort and obtained SCRIPT_STOPPED with mayHaveCompleted. Public
+alias MCP/recipe checks and supported cleanup passed. This is isolated Wayland,
+not a physical GNOME image or an AT-SPI activation. The screenshot SHA-256 is
+e8401f8dd1f71faaf9a5d17af699f6996b84384c637f823dcc8a7d8f576324d0; the
+screenshot receipt SHA-256 is d6ef49a60da119c0c95f90291bde44eaf3c9ad428ee3f6c71e259b7ca6e4cd5b.
+The CLI package came from 4b925a98a8c30d9c38c8c3bac386dd6b952874a2; CLI, shared
+and lockfile inputs match e36. The root package differs only in lint scripts.
+
+The separate 4cc334acc60e405151d4fbbcd9433059d177d345 instrumented GTK/CEF
+build used LLM OFF and test-only G08 observation ON. A per-frame pre-overlay
+backing proof and same-build production GIF model supported e36 oracle passes
+for C/GIF and S/GIF with encoded-visible confidence only. C/MP4 and S/MP4
+remain insufficient because their pre-dispatch baselines were missing or
+unstable. The actual C/S capture reports retain 211/214 dropped frames. Oracle
+report SHA-256: c6c68f7ad9192b653d61c966b316258419a1b470623c348065163e423e1b9d73.
+Neither this GIF result nor the isolated screenshot proves physical GNOME
+equivalence or an overall G08 pass. Final installed packages and their own
+build options still require independent verification.
+
+A subsequent e36 private isolated-Wayland run exercised the actual visible GTK
+Stop button through its standard AT-SPI click action on a private session bus.
+The helper pinned the app PID, executable hash and start time; the action was
+acknowledged, returned SCRIPT_STOPPED with mayHaveCompleted, retained partial
+artifacts and allowed a later script. The owned app retired normally. This is
+not a physical GNOME interaction. The native Stop button and its LinuxApp
+StopScript implementation are byte-identical between the earlier 3001 Wayland
+checkpoint and e36.
+
+The isolated screenshot SHA-256 is
+d1570861b080e8bfd34e68bde1d9eb05f053f525d1a794aec98fe4a85441aa90, and the
+GTK action receipt SHA-256 is
+da5a8ace2f0df4d15b42c6c3dd1b506c8b7b2705e2cf395a191cd8ba317e0ab0.
+
+## Ubuntu installed-package replay
+
+Hosted Ubuntu 22.04 run 42102220654 built and installed source
+1a148927ad081fab54a71ba8ada95bf038c7c9ef. Its original installed-media
+step failed because FFmpeg 4.4.2 rejected the newer `-fps_mode` option; the
+failure is retained. Test-only source 45d841a5535123a6b3ff176e57aeded6cd014b43
+replayed that exact package in run 42107002688 with passthrough decoding via
+`-vsync 0`. Package and installed identity receipts matched the original;
+the installed ELF SHA-256 was
+f25aa6850ed8e789d44023e3cb62c70d48ffd418f76b8e6322d0cb9370ea5c30,
+and the installed identity receipt SHA-256 was
+4152dbf6c1960a2169023a9dc7e86024718e71d08d74a9b09cbfbf01b10fefb0.
+The replay passed all 54 native cases, decoded all 44 retained artifacts,
+passed continuous marker center and clear verification, passed the five CLI
+checks with ten observations, and cleaned up. The continuous-marker receipt
+SHA-256 was 642b7ae0217637d6f58bddeb08e55075e4cf03947057d832aef5fa89e5f5a69b.
+
+This is an installed, headless container result, not physical Ubuntu desktop
+or published-release verification. The Fedora row of 42107002688 failed
+before testing while its source artifact was unavailable; it does not establish
+a Fedora runtime result.
+
+## Isolated GTK PNG-only marker transition
+
+On Fedora 44, GTK/CEF source 0fef3222ca6bdcc5aa3df12b4a6c4371b4858490
+was built with local LLM and test observation OFF. Its executable SHA-256 was
+ff97028b4b6d1fccc808a55882c30737741aa7bbe0e47b72f32b83baade0bf2c.
+Test source 27071547b2d7e46d57bd4dab4d848cacdd60c13c exercised one
+PNG-only click with a 5000 ms indicator through public HTTP in a private,
+test-owned Weston session. The click was trusted and the response completed in
+1817.84 ms. A post-response 1280×900 native compositor screenshot showed the
+red marker centered on Confirm order with no Stop button in the chrome.
+Screenshot SHA-256:
+f38e60c5636265d61e45a5d446ab09b0aa8682e6b29d68686061437c0e03eb0c.
+The exact app and compositor exited, the bounded unit became inactive and the
+unrelated Fedora process remained present.
+
+This is one isolated-Wayland PNG-only observation. It does not prove the
+marker fades to expiry, the next run suppresses it, an explicit screenshot
+without capture behaves equivalently, or a physical GNOME display. The test
+receipt's legacy invocation and pointer-duration labels incorrectly describe
+the old Stop flow; this run used no abort and disabled the pointer. The labels
+were corrected in test source feb1dc08, after this observation.
+
+## Paired Fedora synthetic marker control
+
+The 42102220654 Fedora installed candidate failed its strict final MP4 marker
+check in the original and untraced runs. Both had 15 manifest and 15 decoded
+frames: the retained original MP4 SHA-256 was
+45348d2b6356f97cb822397ae7d910a8a1a7384fdcd6f3ed89218e77518f3bf9
+with two red pixels, and the replay MP4 SHA-256 was
+5ece92efd08a2f73f0e1525512638d56d9fbac5055e8a4c4f0a704bc6bbbfd32
+with eleven. Their same-frame pre-encoder rasters were not retained.
+
+A separate synthetic control used product source 0fef3222ca6bdcc5aa3df12b4a6c4371b4858490
+with admission observation ON, instrumented ELF SHA-256
+a0f2214c3b4b54321724ae80eb653f5ca660be3c5c17471ce0d051cbd64de869.
+All 15 admitted frames mapped to 15 decoded MP4 frames without drops, and
+their PTS aligned within 2 ms. The last frame's PTS was 2.035926 s and its
+marker age was 808.57 ms of 700 ms. The fixed 45×45 ROI contained zero red
+pixels before overlay, after overlay, and in the corresponding decoded frame.
+The post-overlay raw ROI SHA-256 was
+770d4c6b4bff8ae1d0660fdb1a2a6f190c7f8e839d963e065a308699ff51fa45;
+the MP4 SHA-256 was
+30a223ed4d3be0413591caaa262707116443254d3e1b9a7502c24cf9db852115;
+the analysis receipt SHA-256 was
+a6e205dddca547b45a1ec62e31bc3c8f58bae48b03758593bf45990f6b94f1b4.
+The test app exited normally and its bounded unit retired.
+
+This clear/clear control did not reproduce the installed failures and cannot
+attribute them to source admission or encoder carryover. The original files,
+strict zero-pixel requirement and failed receipts remain unchanged.
+
+## Retained Linux dense motion analysis
+
+The retained normal OSR C/S recordings from source 80644c780b7177a353619701e474bf67e2c14ef8,
+ELF 606d3e0ba5e03614ed5abe3774ff6c0e4d19efd5df364568a6e315a82642f549,
+were analyzed with shared verifier 414d82af. C/GIF and S/GIF passed the dense
+decoded-pixel fit, with 19 motion samples each and pointer RMS 0.992 px and
+0.906 px respectively. The recorded capture drops were 287 for C and 278 for S.
+Both MP4 analyses remained insufficient because their final tails differed
+from the calibrated same-recording pointer baseline. Analysis SHA-256:
+c977ad9d2b7e04f37f625d289cd63414b41dc061296b43985ee58a6a268acad4.
+
+The first decoder launch failed because the isolated verifier lacked the shared
+build output; the completed run used the existing shared dist after confirming
+its source inputs matched. These results do not establish overall G08 success,
+physical GTK equivalence or the default 350 ms motion profile.
+
+## Synthetic codec-history discriminator
+
+A separate authored-pixel control at source 315ccf89a4a745029613f019ffdd1ac703243043
+used the production Linux compositor/encoder with the original and replay
+15-frame PTS vectors, 1000×702 frames, 15 fps, GIF+MP4, six synthetic PNG
+steps and a 16 MiB shared budget. It used Fedora GStreamer 1.28.8-1.fc44 and
+OpenH264 2.6.0-3.fc44, matching the installed candidate's package receipt.
+White backing, marker history and PNG timing/byte sizes were authored controls.
+
+For each PTS vector, the clear-history and red-history controls had byte-identical
+full final BGRA frames, SHA-256
+1617f651ae97cf6ac61fc92808292d9aaf3c89feda1dab2b4d957606c6ff18ea.
+All GIF and MP4 outputs had 15 frames and zero drops; decoded MP4 PTS matched
+within 2 ms. The final decoded fixed ROI had zero red pixels in both clear
+controls and three in each red-history control. The history MP4 hashes were
+25aa26f6a2327ad9792a38c1644a3238b995985c212d4275a16cfd016e6ba627
+and d63c8003357ec58b39b632a3efe82b24252af7e3b49426e059272f92eb854ee0.
+The bounded analysis receipt SHA-256 was
+0cfea10b6fb0ad1011e458715f4b8426af3992f598e722d5b4333494bbd2fe5b.
+The control executable SHA-256 was
+657b71ba8872d631277bd116359eb32bb3f2231498bacadf1a1ac5f28e8591b0.
+
+This establishes decoded red carryover for the authored codec stimulus. It
+does not establish the cause of the earlier installed Fedora MP4 failures,
+whose same-frame source rasters were not retained. Their strict zero-pixel
+gate remains failed.
+
+## Fedora installed CLI-only replay
+
+Hosted run 42115990764 installed the exact Fedora RPM from candidate run
+42102220654, source 1a148927ad081fab54a71ba8ada95bf038c7c9ef. The RPM
+SHA-256 was 7872126627adb7e58a4d67497d578d94666dc3b7c6e12b5a3d6ff3380ed0f96e,
+installed ELF 677510849e04dbc01a96db9ac724104f9dfffc07a3dca135f29485c6a71e9989,
+and CLI archive e4020d1600a0a9701bcfc32047aaaa238c576b58a86f1915fface71fa0ca7c8d.
+The isolated, sandboxed CLI-only run passed five public checks and ten
+observations, then stopped through the public alias and removed readiness.
+Its alias report SHA-256 was
+d4955b1f6d8f26668fb2fb0a77d9d5a00c4fdb03c8048534906d01992f2c878e,
+and its outcome was cli-only-complete with exit code zero.
+
+This is separate from the failed Fedora independent-media gate; it does not
+mark the complete installed package or a published release as accepted.
+An earlier CLI-only dispatch, 42115481155, failed before runtime because the
+selector helper was absent from that owner ref, and remains preserved.
+
+## Test-only terminal keyframe control
+
+A separate test-only media target at source 18c9f152d106e3ac36d95b322427ef0471b0fcdb
+sent a GStreamer upstream force-key-unit event after the preceding packet was
+pulled and immediately before the final raw frame of the paired codec-history
+stimulus. The normal production target did not enable this instrumentation.
+Four events were accepted in 12–15 microseconds. The complete four-scenario
+producer took 0.64 s elapsed, 0.47 s user and 0.11 s system; the earlier
+baseline did not retain comparable CPU timing.
+
+All four outputs retained 15 aligned PTS and byte-identical complete final
+raw BGRA frames against their respective baseline. The final sample had the
+MP4 packet key flag and an AVC IDR NAL, parsed using the four-byte length size
+in its avcC configuration. Both red-history final ROIs decoded with zero red
+pixels, compared with three each in the preceding unforced control; clear
+controls also remained at zero. Each history MP4 was 7,531 bytes, 2,131 bytes
+larger than its baseline; each clear control grew by 2,153 bytes. Packet
+analysis SHA-256:
+b9c8397820ff659c500d246bbe5e0a114641d3263d60f6862e548061f9c54d5b.
+Producer log SHA-256:
+537aadfe6edd82acf9b8bfee7a89a40e364265556a40ac560f86dc558b16e0e0.
+
+The initial independent verifier failed because Fedora ffprobe reported
+unknown decoded frame types and key_frame=0 even for the first sample.
+The retained output was then checked directly using packet offsets, flags,
+avcC and AVC NALs; no stimulus was repeated. This is a synthetic control,
+not proof of the original installed failure's cause, and no shipping encoder
+or pixel threshold was changed.
+
+## Fedora terminal-clear candidate
+
+The normal GTK/CEF candidate at source c42fc68d7fdfa01fae0cbe9cda82dc39bd8c4dc2,
+ELF SHA-256 6439d5decf10b5a405f123612fa03ea55cb76a5ff3e5825d5f78d54711c2116c,
+was built on Fedora 44 with admission and G08 observations OFF. Focused
+terminal identity, frame proof and media tests passed. A test-only injected
+force failure retained the earlier GIF and MP4 prefixes, reported failure
+and partial manifests, allowed owner-scoped retrieval and refused retrieval
+after explicit discard. This explicit discard does not prove a sensitive
+workflow automatically triggered privacy disposal.
+
+One real offscreen HTTP fixture completed a trusted click and produced six
+PNGs, one GIF and one MP4. All eight artifacts decoded; the strict marker
+center/fade/final-clear check passed. The MP4 contained 17 frames, with a
+final key-flagged AVC IDR at PTS 2.125327 s. MP4 SHA-256:
+1bee642448638c94f01cceed1ff81206d179ebfd6ca733836f4273e8a3fe9afe.
+The independent IDR, all-frame and marker receipts had SHA-256 values
+34749dbc85a338aeb3ee04646a12c756c698fc05f500301cede8eb556048a1c8,
+9c8667b9e96b36adb65784a4dfe1e380a8a47c637ed1ee0799a47921507bd2d9 and
+767476d676d153dfe4296bce372ac3b5c7109c7b57ecc17042b814d0ff882705,
+respectively. The owned app/unit retired and the unrelated Fedora process
+remained present.
+
+This is a single Fedora candidate path, not final installed Fedora or Ubuntu
+package verification. The previously failed 421022 media receipts are retained.

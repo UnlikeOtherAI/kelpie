@@ -11,13 +11,15 @@ import { readNativeIdentity } from "./native-lifecycle.mjs";
 const execute = promisify(execFile);
 
 /** Standard AT-SPI Stop on one pinned native GTK process; never focus or inject input. */
-export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown }) {
+export async function runGtkStop({ readiness, identity, binary, hash, output, env, signal, captureShown, captureTimeline }) {
   assert.equal(env.GDK_BACKEND, "wayland");
   const isolated = Boolean(captureShown);
+  const privateAction = isolated && env.KELPIE_PRIVATE_ATSPI_ACTION === "1";
   const fixture = await startCaptureFixture();
-  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: isolated ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
-    display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim", artifacts: [] };
-  let pending;
+  const report = { source: process.env.KELPIE_CAPTURE_SOURCE, invocation: env.KELPIE_GTK_DETACHED === "1" ? "PNG-only completion with isolated compositor capture" : isolated && !privateAction ? "isolated compositor capture and public HTTP abort" : "standard AT-SPI Action.DoAction",
+    display: isolated ? "ISOLATED_WAYLAND" : "existing GNOME Wayland session; no compositor pixel claim",
+    pointerDuration: env.KELPIE_GTK_DETACHED === "1" ? "disabled" : env.KELPIE_GTK_DEFAULT_POINTER === "1" ? "omitted" : 300, artifacts: [] };
+  let pending, timeline;
   const api = async (method, body = {}) => {
     const response = await fetch("http://127.0.0.1:" + readiness.port + "/v1/" + method, {
       method: "POST", headers: { authorization: "Bearer " + readiness.token, "content-type": "application/json" },
@@ -48,22 +50,43 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
     const tabId = (await api("get-tabs")).tabs.find(tab => tab.active)?.id;
     assert.equal((await api("navigate", { tabId, url: fixture.url })).success, true);
     assert.equal((await api("play-script", { version: 1, tabId, actions: [{ action: "wait-ready", state: "complete" }] })).success, true);
+    if (env.KELPIE_GTK_DETACHED === "1") {
+      assert.ok(captureShown, "Detached transition requires owned isolated Weston");
+      const started=process.hrtime.bigint();
+      const result=await api("play-script",{version:1,tabId,
+        actions:[{action:"click",target:{role:"button",name:"Confirm order",exact:true}}],
+        capture:{formats:["screenshots"],fps:15,maxWidth:640,maxBytes:8388608,maxDurationMs:30000},
+        pointer:{enabled:false},tapIndicator:{color:"#FF0000",radius:24,durationMs:5000,wobble:true,fade:true}});
+      report.responseNs=process.hrtime.bigint().toString();
+      assert.equal(result.success,true,JSON.stringify(result.error));
+      assert.ok(result.totalDurationMs<4500,"PNG-only transition exceeded marker dwell bound");
+      report.elapsedMs=Number(BigInt(report.responseNs)-started)/1e6;
+      report.event=await wait(()=>fixture.events.find(event=>event.type==="click"&&event.target==="unique"),"trusted click",3000);
+      assert.equal(report.event.trusted,true);
+      report.nativeImage=await captureShown();
+      report.result={runId:result.runId,actionsExecuted:result.actionsExecuted};
+      return report;
+    }
+    timeline = captureTimeline?.();
+    if (timeline) void timeline.catch(() => {});
     pending = observeInFlight(api("play-script", { version: 1, tabId, actions: [
       { action: "click", target: { role: "button", name: "Confirm order", exact: true } },
       { action: "wait", ms: 30000 },
       { action: "click", target: { role: "button", name: "Confirm order", exact: true } },
     ], capture: { formats: ["gif", "video", "screenshots"], fps: 5, maxWidth: 640, maxBytes: 8388608, maxDurationMs: 40000 },
-    pointer: { enabled: true, curve: "s", durationMs: 300, easing: "ease-in-out" },
+    pointer: { enabled: true, curve: "s", ...(env.KELPIE_GTK_DEFAULT_POINTER === "1" ? {} : { durationMs: 300 }), easing: "ease-in-out" },
     tapIndicator: { color: "#FF0000", radius: 24, durationMs: 5000, wobble: true, fade: true } }));
     report.event = await wait(() => fixture.events.find(event => event.type === "click" && event.target === "unique"),
       "Trusted native click after encoded marker admission", 20000);
     assert.equal(report.event.trusted, true);
-    if (!isolated) report.button = await wait(() => automate("inspect"), "Native Stop button showing");
+    report.eventObservedNs=process.hrtime.bigint().toString();
+    if (timeline) report.timeline=await timeline;
+    if (!isolated || privateAction) report.button = await wait(() => automate("inspect"), "Native Stop button showing");
     if (captureShown) report.nativeImage = await captureShown();
     const current = await readNativeIdentity(identity.pid); assert.equal(current?.startTicks, identity.startTicks);
     const running = await api("get-script-status");
     assert.equal(running.playing, true); assert.equal(running.state, "running");
-    if (isolated) {
+    if (isolated && !privateAction) {
       const aborted = await api("abort-script", { runId: running.runId }); assert.equal(aborted.success, true);
       report.action = { interface: "public HTTP abort-script", success: true };
     } else {
@@ -99,6 +122,7 @@ export async function runGtkStop({ readiness, identity, binary, hash, output, en
   } catch (error) { report.failure = error.message; throw error; }
   finally {
     if (pending) await awaitBounded(pending, 5000).catch(() => {});
+    if (timeline) await timeline.catch(() => {});
     await fixture.close();
     await writeFile(join(output, "gtk-stop.json"), JSON.stringify(report, null, 2));
   }

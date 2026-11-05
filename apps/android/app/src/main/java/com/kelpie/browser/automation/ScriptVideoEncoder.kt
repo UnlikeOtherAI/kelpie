@@ -9,11 +9,12 @@ import java.io.File
 import java.nio.ByteBuffer
 
 /** Native H.264 only. Encoded samples are admitted before the MP4 muxer sees them. */
-class ScriptVideoEncoder(
+internal class ScriptVideoEncoder(
     private val width: Int,
     private val height: Int,
     fps: Int,
     private val budget: ScriptMediaBudget,
+    private val diagnostics: ScriptCaptureDiagnostics? = null,
     private val createFile: () -> File,
 ) {
     private val codec: MediaCodec
@@ -77,64 +78,26 @@ class ScriptVideoEncoder(
             dropped++
             return true
         }
+        val conversionStarted = System.nanoTime()
         val image = codec.getInputImage(index) ?: throw ScriptFailure("CAPTURE_VIDEO_UNAVAILABLE")
         try {
             val planes = image.planes
-            for (y in 0 until height) {
-                for (x in 0 until width) {
-                    val pixel = pixels[y * width + x]
-                    val red = (pixel ushr 16) and 255
-                    val green = (pixel ushr 8) and 255
-                    val blue = pixel and 255
-                    put(
-                        planes[0].buffer,
-                        planes[0].rowStride,
-                        planes[0].pixelStride,
-                        x,
-                        y,
-                        (((66 * red + 129 * green + 25 * blue + 128) shr 8) + 16),
-                    )
-                }
-            }
-            for (y in 0 until height step 2) {
-                for (x in 0 until width step 2) {
-                    var red = 0
-                    var green = 0
-                    var blue = 0
-                    for (dy in 0..1) {
-                        for (dx in 0..1) {
-                            val pixel = pixels[(y + dy) * width + x + dx]
-                            red += (pixel ushr 16) and 255
-                            green += (pixel ushr 8) and 255
-                            blue += pixel and 255
-                        }
-                    }
-                    red = (red + 2) / 4
-                    green = (green + 2) / 4
-                    blue = (blue + 2) / 4
-                    put(
-                        planes[1].buffer,
-                        planes[1].rowStride,
-                        planes[1].pixelStride,
-                        x / 2,
-                        y / 2,
-                        (((-38 * red - 74 * green + 112 * blue + 128) shr 8) + 128),
-                    )
-                    put(
-                        planes[2].buffer,
-                        planes[2].rowStride,
-                        planes[2].pixelStride,
-                        x / 2,
-                        y / 2,
-                        (((112 * red - 94 * green - 18 * blue + 128) shr 8) + 128),
-                    )
-                }
-            }
+            ScriptYuv420.convert(
+                pixels,
+                width,
+                height,
+                ScriptYuv420.Plane(planes[0].buffer, planes[0].rowStride, planes[0].pixelStride),
+                ScriptYuv420.Plane(planes[1].buffer, planes[1].rowStride, planes[1].pixelStride),
+                ScriptYuv420.Plane(planes[2].buffer, planes[2].rowStride, planes[2].pixelStride),
+            )
         } finally {
             image.close()
+            diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_CONVERSION, System.nanoTime() - conversionStarted)
         }
         val timestamp = (elapsedMs * 1000).toLong()
+        val submitStarted = System.nanoTime()
         codec.queueInputBuffer(index, 0, width * height * 3 / 2, timestamp, 0)
+        diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_SUBMIT, System.nanoTime() - submitStarted)
         pendingDocuments[timestamp] = documentId
         pending++
         submitted++
@@ -173,6 +136,15 @@ class ScriptVideoEncoder(
     }
 
     private fun drain(final: Boolean) {
+        val started = System.nanoTime()
+        try {
+            drainCodec(final)
+        } finally {
+            diagnostics?.record(ScriptCaptureDiagnostics.Phase.VIDEO_DRAIN, System.nanoTime() - started)
+        }
+    }
+
+    private fun drainCodec(final: Boolean) {
         val deadline = System.nanoTime() + 5_000_000_000L
         while (!ended) {
             val info = MediaCodec.BufferInfo()
@@ -223,17 +195,6 @@ class ScriptVideoEncoder(
                 codec.releaseOutputBuffer(index, false)
             }
         }
-    }
-
-    private fun put(
-        buffer: ByteBuffer,
-        rowStride: Int,
-        pixelStride: Int,
-        x: Int,
-        y: Int,
-        value: Int,
-    ) {
-        buffer.put(buffer.position() + y * rowStride + x * pixelStride, value.coerceIn(0, 255).toByte())
     }
 
     companion object {

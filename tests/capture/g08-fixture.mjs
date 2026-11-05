@@ -39,9 +39,37 @@ export function g08Workflow(tabId,curve="c"){
   assert.ok(["c","s"].includes(curve));
   return {version:1,tabId,pointer:{enabled:true,curve,durationMs:2400,easing:"ease-in-out"},
     tapIndicator:{color:curve==="c"?"#ff0000":"#0000ff",radius:48,durationMs:3000,wobble:true,fade:true},
-    capture:{formats:["gif","video"],fps:20,maxWidth:640,maxDurationMs:26000,maxBytes:33554432},
+    capture:{formats:["gif","video"],fps:20,maxWidth:640,maxDurationMs:33000,maxBytes:33554432},
     actions:[{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
+      {action:"wait",ms:3500},{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
       {action:"wait",ms:3500},{action:"click",target:{role:"button",name:"G08 Start",exact:true}},
       {action:"wait",ms:3500},{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
       {action:"wait",ms:3500}]};
+}
+
+/** Bind four independently observed, ordered clicks to the same fixture scene. */
+export function mapG08Scene(events){
+  assert.ok(Array.isArray(events)&&events.length===4);
+  assert.deepEqual(events.map(event=>event.target),["finish","finish","start","finish"]);
+  const [warmup,calibration,start,finish]=events;
+  assert.ok(typeof warmup.documentId==="string"&&warmup.documentId.length>0&&warmup.documentId.length<=128);
+  for(const [index,event] of events.entries()){
+    assert.equal(event.documentId,warmup.documentId);
+    assert.ok([event.center?.x,event.center?.y,event.viewport?.width,event.viewport?.height].every(Number.isFinite));
+    assert.ok(event.viewport.width>0&&event.viewport.height>0);
+    assert.deepEqual(event.viewport,warmup.viewport);
+    assert.deepEqual(event.visualViewport,warmup.visualViewport);
+    assert.equal(typeof event.trusted,"boolean");
+    assert.ok(Number.isFinite(event.timeMs)&&(index===0||event.timeMs>events[index-1].timeMs));
+  }
+  assert.ok(calibration.timeMs-warmup.timeMs>=3500,"Warmup did not clear before calibration");
+  assert.deepEqual(warmup.center,calibration.center);
+  assert.deepEqual(calibration.center,finish.center);
+  return {warmup,calibration,start,finish};
+}
+/** Legacy scenes have no warmup key; a present key must be a complete scene. */
+export function hasG08Warmup(scene){
+  if(!Object.hasOwn(scene,"warmup"))return false;
+  mapG08Scene([scene.warmup,scene.calibration,scene.start,scene.finish]);
+  return true;
 }

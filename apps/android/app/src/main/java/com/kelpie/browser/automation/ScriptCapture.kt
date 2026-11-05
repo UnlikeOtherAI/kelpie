@@ -105,7 +105,11 @@ class ScriptCapture(
                     var next = System.nanoTime() + period
                     while (!run.stopped.get()) {
                         val wait = next - System.nanoTime()
-                        if (wait > 0) delay((wait / 1_000_000).coerceAtLeast(1))
+                        if (wait > 0) {
+                            val waitingStarted = System.nanoTime()
+                            delay((wait / 1_000_000).coerceAtLeast(1))
+                            diagnostics.record(ScriptCaptureDiagnostics.Phase.SCHEDULE_WAIT, System.nanoTime() - waitingStarted)
+                        }
                         val elapsed = run.elapsedMs() - originMs
                         val max = (options["maxDurationMs"] as? Number)?.toLong() ?: 60_000
                         if (elapsed >= max) {
@@ -135,12 +139,12 @@ class ScriptCapture(
                             run.stop("CAPTURE_FAILED")
                             break
                         }
-                        next += period
-                        val lag = System.nanoTime() - next
-                        if (lag >= 0) {
-                            dropped.addAndGet((lag / period + 1).toInt())
-                            next = System.nanoTime() + period
+                        val advanced = ScriptCaptureSchedule.advance(next, System.nanoTime(), period)
+                        if (advanced.missed > 0) {
+                            dropped.addAndGet(advanced.missed.toInt())
+                            diagnostics.record(ScriptCaptureDiagnostics.Phase.SCHEDULE_EXCESS, advanced.oldPolicyExcess)
                         }
+                        next = advanced.next
                     }
                 }
         }
@@ -272,7 +276,7 @@ class ScriptCapture(
                 gif = ScriptGifEncoder(gifStream, outputWidth, outputHeight, budget, color)
             }
             if ("video" in formats) {
-                video = ScriptVideoEncoder(outputWidth, outputHeight, fps, budget) { run.artifacts.newFile("mp4") }
+                video = ScriptVideoEncoder(outputWidth, outputHeight, fps, budget, diagnostics) { run.artifacts.newFile("mp4") }
             }
         } catch (_: Exception) {
             failed = "CAPTURE_ENCODING_UNAVAILABLE"

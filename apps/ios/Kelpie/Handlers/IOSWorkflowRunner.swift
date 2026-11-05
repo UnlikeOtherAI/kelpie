@@ -12,6 +12,8 @@ final class IOSWorkflowRunner {
     private var totalActions = 0
     private var finalizing = false
     private var terminal: [(id: String, owner: String, value: Body)] = []
+    private var retiringPresentation: IOSWorkflowPresentation?
+    private var retirementTask: Task<Void, Never>?
 
     init(host: ScriptHandler) { self.host = host }
     var isRunning: Bool { runID != nil }
@@ -81,6 +83,7 @@ final class IOSWorkflowRunner {
             let admitted = host.playbackState.start(totalActions: workflow.steps.count, continueOnError: false)
             host.router.browserLease.end()
             guard admitted else { throw IOSWorkflowFailure("RECORDING_IN_PROGRESS") }
+            clearRetiringPresentation()
             let id = UUID().uuidString
             runID = id
             owner = grant.owner
@@ -89,7 +92,7 @@ final class IOSWorkflowRunner {
             totalActions = workflow.steps.count
             finalizing = false
             await host.context.exit3DInspectorIfNeeded(notify: true)
-            await host.setRecordingMode(true)
+            await host.setRecordingMode(true, workflow.requiresMovieImmersion)
             return await run(workflow, tab: tab, grant: grant, id: id)
         } catch { return (error as? IOSWorkflowFailure ?? IOSWorkflowFailure("INVALID_SCRIPT")).response }
     }
@@ -133,16 +136,20 @@ final class IOSWorkflowRunner {
                 actionIndex = index + 1
                 if index + 1 < workflow.steps.count { try await executor.wait(milliseconds: workflow.settings["defaultWaitBetweenActions"] as? Int ?? 0) }
             }
-            if let end = scene.markerEnd {
-                try await executor.wait(milliseconds: Int(max(0, end - ProcessInfo.processInfo.systemUptime) * 1000))
-            }
             if let sampler, sampler.recordsMotion {
+                if let end = scene.markerEnd {
+                    try await executor.wait(milliseconds: Int(max(0, end - ProcessInfo.processInfo.systemUptime) * 1000))
+                }
                 while !(try await sampler.step(nil)) { try sampler.checkTime() }
             }
         } catch { issue = error as? IOSWorkflowFailure ?? IOSWorkflowFailure("WORKFLOW_FAILED") }
         finalizing = true
         await sampler?.stop()
-        presentation?.finish()
+        if issue == nil, !host.playbackState.isAbortRequested(), sampler?.recordsMotion != true, let presentation {
+            retirePresentation(presentation, tab: tab, grant: grant)
+        } else {
+            presentation?.finish()
+        }
         // Late renderer results may still classify an attempted edit as sensitive.
         // Stop sampling first; the existing retirement fence owns callback completion.
         await IOSRendererDeadline.waitForRetirement(tab.view)
@@ -164,15 +171,63 @@ final class IOSWorkflowRunner {
         ) ?? []
         await tab.resetTargets()
         await IOSRendererDeadline.waitForRetirement(tab.view)
-        await host.setRecordingMode(false)
+        await host.setRecordingMode(false, false)
         issue = IOSWorkflowFailure.terminal(
             action: issue,
             capture: media?.failure ?? sampler?.failure,
             stopRequested: host.playbackState.isAbortRequested()
         )
+        if issue != nil { clearRetiringPresentation(ifOwned: presentation) }
         let response = finish(id: id, owner: grant.owner, issue: issue, outputs: outputs, artifacts: artifacts)
-        guard await grant.isCurrent() else { return denied() }
+        guard await grant.isCurrent() else { clearRetiringPresentation(ifOwned: presentation); return denied() }
         return response
+    }
+
+    private func clearRetiringPresentation() {
+        retirementTask?.cancel()
+        retirementTask = nil
+        retiringPresentation?.finish()
+        retiringPresentation = nil
+    }
+
+    private func clearRetiringPresentation(ifOwned presentation: IOSWorkflowPresentation?) {
+        guard let presentation, retiringPresentation === presentation else { return }
+        clearRetiringPresentation()
+    }
+
+    private func retirePresentation(_ presentation: IOSWorkflowPresentation, tab: IOSWorkflowTab, grant: IOSScriptGrant) {
+        guard let end = presentation.markerEnd, end > ProcessInfo.processInfo.systemUptime,
+              let window = tab.view.window else { presentation.finish(); return }
+        let document = tab.document
+        retiringPresentation = presentation
+        presentation.beginRetirement(window: window, document: document, deadline: end) { [weak self, weak presentation] in
+            self?.clearRetiringPresentation(ifOwned: presentation)
+        }
+        guard retiringPresentation === presentation else { return }
+        retirementTask = Task { @MainActor [weak self, presentation, weak window] in
+            while !Task.isCancelled && ProcessInfo.processInfo.systemUptime < end {
+                guard let window, tab.view.window === window, window.windowScene?.activationState == .foregroundActive,
+                      tab.document == document, (try? tab.requireCurrent()) != nil else {
+                    #if DEBUG
+                    presentation.retirementDiagnostic("owner", deadline: end)
+                    #endif
+                    break
+                }
+                guard await grant.isCurrent() else {
+                    #if DEBUG
+                    presentation.retirementDiagnostic("grant", deadline: end)
+                    #endif
+                    break
+                }
+                let remaining = end - ProcessInfo.processInfo.systemUptime
+                if remaining > 0 { try? await Task.sleep(nanoseconds: UInt64(min(0.025, remaining) * 1_000_000_000)) }
+            }
+            guard !Task.isCancelled else { return }
+            presentation.finish()
+            guard self?.retiringPresentation === presentation else { return }
+            self?.retiringPresentation = nil
+            self?.retirementTask = nil
+        }
     }
 
     private func finish(id: String, owner runOwner: String, issue: IOSWorkflowFailure?, outputs: Body, artifacts: [Body]) -> Body {

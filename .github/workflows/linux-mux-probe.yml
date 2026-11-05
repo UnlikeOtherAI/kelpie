@@ -1,0 +1,47 @@
+name: Linux retained AVC mux comparison
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6.0.3
+      - name: Download exact retained synthetic fixture
+        uses: actions/download-artifact@v8.0.1
+        with:
+          artifact-ids: 13446433522
+          run-id: 42092291516
+          github-token: ${{ github.token }}
+          path: mux-input
+      - name: Compare Ubuntu mux configurations
+        run: |
+          set -euo pipefail
+          fixture="mux-input/installed-smoke/capture/count-mismatch.mp4"
+          printf '%s  %s\n' df7a97cf8a9633f74a5906f9c63ec74b14549bd7abf1c30496a052fc2df24e4f "$fixture" | sha256sum -c -
+          mkdir -p mux-output
+          docker run --rm --cpus=2 --memory=3g --pids-limit=256 --security-opt no-new-privileges=true \
+            -v "$PWD:/workspace:ro" -v "$PWD/mux-output:/work" -w /workspace \
+            ubuntu@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends g++ pkg-config python3 ffmpeg nlohmann-json3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-tools gstreamer1.0-plugins-good util-linux
+              runner_uid="$(stat -c %u /work)"; runner_gid="$(stat -c %g /work)"
+              setpriv --reuid "$runner_uid" --regid "$runner_gid" --clear-groups env HOME=/work XDG_CACHE_HOME=/work/cache TMPDIR=/work bash tests/linux/run-mux-comparison.sh /workspace/mux-input/installed-smoke/capture/count-mismatch.mp4 /work/result
+            '
+      - name: Upload bounded comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: linux-mux-comparison-ubuntu-22.04
+          path: |
+            mux-output/result/*.json
+            mux-output/result/*.txt
+            mux-output/result/*.log
+            mux-output/result/*.mp4
+          if-no-files-found: warn

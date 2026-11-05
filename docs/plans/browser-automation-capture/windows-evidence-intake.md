@@ -203,6 +203,186 @@ otherwise stated. Its Windows production/build inputs are unchanged at
 Windows 0.1.16 is consistent in CMake, RC, device info and runtime at
 65fe4866. The final integrated revision still requires the sandboxed CEF
 rebuild/package and candidate replay, keyless signing of verified copies on
-Minis, signature/timestamp/EKU and SignTool verification, immutable upload,
+Maxis (Minis fallback), signature/timestamp/EKU and SignTool verification, immutable upload,
 then exact published-package install and runtime checks. The current candidate
 and native screenshots do not establish those release steps.
+
+## Windows candidate and warmup diagnostics
+
+The unsigned d849ee41 Windows production build used the pinned sandboxed CEF
+wrapper and normal local-inference graph. Its DLL SHA-256 is
+`7a0136fc35698e9353dac31b844d90726b36466fd128ce76afd9ddb834feaf8e`;
+the pinned bootstrap EXE SHA-256 is
+`54c8be31e003853947182c9461755bf4e7be5f91a2c64fcfb97ed5da1a32d755`.
+These files are build evidence, not a signed release.
+
+The earlier a916f4db candidate passed all 65 native CTest cases in one
+interactive Windows Session 1. Its DLL SHA-256 was
+`a15c00c4d9f32a8e1516ebcd5da2db6386a0097205c88cf491689e9b26844c29`.
+The d849 rebuild includes a later shared target change, so that 65/65 result
+does not establish a full test pass for d849.
+
+On a916, the omitted-duration default C workflow completed six actions with
+trusted page events, GIF and MP4, and 322 actual owned-window WGC frames.
+Recorded native and export dimensions matched at 640x276. The final motion
+was observed from the last start frame to the first endpoint frame in a
+266.7 ms sampling bracket; this is not an exact duration measurement or a
+dense easing pass. Public stop, process exit and private alias removal passed.
+The dense oracle is intentionally not applied to the 350 ms profile.
+
+A separate a916 dense C run returned successful media and 407 real WGC
+frames, but lacked the required two exact stable pre-dispatch endpoint frames.
+Its canonical native result remains insufficient. The first d849 four-click
+warmup run reached the owned presentation and recorded 524 frames but the
+public workflow returned `CAPTURE_DURATION_EXCEEDED` at the 33 s test cap.
+Both failures and their raw reports remain preserved. A source audit found
+pointer progress uses monotonic elapsed time; the separate fixed-step wait
+loop accumulates callback/sleep overhead and is being corrected and verified.
+
+The d849 full native verification, the final warmup C/S and same-run native/export
+comparison, current parent-window and Stop imagery, signing, package and
+installed-release checks remain open. The single-listener foreign-grant limit
+recorded above is unchanged.
+
+The later a44f6a50 candidate contains the monotonic wait correction. Its real
+four-click warmup C workflow completed with four trusted events, two movie
+exports, 409 actual WGC frames and 640x276 native/export dimensions; public
+cleanup passed. The native dense oracle failed with
+`G08_PATH_OR_EASING_MISMATCH`. Analysis of 29 in-path samples spanning
+1,850 ms found timed RMS 6.26 px and maximum 14.56 px, while the nearest
+geometric-curve RMS was 0.324 px. This is a retained failure, not a dense pass.
+
+A separate direct-owned diagnostic build at eceb6d4c used the same four-click
+C workflow and an opt-in bounded numeric trace. Its DLL SHA-256 was
+`574c5251c7d38f576452a7e4cb937cae142592cb3e02ebaa916d64e8320a3af0`.
+The workflow, four trusted events, public close and owned-process cleanup
+passed. Across 223 completed sampler latch observations, the median was
+83.635 ms, p90 106.709 ms and maximum 164.146 ms. Across 225 recorded
+owner-thread queue observations, p99 was 7.676 ms and maximum 11.299 ms.
+Neither stream truncated; non-latched queue waits below 10 ms were deliberately
+not logged. The latch measurement includes mutex acquisition, and tracing
+may perturb timing. It supports investigation of the sampler latch; it does
+not prove actual paint time or replace the earlier same-run WGC evidence.
+The sanitized report SHA-256 is
+`7d4a4f861361244abbd09fd9046261a071d92f4f85a23bc5211b6459b2952799`.
+The supported Windows G08 runner evaluates short default/fast profiles with
+`tests/windows/wgc-fast-profile.mjs`, which maps actual WGC positions and
+timestamps into fixture CSS coordinates before calling the shared
+`tests/capture/g08-fast-profile.mjs` fitter. It writes the input points and
+result to `fast-profile.json` after provenance verification. Dense runs still
+use the independent dense oracle. For de318b47, a separate retained fit on the
+original default C WGC samples passed: 350 ms RMS 6.00 CSS px versus 500 ms
+RMS 90.47 px, five intermediate positions and a 383.34 ms sampled bracket.
+The original `FAST_PROFILE_NOT_DENSE` receipt remains unchanged.
+The retained de318 dense C and S WGC runs reached the marker-opacity gate
+after the canonical path/easing gate, but both remained insufficient at
+marker onset. An independent owned layered-window calibration used partial
+red BGRA [0,0,178,178], partial green [0,89,0,89], opaque blue and clear
+patches. The exact-owner WGC deep copy reported `straight` while all 3x3
+interior raw samples retained their premultiplied input bytes at the observed
+2x DPI. Red white-backed as straight became [201,77,77], matching the failed
+observations; interpreted as premultiplied it became [255,77,77]. Green and
+opaque/clear controls corroborated the distinction.
+
+The Windows WGC numeric adapter therefore records the API alpha label and
+uses premultiplied composition only for the exact owned layered overlay,
+rejecting channels above alpha. The original raw and PNG evidence is unchanged;
+the older timeline reports remain insufficient because they did not retain
+every raw frame. Fresh runs are required for dense acceptance. The calibration
+raw SHA-256 is
+`d8e9fea696fdec1e7b3455eeb498f7cf0c8ba5eec9c141b0e3f085f01e82a7c4`,
+and the retained PNG SHA-256 is
+`7e17ebc50b0956fe91b354c2374ddd6ef7d4365f2bb4d3d1b0b32293eba75735`.
+
+The calibrated de318 native WGC C and S runs subsequently passed the unchanged
+dense path, easing and marker oracle. Their case SHA-256 values are
+`feeca5123401c2c878559662aee11602f2481e1e003e532141ab093b4f9bf1c5`
+and `e4e86ff3c977644b69a619139fec0ce9d8e4584aab779ae2a5d5acde0c89f318`.
+The separate exported GIF/MP4 oracle remained insufficient; the native pass
+does not establish export correspondence.
+
+On Maxis Session 1, the ceec9e9d LLM-on sandbox build and focused owned-window
+lifecycle and marker-policy checks passed. A real public CLI/HTTP workflow
+then completed two trusted clicks and three actions with screenshots-only
+capture in 3,918 ms. Its final actionIndex=2 PNG was downloaded with chunk
+identity, length and SHA-256 checks. A fresh WGC session started only after the
+HTTP response, against the same exact owned presentation HWND with cursor off
+and the default border. Its raw frame contained 29,124 red pixels in the target
+region (maximum alpha 135); owned UIA inspection found zero visible Stop
+controls. Public stop and alias removal passed, and the owned PID, listener,
+scheduled task and Job processes were absent.
+
+The evidence directory is
+`D:/BuildArtifacts/kelpie/capture-windows-resume-20261105/production/marker-transition-ceec-r1/evidence/`.
+The product DLL SHA-256 is
+`84ae1497ccf0b78929eaab2d53204995614b67c321649f6ed23e0f3abde00d40`;
+test revision is `63bc86b4f5a00c2151d882320d8e969d9407b5a0`.
+The 3,115-byte report SHA-256 is
+`f76d06b9d32801064768ec50e1ea2d079e24b9b018640fd88310efe61cebe842`,
+the 2,397-byte terminal PNG is
+`aee50ba07cb8cf461f2f756873d2e93c4f478c639118d4fe8d39e0bb21a9261d`,
+and the 10,020-byte post-response WGC PNG is
+`94a1b3c9983e0f2c45a51b04d3d79124d26f18211d888969cc313c03158f3120`.
+The 6,367,760-byte raw BGRA frame is
+`29b5c2c093bd1b199d46fc6bd116a2330f95b63c7fbcec26bf5fe961f6661c23`.
+This single transition does not establish expiry, no-capture behavior,
+resize/revocation recovery, or full Windows acceptance. The earlier c89
+fixture-ready HTTP 400 reports and their successful cleanups remain retained.
+
+
+A separate no-capture ceec Session 1 workflow completed two trusted clicks and
+three actions in 3,063.6 ms with zero artifacts. A fresh post-response WGC
+capture of the exact owned presentation HWND found 29,147 red pixels in the
+target region (maximum alpha 168), and UIA found no visible Stop control.
+After a further 5.5 seconds the presentation was absent and Stop remained
+absent while the listener and active tab still responded. Foreground ownership
+at that later instant was not independently measured, so this establishes
+absence after the requested lifetime, not the cause of the hide. Public
+cleanup passed and the owned PID, listener, task and Job processes retired.
+The report SHA-256 is
+`3f7b26f9cc4a3b40f21d7254f63b7649ec0f375036e2365772c554bab273f850`;
+the retained WGC PNG is
+`975e88d1feea54301949964d6468af30844aad4c79d0d121fc1ff5e43fca9290`.
+
+A separate omitted-duration S workflow on the same ceec binary passed the
+native fast-profile fitter: 350 ms RMS 4.917 CSS px versus 500 ms RMS
+87.276 px, four intermediate positions, a 350.0 ms observed bracket and
+220 actual owned-HWND WGC frames. Eight actions and four trusted events passed;
+GIF and MP4 artifacts were retained and probed. This is short-profile native
+motion evidence, not dense export correspondence. Public cleanup and exact
+owned-process retirement passed. The report SHA-256 is
+`f4867d20784da43e3ec1aed837e95837ae909a20461699367b5aa32b4e306ae2`;
+the fast-profile input and result SHA-256 is
+`63facb3535652e8dcfc3bfbc345dbd9ac3d33f7aae8f7ac09f2baa24cf541651`.
+Both runs used test revision `cc303fe271e6e1abda3c0b9c1d1f9600e0669907`.
+
+
+The normal completion-receipt candidate 5fc5f353 was built on Maxis with
+CEF and local LLM enabled. Its DLL SHA-256 is
+`be132690a0c8fff25decbfc5a3175d41f50254ca0683ff71d08f49adf9d78f35`.
+The focused capture-state and DevTools protocol tests passed. A separate
+Session 1 real HTTP/MCP safety session passed five selected checks: both
+navigation-marker formats, target replacement with recovery, MCP abort with
+recovery, and sensitive-target capture refusal. Public close exited normally,
+the readiness file was absent, and the owned PID, listener, task and Job
+processes retired. The 622-byte diagnostic report SHA-256 is
+`50c82ccc4d3a3503d553b34ef3f5c3ed5a3338202cc786f0c5c77748af7177fb`.
+These checks are not a cadence or release pass.
+
+The separate 736a0453 test-hook build forced a real navigation after screenshot
+completion and before the pinned viewport read. Its fixed checkpoint events
+were navigation, torn-frame drop and new-frame admission. An independently
+decoded ROI from the actual generic old screenshot was red [255,0,0], while
+the downloaded final action PNG ROI was blue [0,0,255]; a public recovery run
+passed. Public close, readiness cleanup and exact owned-process retirement
+also passed. The test-hook DLL SHA-256 is
+`f5b584165e32d9db4156a2f68249551601a48d19468e4b1ec713e07efe77b247`;
+it is not a normal candidate or release artifact. The 640-byte report
+SHA-256 is
+`c218711f48062a8e0f0c2a36632c7561bcf76ec101fe853fa19c6f378d98eb94`.
+The 6,545-byte old control PNG SHA-256 is
+`d07f014e9e127dad44d4fd3f0f102d84c71c1c3670ce07f6f601b36767cfe0ac`;
+the 1,391-byte final PNG SHA-256 is
+`3da13d45e7c01d5662e3a4738e1aefce0a49115c91f7d71eb6a302049eb1106b`.
+Actual replacement and shutdown at this checkpoint and matched normal-build
+cadence comparison remain open.

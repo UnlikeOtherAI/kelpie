@@ -1,0 +1,176 @@
+name: Installed Linux resource diagnostic
+
+on:
+  workflow_call:
+    inputs:
+      source_run:
+        type: string
+        required: true
+      cli_only:
+        type: boolean
+        default: false
+      require_terminal_idr:
+        type: boolean
+        default: false
+      expected_source:
+        type: string
+        default: ""
+      expected_rpm:
+        type: string
+        default: ""
+      expected_cli:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    name: Installed resource snapshot (${{ matrix.distro.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        distro: ${{ fromJSON(inputs.cli_only && '[{"name":"fedora-44","image":"fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e"}]' || '[{"name":"ubuntu-22.04","image":"ubuntu@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11"},{"name":"fedora-44","image":"fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e"}]') }}
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate source run
+        env:
+          SOURCE_RUN: ${{ inputs.source_run }}
+          CLI_ONLY: ${{ inputs.cli_only }}
+          REQUIRE_IDR: ${{ inputs.require_terminal_idr }}
+          EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          EXPECTED_RPM: ${{ inputs.expected_rpm }}
+          EXPECTED_CLI: ${{ inputs.expected_cli }}
+        run: |
+          set -euo pipefail
+          [[ "${SOURCE_RUN}" =~ ^[0-9]+$ ]]
+          if [[ "$CLI_ONLY" == true ]]; then
+            [[ "$REQUIRE_IDR" != true ]]
+            [[ "$EXPECTED_SOURCE" =~ ^[a-f0-9]{40}$ && "$EXPECTED_RPM" =~ ^[a-f0-9]{64}$ && "$EXPECTED_CLI" =~ ^[a-f0-9]{64}$ ]]
+          fi
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: linux-native-candidate-${{ matrix.distro.name }}
+          path: dist/release/${{ matrix.distro.name }}
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+      - uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22.14.0
+      - name: Prepare original corpus and diagnostic hooks
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          CLI_ONLY: ${{ inputs.cli_only }}
+          REQUIRE_IDR: ${{ inputs.require_terminal_idr }}
+          EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          EXPECTED_RPM: ${{ inputs.expected_rpm }}
+          EXPECTED_CLI: ${{ inputs.expected_cli }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          diagnostic_revision="$(git rev-parse HEAD)"
+          package_revision="$(cat "${package_root}/source-revision.txt")"
+          if [[ "$CLI_ONLY" == true ]]; then
+            [[ "$DISTRO_NAME" == fedora-44 && "$package_revision" == "$EXPECTED_SOURCE" ]]
+            mapfile -d '' rpm_files < <(find "$package_root" -maxdepth 1 -type f -name '*.rpm' -print0)
+            mapfile -d '' cli_files < <(find "$package_root" -maxdepth 1 -type f -name '*.tgz' -print0)
+            [[ ${#rpm_files[@]} == 1 && ${#cli_files[@]} == 1 ]]
+            [[ "$(sha256sum "${rpm_files[0]}" | cut -d' ' -f1)" == "$EXPECTED_RPM" ]]
+            [[ "$(sha256sum "${cli_files[0]}" | cut -d' ' -f1)" == "$EXPECTED_CLI" ]]
+            printf 'expectedSource=%s\nexpectedRPM=%s\nexpectedCLI=%s\n' "$EXPECTED_SOURCE" "$EXPECTED_RPM" "$EXPECTED_CLI" > "$package_root/resource-expected.txt"
+          fi
+          [[ "${package_revision}" =~ ^[a-f0-9]{40}$ ]]
+          git cat-file -e "${package_revision}^{commit}"
+          git diff "${package_revision}" "${diagnostic_revision}" -- \
+            scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs tests/capture/ffmpeg-passthrough.mjs \
+            tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs tests/windows/capture-final-dwell-cases.mjs \
+            > "${package_root}/resource-hook-diff.patch"
+          git checkout --detach "${package_revision}"
+          for path in scripts/ci/linux-installed-smoke.sh tests/linux/diagnose-media-count.mjs tests/linux/verify-continuous-marker.mjs tests/capture/ffmpeg-passthrough.mjs tests/linux/native-resource-snapshot.mjs \
+            tests/linux/navigation-resource-diagnostic.mjs \
+            tests/linux/run-native-capture-acceptance.mjs tests/windows/run-script-capture-acceptance.mjs; do
+            git show "${diagnostic_revision}:${path}" > "${path}"
+          done
+          if [[ "$REQUIRE_IDR" == true ]]; then
+            for path in tests/linux/verify-native-replay.mjs tests/linux/verify-terminal-idr.mjs; do
+              git show "$diagnostic_revision:$path" > "$path"
+            done
+          fi
+          if git cat-file -e "$diagnostic_revision:tests/windows/capture-final-dwell-cases.mjs" 2>/dev/null; then
+            git show "$diagnostic_revision:tests/windows/capture-final-dwell-cases.mjs" > tests/windows/capture-final-dwell-cases.mjs
+          fi
+          printf '%s\n' "${diagnostic_revision}" > "${package_root}/resource-test-revision.txt"
+          pnpm install --frozen-lockfile
+          pnpm --filter @unlikeotherai/kelpie-shared build
+          test -s packages/shared/dist/index.js
+          pnpm --filter @unlikeotherai/kelpie build
+      - name: Run original installed package with numeric snapshots
+        timeout-minutes: 15
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+          SOURCE_RUN: ${{ inputs.source_run }}
+          CLI_ONLY: ${{ inputs.cli_only }}
+          REQUIRE_IDR: ${{ inputs.require_terminal_idr }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          printf 'referenceRun=42066988249\nsourceRun=%s\nimage=%s\nshmSizeBytes=268435456\n' "${SOURCE_RUN}" "${DISTRO_IMAGE}" > "${package_root}/resource-image.txt"
+          curl -fsSL https://raw.githubusercontent.com/moby/profiles/4b8214fc4971e06172938a1f1554ccff6647ee80/seccomp/default.json -o "${RUNNER_TEMP}/kelpie-moby-default.json"
+          KELPIE_SECCOMP_BASELINE="${RUNNER_TEMP}/kelpie-moby-default.json" node --test tests/linux/seccomp-profile.test.mjs
+          node scripts/ci/linux-test-seccomp.mjs "${RUNNER_TEMP}/kelpie-moby-default.json" "${RUNNER_TEMP}/kelpie-test-seccomp.json"
+          expected="$(awk 'NR==2 {print $1}' "${package_root}/test-seccomp-sha256.txt")"
+          test "$(sha256sum "${RUNNER_TEMP}/kelpie-test-seccomp.json" | cut -d' ' -f1)" = "${expected}"
+          test_revision="$(cat "${package_root}/resource-test-revision.txt")"
+          cli_only=0; resource_mode=1
+          if [[ "$CLI_ONLY" == true ]]; then cli_only=1; resource_mode=0; fi
+          require_idr=0; if [[ "$REQUIRE_IDR" == true ]]; then require_idr=1; fi
+          printf "cliOnly=%s\nrequireTerminalIDR=%s\n" "$cli_only" "$require_idr" > "$package_root/resource-scope.txt"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 --shm-size=256m \
+            --security-opt no-new-privileges=true \
+            --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
+            -e KELPIE_LINUX_RESOURCE_DIAGNOSTIC="$resource_mode" -e KELPIE_INSTALLED_SMOKE_DIAGNOSTIC="$resource_mode" \
+            -e KELPIE_INSTALLED_SMOKE_CLI_ONLY="$cli_only" -e KELPIE_VERIFY_TERMINAL_IDR="$require_idr" \
+            -e KELPIE_RESOURCE_TEST_REVISION="${test_revision}" \
+            -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -w /workspace "${DISTRO_IMAGE}" \
+            bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
+            2>&1 | tee "${package_root}/resource-diagnostic.log"
+      - name: Upload bounded resource evidence
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: linux-resource-diagnostic-${{ matrix.distro.name }}
+          path: |
+            dist/release/${{ matrix.distro.name }}/resource-expected.txt
+            dist/release/${{ matrix.distro.name }}/resource-scope.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/installed-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/client-package-sha256.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/public-cli.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/report.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/observations.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-cli-only/alias/alias/report.json
+            dist/release/${{ matrix.distro.name }}/resource-test-revision.txt
+            dist/release/${{ matrix.distro.name }}/resource-image.txt
+            dist/release/${{ matrix.distro.name }}/resource-hook-diff.patch
+            dist/release/${{ matrix.distro.name }}/resource-diagnostic.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/outcome.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.txt
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/*.log
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/count-mismatch.gif
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/count-mismatch.mp4
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/*.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-resource/capture/capture/*.json
+          if-no-files-found: warn

@@ -5,7 +5,15 @@ set -euo pipefail
 distro="$1"
 package_root="$(realpath "$2")"
 [[ "$package_root" == /workspace/dist/release/* && -d "$package_root" ]] || exit 1
+cli_only="${KELPIE_INSTALLED_SMOKE_CLI_ONLY:-0}"
+[[ "$cli_only" == 0 || ( "$cli_only" == 1 && "$distro" == fedora-44 ) ]] || exit 1
 output="$package_root/installed-smoke"
+if [[ "${KELPIE_INSTALLED_SMOKE_REPLAY:-}" == 1 ]]; then output="$package_root/installed-smoke-replay"; fi
+if [[ "${KELPIE_INSTALLED_SMOKE_DIAGNOSTIC:-}" == 1 ]]; then output="$package_root/installed-smoke-resource"; fi
+if [[ "$cli_only" == 1 ]]; then
+  [[ "${KELPIE_INSTALLED_SMOKE_DIAGNOSTIC:-0}" == 0 && "${KELPIE_INSTALLED_SMOKE_REPLAY:-0}" == 0 ]] || exit 1
+  output="$package_root/installed-smoke-cli-only"
+fi
 mkdir "$output"
 stage=install
 cgroup_snapshot() {
@@ -66,6 +74,8 @@ cp /etc/os-release "$output/os-release.txt"
 source_revision="$(cat "$package_root/source-revision.txt")"
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ ]]
 printf '%s\n' "$source_revision" > "$output/source-revision.txt"
+test_revision="${KELPIE_RESOURCE_TEST_REVISION:-$source_revision}"
+[[ "$test_revision" =~ ^[a-f0-9]{40}$ ]]
 [[ "$(cat /opt/kelpie/source-revision.txt)" == "$source_revision" ]]
 sha256sum /opt/kelpie/source-revision.txt > "$output/embedded-source-sha256.txt"
 
@@ -99,17 +109,27 @@ runuser -u kelpie-smoke -- timeout 10 unshare --user --map-root-user --net --pid
 run() {
   runuser -u kelpie-smoke -- env HOME="$home" XDG_RUNTIME_DIR="$home/runtime" \
     TMPDIR="$home/runtime" NODE_OPTIONS=--max-old-space-size=2048 \
-    KELPIE_CAPTURE_SOURCE="$source_revision" KELPIE_TEST_REVISION="$source_revision" \
+    KELPIE_CAPTURE_SOURCE="$source_revision" KELPIE_TEST_REVISION="$test_revision" \
+    KELPIE_LINUX_RESOURCE_DIAGNOSTIC="${KELPIE_LINUX_RESOURCE_DIAGNOSTIC:-0}" \
+    KELPIE_VERIFY_TERMINAL_IDR="${KELPIE_VERIFY_TERMINAL_IDR:-0}" \
     KELPIE_CLI_BUILD_REVISION="$source_revision" \
     KELPIE_LINUX_FINALIZE_FAULT=1 KELPIE_LINUX_PREINPUT_REPLACEMENT=1 \
     timeout --signal=TERM --kill-after=10 300 "$node" "$@"
 }
+if [[ "$cli_only" == 0 ]]; then
 stage=native-http-mcp
 run tests/linux/run-native-capture-acceptance.mjs /usr/bin/kelpie-linux "$output/capture" \
   > "$output/native-corpus.log" 2>&1
 stage=independent-media
-run tests/linux/verify-native-replay.mjs "$output/capture" > "$output/native-media.log" 2>&1
+if run tests/linux/verify-native-replay.mjs "$output/capture" > "$output/native-media.log" 2>&1; then
+  :
+else
+  media_status=$?
+  run tests/linux/diagnose-media-count.mjs "$output/capture" --synthetic-fixture > "$output/media-diagnostic.log" 2>&1 || true
+  exit "$media_status"
+fi
+fi
 stage=public-cli
 run tests/linux/run-native-alias-acceptance.mjs /usr/bin/kelpie-linux \
   "$home/client/package/bin/kelpie.js" "$output/alias" offscreen > "$output/public-cli.log" 2>&1
-stage=complete
+if [[ "$cli_only" == 1 ]]; then stage=cli-only-complete; else stage=complete; fi

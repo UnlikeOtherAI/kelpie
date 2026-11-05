@@ -8,6 +8,7 @@ final class WorkflowLoopbackPage {
     private let responseDelay: TimeInterval
     private let requestCounter = WorkflowRequestCounter()
     func requestCount(path: String) -> Int { requestCounter.count(path) }
+    func responseCount(path: String) -> Int { requestCounter.count("response:" + path) }
     init(responseDelay: TimeInterval = 0) throws {
         self.responseDelay = responseDelay
         let params = NWParameters.tcp
@@ -47,6 +48,7 @@ final class WorkflowLoopbackPage {
           field.oninput=()=>{document.title='Unexpected edit'};
           if(location.pathname==='/focus-secret-password')field.onfocus=()=>{field.type='password'};
           if(location.pathname==='/focus-secret-autocomplete')field.onfocus=()=>{field.autocomplete='current-password'};
+          if(location.pathname==='/focus-secret-timeout')document.title+=' | '+String.fromCodePoint(0x1F9EA);
           if(location.pathname==='/focus-secret-timeout')field.onfocus=()=>{
             const end=performance.now()+6500;while(performance.now()<end){}
           };
@@ -64,7 +66,17 @@ final class WorkflowLoopbackPage {
         }
         if(location.pathname.startsWith('/paced')){
           const field=document.querySelector('#entry'), events=[];
+          const facts=document.createElement('output'), scene=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+          facts.id='keyboard-geometry';facts.style='position:absolute;left:0;top:0;color:transparent;font-size:1px;pointer-events:none';document.body.appendChild(facts);
+          const reportGeometry=()=>{const v=visualViewport;facts.textContent=JSON.stringify({
+            scene,width:v.width,height:v.height,x:v.offsetLeft,y:v.offsetTop,scale:v.scale,
+            layoutWidth:innerWidth,layoutHeight:innerHeight,dpr:devicePixelRatio
+          })};
+          visualViewport.addEventListener('resize',reportGeometry);visualViewport.addEventListener('scroll',reportGeometry);
+          window.addEventListener('resize',reportGeometry);
+          reportGeometry();
           field.value='seed';
+          if(location.pathname==='/paced-readonly')field.readOnly=true;
           const report=()=>{document.title=JSON.stringify(events)};
           field.oninput=e=>{
             events.push({data:e.data,value:field.value,at:performance.now()});
@@ -72,6 +84,19 @@ final class WorkflowLoopbackPage {
             if(location.pathname==='/paced-focus' && events.length===1)button.focus();
           };
           button.onclick=()=>{events.push({data:'LATER'});report()};
+        }
+        if(location.pathname==='/paced-final-ack'){
+          document.title='Final '+String.fromCodePoint(0x1F9EA);
+          document.querySelector('#entry').oninput=()=>{
+            const timer=setInterval(async()=>{
+              if(await (await fetch('/paced-signal')).text()==='go'){
+                clearInterval(timer);location.href='/landed';
+              }
+            },25);
+          };
+        }
+        if(location.pathname==='/projection'){
+          button.style='position:fixed;left:100px;top:300px;width:150px;height:80px;margin:0';
         }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
@@ -82,9 +107,11 @@ final class WorkflowLoopbackPage {
           document.body.innerHTML='<button style="appearance:none;position:fixed;left:58vw;top:60vh;transform:translate(-50%,-50%);margin:0;background:#505050;color:#181818;border:0">Track</button>'
           document.querySelector('button').onclick=()=>{document.title='Track clicked'}
         }
-        if(location.pathname==='/pinch'){
+        if(location.pathname==='/pinch'||location.pathname==='/pinch-scroll'){
           document.documentElement.style.background='#606060';
-          document.body.style='margin:0;background:#606060;height:100vh;overflow:hidden';
+          document.body.style=location.pathname==='/pinch-scroll'
+            ? 'margin:0;background:#606060;height:200vh'
+            : 'margin:0;background:#606060;height:100vh;overflow:hidden';
           document.body.innerHTML='<button id="edge" style="position:fixed;margin:0;width:150px;height:80px;appearance:none;background:#505050;color:#181818;border:0">Edge</button><output id="zoom" style="position:absolute;left:0;top:0;color:#181818;font-size:8px"></output><output id="clicked" style="position:absolute;left:0;top:14px;color:#181818;font-size:8px"></output>';
           const edge=document.querySelector('#edge'),metrics=document.querySelector('#zoom');
           let clicks=0;
@@ -92,9 +119,22 @@ final class WorkflowLoopbackPage {
             width:visualViewport.width,height:visualViewport.height,layoutWidth:innerWidth,layoutHeight:innerHeight});
           const position=()=>{
             const v=viewport();
-            edge.style.left=Math.min(innerWidth-150,v.x+v.width-50)+'px';
-            edge.style.top=(v.y+v.height/2-40)+'px';
-            metrics.textContent=JSON.stringify({...v,clicks});
+            if(!edge.style.left)edge.style.left='0px';
+            if(!edge.style.top)edge.style.top='0px';
+            // Fixed-element CSS positions and DOMRects can have different origins after native pinch.
+            // Calibrate against the actual DOMRect, without dispatching input.
+            for(let i=0;i<3;i++){
+              const rect=edge.getBoundingClientRect();
+              const dx=(v.x+v.width-50)-rect.left,dy=(v.y+v.height/2-40)-rect.top;
+              if(Math.abs(dx)<0.5&&Math.abs(dy)<0.5)break;
+              edge.style.left=(parseFloat(edge.style.left)+dx)+'px';
+              edge.style.top=(parseFloat(edge.style.top)+dy)+'px';
+            }
+            const rect=edge.getBoundingClientRect();
+            const visibleWidth=Math.max(0,Math.min(v.x+v.width,rect.right)-Math.max(v.x,rect.left));
+            const visibleHeight=Math.max(0,Math.min(v.y+v.height,rect.bottom)-Math.max(v.y,rect.top));
+            metrics.textContent=JSON.stringify({...v,clicks,edgeLeft:rect.left,edgeTop:rect.top,
+              edgeWidth:rect.width,edgeHeight:rect.height,visibleWidth,visibleHeight});
           };
           visualViewport.addEventListener('resize',position);visualViewport.addEventListener('scroll',position);
           edge.onclick=e=>{
@@ -126,7 +166,15 @@ final class WorkflowLoopbackPage {
             Self.readPath(connection, buffered: Data()) { path in
                 requestCounter.record(path)
                 queue.asyncAfter(deadline: .now() + responseDelay) {
-                    connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+                    let reply: Data
+                    if path == "/paced-signal" {
+                        let body = requestCounter.count("/paced-ack") > 0 ? "go" : "wait"
+                        reply = Data("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)".utf8)
+                    } else {
+                        reply = data
+                    }
+                    requestCounter.record("response:" + path)
+                    connection.send(content: reply, completion: .contentProcessed { _ in connection.cancel() })
                 }
             }
         }

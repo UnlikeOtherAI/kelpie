@@ -77,3 +77,11 @@ The Linux deterministic GIF model is test-only and not wired into verifier
 acceptance. Exact decoded model equality can support an encoded-visible tail
 statement only after candidate provenance and real retained-marker controls
 are established. It cannot prove physical zero alpha or relax MP4 criteria.
+
+## Later paced-typing source checkpoint
+
+At integrated `2153a422`, the shared bounded scalar planner and Windows, Linux,
+macOS and iOS adapters are present in source. Android was still implementing
+its adapter at this checkpoint; its interim preflight refusal remains. All
+platforms still require native paced-input, privacy, cancellation and decoded
+capture evidence. The earlier 783bc381 gap remains historical.

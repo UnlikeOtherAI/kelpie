@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <optional>
+#include <string>
 #include <nlohmann/json.hpp>
 
 namespace kelpie {
@@ -16,10 +17,38 @@ inline bool ScriptCaptureViewportCompatible(const nlohmann::json& previous,
     return true;
   }catch(const std::exception&){return false;}
 }
+// Whitelist bounded numeric facts; never serialize page-provided arbitrary JSON.
+inline nlohmann::json ScriptCaptureViewportFacts(const nlohmann::json& input) {
+  nlohmann::json facts=nlohmann::json::object();
+  auto add=[&](const nlohmann::json& from,const char* key,const char* output) {
+    if (!from.is_object() || !from.contains(key) || !from[key].is_number()) return;
+    const double value=from[key].get<double>();
+    if (std::isfinite(value) && std::abs(value)<=1000000) facts[output]=value;
+  };
+  add(input,"width","width"); add(input,"height","height");
+  if (input.is_object() && input.contains("visualViewport")) {
+    const auto& view=input["visualViewport"];
+    for (const char* key:{"offsetLeft","offsetTop","width","height","scale"}) {
+      const std::string name=std::string("visual_")+key; add(view,key,name.c_str());
+    }
+  }
+  return facts;
+}
 // Called only after the fixed renderer inspection has been attempted.
 inline bool ScriptTargetInspectionExplicit(const nlohmann::json& value) {
   return value.is_object() && value.contains("ok") && value["ok"].is_boolean() &&
     value.contains("sensitive") && value["sensitive"].is_boolean();
+}
+inline bool ScriptTargetPostMutationExplicit(const nlohmann::json& value) {
+  if (!ScriptTargetInspectionExplicit(value) || !value.contains("sensitivityKnown") ||
+      !value["sensitivityKnown"].is_boolean()) return false;
+  if (value["ok"].get<bool>()) return !value.contains("error");
+  return value.contains("error") && value["error"].is_string() && !value["error"].get<std::string>().empty();
+}
+inline std::string ScriptTargetPostMutationErrorCode(const nlohmann::json& value) {
+  if (ScriptTargetPostMutationExplicit(value) && !value["ok"].get<bool>() &&
+      value["error"].get<std::string>() == "INVALID_TARGET_OPERATION") return "INVALID_TARGET_OPERATION";
+  return "TARGET_INSPECTION_INVALID";
 }
 inline bool ScriptTargetInspectionUncertain(const nlohmann::json& value) {
   return !ScriptTargetInspectionExplicit(value) || (!value["sensitive"].get<bool>() &&

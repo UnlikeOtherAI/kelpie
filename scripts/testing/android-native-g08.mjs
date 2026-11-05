@@ -4,12 +4,15 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { startG08Fixture, g08Workflow } from '../../tests/capture/g08-fixture.mjs';
+import { startG08Fixture, g08Workflow, mapG08Scene } from '../../tests/capture/g08-fixture.mjs';
 
 const execute = promisify(execFile);
 
 // Uses the same paired CLI and app-owned test bridge as the other hosted flow.
 export async function runG08({ command, folder, tabId, profile, revision, binarySHA256 }) {
+  // Fail before navigation or playback when required media tools are absent.
+  await execute("ffprobe", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
+  await execute("ffmpeg", ["-version"], { timeout: 10000, maxBuffer: 1048576 });
   const cases = [];
   let eventsDropped = 0;
   for (const curve of ['c', 's']) {
@@ -37,11 +40,11 @@ export async function runG08({ command, folder, tabId, profile, revision, binary
         const eventsResponse = await fetch(fixture.url.replace('/g08', '/events'));
         assert.equal(eventsResponse.status, 200);
         facts = await eventsResponse.json();
-        if (facts.events.length < 3) await new Promise(resolveEvents => setTimeout(resolveEvents, 50));
-      } while (facts.events.length < 3 && Date.now() < eventDeadline);
+        if (facts.events.length < 4) await new Promise(resolveEvents => setTimeout(resolveEvents, 50));
+      } while (facts.events.length < 4 && Date.now() < eventDeadline);
       await writeFile(join(folder, 'g08-' + curve + '-events.json'), JSON.stringify(facts, null, 2));
       eventsDropped += facts.dropped;
-      assert.equal(facts.events.length, 3);
+      assert.equal(facts.events.length, 4);
       const artifacts = [];
       for (const mime of ['image/gif', 'video/mp4']) {
         const item = run.artifacts.find(entry => entry.mimeType === mime);
@@ -58,7 +61,7 @@ export async function runG08({ command, folder, tabId, profile, revision, binary
         const metadata = JSON.parse(probe.stdout);
         artifacts.push({ ...item, file, timestamps: metadata.frames.map(frame => Number(frame.best_effort_timestamp_time)) });
       }
-      cases.push({ curve, scene: { calibration: facts.events[0], start: facts.events[1], finish: facts.events[2] }, artifacts });
+      cases.push({ curve, scene: mapG08Scene(facts.events), artifacts });
     } finally {
       await fixture.close();
     }

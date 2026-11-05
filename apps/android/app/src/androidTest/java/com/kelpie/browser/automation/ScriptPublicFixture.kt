@@ -148,8 +148,14 @@ abstract class ScriptPublicFixture {
         }
     }
 
-    protected fun captureBlueMarker(client: ScriptHttpFixture): Bitmap {
+    protected fun captureBlueMarker(
+        client: ScriptHttpFixture,
+        geometry: JSONObject,
+    ): Bitmap {
+        // Recording can resize the WebView; measure the same fixture after admission.
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
+        val currentGeometry = readSubmitGeometry(owned, geometry.getString("href"))
+        assertEquals(geometry.getString("href"), currentGeometry.getString("href"))
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
         val observations = org.json.JSONArray()
@@ -164,11 +170,14 @@ abstract class ScriptPublicFixture {
             // here would defer the screenshot until the marker has disappeared.
             val viewport = android.graphics.Rect()
             instrumentation.runOnMainSync {
-                val location = IntArray(2)
-                owned.getLocationOnScreen(location)
-                viewport.set(location[0], location[1], location[0] + owned.width, location[1] + owned.height)
+                if (owned.getGlobalVisibleRect(viewport)) {
+                    val rootLocation = IntArray(2)
+                    owned.rootView.getLocationOnScreen(rootLocation)
+                    viewport.offset(rootLocation[0], rootLocation[1])
+                }
             }
-            val target = submitTargetBounds(viewport)
+            val projection = JSONObject()
+            val target = submitTargetBounds(owned, currentGeometry, projection)
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
             val now = System.nanoTime()
@@ -180,6 +189,7 @@ abstract class ScriptPublicFixture {
                         .put("actionIndex", status?.optInt("actionIndex", -1) ?: -1)
                         .put("playing", status?.optBoolean("playing") ?: false)
                         .put("targetVisible", target != null)
+                        .put("projection", projection)
                         .put("markerFound", marker != null)
                         .put("accessibility", diagnoseSubmitWindows()),
                 )
@@ -269,24 +279,141 @@ abstract class ScriptPublicFixture {
         return JSONObject().put("activeRootPresent", activePresent).put("windows", windows)
     }
 
-    @Suppress("DEPRECATION")
-    private fun submitTargetBounds(viewport: android.graphics.Rect): android.graphics.Rect? {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
-        try {
-            val nodes = root.findAccessibilityNodeInfosByText("Submit")
-            try {
-                for (node in nodes) {
-                    if (!node.isVisibleToUser || !node.isClickable || node.text?.toString() != "Submit") continue
-                    val rect = android.graphics.Rect()
-                    node.getBoundsInScreen(rect)
-                    if (rect.intersect(viewport) && !rect.isEmpty) return rect
-                }
-            } finally {
-                nodes.forEach { it.recycle() }
+    private val submitGeometryExpression =
+        """(()=>{const b=[...document.querySelectorAll('button')],v=visualViewport;
+        if(b.length!==1||b[0].textContent!=='Submit'||!v)return null;
+        const r=b[0].getBoundingClientRect();
+        return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,
+        offsetLeft:v.offsetLeft,offsetTop:v.offsetTop,width:v.width,height:v.height,href:location.href};})()"""
+
+    /** Resolve the single fixture button independently of the marker renderer. */
+    protected fun readSubmitGeometry(
+        client: ScriptHttpFixture,
+        expectedPath: String = "/fixture",
+    ): JSONObject {
+        val geometry = client.call("evaluate", JSONObject().put("expression", submitGeometryExpression)).getJSONObject("result")
+        assertEquals(
+            expectedPath,
+            android.net.Uri
+                .parse(geometry.getString("href"))
+                .path,
+        )
+        assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
+        assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
+        return geometry
+    }
+
+    /** Read-only fixture probe bypasses the gateway's intentional recording lock. */
+    private fun readSubmitGeometry(
+        view: android.webkit.WebView,
+        expectedHref: String,
+    ): JSONObject {
+        val value =
+            java.util.concurrent.atomic
+                .AtomicReference<String>()
+        val done = java.util.concurrent.CountDownLatch(1)
+
+        instrumentation.runOnMainSync {
+            view.evaluateJavascript(submitGeometryExpression) { result ->
+                value.set(result)
+                done.countDown()
             }
-        } finally {
-            root.recycle()
         }
-        return null
+        check(done.await(3, java.util.concurrent.TimeUnit.SECONDS)) { "Fixture geometry callback timed out" }
+        val geometry = JSONObject(checkNotNull(value.get()))
+        assertEquals(expectedHref, geometry.getString("href"))
+        assertTrue(geometry.getDouble("right") > geometry.getDouble("left"))
+        assertTrue(geometry.getDouble("bottom") > geometry.getDouble("top"))
+        return geometry
+    }
+
+    /** Project DOM CSS coordinates through the exact owned WebView's native transform. */
+    private fun submitTargetBounds(
+        view: android.webkit.WebView,
+        geometry: JSONObject,
+        diagnostic: JSONObject,
+    ): android.graphics.Rect? {
+        var target: android.graphics.Rect? = null
+        instrumentation.runOnMainSync {
+            diagnostic.put("viewWidth", view.width).put("viewHeight", view.height)
+            if (!view.isAttachedToWindow || !view.isShown || view.width <= 0 || view.height <= 0) {
+                diagnostic.put("reason", "view-unavailable")
+                return@runOnMainSync
+            }
+            val width = geometry.getDouble("width")
+            val height = geometry.getDouble("height")
+            diagnostic.put("cssWidth", width).put("cssHeight", height)
+            if (!width.isFinite() || !height.isFinite() || width <= 0 || height <= 0) {
+                diagnostic.put("reason", "viewport-invalid")
+                return@runOnMainSync
+            }
+            val scaleX = view.width / width
+            val scaleY = view.height / height
+            diagnostic.put("scaleX", scaleX).put("scaleY", scaleY)
+            if (kotlin.math.abs(scaleX / scaleY - 1.0) > 0.02) {
+                diagnostic.put("reason", "viewport-scale-mismatch")
+                return@runOnMainSync
+            }
+            val left = (geometry.getDouble("left") - geometry.getDouble("offsetLeft")) * scaleX
+            val top = (geometry.getDouble("top") - geometry.getDouble("offsetTop")) * scaleY
+            val right = (geometry.getDouble("right") - geometry.getDouble("offsetLeft")) * scaleX
+            val bottom = (geometry.getDouble("bottom") - geometry.getDouble("offsetTop")) * scaleY
+            diagnostic
+                .put("localLeft", left)
+                .put("localTop", top)
+                .put("localRight", right)
+                .put("localBottom", bottom)
+            if (left < 0 || top < 0 || right > view.width || bottom > view.height) {
+                diagnostic.put("reason", "target-outside-view")
+                return@runOnMainSync
+            }
+            val rect = android.graphics.RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
+            val matrix = android.graphics.Matrix()
+            view.transformMatrixToGlobal(matrix)
+            val values = FloatArray(9)
+            matrix.getValues(values)
+            val sx = values[android.graphics.Matrix.MSCALE_X]
+            val sy = values[android.graphics.Matrix.MSCALE_Y]
+            diagnostic.put("matrixScaleX", sx.toDouble()).put("matrixScaleY", sy.toDouble())
+            if (!matrix.isAffine ||
+                sx <= 0f ||
+                sy <= 0f ||
+                kotlin.math.abs(sx / sy - 1f) > 0.02f ||
+                kotlin.math.abs(values[android.graphics.Matrix.MSKEW_X]) > 0.0001f ||
+                kotlin.math.abs(values[android.graphics.Matrix.MSKEW_Y]) > 0.0001f
+            ) {
+                diagnostic.put("reason", "native-transform-unsupported")
+                return@runOnMainSync
+            }
+            val origin = floatArrayOf(0f, 0f)
+            matrix.mapPoints(origin)
+            matrix.mapRect(rect)
+            val screen = IntArray(2)
+            view.getLocationOnScreen(screen)
+            rect.offset(screen[0] - origin[0], screen[1] - origin[1])
+            val visible = android.graphics.Rect()
+            if (!view.getGlobalVisibleRect(visible)) {
+                diagnostic.put("reason", "view-not-visible")
+                return@runOnMainSync
+            }
+            val rootLocation = IntArray(2)
+            view.rootView.getLocationOnScreen(rootLocation)
+            visible.offset(rootLocation[0], rootLocation[1])
+            val projected =
+                android.graphics.Rect(
+                    kotlin.math.floor(rect.left.toDouble()).toInt(),
+                    kotlin.math.floor(rect.top.toDouble()).toInt(),
+                    kotlin.math.ceil(rect.right.toDouble()).toInt(),
+                    kotlin.math.ceil(rect.bottom.toDouble()).toInt(),
+                )
+            diagnostic.put("visible", visible.toShortString()).put("projected", projected.toShortString())
+            if (visible.contains(projected)) {
+                diagnostic.put("reason", "admitted")
+                target = projected
+            } else {
+                diagnostic.put("reason", "target-clipped")
+            }
+        }
+        return target
     }
 }

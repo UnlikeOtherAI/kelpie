@@ -118,7 +118,9 @@ endpoint as a compatibility workaround. There is no automatic backend fallback.
 
 The [Lightpanda analysis](../plans/browser-automation-capture/lightpanda-analysis.md)
 records exact upstream revisions and the bounded real-binary diagnostics, including
-failures, completed narrow production acceptance and pending reader expansion.
+failures and the completed narrow production stdio acceptance of the four
+explicitly selected readers. Broader methods and other binaries require separate
+verification.
 Passing protocol or mock tests alone does not establish compatibility.
 
 ## Experimental WebMCP controller

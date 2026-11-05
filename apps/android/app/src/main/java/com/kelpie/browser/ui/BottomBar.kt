@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,15 +73,23 @@ fun BottomBar(
     onShowTabs: () -> Unit,
     onExpand: () -> Unit,
     onTransientUiChanged: (Boolean) -> Unit,
+    scriptActive: Boolean = false,
     moreContent: @Composable ColumnScope.(() -> Unit) -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
     SideEffect { onTransientUiChanged(editing || more) }
     DisposableEffect(Unit) { onDispose { onTransientUiChanged(false) } }
+    val focus = LocalFocusManager.current
+    LaunchedEffect(scriptActive) {
+        if (scriptActive) {
+            if (editing) focus.clearFocus(force = true)
+            editing = false
+            more = false
+        }
+    }
     val compact = isCollapsed && !editing && !more
     val height by animateDpAsState(if (compact) 34.dp else 62.dp, tween(250), label = "Toolbar height")
-    val focus = LocalFocusManager.current
     val density = LocalDensity.current.density
     Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f), shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth().height(height)) {

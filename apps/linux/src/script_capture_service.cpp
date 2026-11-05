@@ -1,6 +1,16 @@
 #include "script_capture_service.h"
+#include "kelpie/desktop_presentation_order.h"
 #include "script_frame_compositor.h"
+#include "script_capture_cadence.h"
 #include "script_media_encoder.h"
+#include "script_terminal_frame.h"
+#ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+#include "../tests/script_admission_trace.h"
+#include "../tests/script_fixture_roi.h"
+#endif
+#ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+#include "../tests/g08_backing_observation.h"
+#endif
 #include "kelpie/script_presentation.h"
 #include <deque>
 #include <algorithm>
@@ -19,7 +29,10 @@ class Capture final : public DesktopScriptCapture {
       std::vector<std::string> formats;
       for (const auto& value : options_.at("formats")) {
         const auto format = value.get<std::string>();
-        if (format == "screenshots") screenshots_ = true; else formats.push_back(format == "video" ? "mp4" : format);
+        if (format == "screenshots") screenshots_ = true; else {
+          if (format == "video") video_=true;
+          formats.push_back(format == "video" ? "mp4" : format);
+        }
       }
       movies_ = !formats.empty();
       encoder_ = ScriptMediaEncoder::Create(directory_, formats, options_.value("fps", 15), options_.value("maxBytes", std::size_t(67108864)));
@@ -33,7 +46,8 @@ class Capture final : public DesktopScriptCapture {
     std::error_code ignored;
     std::filesystem::remove(directory_, ignored); // Preserve unrelated collision files.
   }
-  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step) override {
+  bool SupportsTerminalClear() const override { return video_; }
+  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& shown, double elapsed, int index, bool step, DesktopScriptFramePurpose purpose) override {
     ScriptFrameSourceSize source_size;
     auto frame = DecodeScriptFrame(image.base64_data, options_.value("maxWidth", 1280), elapsed, &source_size);
     if (source_size_.width && (source_size_.width != source_size.width || source_size_.height != source_size.height))
@@ -41,11 +55,32 @@ class Capture final : public DesktopScriptCapture {
     source_size_ = source_size;
     if (width_ && (width_ != frame.width || height_ != frame.height)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_ = frame.width; height_ = frame.height; last_elapsed_ = elapsed;
+    #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+    auto backing = ObserveG08Backing(frame, source_size, shown, run_, observed_frames_);
+    #endif
+    // Step PNG requests share samples but must not increase movie frame rate.
+    const bool movie_due=ScriptMovieFrameDue(last_movie_frame_,elapsed,options_.value("fps", 15));
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    std::vector<std::uint8_t> fixture_before;
+    if (movie_due && FixtureRoiEnabled()) fixture_before=FixtureRoi(frame);
+    int admitted_index=-1;
+    #endif
     DrawScriptOverlay(frame, shown);
     DesktopScriptFrameAdmission committed;
-    // Step PNG requests share samples but must not increase movie frame rate.
-    if (last_movie_frame_ < 0 || elapsed - last_movie_frame_ + .000001 >= 1000.0 / options_.value("fps", 15)) {
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    const double previous_movie=last_movie_frame_;
+    const auto committed_before=encoder_->committed_movie_frames();
+    #endif
+    if (movie_due) {
       if (!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      pending_terminal_proof_=TerminalFrameProof(shown,elapsed);
+      #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+      admitted_index=static_cast<int>(trace_admitted_index_++);
+      if (FixtureRoiEnabled()) WriteFixtureRoi(admitted_index,fixture_before,FixtureRoi(frame));
+      #endif
+      #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+      WriteG08Backing(backing); ++observed_frames_;
+      #endif
       if (movies_) {
         DesktopScriptFrameAdmission queued;
         if (shown.contains("marker")) {
@@ -67,6 +102,23 @@ class Capture final : public DesktopScriptCapture {
       }
       last_movie_frame_ = elapsed;
     }
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    if (AdmissionTraceEnabled()) {
+      const bool has_marker=shown.contains("marker");
+      const double start=has_marker ? shown.at("marker").value("startedMs",elapsed) : -1;
+      const double duration=has_marker ? shown.at("marker").value("durationMs",700.0) : -1;
+      WriteAdmissionTrace({{"phase",0},{"elapsedMs",elapsed},{"hasMarker",int(has_marker)},
+        {"markerStartMs",start},{"markerDurationMs",duration},{"markerAgeMs",has_marker ? elapsed-start : -1},
+        {"previousMovieMs",previous_movie},{"due",int(movie_due)},{"committedBefore",committed_before},
+        {"committedAfter",encoder_->committed_movie_frames()},{"actionIndex",index},{"stepPng",int(step)},
+        {"admittedIndex",admitted_index}});
+    }
+    #endif
+    if (purpose==DesktopScriptFramePurpose::TerminalClear) {
+      if (!video_ || !MatchingTerminalFrameProof(TerminalFrameProof(shown,elapsed),pending_terminal_proof_) ||
+          !encoder_->MarkTerminalClear(frame))
+        throw std::runtime_error("CAPTURE_TERMINAL_FRAME_UNAVAILABLE");
+    }
     if (step && screenshots_) {
       const auto path = directory_ / ("step-" + std::to_string(index) + ".png");
       if (!encoder_->WriteStepPNG(frame, path)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
@@ -82,19 +134,32 @@ class Capture final : public DesktopScriptCapture {
     if (finished_) return result_;
     std::string failure;
     std::vector<ScriptMediaOutput> outputs;
+    if (partial) encoder_->ClearTerminalClear();
     try { outputs = encoder_->Finish(std::max(last_elapsed_ + 1, terminal)); }
     catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
+    #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+    if (AdmissionTraceEnabled()) {
+      std::size_t gif_frames=0, video_frames=0, gif_dropped=0, video_dropped=0;
+      for (const auto& output : outputs) {
+        if (output.mime_type=="image/gif") { gif_frames=output.frame_count; gif_dropped=output.dropped_frames; }
+        if (output.mime_type=="video/mp4") { video_frames=output.frame_count; video_dropped=output.dropped_frames; }
+      }
+      WriteAdmissionTrace({{"phase",1},{"elapsedMs",terminal},{"gifFrames",gif_frames},{"videoFrames",video_frames},
+        {"gifDropped",gif_dropped},{"videoDropped",video_dropped},
+        {"committedAfter",encoder_->committed_movie_frames()}});
+    }
+    #endif
+    if (encoder_->budget_exceeded()) failure = "CAPTURE_BUDGET_EXCEEDED";
+    if (encoder_->finalization_failed()) failure = "CAPTURE_FINALIZE_FAILED";
     for (const auto& output : outputs) {
       try {
         owned_.emplace(output.path, InspectCaptureFile(output.path));
         manifests_.push_back(service_->artifacts().Publish(output.path, output.mime_type,
             {{"width", output.width}, {"height", output.height}, {"durationMs", output.duration_ms},
-             {"frameCount", output.frame_count}, {"droppedFrames", output.dropped_frames}, {"partial", partial}}, run_, owner_));
+             {"frameCount", output.frame_count}, {"droppedFrames", output.dropped_frames}, {"partial", partial || !failure.empty()}}, run_, owner_));
         retained_.insert(output.path);
       } catch (...) { failure = "CAPTURE_FINALIZE_FAILED"; }
     }
-    if (encoder_->budget_exceeded()) failure = "CAPTURE_BUDGET_EXCEEDED";
-    if (encoder_->finalization_failed()) failure = "CAPTURE_FINALIZE_FAILED";
     // Successful capture supplies every requested artifact family. Empty
     // encoder output or publication failure cannot become nominal success.
     if (failure.empty()) for (const auto& format : options_.at("formats")) {
@@ -122,7 +187,14 @@ class Capture final : public DesktopScriptCapture {
   double last_elapsed_ = 0, last_movie_frame_ = -1;
   std::deque<DesktopScriptFrameAdmission> movie_markers_;
   std::size_t committed_marker_frames_ = 0;
-  bool screenshots_ = false, movies_ = false, finished_ = false;
+  bool screenshots_ = false, movies_ = false, video_ = false, finished_ = false;
+  ScriptTerminalFrameProof pending_terminal_proof_;
+  #ifdef KELPIE_LINUX_ADMISSION_TEST_OBSERVATION
+  std::size_t trace_admitted_index_ = 0;
+  #endif
+  #ifdef KELPIE_LINUX_G08_TEST_OBSERVATION
+  std::size_t observed_frames_ = 0;
+  #endif
 };
 }
 LinuxScriptService::LinuxScriptService(DocumentGuard guard) : guard_(std::move(guard)) {}
@@ -133,22 +205,48 @@ void LinuxScriptService::Configure(DesktopApp::Config& config) {
   };
   config.scripts.discard = [self](const std::string& run, const std::string& owner) { self->artifacts_.Discard(run, owner); };
   config.scripts.artifact = [self](const Json& request, const std::string& owner) { return self->artifacts_.Read(request, owner); };
-  config.scripts.present = [self](const Json& presentation, std::function<void()> stop) { self->Show(presentation, std::move(stop)); };
+  config.scripts.present = [self](const Json& presentation, std::function<void()> stop, std::function<bool()> valid) { self->Show(presentation, std::move(stop), std::move(valid)); };
 }
-void LinuxScriptService::Show(const Json& presentation, std::function<void()> stop) {
-  std::lock_guard lock(mutex_); presentation_ = presentation; stop_ = std::move(stop);
+void LinuxScriptService::Show(const Json& presentation, std::function<void()> stop, std::function<bool()> valid) {
+  std::lock_guard lock(mutex_);
+  if(!AcceptDesktopPresentationRevision(presentation,last_presentation_revision_)) return;
+  presentation_ = presentation; stop_ = std::move(stop); valid_ = std::move(valid);
   shown_at_ = std::chrono::steady_clock::now();
 }
-LinuxScriptService::Json LinuxScriptService::Presentation() const {
+LinuxScriptService::Json LinuxScriptService::Presentation(bool foreground) const {
   Json shown;
+  std::function<bool()> valid;
   {
-    std::lock_guard lock(mutex_); shown = presentation_;
-    if (shown.value("playing", false) && !shown.value("captureLatched", false))
+    std::lock_guard lock(mutex_); shown = presentation_; valid = valid_;
+    if (shown.value("playing", false) || shown.value("detachedMarker", false))
       shown["elapsedMs"] = shown.value("elapsedMs", 0.0) +
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - shown_at_).count();
   }
-  if (shown.value("playing", false) && guard_ && !guard_(shown)) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
+  const bool detached = shown.value("detachedMarker", false);
+  bool hide = false;
+  if (detached) {
+    const auto& marker = shown.at("marker");
+    hide = !foreground || !guard_ || !valid || shown.value("elapsedMs", 0.0) >=
+        marker.value("startedMs", 0.0) + marker.value("durationMs", 700.0);
+    if (!hide) try { hide = !valid(); } catch (...) { hide = true; }
+  }
+  if (!hide && (shown.value("playing", false) || detached) && guard_)
+    try { hide = !guard_(shown); } catch (...) { hide = true; }
+  {
+    std::lock_guard lock(mutex_);
+    if (presentation_.value("_presentationRevision",std::uint64_t{}) != shown.value("_presentationRevision",std::uint64_t{}))
+      return Json{{"playing",false}};
+    if (hide && detached) { presentation_ = Json{{"playing",false}}; valid_ = {}; }
+  }
+  if (hide) { shown.erase("marker"); shown.erase("pointer"); shown.erase("commentary"); }
   return shown;
+}
+void LinuxScriptService::RetireDetachedMarker(std::uint64_t revision) {
+  std::lock_guard lock(mutex_);
+  if (presentation_.value("detachedMarker",false) &&
+      presentation_.value("_presentationRevision",std::uint64_t{}) == revision) {
+    presentation_ = Json{{"playing",false}}; valid_ = {};
+  }
 }
 void LinuxScriptService::Stop() {
   std::function<void()> stop;
