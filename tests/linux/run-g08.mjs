@@ -33,6 +33,14 @@ try {
     try {
       const nav = await api("navigate", { tabId, url: fixture.url });
       assert.equal(nav.success, true, JSON.stringify(nav.error));
+      let loaded = false;
+      for (let attempt = 0; attempt < 50 && !loaded; attempt++) {
+        const state = await api("evaluate", { tabId, expression:
+          "document.readyState === 'complete' && !!document.querySelector('[aria-label=\"G08 Start\"]')" });
+        loaded = state.success && state.result === true;
+        if (!loaded) await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      assert.ok(loaded, "G08 fixture did not become ready");
       const result = await api("play-script", g08Workflow(tabId, curve));
       assert.equal(result.success, true, JSON.stringify(result.error));
       const facts = await (await fetch(new URL("/events", fixture.url))).json();
