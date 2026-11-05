@@ -134,7 +134,6 @@ final class IOSWorkflowActions {
         let editing = action == "type" || action == "fill"
         let text = editing ? step["text"] as? String : nil
         let plan = workflow.pacedPlans[index]
-        if plan != nil, let text { registerEditLiteral(text) }
         let consume = { [self] (result: Body) in
             consumeSensitivity(result, text: text)
         }
