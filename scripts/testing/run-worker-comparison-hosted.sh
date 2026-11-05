@@ -106,6 +106,16 @@ run_arm() {
    fi
   fi
  fi
+ if [[ "$backend" == sandbox && -s "$dir/namespace-verified.json" ]]; then
+  for _ in $(seq 1 300); do
+   [[ -s "$dir/browser-identity.json" ]] && break
+   kill -0 "$launcher" 2>/dev/null || break
+   sleep 0.1
+  done
+  if [[ -s "$dir/browser-identity.json" ]]; then
+   timeout 35s "$node" "$root/tests/linux/worker-comparison-host-sandbox-check.mjs" "$dir" "$unit" "$comparison_id" || true
+  fi
+ fi
  local status=0
  wait "$launcher" || status=$?
  printf '%s\n' "$status" >"$dir/launcher-exit.txt"
