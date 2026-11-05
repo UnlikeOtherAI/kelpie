@@ -23,6 +23,10 @@ final class IOSCaptureViewportTests: XCTestCase {
         XCTAssertTrue(IOSCaptureViewportStability.matchesInsets(viewport(width: 1024, height: 1346, native: pad),
                                                                 top: 0, bottom: 20))
         XCTAssertFalse(IOSCaptureViewportStability.matchesInsets(settled, top: -1, bottom: 34))
+        let landscape = viewport(width: 389, height: 190.5, native: CGSize(width: 874, height: 402), scale: 2)
+        XCTAssertTrue(IOSCaptureViewportStability.matchesInsets(landscape, top: 0, bottom: 21, left: 62, right: 34))
+        XCTAssertFalse(IOSCaptureViewportStability.matchesInsets(landscape, top: 0, bottom: 21, left: 0, right: 0))
+        XCTAssertFalse(IOSCaptureViewportStability.matchesInsets(landscape, top: 0, bottom: 21, left: 874, right: 0))
         var stability = IOSCaptureViewportStability()
         XCTAssertFalse(stability.observe(settled, at: 0))
         XCTAssertFalse(stability.observe(settled, at: 0.3, admissible: false))

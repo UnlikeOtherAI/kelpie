@@ -28,11 +28,14 @@ struct IOSCaptureViewportStability {
         throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
     }
 
-    static func matchesInsets(_ viewport: IOSWorkflowTab.Viewport, top: CGFloat, bottom: CGFloat) -> Bool {
+    static func matchesInsets(
+        _ viewport: IOSWorkflowTab.Viewport, top: CGFloat, bottom: CGFloat, left: CGFloat = 0, right: CGFloat = 0
+    ) -> Bool {
         let native = viewport.bounds
         guard native.width > 0, native.height > 0, viewport.visible.width > 0,
-              top.isFinite, bottom.isFinite, top >= 0, bottom >= 0, top + bottom < native.height else { return false }
-        let ratio = viewport.visible.width / native.width
+              [top, bottom, left, right].allSatisfy({ $0.isFinite && $0 >= 0 }),
+              top + bottom < native.height, left + right < native.width else { return false }
+        let ratio = viewport.visible.width / (native.width - left - right)
         let expectedHeight = (native.height - top - bottom) * ratio
         return expectedHeight.isFinite && abs(viewport.visible.height - expectedHeight) <= max(1, ratio)
     }

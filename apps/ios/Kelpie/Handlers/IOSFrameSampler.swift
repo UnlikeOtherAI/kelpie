@@ -221,7 +221,9 @@ final class IOSFrameSampler {
             },
             admissible: { [self] viewport in
                 let insets = tab.view.scrollView.adjustedContentInset
-                return IOSCaptureViewportStability.matchesInsets(viewport, top: insets.top, bottom: insets.bottom)
+                return IOSCaptureViewportStability.matchesInsets(
+                    viewport, top: insets.top, bottom: insets.bottom, left: insets.left, right: insets.right
+                )
             }
         )
         guard let viewport else {
