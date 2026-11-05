@@ -128,8 +128,11 @@ final class IOSWorkflowActions {
         let consume = { [self] (result: Body) in
             consumeSensitivity(result, text: text)
         }
+        let missing = { [self] in protectEditPrivacy(text: text) }
         if step["sensitive"] as? Bool == true { consume(["sensitive": true]) }
-        let found = try await tab.target(target, refuseSensitive: workflow.capture != nil, consume: consume)
+        let found = try await tab.target(
+            target, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
+        )
         try requireOK(found)
         guard let token = found["token"] as? String, let x = found["x"] as? Double, let y = found["y"] as? Double else {
             throw IOSWorkflowFailure("INVALID_TARGET")
@@ -140,7 +143,7 @@ final class IOSWorkflowActions {
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width
         try requireOK(try await tab.target(
-            target, token: token, refuseSensitive: workflow.capture != nil, consume: consume
+            target, token: token, refuseSensitive: workflow.capture != nil, consume: consume, missingResult: missing
         ))
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
         let hold = sampler?.recordsMotion == true
@@ -159,7 +162,8 @@ final class IOSWorkflowActions {
             dispatch: !editing,
             edit: edit,
             refuseSensitive: workflow.capture != nil,
-            consume: consume
+            consume: consume,
+            missingResult: missing
         )
         try requireOK(result)
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
@@ -168,6 +172,10 @@ final class IOSWorkflowActions {
 
     private func consumeSensitivity(_ result: Body, text: String?) {
         guard result["sensitive"] as? Bool == true else { return }
+        protectEditPrivacy(text: text)
+    }
+
+    private func protectEditPrivacy(text: String?) {
         if let text, !secrets.contains(text) { secrets.append(text) }
         if workflow.capture != nil { discardMedia = true }
     }
