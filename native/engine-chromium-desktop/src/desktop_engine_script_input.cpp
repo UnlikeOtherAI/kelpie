@@ -54,47 +54,77 @@ BrowserControlResult DesktopEngine::DispatchScriptTarget(
   } cleanup{impl_,lease,native_pressed,native_keys};
   Json target;
   const auto inspect = [&](bool privacy_only=false, bool prove_non_input=false) -> BrowserControlResult {
+    const auto uncertain = [&]() { if (privacy_only && output) (*output)["inspectionUncertain"] = true; };
     if (cancelled && cancelled()) {
-      if (privacy_only && output) (*output)["inspectionUncertain"] = true;
+      uncertain();
       return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped");
     }
-    const auto unknown_privacy = [&]() {
-      // Only the immediately acknowledged final click may consume this proof.
-      const bool allowed = allow_non_input_privacy && output &&
+    // Drop only the document fence, retaining this tab ID, generation, active
+    // requirement, cancellation and deadline. A closed/replaced tab is not a
+    // navigation proof and never authorizes fallback.
+    const auto same_tab_navigated = [&]() {
+      if (!lease.document_version || (cancelled && cancelled())) return false;
+      TabLease same_tab = lease; same_tab.document_version.reset();
+      BrowserNavigationState state;
+      const auto remaining = std::min(RemainingTimeout(began, timeout),
+        std::chrono::duration_cast<Timeout>(std::chrono::seconds(2)));
+      if (remaining <= Timeout::zero()) return false;
+      const auto observed = GetNavigationState(same_tab, &state, remaining);
+      return observed.ok && !(cancelled && cancelled()) &&
+        state.tab.document_version != *lease.document_version;
+    };
+    const auto unknown_privacy = [&](bool confirmed_navigation) {
+      // Only the immediately acknowledged final click may consume this proof,
+      // and only when this exact tab is independently known to have navigated.
+      const bool allowed = confirmed_navigation && allow_non_input_privacy && output &&
         !output->value("sensitive", false) && !output->value("inspectionUncertain", false);
       allow_non_input_privacy = false;
       if (allowed) return BrowserControlResult::Success();
-      if (output) (*output)["inspectionUncertain"] = true;
+      uncertain();
       return options.value("policy", Json::object()).value("refuseSensitive", false)
         ? BrowserControlResult::Failure("TARGET_INSPECTION_INVALID", "Post-input privacy is unknown")
         : BrowserControlResult::Success();
     };
     const auto remaining = std::min(RemainingTimeout(began, timeout), std::chrono::duration_cast<Timeout>(std::chrono::seconds(10)));
-    if (remaining <= Timeout::zero()) return privacy_only ? unknown_privacy() : DeadlineExceeded();
+    if (remaining <= Timeout::zero()) { uncertain(); return DeadlineExceeded(); }
     Json inspection_options = options;
     if (privacy_only) inspection_options["postMutation"] = true;
     if (prove_non_input) inspection_options["proveNonInput"] = true;
     char* raw = kelpie_browser_script_target_expression(inspection_options.dump().c_str());
-    if (!raw) return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("INVALID_TARGET", "Shared target preflight rejected the request");
+    if (!raw) { uncertain(); return BrowserControlResult::Failure("INVALID_TARGET", "Shared target preflight rejected the request"); }
     Json generated;
     try { generated = Json::parse(raw); } catch (...) {
-      kelpie_mcp_free_string(raw);
-      return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("INVALID_TARGET", "Shared target expression is unavailable");
+      kelpie_mcp_free_string(raw); uncertain();
+      return BrowserControlResult::Failure("INVALID_TARGET", "Shared target expression is unavailable");
     }
     kelpie_mcp_free_string(raw);
     target=Json(); // A failed inspection cannot reuse an earlier classification.
     const auto read = EvaluateBrowserControl(lease, generated.at("expression").get<std::string>(), &target, remaining);
     if(output && target.is_object() && target.contains("sensitive") && target["sensitive"].is_boolean() && target["sensitive"].get<bool>()) (*output)["sensitive"]=true;
     if(output && !privacy_only && ScriptTargetInspectionUncertain(target)) (*output)["inspectionUncertain"]=true;
-    if (!read.ok) return privacy_only ? unknown_privacy() : read;
-    if (!ScriptTargetInspectionExplicit(target))
-      return privacy_only ? unknown_privacy() : BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
+    if (cancelled && cancelled()) {
+      uncertain();
+      return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped");
+    }
+    if (!read.ok) {
+      const bool navigated = privacy_only && read.error_code == "TAB_NOT_FOUND" && same_tab_navigated();
+      if (cancelled && cancelled()) { uncertain(); return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped"); }
+      if (navigated) return unknown_privacy(true);
+      uncertain();
+      return read;
+    }
+    if (!ScriptTargetInspectionExplicit(target)) {
+      uncertain();
+      return BrowserControlResult::Failure("TARGET_INSPECTION_INVALID","Fixed target inspection returned no usable result");
+    }
     if (privacy_only) {
-      // Acknowledged mutations may navigate or change layout. Classify the
-      // retained target for privacy without reapplying pre-input gates.
       const bool known = target.contains("sensitivityKnown") &&
         target["sensitivityKnown"].is_boolean() && target["sensitivityKnown"].get<bool>();
-      if (!known) return unknown_privacy();
+      if (!known) {
+        const bool navigated = same_tab_navigated();
+        if (cancelled && cancelled()) { uncertain(); return BrowserControlResult::Failure("SCRIPT_STOPPED", "Script stopped"); }
+        return unknown_privacy(navigated);
+      }
       if (target.value("sensitive", false) && options.value("policy", Json::object()).value("refuseSensitive", false))
         return BrowserControlResult::Failure("SENSITIVE_CAPTURE_REFUSED", "Sensitive input cannot expose captures");
       if (!target.value("ok", false))
