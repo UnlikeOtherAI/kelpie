@@ -1,7 +1,8 @@
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import type { Command } from "commander";
 import { allocateBrowserPort } from "../browser/launch.js";
@@ -77,6 +78,26 @@ export interface LaunchChild {
   removeListener(event: "error", listener: (error: Error) => void): unknown;
 }
 
+/** Retire only the original process handle; false means its identity stays pending. */
+export async function retireUnreadyChild(child: ChildProcess): Promise<boolean> {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise<boolean>((resolve) => {
+    const onError = () => { cleanup(); resolve(false); };
+    const onExit = () => { cleanup(); resolve(true); };
+    const cleanup = () => { child.removeListener("error", onError); child.removeListener("exit", onExit); };
+    child.once("exit", onExit);
+    child.once("error", onError);
+    if (child.exitCode !== null || child.signalCode !== null) { onExit(); return; }
+    try { if (!child.kill()) onError(); } catch { onError(); }
+  });
+}
+
+/** A recycled PID is conservatively treated as still present, never killed. */
+export function pendingProcessGone(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return false; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH"; }
+}
 export interface ReadinessWaitOptions {
   timeoutMs?: number;
   pollMs?: number;
@@ -154,6 +175,11 @@ export function registerBrowser(program: Command): void {
         process.exitCode = 4;
         return;
       }
+      const store = await loadBrowserStore();
+      if (store.running[name]?.pendingLaunch) {
+        print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch is still pending; retry launch after its process exits" } }, globals.format);
+        process.exitCode = 6; return;
+      }
       await upsertBrowserAlias(name, { platform: opts.platform, appPath: opts.appPath, profileDir });
       print({ success: true, name, platform: opts.platform, appPath: opts.appPath ?? null, profileDir: profileDir ?? null }, globals.format);
     });
@@ -172,6 +198,7 @@ export function registerBrowser(program: Command): void {
             appPath: alias.appPath ?? "",
             port: running?.port ?? "",
             lastLaunchedAt: running?.lastLaunchedAt ?? "",
+            pendingLaunch: Boolean(running?.pendingLaunch),
             reachable: await isReachable(running?.port),
           };
         }),
@@ -197,6 +224,7 @@ export function registerBrowser(program: Command): void {
         appPath: alias.appPath ?? null,
         port: running?.port ?? null,
         lastLaunchedAt: running?.lastLaunchedAt ?? null,
+        pendingLaunch: Boolean(running?.pendingLaunch),
         reachable: await isReachable(running?.port),
       }, globals.format);
     });
@@ -205,6 +233,11 @@ export function registerBrowser(program: Command): void {
     .command("remove <name>")
     .action(async (name: string) => {
       const globals = program.opts<GlobalOptions>();
+      const store = await loadBrowserStore();
+      if (store.running[name]?.pendingLaunch) {
+        print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch is still pending; retry launch after its process exits" } }, globals.format);
+        process.exitCode = 6; return;
+      }
       await removeBrowserAlias(name);
       print({ success: true, removed: name }, globals.format);
     });
@@ -223,6 +256,14 @@ export function registerBrowser(program: Command): void {
         return;
       }
 
+      const previousRunning = (await loadBrowserStore()).running[name];
+      if (previousRunning?.pendingLaunch) {
+        if (!previousRunning.pid || !pendingProcessGone(previousRunning.pid)) {
+          print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "A prior launch process is still present; it will not be killed by PID" } }, globals.format);
+          process.exitCode = 6; return;
+        }
+        await clearRunningBrowser(name);
+      }
       const { hidden = false, headless = false } = command.opts<{ hidden?: boolean; headless?: boolean }>();
       if (headless && (alias.platform !== "linux" || os.platform() !== "linux")) {
         print({ success: false, error: { code: "PLATFORM_NOT_SUPPORTED", message: "--headless requires a Linux alias on a Linux host" } }, globals.format);
@@ -250,22 +291,40 @@ export function registerBrowser(program: Command): void {
           process.exitCode = 5;
           return;
         }
-        let launched = false;
+        let child: ChildProcess | undefined;
+        let pendingSaved = false;
         try {
           await access(appPath);
           const previous = await readLocalReadiness(readinessFile);
           if (previous && await isReachable(previous.port)) {
             throw new Error("A live browser already owns this profile; attach to its alias or stop it first");
           }
-          const child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir, ...(headless ? ["--headless"] : [])], { detached: true, stdio: "ignore", ...(hidden ? { windowsHide: true } : {}) });
-          launched = true;
-          child.unref();
+          child = spawn(appPath, ["--port", String(port), "--profile-dir", profileDir, ...(headless ? ["--headless"] : [])], { detached: true, stdio: "ignore", ...(hidden ? { windowsHide: true } : {}) });
+          child.once("error", () => { /* Spawn errors are handled by readiness. */ });
+          if (!child.pid) throw new Error("Kelpie process could not be started");
+          const startedAt = new Date().toISOString();
+          await setRunningBrowser(name, { port, lastLaunchedAt: startedAt, pid: child.pid, readinessFile,
+            pendingLaunch: { attemptId: randomUUID(), appPath, profileDir, startedAt, previousLaunchId: previous?.launchId } });
+          pendingSaved = true;
           const readiness = await waitForReadiness(readinessFile, previous?.launchId, child);
           if (!readiness) throw new Error("Kelpie did not publish a valid local readiness file");
           await setRunningBrowser(name, { port: readiness.port, lastLaunchedAt: new Date().toISOString(), pid: child.pid, launchId: readiness.launchId, readinessFile, deviceId: readiness.deviceId });
+          child.unref();
           print({ success: true, name, platform: alias.platform, appPath, profileDir: alias.profileDir, port: readiness.port, deviceId: readiness.deviceId, launchId: readiness.launchId }, globals.format);
         } catch (error) {
-          if (launched) await clearRunningBrowser(name);
+          const retired = !child || await retireUnreadyChild(child);
+          if (retired && pendingSaved) await clearRunningBrowser(name);
+          if (!retired && !pendingSaved && child) {
+            const owned = child;
+            if (owned.exitCode === null && owned.signalCode === null) {
+              await new Promise<void>((resolve) => { owned.once("exit", () => { resolve(); }); });
+            }
+          }
+          if (!retired && pendingSaved) {
+            child?.unref();
+            print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "The launch process could not be retired; its pending record was preserved" } }, globals.format);
+            process.exitCode = 6; return;
+          }
           print({ success: false, error: { code: "BROWSER_LAUNCH_FAILED", message: error instanceof Error ? error.message : "Failed to launch browser" } }, globals.format);
           process.exitCode = 6;
         }
@@ -312,6 +371,10 @@ export function registerBrowser(program: Command): void {
       const globals = program.opts<GlobalOptions>();
       const store = await loadBrowserStore();
       const running = store.running[name];
+      if (running?.pendingLaunch) {
+        print({ success: false, error: { code: "BROWSER_LAUNCH_PENDING", message: "The prior launch is pending; retry launch after its process exits" } }, globals.format);
+        process.exitCode = 6; return;
+      }
       if (!running?.pid || !running.launchId || !running.readinessFile) {
         print({ success: false, error: { code: "BROWSER_NOT_RUNNING", message: `No CLI-launched browser is recorded for ${name}` } }, globals.format);
         process.exitCode = 4;

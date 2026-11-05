@@ -962,7 +962,7 @@ artifact. See the Windows release ZIP instructions for extraction and update ste
 The stdio command is the local-agent/Nessie bridge: it reads the current user’s readiness token
 in memory, fetches the running browser’s authenticated callable catalogue, and emits only JSON-RPC
 on stdout. `kelpie browser stop win` asks the app to close
-orderly and waits for the matching readiness record to disappear.
+orderly and waits for the matching readiness record to disappear. If a Windows or Linux launch fails before readiness, the CLI retires its exact child before returning. If retirement cannot be confirmed, it retains a pending launch and refuses to replace or remove that alias while the process may still exist. A later launch retries once the PID is absent; it never kills a process by a stored PID. The pending record is written after process creation, so an abrupt CLI crash in that small interval can still leave an untracked child; the recorded start time is informational and is not an OS process identity.
 
 Windows aliases deliberately reject `kelpie --browser win mcp --http`: proxying their local
 capability token through another HTTP listener would widen the local trust boundary. Use stdio,

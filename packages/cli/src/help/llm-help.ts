@@ -75,7 +75,7 @@ const manualCommandHelp: Record<string, CommandHelpOutput> = {
       { name: "hidden", type: "boolean", required: false, description: "Windows host and Windows alias only: launch without showing its window; not a headless backend" },
       { name: "port", type: "number", required: false, description: "Optional explicit HTTP port, used exactly; --port may come before or after the command. Omitted, the first free port from 8420 upward, skipping 8421" },
     ],
-    errors: describeErrors(["BROWSER_NOT_REGISTERED", "APP_NOT_INSTALLED", "BROWSER_LAUNCH_FAILED"]),
+    errors: describeErrors(["BROWSER_NOT_REGISTERED", "APP_NOT_INSTALLED", "BROWSER_LAUNCH_FAILED", "BROWSER_LAUNCH_PENDING"]),
     related: ["browser register", "browser list", "browser inspect"],
     response: defaultResponse,
   },

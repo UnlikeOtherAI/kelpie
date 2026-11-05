@@ -20,7 +20,7 @@ vi.mock("../../src/mcp/transport.js", () => ({
 import { execFile, spawn } from "node:child_process";
 import { allocateBrowserPort } from "../../src/browser/launch.js";
 import { probeHealth } from "../../src/discovery/local-probe.js";
-import { getBrowserAlias, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
+import { getBrowserAlias, loadBrowserStore, readLocalReadiness, readinessPath, setRunningBrowser } from "../../src/browser/store.js";
 import { startHttp } from "../../src/mcp/transport.js";
 import { createProgram } from "../../src/program.js";
 
@@ -35,6 +35,7 @@ function launchChild(): EventEmitter & { exitCode: null; pid: number; unref: () 
 describe("browser launch --port on Windows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(loadBrowserStore).mockResolvedValue({ aliases: {}, running: {} });
     vi.spyOn(os, "platform").mockReturnValue("win32");
     vi.mocked(getBrowserAlias).mockResolvedValue({ platform: "windows", appPath: process.execPath, profileDir: "C:/profile" });
     vi.mocked(readinessPath).mockReturnValue("C:/profile/readiness.json");

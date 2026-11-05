@@ -59,6 +59,18 @@ describe("device registry", () => {
     await rm(homeDir, { recursive: true, force: true });
   });
 
+  it("does not resolve a pending launch as a browser alias", async () => {
+    const previous = process.env.KELPIE_HOME;
+    process.env.KELPIE_HOME = homeDir;
+    try {
+      await upsertBrowserAlias("pending", { platform: "windows", appPath: "app", profileDir: "profile" });
+      await setRunningBrowser("pending", { port: 28423, lastLaunchedAt: "now", pid: process.pid,
+        pendingLaunch: { attemptId: "attempt", appPath: "app", profileDir: "profile", startedAt: "now" } });
+      expect(await getDevice("pending")).toBeUndefined();
+    } finally {
+      if (previous === undefined) delete process.env.KELPIE_HOME; else process.env.KELPIE_HOME = previous;
+    }
+  });
   it("adds and retrieves a device by ID", async () => {
     const d = makeDevice();
     addDevice(d);
