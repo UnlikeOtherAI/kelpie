@@ -47,3 +47,10 @@ test("privacy leaks, false readiness and missing adversary installation fail clo
   assert.equal((await run(fixture({badReady:true}))).result.ready,false);
   assert.deepEqual((await run(fixture(),false)).result,{snapshot:false,extract:false,status:false,ready:false});
 });
+
+test("qualification reports only explicitly selected candidates",async()=>{
+  const checks=[];const check=async(name,fn)=>{await fn();checks.push(name);return true};
+  const result=await runLightpandaReaderDiagnostics({check,read:fixture(),adversariesInstalled:()=>true,selected:["status"]});
+  assert.deepEqual(result,{status:true});assert.equal(checks.length,1);
+  await assert.rejects(()=>runLightpandaReaderDiagnostics({check,read:fixture(),adversariesInstalled:()=>true,selected:["snapshot","snapshot"]}));
+});

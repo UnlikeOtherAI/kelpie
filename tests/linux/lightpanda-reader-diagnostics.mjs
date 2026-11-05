@@ -14,14 +14,15 @@ function refs(snapshot,prefix){
 }
 
 /** Real fixed-reader observations only; these checks never widen capabilities. */
-export async function runLightpandaReaderDiagnostics({check,read,adversariesInstalled}){
-  const passed={snapshot:true,extract:true,status:true,ready:true};
-  const run=async(kind,name,fn)=>{const ok=await check(name,fn);passed[kind]=passed[kind]&&ok;};
+export async function runLightpandaReaderDiagnostics({check,read,adversariesInstalled,referencePrefix=value=>value,selected=["snapshot","extract","status","ready"]}){
+  assert.ok(selected.length>0&&new Set(selected).size===selected.length&&selected.every(value=>["snapshot","extract","status","ready"].includes(value)));
+  const passed=Object.fromEntries(selected.map(value=>[value,true]));
+  const run=async(kind,name,fn)=>{if(!Object.hasOwn(passed,kind))return;const ok=await check(name,fn);passed[kind]=passed[kind]&&ok;};
   const requireFixture=()=>assert.equal(adversariesInstalled(),true,"Adversarial fixture was not installed");
   await run("snapshot","reader bounded priority snapshot",async()=>{
     requireFixture();
     const snapshot=await read("snapshot",{maxElements:20,maxChars:8000,prioritize:true,prefix:"lp-audit-c-"});
-    safe(snapshot);refs(snapshot,"lp-audit-c-");
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-c-"));
     assert.equal(snapshot.elements.length,20);assert.equal(snapshot.truncated,true);
     assert.deepEqual(snapshot.elements.slice(0,10).map(item=>item.name),
       ["Confirm order","Duplicate action","Duplicate action","Disabled action","Covered action",
@@ -34,7 +35,7 @@ export async function runLightpandaReaderDiagnostics({check,read,adversariesInst
     requireFixture();
     const snapshot=await read("snapshot",{scope:"#catalogue",maxElements:64,maxChars:8000,
       prioritize:true,prefix:"lp-audit-d-"});
-    safe(snapshot);refs(snapshot,"lp-audit-d-");
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-d-"));
     assert.ok(!snapshot.elements.some(item=>item.name==="Confirm order"));
     for(const name of ["Available products","Green tea","Black tea"])
       assert.ok(snapshot.elements.some(item=>item.name===name),name);
@@ -44,7 +45,7 @@ export async function runLightpandaReaderDiagnostics({check,read,adversariesInst
   await run("snapshot","reader text and element budgets",async()=>{
     requireFixture();
     const snapshot=await read("snapshot",{maxElements:5,maxChars:256,prioritize:true,prefix:"lp-audit-e-"});
-    safe(snapshot);refs(snapshot,"lp-audit-e-");
+    safe(snapshot);refs(snapshot,referencePrefix("lp-audit-e-"));
     assert.ok(snapshot.text.length<=256);assert.ok(snapshot.elements.length<=5);
     assert.equal(snapshot.truncated,true);
     return {elements:snapshot.elements.length,chars:snapshot.text.length,truncated:true};
