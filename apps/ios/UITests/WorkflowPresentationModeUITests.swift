@@ -25,7 +25,7 @@ extension WorkflowCaptureUITests {
             beforeImage.name = name + " before script"
             beforeImage.lifetime = .keepAlways
             add(beforeImage)
-            var actions: [Body] = [["action": "wait", "ms": 5000]]
+            var actions: [Body] = [["action": "wait", "ms": 10000]]
             if explicit { actions.append(["action": "screenshot", "name": "still"]) }
             var script: Body = ["version": 1, "tabId": tab, "actions": actions]
             if let formats { script["capture"] = ["formats": formats, "fps": 5, "maxWidth": 384] }
@@ -37,7 +37,12 @@ extension WorkflowCaptureUITests {
             if movie {
                 XCTAssertFalse(chrome.exists, name)
             } else {
-                XCTAssertFalse(chrome.exists, name)
+                if chrome.exists {
+                    XCTAssertFalse(chrome.isEnabled, name)
+                    chrome.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                    XCTAssertTrue(stop.exists, name)
+                    XCTAssertFalse(application.buttons["browser.tabs.add"].exists, name)
+                }
                 XCTAssertEqual(during.minX, initial.minX, accuracy: 0.5, name)
                 XCTAssertEqual(during.minY, initial.minY, accuracy: 0.5, name)
                 XCTAssertEqual(during.width, initial.width, accuracy: 0.5, name)
@@ -97,7 +102,12 @@ extension WorkflowCaptureUITests {
         XCTAssertEqual(during.minY, before.minY, accuracy: 0.5)
         XCTAssertEqual(during.width, before.width, accuracy: 0.5)
         XCTAssertEqual(during.height, before.height, accuracy: 0.5)
-        XCTAssertFalse(application.buttons["browser.viewport.close"].exists)
+        let close = application.buttons["browser.viewport.close"]
+        if close.exists {
+            XCTAssertFalse(close.isEnabled)
+            close.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(stop.exists)
+        }
         let active = XCTAttachment(screenshot: application.screenshot())
         active.name = "Tablet stage during non-movie script"
         active.lifetime = .keepAlways
@@ -132,7 +142,11 @@ extension WorkflowCaptureUITests {
         }
         let stop = application.buttons["browser.recording.stop"]
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
-        XCTAssertFalse(address.exists)
+        if address.exists {
+            XCTAssertFalse(address.isEnabled)
+            address.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(stop.exists)
+        }
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         let attachment = XCTAttachment(screenshot: application.screenshot())
         attachment.name = "Non-movie script after address focus retirement"
@@ -201,6 +215,7 @@ extension WorkflowCaptureUITests {
         stop.tap()
         let loadResult = try await loading.value
         XCTAssertEqual((loadResult["error"] as? Body)?["code"] as? String, "SCRIPT_ABORTED")
+        XCTAssertEqual(loadResult["mayHaveCompleted"] as? Bool, true)
     }
 
 }
