@@ -1,5 +1,5 @@
 import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +14,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   } };
 });
 import { createProgram } from "../../src/program.js";
-import { loadBrowserStore, setRunningBrowser } from "../../src/browser/store.js";
+import { clearRunningBrowserIfMatches, loadBrowserStore, setRunningBrowser } from "../../src/browser/store.js";
 
 describe("public browser launch child lifecycle", () => {
   let home = "";
@@ -38,6 +38,7 @@ describe("public browser launch child lifecycle", () => {
     await run("browser", "launch", "owned", "--port", "28423");
     const first = control.child!;
     expect(first.exitCode !== null || first.signalCode !== null).toBe(true);
+    expect(vi.mocked(console.log).mock.calls.flat().join(" ")).toContain('"outcome": "exited"');
     expect((await loadBrowserStore()).running.owned).toBeUndefined();
     process.exitCode = undefined;
     control.exitsEarly = true;
@@ -58,6 +59,7 @@ describe("public browser launch child lifecycle", () => {
     const child = control.child!;
     const pending = (await loadBrowserStore()).running.owned;
     expect(pending?.pid).toBe(child.pid);
+    expect(vi.mocked(console.log).mock.calls.flat().join(" ")).toContain("kill-refused");
     expect(pending?.pendingLaunch?.profileDir).toBe(profile);
     expect(child.exitCode).toBeNull();
     await once(child, "exit");
@@ -86,6 +88,35 @@ describe("public browser launch child lifecycle", () => {
     const store = await loadBrowserStore();
     expect(store.running.owned).toBeUndefined();
     expect(store.aliases.owned).toBeUndefined();
+  });
+  it("reconciles a dead launch without deleting readiness and refuses changed identity", async () => {
+    home = await mkdtemp(path.join(os.tmpdir(), "kelpie-launch-stale-"));
+    process.env.KELPIE_HOME = home;
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const profile = path.join(home, "profile"), readinessFile = path.join(profile, "readiness.json");
+    await mkdir(profile);
+    await run("browser", "register", "owned", "--platform", "windows", "--app-path", process.execPath, "--profile-dir", profile);
+    control.exitsEarly = true;
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, []); await once(child, "exit");
+    const running = { port: 28423, lastLaunchedAt: "now", pid: child.pid, launchId: "launch-a", readinessFile };
+    await writeFile(readinessFile, JSON.stringify({ version: 1, launchId: "launch-a", deviceId: "device-a", port: 28423,
+      token: "a".repeat(32), controlMode: "loopback", mcp: { http: true, stdio: false, endpoint: "/mcp" } }), { mode: 0o600 });
+    await setRunningBrowser("owned", { ...running, launchId: "replacement" });
+    expect(await clearRunningBrowserIfMatches("owned", running)).toBe(false);
+    expect((await loadBrowserStore()).running.owned.launchId).toBe("replacement");
+    await setRunningBrowser("owned", { ...running, launchId: "other" });
+    await run("browser", "stop", "owned");
+    expect((await loadBrowserStore()).running.owned.launchId).toBe("other");
+    process.exitCode = undefined;
+    await setRunningBrowser("owned", running);
+    await run("browser", "stop", "owned");
+    expect((await loadBrowserStore()).running.owned).toBeUndefined();
+    expect(JSON.parse(await readFile(readinessFile, "utf8")).launchId).toBe("launch-a");
+    await rm(readinessFile);
+    await setRunningBrowser("owned", running);
+    await run("browser", "stop", "owned");
+    expect((await loadBrowserStore()).running.owned).toBeUndefined();
   });
   it("keeps a pending live PID and does not replace or kill it", async () => {
     home = await mkdtemp(path.join(os.tmpdir(), "kelpie-launch-pending-"));

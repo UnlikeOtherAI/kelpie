@@ -51,7 +51,7 @@ describe("unready owned process retirement", () => {
     const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 250)"], { stdio: "ignore" });
     await once(child, "spawn");
     const kill = vi.spyOn(child, "kill").mockReturnValue(true);
-    expect(await retireUnreadyChild(child, 30)).toBe(false);
+    expect((await retireUnreadyChild(child, 30)).outcome).toBe("exit-wait-expired");
     expect(child.exitCode).toBeNull();
     await once(child, "exit");
     kill.mockRestore();
@@ -61,14 +61,14 @@ describe("unready owned process retirement", () => {
     const child = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{});console.log('ready');setTimeout(()=>{},500)"]);
     if (!child.stdout) throw new Error("Expected child output");
     await once(child.stdout, "data");
-    expect(await retireUnreadyChild(child, 50)).toBe(false);
+    expect((await retireUnreadyChild(child, 50)).outcome).toBe("exit-wait-expired");
     await once(child, "exit");
   });
   it("reports refused termination without killing a different process", async () => {
     const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 250)"], { stdio: "ignore" });
     await once(child, "spawn");
     const kill = vi.spyOn(child, "kill").mockReturnValue(false);
-    expect(await retireUnreadyChild(child)).toBe(false);
+    expect((await retireUnreadyChild(child)).outcome).toBe("kill-refused");
     expect(child.exitCode).toBeNull();
     await once(child, "exit");
     expect(child.exitCode).toBe(0);

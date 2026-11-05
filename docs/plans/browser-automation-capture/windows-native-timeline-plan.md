@@ -169,3 +169,5 @@ does not establish orderly CLI cleanup. Correct this lifecycle invariant and
 verify recovery before treating further launch attempts as complete.
 Receipts are under D:/BuildArtifacts/kelpie/capture-windows-resume-20261105
 with prefixes core8-selftest, core8-register and g08c-a2e3-r7.
+
+The original r9 dead process record was reconciled through public stop without removing the old readiness file. The subsequent same-alias/profile relaunch returned BROWSER_LAUNCH_PENDING; the exact new PID exited later without manual intervention, and its pending record and old readiness remain preserved for supported recovery. The report SHA-256 is fbb7649ea0f27abaa574e8d33f83fc7eeaf99f4e13cdcee29216b76d9bad9436. This is a partial recovery result, not a successful relaunch or animation proof.
