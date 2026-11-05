@@ -257,6 +257,7 @@ jobs:
             ' 2>&1 | tee "${package_root}/candidate-build.log"
 
       - name: Verify installed Linux candidate
+        id: installed_candidate
         timeout-minutes: 15
         env:
           DISTRO_NAME: ${{ matrix.distro.name }}
@@ -278,6 +279,44 @@ jobs:
             bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
             2>&1 | tee "${package_root}/candidate-installed-smoke.log"
 
+      - name: Diagnose failed installed candidate namespaces
+        if: failure() && steps.installed_candidate.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          test -s "${RUNNER_TEMP}/kelpie-test-seccomp.json"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+            --security-opt no-new-privileges=true \
+            --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
+            -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -w /workspace "${DISTRO_IMAGE}" \
+            bash scripts/ci/linux-namespace-diagnostic.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
+            2>&1 | tee "${package_root}/candidate-namespace-diagnostic.log"
+
+      - name: Replay failed installed candidate without tracing
+        if: failure() && steps.installed_candidate.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          DISTRO_NAME: ${{ matrix.distro.name }}
+          DISTRO_IMAGE: ${{ matrix.distro.image }}
+        run: |
+          set -euo pipefail
+          package_root="dist/release/${DISTRO_NAME}"
+          test -s "${RUNNER_TEMP}/kelpie-test-seccomp.json"
+          docker run --rm --cpus=2 --memory=6g --pids-limit=512 \
+            --security-opt no-new-privileges=true \
+            --security-opt "seccomp=${RUNNER_TEMP}/kelpie-test-seccomp.json" \
+            -e KELPIE_INSTALLED_SMOKE_REPLAY=1 -v "${PWD}:/workspace:ro" -v "${PWD}/${package_root}:/workspace/${package_root}" \
+            -w /workspace "${DISTRO_IMAGE}" \
+            bash scripts/ci/linux-installed-smoke.sh "${DISTRO_NAME}" "/workspace/${package_root}" \
+            2>&1 | tee "${package_root}/candidate-installed-replay.log"
+
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
@@ -286,6 +325,8 @@ jobs:
             dist/release/${{ matrix.distro.name }}/*.tar.gz
             dist/release/${{ matrix.distro.name }}/*.tgz
             dist/release/${{ matrix.distro.name }}/installed-smoke/
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/
+            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
             dist/release/${{ matrix.distro.name }}/*.deb
             dist/release/${{ matrix.distro.name }}/*.rpm
             dist/release/${{ matrix.distro.name }}/*.AppImage

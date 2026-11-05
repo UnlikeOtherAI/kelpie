@@ -6,6 +6,7 @@ distro="$1"
 package_root="$(realpath "$2")"
 [[ "$package_root" == /workspace/dist/release/* && -d "$package_root" ]] || exit 1
 output="$package_root/installed-smoke"
+if [[ "${KELPIE_INSTALLED_SMOKE_REPLAY:-}" == 1 ]]; then output="$package_root/installed-smoke-replay"; fi
 mkdir "$output"
 stage=install
 cgroup_snapshot() {
