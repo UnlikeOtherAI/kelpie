@@ -87,13 +87,16 @@ static void StreamOverflow(HostedStreamObserver *observer, CEFHostedStreamProbe 
 static void StreamEvent(cef_dev_tools_message_observer_t *base, cef_browser_t *browser,
                         const cef_string_t *method, const void *payload, size_t length) {
     auto *observer = reinterpret_cast<HostedStreamObserver *>(base);
-    if (method == nullptr || method->str == nullptr || method->length > 64 || payload == nullptr ||
+    if (method == nullptr || method->str == nullptr || method->length > 64 ||
         CEFBridgeBrowserIdentifier(browser) != observer->browserID) { return; }
     NSString *name = [[NSString alloc] initWithCharacters:(const unichar *)method->str length:method->length];
     if (![name isEqualToString:@"Page.screencastFrame"]) { return; }
     CEFHostedStreamProbe *owner = observer->owner;
     if (owner == nil) { return; }
-    if (length == 0 || length > 2 * 1024 * 1024 + 4096) { StreamOverflow(observer, owner); return; }
+    if (payload == nullptr || length == 0 || length > 2 * 1024 * 1024 + 4096) {
+        StreamOverflow(observer, owner);
+        return;
+    }
 
     // The closed gate cannot race a new reservation into the retirement group.
     bool overflow = false;

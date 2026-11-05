@@ -72,6 +72,13 @@ static void emitFrame(cef_browser_t *target = &browser, cef_dev_tools_message_ob
     cef_string_t method{methodText.data(), methodText.size()};
     destination->on_dev_tools_event(destination, target, &method, json.bytes, json.length);
 }
+static void emitNullFrame() {
+    NSString *event = @"Page.screencastFrame";
+    std::u16string methodText(event.length, 0);
+    [event getCharacters:reinterpret_cast<unichar *>(methodText.data()) range:NSMakeRange(0,event.length)];
+    cef_string_t method{methodText.data(), methodText.size()};
+    observer->on_dev_tools_event(observer, &browser, &method, nullptr, 0);
+}
 int main() {
     @autoreleasepool {
         setenv("GITHUB_ACTIONS","true",1); setenv("RUNNER_OS","macOS",1);
@@ -146,8 +153,18 @@ int main() {
                                                                                 assert(stoppedSixth && stops == 6);
                                                                                 NSArray *sealed = [sixth sealAfterAudit:YES];
                                                                                 assert(sealed != nil && sealed.count == 0);
-                                                                                puts("PASS: ACK, bounded ingress/decode, metadata, late events, separate ingress/ACK retirement, identity and detach");
-                                                                                exit(0);
+                                                                                CEFHostedStreamProbe *seventh = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:129 width:100 height:100 identity:^BOOL { return YES; }];
+                                                                                [seventh startWithCompletion:^(BOOL seventhStarted) {
+                                                                                    assert(seventhStarted);
+                                                                                    emitNullFrame();
+                                                                                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                                        [seventh stopWithCompletion:^(BOOL) {
+                                                                                            assert([seventh sealAfterAudit:YES] == nil && stops == 7);
+                                                                                            puts("PASS: ACK, bounded ingress/decode, malformed metadata/payload, late events, separate retirement, identity and detach");
+                                                                                            exit(0);
+                                                                                        }];
+                                                                                    });
+                                                                                }];
                                                                             }];
                                                                             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
                                                                                 assert(!retired);
