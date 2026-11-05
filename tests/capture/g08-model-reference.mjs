@@ -119,7 +119,7 @@ export async function loadG08ModelReference(paths,context) {
     return item;
   }));
   const child=spawn(process.env.FFMPEG??"ffmpeg",["-v","error","-threads","1","-filter_threads","1",
-    "-i",resolve(files[0].file),"-map","0:v:0","-fps_mode","passthrough","-f","rawvideo","-pix_fmt","rgb24","-"],
+    "-i",resolve(files[0].file),"-map","0:v:0","-vsync","0","-f","rawvideo","-pix_fmt","rgb24","-"],
     {windowsHide:true,stdio:["ignore","pipe","pipe"]});
   let stderr="";child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
   const exited=new Promise((ok,bad)=>{child.once("error",bad);child.once("close",code=>code===0?ok():bad(Error("model decoder "+stderr)));});
