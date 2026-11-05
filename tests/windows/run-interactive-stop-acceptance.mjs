@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {readFile,writeFile,mkdir} from "node:fs/promises";
-import {createHash} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
+import {nativeWindowFixtureExpression} from "./native-window-fixture.mjs";
+import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {fileURLToPath} from "node:url";
@@ -68,13 +70,16 @@ try {
  assert.ok(sockets.length>0);assert.ok(sockets.every(parts=>Number(parts[4])===running.pid));
  assert.equal((await api("get-device-info")).value.success,true);
  report.identity={...identity,launchId:readiness.launchId,port:28420};
- assert.equal((await api("navigate",{url:"about:blank"})).value.success,true);
+ report.phase="fixture-navigation";
+ assert.equal((await api("navigate",{url:"about:blank"})).value.success,true,"FIXTURE_NAVIGATION_FAILED");
  const tabs=(await api("get-tabs")).value;const tabId=tabs.tabs.find(tab=>tab.active).id;
 
  if(mode!=="stop"){
-   const prepared=(await api("evaluate",{tabId,expression:"(()=>{document.body.innerHTML='<button id=\"native-capture-target\" style=\"position:fixed;left:150px;top:150px;width:160px;height:60px\">Capture target</button>';document.body.style.cssText='margin:0;height:100vh;background:white';window.__nativeCaptureDocument=crypto.randomUUID();const b=document.getElementById('native-capture-target');b.onclick=e=>{window.__nativeCaptureClick={trusted:e.isTrusted,x:e.clientX,y:e.clientY,rect:b.getBoundingClientRect().toJSON(),documentId:window.__nativeCaptureDocument,dpr:devicePixelRatio,visualScale:visualViewport.scale};};const r=b.getBoundingClientRect();return{target:{x:r.left+r.width/2,y:r.top+r.height/2},viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio,visualScale:visualViewport.scale},documentId:window.__nativeCaptureDocument};})()"})).value;
-   assert.equal(prepared.success,true);report.scene={...prepared.result,radius:24};
+   report.phase="fixture-preparation";
+   const prepared=(await api("evaluate",{tabId,expression:nativeWindowFixtureExpression(randomUUID())})).value;
+   assert.equal(prepared.success,true,"FIXTURE_PREPARATION_FAILED:"+prepared.error?.code);report.scene={...prepared.result,radius:24};
  }
+ report.phase="script-start";
  const actions=[{action:"commentary",text:"Stop accessibility acceptance",durationMs:30000}];
  if(mode!=="stop")actions.push({action:"click",target:{role:"button",name:"Capture target",exact:true}});
  actions.push({action:"wait",ms:30000});
@@ -113,6 +118,7 @@ try {
    const sceneFile=join(output,"native-window-scene.json");await writeFile(sceneFile,JSON.stringify(scene,null,2),{flag:"wx"});
    report.nativeStopCapture=await automation(["capture-stop",String(running.pid),exe,identity.startTime,join(output,"native-stop-window")]);
    const captureDirectory=join(output,"wgc-native-window");
+   report.phase="native-wgc-capture";
    report.wgc=JSON.parse((await child(wgcHelper,[String(running.pid),exe,identity.startFileTime,window.windowHandle,captureDirectory],
      {signal:deadline.signal,timeout:10000})).stdout);
    assert.equal(report.wgc.className,"KelpieScriptPresentation");assert.equal(report.wgc.processId,running.pid);
@@ -156,7 +162,9 @@ try {
  if(launched){
    if(pending&&readiness){try{await api("abort-script",{},true);await awaitBounded(pending,5000);}catch(error){report.pendingCleanup=error.message;}}
    try{
-     const closed=await publicCli(["browser","stop",alias]);assert.equal(closed.success,true);report.cleanup="supported-cli-closed";
+     const closed=await publicCli(["browser","stop",alias]);assert.equal(closed.success,true);
+     if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
+     report.cleanup="supported-cli-closed";
    }catch(error){report.cleanup="failed";report.checks.push({name:"public cleanup",passed:false,error:error.message});process.exitCode=1;}
  }
  clearTimeout(timer);await save();

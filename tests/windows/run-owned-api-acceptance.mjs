@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
+import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {readFile,writeFile,mkdir,access} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {dirname,join,isAbsolute} from "node:path";
 import {fileURLToPath} from "node:url";
-const [exe,cli,privateRoot,evidenceRoot,manifestFile]=process.argv.slice(2);
+const [exe,cli,privateRoot,evidenceRoot,manifestFile,mode="full"]=process.argv.slice(2);
 assert.ok([exe,cli,privateRoot,evidenceRoot,manifestFile].every(value=>value&&isAbsolute(value)));
+assert.ok(mode==="full"||mode==="fixture");
 const execute=promisify(execFile),tests=dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(await readFile(manifestFile,"utf8"));
 for(const key of ["exeSha256","dllSha256","cliSha256"])assert.match(manifest[key],/^[a-f0-9]{64}$/);
@@ -55,6 +57,9 @@ try{
  assert.ok(Date.parse(pinned.startTime)>=Date.parse(started)-1000);
  report.identity={...pinned,source:manifest.source,launchId:readiness.launchId,port:28420,hashes:manifest};
  const identityFile=join(evidenceRoot,"identity.json");await writeFile(identityFile,JSON.stringify(report.identity,null,2));
+ if(mode==="fixture"){
+  await childCase("native fixture preparation diagnosis","probe-script-fixture.mjs",[readinessFile,join(evidenceRoot,"fixture.json")]);
+ }else{
  await childCase("native full script capture corpus","run-script-capture-acceptance.mjs",
   [readinessFile,join(evidenceRoot,"native")],{KELPIE_CAPTURE_SOURCE:manifest.source});
  await childCase("canonical observations/extraction/readiness","run-observation-acceptance.mjs",
@@ -63,12 +68,15 @@ try{
   [cli,alias,cliHome,readinessFile,join(evidenceRoot,"alias")],{KELPIE_CAPTURE_SOURCE:manifest.source});
  await childCase("three artifact protocols","run-artifact-protocol-acceptance.mjs",
   [readinessFile,identityFile,join(evidenceRoot,"protocols")]);
+ }
 }catch(error){
  report.checks.push({name:"owned API flow",passed:false,error:error.message});process.exitCode=1;
 }finally{
  await writeFile(join(evidenceRoot,"flow-report.json"),JSON.stringify(report,null,2));
  if(launched){
-  try{assert.equal((await publicCli(["browser","stop",alias])).success,true);report.cleanup="public-cli-closed";}
+  try{assert.equal((await publicCli(["browser","stop",alias])).success,true);
+   if(report.identity){report.processExit=await waitForOwnedExit({pid:running.pid,executable:exe,startTime:report.identity.startTime});assert.equal(report.processExit.exited,true);}
+   report.cleanup="public-cli-closed";}
   catch(error){report.cleanup="failed";report.checks.push({name:"public close",passed:false,error:error.message});process.exitCode=1;}
  }
  if(running){
