@@ -1,5 +1,6 @@
 // Diagnostic-only: retain the first synthetic artifact whose decoded frame count differs.
 import { createHash } from "node:crypto";
+import { ffmpegPassthrough } from "../capture/ffmpeg-passthrough.mjs";
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile, copyFile, realpath, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -47,7 +48,7 @@ if(!mismatch) {
     const width=Math.min(item.width-left,2*radius+1),height=Math.min(item.height-top,2*radius+1);
     if(![left,top,width,height].every(Number.isSafeInteger) || width<=0 || height<=0 || width*height>65536) throw Error("INVALID_CROP");
     const decoded=spawnSync("ffmpeg",["-v","error","-threads","1","-i",path,"-vf",`format=rgb24,crop=${width}:${height}:${left}:${top}:exact=1`,
-      "-vsync","0","-f","rawvideo","-pix_fmt","rgb24","-"],{timeout:30000,maxBuffer:16777216});
+      ...ffmpegPassthrough("ffmpeg"),"-f","rawvideo","-pix_fmt","rgb24","-"],{timeout:30000,maxBuffer:16777216});
     if(decoded.status!==0 || decoded.stdout.length%(width*height*3)) throw Error("FRAME_DECODE_FAILED");
     const frameSize=width*height*3,frameCount=decoded.stdout.length/frameSize;
     if(!frameCount) throw Error("FRAME_DECODE_EMPTY");
