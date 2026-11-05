@@ -24,6 +24,10 @@ ScriptFrame Frame(int index, int width = 64, int height = 48) {
        {"startedMs", value.elapsed_ms}, {"durationMs", 700}, {"wobble", false}, {"fade", false}}}});
   return value;
 }
+void NoMuxScratch(const std::filesystem::path& directory) {
+  for (const auto& file : std::filesystem::directory_iterator(directory))
+    assert(!file.path().filename().string().starts_with(".mux-"));
+}
 std::vector<std::uint8_t> Bytes(const std::filesystem::path& path) {
   std::ifstream input(path, std::ios::binary);
   assert(input); return {std::istreambuf_iterator<char>(input), {}};
@@ -240,10 +244,12 @@ int main() {
   const auto fault_dir = CreatePrivateCaptureDirectory();
   auto fault = ScriptMediaEncoder::Create(fault_dir, {"gif", "mp4"}, 10, 1048576);
   assert(fault->AddFrame(Frame(0)) && fault->AddFrame(Frame(1)));
+  NoMuxScratch(fault_dir); // The pre-action proof has already retired its spool.
   assert(fault->committed_movie_frames() == 1); // Actual picture retained by both writers.
   std::ofstream(fault_dir / "capture.mp4") << "owned finalization collision";
   const auto survived = fault->Finish(200);
   assert(fault->finalization_failed() && survived.size() == 1 && survived[0].mime_type == "image/gif");
+  NoMuxScratch(fault_dir); // A final artifact collision leaves no private mux spool.
   assert(DecodeGif(survived[0]) == 2);
   report["postAckFinalizeFailure"] = {{"failed", true}, {"retainedGifFrames", survived[0].frame_count}};
   for (const auto& output : survived) std::filesystem::remove(output.path);
