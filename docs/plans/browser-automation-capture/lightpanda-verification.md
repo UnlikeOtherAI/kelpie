@@ -10,7 +10,7 @@ Linux-native test target, not a development host or ongoing worker service.
   canonical public worker wiring and production stdio corpus, integrated by root.
   No uncommitted source is copied to Fedora.
 - Proposed test path: an explicitly assigned worktree under
-  /home/ondre/Projects/kelpie-test-worktrees. Do not create/reuse it until root gives
+  /home/ondre/Projects/kelpie-worktrees/capture-linux-20261104. Do not create/reuse it until root gives
   the exact path and branch and verifies ownership/status.
 - Executable: upstream stable 1.0.2, source commit
   c5f7bb29b127040c899d4e181b5709f76fc71a6f.
@@ -117,3 +117,32 @@ completed LP compatibility result. No real LP task or performance result is
 claimed by this plan.
 
 The candidate Linux IP controls and their unsupported-kernel caveat are documented by [systemd.resource-control](https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html#IPAddressAllow=ADDRESS[/PREFIXLENGTH]%E2%80%A6). This plan requires an actual enforcement probe and does not treat unit acceptance as proof.
+
+## Actual boundary probe, 5 November2026
+
+Root assigned the existing owned Fedora checkout
+/home/ondre/Projects/kelpie-worktrees/capture-linux-20261104. Exact probe source:
+6fb0091aa9379e89ff0071fac2c34337032ba91f. Lightpanda itself has not run.
+
+Fedora systemd259.9 has cgroupv2/BPF support. The unfiltered documentation-address
+UDP baseline completed; the same send returned EPERM inside the restricted
+transient service, while its own TCP loopback handshake completed. Kernel
+cgroup files reported memory.max2147483648, cpu.max100000/100000 and pids.max64.
+The unit used operator User=ondre, CPUWeight1, NoNewPrivileges=yes,
+IPAddressDeny=any, IPAddressAllow=localhost, RuntimeMaxSec8 and control-group
+cleanup. These are resource/packet-egress controls, not a claim of a complete
+filesystem or local-service isolation boundary.
+
+Actual successful service runtime was266ms, CPU201ms and peak14.7MiB.
+It exited0 and the collected unit was not-found/inactive/MainPID0. No LP,
+browser or native compiler ran during the probe. The original pipe transport
+failed before service creation; manager-opened append stdout failed209 before
+execution. Default journal transport worked without policy changes. Failed
+transport evidence is preserved rather than counted as enforcement success.
+
+Sanitized artifacts are retained on Maxis at
+D:/BuildArtifacts/kelpie/capture-desktop-20261104/linux-boundary, notably
+worker-boundary-journal-report.txt, worker-boundary-journal-unit.txt and
+worker-boundary-baseline.json. Future corpus execution must use the verified
+journal transport, retain the exact unit identity and recheck teardown. Runtime
+execution remains subject to the coordinator's functional-workload slot.
