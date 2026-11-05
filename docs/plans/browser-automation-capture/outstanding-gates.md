@@ -83,71 +83,78 @@ Run identifiers identify evidence to inspect, not a claim that the run passed.
 The coordinator must reconcile newer results and exact artifact hashes before
 closing any requirement.
 
-## Current scope supplement — 2026-11-05
+## Current scope supplement - 2026-11-05
 
-Source snapshot `0850bde7`; later owner reports below identify their own
-revision or run. Earlier rows and platform documents retain the historical
-failures. These are scoped checkpoints, not whole-platform acceptance.
+Source snapshot `d7f4306d`. Reports below identify the source, test or
+hosted run actually exercised; earlier rows and platform receipts preserve
+historical failures. No row claims whole-platform acceptance.
 
-- **Shared and delivery:** the 52-case mutation-receipt matrix passed the
-  Android, iOS and Mac production decoders and validators. This does not
-  prove the full native workflow. Final integrated portable checks,
-  component versions, the single PR, publication, signing and installed
-  release verification remain open.
-- **Pointer speed:** shared normalization and the desktop, Android, iOS and
-  Mac fallback sites specify a 350 ms enabled-pointer default. Explicit
-  duration overrides remain supported; G08 intentionally requests 2400 ms.
-  Windows `a916f4db` exercised the omitted default through the public
-  workflow with 322 WGC frames and a sampled 266.7 ms endpoint bracket; this
-  is not an exact duration or dense-easing proof. Current-source omitted
-  default and native/display versus exported-output checks remain open.
-  Mac has an omitted-duration WK/CEF test awaiting native replay. iPhone,
-  iPad, Android phone and tablet still need their final-source omitted-default
-  and capture-disabled isolation evidence. Do not count explicit 400 ms or
-  2400 ms runs as default verification.
-- **Linux:** the normal `d849ee41` native corpus passed 54/54 and its
-  focused BODY overflow case. Its immediate-end marker decoder preserved a
-  strict MP4 tail failure: eight red-classified pixels in the final frame.
-  A separate instrumented `dfb` run admitted a marker-expired source frame
-  at 774.670 ms without drawing the marker; its final GIF tail classified
-  zero red pixels and MP4 four. This does not explain the earlier sample or
-  establish a codec-only cause. The original 4cc/e36 instrumented GIF
-  model analysis remains encoded-visible only; MP4 is insufficient. Warmup
-  `c202` GIF C/S passed with 279/282 dropped samples; both MP4s were
-  insufficient. Normal-source dense G08 and package/release gates remain.
-  Installed Ubuntu and Fedora previously reached 52/54 but two cases failed
-  on their initial navigation before their named assertions. Diagnostic run
-  `42082858225` never reached navigation because shared dist was missing;
-  the corrected reused-package resource run `42088123244` has completed
-  Ubuntu with 48 complete snapshots: a navigation reporting
-  `ERR_INSUFFICIENT_RESOURCES` had 2,035,712 of 67,108,864 bytes
-  available in /dev/shm before the request and 65,921,024 afterward.
-  This is evidence of pressure, not proof of the error's cause. A second
-  unsuccessful response had neither allowlisted error flag. The Fedora
-  job is still running. The observer can perturb timing.
-- **Windows:** Session 1 native CTest passed 65/65. Earlier native C/S and
-  fast-profile attempts, WGC/window and startup failures remain in the
-  platform receipts; a current-source dense C/S and omission-default proof,
-  final native/export comparison, and signed installed package remain open.
-- **Android:** API 29 minimum is approved. Phone marker and native Stop
-  recovery passed with explicit 400 ms pointer; tablet equivalents remain
-  open. Both 2400 ms dense media cases failed the strict coverage oracle.
-  Final phone/tablet privacy, paced workflows and public transport, omitted
-  350 ms and capture-disabled isolation remain separate gates.
-- **macOS:** WK run `42081421741` passed dense C MP4/GIF and S GIF;
-  S MP4 remained insufficient because its tail differed from its calibrated
-  pointer baseline. Prior `42076485229` C MP4 also had unstable baseline.
-  No same-frame raw source or marker-age evidence establishes the encoded
-  MP4 difference as a codec artifact. CEF, current native omission-default
-  and full release checks remain open.
-- **iOS:** same-scene iPhone evidence measured CSS (175,340) versus native
-  (175,402), with top/bottom insets 62/34 points; iPad measured equal
-  centers with top/bottom insets 0/20. Native projection and shared G08
-  geometry evidence are changed in source, but hosted per-device replay,
-  pinch/landscape and omitted-default proof are pending. Do not treat the
-  earlier displaced overlay or synthetic geometry checks as a native pass.
-- **Other scope:** the explicitly selected Lightpanda 1.0.2 DOM/text reader
-  passed its 16-case public stdio corpus; native visual/input/capture/WebMCP
-  remain outside that backend. Published-package verification remains open.
-  Preserve paced-edit privacy/acknowledgement gates and all original
-  failure receipts; no new pass follows from an incomplete diagnostic.
+- **Shared and release:** the 52-case mutation-receipt matrix passed Android,
+  iOS and Mac production decoders and validators. This is not full native
+  workflow proof. Final integrated portable checks, component versions, the
+  single PR, required CI, signing, publication and installed-release checks
+  remain open. Lightpanda 1.0.2's explicitly selected DOM/text reader passed
+  its 16-case public stdio corpus; published-package verification is open.
+- **Default pointer speed:** the shared schema and desktop, Android, iOS and
+  Mac fallback sites specify 350 ms when the pointer is enabled and duration
+  omitted. Explicit overrides remain supported; dense G08 intentionally uses
+  2400 ms. Windows `de318b47` omitted-duration C recorded five intermediate
+  samples and a 383.34 ms observed endpoint bracket. A separate analysis with
+  shared fitter `131031d5` measured 350/500 RMS fits of 6.00/90.47 CSS px;
+  output SHA-256 `6e7d98efaf75836d7158d4211ff856e0d281684aa26c0c040854189a05164bb2`.
+  This is scoped native evidence, not exact
+  timing or display/export parity. Linux `80644c78` omitted C/S produced
+  insufficient samples in all four GIF/MP4 fits, with 201 sampler drops per
+  run. Mac's omitted-default case did not pass in `42091168804`; current
+  hosted verification is pending. iPhone, iPad, Android phone and tablet
+  need final-source omission and capture-disabled isolation evidence.
+- **Windows:** Session 1 native CTest passed 65/65. Dense C/S at `de318b47`
+  passed path/easing analysis but both stopped at marker-onset opacity.
+  An owned known-opacity WGC control showed BGRA [0,0,178,178] retained
+  unchanged while metadata labelled it straight; treating those bytes as
+  straight produced RGB [201,77,77], while premultiplied composition produced
+  [255,77,77]. The scoped alpha-observation correction `664bb462f8a9642d35ec50111da99b5fd2cd3a62` has not
+  yet received a corrected native replay. Do not convert the prior dense
+  failures into passes. Final C/S native/export comparison and signed
+  installed-package checks remain open.
+- **Linux:** installed runs with 256 MiB shared memory cleared the prior
+  Ubuntu and Fedora navigation failures; earlier 64 MiB diagnostic samples
+  and failures remain preserved. Ubuntu hosted `42092291516`, source
+  `80644c78`, passed 54/54 native checks in original and untraced replay,
+  then both failed media verification: MP4 manifest count 15, decoded count
+  14. The retained original MP4 SHA-256 is
+  `df7a97cf8a9633f74a5906f9c63ec74b14549bd7abf1c30496a052fc2df24e4f`.
+  Both final VCL samples physically exist; the last trun lacks an explicit
+  offset and ffprobe identifies its position as the moof base. The qtmux
+  implicit-run versus FFmpeg interpretation is the current finding, not a
+  validated mux fix. The separate immediate-end marker-tail failures remain
+  open; an instrumented `4bab` expired source sample and both encoded tails
+  were clear, but do not explain earlier nonzero tails.
+- **Android:** API 29 minimum is approved. On API 35 phone and tablet,
+  `fb2` app and `b685` tests passed native marker and actual Stop,
+  partial-result and recovery flows. Conversion change `11384080` passed
+  two native codec controls and reduced C/S conversion from 72.2/70.6 to
+  55.8/51.9 ms per frame. Dense C/S in all formats remained insufficient at
+  roughly 100 frames over 28 seconds. Same-phone anchored-cadence changes
+  `1184b44f`/`2d9aa7c5`, integrated at `c1e63a6a`, produced 108/108
+  C/S frames versus 100/102 and MP4 median gaps near 258 ms versus 278/274;
+  dense evidence remains insufficient and short timing has not started.
+  Full device corpora, omitted-default
+  and capture-disabled proof, inference cancellation and signed final-source
+  replay remain separate gates; see `android.md`.
+- **macOS:** WK run `42091168804` at `9f366` passed semantic, privacy,
+  Stop, low-FPS and CLI GIF/MP4/PNG checks. Its omitted-350 case failed with
+  generic assertion and G08 was not reached; CEF switch failed at DNS
+  listener setup and CEF was not exercised. Earlier `42081421741` passed
+  WK dense C MP4/GIF and S GIF, with S MP4 insufficient. The current
+  `42095244866` includes source fixes and is still running; no pass is
+  inferred from it.
+- **iOS:** completed `42088321625` at `0850bde7` passed 3/8 on each
+  device. Both failed normal and interaction-disabled keyboard controls;
+  iPhone also failed live projection and two capture admissions, and iPad
+  failed both pinch controls and MCP marker. Same-scene iPhone evidence
+  measured CSS (175,340) and native (175,402), with top/bottom insets 62/34;
+  iPad centers matched with insets 0/20. Focused geometry run `42095635452`
+  and DEBUG callback probe `42096878949` are pending device outcomes.
+  Projection, pinch, omitted-default, both public device corpora and release
+  verification remain open.
