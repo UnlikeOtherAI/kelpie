@@ -7,6 +7,7 @@ import {resolve} from "node:path";
 import {consumeG08Frames} from "./g08-frame-stream.mjs";
 import {measureG08Frame} from "./g08-pixels.mjs";
 import {evaluateG08} from "./g08-timeline.mjs";
+import {validateG08PTS} from "./g08-pts.mjs";
 const [inputPath,outputPath]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
 assert.ok((await stat(inputPath)).size<=524288,"Input report exceeds bound");
@@ -49,12 +50,7 @@ for(const item of input.cases){
         "-of","json",resolve(artifact.file)],{windowsHide:true,maxBuffer:1048576,timeout:30000});
       assert.equal(probe.status,0,"PTS probe failed");
       const metadata=JSON.parse(probe.stdout.toString());
-      assert.equal(metadata.streams.length,1);
-      assert.equal(metadata.streams[0].width,artifact.width);assert.equal(metadata.streams[0].height,artifact.height);
-      const actualPTS=metadata.frames.map(frame=>Number(frame.best_effort_timestamp_time));
-      assert.equal(actualPTS.length,artifact.timestamps.length);
-      assert.ok(actualPTS.every((t,i)=>Number.isFinite(t)&&Math.abs(t-artifact.timestamps[i])<0.000001&&
-        (i===0||t>actualPTS[i-1])),"Recorded timestamps differ from decoded media PTS");
+      const actualPTS=validateG08PTS(metadata,artifact);
       const config={from:start.center,to:finish.center,curve:item.curve,pointerMs:2400,markerMs:3000,radius:48,
         color:item.curve==="c"?"#ff0000":"#0000ff",
         scale:{x:artifact.width/start.viewport.width,y:artifact.height/start.viewport.height}};
