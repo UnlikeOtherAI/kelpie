@@ -1,4 +1,5 @@
 import ImageIO
+import UIKit
 import XCTest
 
 /// Independent image measurements on a neutral fixture. No product geometry or drawing helper is shared.
@@ -52,6 +53,29 @@ enum WorkflowMotionFrames {
             let pointer = white < 4 ? nil : CGPoint(x: Double(xSum) / Double(white), y: Double(ySum) / Double(white))
             return Sample(time: time, pointer: pointer, indicatorWidth: max(0, right - left + 1), colorStrength: strength)
         }
+    }
+
+    static func contactSheet(_ data: Data) throws -> Data {
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let frameCount = CGImageSourceGetCount(source)
+        guard frameCount > 0 else { throw NSError(domain: "WorkflowMotionFrames", code: 1) }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let sheet = UIGraphicsImageRenderer(size: CGSize(width: 480, height: 320), format: format).image { renderer in
+            UIColor.white.setFill()
+            renderer.fill(CGRect(x: 0, y: 0, width: 480, height: 320))
+            for cell in 0..<8 {
+                let index = frameCount == 1 ? 0 : cell * (frameCount - 1) / 7
+                guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else { continue }
+                let scale = min(120 / CGFloat(image.width), 160 / CGFloat(image.height))
+                let width = CGFloat(image.width) * scale
+                let height = CGFloat(image.height) * scale
+                let x = CGFloat(cell % 4) * 120 + (120 - width) / 2
+                let y = CGFloat(cell / 4) * 160 + (160 - height) / 2
+                UIImage(cgImage: image).draw(in: CGRect(x: x, y: y, width: width, height: height))
+            }
+        }
+        return try XCTUnwrap(sheet.pngData())
     }
 
     static func verify(_ frames: [Sample], curve: String) throws {

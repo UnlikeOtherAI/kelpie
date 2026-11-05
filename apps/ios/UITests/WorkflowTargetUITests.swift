@@ -153,6 +153,10 @@ extension WorkflowCaptureUITests {
         attachment.lifetime = .keepAlways
         add(attachment)
         XCTAssertGreaterThan(try WorkflowMotionFrames.decode(bytes).count, 2)
+        let contact = XCTAttachment(data: try WorkflowMotionFrames.contactSheet(bytes), uniformTypeIdentifier: "public.png")
+        contact.name = "Decoded native pointer journey GIF contact sheet"
+        contact.lifetime = .keepAlways
+        add(contact)
     }
 
     @MainActor
