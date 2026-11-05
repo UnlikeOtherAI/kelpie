@@ -132,12 +132,12 @@ libgif.so.7; a package-version-to-SONAME inference was incorrect and is not used
 ## Candidate checks before publication
 
 [Linux native candidates](../../.github/workflows/linux-native.yml) is the single
-Ubuntu22/Fedora44 build/package graph. Pull requests inspect exact base/head
-commits and build only Linux app/native dependency inputs. Unrelated changes
+Ubuntu22/Fedora44 build/package graph. Pull requests compare their head to the merge base with the exact base
+commit and build only Linux app/native dependency inputs. Unrelated changes
 finish with a successful aggregate skip. Missing/invalid Git history fails the
 scope check instead of becoming a false skip. The real-Git scope regression
-passed on Maxis, covering unrelated prose/Windows edits, Linux/shared/build
-inputs and invalid commits.
+passed on Maxis, covering app documentation/shared test/Windows skips,
+actual Linux/shared build inputs, missing commits and main-only native edits.
 
 The same workflow supports manual dispatch and release workflow_call. It has
 contents:read permission, no signing/publication steps and stages candidate
