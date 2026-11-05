@@ -21,7 +21,7 @@ inline void Deadline(Clock::time_point end) {
 }
 template<class Operation> inline auto Wait(Operation const& operation,Clock::time_point end) {
   Deadline(end);
-  if(operation.wait_for(end-Clock::now())==winrt::Windows::Foundation::AsyncStatus::Started) {
+  if(operation.wait_for(std::chrono::duration_cast<winrt::Windows::Foundation::TimeSpan>(end-Clock::now()))==winrt::Windows::Foundation::AsyncStatus::Started) {
     operation.Cancel(); throw std::runtime_error("WGC_OPERATION_TIMEOUT");
   }
   return operation.GetResults();
