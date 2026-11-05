@@ -683,3 +683,16 @@ This does not establish the reason for retirement. Tablet PNG, Stop and movie
 cases remain open. Both runs used app SHA-256
 4c412fc82eadfe8daf8246235f8456e6b4735b76c689a5bc375dd93d8985f84e and test
 SHA-256 7169e038d25de9f3c73fcbc67c3c7ac3e97642e839c181ba3b75a32329b62cec.
+
+A separate instrumented API 35 tablet run passed the same no-capture native
+marker assertion. The diagnostic app SHA-256 was
+f6d497acf57a35aceba298400f5987176f4206296654925aa5176462067c5c12 and test
+SHA-256 187f108a1675d865872ec4777c9f5eafbfb60da8860f39c81a856dca55edc41a.
+The retained screenshot SHA-256 is
+01fa285a1e135cb7d00b885eb65dc003393c37ec721b9854f7f6e163dae7e553.
+The marker was centered at (319.5,485.5) in target [200,426,440,546], with
+center coverage 1. The debug trace recorded retention accepted 332 ms after
+marker publication; the first screenshot was acquired 1.62–1.97 s after
+publication and the marker expired at its original five-second deadline.
+This diagnostic adds instrumentation and does not explain the earlier 2d8
+tablet failure. Tablet PNG, Stop and movie checks remain open.
