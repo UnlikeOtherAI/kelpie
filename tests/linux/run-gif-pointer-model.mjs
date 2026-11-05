@@ -134,7 +134,7 @@ for (const item of entries.slice(1,4))
   assert.ok(item.frames.some(frame=>frame.roiSHA256!==model),"A retained-marker negative is invisible");
 assert.ok(entries[4].frames.every(frame=>frame.roiSHA256===model),
   "Palette-collision control is distinguishable; no ambiguity claim can be made");
-const report={version:1,confidence:"encoded-visible-only",source:evidence.source,
+const report={version:1,confidence:"insufficient",provenance:"loader binding closure unverified",source:evidence.source,
   candidateBinarySHA256:candidateHash,generatorSHA256:generatorHash,
   candidateEvidenceSHA256:await fileHash(candidateEvidencePath),mediaObjectSHA256:objectHashes,mediaArchiveSHA256:await fileHash(archive),candidateLinkMapSHA256:await fileHash(maps[0]),generatorLinkMapSHA256:await fileHash(maps[1]),generatorDependencies,sourceSHA256:sourceHashes,input:config,
   encoder:generatedReport.encoder,roi,cases:entries};
