@@ -336,6 +336,7 @@ jobs:
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/count-mismatch.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/*.json
             dist/release/${{ matrix.distro.name }}/installed-smoke/capture/capture/report.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke/alias/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.log
             dist/release/${{ matrix.distro.name }}/installed-smoke/*.txt
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/outcome.json
@@ -343,6 +344,7 @@ jobs:
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/count-mismatch.mp4
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/*.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/capture/capture/report.json
+            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/alias/report.json
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.log
             dist/release/${{ matrix.distro.name }}/installed-smoke-replay/*.txt
             dist/release/${{ matrix.distro.name }}/candidate-installed-*.log
@@ -356,14 +358,18 @@ jobs:
           path: |
             dist/release/${{ matrix.distro.name }}/*.tar.gz
             dist/release/${{ matrix.distro.name }}/*.tgz
-            dist/release/${{ matrix.distro.name }}/installed-smoke/
-            dist/release/${{ matrix.distro.name }}/installed-smoke-replay/
-            dist/release/${{ matrix.distro.name }}/namespace-diagnostic/
             dist/release/${{ matrix.distro.name }}/*.deb
             dist/release/${{ matrix.distro.name }}/*.rpm
             dist/release/${{ matrix.distro.name }}/*.AppImage
-            dist/release/${{ matrix.distro.name }}/*.txt
-            dist/release/${{ matrix.distro.name }}/*.log
+            dist/release/${{ matrix.distro.name }}/checksums.txt
+            dist/release/${{ matrix.distro.name }}/source-revision.txt
+            dist/release/${{ matrix.distro.name }}/binary-sha256.txt
+            dist/release/${{ matrix.distro.name }}/lock-sha256.txt
+            dist/release/${{ matrix.distro.name }}/build-options.txt
+            dist/release/${{ matrix.distro.name }}/factory-provenance.txt
+            dist/release/${{ matrix.distro.name }}/native-checks.log
+            dist/release/${{ matrix.distro.name }}/test-seccomp-sha256.txt
+            dist/release/${{ matrix.distro.name }}/test-docker-version.txt
           if-no-files-found: warn
 
 

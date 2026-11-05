@@ -50,3 +50,12 @@ test("package workflow shell parses before starting its build container", { skip
   const broken=script.replace('awk "/^(CEF_ROOT', "awk '/^(CEF_ROOT").replace('):/ { print }" \"$cache\"', "):/ { print }' \"$cache\"");
   assert.notEqual(spawnSync("bash",["-n"],{input:broken}).status,0);
 });
+
+test("package upload uses an explicit allowlist and never traverses private CLI state",()=>{
+  const upload=workflow.split("      - uses: actions/upload-artifact@v7.0.1").at(-1).split("\n\n\n  result:")[0];
+  assert.doesNotMatch(upload,/installed-smoke\/|namespace-diagnostic\/|\*\.txt|\*\.log/);
+  for(const name of ["*.deb","*.rpm","checksums.txt","source-revision.txt","binary-sha256.txt"]) assert.ok(upload.includes(name));
+  const diagnostics=workflow.split("      - name: Upload installed-candidate diagnostics")[1].split("      - uses: actions/upload-artifact@v7.0.1")[0];
+  assert.match(diagnostics,/installed-smoke\/alias\/report\.json/);
+  assert.match(diagnostics,/installed-smoke\/capture\/media-verification\.json|installed-smoke\/capture\/\*\.json/);
+});
