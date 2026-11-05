@@ -12,6 +12,7 @@ import {validHostSandboxHandoff} from "./worker-comparison-host-sandbox.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
 import {classifySpawnError,createBoundedStderr} from "./worker-comparison-launch-diagnostic.mjs";
 import {startSmokeFixture} from "./worker-comparison-smoke-fixture.mjs";
+import {queryRendererPids} from "./worker-comparison-cdp-process.mjs";
 const [binary,expected,output]=process.argv.slice(2);
 assert.match(expected??"",/^[a-f0-9]{64}$/);
 assert.match(process.env.KELPIE_COMPARISON_ID??"",/^[a-f0-9]{64}$/);
@@ -33,7 +34,7 @@ const group=(await readFile("/proc/self/cgroup","utf8")).split("\n").find(x=>x.s
 assert.ok(group?.startsWith("/"));
 const delay=ms=>new Promise(ok=>setTimeout(ok,ms));
 const env={PATH:process.env.PATH??"/usr/bin:/bin",HOME:home,LANG:"C.UTF-8"};
-let browser,fixture,canaryObserved=false,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
+let browser,fixture,canaryObserved=false,devtoolsFailure=null,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
 const stderr=createBoundedStderr();
 let preIdentityExit=false,exitObserved=false,exitCode=null,exitSignal=null,cleanup="none";
 try{
@@ -54,11 +55,16 @@ try{
  category="page-canary-unobserved";
  canaryObserved=await Promise.race([fixture.waitForCanary(15000),closePromise.then(()=>false)]);
  assert.ok(canaryObserved,"PAGE_CANARY_MISSING");
+ category="devtools-unavailable";
+ let rendererPids;
+ try{rendererPids=await queryRendererPids(join(home,"profile"),browser.pid,startTicks);}
+ catch(error){const codes=["DEVTOOLS_PORT_UNAVAILABLE","DEVTOOLS_NO_RENDERER","DEVTOOLS_BROWSER_MISMATCH","DEVTOOLS_DUPLICATE_RENDERER","DEVTOOLS_PROCESS_LIST","DEVTOOLS_TIMEOUT","DEVTOOLS_CONNECTION_FAILED","DEVTOOLS_CLOSED","DEVTOOLS_RESPONSE_INVALID","DEVTOOLS_PROTOCOL_ERROR","ENGINE_IDENTITY_UNAVAILABLE","ENGINE_IDENTITY_CHANGED","ENGINE_LISTENER_MISSING","ENGINE_LISTENER_NOT_OWNED"];
+  const code=String(error?.message??"").split("\n")[0];devtoolsFailure=codes.includes(code)?code:"OTHER";throw error;}
  category="identity";
  assert.equal(await nativeProcessStartTicks(browser.pid),startTicks,"SANDBOX_BROWSER_CHANGED");
  assert.equal(browser.exitCode,null,"SANDBOX_BROWSER_EXITED");
  assert.equal(browser.signalCode,null,"SANDBOX_BROWSER_EXITED");
- await writeFile(join(dir,"browser-identity.json"),JSON.stringify({pid:browser.pid,startTicks,unitPid:process.pid,nonce:process.env.KELPIE_COMPARISON_ID}),{mode:0o600,flag:"wx"});
+ await writeFile(join(dir,"browser-identity.json"),JSON.stringify({pid:browser.pid,startTicks,rendererPids,unitPid:process.pid,nonce:process.env.KELPIE_COMPARISON_ID}),{mode:0o600,flag:"wx"});
  category="host-audit-timeout";
  for(let attempt=0;attempt<400&&!evidence;attempt++){
   if(browser.exitCode!==null||browser.signalCode!==null)break;
@@ -83,7 +89,7 @@ try{
  const allowedSignals=["SIGABRT","SIGBUS","SIGFPE","SIGILL","SIGKILL","SIGSEGV","SIGSYS","SIGTERM","SIGTRAP"];
  const diagnostic={binarySHA256:expected,spawnEvent:spawnEvent==="not-started"?"timeout":spawnEvent,spawnError,
   pid:Number.isSafeInteger(browser?.pid)?browser.pid:null,startTicks,
-  canaryObserved,preIdentityExit,exitObserved,exitCode:Number.isInteger(exitCode)?exitCode:null,
+  canaryObserved,devtoolsFailure,preIdentityExit,exitObserved,exitCode:Number.isInteger(exitCode)?exitCode:null,
   exitSignal:allowedSignals.includes(exitSignal)?exitSignal:exitSignal?"OTHER":null,cleanup,stderr:stderr.result()};
  await writeFile(join(dir,"process-diagnostic.json"),JSON.stringify(diagnostic,null,2),{mode:0o600,flag:"wx"});
 }

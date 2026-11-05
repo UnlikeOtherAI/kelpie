@@ -7,7 +7,7 @@ import {parseProcStat} from "./native-resource-snapshot.mjs";
 import {parseStatusValue,validateSandboxCollection} from "./worker-comparison-sandbox.mjs";
 const exec=promisify(execFile);
 const disabled=["--no-sandbox","--disable-setuid-sandbox","--disable-namespace-sandbox","--disable-seccomp-filter-sandbox"];
-export function validateHostSnapshot({unitPid,browserPid,startTicks,before,after}){
+export function validateHostSnapshot({unitPid,browserPid,startTicks,rendererPids,before,after}){
  assert.ok(before.has(unitPid)&&before.has(browserPid),"AUDIT_IDENTITY");
  const browser=before.get(browserPid),unit=before.get(unitPid);
  assert.equal(browser.startTicks,startTicks,"AUDIT_RACE");
@@ -29,6 +29,8 @@ export function validateHostSnapshot({unitPid,browserPid,startTicks,before,after
   while(parent&&!seen.has(parent)){if(parent===browserPid){descendant=true;break;}seen.add(parent);parent=before.get(parent)?.ppid??0;}
   renderers.push({...item,owned:true,descendant});
  }
+ assert.ok(Array.isArray(rendererPids)&&rendererPids.length>0&&rendererPids.length<=256&&rendererPids.every(pid=>Number.isSafeInteger(pid)&&pid>0),"AUDIT_CDP_RENDERER_MISMATCH");
+ assert.deepEqual(renderers.map(x=>x.pid).sort((a,b)=>a-b),[...rendererPids].sort((a,b)=>a-b),"AUDIT_CDP_RENDERER_MISMATCH");
  return validateSandboxCollection({...browser,owned:true},renderers);
 }
 async function boundedRead(path){
@@ -81,6 +83,7 @@ export async function readHostSnapshot(group,reader){
 }
 export function hostAuditCategory(error){
  const text=String(error?.message??"");
+ if(text.includes("AUDIT_CDP_RENDERER_MISMATCH"))return "cdp-mismatch";
  if(text.includes("AUDIT_UNREADABLE"))return "proc-unreadable";
  if(text.includes("AUDIT_RACE"))return "process-race";
  if(text.includes("AUDIT_BUDGET"))return "budget";
@@ -93,7 +96,7 @@ export function hostAuditCategory(error){
 }
 
 export function validHostSandboxHandoff(result,pid,startTicks,unitPid,nonce){
- const categories=["proc-unreadable","process-race","budget","no-renderer","flags","filters","namespace","identity","other"];
+ const categories=["cdp-mismatch","proc-unreadable","process-race","budget","no-renderer","flags","filters","namespace","identity","other"];
  return result?.pid===pid&&result.startTicks===startTicks&&result.unitPid===unitPid&&result.nonce===nonce&&
   (result.ok===true?result.evidence?.allOwnedRenderers===true&&result.evidence?.ownedRenderer===true&&
    result.evidence?.chromiumFlagsSafe===true&&result.evidence?.rendererSeccomp===2&&

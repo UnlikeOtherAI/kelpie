@@ -7,14 +7,15 @@ const renderer={pid:3,ppid:2,startTicks:"30",userNs:"user:[2]",pidNs:"pid:[1]",f
 const snapshot=()=>new Map([[1,{...unit}],[2,{...browser}],[3,{...renderer}]]);
 test("host proof binds the unit and browser and checks every stable renderer",()=>{
  const before=snapshot(),after=snapshot();
- assert.equal(validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",before,after}).rendererCount,1);
- assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"21",before,after}));
+ assert.equal(validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",rendererPids:[3],before,after}).rendererCount,1);
+ assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"21",rendererPids:[3],before,after}));
  const shifted=snapshot();shifted.get(3).filters=3;
- assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",before,after:shifted}),/AUDIT_RACE/);
+ assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",rendererPids:[3],before,after:shifted}),/AUDIT_RACE/);
  after.get(3).startTicks="31";
- assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",before,after}),/AUDIT_RACE/);
+ assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",rendererPids:[3],before,after}),/AUDIT_RACE/);
+ assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",rendererPids:[4],before,after:before}),/AUDIT_CDP_RENDERER_MISMATCH/);
  const wrong=snapshot();wrong.get(3).ppid=1;
- assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",before:wrong,after:wrong}));
+ assert.throws(()=>validateHostSnapshot({unitPid:1,browserPid:2,startTicks:"20",rendererPids:[3],before:wrong,after:wrong}));
 });
 test("host handoff rejects stale identity and malformed success",()=>{
  const evidence={ownedRenderer:true,chromiumFlagsSafe:true,rendererSeccomp:2,additionalSeccompFilter:true,rendererNamespaceSeparated:true,allOwnedRenderers:true,rendererCount:1};

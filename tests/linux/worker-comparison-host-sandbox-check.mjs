@@ -11,6 +11,7 @@ const identity=JSON.parse(await readFile(join(dir,"browser-identity.json"),"utf8
 const policy=JSON.parse(await readFile(join(dir,"policy-observed.json"),"utf8"));
 const namespace=JSON.parse(await readFile(join(dir,"namespace-verified.json"),"utf8"));
 assert.ok(Number.isSafeInteger(identity.pid)&&identity.pid>0&&/^\d+$/.test(identity.startTicks??""));
+assert.ok(Array.isArray(identity.rendererPids)&&identity.rendererPids.length>0&&identity.rendererPids.length<=256&&identity.rendererPids.every(pid=>Number.isSafeInteger(pid)&&pid>0)&&new Set(identity.rendererPids).size===identity.rendererPids.length);
 assert.equal(identity.unitPid,policy.policy?.pid);assert.equal(identity.unitPid,namespace.pid);
 assert.equal(identity.nonce,nonce);assert.equal(namespace.nonce,nonce);
 const reader=createHostReader(),delay=ms=>new Promise(ok=>setTimeout(ok,ms));
@@ -21,7 +22,7 @@ try{
  while(reader.within()&&!evidence){
   try{
    const before=await readHostSnapshot(group,reader),after=await readHostSnapshot(group,reader);
-   evidence=validateHostSnapshot({unitPid:identity.unitPid,browserPid:identity.pid,startTicks:identity.startTicks,before,after});
+   evidence=validateHostSnapshot({unitPid:identity.unitPid,browserPid:identity.pid,startTicks:identity.startTicks,rendererPids:identity.rendererPids,before,after});
   }catch(error){
    category=hostAuditCategory(error);
    if(category!=="no-renderer"&&category!=="process-race")break;
