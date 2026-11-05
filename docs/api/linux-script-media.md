@@ -128,3 +128,25 @@ They include generated ELF dependencies and selected plugin provenance. RPM
 keeps private CEF automatic dependency handling disabled and adds the GIF SONAME
 read from the exact app ELF. The verified Fedora44 giflib6.1.3 still provides
 libgif.so.7; a package-version-to-SONAME inference was incorrect and is not used.
+
+## Candidate checks before publication
+
+[Linux native candidates](../../.github/workflows/linux-native.yml) is the single
+Ubuntu22/Fedora44 build/package graph. Pull requests inspect exact base/head
+commits and build only Linux app/native dependency inputs. Unrelated changes
+finish with a successful aggregate skip. Missing/invalid Git history fails the
+scope check instead of becoming a false skip. The real-Git scope regression
+passed on Maxis, covering unrelated prose/Windows edits, Linux/shared/build
+inputs and invalid commits.
+
+The same workflow supports manual dispatch and release workflow_call. It has
+contents:read permission, no signing/publication steps and stages candidate
+artifacts/diagnostics only. Release publication calls this graph with its tag and
+artifact prefix; Android/signing/upload jobs are not part of the check workflow.
+Distro builds run serially, each bounded to two CPUs,6GiB and45 minutes.
+
+Package version comes from the existing Linux CMake manifest; prerelease checks
+add a candidate/source suffix. Date tags label release files rather than replacing
+the component version. Source, lock, ELF/codec metadata, checks and checksums are
+retained with candidates. Actual reusable workflow/distro-container execution is
+pending; this source checkpoint is not a published or installed release.
