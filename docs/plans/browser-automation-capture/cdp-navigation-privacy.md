@@ -47,3 +47,28 @@ and guaranteed release on all abort and error paths. Lost realms, malformed
 results and unsupported navigation kinds remain unknown; capture discard and
 output scrubbing must not be weakened. Acknowledged navigation itself remains
 a valid final input outcome.
+
+## CEF renderer lifecycle candidate
+
+CEF's [render-process handler](https://github.com/chromiumembedded/cef/blob/master/include/cef_render_process_handler.h)
+provides OnContextReleased on the renderer thread immediately before a V8
+context is released. References must not be retained after that callback.
+The [CEF world-identity issue](https://github.com/chromiumembedded/cef/issues/3867)
+documents that DevTools isolated worlds can produce callbacks but the
+callback does not expose their world ID.
+
+A possible test-only probe would arm one bounded action against a specific
+browser and frame, use an unpredictable isolated-world nonce and target token,
+and attempt synchronous classification in the matching retiring context. Its
+typed reply must carry the action nonce; missing, malformed, late, duplicated
+or mismatched replies remain unknown. The registration and all context
+references must retire at action completion, abort or teardown.
+
+This remains a hypothesis. A native CEF test must establish that fixed-reader
+evaluation and DOM access are allowed during the callback, that it follows
+all synchronous final handlers, and that it distinguishes the correct
+isolated world. It must exercise an actual navigation, late sensitivity,
+target replacement, stale replies, crash and no-release cases. A BFCache
+entry, failed or cancelled navigation, and a missing callback cannot be
+treated as a non-sensitive classification. Do not introduce a persistent
+page script or relax capture discard in lieu of that evidence.

@@ -81,3 +81,38 @@ No row grants a whole-platform or 432-cell pass.
 Run identifiers identify evidence to inspect, not a claim that the run passed.
 The coordinator must reconcile newer results and exact artifact hashes before
 closing any requirement.
+
+## Current scope supplement - 2026-11-05
+
+This supplement supersedes the earlier working snapshot without removing its
+historical failures. Integration has advanced through `15cc0dc4` and remains
+in progress. A reported subset is not a platform or full-matrix pass.
+
+- **Lightpanda:** the pinned 1.0.2 optional reader tranche passed its bounded
+  public stdio corpus (16 cases) and was accepted for the four explicitly
+  selected DOM/text reader methods. The default remains deny; geometry, input,
+  capture and WebMCP are not admitted. The published package and installed
+  release still require verification.
+- **Android:** API 29 minimum is user-approved. The owner reports 7/7 local
+  phone privacy cases after the focus fix; tablet, hosted full corpus, actual
+  scene and dense G08 evidence remain separate gates. Earlier API 35 focus
+  failures and sparse capture results are retained.
+- **Linux:** the a05 real-CDP corpus passed 40/42, including all six new
+  post-ack cases. Two cross-document capture cases remain refused because
+  old-realm sensitivity is unknown. No classification is inferred from the
+  new document. GTK/OSR, installed RPM, dense G08 and release acceptance
+  require their own final integrated evidence. The deterministic GIF model
+  generator and provenance checks are under development.
+- **Windows:** prior four C/S GIF/MP4 export results and the coordinator's
+  native spatial/Stop observations are scoped evidence at their recorded
+  revisions. Final native timeline and the 350 ms profile remain open; later
+  launch/readiness failures are preserved. The launch lifecycle fix and
+  exact installed release verification remain open.
+- **macOS and iOS:** WK/CEF and iPhone/iPad need separate final-source runtime,
+  privacy, G08 and public transport evidence; earlier hosted or build subsets
+  do not establish full acceptance.
+- **Shared and release:** the 350 ms default and final-event privacy changes
+  require regenerated native bindings and platform replays on the integrated
+  source. Final portable checks, component versions, one reviewed PR, release
+  publication and installed signed/package verification remain open. No
+  nine-runtime or 432-cell completion is asserted.
