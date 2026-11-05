@@ -39,7 +39,11 @@ extension WorkflowCaptureUITests {
                     ["action": "output", "source": "url", "name": "url"]
                 ]
             ])
-            XCTAssertEqual(settled["success"] as? Bool, true)
+            let rawCode = (settled["error"] as? Body)?["code"] as? String ?? "none"
+            let code = rawCode.range(of: "^[A-Z0-9_]{1,80}$", options: .regularExpression) == nil ? "UNKNOWN" : rawCode
+            report["settledCode"] = code
+            report["settledActions"] = settled["actionsExecuted"] as? Int ?? -1
+            XCTAssertEqual(settled["success"] as? Bool, true, "Settled workflow error: " + code)
             XCTAssertEqual((settled["outputs"] as? Body)?["url"] as? String,
                            origin + (succeeded ? "/cold-destination" : "/cold-prior"))
             if !succeeded {

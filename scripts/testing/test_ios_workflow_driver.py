@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
 import types
 import unittest
 import json
@@ -32,6 +33,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as early:
                 post({"verified": True})
             self.assertEqual(early.exception.code, 409)
+            early.exception.close()
             self.assertEqual(post({"tabId": "a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed"}), 202)
             self.assertFalse(bridge.standard_verified())
             bridge.standard_passed()
@@ -40,11 +42,37 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as duplicate:
                 post({"verified": True})
             self.assertEqual(duplicate.exception.code, 409)
+            duplicate.exception.close()
             bridge.finish(False)
             with urllib.request.urlopen(url, timeout=2) as response:
                 self.assertEqual(json.load(response), {"state": "failed"})
         finally:
             bridge.close()
+
+    def test_capture_diagnostics_only_keep_fixed_reasons(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "log"
+            output = Path(directory) / "diagnostics"
+            source.write_text("prefix [WorkflowCapture] reason=visible-size\n"
+                              "[WorkflowCapture] reason=observation-BUSY\n"
+                              "[WorkflowCapture] reason=private-user-value\n")
+            DRIVER.failure_diagnostics(source, output)
+            self.assertEqual(output.read_text(), "[WorkflowCapture] reason=visible-size\n"
+                             "[WorkflowCapture] reason=observation-BUSY\n")
+
+    def test_cli_failure_status_keeps_only_bounded_metadata(self):
+        from ios_workflow_cli import run_fixture
+        responses = [{"success": True}, subprocess.TimeoutExpired("script", 60),
+                     {"state": "running", "playing": True, "actionIndex": 1,
+                      "outputs": {"secret": "private"}, "runError": {"code": "SAFE_CODE", "message": "private"}}]
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("ios_workflow_cli.invoke", side_effect=responses):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    run_fixture("a74a8e9e-4557-4e01-b5ca-c0e7fb70c0ed", Path(directory) / "cli")
+            report = json.loads((Path(directory) / "cli/status-on-failure.json").read_text())
+            self.assertEqual(report, {"status": "observed", "state": "running", "playing": True,
+                                      "actionIndex": 1, "errorCode": "SAFE_CODE"})
+            self.assertNotIn("private", json.dumps(report))
 
     def test_navigation_diagnostics_emit_only_known_fixed_events(self):
         from ios_workflow_diagnostics import fixed_events
@@ -72,7 +100,11 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testInitialOwnedHTTPNavigationLoadsFixture",
             "testColdPriorHTTPEitherNavigatesOrRefusesBeforeLoadThenRecovers",
         })
+        _, diagnostic_names = DRIVER.selection("diagnostics")
+        self.assertTrue(names < diagnostic_names)
+        self.assertIn("testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat", diagnostic_names)
         _, full_names = DRIVER.selection("full")
+        self.assertTrue(diagnostic_names < full_names)
         self.assertTrue(names < full_names)
         self.assertIn("testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat", full_names)
         with self.assertRaises(ValueError):

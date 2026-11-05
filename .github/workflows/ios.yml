@@ -61,9 +61,9 @@ on:
         type: boolean
         default: false
       native_workflow_scope:
-        description: Select the full corpus or the focused navigation diagnostic
+        description: Select the full corpus or a focused diagnostic
         type: choice
-        options: [full, navigation]
+        options: [full, navigation, diagnostics]
         default: full
 
 permissions:
@@ -197,13 +197,13 @@ jobs:
         run: pnpm --filter @unlikeotherai/kelpie build
 
       - name: Use Node 24 for capture evidence
-        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') == 'full'
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation'
         uses: actions/setup-node@v6.4.0
         with:
           node-version: 24
 
       - name: Install media verification tools
-        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') == 'full'
+        if: inputs.native_workflow_tests && (inputs.native_workflow_scope || 'full') != 'navigation'
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             brew install ffmpeg

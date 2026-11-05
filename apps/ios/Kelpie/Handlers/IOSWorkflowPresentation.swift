@@ -150,7 +150,10 @@ final class IOSWorkflowPresentation: NSObject {
 
     func latch() throws -> State {
         try tab.requireCurrent()
-        guard let parent = tab.view.superview, parent === canvas.superview else { throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED") }
+        guard let parent = tab.view.superview, parent === canvas.superview else {
+            IOSFrameSampler.diagnostic("presentation-parent")
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+        }
         parent.layoutIfNeeded()
         synchronize()
         let state = current()

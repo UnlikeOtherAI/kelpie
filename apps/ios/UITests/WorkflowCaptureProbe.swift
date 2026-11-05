@@ -60,7 +60,16 @@ final class WorkflowCaptureProbe {
 
     func toolValue(_ name: String, _ arguments: Body) async throws -> Any {
         let envelope = try await toolEnvelope(name, arguments)
-        XCTAssertEqual(envelope["ok"] as? Bool, true, "\(envelope["error"] ?? "")")
+        if envelope["ok"] as? Bool != true {
+            // Preserve only fixed error codes and action metadata; never attach page output.
+            let status = try? await toolEnvelope("kelpie_get_script_status", [:])
+            let value = status?["value"] as? Body
+            let error = value?["runError"] as? Body
+            let rawCode = error?["code"] as? String ?? "UNKNOWN"
+            let code = rawCode.range(of: "^[A-Z0-9_]{1,80}$", options: .regularExpression) == nil ? "UNKNOWN" : rawCode
+            let index = value?["actionIndex"] as? Int ?? -1
+            XCTFail("MCP play failed; terminal code: \(code); action index: \(index)")
+        }
         return try XCTUnwrap(envelope["value"])
     }
 
@@ -80,6 +89,11 @@ final class WorkflowCaptureProbe {
         }
         XCTAssertEqual(SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(), manifest["sha256"] as? String)
         return bytes
+    }
+
+    static func errorCode(_ value: Body) -> String {
+        let code = (value["error"] as? Body)?["code"] as? String ?? "NONE"
+        return code.range(of: "^[A-Z0-9_]{1,80}$", options: .regularExpression) == nil ? "UNKNOWN" : code
     }
 
     enum ProbeError: Error { case invalidChunk, pairing, listener }
