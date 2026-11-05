@@ -6,14 +6,35 @@ struct ScriptHandler {
     let playbackState: ScriptPlaybackState
     let setRecordingMode: @Sendable (Bool) async -> Void
 
+    @MainActor
     func register(on router: Router) {
+        router.browserMutationAllowed = { [weak context] tabID in
+            guard let context, let renderer = try? context.resolveRenderer(tabId: tabID) else { return false }
+            return !ScriptRendererDeadline.isRetiring(renderer)
+        }
+        let workflow = ScriptWorkflowRunner(host: self)
+        context.scriptWorkflowRunner = workflow
         router.register("play-script") { body in await playScript(body) }
-        router.register("abort-script") { _ in abortScript() }
-        router.register("get-script-status") { _ in getScriptStatus() }
+        router.register("abort-script") { body in
+            await workflow.control("abort-script", body, legacy: abortScript)
+        }
+        router.register("get-script-status") { body in
+            await workflow.control("get-script-status", body) {
+                if playbackState.statusResponse()["playing"] as? Bool == true { return getScriptStatus() }
+                return ScriptBoundWorkflow.capabilities.merging(["playing": false, "state": "idle"]) { _, new in new }
+            }
+        }
+        router.register("get-script-artifact") { body in
+            await workflow.control("get-script-artifact", body, legacy: { ScriptWorkflowFailure("RUN_NOT_FOUND").response })
+        }
     }
 
     @MainActor
     private func playScript(_ body: [String: Any]) async -> [String: Any] {
+        if body["version"] != nil {
+            guard let workflow = context.scriptWorkflowRunner else { return ScriptWorkflowFailure("SCRIPT_UNAVAILABLE").response }
+            return await workflow.play(body)
+        }
         guard let actions = body["actions"] as? [[String: Any]], !actions.isEmpty else {
             return errorResponse(code: "MISSING_PARAM", message: "actions is required")
         }

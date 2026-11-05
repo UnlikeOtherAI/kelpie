@@ -213,7 +213,8 @@ final class CEFRenderer: RendererEngine {
         canGoBack = bridge.canGoBack()
         canGoForward = bridge.canGoForward()
         if isLoading, !previousLoading {
-            NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
+            ConnectDocument.navigated(self)
+            NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: self)
             documentNavigationStart = Date()
             capturedDocumentResponseURL = nil
         } else if !isLoading, previousLoading {
@@ -323,6 +324,17 @@ final class CEFRenderer: RendererEngine {
         guard let image = NSImage(data: data) else {
             throw HandlerError.noWebView
         }
+        return image
+    }
+
+    func takeScriptSnapshot(viewport: CGRect, maximumPixels: CGSize, pixelRatio: CGFloat) async throws -> NSImage {
+        guard let bridge else { throw ScriptWorkflowFailure("CAPTURE_PIXEL_SOURCE_UNAVAILABLE") }
+        let data: Data? = await withCheckedContinuation { continuation in
+            bridge.takeScriptScreenshot(viewport: viewport, maximumPixels: maximumPixels, pixelRatio: pixelRatio) {
+                continuation.resume(returning: $0 as Data?)
+            }
+        }
+        guard let data, let image = NSImage(data: data) else { throw ScriptWorkflowFailure("CAPTURE_PIXEL_SOURCE_UNAVAILABLE") }
         return image
     }
 

@@ -1,0 +1,159 @@
+import AppKit
+
+@MainActor
+final class ScriptWorkflowActions {
+    typealias Body = [String: Any]
+    let workflow: ScriptBoundWorkflow
+    let tab: ScriptWorkflowTab
+    let presentation: ScriptPresentation
+    let router: Router
+    let check: () async throws -> Void
+    var capture: ScriptCapture?
+    private(set) var outputs: Body = [:]
+    private(set) var secrets: [String]
+
+    init(
+        workflow: ScriptBoundWorkflow,
+        tab: ScriptWorkflowTab,
+        presentation: ScriptPresentation,
+        router: Router,
+        check: @escaping () async throws -> Void
+    ) {
+        self.workflow = workflow
+        self.tab = tab
+        self.presentation = presentation
+        self.router = router
+        self.check = check
+        secrets = workflow.sensitiveValues
+    }
+
+    func execute(_ step: Body, index: Int) async throws {
+        try await check()
+        let action = step["action"] as? String ?? ""
+        switch action {
+        case "click", "tap", "type", "fill":
+            try await interact(step, action: action, index: index)
+            return
+        case "navigate":
+            presentation.clear()
+            try await tab.navigate(step["url"] as? String ?? "")
+        case "scroll":
+            presentation.clear()
+            try await tab.scroll(step)
+        case "wait": try await wait(milliseconds: step["ms"] as? Int ?? 0)
+        case "assert", "wait-ready": try await predicate(step, action: action)
+        case "commentary": presentation.show(step)
+        case "screenshot": break
+        case "output": try store(try await tab.output(step["source"] as? String ?? ""), step: step)
+        case "extract": try store(try await read("tab.extract", params: step["params"] as? Body ?? [:]), step: step)
+        default: throw ScriptWorkflowFailure("UNSUPPORTED_SCRIPT_ACTION")
+        }
+        if workflow.stepScreenshots || action == "screenshot" {
+            do { try await capture?.screenshot(index: index) } catch {
+                if ["navigate", "scroll"].contains(action) { throw ScriptWorkflowFailure("CAPTURE_AFTER_ACTION_FAILED", mayHaveCompleted: true) }
+                throw error
+            }
+        }
+    }
+
+    private func store(_ value: Any, step: Body) throws {
+        guard let name = step["name"] as? String else { throw ScriptWorkflowFailure("INVALID_OUTPUT") }
+        outputs[name] = value
+        guard let json = ScriptBoundWorkflow.json(outputs), json.utf8.count <= 262144 else {
+            outputs.removeValue(forKey: name)
+            throw ScriptWorkflowFailure("OUTPUT_BUDGET_EXCEEDED")
+        }
+    }
+
+    private func read(_ method: String, params: Body) async throws -> Body {
+        try tab.requireCurrent()
+        let document = tab.document
+        let result = await router.browserControl(["version": 1, "method": method, "tabId": tab.id, "params": params])
+        try await check()
+        try tab.requireCurrent()
+        guard document == tab.document else { throw ScriptWorkflowFailure("DOCUMENT_CHANGED") }
+        guard result["ok"] as? Bool == true, let value = result["value"] as? Body else {
+            throw ScriptWorkflowFailure("OBSERVATION_FAILED")
+        }
+        return value
+    }
+
+    private func predicate(_ step: Body, action: String) async throws {
+        let end = ProcessInfo.processInfo.systemUptime + Double(step["timeoutMs"] as? Int ?? 10000) / 1000
+        repeat {
+            try await check()
+            if action == "wait-ready" {
+                var params: Body = ["state": step["state"] ?? "interactive"]
+                params["selector"] = step["selector"]
+                if try await read("tab.ready", params: params)["ready"] as? Bool == true { return }
+            } else {
+                let state = step["state"] as? String
+                let result = try await tab.target(step["target"] as? Body ?? [:], observe: true)
+                if result["ok"] as? Bool == true {
+                    if state == "visible" || (state == "enabled" && result["enabled"] as? Bool == true) { return }
+                } else if result["error"] as? String == "TARGET_NOT_FOUND" {
+                    if state == "hidden" { return }
+                } else { try requireOK(result) }
+            }
+            try await wait(milliseconds: 80)
+        } while ProcessInfo.processInfo.systemUptime < end
+        throw ScriptWorkflowFailure("TIMEOUT")
+    }
+
+    func wait(milliseconds: Int) async throws {
+        let end = ProcessInfo.processInfo.systemUptime + Double(max(0, milliseconds)) / 1000
+        repeat {
+            try await check()
+            let remaining = end - ProcessInfo.processInfo.systemUptime
+            if remaining <= 0 { return }
+            try await Task.sleep(nanoseconds: UInt64(min(0.05, remaining) * 1_000_000_000))
+        } while true
+    }
+
+    private func requireOK(_ result: Body) throws {
+        guard result["ok"] as? Bool == true else {
+            // The isolated-world fixed target function supplies these diagnostic enums.
+            let allowed: Set<String> = [
+                "AMBIGUOUS_TARGET", "INPUT_UNCERTAIN", "INVALID_TARGET", "INVALID_TARGET_OPERATION",
+                "STALE_TARGET", "TARGET_MOVED", "TARGET_NOT_EDITABLE", "TARGET_NOT_FOUND",
+                "TARGET_NOT_INTERACTABLE", "TARGET_OBSCURED", "TARGET_OUTSIDE_VIEWPORT",
+                "TARGET_QUERY_LIMIT", "VIEWPORT_CHANGED"
+            ]
+            let code = result["error"] as? String ?? ""
+            throw ScriptWorkflowFailure(allowed.contains(code) ? code : "TARGET_FAILED",
+                                        mayHaveCompleted: result["mayHaveCompleted"] as? Bool == true)
+        }
+    }
+
+    private func interact(_ step: Body, action: String, index: Int) async throws {
+        let target = step["target"] as? Body ?? [:]
+        let document = tab.document
+        let viewport = try await tab.viewport()
+        let found = try await tab.target(target)
+        try requireOK(found)
+        guard let token = found["token"] as? String, let x = found["x"] as? Double, let y = found["y"] as? Double else {
+            throw ScriptWorkflowFailure("INVALID_TARGET")
+        }
+        let editing = action == "type" || action == "fill"
+        let sensitive = found["sensitive"] as? Bool == true || step["sensitive"] as? Bool == true
+        if sensitive, workflow.capture != nil { throw ScriptWorkflowFailure("SENSITIVE_CAPTURE_REFUSED") }
+        if editing, sensitive, let text = step["text"] as? String { secrets.append(text) }
+        let point = viewport.displayPoint(CGPoint(x: x, y: y))
+        try await presentation.move(to: point, options: workflow.settings["pointer"] as? Body ?? [:], check: check)
+        var settings = workflow.settings["tapIndicator"] as? Body ?? [:]
+        settings["radius"] = Double(CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width)
+        try requireOK(try await tab.target(target, token: token))
+        presentation.indicate(at: point, options: settings, hold: capture?.hasMovies == true)
+        if workflow.stepScreenshots { try await capture?.screenshot(index: index) }
+        try await capture?.ensureMarkerAdmission()
+        presentation.releaseMarker()
+        try await check()
+        let current = try await tab.viewport()
+        guard tab.document == document, viewport == current else { throw ScriptWorkflowFailure("STALE_TARGET") }
+        let edit: Body? = editing ? ["action": action, "text": step["text"] ?? ""] : nil
+        let result = try await tab.target(target, token: token, dispatch: !editing, edit: edit)
+        try requireOK(result)
+        do { try await check() } catch { throw ScriptWorkflowFailure("INPUT_INTERRUPTED", mayHaveCompleted: true) }
+    }
+
+}

@@ -277,6 +277,10 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
 
     // MARK: - WKNavigationDelegate
 
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        ScriptRendererDeadline.rendererTerminated(self)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         self.isLoading = false
         self.onStateChange?()
@@ -286,7 +290,7 @@ final class WKWebViewRenderer: NSObject, RendererEngine, WKScriptMessageHandler,
         ConnectDocument.navigated(self, navigation: navigation)
         // Each new provisional navigation starts clean — clear any error captured
         // by a superseded load so a cancelled-then-successful sequence is not fatal.
-        NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: nil)
+        NotificationCenter.default.post(name: .kelpieBrowserDocumentChanged, object: self)
         self.lastNavigationError = nil
         self.documentNavigationStart = Date()
         self.capturedDocumentResponseURL = nil

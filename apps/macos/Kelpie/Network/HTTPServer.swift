@@ -32,6 +32,8 @@ final class HTTPServer: @unchecked Sendable {
     /// Prevents slow-loris clients from pinning sockets indefinitely.
     static let requestTimeoutSeconds: Double = 30
 
+    let scriptListener = ScriptListenerScope()
+
     let port: UInt16
     let router: Router
     let pairingStore: PairingStore
@@ -114,9 +116,10 @@ final class HTTPServer: @unchecked Sendable {
         let svc = bonjourService
         lock.unlock()
 
+        let incarnation = scriptListener.start()
         newListener.service = svc
         newListener.serviceRegistrationUpdateHandler = { [weak self] change in
-            guard let self else { return }
+            guard let self, self.scriptListener.incarnation == incarnation else { return }
             switch change {
             case .add(let endpoint):
                 print("[mDNS] Advertising: \(endpoint)")
@@ -130,20 +133,22 @@ final class HTTPServer: @unchecked Sendable {
         }
 
         newListener.newConnectionHandler = { [weak self] connection in
-            self?.handleConnection(connection)
+            self?.handleConnection(connection, listener: incarnation)
         }
         newListener.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+            guard let self, self.scriptListener.incarnation == incarnation else { return }
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self.port)")
                 self.onStateChange?(true)
                 self.onReady?()
             case .failed(let error):
+                self.scriptListener.stop(incarnation)
                 print("[HTTPServer] Listener failed: \(error)")
                 self.onBonjourStateChange?(false)
                 self.onStateChange?(false)
             case .cancelled:
+                self.scriptListener.stop(incarnation)
                 self.onBonjourStateChange?(false)
                 self.onStateChange?(false)
             default:
@@ -154,6 +159,7 @@ final class HTTPServer: @unchecked Sendable {
     }
 
     func stop() {
+        scriptListener.stop()
         lock.lock()
         let current = listener
         listener = nil
@@ -168,16 +174,16 @@ final class HTTPServer: @unchecked Sendable {
         onStateChange?(false)
     }
 
-    private func handleConnection(_ connection: NWConnection) {
+    private func handleConnection(_ connection: NWConnection, listener: UUID) {
         connection.start(queue: .global(qos: .userInitiated))
         let deadline = Date().addingTimeInterval(Self.requestTimeoutSeconds)
-        receiveData(connection: connection, buffer: Data(), deadline: deadline)
+        receiveData(connection: connection, buffer: Data(), deadline: deadline, listener: listener)
     }
 
     /// Recursively drains `connection` into `buffer`, enforcing header-byte,
     /// body-byte, and overall-deadline limits. Each invocation re-checks the
     /// deadline before requesting more data so slow-loris clients are bounded.
-    private func receiveData(connection: NWConnection, buffer: Data, deadline: Date) {
+    private func receiveData(connection: NWConnection, buffer: Data, deadline: Date, listener: UUID) {
         if Date() >= deadline {
             send408AndClose(connection: connection)
             return
@@ -188,15 +194,15 @@ final class HTTPServer: @unchecked Sendable {
             if let content { accumulated.append(content) }
 
             if isComplete || error != nil {
-                Task { await self.processRequest(connection: connection, data: accumulated) }
+                Task { await self.processRequest(connection: connection, data: accumulated, listener: listener) }
                 return
             }
 
-            self.continueReceive(connection: connection, accumulated: accumulated, deadline: deadline)
+            self.continueReceive(connection: connection, accumulated: accumulated, deadline: deadline, listener: listener)
         }
     }
 
-    private func continueReceive(connection: NWConnection, accumulated: Data, deadline: Date) {
+    private func continueReceive(connection: NWConnection, accumulated: Data, deadline: Date, listener: UUID) {
         let headerSeparator = accumulated.range(of: Data("\r\n\r\n".utf8))
 
         // Enforce header byte cap before headers complete. Closing early
@@ -207,7 +213,7 @@ final class HTTPServer: @unchecked Sendable {
         }
 
         guard let headerEnd = headerSeparator else {
-            receiveData(connection: connection, buffer: accumulated, deadline: deadline)
+            receiveData(connection: connection, buffer: accumulated, deadline: deadline, listener: listener)
             return
         }
 
@@ -237,9 +243,9 @@ final class HTTPServer: @unchecked Sendable {
                 return
             }
             if bodyReceived >= contentLength {
-                Task { await self.processRequest(connection: connection, data: accumulated) }
+                Task { await self.processRequest(connection: connection, data: accumulated, listener: listener) }
             } else {
-                receiveData(connection: connection, buffer: accumulated, deadline: deadline)
+                receiveData(connection: connection, buffer: accumulated, deadline: deadline, listener: listener)
             }
         case .missing:
             // Reject POSTs without Content-Length; GETs never have a body.
@@ -247,7 +253,7 @@ final class HTTPServer: @unchecked Sendable {
             if requestLine.hasPrefix("POST ") {
                 send411AndClose(connection: connection)
             } else {
-                Task { await self.processRequest(connection: connection, data: accumulated) }
+                Task { await self.processRequest(connection: connection, data: accumulated, listener: listener) }
             }
         case .malformed:
             send400AndClose(connection: connection, message: "Malformed Content-Length")
@@ -303,7 +309,7 @@ final class HTTPServer: @unchecked Sendable {
         connection.send(content: response.render(), completion: .contentProcessed { _ in connection.cancel() })
     }
 
-    private func processRequest(connection: NWConnection, data: Data) async {
+    private func processRequest(connection: NWConnection, data: Data, listener: UUID) async {
         let sourceAddress = HTTPRequestParser.formatSourceAddress(connection.endpoint)
         guard let parsed = HTTPRequestParser.parse(data: data, sourceAddress: sourceAddress) else {
             await send(connection: connection, response: PairingHTTPResponse.malformed())
@@ -320,7 +326,14 @@ final class HTTPServer: @unchecked Sendable {
         case .unauthenticated:
             await routeUnauthenticated(parsed: parsed, connection: connection)
         case let .authenticated(clientId):
-            await routeAuthenticated(parsed: parsed, clientId: clientId, connection: connection)
+            guard scriptListener.incarnation == listener else {
+                await send(connection: connection, response: PairingHTTPResponse.error(status: 401, code: "UNAUTHORIZED", message: "Listener expired"))
+                return
+            }
+            let grant = scriptGrant(parsed, clientID: clientId, listener: listener)
+            await ScriptRequestOwner.$current.withValue(grant) {
+                await routeAuthenticated(parsed: parsed, clientId: clientId, connection: connection)
+            }
         }
     }
 

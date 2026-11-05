@@ -35,7 +35,9 @@ protocol RendererEngine: AnyObject {
     func deleteAllCookies() async
 
     // MARK: - Screenshot
+    var scriptViewportRect: CGRect { get }
     func takeSnapshot() async throws -> NSImage
+    func takeScriptSnapshot(viewport: CGRect, maximumPixels: CGSize, pixelRatio: CGFloat) async throws -> NSImage
 
     // MARK: - View
     /// Returns the NSView to embed in SwiftUI via NSViewRepresentable.
@@ -73,5 +75,12 @@ extension RendererEngine {
 extension RendererEngine {
     func evaluateBrowserControlJS(_ script: String) async throws -> Any? {
         try await evaluateJS(script)
+    }
+}
+
+extension RendererEngine {
+    var scriptViewportRect: CGRect { makeView().bounds }
+    func takeScriptSnapshot(viewport: CGRect, maximumPixels: CGSize, pixelRatio: CGFloat) async throws -> NSImage {
+        throw ScriptWorkflowFailure("SCRIPT_CAPTURE_UNSUPPORTED")
     }
 }
