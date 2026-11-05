@@ -161,6 +161,9 @@ final class ScriptWorkflowRunner {
             markerRetiree = retiree
             retiringMarker = retiree
         } else {
+            #if DEBUG
+            debugSkippedRetiree(issue: issue, presentation: presentation)
+            #endif
             presentation?.stop()
             retiringMarker = nil
         }
@@ -173,6 +176,24 @@ final class ScriptWorkflowRunner {
         }
         return response
     }
+
+    #if DEBUG
+    private func debugSkippedRetiree(issue: ScriptWorkflowFailure?, presentation: ScriptPresentation?) {
+        let reason: String
+        if issue != nil {
+            reason = "issue"
+        } else if capture?.hasMovies == true {
+            reason = "movie"
+        } else if presentation?.markerEnd == nil {
+            reason = "marker"
+        } else if (presentation?.markerEnd ?? 0) <= ProcessInfo.processInfo.systemUptime {
+            reason = "expired"
+        } else {
+            reason = "identity"
+        }
+        print("[WorkflowRetiree] event=skipped reason=\(reason)")
+    }
+    #endif
 
     private func finish(id: String, owner runOwner: String, issue: ScriptWorkflowFailure?, outputs: Body, artifacts: [Body]) -> Body {
         if let issue { _ = host.playbackState.finishFatalFailure(code: issue.code, message: "Workflow stopped") } else { _ = host.playbackState.finishSuccess() }

@@ -104,7 +104,7 @@ export async function runEngine(client,fixture,engine,report,scope="full") {
  await load();
  if(scope==="cef-timing"){
   requireTrue(engine==="chromium","FOCUSED_RENDERER");
-  await runRetiree({client,engine,base,capture,check,load});
+  await runRetiree({client,engine,base,capture,check,load,report});
   await runEdge({client,fixture,engine,base,capture,check,load,continueOnFailure:true});
   await runDefaultMotion({client,fixture,engine,base,capture,check,load});
   const failed=checks.find(item=>!item.passed);
@@ -155,7 +155,7 @@ export async function runEngine(client,fixture,engine,report,scope="full") {
   semanticStage="media-decode";
   return {runId:result.runId,artifacts:artifacts.map(a=>({...a,decode:inspectMedia(a,{marker:a.mimeType!=="image/png"})})),event};
  });
- await runRetiree({client,engine,base,capture,check,load});
+ await runRetiree({client,engine,base,capture,check,load,report});
  await runPaced({client,fixture,engine,base,capture,check,load,play});
  await load();
  await check("observation-and-readiness-public-entry",async()=>{

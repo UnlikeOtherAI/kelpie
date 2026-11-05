@@ -88,3 +88,9 @@ export function pointerTimingSignal(line){
  return match?{engine:match[1],elapsedMs:Number(match[2]),updates:Number(match[3]),maxUpdateGapMs:Number(match[4]),
   draws:Number(match[5]),maxDrawGapMs:Number(match[6]),completed:match[7]==="1"}:null;
 }
+
+// Fixed retiree lifecycle labels only, never page content or window identifiers.
+export function retireeSignal(line){
+ const match=/^\[WorkflowRetiree\] event=(start|retire|skipped) reason=(none|expired|missing|inactive|identity|visibility|document|target|geometry|issue|movie|marker)$/.exec(line);
+ return match?{event:match[1],reason:match[2]}:null;
+}
