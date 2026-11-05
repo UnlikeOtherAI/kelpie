@@ -9,6 +9,8 @@ import {measureG08Frame} from "./g08-pixels.mjs";
 import {evaluateG08} from "./g08-timeline.mjs";
 import {validateG08PTS} from "./g08-pts.mjs";
 import {loadG08ModelReference} from "./g08-model-reference.mjs";
+import {mapG08Scene} from "./g08-fixture.mjs";
+import {createG08Retention} from "./g08-retention.mjs";
 const [inputPath,outputPath,modelPath,backingDir,evidencePath]=process.argv.slice(2);
 assert.ok(outputPath,"Provide owned joined artifact/decoder input and fresh output path");
 assert.ok((await stat(inputPath)).size<=524288,"Input report exceeds bound");
@@ -27,7 +29,8 @@ const output={version:1,source:input.source,binarySHA256:input.binarySHA256,runt
 const seen=new Set();
 for(const item of input.cases){
   assert.ok(["c","s"].includes(item.curve)&&!seen.has(item.curve));seen.add(item.curve);
-  const {calibration,start,finish}=item.scene;
+  const {warmup,calibration,start,finish}=item.scene;
+  if(warmup)mapG08Scene([warmup,calibration,start,finish]);
   assert.equal(calibration.target,"finish");
   assert.equal(calibration.documentId,start.documentId);
   assert.deepEqual(calibration.viewport,start.viewport);
@@ -50,7 +53,7 @@ for(const item of input.cases){
       formats.add(artifact.mimeType);
       assert.equal(artifact.partial,false);
       assert.ok(Number.isInteger(artifact.byteLength)&&artifact.byteLength>0&&artifact.byteLength<=33554432);
-      assert.ok(Array.isArray(artifact.timestamps)&&artifact.timestamps.length>=50&&artifact.timestamps.length<=600);
+      assert.ok(Array.isArray(artifact.timestamps)&&artifact.timestamps.length>=50&&artifact.timestamps.length<=800);
       assert.ok((await stat(artifact.file)).size===artifact.byteLength);
       const digest=createHash("sha256");
       for await(const bytes of createReadStream(artifact.file))digest.update(bytes);
@@ -62,7 +65,7 @@ for(const item of input.cases){
       const metadata=JSON.parse(probe.stdout.toString());
       const actualPTS=validateG08PTS(metadata,artifact);
       const config={from:start.center,to:finish.center,curve:item.curve,pointerMs:2400,markerMs:3000,radius:48,
-        color:item.curve==="c"?"#ff0000":"#0000ff",
+        color:item.curve==="c"?"#ff0000":"#0000ff",warmupCalibration:Boolean(warmup),
         scale:{x:artifact.width/start.viewport.width,y:artifact.height/start.viewport.height}};
       const marker={center:{x:finish.center.x*config.scale.x,y:finish.center.y*config.scale.y},
         radius:48*config.scale.x,color:config.color};
@@ -73,18 +76,13 @@ for(const item of input.cases){
       let stderr="";child.stderr.on("data",chunk=>{if(stderr.length<4096)stderr+=chunk.toString().slice(0,4096-stderr.length);});
       const exited=new Promise((resolve,reject)=>{child.once("error",reject);child.once("close",code=>code===0?resolve():reject(Error("Decoder failed "+code+" "+stderr)));});
       void exited.catch(()=>{}); // A stream assertion can fail before the process-close await.
-      let calibrationStart,calibrationMarkerSeen=false;
+      const retention=createG08Retention(config,entry.samples);
       try{
         const count=await consumeG08Frames(child.stdout,artifact.width,artifact.height,(frame,index)=>{
           assert.ok(index<artifact.timestamps.length,"Decoder exceeded recorded PTS");
           const sample={timeMs:actualPTS[index]*1000,
             ...measureG08Frame(frame,artifact.width,artifact.height,marker)};
-          if(calibrationStart===undefined&&sample.pointer)calibrationStart=sample.timeMs;
-          sample.calibrationCandidate=calibrationStart!==undefined&&!calibrationMarkerSeen&&sample.timeMs<=calibrationStart+8000;
-          if(sample.marker.alpha>.2)calibrationMarkerSeen=true;
-          entry.samples.push(sample);
-          const old=entry.samples[index-100];
-          if(old&&!old.calibrationCandidate)delete old.marker.roi;
+          retention.push(sample);
         });
         await exited;assert.equal(count,artifact.timestamps.length);
       }finally{clearTimeout(timeout);if(child.exitCode===null)child.kill();await exited.catch(()=>{});}
