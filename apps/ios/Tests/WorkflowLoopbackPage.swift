@@ -8,6 +8,7 @@ final class WorkflowLoopbackPage {
     private let responseDelay: TimeInterval
     private let requestCounter = WorkflowRequestCounter()
     func requestCount(path: String) -> Int { requestCounter.count(path) }
+    func responseCount(path: String) -> Int { requestCounter.count("response:" + path) }
     init(responseDelay: TimeInterval = 0) throws {
         self.responseDelay = responseDelay
         let params = NWParameters.tcp
@@ -172,6 +173,7 @@ final class WorkflowLoopbackPage {
                     } else {
                         reply = data
                     }
+                    requestCounter.record("response:" + path)
                     connection.send(content: reply, completion: .contentProcessed { _ in connection.cancel() })
                 }
             }

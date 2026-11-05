@@ -25,6 +25,7 @@ struct BottomBarView<MoreContent: View>: View {
     let onShowTabs: () -> Void
     @Binding var isCollapsed: Bool
     @Binding var isEditing: Bool
+    let interactionDisabled: Bool
     @ViewBuilder let moreContent: () -> MoreContent
 
     @State private var urlText = ""
@@ -77,7 +78,10 @@ struct BottomBarView<MoreContent: View>: View {
         }
         .onChange(of: tabStore.activeBrowserTabID) { _ in
             addressFocused = false
-            isCollapsed = false
+            if !interactionDisabled { isCollapsed = false }
+        }
+        .onChange(of: interactionDisabled) { disabled in
+            if disabled { addressFocused = false }
         }
     }
 

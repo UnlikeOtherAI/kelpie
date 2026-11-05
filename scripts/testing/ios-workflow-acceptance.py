@@ -30,7 +30,9 @@ def selection(scope):
     if scope == "marker":
         ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
               "testRetiredMarkerDoesNotReappearAfterTabChange",
-              "testScriptStopPreservesNonMovieViewportAndMovieImmersion"}
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+              "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
+              "testNonMovieLoadingAndScrollKeepChromeGeometry"}
         unit = {"testOnlyMovieFormatsSelectImmersiveLayout"}
         return (["KelpieTests/IOSWorkflowPresentationModeTests"] +
                 ["KelpieUITests/WorkflowCaptureUITests/" + name for name in sorted(ui)]), ui | unit
@@ -95,6 +97,9 @@ def selection(scope):
                 "testMarkerDwellOnlyForMoviesAndRetiresOnNextRun",
                 "testRetiredMarkerDoesNotReappearAfterTabChange",
                 "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+                "testNonMovieTabletStageRetainsRendererFrame",
+                "testNonMovieScriptClearsAddressFocus",
+                "testNonMovieLoadingAndScrollKeepChromeGeometry",
                 "testNativePinchClipsTapCenterAndExportedMarker",
                 "testNativePinchScrollableControl",
                 "testMarkerDetectorRecognizesFadedGreenWithoutAcceptingGray",

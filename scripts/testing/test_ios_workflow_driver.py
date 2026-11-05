@@ -226,7 +226,9 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
     def test_marker_selection_includes_both_lifetime_controls(self):
         targets, names = DRIVER.selection("marker")
         ui = {"testMarkerDwellOnlyForMoviesAndRetiresOnNextRun", "testRetiredMarkerDoesNotReappearAfterTabChange",
-              "testScriptStopPreservesNonMovieViewportAndMovieImmersion"}
+              "testScriptStopPreservesNonMovieViewportAndMovieImmersion",
+              "testNonMovieTabletStageRetainsRendererFrame", "testNonMovieScriptClearsAddressFocus",
+              "testNonMovieLoadingAndScrollKeepChromeGeometry"}
         self.assertEqual(names, ui | {"testOnlyMovieFormatsSelectImmersiveLayout"})
         self.assertEqual(set(targets), {"KelpieTests/IOSWorkflowPresentationModeTests"} |
                          {"KelpieUITests/WorkflowCaptureUITests/" + name for name in ui})
@@ -245,7 +247,7 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         marker_targets, marker_names = DRIVER.selection("marker")
         self.assertEqual(targets, geometry_targets + marker_targets)
         self.assertEqual(names, geometry_names | marker_names)
-        self.assertEqual(len(names), 11)
+        self.assertEqual(len(names), 14)
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:
