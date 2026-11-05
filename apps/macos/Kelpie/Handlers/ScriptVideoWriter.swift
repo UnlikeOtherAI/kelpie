@@ -101,6 +101,7 @@ final class ScriptVideoWriter {
             input.markAsFinished()
             await writer.finishWriting()
             guard writer.status == .completed else { throw ScriptCaptureError.image }
+            guard sink.budgetExceeded || sink.frameCount == submittedFrames else { throw ScriptCaptureError.image }
             return try sink.finish()
         } catch {
             pending = nil
