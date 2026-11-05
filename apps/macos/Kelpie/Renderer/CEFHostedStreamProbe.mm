@@ -11,6 +11,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <cmath>
 #include <climits>
 
@@ -18,8 +19,11 @@
 struct HostedStreamObserver {
     cef_dev_tools_message_observer_t api{};
     std::atomic<int> references{1};
-    std::atomic<unsigned> ingress{0};
-    std::atomic<bool> overflowSignaled{false};
+    std::mutex ingressLock;
+    dispatch_group_t ingressGroup = dispatch_group_create();
+    unsigned ingress = 0;
+    bool ingressOpen = true;
+    bool overflowSignaled = false;
     int browserID = 0;
     __weak CEFHostedStreamProbe *owner = nil;
 };
@@ -69,9 +73,16 @@ static void StreamDetached(cef_dev_tools_message_observer_t *base, cef_browser_t
     dispatch_async(dispatch_get_main_queue(), ^{ [owner agentDetached]; });
 }
 static void StreamOverflow(HostedStreamObserver *observer, CEFHostedStreamProbe *owner) {
-    if (!observer->overflowSignaled.exchange(true)) {
-        dispatch_async(dispatch_get_main_queue(), ^{ [owner ingressOverflow]; });
+    bool signal = false;
+    {
+        std::lock_guard<std::mutex> guard(observer->ingressLock);
+        if (observer->ingressOpen && !observer->overflowSignaled) {
+            observer->ingressOpen = false;
+            observer->overflowSignaled = true;
+            signal = true;
+        }
     }
+    if (signal) { dispatch_async(dispatch_get_main_queue(), ^{ [owner ingressOverflow]; }); }
 }
 static void StreamEvent(cef_dev_tools_message_observer_t *base, cef_browser_t *browser,
                         const cef_string_t *method, const void *payload, size_t length) {
@@ -84,18 +95,36 @@ static void StreamEvent(cef_dev_tools_message_observer_t *base, cef_browser_t *b
     if (owner == nil) { return; }
     if (length == 0 || length > 2 * 1024 * 1024 + 4096) { StreamOverflow(observer, owner); return; }
 
-    // Bound ingress before allocating a payload or scheduling a main-queue block.
-    unsigned pending = observer->ingress.load();
-    do {
-        if (pending >= 3) { StreamOverflow(observer, owner); return; }
-    } while (!observer->ingress.compare_exchange_weak(pending, pending + 1));
+    // The closed gate cannot race a new reservation into the retirement group.
+    bool overflow = false;
+    {
+        std::lock_guard<std::mutex> guard(observer->ingressLock);
+        if (!observer->ingressOpen) { return; }
+        if (observer->ingress >= 3) {
+            overflow = true;
+        } else {
+            ++observer->ingress;
+            dispatch_group_enter(observer->ingressGroup);
+            observer->api.base.add_ref(&observer->api.base);
+        }
+    }
+    if (overflow) { StreamOverflow(observer, owner); return; }
+#if defined(KELPIE_HOSTED_STREAM_MOCK)
+    CEFHostedStreamMockAfterReserve();
+#endif
     NSData *copy = [NSData dataWithBytes:payload length:length];
-    if (copy == nil) { observer->ingress.fetch_sub(1); StreamOverflow(observer, owner); return; }
-    observer->api.base.add_ref(&observer->api.base);
+    if (copy == nil) {
+        { std::lock_guard<std::mutex> guard(observer->ingressLock); --observer->ingress; }
+        dispatch_group_leave(observer->ingressGroup);
+        StreamOverflow(observer, owner);
+        observer->api.base.release(&observer->api.base);
+        return;
+    }
     const int browserID = observer->browserID;
     dispatch_async(dispatch_get_main_queue(), ^{
         [owner consumeBrowser:browserID payload:copy];
-        observer->ingress.fetch_sub(1);
+        { std::lock_guard<std::mutex> guard(observer->ingressLock); --observer->ingress; }
+        dispatch_group_leave(observer->ingressGroup);
         observer->api.base.release(&observer->api.base);
     });
 }
@@ -245,10 +274,17 @@ static BOOL StreamJSONNumber(id value) {
     [_waiters addObject:[completion copy]];
     if (_stopping) { return; }
     _stopping = YES;
+    if (_observer != nullptr) {
+        std::lock_guard<std::mutex> guard(_observer->ingressLock);
+        _observer->ingressOpen = false;
+    }
     if (_host == nullptr || !_started) { [self finishStop:NO]; return; }
     CEFBridgeSendBrowserControlCommand(_host, @"Page.stopScreencast", nil, ^(BOOL success, NSDictionary *) {
         if (!success && self->_fence) { self->_fence->invalidate(); }
-        dispatch_group_notify(self->_pending, dispatch_get_main_queue(), ^{ [self finishStop:success]; });
+        dispatch_group_notify(self->_pending, dispatch_get_main_queue(), ^{
+            if (self->_observer == nullptr) { [self finishStop:success]; return; }
+            dispatch_group_notify(self->_observer->ingressGroup, dispatch_get_main_queue(), ^{ [self finishStop:success]; });
+        });
     });
 }
 

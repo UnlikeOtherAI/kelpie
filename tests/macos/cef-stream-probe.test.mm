@@ -3,6 +3,7 @@
 #import "CEFHostedStreamMock.h"
 #import "../../apps/macos/Kelpie/Renderer/CEFHostedStreamProbe.h"
 #include <cassert>
+#include <atomic>
 #include <string>
 
 static cef_browser_t browser{};
@@ -15,6 +16,15 @@ static int stops = 0;
 static int eventWidth = 100;
 static BOOL holdAck = NO;
 static void (^heldAck)(BOOL, NSDictionary *) = nil;
+static std::atomic<bool> holdIngress{false};
+static std::atomic<bool> ingressReserved{false};
+static dispatch_semaphore_t resumeIngress;
+void CEFHostedStreamMockAfterReserve(void) {
+    if (holdIngress.load()) {
+        ingressReserved.store(true);
+        dispatch_semaphore_wait(resumeIngress, DISPATCH_TIME_FOREVER);
+    }
+}
 static void addRef(cef_base_ref_counted_t *) {}
 static int releaseRef(cef_base_ref_counted_t *) { return 0; }
 static cef_registration_t *registerObserver(cef_browser_host_t *, cef_dev_tools_message_observer_t *value) {
@@ -122,8 +132,30 @@ int main() {
                                                             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,100 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
                                                                 [fifth stopWithCompletion:^(BOOL) {
                                                                     assert([fifth sealAfterAudit:YES] == nil && stops == 5);
-                                                                    puts("PASS: ACK, bounded ingress/decode, metadata, late events, retirement, identity and detach");
-                                                                    exit(0);
+                                                                    CEFHostedStreamProbe *sixth = [[CEFHostedStreamProbe alloc] initWithBridge:bridge epoch:128 width:100 height:100 identity:^BOOL { return YES; }];
+                                                                    [sixth startWithCompletion:^(BOOL sixthStarted) {
+                                                                        assert(sixthStarted);
+                                                                        resumeIngress = dispatch_semaphore_create(0);
+                                                                        holdIngress.store(true);
+                                                                        dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{ emitFrame(); });
+                                                                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,100 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                            assert(ingressReserved.load());
+                                                                            __block BOOL retired = NO;
+                                                                            [sixth stopWithCompletion:^(BOOL stoppedSixth) {
+                                                                                retired = YES;
+                                                                                assert(stoppedSixth && stops == 6);
+                                                                                NSArray *sealed = [sixth sealAfterAudit:YES];
+                                                                                assert(sealed != nil && sealed.count == 0);
+                                                                                puts("PASS: ACK, bounded ingress/decode, metadata, late events, separate ingress/ACK retirement, identity and detach");
+                                                                                exit(0);
+                                                                            }];
+                                                                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,50 * NSEC_PER_MSEC),dispatch_get_main_queue(), ^{
+                                                                                assert(!retired);
+                                                                                holdIngress.store(false);
+                                                                                dispatch_semaphore_signal(resumeIngress);
+                                                                            });
+                                                                        });
+                                                                    }];
                                                                 }];
                                                             });
                                                         }];

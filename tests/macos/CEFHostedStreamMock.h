@@ -27,3 +27,5 @@ struct cef_browser_host_t {
 int CEFBridgeBrowserIdentifier(cef_browser_t *);
 cef_browser_host_t *CEFBridgeCopyBrowserHost(cef_browser_t *);
 void CEFBridgeSendBrowserControlCommand(cef_browser_host_t *, NSString *, NSDictionary *, void (^)(BOOL, NSDictionary *));
+
+void CEFHostedStreamMockAfterReserve(void);
