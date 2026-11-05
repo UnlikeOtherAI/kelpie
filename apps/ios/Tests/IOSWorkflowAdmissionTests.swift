@@ -1,3 +1,4 @@
+import UIKit
 import WebKit
 import XCTest
 @testable import Kelpie
@@ -50,6 +51,57 @@ final class IOSWorkflowAdmissionTests: XCTestCase {
         XCTAssertFalse(manager.fileExists(atPath: directory.path))
         XCTAssertEqual((ScriptArtifactStore.shared.read(request, owner: "owner")["error"] as? Body)?["code"] as? String,
                        "ARTIFACT_READ_FAILED")
+    }
+
+    @MainActor
+    func testWorkflowReadInspectsRealSelectedTabWhilePublicGateRemainsClosed() async throws {
+        let context = HandlerContext()
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let container = UIView(frame: view.frame)
+        container.addSubview(view)
+        let tab = BrowserTab(webView: view, recordsHistory: false)
+        let store = TabStore(isolatedTab: tab)
+        context.webView = view
+        context.tabStore = store
+        let router = Router()
+        let playback = ScriptPlaybackState()
+        router.handlerContext = context
+        router.scriptPlaybackState = playback
+        MobileTabHandler(context: context).register(on: router)
+        view.loadHTMLString("<body><p id='fixture'>workflow read ready</p></body>", baseURL: nil)
+        defer { view.stopLoading(); withExtendedLifetime(container) {} }
+        let deadline = Date().addingTimeInterval(10)
+        var loaded = false
+        repeat {
+            loaded = (try? await BrowserControlWebKit.evaluate("document.body?.textContent", in: view) as? String) == "workflow read ready"
+            if !loaded { try await Task.sleep(nanoseconds: 50_000_000) }
+        } while !loaded && Date() < deadline
+        XCTAssertTrue(loaded)
+        guard loaded else { return }
+        XCTAssertTrue(playback.start(totalActions: 1, continueOnError: false))
+        defer { _ = playback.finishSuccess() }
+
+        let blocked = await router.handle(method: "get-tabs", body: [:], browserGatewayDispatch: true).json
+        XCTAssertEqual((blocked["error"] as? Body)?["code"] as? String, "RECORDING_IN_PROGRESS")
+        let request: Body = ["version": 1, "method": "tab.ready", "tabId": tab.id.uuidString,
+                             "params": ["state": "complete", "selector": "#fixture"]]
+        let unscoped = await router.browserControl(request)
+        XCTAssertEqual((unscoped["error"] as? Body)?["code"] as? String, "COMMAND_FAILED")
+
+        let ready = await router.workflowRead(method: "tab.ready", tabID: tab.id.uuidString,
+                                              params: ["state": "complete", "selector": "#fixture"])
+        XCTAssertEqual(ready["ok"] as? Bool, true)
+        XCTAssertEqual((ready["value"] as? Body)?["ready"] as? Bool, true)
+        let extracted = await router.workflowRead(method: "tab.extract", tabID: tab.id.uuidString,
+                                                  params: ["fields": [["name": "text", "selector": "#fixture", "source": "text"]]])
+        let value = try XCTUnwrap(extracted["value"] as? Body)
+        let fields = try XCTUnwrap(value["fields"] as? [Body])
+        XCTAssertEqual(fields.first?["values"] as? [String], ["workflow read ready"])
+        let denied = await router.workflowRead(method: "tab.click", tabID: tab.id.uuidString, params: [:])
+        XCTAssertEqual((denied["error"] as? Body)?["code"] as? String, "UNSUPPORTED")
+        let stillBlocked = await router.handle(method: "get-tabs", body: [:], browserGatewayDispatch: true).json
+        XCTAssertEqual((stillBlocked["error"] as? Body)?["code"] as? String, "RECORDING_IN_PROGRESS")
+        withExtendedLifetime(store) {}
     }
 
     func testFullPreflightRejectsForeignSessionsAndUnsupportedKeyAfterTap() throws {

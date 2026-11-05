@@ -49,6 +49,25 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
         finally:
             bridge.close()
 
+    def test_capture_geometry_diagnostics_are_bounded_numeric_only(self):
+        from ios_workflow_diagnostics import fixed_capture_geometry
+        line = "[WorkflowCaptureGeometry] before=390,800,390,800,390,800,1,3 after=390,790,390,790,390,790,1,3"
+        self.assertEqual(fixed_capture_geometry(line), {
+            "before": [390, 800, 390, 800, 390, 800, 1, 3],
+            "after": [390, 790, 390, 790, 390, 790, 1, 3],
+        })
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "private,800")))
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "999999,800")))
+        self.assertIsNone(fixed_capture_geometry(line.replace("390,800", "390,0")))
+
+    def test_capture_xcresult_diagnostics_only_keep_fixed_enums(self):
+        from ios_workflow_diagnostics import fixed_capture_events
+        self.assertEqual(fixed_capture_events([
+            "prefix [WorkflowCapture] reason=observation-INVALID_ARGUMENTS",
+            "[WorkflowCapture] reason=snapshot-visible-size",
+            "[WorkflowCapture] reason=private_value",
+        ]), {"observation-INVALID_ARGUMENTS": 1, "snapshot-visible-size": 1})
+
     def test_capture_diagnostics_only_keep_fixed_reasons(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "log"

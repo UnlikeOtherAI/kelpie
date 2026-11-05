@@ -138,6 +138,7 @@ final class IOSFrameSampler {
             let documentResize = initial.layout != viewport.layout || initial.visible.size != viewport.visible.size || initial.scale != viewport.scale
             if nativeResize || (initialDocument == generation && documentResize) {
                 Self.diagnostic(Self.resizeReason(initial: initial, viewport: viewport))
+                Self.geometryDiagnostic(before: initial, after: viewport)
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
             }
         }
@@ -153,6 +154,21 @@ final class IOSFrameSampler {
         if initial.layout != viewport.layout { return "layout-size" }
         if initial.visible.size != viewport.visible.size { return "visible-size" }
         return "scale"
+    }
+
+    private static func geometryDiagnostic(before: IOSWorkflowTab.Viewport, after: IOSWorkflowTab.Viewport) {
+        #if DEBUG
+        func values(_ viewport: IOSWorkflowTab.Viewport) -> [CGFloat] {
+            [viewport.bounds.width, viewport.bounds.height, viewport.layout.width, viewport.layout.height,
+             viewport.visible.width, viewport.visible.height, viewport.scale, viewport.pixelRatio]
+        }
+        let first = values(before), second = values(after)
+        guard (first + second).allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000 }) else { return }
+        func encode(_ values: [CGFloat]) -> String {
+            values.map { String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double($0)) }.joined(separator: ",")
+        }
+        print("[WorkflowCaptureGeometry] before=" + encode(first) + " after=" + encode(second))
+        #endif
     }
 
     private func canvas(_ viewport: IOSWorkflowTab.Viewport) -> CGSize {
@@ -207,7 +223,8 @@ final class IOSFrameSampler {
             let scrolled = after.bounds == viewport.bounds && after.layout == viewport.layout &&
                 after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
             guard scrolled else {
-                Self.diagnostic("snapshot-viewport")
+                Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))
+                Self.geometryDiagnostic(before: viewport, after: after)
                 throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
             }
             if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }
