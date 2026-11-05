@@ -153,7 +153,8 @@ abstract class ScriptPublicFixture {
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
         while (System.nanoTime() < deadline) {
-            ui.waitForIdle()
+            // The live overlay invalidates while animating; waiting for Compose idle
+            // here would defer the screenshot until the marker has disappeared.
             val viewport = android.graphics.Rect()
             instrumentation.runOnMainSync {
                 val location = IntArray(2)
