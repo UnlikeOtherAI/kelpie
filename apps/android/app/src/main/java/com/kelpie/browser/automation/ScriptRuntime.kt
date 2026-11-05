@@ -240,7 +240,18 @@ class ScriptRuntime(
                     )
                 }
             if (run.script["capture"] != null || ScriptPreflight.actions(run.script).any { it["action"] == "screenshot" }) {
-                capture = ScriptCapture(run, view, { if (ctx.scriptCaptureScene) ctx.scriptCaptureSceneGeneration else -1L }, settings, runner::document, runner::guard)
+                capture =
+                    ScriptCapture(run, view, {
+                        if (ctx.scriptCaptureScene &&
+                            !ctx.scriptCaptureActionMode &&
+                            !ctx.isIn3DInspector &&
+                            ctx.activePanel.value == null
+                        ) {
+                            ctx.scriptCaptureSceneGeneration
+                        } else {
+                            -1L
+                        }
+                    }, settings, runner::document, runner::guard)
                 capture.start(CoroutineScope(kotlin.coroutines.coroutineContext))
             }
             val steps = ScriptPreflight.actions(run.script)

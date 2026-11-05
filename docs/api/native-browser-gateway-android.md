@@ -191,3 +191,12 @@ fail closed until that callback retires. API28 fails closed because it does not
 have this verified frame fence.
 A staged tablet viewport temporarily removes its rounded clipping during capture
 to provide the complete rectangular WebView scene. Native device replay is pending.
+
+Recording scene certification accounts for the inspector, tab overview, address
+editing/menu, open sheets, welcome state, pairing prompt, pending panel requests
+and native action modes. Entering or leaving a panel, inspector or action mode
+invalidates the scene generation even if it changes back before a copy completes.
+The WebView rectangle admits positive, axis-aligned uniform view transforms when
+the mapped bounds are pixel-aligned and completely visible; other transforms and
+fractional boundaries fail closed to avoid sampling neighboring window pixels.
+These checks require native phone/tablet replay before acceptance.
