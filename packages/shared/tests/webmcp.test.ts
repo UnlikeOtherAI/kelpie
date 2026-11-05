@@ -107,7 +107,7 @@ describe("WebMCP host policy and completion ownership", () => {
       await expect(f.controller.probe(identity.origin)).rejects.toMatchObject({ code: "BUSY" });
       expect(f.evaluate).toHaveBeenCalledTimes(2);
       finish(response({ output: "late" }));
-      await Promise.resolve(); await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0); // Drain the actual reply ownership chain.
       f.evaluate.mockResolvedValue(response({ available: true }));
       expect(await f.controller.probe(identity.origin)).toEqual({ available: true });
     } finally { vi.useRealTimers(); }
@@ -120,5 +120,47 @@ describe("WebMCP host policy and completion ownership", () => {
     f.evaluate.mockResolvedValue({ ok: false, error: { code: "WEBMCP_FAILED", message: "SECRET_SITE_ERROR", mayHaveCompleted: false } } as never);
     const error = await f.controller.probe(identity.origin).catch((value: unknown) => value);
     expect(String(error)).not.toContain("SECRET_SITE_ERROR");
+  });
+});
+
+describe("WebMCP admission and abort races", () => {
+  it("does not dispatch after disposal races an awaited grant", async () => {
+    const f = fixture();
+    let signalEntered: () => void = () => undefined;
+    const entered = new Promise<void>(resolve => { signalEntered = resolve; });
+    let release: () => void = () => undefined;
+    f.authorize.mockImplementationOnce(() => {
+      signalEntered();
+      return new Promise<void>(resolve => { release = resolve; });
+    });
+    const request = f.controller.probe(identity.origin);
+    await entered;
+    await f.controller.dispose();
+    release();
+    await expect(request).rejects.toMatchObject({ code: "SESSION_CLOSED", mayHaveCompleted: false });
+    expect(f.evaluate.mock.calls.map(([input]) => input.operation)).toEqual(["dispose"]);
+  });
+
+  it("keeps abort rejection fenced until trusted actual document retirement", async () => {
+    const f = fixture();
+    const retired = vi.fn(async () => false);
+    f.binding.isDocumentRetired = retired;
+    await f.controller.discover({ origin: identity.origin });
+    f.evaluate.mockResolvedValue({ ok: false, error: { code: "TIMEOUT", mayHaveCompleted: true }, completionUnknown: true });
+    await expect(f.controller.call({ origin: identity.origin, ref: "ref1" })).rejects.toMatchObject({ code: "TIMEOUT", mayHaveCompleted: true });
+    vi.mocked(f.binding.identity).mockResolvedValue({ ...identity, documentGeneration: "different-but-not-proof" });
+    await expect(f.controller.probe(identity.origin)).rejects.toMatchObject({ code: "BUSY" });
+    expect(retired).toHaveBeenCalledWith(identity);
+    retired.mockResolvedValue(true);
+    f.evaluate.mockResolvedValue({ ok: true, value: { available: true } });
+    expect(await f.controller.probe(identity.origin)).toMatchObject({ available: true });
+  });
+
+  it("rejects very long property names before serialization and omits nonenumerable hooks", () => {
+    const getter = vi.fn();
+    const value = Object.defineProperty({}, "toJSON", { get: getter });
+    expect(boundedWebMcpJson(value, { maxBytes: 100, maxDepth: 2, maxProperties: 2 })).toEqual({});
+    expect(getter).not.toHaveBeenCalled();
+    expect(() => boundedWebMcpJson({ ["x".repeat(10_000)]: 1 }, { maxBytes: 100, maxDepth: 2, maxProperties: 2 })).toThrow(/key limit/);
   });
 });

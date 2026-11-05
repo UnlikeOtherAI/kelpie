@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BrowserControlError } from "@unlikeotherai/kelpie-shared/browser-control";
+import { BrowserControlError, RetainedCleanupError } from "@unlikeotherai/kelpie-shared/browser-control";
 import type { ManagedBrowserSession } from "@unlikeotherai/kelpie-shared/browser-control";
 import { createManagedSessionRegistry } from "../../src/browser/automation-sessions.js";
 
@@ -71,5 +71,46 @@ describe("worker transport registry", () => {
     expect((await f.registry.create({ isolation: "shared" })).sessionId).toBe("owned-2");
     expect(f.created[0]?.close).toHaveBeenCalledOnce();
     await f.registry.dispose();
+  });
+});
+
+describe("failed registry admission retains cleanup", () => {
+  it("retries an allocated orphan and counts it against the budget without exposing it", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const original = f.allocate.getMockImplementation();
+    if (!original) throw new Error("fixture allocation missing");
+    f.allocate.mockImplementationOnce(async () => {
+      const session = await original();
+      vi.mocked(session.close).mockRejectedValueOnce(new Error("cleanup unavailable"));
+      f.authorize.mockImplementation(() => { throw new Error("revoked during allocation"); });
+      return session;
+    });
+    try {
+      await expect(f.registry.create({ isolation: "isolated" })).rejects.toMatchObject({ code: "CLEANUP_PENDING" });
+      f.authorize.mockReset();
+      expect(await f.registry.list()).toEqual([]);
+      await expect(f.registry.create({ isolation: "isolated" })).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(f.created[0]?.close).toHaveBeenCalledTimes(2);
+      expect((await f.registry.create({ isolation: "isolated" })).sessionId).toBe("owned-2");
+    } finally { await f.registry.dispose(); vi.useRealTimers(); }
+  });
+});
+
+describe("initial allocator cleanup budget", () => {
+  it("counts a hidden initial allocation until its retained cleanup really succeeds", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const retry = vi.fn<() => Promise<void>>().mockRejectedValue(new Error("still unavailable"));
+    f.allocate.mockRejectedValueOnce(new RetainedCleanupError(retry));
+    try {
+      await expect(f.registry.create({ isolation: "isolated" })).rejects.toMatchObject({ code: "CLEANUP_PENDING" });
+      expect(await f.registry.list()).toEqual([]);
+      await expect(f.registry.create({ isolation: "isolated" })).rejects.toMatchObject({ code: "RESOURCE_LIMIT" });
+      retry.mockResolvedValue(undefined);
+      await vi.advanceTimersByTimeAsync(1001);
+      expect((await f.registry.create({ isolation: "isolated" })).sessionId).toBe("owned-1");
+    } finally { await f.registry.dispose(); vi.useRealTimers(); }
   });
 });

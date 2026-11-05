@@ -1,6 +1,6 @@
 import { automationSessionOptionsSchema } from "@unlikeotherai/kelpie-shared";
 import type { AutomationSessionOptions, AutomationSessionDescription } from "@unlikeotherai/kelpie-shared";
-import { BrowserControlError } from "@unlikeotherai/kelpie-shared/browser-control";
+import { createCleanupOwner, RetainedCleanupError, BrowserControlError } from "@unlikeotherai/kelpie-shared/browser-control";
 import type { BrowserControlRequest, BrowserControlResponse, ManagedBrowserSession } from "@unlikeotherai/kelpie-shared/browser-control";
 
 export interface ManagedSessionRegistryOptions {
@@ -27,6 +27,7 @@ export function createManagedSessionRegistry(options: ManagedSessionRegistryOpti
     throw new BrowserControlError("INVALID_ARGUMENTS", "Invalid session registry ownership or limit.");
   }
   const sessions = new Map<string, ManagedBrowserSession>();
+  const cleanup = createCleanupOwner();
   let allocating = 0;
   let disposed = false;
   const active = (): void => {
@@ -58,7 +59,7 @@ export function createManagedSessionRegistry(options: ManagedSessionRegistryOpti
       const parsed = automationSessionOptionsSchema.parse(input);
       await admit();
       await prune();
-      if (sessions.size + allocating >= maxSessions) throw new BrowserControlError("RESOURCE_LIMIT", "The worker session limit has been reached.");
+      if (sessions.size + allocating + cleanup.pending() >= maxSessions) throw new BrowserControlError("RESOURCE_LIMIT", "The worker session limit has been reached.");
       allocating++;
       let session: ManagedBrowserSession | undefined;
       try {
@@ -69,7 +70,10 @@ export function createManagedSessionRegistry(options: ManagedSessionRegistryOpti
         sessions.set(description.sessionId, session);
         return description;
       } catch (error) {
-        if (session) await session.close().catch(() => undefined);
+        // Failed initial allocations also remain in this registry's resource budget.
+        const allocated = session;
+        const retry = allocated ? () => allocated.close() : error instanceof RetainedCleanupError ? error.retryCleanup : undefined;
+        if (retry) await cleanup.close("allocation:" + crypto.randomUUID(), retry);
         throw error;
       } finally { allocating--; }
     },
@@ -80,7 +84,8 @@ export function createManagedSessionRegistry(options: ManagedSessionRegistryOpti
     async dispose() {
       disposed = true;
       const results = await Promise.allSettled([...sessions].map(async ([id, session]) => { await session.close(); sessions.delete(id); }));
-      if (results.some((result) => result.status === "rejected")) throw new BrowserControlError("CLEANUP_FAILED", "Some worker sessions could not be closed.");
+      await cleanup.drain();
+      if (results.some((result) => result.status === "rejected")) throw new BrowserControlError("CLEANUP_PENDING", "Some worker sessions remain owned for cleanup.");
     },
   };
 }

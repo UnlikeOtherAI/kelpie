@@ -26,9 +26,9 @@ interface Registry {
 }
 
 /** Fixed reader/action. Browser API calls are unavoidable; page metadata getters are never serialized. */
-export async function runWebMcpPageOperation(options: WebMcpPageInput): Promise<unknown> {
-  const failure = (code: string, message: string, mayHaveCompleted = false) =>
-    ({ ok: false, error: { code, message, mayHaveCompleted } });
+export async function runWebMcpPageOperation(options: WebMcpPageInput, copyJson: typeof boundedWebMcpJson): Promise<unknown> {
+  const failure = (code: string, message: string, mayHaveCompleted = false, completionUnknown = false) =>
+    ({ ok: false, error: { code, message, mayHaveCompleted }, ...(completionUnknown ? { completionUnknown: true } : {}) });
   const identity = options.identity;
   if (options.operation === "call" && options.inputEncoding !== "json-string" && options.inputEncoding !== "object") return failure("INVALID_ARGUMENTS", "The site tool input encoding is unsupported.");
   if (location.origin !== identity.origin) return failure("STALE_DOCUMENT", "The authorized origin changed.");
@@ -74,7 +74,7 @@ export async function runWebMcpPageOperation(options: WebMcpPageInput): Promise<
       { name, description: description.slice(0, 2048) };
     for (const field of ["inputSchema", "annotations"] as const) {
       const value = data(tool, field);
-      if (value !== undefined) output[field] = boundedWebMcpJson(value, { maxBytes: 8192, maxDepth: 8, maxProperties: 512 });
+      if (value !== undefined) output[field] = copyJson(value, { maxBytes: 8192, maxDepth: 8, maxProperties: 512 });
     }
     return output;
   };
@@ -125,7 +125,7 @@ export async function runWebMcpPageOperation(options: WebMcpPageInput): Promise<
     return failure("STALE_REFERENCE", "The observed site tool changed.");
   }
   let input: object;
-  try { input = boundedWebMcpJson(options.input ?? {}, { maxBytes: 16_384, maxDepth: 8, maxProperties: 512, objectOnly: true }) as object; }
+  try { input = copyJson(options.input ?? {}, { maxBytes: 16_384, maxDepth: 8, maxProperties: 512, objectOnly: true }) as object; }
   catch { return failure("INVALID_ARGUMENTS", "Use a bounded JSON input object."); }
   registry.targets.clear(); // A tool invocation consumes this observed catalogue.
   const controller = new AbortController();
@@ -135,21 +135,21 @@ export async function runWebMcpPageOperation(options: WebMcpPageInput): Promise<
     const result = await context.executeTool(target.tool, options.inputEncoding === "json-string" ? JSON.stringify(input) : input, { signal: controller.signal });
     if (deadline.timedOut) return failure("TIMEOUT", "The site tool exceeded its deadline; reconcile before continuing.", true);
     if (location.origin !== identity.origin || !sameIdentity(registry)) return failure("STALE_DOCUMENT", "The document changed during site tool execution.", true);
-    if (typeof result !== "string" || new TextEncoder().encode(result).length > 32_768) return failure("RESULT_LIMIT", "The site tool result exceeds its limit.", true);
+    if (typeof result !== "string" || result.length > 32_768 || new TextEncoder().encode(result).length > 32_768) return failure("RESULT_LIMIT", "The site tool result exceeds its limit.", true);
     let output: unknown = result;
     let structured = false;
     try { output = JSON.parse(result); structured = true; } catch { /* Plain text is valid. */ }
     if (structured) {
-      try { output = boundedWebMcpJson(output, { maxBytes: 32_768, maxDepth: 8, maxProperties: 1024 }); }
+      try { output = copyJson(output, { maxBytes: 32_768, maxDepth: 8, maxProperties: 1024 }); }
       catch { return failure("RESULT_LIMIT", "The site tool JSON exceeds its structural limit.", true); }
     }
     return { ok: true, value: { origin: identity.origin, documentGeneration: identity.documentGeneration, untrusted: true, output } };
   } catch {
-    return failure(deadline.timedOut ? "TIMEOUT" : "WEBMCP_FAILED", "The site tool may have run; reconcile before continuing.", true);
+    return failure(deadline.timedOut ? "TIMEOUT" : "WEBMCP_FAILED", "The site tool may have run; reconcile before continuing.", true, deadline.timedOut);
   } finally { clearTimeout(timer); }
 }
 
 /** Only trusted fixed source and JSON arguments are assembled; callers supply no script. */
 export function webMcpPageExpression(input: WebMcpPageInput): string {
-  return `(() => { const boundedWebMcpJson = ${boundedWebMcpJson.toString()}; return (${runWebMcpPageOperation.toString()})(${JSON.stringify(input)}); })()`;
+  return `(${runWebMcpPageOperation.toString()})(${JSON.stringify(input)}, (${boundedWebMcpJson.toString()}))`;
 }

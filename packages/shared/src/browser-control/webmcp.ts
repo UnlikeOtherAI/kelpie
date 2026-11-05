@@ -5,70 +5,109 @@ import type { WebMcpCallParams, WebMcpDiscoverParams, WebMcpDiscovery, WebMcpIde
 import type { WebMcpPageInput } from "./webmcp-reader.js";
 
 export interface WebMcpBinding {
-  /** Exact supported runtime API, selected by the trusted host, never page hints. */
+  /** Audited runtime API selected by the trusted host, never page hints. */
   inputEncoding: "json-string" | "object";
-  /** Existing authenticated session, exact current origin and renderer generation. */
   identity(): Promise<WebMcpIdentity>;
-  /** Explicit host grant. A page hint never grants discovery or invocation. */
   authorize(identity: WebMcpIdentity, operation: "discover" | "call"): Promise<void> | void;
-  /** Executes webMcpPageExpression only in this owned document. */
+  /** Fixed expression only, in this owned document. */
   evaluate(input: WebMcpPageInput): Promise<unknown>;
+  /** Actual execution-context teardown, never URL/hash/history change alone. */
+  isDocumentRetired?(identity: WebMcpIdentity): Promise<boolean>;
 }
 export interface WebMcpController {
   probe(origin: string): Promise<{ available: boolean; [key: string]: unknown }>;
   discover(params: WebMcpDiscoverParams): Promise<WebMcpDiscovery>;
   call(params: WebMcpCallParams): Promise<unknown>;
+  ensureIdle(): Promise<void>;
   dispose(): Promise<void>;
+}
+interface PageResponse {
+  ok?: boolean; value?: unknown; completionUnknown?: unknown;
+  error?: { code?: unknown; mayHaveCompleted?: unknown };
 }
 const equal = (left: WebMcpIdentity, right: WebMcpIdentity): boolean =>
   left.sessionId === right.sessionId && left.origin === right.origin && left.documentGeneration === right.documentGeneration;
 
-/** Policy and completion ownership surround the fixed browser API operation. */
+/** Host permission and completion ownership surround every fixed browser operation. */
 export function createWebMcpController(binding: WebMcpBinding): WebMcpController {
-  if (!["json-string", "object"].includes(binding.inputEncoding)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an audited site tool input encoding.");
+  const inputEncoding = binding.inputEncoding;
+  if (!["json-string", "object"].includes(inputEncoding)) throw new BrowserControlError("INVALID_ARGUMENTS", "Choose an audited site tool input encoding.");
   const registryKey = "__kelpieWebMcp_" + crypto.randomUUID();
   let observed: WebMcpIdentity | undefined;
-  let pending: Promise<unknown> | undefined;
+  let pending: Promise<PageResponse | null | undefined> | undefined;
+  let uncertain: WebMcpIdentity | undefined;
   let disposed = false;
-  const admit = async (origin: string, operation: "discover" | "call"): Promise<WebMcpIdentity> => {
-    if (disposed) throw new BrowserControlError("SESSION_CLOSED", "The site tool session is closed.");
+  const active = (mayHaveCompleted = false): void => {
+    if (disposed) throw new BrowserControlError("SESSION_CLOSED", "The site tool session is closed.", mayHaveCompleted);
+  };
+  const ensureIdle = async (): Promise<void> => {
+    active();
     if (pending) throw new BrowserControlError("BUSY", "A prior site tool operation is still pending.");
+    if (uncertain) {
+      if (await binding.isDocumentRetired?.(uncertain) === true) uncertain = undefined;
+      else throw new BrowserControlError("BUSY", "Site tool completion remains unknown until confirmed document teardown.");
+    }
+    active();
+  };
+  const admit = async (origin: string, operation: "discover" | "call"): Promise<WebMcpIdentity> => {
+    await ensureIdle();
     const identity = await binding.identity();
+    active();
     if (identity.origin !== origin || !identity.sessionId || !identity.documentGeneration) throw new BrowserControlError("ACCESS_DENIED", "The site tool origin or document is not authorized.");
     await binding.authorize(identity, operation);
+    active();
     if (!equal(identity, await binding.identity())) throw new BrowserControlError("STALE_DOCUMENT", "The authorized document changed.");
+    active();
     return identity;
   };
   const run = async (input: WebMcpPageInput, timeoutMs: number): Promise<unknown> => {
+    await ensureIdle();
+    active();
     if (pending) throw new BrowserControlError("BUSY", "A prior site tool operation is still pending.");
     const mutates = input.operation === "call";
-    const operation = Promise.resolve().then(() => binding.evaluate({ ...input, inputEncoding: binding.inputEncoding }));
+    let dispatched = false;
+    const operation = Promise.resolve().then(() => {
+      active(); // Disposal can race admission and the dispatch microtask.
+      dispatched = true;
+      return binding.evaluate({ ...input, inputEncoding });
+    }).then(raw => {
+      try {
+        const response = boundedWebMcpJson(raw, { maxBytes: 100_000, maxDepth: 16, maxProperties: 6000 }) as PageResponse | null | undefined;
+        if (response?.completionUnknown === true) uncertain = input.identity;
+        return response;
+      } catch (error) {
+        if (mutates && dispatched) uncertain = input.identity;
+        throw error;
+      }
+    }, (error: unknown) => {
+      if (mutates && dispatched) uncertain = input.identity;
+      throw error;
+    });
     pending = operation;
     void operation.finally(() => { if (pending === operation) pending = undefined; }).catch(() => undefined);
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const raw = await Promise.race([
+      const response = await Promise.race([
         operation,
-        new Promise<never>((_, reject) => { timer = setTimeout(() => { reject(new BrowserControlError("TIMEOUT", "The site tool deadline elapsed; reconcile before continuing.", mutates)); }, timeoutMs); }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => { reject(new BrowserControlError("TIMEOUT", "The site tool deadline elapsed; reconcile before continuing.", mutates && dispatched)); }, timeoutMs); }),
       ]);
-      const response = boundedWebMcpJson(raw, { maxBytes: 100_000, maxDepth: 16, maxProperties: 6000 }) as {
-        ok?: boolean; value?: unknown; error?: { code?: unknown; message?: unknown; mayHaveCompleted?: unknown };
-      } | null | undefined;
       if (response?.ok !== true) {
         const code = typeof response?.error?.code === "string" ? response.error.code.slice(0, 80) : "WEBMCP_FAILED";
-        // Page-authored errors never become model-facing exception text.
         throw new BrowserControlError(code, "The site tool operation was refused or failed.", response?.error?.mayHaveCompleted === true);
       }
+      active(mutates);
       if (!equal(input.identity, await binding.identity())) throw new BrowserControlError("STALE_DOCUMENT", "The document changed during the site tool operation.", mutates);
       try { await binding.authorize(input.identity, mutates ? "call" : "discover"); }
       catch { throw new BrowserControlError("ACCESS_DENIED", "Session permission ended during the site tool operation.", mutates); }
+      active(mutates);
       return response.value;
     } catch (error) {
       if (error instanceof BrowserControlError) throw error;
-      throw new BrowserControlError("WEBMCP_FAILED", "The site tool operation failed.", mutates);
+      throw new BrowserControlError("WEBMCP_FAILED", "The site tool operation failed.", mutates && dispatched);
     } finally { if (timer !== undefined) clearTimeout(timer); }
   };
   return {
+    ensureIdle,
     async probe(origin) {
       const parsed = webMcpDiscoverParamsSchema.parse({ origin });
       const identity = await admit(parsed.origin, "discover");
@@ -97,10 +136,9 @@ export function createWebMcpController(binding: WebMcpBinding): WebMcpController
     async dispose() {
       disposed = true;
       observed = undefined;
-      // Unknown completion stays fenced; the owning session tears its renderer down.
-      if (pending) return;
+      if (pending || uncertain) return; // Owning session must confirm renderer teardown.
       const identity = await binding.identity();
-      await binding.evaluate({ operation: "dispose", identity, registryKey });
+      await binding.evaluate({ operation: "dispose", identity, registryKey, inputEncoding });
     },
   };
 }

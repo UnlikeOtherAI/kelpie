@@ -18,8 +18,8 @@ const errorResult = (error: unknown) => ({
     mayHaveCompleted: error instanceof BrowserControlError && error.mayHaveCompleted,
   } }) }],
 });
-export function createWorkerMcpServer(registry: ManagedSessionRegistry): McpServer {
-  const server = new McpServer({ name: "kelpie-worker", version: "1.0.0" }, { capabilities: { tools: {} } });
+export function createWorkerMcpServer(registry: ManagedSessionRegistry, version: string): McpServer {
+  const server = new McpServer({ name: "kelpie-worker", version }, { capabilities: { tools: {} } });
   server.registerTool("kelpie_worker_session", {
     description: "Create/list/describe/close sessions on this operator-configured external worker. Shared sessions share only this worker's explicit automation context. Endpoint, owner and origin grants cannot be changed by tools.",
     inputSchema: { request: lifecycle },

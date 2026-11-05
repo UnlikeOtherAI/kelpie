@@ -182,7 +182,8 @@ cache, WSL install, native build or Computer Use was used.
   --enable-features=WebMCP,WebMCPTesting. document.modelContext/getTools/executeTool/
   registerTool were present. Discovery/call, hint-independent operator denial,
   toolchange and document invalidation, result bound and timeout uncertainty passed.
-  A late invocation retained BUSY until actual reply retired; it was not retried.
+  The first corpus checked immediate BUSY; the follow-up below strengthens actual
+  completion/abort evidence and never retries a mutation.
 - Existing executable read only:
   C:/Users/ondre/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe;
   SHA-256 409805A16D6416087E6B2F778DF1CF8F7BBB267D6B99F6B5BB0A618EACE234F2.
@@ -202,5 +203,91 @@ automatic call probe or mutation retry is used.
 is the runtime authority; the current WebMCP spec's object argument is a separate
 revision.
 
-CLI stdio end-to-end with borrowed endpoint survival, real Lightpanda Linux
+The later follow-up below completes CLI stdio borrowed-endpoint survival. Real Lightpanda Linux
 navigation/text/extraction/cost and native WebMCP exposure remain pending.
+
+## Lifecycle/public-worker follow-up verified on Maxis
+
+Base integration 6cef7fb2 was consumed as merge e9c574d0. Source changes prepared
+in this worktree were then checked from merged common base9b939695 (local merge6d74d079):
+
+- WebMCP disposal is rechecked after asynchronous admission and immediately before
+  evaluation. An abort rejection marked completionUnknown retains a document-scoped
+  fence until trusted exact-page teardown; epochs/URLs do not prove retirement.
+- New pages enter owned tracking before later admission. Failed page/context and
+  orphan registry cleanup remains retained with automatic backoff; it is not
+  swallowed or removed from the resource budget.
+- JSON metadata iteration avoids an eager own-key array, checks key length before
+  serialization and rejects oversized result strings before UTF-8 allocation.
+  Browser API/proxy enumeration itself is not an OS resource sandbox.
+- Managed public WebMCP policy takes exact operator webMcpOrigins and audited
+  encoding, verifies the origin subset, probes an owned private main-frame CDP world
+  and adds canonical methods only for actual eligible pages. The page realm cannot
+  self-grant or spoof the API probe.
+- A built production CLI stdio corpus covers public observation composition,
+  granted/denied WebMCP, page shadows, two managed siblings/popups and human-page
+  preservation, isolation, cleanup and borrowed endpoint survival.
+- Fedora LP exact-binary/corpus/cost preparation is documented in
+  lightpanda-verification.md. No Linux worker or benchmark has run.
+
+Source preparation used no tests, browser, CUA or headed work. The subsequently allocated BACKEND-7 verification is recorded below.
+
+## BACKEND-7 and BACKEND-FINAL-12 evidence, Maxis, 4–5 November 2026
+
+Runtime candidate: merged common9b939695 via6d74d079 plus this scoped follow-up.
+The source was frozen during each check; the same runtime source was committed
+after verification. The deterministic fixture correction is separate commit
+ece3d41a3146db079f9b33e3867e522c26013bf8.
+
+- Required pnpm lint, build and full test passed. Shared139 passed; CLI688 passed
+  and1 skipped. Final run used max1 Vitest worker and Node heap2GiB.
+- Focused deterministic SSE fixture11 passed. The old test incorrectly expected
+  TCP read boundaries to preserve writes; authored LF/CRLF streams now prove
+  split UTF-8/data fields and fully coalesced input through the same parser.
+  Actual HTTP content, comments, usage, DONE and tool argument fragments remain.
+- Lifecycle regressions prove post-admission disposal cannot dispatch; failed
+  initial pages/contexts and orphan allocations retain cleanup ownership and
+  retry. Hidden initial allocation cleanup also counts against maxSessions.
+  Public transports expose only fixed error fields, never cleanup continuations.
+- Built production entrypoint node packages/cli/bin/kelpie.js worker mcp passed:
+  create/list/control/close; isolated and explicit shared storage; two managed
+  shared siblings and their actual popups; foreign-tab and ungranted-origin
+  refusal; human pages hidden/preserved; clean shutdown releases owned contexts
+  while the borrowed endpoint and human context remain alive.
+- Bundled snapshots/extraction/status/readiness passed public facts, value omission,
+  publisher provenance and unavailable diagnostic signals. This exercises the
+  production fixed-function composition, beyond direct SDK helpers.
+- Public WebMCP used the actual Chromium151 API in a private CDP world. The
+  fixture's main world successfully replaced document.modelContext with a forged
+  catalogue; the public worker still discovered/called the actual registered
+  tools. No API polyfill or model-supplied endpoint/origin grant was accepted.
+- Actual timeout callback counter remained1 at the mid-flight checkpoint and
+  became2 only after its delayed executor. Same-page commands stayed BUSY.
+  Chromium rejected the API promise on abort while that executor continued:
+  the completion fence correctly remained until exact owned-session teardown.
+  No mutation retry occurred. URL/history epochs do not retire this fence.
+- Actual standalone managed and API-enabled WebMCP corpora passed. Browser:
+  sandbox-enabled headless Chromium151.0.7922.34, existing executable/hash above,
+  explicit --enable-features=WebMCP,WebMCPTesting. The audited input encoding is
+  json-string for the exact tagged IDL; the current spec's object input differs.
+- Package version, public --version and both worker MCP initialize serverInfo
+  responses all reported0.1.22. The worker receives the already canonical
+  Commander/package version; it adds no central version constant or manifest.
+- Safe artifacts under
+  D:/BuildArtifacts/kelpie/capture-desktop-20261104/acceptance/backend7:
+  worker-stdio.json, managed-playwright.json, webmcp-actual-api.json,
+  runtime-source-sha256.json and cli-bundle-sha256.json.
+  Final required logs are backend12-lint.log, backend12-build.log and
+  backend12-test.log. Prior failing lint/fixture logs remain under backend7-*.
+- Initial corrections: explicit callback typing/binding, narrowed capability
+  inference, and draining the full actual-reply promise chain in the timeout
+  test. The separate SSE correction fixes its transport assumption rather than
+  increasing sleeps or waiting for a lucky suite.
+- No CUA, headed UI, browser download, native app build or LP worker was used.
+  These are machine-interface results, not GTK/Windows/macOS/mobile UI evidence.
+
+Native rollout, native WebMCP grant/API seams, actual Lightpanda1.0.2 corpus/cost,
+Linux codecs/GTK/headless/no-CEF/package verification and the integrated published
+release remain separate requirements. Linux source now has its own assigned
+D:/Worktrees/kelpie/capture-linux-20261104 branch at8423d7df; its adapters are
+unbuilt drafts and do not inherit the portable worker acceptance result.

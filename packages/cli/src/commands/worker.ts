@@ -7,7 +7,9 @@ export function registerWorker(program: Command): void {
     .action(async (options: { config: string }) => {
       try {
         const { startWorkerMcp } = await import("../worker/runtime.js");
-        await startWorkerMcp(options.config);
+        const version = program.version();
+        if (!version) throw new Error("CLI version unavailable");
+        await startWorkerMcp(options.config, version);
       } catch {
         process.stderr.write("Worker startup failed. Check the operator configuration and endpoint.\n");
         process.exitCode = 1;

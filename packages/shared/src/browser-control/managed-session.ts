@@ -3,6 +3,9 @@ import { BrowserControlError, browserControlMutates } from "./protocol.js";
 import type { BrowserControlBackend, BrowserControlRequest, BrowserControlTransport, BrowserTabInfo } from "./protocol.js";
 import { createPlaywrightBrowserBackend } from "./playwright.js";
 import { createBrowserControlProxy } from "./proxy.js";
+import { createCleanupOwner } from "./cleanup.js";
+import { createManagedWebMcpTabs } from "./managed-webmcp.js";
+import type { ManagedWebMcpPolicy } from "./managed-webmcp.js";
 import type { PlaywrightBrowserBinding } from "./playwright.js";
 import { createLightpandaBrowserBackend } from "./lightpanda.js";
 import type { LightpandaVerifiedMethod } from "./lightpanda.js";
@@ -25,6 +28,8 @@ export interface ManagedBrowserSessionOptions {
    */
   network: { boundary: "operator-enforced"; allowNavigation(url: URL): Promise<boolean> | boolean };
   verifiedLightpandaMethods?: readonly LightpandaVerifiedMethod[];
+  /** Trusted operator grant, never accepted from a browser request. */
+  webMcp?: ManagedWebMcpPolicy;
 }
 
 export interface ManagedBrowserSession {
@@ -55,7 +60,8 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
   const pages = new Map<string, Page>();
   const popups = new Set<Page>();
   let closed = false;
-  let closing: Promise<void> | undefined;
+  const cleanup = createCleanupOwner();
+  let released = false;
   let creating = 0;
 
   const active = (): void => {
@@ -88,40 +94,66 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
     if (pages.size + creating >= maxTabs) throw new BrowserControlError("RESOURCE_LIMIT", "The session tab limit has been reached.");
     creating++;
     let page: Page | undefined;
+    const id = crypto.randomUUID();
     try {
       page = await context.newPage();
-      await admit();
-      const id = crypto.randomUUID();
       pages.set(id, page);
-      page.once("close", () => pages.delete(id));
+      page.once("close", () => { pages.delete(id); webMcp?.forget(id); });
       // Popups are not implicitly session-owned. Do not expose or retain them.
       page.on("popup", (popup) => {
         popups.add(popup);
-        void popup.close().then(() => popups.delete(popup)).catch(() => undefined);
+        const popupId = crypto.randomUUID();
+        void cleanup.close("popup:" + popupId, async () => { await popup.close(); popups.delete(popup); }).catch(() => undefined);
       });
+      await admit();
+      if (page.isClosed()) throw new BrowserControlError("TAB_NOT_FOUND", "The allocated tab closed before admission.");
       if (url !== undefined) await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10_000 });
       await admit();
       return info(id, page);
     } catch (error) {
-      if (page) await page.close().catch(() => undefined);
+      if (page) {
+        const allocated = page;
+        await cleanup.close("page:" + id, async () => { await allocated.close(); pages.delete(id); webMcp?.forget(id); });
+      }
       throw error;
     } finally { creating--; }
   };
   const binding: PlaywrightBrowserBinding = {
     async listTabs() { await admit(); return [...pages].filter(([, page]) => !page.isClosed()).map(([id, page]) => info(id, page)); },
     getPage, newTab,
-    async closeTab(id) { const page = await getPage(id); await page.close(); pages.delete(id); },
+    async closeTab(id) { const page = await getPage(id); await cleanup.close("page:" + id, () => page.close()); pages.delete(id); },
   };
   // Validate the capability profile before allocating any browser resources.
   const underlying = input.backend === "lightpanda"
     ? createLightpandaBrowserBackend(binding, input.verifiedLightpandaMethods)
     : createPlaywrightBrowserBackend(binding);
+  const baseMethods = underlying.capabilities.methods.filter(method => method !== "tab.webmcp.discover" && method !== "tab.webmcp.call");
+  const capabilities: BrowserControlBackend["capabilities"] = { ...underlying.capabilities, methods: baseMethods };
+  if (input.backend === "lightpanda" && input.webMcp?.origins.length) throw new BrowserControlError("UNSUPPORTED", "Site tools have not been verified for this worker backend.");
+  const webMcp = input.webMcp ? createManagedWebMcpTabs({
+    policy: input.webMcp, sessionId, getPage, authorize: admit,
+    allowNavigation: url => input.network.allowNavigation(url),
+    availability(available) {
+      capabilities.methods = available ? [...baseMethods, "tab.webmcp.discover", "tab.webmcp.call"] : [...baseMethods];
+    },
+  }) : undefined;
   const backend: BrowserControlBackend = {
-    capabilities: underlying.capabilities,
+    capabilities,
     async execute(request: BrowserControlRequest) {
       await admit();
-      if (request.method === "tab.goto") await navigationAllowed(request.params.url);
-      const value = await underlying.execute(request);
+      let value: unknown;
+      if (request.method === "tab.webmcp.discover" || request.method === "tab.webmcp.call") {
+        if (!webMcp) throw new BrowserControlError("UNSUPPORTED", "No operator site tool grant is configured.");
+        if (!request.tabId) throw new BrowserControlError("TAB_REQUIRED", "Choose an owned tab.");
+        const controller = await webMcp.controller(request.tabId, request.params.origin);
+        value = request.method === "tab.webmcp.discover" ? await controller.discover(request.params) : await controller.call(request.params);
+      } else {
+        if (request.tabId && request.method !== "tabs.close") await webMcp?.ensureIdle(request.tabId);
+        if (request.method === "tab.goto") await navigationAllowed(request.params.url);
+        value = await underlying.execute(request);
+        if (request.tabId && browserControlMutates(request.method) && request.method !== "tabs.close") await webMcp?.refresh(request.tabId);
+        if (request.method === "tabs.new" && value && typeof value === "object" && "id" in value && typeof value.id === "string") await webMcp?.refresh(value.id);
+      }
       try { await admit(); }
       catch {
         throw new BrowserControlError("SESSION_CLOSED", "Session access ended while the command was running.", browserControlMutates(request.method));
@@ -135,9 +167,9 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
   const close = (): Promise<void> => {
     closed = true;
     clearTimeout(timer);
-    if (closing) return closing;
+    if (released) return Promise.resolve();
     // The borrowed browser and shared context remain alive; close only owned resources.
-    closing = (async () => {
+    return cleanup.close("session:" + sessionId, async () => {
       if (ownsContext) await context.close();
       else {
         const results = await Promise.allSettled([...pages.values(), ...popups].map((page) => page.close()));
@@ -145,20 +177,21 @@ export async function allocateManagedBrowserSession(input: ManagedBrowserSession
       }
       pages.clear();
       popups.clear();
-    })().catch(() => {
-      closing = undefined; // A later explicit close can retry resource cleanup.
-      throw new BrowserControlError("CLEANUP_FAILED", "Session resources could not be fully closed.");
+      released = true;
     });
-    return closing;
   };
   const timer = setTimeout(() => { void close().catch(() => undefined); }, ttlMs);
   // Node can release an idle session timer; browser runtimes return a number.
   const timerHandle = timer as unknown as { unref?: () => void };
   timerHandle.unref?.();
   try { await newTab(); }
-  catch (error) { await close().catch(() => undefined); throw error; }
+  catch (error) { await close(); throw error; }
   return {
-    backend, close, transport: createBrowserControlProxy(backend, { authorize: admit }),
+    backend, close, transport: createBrowserControlProxy(backend, { async authorize(request) {
+      await admit();
+      if (request.method === "capabilities" && request.tabId) await webMcp?.refresh(request.tabId);
+      await admit();
+    } }),
     describe() {
       active();
       return {
