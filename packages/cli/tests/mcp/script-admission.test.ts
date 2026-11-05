@@ -30,3 +30,26 @@ it("preserves unversioned legacy playback without capability probes or pinning",
   expect(io.ordinary).toHaveBeenCalledWith(device, "playScript", { actions: [] }, 10000);
   expect(io.pin).not.toHaveBeenCalled();
 });
+
+it("recovers strict admission automatically when a legacy run retires", async () => {
+  io.ordinary.mockResolvedValue({ ok: true, status: 200 });
+  io.pin.mockResolvedValue(io.pinned);
+  io.pinned.mockResolvedValueOnce({ ok: true, status: 200, data: { success: true, playing: true } })
+    .mockResolvedValueOnce({ ok: true, status: 200, data: { success: true, playing: false, state: "idle", supportedVersions: [1, 2] } })
+    .mockResolvedValueOnce({ ok: true, status: 200, data: { success: true, runId: "next" } });
+  const first = await sendScriptPlayback(device, { version: 1, actions: [] }, 1000);
+  expect(first.data).toMatchObject({ error: { code: "UNSUPPORTED_SCRIPT_VERSION" } });
+  const next = await sendScriptPlayback(device, { version: 1, actions: [] }, 1000);
+  expect(next.data).toMatchObject({ success: true, runId: "next" });
+  expect(io.pinned.mock.calls.map(call => call[0])).toEqual(["getScriptStatus", "getScriptStatus", "playScript"]);
+});
+it("admits a new run after a successful query describing a failed terminal run", async () => {
+  io.ordinary.mockResolvedValue({ ok: true, status: 200 });
+  io.pin.mockResolvedValue(io.pinned);
+  io.pinned.mockResolvedValueOnce({ ok: true, status: 200, data: { success: true, supportedVersions: [1],
+    state: "failed", playing: false, runId: "old", runSuccess: false,
+    runError: { code: "SCRIPT_STOPPED", message: "Script stopped" }, artifacts: [] } })
+    .mockResolvedValueOnce({ ok: true, status: 200, data: { success: true, runId: "next" } });
+  expect((await sendScriptPlayback(device, { version: 1, actions: [] }, 1000)).data).toMatchObject({ runId: "next" });
+  expect(io.pinned.mock.calls.map(call => call[0])).toEqual(["getScriptStatus", "playScript"]);
+});

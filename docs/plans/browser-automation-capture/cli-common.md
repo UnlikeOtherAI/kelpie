@@ -3,6 +3,15 @@
 Owner: common-contracts agent, isolated Maxis worktree
 D:/Worktrees/kelpie/capture-observations-20261104. Computer Use remains OFF.
 
+## Status admission recovery
+
+WFL-01/RDY-02: pinned host admission tests now verify an unmarked legacy-active
+status blocks v1 play, and a later marked idle query automatically admits playback
+without clearing state. A successful query describing a failed terminal run also
+admits the next run; runError does not become query error. These are host transport
+tests, not actual native legacy retirement evidence. Included in final integrated
+CLI694 passed/1skip and shared142 passed after merging root ad60.
+
 ## Host secrets and explicit Windows hidden launch
 
 SEC-01: host result redaction matches URI/form percent-triplet hex digits in either
