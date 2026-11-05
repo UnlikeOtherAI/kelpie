@@ -172,3 +172,27 @@ MCP status, ready/extract, independent GIF/MP4 retrieval/decode, movies-only1FPS
 navigation frame inspection, RGB/chroma/timing/min-budget video checks, UTF8/
 escaped-NUL/redactor vectors and repeated native allocation/free. No emulator,
 APK install, physical device, rendered UI screenshot or signed release was used.
+ANDROID-EMULATOR-1 source preparation: real public flow coverage now also includes
+zero-action preflight refusals, generic/direct MCP discovery and calls, native Stop
+partial finalization plus next-run recovery, foreign-owner status/abort/artifact
+denial and revocation, scoped value-free snapshots, nested/missing/ambiguous
+extraction, publisher metadata, immediate readiness and unavailable diagnostics.
+The existing Stop square has the accessible name Stop recording. MP4 keeps a
+bounded four-input PTS-to-captured-document map; encoded acknowledgements never
+borrow the current sample's document. Phone and tablet task-owned AVDs are approved
+for sequential headless execution using installed API35 google_apis x86_64, at
+most two cores/four GiB each. No profile has booted yet. The new cases still require
+compilation/package and actual execution before any acceptance row can be marked.
+ANDROID-EMULATOR-1 package checkpoint: ktlintFormat, all175 JVM tests,
+assembleDebug and assembleDebugAndroidTest passed on Maxis (final incremental
+39s, emulator-1-package-final.log). The initial2m50s run built the app but found a
+Kotlin test-helper visibility error after common fixture extraction; making that
+test helper public fixed it. APK is intentionally x86_64 only; the arm64 missing
+library packaging note is not an ARM64 verification result. Shipping JNI/local
+inference remains enabled. Verified copies are under packages/emulator-1:
+
+- app-debug.apk: 86743669 bytes, SHA-256 887f5ce4d234fd34d97150bd155434a60a6b868c640599733f523d976263bddd
+- app-debug-androidTest.apk: 2468146 bytes, SHA-256 aa12b6dd506d8173e8ea45875c84226f799d80581991cbe6dd5b6df500ef8cf5
+
+No emulator/device test has run at this checkpoint. Source and docs are committed
+before installation; later entries identify exact profile/serial and source.

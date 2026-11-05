@@ -33,11 +33,12 @@ class ScriptVideoCodecTest {
                     }
                 val colors = intArrayOf(Color.RED, Color.GREEN, Color.BLUE, Color.WHITE)
                 repeat(count) { index ->
-                    assertTrue(encoder.frame(IntArray(64 * 48) { colors[index] }, index * 100.0))
+                    assertTrue(encoder.frame(IntArray(64 * 48) { colors[index] }, index * 100.0, "document-" + index))
                     Thread.sleep(40)
                 }
                 val file = checkNotNull(encoder.finish(count * 100.0))
                 assertEquals(count, encoder.frames)
+                assertEquals("document-" + (count - 1), encoder.lastWrittenDocument)
                 assertTrue(file.length() > 0)
                 assertTrue(file.length() <= budget.limit)
                 assertEquals(count * 100.0, encoder.durationMs, 1.0)

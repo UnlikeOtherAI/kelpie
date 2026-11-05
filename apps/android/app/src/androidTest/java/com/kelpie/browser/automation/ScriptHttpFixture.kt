@@ -10,7 +10,7 @@ import java.net.URL
 import java.util.UUID
 
 /** Public HTTP/MCP client. Bearer material stays in memory and is never asserted/logged. */
-internal class ScriptHttpFixture : AutoCloseable {
+class ScriptHttpFixture : AutoCloseable {
     private val base = "http://127.0.0.1:" + BuildConfig.LOCAL_HTTP_PORT
     private var token: String? = null
 

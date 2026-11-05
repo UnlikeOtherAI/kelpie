@@ -326,8 +326,12 @@ class ScriptCapture(
                         if (pending != null && gif != null) admission.admit("gif", pendingTime + originMs, pendingDocument)
                         val pixels = IntArray(outputWidth * outputHeight)
                         frame.bitmap.getPixels(pixels, 0, outputWidth, 0, 0, outputWidth, outputHeight)
-                        if (video?.frame(pixels, frameTime) == false) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
-                        video?.let { if (it.lastWrittenMs >= 0) admission.admit("video", it.lastWrittenMs + originMs, frame.documentId) }
+                        if (video?.frame(pixels, frameTime, frame.documentId) == false) throw ScriptFailure("CAPTURE_BUDGET_EXCEEDED")
+                        video?.let { encoder ->
+                            encoder.lastWrittenDocument?.let { writtenDocument ->
+                                admission.admit("video", encoder.lastWrittenMs + originMs, writtenDocument)
+                            }
+                        }
                         pending = if (gif != null) pixels else null
                         pendingDocument = frame.documentId
                         pendingTime = frameTime

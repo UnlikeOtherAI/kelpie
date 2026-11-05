@@ -22,6 +22,9 @@ class ScriptVideoEncoder(
     private var outputFile: File? = null
     private var track = -1
     private var pending = 0
+    private val pendingDocuments = mutableMapOf<Long, String>()
+    var lastWrittenDocument: String? = null
+        private set
     private var ended = false
     private var lastAcceptedUs = -1L
     val lastWrittenMs: Double get() = lastAcceptedUs / 1000.0
@@ -50,6 +53,7 @@ class ScriptVideoEncoder(
     fun frame(
         pixels: IntArray,
         elapsedMs: Double,
+        documentId: String = "",
     ): Boolean {
         if (budget.exceeded) return false
         drain(false)
@@ -118,7 +122,9 @@ class ScriptVideoEncoder(
         } finally {
             image.close()
         }
-        codec.queueInputBuffer(index, 0, width * height * 3 / 2, (elapsedMs * 1000).toLong(), 0)
+        val timestamp = (elapsedMs * 1000).toLong()
+        codec.queueInputBuffer(index, 0, width * height * 3 / 2, timestamp, 0)
+        pendingDocuments[timestamp] = documentId
         pending++
         drain(false)
         return !budget.exceeded
@@ -171,6 +177,9 @@ class ScriptVideoEncoder(
             try {
                 if (info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                     pending = maxOf(pending - 1, 0)
+                    val document =
+                        pendingDocuments.remove(info.presentationTimeUs)
+                            ?: throw ScriptFailure("CAPTURE_INVALID_TIMESTAMP")
                     val bytes = info.size.toLong() * 2 + 512 + if (frames == 0) 65_536 else 0
                     if (!budget.take(bytes)) {
                         dropped++
@@ -192,6 +201,7 @@ class ScriptVideoEncoder(
                         val buffer = codec.getOutputBuffer(index) ?: throw ScriptFailure("CAPTURE_ENCODING_FAILED")
                         muxer?.writeSampleData(track, buffer, info)
                         lastAcceptedUs = info.presentationTimeUs
+                        lastWrittenDocument = document
                         frames++
                     }
                 }
