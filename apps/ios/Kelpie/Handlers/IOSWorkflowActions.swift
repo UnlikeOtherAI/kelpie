@@ -228,7 +228,6 @@ final class IOSWorkflowActions {
             consume: consume,
             missingResult: missing
         )
-        try requireOK(result)
         try requireMutationAcknowledgement(result, token: token, missing: missing)
         if editing && tab.document != document { missing() }
         if discardMedia { throw IOSWorkflowFailure("SENSITIVE_CAPTURE_REFUSED", mayHaveCompleted: true) }
@@ -241,6 +240,13 @@ final class IOSWorkflowActions {
     private func requireMutationAcknowledgement(
         _ result: Body, token: String, missing: () -> Void
     ) throws {
+        if result["ok"] as? Bool == false {
+            guard result["error"] is String, result["mayHaveCompleted"] is Bool else {
+                missing()
+                throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
+            }
+            try requireOK(result)
+        }
         guard IOSPacedTypingExecutor.isAcknowledgement(result, token: token) else {
             missing()
             throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
@@ -293,11 +299,7 @@ final class IOSWorkflowActions {
             }
             throw failure
         }
-        try requireOK(result)
-        guard IOSPacedTypingExecutor.isAcknowledgement(result, token: context.token) else {
-            context.missing()
-            throw IOSWorkflowFailure("INPUT_UNCERTAIN", mayHaveCompleted: true)
-        }
+        try requireMutationAcknowledgement(result, token: context.token, missing: context.missing)
         do {
             let known = IOSPacedTypingExecutor.hasKnownSensitivity(result)
             if !known || tab.document != context.document { context.missing() }
