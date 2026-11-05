@@ -191,8 +191,15 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
             "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
             "testNativePinchClipsTapCenterAndExportedMarker",
             "testNativePinchScrollableControl",
+            "testFirstCaptureRequiresInsetPropagationIncludingZoom",
+            "testProjectionUsesInsetContentOriginAndVisualViewport",
+            "testUnsettledInsetAdmissionHonorsDeadlineAndStop",
         })
-        self.assertEqual(set(targets), {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names})
+        units = {"testFirstCaptureRequiresInsetPropagationIncludingZoom",
+                 "testProjectionUsesInsetContentOriginAndVisualViewport",
+                 "testUnsettledInsetAdmissionHonorsDeadlineAndStop"}
+        self.assertEqual(set(targets), {"KelpieTests/IOSCaptureViewportTests"} |
+                         {"KelpieUITests/WorkflowCaptureUITests/" + name for name in names - units})
         _, full_names = DRIVER.selection("full")
         self.assertTrue(names < full_names)
 
@@ -202,6 +209,18 @@ class HostedSimulatorCleanupTests(unittest.TestCase):
                                  "testPreAuthorizationTimeoutAndExactViewTermination"})
         self.assertEqual(targets, ["KelpieTests/IOSPostEvaluationProbeTests",
                                    "KelpieUITests/WorkflowCaptureUITests/testPostEvaluationCallbackKeepsKeyboardClosed"])
+
+    def test_keyboard_selection_and_bounded_geometry(self):
+        from ios_workflow_diagnostics import fixed_keyboard_geometry
+        targets, names = DRIVER.selection("keyboard")
+        self.assertEqual(names, {"testKeyboardGeometryForOwnedPacedCapture"})
+        self.assertEqual(targets, ["KelpieUITests/WorkflowCaptureUITests/testKeyboardGeometryForOwnedPacedCapture"])
+        values = [1, 1, 1, 1, 1, 1] + [0] * 14
+        line = "[WorkflowKeyboardGeometry] phase=will values=" + ",".join(map(str, values))
+        self.assertEqual(fixed_keyboard_geometry(line), {"phase": "will", "values": values})
+        self.assertIsNone(fixed_keyboard_geometry(line.replace("phase=will", "phase=private")))
+        self.assertIsNone(fixed_keyboard_geometry(line.replace("1,1,1", "2,1,1", 1)))
+        self.assertIsNone(fixed_keyboard_geometry(line + ",1"))
 
     def test_already_shutdown_device_is_verified_without_mutation(self):
         with patch.object(DRIVER, "device_state", return_value="Shutdown"), patch.object(DRIVER.subprocess, "run") as run:

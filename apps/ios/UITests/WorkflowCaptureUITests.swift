@@ -128,6 +128,8 @@ final class WorkflowCaptureUITests: XCTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 15))
         let deadline = Date().addingTimeInterval(10)
         var visible = false
+        var pollCount = 0
+        let pollStart = Date()
         var mismatch: (screen: XCUIScreenshot, target: CGRect, viewport: CGRect, greenElsewhere: Bool)?
         repeat {
             let viewport = app.webViews.firstMatch
@@ -135,6 +137,7 @@ final class WorkflowCaptureUITests: XCTestCase {
             let viewportFrame = viewport.exists ? viewport.frame : .null
             let target = !viewportFrame.isNull && submit.exists ? submit.frame.intersection(viewportFrame) : .null
             let screen = app.screenshot()
+            pollCount += 1
             if !target.isNull, WorkflowCaptureProbe.containsTargetMarker(screen, visibleTarget: target, app: app.frame) {
                 let geometry = XCTAttachment(string: "Visible Submit frame in app screen points: " + String(describing: target))
                 geometry.name = "Native marker target geometry"
@@ -147,7 +150,7 @@ final class WorkflowCaptureUITests: XCTestCase {
                 visible = true
                 break
             }
-            if stop.exists {
+            if mismatch == nil || stop.exists {
                 let greenElsewhere = screen.image.cgImage.map { WorkflowCaptureProbe.containsMarker($0) } ?? false
                 if mismatch == nil || (target.isNull == false && mismatch?.target.isNull == true) ||
                     (greenElsewhere && mismatch?.greenElsewhere == false) {
@@ -164,7 +167,9 @@ final class WorkflowCaptureUITests: XCTestCase {
             let geometry = XCTAttachment(string: "Visible Submit frame " + String(describing: mismatch.target) +
                 ", WebView frame " + String(describing: mismatch.viewport) +
                 ", app frame " + String(describing: app.frame) +
-                ", green component elsewhere " + String(mismatch.greenElsewhere))
+                ", green component elsewhere " + String(mismatch.greenElsewhere) +
+                ", polls " + String(pollCount) + ", elapsed " + String(Date().timeIntervalSince(pollStart)) +
+                ", Stop visible " + String(stop.exists))
             geometry.name = "Failed marker target geometry"
             geometry.lifetime = .keepAlways
             add(geometry)

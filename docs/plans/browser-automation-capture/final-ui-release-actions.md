@@ -40,8 +40,18 @@ candidates only, not edits made by this audit.
 | macOS | 0.1.36 | Info.plist app version/build policy; final WK/CEF compile/runtime; existing ZIP release/signing decision, install latest /Applications/Kelpie.app and relaunch. |
 | iOS | 0.1.22 | Project.swift MARKETING_VERSION/build; existing simulator ZIP release target and installed simulator verification. No new device IPA/App Store requirement is introduced. |
 | Android | 0.1.20/code20 | build.gradle.kts; four existing signing secrets, verified APK/AAB, actual phone/tablet install and public workflows. |
-| Windows | 0.1.16 | CMake project,kelpie.rc,device_info_windows.h,windows_runtime.cpp; Maxis package with sandbox/CEF assets, existing Azure signing on Minis, signature/timestamp/EKU and exact installed signed runtime. |
+| Windows | 0.1.16 | CMake project,kelpie.rc,device_info_windows.h,windows_runtime.cpp; Maxis package with sandbox/CEF assets; sign a verified copy on Maxis using the durable helper (Minis fallback), verify signature/timestamp/EKU and the exact installed signed runtime. |
 | Linux | 0.1.16 | KELPIE_LINUX_VERSION; authoritative DEB/RPM/AppImage routes and actual supported installed package/runtime verification. |
+
+The version table records the earlier audit, not current manifest values.
+For Windows signing, first verify the unsigned artifact's source commit and
+SHA-256. On Maxis use the durable
+`$env:USERPROFILE\.config\unlikeotherai\windows-signing\sign.ps1` helper
+with `-InputPath`, a new `-OutputPath`, `-ExpectedSha256` and
+`-SourceCommit`. Preserve the unsigned original and prior outputs; verify the
+exact publisher, profile EKU, timestamp and SignTool trust, then exercise the
+exact signed installed package. The helper's local README records the procedure.
+Minis is the fallback; never transfer Azure tokens or caches.
 
 First finish privacy/G07 and each runtime's finite gates; then integrate all source,
 bump affected manifests BEFORE final integrated checks and PR description/open.

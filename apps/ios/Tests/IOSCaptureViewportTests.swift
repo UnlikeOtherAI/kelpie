@@ -37,6 +37,21 @@ final class IOSCaptureViewportTests: XCTestCase {
             top: 0, bottom: 21, left: 62, right: 34
         ))
         XCTAssertFalse(IOSCaptureViewportStability.matchesInsets(landscape, top: 0, bottom: 21, left: 874, right: 0))
+        XCTAssertEqual(IOSCaptureViewportStability.snapshotDecision(
+            before: old, after: settled, hasBaseline: false, targetBound: false, now: 1.9, deadline: 2
+        ), .discard)
+        XCTAssertEqual(IOSCaptureViewportStability.snapshotDecision(
+            before: settled, after: settled, hasBaseline: false, targetBound: false, now: 1.95, deadline: 2
+        ), .coherent)
+        XCTAssertEqual(IOSCaptureViewportStability.snapshotDecision(
+            before: old, after: settled, hasBaseline: true, targetBound: false, now: 1.9, deadline: 2
+        ), .fenced)
+        XCTAssertEqual(IOSCaptureViewportStability.snapshotDecision(
+            before: old, after: settled, hasBaseline: false, targetBound: true, now: 1.9, deadline: 2
+        ), .fenced)
+        XCTAssertEqual(IOSCaptureViewportStability.snapshotDecision(
+            before: old, after: settled, hasBaseline: false, targetBound: false, now: 2, deadline: 2
+        ), .fenced)
         var stability = IOSCaptureViewportStability()
         XCTAssertFalse(stability.observe(settled, at: 0))
         XCTAssertFalse(stability.observe(settled, at: 0.3, admissible: false))

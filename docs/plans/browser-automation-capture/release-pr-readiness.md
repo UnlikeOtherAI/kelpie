@@ -39,12 +39,17 @@ Sources: [primary manifests](https://github.com/UnlikeOtherAI/kelpie/tree/main),
   configured secrets: ANDROID_KEYSTORE_BASE64,ANDROID_KEYSTORE_PASSWORD,
   ANDROID_KEY_ALIAS,ANDROID_KEY_PASSWORD; it verifies APK and AAB signatures.
   linux calls reusable linux-native.yml. The attach job gathers those artifacts.
-- release-windows.yml intentionally builds only an unsigned candidate,with
-  contents:read. It cannot publish an unsigned Windows release. Maxis builds;
-  Minis performs the existing Nessie Azure Artifact Signing recipe on a verified
-  copy,not a copied key. Preserve unsigned source/hash; verify legal publisher,
-  profile EKU,timestamp,Get-AuthenticodeSignature Valid and SignTool verification,
-  then test the exact signed package before upload.
+- release-windows.yml intentionally builds only an unsigned candidate, with
+  contents:read. It cannot publish an unsigned Windows release. Build and sign
+  on Maxis by default; Minis is the signing fallback. Verify the unsigned
+  source commit and SHA-256 first, and preserve the original and prior outputs.
+  On Maxis use the durable
+  `$env:USERPROFILE\.config\unlikeotherai\windows-signing\sign.ps1` helper
+  with `-InputPath`, a new `-OutputPath`, `-ExpectedSha256` and
+  `-SourceCommit`; its local README records the procedure. Verify the exact
+  publisher, profile EKU, timestamp, valid Authenticode status and SignTool
+  trust, then test the exact signed installed package before upload. Do not
+  transfer Azure tokens or caches.
 - linux-native.yml supports PR,manual and reusable force_build/release_tag/
   artifact_prefix inputs. Shipping source graph is affected here; final Linux
   builds are justified. Verify package dependencies,codec/sandbox assets and

@@ -14,6 +14,7 @@ STATES = frozenset({
 CAPTURE_REASONS = frozenset({
     "native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale", "presentation-parent",
     "responder-accepted", "responder-refused", "responder-descendant", "responder-outside",
+    "postedit-authorized", "postedit-result",
     "text-interaction-still-on", "text-interaction-disabled", "text-interaction-restored-on", "text-interaction-restored-off",
     *(f"snapshot-{value}" for value in ("native-bounds", "native-insets", "pixel-ratio", "layout-size", "visible-size", "scale")),
     *(f"focus-{value}" for value in (
@@ -27,6 +28,7 @@ CAPTURE_REASONS = frozenset({
         "READINESS_FAILED", "EXTRACT_FAILED", "BROWSER_FAILED", "BROWSER_BUSY", "PAGE_CHANGED", "OTHER",
     )),
 })
+KEYBOARD_EVENT = re.compile(r"\[WorkflowKeyboardGeometry\] phase=(will|did) values=([-0-9.,]+)(?:\s|$)")
 ADMISSION_EVENT = re.compile(r"\[WorkflowCaptureAdmission\] first=([-0-9.,]+) last=([-0-9.,]+) count=([0-9]+)(?:\s|$)")
 INSETS_EVENT = re.compile(r"\[WorkflowCaptureInsets\] before=([-0-9.,]+) after=([-0-9.,]+)(?:\s|$)")
 GEOMETRY_EVENT = re.compile(r"\[WorkflowCaptureGeometry\] before=([0-9.,]+) after=([0-9.,]+)(?:\s|$)")
@@ -90,6 +92,21 @@ def fixed_capture_encode(line):
     return value if 0 <= value <= 10000 else None
 
 
+def fixed_keyboard_geometry(line):
+    found = KEYBOARD_EVENT.search(line)
+    if not found:
+        return None
+    try:
+        values = [float(number) for number in found[2].split(",")]
+    except ValueError:
+        return None
+    if len(values) != 20 or not all(math.isfinite(number) and abs(number) <= 10000 for number in values):
+        return None
+    if any(value not in (0, 1) for value in values[:6]):
+        return None
+    return {"phase": found[1], "values": values}
+
+
 def fixed_admission(line):
     found = ADMISSION_EVENT.search(line)
     if not found:
@@ -135,6 +152,7 @@ def export_lease_diagnostics(result, destination):
         encodes = []
         projections = []
         admissions = []
+        keyboards = []
         for file in raw.rglob("StandardOutputAndStandardError*.txt"):
             with file.open(errors="replace") as stream:
                 for line in stream:
@@ -149,6 +167,9 @@ def export_lease_diagnostics(result, destination):
                     encode = fixed_capture_encode(line)
                     if encode is not None and len(encodes) < 1000:
                         encodes.append(encode)
+                    keyboard = fixed_keyboard_geometry(line)
+                    if keyboard and len(keyboards) < 100:
+                        keyboards.append(keyboard)
                     admission = fixed_admission(line)
                     if admission and len(admissions) < 100:
                         admissions.append(admission)
@@ -156,7 +177,7 @@ def export_lease_diagnostics(result, destination):
                     if projection is not None and len(projections) < 1000:
                         projections.append(projection)
         report = {"events": dict(sorted(events.items()))}
-        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets, "encodeMs": encodes, "projections": projections, "admissions": admissions}
+        capture_report = {"events": dict(sorted(capture.items())), "geometry": geometry, "insets": insets, "encodeMs": encodes, "projections": projections, "admissions": admissions, "keyboards": keyboards}
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         report = {"unavailable": type(error).__name__}
         capture_report = report

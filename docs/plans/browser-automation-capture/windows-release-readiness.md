@@ -4,7 +4,7 @@ This is a read-only readiness audit and release-policy repair, not a release. Ro
 
 ## Source, build and package
 
-All four Windows version declarations currently agree on 0.1.15: apps/windows/CMakeLists.txt, resources/kelpie.rc, src/device_info_windows.h and src/windows_runtime.cpp. Bump them together only when root selects the release.
+All four Windows version declarations agree on the selected 0.1.16: apps/windows/CMakeLists.txt, resources/kelpie.rc, src/device_info_windows.h and src/windows_runtime.cpp. Keep them in step.
 
 The tested unsigned private candidate is source 9333ff507ec91d06d86e338b1d2d9378daca2ac5. Its DLL hash is 27a474291206310a64e17cce27f6f9c50836af55b997b275d5f31e0fc71bca8c. This does not substitute for rebuilding the final integrated revision and rerunning the public app flow.
 
@@ -16,7 +16,7 @@ scripts/build-windows.ps1 supplies the documented bootstrap, static CRT and CTes
 
 The previous release-windows workflow attached unsigned ZIPs directly to public releases. The repaired workflow has contents: read, retains only windows-unsigned-candidate artifacts and has no release-upload job or signing trust. Packaging names the ZIP *-unsigned.zip and records signing_status=unsigned. No unsigned fallback is a release.
 
-The agent preserves this candidate and provenance before signing copies on Minis. Resource stamping occurs before signing. The existing ZIP stage is temporary, so extract a copy into a dedicated ignored signing directory; do not alter the preserved unsigned input or third-party runtime assets. After signing the first-party EXE/DLL, rebuild the final signed ZIP and fresh checksums/provenance. The old unsigned ZIP checksum cannot describe the signed archive.
+The agent preserves this candidate and provenance before signing copies on Maxis. Resource stamping occurs before signing. The existing ZIP stage is temporary, so extract a copy into a dedicated ignored signing directory; do not alter the preserved unsigned input or third-party runtime assets. After signing the first-party EXE/DLL, rebuild the final signed ZIP and fresh checksums/provenance. The old unsigned ZIP checksum cannot describe the signed archive.
 
 ## Existing signing authority and tool availability
 
@@ -30,12 +30,12 @@ The approved keyless Azure Artifact Signing Public Trust identity is the existin
 
 On 5 November 2026, Minis az account show reported the expected tenant and Subscription 1test. The SDK 10.0.26100.0 x64 SignTool is present. Both approved scripts exist at C:/Users/ondre/Projects/nessie/scripts/prepare-windows-signing.ps1 and sign-windows-artifact.ps1. GitHub exposes the configured WINDOWS_ARTIFACT_SIGNING_ENDPOINT/ACCOUNT/PROFILE and WINDOWS_SIGNER_EKU variables in UnlikeOtherAI/Nessie. No credential was read into output, copied or stored.
 
-The pinned ArtifactSigning.Client preparation/download and an actual signing authorization request have not been run. At release time use the existing preparation script, verify its archive hash and Microsoft-signed x64 client DLL, then use the existing signing script with the configured identity. No task should weaken execution policy or persist copied tokens.
+The coordinator reports that the existing UOA Artifact Signing account is now configured and verified on Maxis. Its durable %USERPROFILE%/.config/unlikeotherai/windows-signing/sign.ps1 takes an unsigned input, a fresh output path, the expected SHA-256 and source commit; it verifies the publisher, profile EKU, timestamp and SignTool result. Use Maxis for final signing, with Minis only as fallback. No task should weaken execution policy or copy tokens.
 
 ## Final release/install gates
 
 1. Record the clean final source revision, native dependency versions and unsigned candidate size/SHA-256.
-2. Sign verified copies on Minis using the approved scripts. Verify Authenticode Status=Valid, exact publisher, timestamp certificate and the profile-specific EKU; run SignTool verify /pa /all /tw for every signed EXE/installer and verify the first-party DLL.
+2. Sign verified copies on Maxis using the durable UOA signing script; use Minis only as fallback. Verify Authenticode Status=Valid, exact publisher, timestamp certificate and the profile-specific EKU; run SignTool verify /pa /all /tw for every signed EXE/installer and verify the first-party DLL.
 3. Create immutable signed archive/checksum/provenance recording both unsigned input and signed output hashes. Root uploads only that signed result to the coordinated date release.
 4. Install/extract the exact published Windows artifact into an owned test location and verify its public download hash, signatures, runtime version and source identity.
 5. Run direct /mcp, public --browser alias mcp, semantic scripts, GIF/MP4/PNG export, native Stop accessibility invocation, cancellation/partial recovery and readiness cleanup on that installed artifact.

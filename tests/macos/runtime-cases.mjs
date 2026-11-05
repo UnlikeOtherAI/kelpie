@@ -286,11 +286,12 @@ export async function runEngine(client,fixture,engine,report) {
   requireTrue(movies.length===2,"LOW_FPS_FORMATS");
   return movies.map(a=>inspectMedia(a,{marker:true,preNavigation:true}));
  });
- await check("default-350ms-pointer-motion",async()=>{
+ for(const [label,formats] of [["combined",["gif","video"]],["video-only",["video"]]])
+ await check(label==="combined"?"default-350ms-pointer-motion":"default-350ms-pointer-motion-video-only",async()=>{
   await load("/motion");const begin=fixture.events.length;
   const result=await client.api("play-script",{...base,pointer:{enabled:true},
    tapIndicator:{color:"#F54242",radius:2,durationMs:100,wobble:false,fade:true},
-   capture:{...capture,formats:["gif","video"],fps:30},actions:[
+   capture:{...capture,formats,fps:30},actions:[
     {action:"click",target:{role:"button",name:"First"}},{action:"wait",ms:800},
     {action:"click",target:{role:"button",name:"Second"}},{action:"wait",ms:400}]});
   requireTrue(result.success,"DEFAULT_MOTION_WORKFLOW");
@@ -298,9 +299,10 @@ export async function runEngine(client,fixture,engine,report) {
    second=events.find(e=>e.type==="click"&&e.target==="second");
   requireTrue(first&&second,"DEFAULT_MOTION_EVENTS");
   const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
-  const artifacts=await client.download(result,engine+"-default-motion");
-  requireTrue(artifacts.length===2,"DEFAULT_MOTION_FORMATS");
-  return artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}));
+  const artifacts=await client.download(result,engine+"-default-motion-"+label);
+  requireTrue(artifacts.length===formats.length&&artifacts.every(item=>
+   formats.includes(item.mimeType==="video/mp4"?"video":item.mimeType==="image/gif"?"gif":"unknown")),"DEFAULT_MOTION_FORMATS");
+  return {formats,media:artifacts.map(item=>({decode:inspectMedia(item),motion:inspectDefaultMotion(item,scene)}))};
  },{continueOnFailure:true});
  for(const curve of ["s","c"])await check("movie-pointer-curve-"+curve,async()=>{
   await load("/motion");const begin=fixture.events.length;
@@ -335,9 +337,9 @@ export async function runEngine(client,fixture,engine,report) {
   const scene={width:second.viewport.width,height:second.viewport.height,first:{x:first.x,y:first.y},second:{x:second.x,y:second.y}};
   const artifacts=await client.download(result,engine+"-curve-"+curve);
   return {curve,scene,runId:result.runId,decoded:artifacts.map(a=>({decode:inspectMedia(a),motion:inspectCurve(a,curve,scene)}))};
- });
+ },{continueOnFailure:true});
+ await check("dense-animation",()=>runG08(client,tabId,engine,report),{continueOnFailure:true});
  await runSafety({client,fixture,engine,base,capture,check,play,load});
- await check("dense-animation",()=>runG08(client,tabId,engine,report));
  report.gaps.push({engine,capability:"native-pinch",reason:"No supported native pinch input exists in audited public/app-owned interfaces; not substituted with stage scaling or OS input."});
  const failed=checks.find(item=>!item.passed);
  if(failed)throw new Failure(failed.code);
