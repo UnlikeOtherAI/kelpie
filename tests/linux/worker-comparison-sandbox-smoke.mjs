@@ -10,6 +10,7 @@ import {observePrivateBoundary,validatePrivateProbe} from "./worker-comparison-n
 import {validNamespaceHandoff} from "./worker-comparison-netns.mjs";
 import {inspectOwnedChromiumSandbox,sandboxFailureCategory} from "./worker-comparison-sandbox.mjs";
 import {nativeProcessStartTicks} from "./native-resource-snapshot.mjs";
+import {classifySpawnError,createBoundedStderr} from "./worker-comparison-launch-diagnostic.mjs";
 const [binary,expected,output]=process.argv.slice(2);
 assert.match(expected??"",/^[a-f0-9]{64}$/);
 assert.match(process.env.KELPIE_COMPARISON_ID??"",/^[a-f0-9]{64}$/);
@@ -31,17 +32,27 @@ const group=(await readFile("/proc/self/cgroup","utf8")).split("\n").find(x=>x.s
 assert.ok(group?.startsWith("/"));
 const cgroup="/sys/fs/cgroup"+group,delay=ms=>new Promise(ok=>setTimeout(ok,ms));
 const env={PATH:process.env.PATH??"/usr/bin:/bin",HOME:home,LANG:"C.UTF-8"};
-let browser,category="startup",evidence=null;
+let browser,category="startup",evidence=null,startTicks=null,spawnEvent="not-started",spawnError=null,closePromise;
+const stderr=createBoundedStderr();
+let preIdentityExit=false,exitObserved=false,exitCode=null,exitSignal=null,cleanup="none";
 try{
- browser=spawn(executable,["--headless=new","--remote-debugging-port=0","--user-data-dir="+join(home,"profile"),"--no-first-run","about:blank"],{env,stdio:"ignore"});
- browser.on("error",()=>{});
+ browser=spawn(executable,["--headless=new","--remote-debugging-port=0","--user-data-dir="+join(home,"profile"),"--no-first-run","about:blank"],{env,stdio:["ignore","ignore","pipe"]});
+ browser.stderr.on("data",chunk=>stderr.append(chunk));
+ closePromise=new Promise(ok=>browser.once("close",ok));
+ browser.once("exit",(code,signal)=>{exitObserved=true;exitCode=code;exitSignal=signal;if(!startTicks&&cleanup==="none")preIdentityExit=true;});
+ const spawned=new Promise(ok=>{
+  browser.once("spawn",()=>{spawnEvent="spawn";ok();});
+  browser.once("error",error=>{spawnEvent="error";spawnError=classifySpawnError(error.code);ok();});
+ });
+ await Promise.race([spawned,delay(3000)]);
+ assert.equal(spawnEvent,"spawn","SMOKE_SPAWN_FAILED");
  category="identity";
- const startTicks=await nativeProcessStartTicks(browser.pid);
+ startTicks=await nativeProcessStartTicks(browser.pid);
  assert.ok(startTicks,"SANDBOX_BROWSER_ID");
  for(let attempt=0;attempt<80&&!evidence;attempt++){
   if(browser.exitCode!==null||browser.signalCode!==null)break;
   try{evidence=await inspectOwnedChromiumSandbox(cgroup,browser.pid,startTicks);}
-  catch(error){const next=sandboxFailureCategory(error);if(next!=="no-renderer"||category==="startup")category=next;await delay(100);}
+  catch(error){const next=sandboxFailureCategory(error);if(next!=="no-renderer"||category==="identity")category=next;await delay(100);}
  }
  if(!evidence)throw Error("SMOKE_SANDBOX_NOT_PROVEN");
  await writeFile(join(dir,"report.json"),JSON.stringify({pid:process.pid,uid:process.getuid(),networkProbe,
@@ -49,8 +60,14 @@ try{
 }catch{
  await writeFile(join(dir,"failure.json"),JSON.stringify({category}),{mode:0o600,flag:"wx"});process.exitCode=1;
 }finally{
- if(browser&&browser.exitCode===null&&browser.signalCode===null){
-  const exited=new Promise(ok=>browser.once("exit",ok));browser.kill("SIGTERM");
-  await Promise.race([exited,delay(1500)]);if(browser.exitCode===null&&browser.signalCode===null){browser.kill("SIGKILL");await Promise.race([exited,delay(1500)]);}
- }
+ if(browser&&browser.exitCode===null&&browser.signalCode===null&&spawnEvent==="spawn"){
+  cleanup="term";browser.kill("SIGTERM");await Promise.race([closePromise,delay(1500)]);
+  if(browser.exitCode===null&&browser.signalCode===null){cleanup="kill";browser.kill("SIGKILL");await Promise.race([closePromise,delay(1500)]);}
+ }else if(closePromise)await Promise.race([closePromise,delay(1500)]);
+ const allowedSignals=["SIGABRT","SIGBUS","SIGFPE","SIGILL","SIGKILL","SIGSEGV","SIGSYS","SIGTERM","SIGTRAP"];
+ const diagnostic={binarySHA256:expected,spawnEvent:spawnEvent==="not-started"?"timeout":spawnEvent,spawnError,
+  pid:Number.isSafeInteger(browser?.pid)?browser.pid:null,startTicks,
+  preIdentityExit,exitObserved,exitCode:Number.isInteger(exitCode)?exitCode:null,
+  exitSignal:allowedSignals.includes(exitSignal)?exitSignal:exitSignal?"OTHER":null,cleanup,stderr:stderr.result()};
+ await writeFile(join(dir,"process-diagnostic.json"),JSON.stringify(diagnostic,null,2),{mode:0o600,flag:"wx"});
 }
