@@ -64,7 +64,7 @@
   "pointer": {
     "enabled": true,
     "curve": "s",
-    "durationMs": 500,
+    "durationMs": 350,
     "easing": "ease-in-out"
   }
 }
