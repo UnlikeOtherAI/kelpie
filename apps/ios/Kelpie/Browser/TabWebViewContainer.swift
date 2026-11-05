@@ -211,7 +211,14 @@ struct TabWebViewContainer: UIViewRepresentable {
             syncBrowserState(from: webView)
         }
 
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            ConnectDocument.navigated(webView)
+            IOSWorkflowTab.documentCommitted(webView)
+            IOSRendererDeadline.rendererTerminated(webView)
+        }
+
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            IOSWorkflowTab.documentCommitted(webView)
             syncBrowserState(from: webView)
         }
 

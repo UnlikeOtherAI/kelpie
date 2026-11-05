@@ -11,6 +11,7 @@ final class Router: @unchecked Sendable {
     var scriptPlaybackState: ScriptPlaybackState?
     @MainActor var browserGateway: BrowserControlGateway?
     @MainActor var browserGatewayProfile: String?
+    @MainActor var browserMutationAllowed: ((String?) -> Bool)?
     let browserLease = BrowserControlLease()
     @MainActor var browserGateways: [WeakBrowserGateway] = []
     var registeredMethods: [String] { Array(routes.keys) }
@@ -43,7 +44,12 @@ final class Router: @unchecked Sendable {
             return (200, await browserControl(body))
         }
         let mutatingMethod = isBrowserMutation(method: method)
-        let legacyMutation = !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
+        let workflowAdmission = method == "play-script" && body["version"] != nil
+        let workflowControl = ["get-script-status", "abort-script", "get-script-artifact"].contains(method)
+        if mutatingMethod, !workflowControl, let view = handlerContext?.webView, IOSRendererDeadline.isRetiring(view) {
+            return (409, IOSWorkflowFailure("BUSY").response)
+        }
+        let legacyMutation = !workflowAdmission && !workflowControl && !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
         if legacyMutation, browserLease.begin() == false {
             return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
         }
@@ -87,7 +93,7 @@ final class Router: @unchecked Sendable {
         guard !browserGatewayDispatch, browserReferenceOwner == nil,
               let context = handlerContext, context.remoteDocumentGuard == nil,
               let store = context.tabStore,
-              !["new-tab", "switch-tab", "close-tab", "delete-partition"].contains(method) else {
+              !["new-tab", "switch-tab", "close-tab", "delete-partition", "abort-script", "get-script-status", "get-script-artifact"].contains(method) else {
             return await handler(body)
         }
         guard let view = store.activeBrowserTab?.webView else {
@@ -125,17 +131,19 @@ private let iosUnsupportedMethods: Set<String> = [
 
 private func statusCode(forErrorCode code: String?) -> Int {
     switch code {
-    case "ELEMENT_NOT_FOUND", "WATCH_NOT_FOUND":
+    case "UNAUTHORIZED", "AUTHORIZATION_REVOKED":
+        return 401
+    case "ARTIFACT_NOT_FOUND", "RUN_NOT_FOUND", "ELEMENT_NOT_FOUND", "WATCH_NOT_FOUND":
         return 404
     case "TIMEOUT":
         return 408
     case "NAVIGATION_ERROR":
         return 502
-    case "PLATFORM_NOT_SUPPORTED", "PARTITION_UNSUPPORTED":
+    case "SESSION_UNSUPPORTED", "UNSUPPORTED_SCRIPT_ACTION", "PLATFORM_NOT_SUPPORTED", "PARTITION_UNSUPPORTED":
         return 501
     case "IFRAME_ACCESS_DENIED", "PERMISSION_REQUIRED", "SHADOW_ROOT_CLOSED":
         return 403
-    case "RECORDING_IN_PROGRESS", "PARTITION_IN_USE", "PARTITION_DELETING":
+    case "BUSY", "RECORDING_IN_PROGRESS", "PARTITION_IN_USE", "PARTITION_DELETING":
         return 409
     case "WEBVIEW_ERROR":
         return 500

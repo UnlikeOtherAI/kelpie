@@ -55,7 +55,8 @@ final class ScriptPlaybackState: @unchecked Sendable {
 
     private static let allowedMethodsWhileRecording: Set<String> = [
         "abort-script",
-        "get-script-status"
+        "get-script-status",
+        "get-script-artifact"
     ]
 
     private let lock = NSLock()

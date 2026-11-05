@@ -6,10 +6,36 @@ struct ScriptHandler {
     let playbackState: ScriptPlaybackState
     let setRecordingMode: @Sendable (Bool) async -> Void
 
+    @MainActor
     func register(on router: Router) {
-        router.register("play-script") { body in await playScript(body) }
-        router.register("abort-script") { _ in abortScript() }
-        router.register("get-script-status") { _ in getScriptStatus() }
+        let workflow = IOSWorkflowRunner(host: self)
+        router.browserMutationAllowed = { [weak context] tabID in
+            guard let context else { return false }
+            let view = tabID.flatMap { id in context.tabStore?.tabs.first { $0.id.uuidString == id }?.webView } ?? context.webView
+            return view.map { !IOSRendererDeadline.isRetiring($0) } ?? true
+        }
+        router.register("play-script") { body in
+            if body["version"] != nil { return await workflow.play(body) }
+            let versioned: Set<String> = ["capture", "tapIndicator", "pointer", "inputs", "sessionId"]
+            if !versioned.isDisjoint(with: body.keys) { return IOSWorkflowFailure("INVALID_SCRIPT").response }
+            return await playScript(body)
+        }
+        router.register("abort-script") { body in
+            await workflow.control("abort-script", body) { abortScript() }
+        }
+        router.register("get-script-status") { body in
+            await workflow.control("get-script-status", body) {
+                let legacyStatus = getScriptStatus()
+                if legacyStatus["playing"] as? Bool == true { return legacyStatus }
+                var result = IOSBoundWorkflow.capabilities
+                result["playing"] = false
+                result["state"] = "idle"
+                return result
+            }
+        }
+        router.register("get-script-artifact") { body in
+            await workflow.control("get-script-artifact", body) { IOSWorkflowFailure("ARTIFACT_NOT_FOUND").response }
+        }
     }
 
     @MainActor
