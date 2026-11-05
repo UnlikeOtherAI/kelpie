@@ -4,10 +4,10 @@ import {g08NativeGeometry} from "./g08-native-geometry.mjs";
 
 function fixture(top=62,bottom=34){
   const visualViewport={offsetLeft:0,offsetTop:0,width:402,height:874-top-bottom,scale:1};
-  const event=(target,x,y)=>({target,documentId:"fixture",center:{x,y},visualViewport});
-  return {artifact:{width:804,height:1748,timestamps:[0,1],geometry:{
-    kind:"constant-native-content",nativeDocumentId:"native",fixtureDocumentId:"fixture",
-    stableNativeDocument:true,fixtureEventsBound:true,sampledFrames:2,nativeBounds:{width:402,height:874},
+  const event=(target,x,y)=>({target,documentId:"1700000000000-abc",center:{x,y},visualViewport});
+  return {artifact:{width:804,height:1748,documentId:"native",timestamps:[0,1],geometry:{
+    kind:"constant-native-content",nativeDocumentId:"native",fixtureDocumentId:"1700000000000-abc",
+    stableNativeDocument:true,observedFrames:3,encodedFrames:2,nativeBounds:{width:402,height:874},
     contentRect:{x:0,y:top,width:402,height:874-top-bottom},visualViewport}},
   scene:{warmup:event("finish",175,340),calibration:event("finish",175,340),
     start:event("start",75,340),finish:event("finish",175,340)}};
@@ -23,10 +23,15 @@ test("zero top inset preserves native coordinates",()=>{
 test("missing, mismatched or unstable per-artifact mapping is insufficient",()=>{
   for(const change of [
     f=>delete f.artifact.geometry,
-    f=>f.artifact.geometry.sampledFrames--,
+    f=>delete f.scene.warmup,
+    f=>f.scene.calibration.documentId="1700000000000-def",
+    f=>f.artifact.geometry.encodedFrames--,
+    f=>f.artifact.geometry.observedFrames=1,
+    f=>f.artifact.geometry.observedFrames=2.5,
+    f=>f.artifact.documentId="other",
     f=>f.artifact.geometry.stableNativeDocument=false,
-    f=>f.artifact.geometry.fixtureEventsBound=false,
     f=>f.artifact.geometry.fixtureDocumentId="other",
+    f=>f.artifact.geometry.fixtureDocumentId="1700000000000-ABC",
     f=>f.artifact.geometry.nativeDocumentId="",
     f=>f.scene.finish.visualViewport={...f.scene.finish.visualViewport,offsetTop:1},
     f=>f.artifact.geometry.contentRect.y=900,
