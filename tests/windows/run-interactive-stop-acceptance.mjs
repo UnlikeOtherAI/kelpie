@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {createHash,randomUUID} from "node:crypto";
 import {nativeWindowFixtureExpression} from "./native-window-fixture.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
+import {safeCliFailure} from "./safe-cli-failure.mjs";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {fileURLToPath} from "node:url";
@@ -35,7 +36,7 @@ const timer=setTimeout(()=>deadline.abort(),120000);timer.unref();
 const report={source:build.source,buildIdentity:build,buildIdentityManifestSha256:manifestHash,checks:[],cleanup:"not-started",invocation:"standard Microsoft UIA InvokePattern; no physical input"};
 let launched=false,readiness,pending,running,wgcCaptureDirectory,wgcSceneFile,outputCreated=false;
 const child=async(command,args,extra={})=>execute(command,args,{windowsHide:true,timeout:15000,maxBuffer:2097152,...extra});
-const publicCli=async args=>JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);
+const publicCli=async args=>{try{return JSON.parse((await child(process.execPath,[cli,...args],{timeout:args[1]==="launch"?30000:20000,env:{...process.env,USERPROFILE:home,KELPIE_HOME:cliHome}})).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const automation=async args=>JSON.parse((await child(uia,args,{signal:deadline.signal,timeout:10000})).stdout);
 const api=async(method,body={},cleanup=false)=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
@@ -59,8 +60,8 @@ try {
  assert.equal(report.hashes.cliEntry,build.cliSha256);
  assert.equal(await hash(exe),build.exeSha256);
  assert.equal(await hash(join(dirname(exe),"kelpie.dll")),build.dllSha256);
- await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
- const launchStarted=new Date().toISOString();
+ report.phase="cli-register";await publicCli(["browser","register",alias,"--platform","windows","--app-path",exe,"--profile-dir",profile]);
+ report.phase="cli-launch";const launchStarted=new Date().toISOString();
  const launch=await publicCli(["browser","launch",alias,"--port","28420"]);assert.equal(launch.success,true);launched=true;
  const store=JSON.parse(await readFile(join(cliHome,"browsers.json"),"utf8"));running=store.running[alias];
  assert.equal(running.port,28420);assert.equal(resolve(running.readinessFile),join(profile,"readiness.json"));
@@ -184,7 +185,7 @@ try {
    report.checks.push({name:mode==="wgc"?"owned WGC presentation marker and separate native Stop pixels":"owned PrintWindow Stop and marker pixels",passed,...(passed?{}:{error:report.wgcFailure?.error??report.terminalEvidenceFailure?.error??"NATIVE_SPATIAL_VALIDATION_FAILED"})});if(!passed)process.exitCode=1;
  }
 } catch(error) {
- report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.message});process.exitCode=1;
+ report.checks.push({name:"interactive Stop acceptance",passed:false,error:error.safeDetails?"CLI_FAILED":"INTERACTIVE_CHECK_FAILED",stage:report.phase??"setup",...error.safeDetails});process.exitCode=1;
 } finally {
  if(launched){
    if(pending&&readiness){try{await api("abort-script",{},true);await awaitBounded(pending,5000);}catch(error){report.pendingCleanup=error.message;}}
