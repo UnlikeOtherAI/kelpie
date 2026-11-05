@@ -1,4 +1,5 @@
 #include "desktop_script_runtime.h"
+#include "desktop_script_pause.h"
 #include "kelpie/desktop_script_owner.h"
 #include "kelpie/browser_gateway_c_api.h"
 #include "kelpie/browser_schema.h"
@@ -130,10 +131,8 @@ bool DesktopScriptHandler::Impl::Cancelled() const {
   return !capture_error.empty();
 }
 void DesktopScriptHandler::Impl::Pause(int milliseconds) {
-  for (int remaining = milliseconds; remaining > 0; remaining -= 20) {
-    if (Cancelled()) throw std::runtime_error("SCRIPT_STOPPED");
-    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(remaining, 20)));
-  }
+  PauseDesktopScript<Clock>(std::chrono::milliseconds(milliseconds),
+    [this] { return Cancelled(); }, [](auto duration) { std::this_thread::sleep_for(duration); });
 }
 void DesktopScriptHandler::Impl::Present() {
   if (!config.present) return;
