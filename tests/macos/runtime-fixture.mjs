@@ -42,7 +42,7 @@ export async function startFixture() {
     hit:typeof event.clientX==='number'?document.elementFromPoint(event.clientX,event.clientY)?.closest('button,a')?.id:null,
     rect:r?{left:Math.max(0,r.left,clip?.left??0),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right,clip?.right??innerWidth),bottom:Math.min(innerHeight,r.bottom)}:null});
   },true);
-  document.querySelector('#submit')?.addEventListener('click',()=>{if(privacyMode==='/known-url')history.replaceState(null,'','/known-url-changed')});
+  document.querySelector('#submit')?.addEventListener('pointerdown',()=>{if(privacyMode==='/known-url')history.replaceState(null,'','/known-url-changed')});
   document.querySelector('#replace')?.addEventListener('pointerdown',event=>{event.currentTarget.replaceChildren(document.createElement('span'))});
   document.querySelector('#readonly')?.addEventListener('focus',event=>{event.target.readOnly=true});
   document.querySelector('#focus-privacy')?.addEventListener('focus',event=>{

@@ -28,10 +28,13 @@ export async function runPrivacy({client,fixture,base,capture,check,load,authori
   }
  }
  await check("known-nonsensitive-navigation-retains-partial",async()=>{
-  await load("/known-url");
+  await load("/known-url");const begin=fixture.events.length;
   const value=await client.api("play-script",{...base,capture:{...capture,formats:["screenshots"]},actions:[
    {action:"output",name:"before",source:"title"},{action:"click",target:{role:"button",name:"Submit"}}]});
-  requireTrue(!value.success,"KNOWN_NAVIGATION_GUARD_MISSING");
+  requireTrue(!value.success&&value.error?.code==="INPUT_UNCERTAIN"&&value.mayHaveCompleted===true,"KNOWN_NAVIGATION_GUARD_MISSING");
+  const events=fixture.events.slice(begin);
+  requireTrue(events.some(e=>e.type==="pointerdown"&&e.target==="submit")&&
+   !events.some(e=>e.type==="click"&&e.target==="submit"),"KNOWN_NAVIGATION_EVENT_SEQUENCE");
   requireTrue(value.outputs?.before?.includes(canary),"KNOWN_NONSENSITIVE_OUTPUT_OVERSCRUBBED");
   requireTrue((value.artifacts??[]).some(a=>a.partial),"KNOWN_NONSENSITIVE_PARTIAL_DISCARDED");
   const recovery=await client.api("play-script",{...base,actions:[{action:"wait",ms:1}]});
