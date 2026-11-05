@@ -2,8 +2,20 @@
 #include "desktop_script_coordinates.h"
 #include <stdexcept>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace kelpie {
+namespace {
+void ViewportDiagnostic(const char* fence,const nlohmann::json& before,const nlohmann::json& after) {
+  const char* enabled=std::getenv("KELPIE_CAPTURE_VIEWPORT_DIAGNOSTICS");
+  if (!enabled || std::strcmp(enabled,"1")!=0) return;
+  const nlohmann::json facts={{"fence",fence},{"before",ScriptCaptureViewportFacts(before)},
+                    {"after",ScriptCaptureViewportFacts(after)}};
+  std::fprintf(stderr,"KELPIE_CAPTURE_VIEWPORT_DIAGNOSTIC %s\n",facts.dump().c_str());
+}
+}
 void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document) {
   std::unique_lock lock(mutex);
   requested_step = index; requested_step_png=png; requested_step_document=document;
@@ -52,12 +64,18 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       const int width = viewport.value("width", 0), height = viewport.value("height", 0);
       if (width <= 0 || height <= 0) throw std::runtime_error("CAPTURE_VIEWPORT_UNAVAILABLE");
       if (initial_width == 0) { initial_width = width; initial_height = height; first_document = before.tab.document_version; }
-      if (width != initial_width || height != initial_height) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      if (width != initial_width || height != initial_height) {
+        ViewportDiagnostic("initial-size",{{"width",initial_width},{"height",initial_height}},viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
       // Scrollbar gutters may change visible size without changing the surface.
       // Pan/scale remain fenced within a document, and every surface still has
       // an exact before/after five-metric check below.
       if(previous_viewport.is_object() && !ScriptCaptureViewportCompatible(previous_viewport,viewport,
-          previous_document==before.tab.document_version)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+          previous_document==before.tab.document_version)) {
+        ViewportDiagnostic("inter-frame",previous_viewport,viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
       previous_viewport=viewport; previous_document=before.tab.document_version;
       Json shown;
       int step = -1, index = -1; bool png=false; std::string expected_document; std::uint64_t ticket=0;
@@ -91,7 +109,10 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       }
       Json after_viewport;
       result = engine.EvaluateBrowserControl(lease, viewport_expression, &after_viewport, std::chrono::seconds(2));
-      if (!result.ok || after_viewport != viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      if (!result.ok || after_viewport != viewport) {
+        ViewportDiagnostic(result.ok ? "before-after" : "after-read-failed",viewport,after_viewport);
+        throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
+      }
       const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
       const bool proof=!movies || expected_document.empty() ||
         (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);

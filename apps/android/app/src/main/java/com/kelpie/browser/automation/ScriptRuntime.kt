@@ -259,7 +259,8 @@ class ScriptRuntime(
                 runner.guard()
                 run.step(index, action["action"] as String)
                 runner.execute(action, index)
-                if (action["action"] !in setOf("click", "tap", "fill", "type")) {
+                val emptyPacedType = (action["__pacedPlan"] as? ScriptPacedPlan)?.let { !it.clearFirst && it.scalars.isEmpty() } == true
+                if (action["action"] !in setOf("click", "tap", "fill", "type") || emptyPacedType) {
                     capture?.step(index, action["action"] == "screenshot")
                 }
                 runner.guard()

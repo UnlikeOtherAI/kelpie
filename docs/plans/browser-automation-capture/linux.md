@@ -696,3 +696,38 @@ oracle results were insufficient on pre-dispatch pointer position. The prior
 published Fedora RPM was restored with the package manager and its package
 identity, file manifest, executable/CEF hashes, and rpm verification matched
 the pre-test snapshots.
+
+## Frozen Fedora offscreen checkpoint
+
+Fedora 44 exercised product revision 0c8526b872209af176e16f1d37792fb17a5e1781
+with test revision 692841e1c4986ffc02e40e8a07afa9d7c4c68737. The only
+difference between them is the test assertion placement; native/product build
+inputs are identical. The app ELF SHA-256 was
+dc368f394f42a5ce5595670884094b8286115f3d213347910569b5b990902e52
+and libcef.so was d6bee514adcc2ea2d6e8a450939f7a09da746f1e9b7c8275b9be61b60cd26d99.
+
+The isolated offscreen native HTTP and direct/generic MCP corpus passed 54/54,
+including all nine paced typing cases, acknowledged navigation, captured-input
+privacy refusal, pointerup replacement, late release acknowledgement and
+recovery. All configured supplements passed; the owned process exited and its
+readiness file was removed. An unrelated Fedora process on port 18425 was
+preserved. C ABI, post-mutation classification and terminal uncertainty native
+tests passed. The independent decoder validated 44 retained artifacts and 126
+frames (21 PNG, 14 GIF, 9 MP4), including continuous marker center, fade and
+clear checks.
+
+The owned evidence root is
+/home/ondre/Projects/kelpie-worktrees/capture-linux-resume-20261105/.native-artifacts/692-brand-full/.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| launch-report.json | 7b4128c9f7a26ab46b083d87b4eec4e5b0b67dcb986a7a4e445893b729410e16 |
+| media-verification.json | 3da735055e59a05fd55f772150825bc485df2d8b2257ad4cb4a729845309c96c |
+| all-frame-decode.json | 2df8f8a1b95200ab00949681d851f59521e3af1aa0b8e70394ff9f4c0dd1b67d |
+| continuous-marker-pixels.json | 00f8acefb72f4c971fa4f58241d9a918ad15cf3f024daca71ef974deae2f718a |
+
+This checkpoint does not close the full G08 easing/wobble oracle, final
+HEADLESS_ONLY and no-CEF/LLM-off runtime flavors, physical GNOME visual proof,
+Ubuntu installed-package verification, final published package installation, or
+the pending CI zygote diagnosis. The production GIF reference remains
+insufficient until its loader-binding provenance and controls are verified.

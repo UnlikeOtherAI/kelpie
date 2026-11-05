@@ -118,7 +118,7 @@ class ScriptGifEncoder(
 
     private fun compress(pixels: IntArray): ByteArray {
         val writer = Codes()
-        val dictionary = HashMap<Int, Int>(4096)
+        val dictionary = Dictionary()
         var next = 258
         var width = 9
         writer.write(256, width)
@@ -126,14 +126,14 @@ class ScriptGifEncoder(
         for (position in 1 until pixels.size) {
             val color = index(pixels[position])
             val key = (prefix shl 8) or color
-            val found = dictionary[key]
-            if (found != null) {
+            val found = dictionary.find(key)
+            if (found >= 0) {
                 prefix = found
                 continue
             }
             writer.write(prefix, width)
             if (next < 4096) {
-                dictionary[key] = next++
+                dictionary.put(key, next++)
                 if (next > (1 shl width) && width < 12) width++
             } else {
                 writer.write(256, width)
@@ -147,6 +147,34 @@ class ScriptGifEncoder(
         if (next == (1 shl width) && width < 12) width++
         writer.write(257, width)
         return writer.finish()
+    }
+
+    /** Primitive bounded LZW table avoids boxing a lookup for every pixel. */
+    private class Dictionary {
+        private val keys = IntArray(8192) { -1 }
+        private val values = IntArray(8192)
+
+        private fun slot(key: Int): Int {
+            var slot = (key * -1640531527) ushr 19
+            while (keys[slot] != -1 && keys[slot] != key) slot = (slot + 1) and 8191
+            return slot
+        }
+
+        fun find(key: Int): Int {
+            val slot = slot(key)
+            return if (keys[slot] == key) values[slot] else -1
+        }
+
+        fun put(
+            key: Int,
+            value: Int,
+        ) {
+            val slot = slot(key)
+            keys[slot] = key
+            values[slot] = value
+        }
+
+        fun clear() = java.util.Arrays.fill(keys, -1)
     }
 
     private class Codes {

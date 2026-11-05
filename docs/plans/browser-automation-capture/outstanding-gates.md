@@ -83,62 +83,49 @@ Run identifiers identify evidence to inspect, not a claim that the run passed.
 The coordinator must reconcile newer results and exact artifact hashes before
 closing any requirement.
 
-## Current scope supplement - 2026-11-05
+## Current scope supplement — 2026-11-05
 
-This supplement supersedes the earlier working snapshot without removing its
-historical failures. Integration has advanced through `15cc0dc4` and remains
-in progress. A reported subset is not a platform or full-matrix pass.
+Integration source `1d4008bc` contains the current shared contract and
+platform adapter changes. Earlier rows and platform receipts preserve failures
+at their own revisions. The following are scoped checkpoints, not platform,
+nine-runtime or 432-cell acceptance.
 
-- **Lightpanda:** the pinned 1.0.2 optional reader tranche passed its bounded
-  public stdio corpus (16 cases) and was accepted for the four explicitly
-  selected DOM/text reader methods. The default remains deny; geometry, input,
-  capture and WebMCP are not admitted. The published package and installed
-  release still require verification.
-- **Android:** API 29 minimum is user-approved. The owner reports 7/7 local
-  phone privacy cases after the focus fix; tablet, hosted full corpus, actual
-  scene and dense G08 evidence remain separate gates. Earlier API 35 focus
-  failures and sparse capture results are retained.
-- **Linux:** the a05 real-CDP corpus passed 40/42, including all six new
-  post-ack cases. Two cross-document capture cases remain refused because
-  old-realm sensitivity is unknown. No classification is inferred from the
-  new document. GTK/OSR, installed RPM, dense G08 and release acceptance
-  require their own final integrated evidence. The deterministic GIF model
-  generator and provenance checks are under development.
-- **Windows:** prior four C/S GIF/MP4 export results and the coordinator's
-  native spatial/Stop observations are scoped evidence at their recorded
-  revisions. Final native timeline and the 350 ms profile remain open; later
-  launch/readiness failures are preserved. The launch lifecycle fix and
-  exact installed release verification remain open.
-- **macOS and iOS:** WK/CEF and iPhone/iPad need separate final-source runtime,
-  privacy, G08 and public transport evidence; earlier hosted or build subsets
-  do not establish full acceptance.
-- **Shared and release:** the 350 ms default and final-event privacy changes
-  require regenerated native bindings and platform replays on the integrated
-  source. Final portable checks, component versions, one reviewed PR, release
-  publication and installed signed/package verification remain open. No
-  nine-runtime or 432-cell completion is asserted.
-
-## Paced typing and privacy checkpoint at 2153a422
-
-The shared planner and Windows, Linux, macOS and iOS paced adapters are
-integrated in source. Android was still working on its native adapter at this
-checkpoint.
-Every platform must independently verify bounded Unicode pacing, full-literal
-conditional redaction, no refocus after drift, cancellation, lost callbacks,
-and actual decoded capture. An acknowledged final input may complete when
-its later privacy classification is unknown only without capture and with
-full-literal redaction; capture remains fail-closed. Unknown before another
-scalar and any unacknowledged callback must halt without replay.
-
-The CEF isolated-reader brand proof is available in source but is not itself
-a native input-path or cross-document capture pass. The Linux consumer must
-bind an exact-hit genuine anchor/button proof to the original action, token and
-document, and consume it only after the final input ACK. Inputs, labels,
-descendant hits, malformed or missing proof and lost ACK remain unknown. The
-request- and response-stage Fetch probes and the first CEF release-context
-probe did not supply an old-realm classification. Keep the two actual failed
-next-document capture cases open until the final native replay.
-
-The production GIF model generator remains test-only and unwired. Its first
-candidate run stopped on a dependency mismatch; a model acceptance cannot be
-claimed until the exact producer provenance and retained-marker controls pass.
+- **Shared:** the 52-case synthetic mutation receipt matrix covers genuine
+  Boolean fields, token and acknowledgement shape, and privacy outcomes.
+  Android, iOS and Mac owners report all 52 passing their actual JSON decoders
+  and validators; this does not prove a full native workflow. A final
+  integrated portable lint, build and test remains required.
+- **Paced editing:** all native adapters are integrated in source. Preserve
+  the complete attempted literal for conditional redaction; known ordinary
+  input remains visible. Unknown classification before another scalar stops
+  input. A valid final acknowledgement with later unknown privacy may finish
+  only without capture and with redaction; capture is discarded. Lost or
+  malformed acknowledgements remain uncertain and are never replayed.
+  Android's deterministic final post-ack navigation ordering case remains open.
+- **Lightpanda:** the pinned 1.0.2 optional reader's public stdio corpus
+  passed 16 cases for four explicitly selected DOM/text methods. Default deny
+  remains in force; geometry, input, capture and WebMCP are not admitted.
+  Published-package and installed-release verification remain open.
+- **Linux:** product `0c8526b8` with tests `692841e1` passed 54 native
+  CDP cases and supplements; independent decoding covered 44 artifacts and
+  126 frames. This is not dense G08, package, flavor or release acceptance.
+  GIF model `991ffed9` has matching media object/library identities and
+  retained-marker controls, but the actual pre-overlay backing ROI was not
+  observed. Its test-only model remains insufficient and unwired; a palette
+  collision demonstrates encoded-visible limits. MP4 has no relaxed rule.
+- **Windows:** two latest native runs each passed 53 of 54 cases, with
+  different failures; investigate and retain both receipts. Earlier G08
+  export passes and observed native spatial/Stop evidence are scoped to their
+  recorded revisions. Final integrated native timeline, fast profile,
+  recovery, signed package and installed-release checks remain open.
+- **Android:** the API 29 minimum was approved. The latest phone paced
+  corpus passed 8 of 10 cases; the other two fixture/status races are under
+  investigation. Tablet, final phone corpus, scene and dense G08 evidence
+  remain open. Earlier focus, sparse-capture and timeout failures are retained.
+- **macOS and iOS:** updated hosted runs are in progress. WK and CEF, and
+  iPhone and iPad, need separate final-source public transport, privacy,
+  geometry and G08 evidence. The receipt matrix does not replace those runs.
+- **Release:** reconcile the remaining requirements against exact source,
+  binary and evidence hashes; finish component versioning, one reviewed PR,
+  required CI, publication, signing and installed-release verification.
+  Optional native WebMCP remains unavailable unless independently proven.

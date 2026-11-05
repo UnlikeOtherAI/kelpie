@@ -12,6 +12,8 @@ object ScriptNative {
 
     external fun targetExpression(options: String): String?
 
+    external fun typingPlan(action: String): String?
+
     external fun pointerPosition(
         fromX: Double,
         fromY: Double,

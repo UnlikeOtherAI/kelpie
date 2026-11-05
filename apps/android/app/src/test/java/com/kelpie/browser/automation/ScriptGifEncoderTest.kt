@@ -75,6 +75,30 @@ class ScriptGifEncoderTest {
     }
 
     @Test
+    fun randomFramePreservesEveryQuantizedPixelAcrossDictionaryResets() {
+        val random = Random(314159)
+        val pixels = IntArray(256 * 256) { random.nextInt() or 0xff000000.toInt() }
+        val output = ByteArrayOutputStream()
+        val encoder = ScriptGifEncoder(output, 256, 256, ScriptMediaBudget(2_000_000), 0xff3b82f6.toInt())
+        assertTrue(encoder.frame(pixels, 100.0))
+        encoder.finish()
+        val image = decode(output.toByteArray()).single().first
+        pixels.forEachIndexed { index, pixel ->
+            val rgb = pixel and 0xffffff
+            val paletteIndex = ((rgb ushr 16) and 0xe0) or ((rgb ushr 11) and 0x1c) or ((rgb ushr 6) and 3)
+            val expected =
+                when {
+                    rgb == 0x3b82f6 -> 0xff3b82f6.toInt()
+                    rgb == 0xffffff || paletteIndex >= 254 -> 0xffffffff.toInt()
+                    else ->
+                        (0xff000000.toInt()) or (((paletteIndex ushr 5) * 255 / 7) shl 16) or
+                            ((((paletteIndex ushr 2) and 7) * 255 / 7) shl 8) or ((paletteIndex and 3) * 255 / 3)
+                }
+            assertEquals("pixel " + index, expected, image.getRGB(index % 256, index / 256))
+        }
+    }
+
+    @Test
     fun preservesRequestedMarkerColorAndLoops() {
         val color = 0xff3b82f6.toInt()
         val output = ByteArrayOutputStream()

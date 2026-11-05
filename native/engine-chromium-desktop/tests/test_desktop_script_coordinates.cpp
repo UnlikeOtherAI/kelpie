@@ -20,6 +20,12 @@ int main(){
   assert(!kelpie::ScriptTargetInspectionUncertain({{"ok",false},{"sensitive",false},{"sensitivityKnown",true},{"error","TARGET_NOT_FOUND"}}));
   nlohmann::json viewport={{"width",1042},{"height",662},{"visualViewport",{
     {"offsetLeft",0},{"offsetTop",0},{"width",1042},{"height",662},{"scale",1}}}};
+  auto unsafe=viewport; unsafe["secret"]="private-canary";
+  unsafe["visualViewport"]["scale"]=std::numeric_limits<double>::infinity();
+  unsafe["visualViewport"]["offsetTop"]=1000001;
+  const auto facts=kelpie::ScriptCaptureViewportFacts(unsafe);
+  assert(facts.at("width")==1042 && facts.at("visual_width")==1042);
+  assert(!facts.contains("secret") && !facts.contains("visual_scale") && !facts.contains("visual_offsetTop"));
   auto gutter=viewport;gutter["visualViewport"]["width"]=1027;
   assert(kelpie::ScriptCaptureViewportCompatible(viewport,gutter,true));
   auto pan=gutter;pan["visualViewport"]["offsetLeft"]=1;

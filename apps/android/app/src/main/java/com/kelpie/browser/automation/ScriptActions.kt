@@ -28,6 +28,9 @@ class ScriptActions(
     private val key = "__kelpie_script_android_v1"
     private var pointerX = 20.0
     private var pointerY = 20.0
+
+    @Volatile private var editClassificationKnown = false
+
     var mutationInFlight = false
         private set
 
@@ -131,6 +134,11 @@ class ScriptActions(
                 throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED")
             }
         }
+        val paced = action["__pacedPlan"] as? ScriptPacedPlan
+        if (paced != null && !paced.clearFirst && paced.scalars.isEmpty()) {
+            if (resolved["editable"] != true) throw ScriptFailure("TARGET_NOT_EDITABLE")
+            return@scriptLease
+        }
         val oldDocument = document()
         val visual = objectMap(resolved["visualViewport"])
         val visualWidth = number(visual, "width")
@@ -176,23 +184,72 @@ class ScriptActions(
         // The same object/token/document/geometry is checked atomically after
         // movie admission and synchronous focus/default handlers.
         mutationInFlight = true
-        if (edit) {
-            val focused =
-                withContext(Dispatchers.Main.immediate) {
-                    validOnMain() && view.hasWindowFocus() && view.requestFocus()
+        if (edit) editClassificationKnown = false
+        val done =
+            try {
+                if (edit) {
+                    val focused =
+                        withContext(Dispatchers.Main.immediate) {
+                            validOnMain() && view.hasWindowFocus() && view.requestFocus()
+                        }
+                    if (!focused) throw ScriptFailure("INPUT_UNCERTAIN", true)
                 }
-            if (!focused) {
-                // A focus handler may have run without a classifiable callback.
-                consumeSensitivity(action, true)
-                throw ScriptFailure("INPUT_UNCERTAIN", true)
+                if (paced == null) {
+                    resolve(action, token, dispatch = !edit, edit = edit)
+                } else {
+                    pacedEdit(action, token, paced)
+                }
+            } catch (error: Exception) {
+                if (edit && !editClassificationKnown) consumeSensitivity(action, true)
+                throw error
             }
-        }
-        val done = resolve(action, token, dispatch = !edit, edit = edit)
         guard()
         mutationInFlight = false
         pointerX = x
         pointerY = y
-        if (done["inputGuarantee"] != "synthetic-coordinate") throw ScriptFailure("TARGET_EVALUATION_FAILED", true)
+        if (done["inputGuarantee"] != "synthetic-coordinate") throw ScriptFailure("INPUT_UNCERTAIN", true)
+    }
+
+    private suspend fun pacedEdit(
+        action: Map<String, Any?>,
+        token: String,
+        plan: ScriptPacedPlan,
+    ): Map<String, Any?> {
+        val steps =
+            buildList {
+                if (plan.clearFirst) add("fill" to "")
+                plan.scalars.forEach { add("type" to it) }
+            }
+        var last: Map<String, Any?> = emptyMap()
+        for ((index, step) in steps.withIndex()) {
+            if (index > 0 && !(plan.clearFirst && index == 1)) pause(plan.delayMs)
+            guard()
+            last =
+                try {
+                    resolve(action, token, edit = true, editValue = step, requireFocused = index > 0)
+                } catch (failure: ScriptFailure) {
+                    if (index > 0 && !failure.mayHaveCompleted) {
+                        mutationInFlight = true
+                        throw ScriptFailure(failure.code, true)
+                    }
+                    throw failure
+                }
+            val finalStep = index == steps.lastIndex
+            checkPacedPostMutation(last, finalStep, captures()) { consumeSensitivity(action, true) }
+            val classification =
+                try {
+                    rawTarget(action, token, postMutation = true)
+                } catch (error: Exception) {
+                    consumeSensitivity(action, true)
+                    throw error
+                }
+            if (classification["ok"] == false && scriptDispatchReceiptWellFormed(classification, token)) {
+                consumeSensitivity(action, true)
+                throw ScriptFailure(targetFailure(classification).code, true)
+            }
+            checkPacedPostMutation(classification, finalStep, captures()) { consumeSensitivity(action, true) }
+        }
+        return last
     }
 
     private suspend fun navigate(action: Map<String, Any?>) =
@@ -273,11 +330,24 @@ class ScriptActions(
         token: String? = null,
         dispatch: Boolean = false,
         edit: Boolean = false,
+        editValue: Pair<String, String>? = null,
+        requireFocused: Boolean = false,
     ): Map<String, Any?> {
-        val result = rawTarget(action, token, dispatch, edit)
+        val result = rawTarget(action, token, dispatch, edit, editValue = editValue, requireFocused = requireFocused)
         if (result["ok"] != true) {
+            if ((dispatch || edit) && !scriptDispatchReceiptWellFormed(result, token)) {
+                if (edit) consumeSensitivity(action, true)
+                mutationInFlight = true
+                throw ScriptFailure("INPUT_UNCERTAIN", true)
+            }
             if (dispatch || edit) mutationInFlight = result["mayHaveCompleted"] == true
             throw targetFailure(result)
+        }
+        if (dispatch || edit) {
+            requireScriptDispatchReceipt(result, token) {
+                if (edit) consumeSensitivity(action, true)
+                mutationInFlight = true
+            }
         }
         if (result["sensitive"] == true && captures()) throw ScriptFailure("SENSITIVE_CAPTURE_REFUSED", dispatch || edit)
         return result
@@ -289,13 +359,24 @@ class ScriptActions(
         dispatch: Boolean = false,
         edit: Boolean = false,
         observe: Boolean = false,
+        editValue: Pair<String, String>? = null,
+        requireFocused: Boolean = false,
+        postMutation: Boolean = false,
     ): Map<String, Any?> {
         val options = mutableMapOf<String, Any?>("target" to action["target"], "key" to key)
         if (token != null) options["token"] = token
         if (dispatch) options["dispatch"] = true
         if (observe) options["observe"] = true
         if (!observe && captures()) options["policy"] = mapOf("refuseSensitive" to true)
-        if (edit) options["edit"] = mapOf("action" to action["action"], "text" to action["text"])
+        if (edit) {
+            options["edit"] =
+                mapOf(
+                    "action" to (editValue?.first ?: action["action"]),
+                    "text" to (editValue?.second ?: action["text"]),
+                    "requireFocused" to requireFocused,
+                )
+        }
+        if (postMutation) options["postMutation"] = true
         val generated =
             ScriptNative.targetExpression(OpenAIJson.encode(OpenAIJson.fromAny(options)))
                 ?: throw ScriptFailure("INVALID_SCRIPT_TARGET")
@@ -303,20 +384,18 @@ class ScriptActions(
             OpenAIJson.parseObjectOrNull(generated)?.let(OpenAIJson::toMap)?.get("expression") as? String
                 ?: throw ScriptFailure("INVALID_SCRIPT_TARGET")
         val classification = ScriptTargetClassification()
-        try {
-            return withTimeout(30_000) {
-                ctx.evaluateAutomationJSON(expression, ::validOnMain, classification::started) { result ->
-                    // Before validity checks and retirement: a late focus handler
-                    // can make the original editing literal private.
-                    classification.received(result["sensitive"] as? Boolean, result["sensitivityKnown"] as? Boolean)
-                    val unknown = classification.unknown()
-                    consumeSensitivity(action, result["sensitive"] == true || unknown)
+        return withScriptDispatchDeadline(30_000, edit || dispatch, classification, { consumeSensitivity(action, true) }) {
+            ctx.evaluateAutomationJSON(expression, ::validOnMain, classification::started) { result ->
+                // Before validity checks and retirement: a late focus handler
+                // can make the original editing literal private.
+                classification.received(result["sensitive"] as? Boolean, result["sensitivityKnown"] as? Boolean)
+                if (edit && (result["sensitive"] == true || (result["sensitive"] == false && result["sensitivityKnown"] == true))) {
+                    editClassificationKnown = true
                 }
+                val unknown = classification.unknown()
+                consumeSensitivity(action, result["sensitive"] == true || unknown)
+                if (edit || dispatch) protectMalformedScriptReceipt(result, token) { consumeSensitivity(action, true) }
             }
-        } catch (error: Exception) {
-            // A lost classification cannot certify the inspected edit literal.
-            if (classification.unknown()) consumeSensitivity(action, true)
-            throw error
         }
     }
 
