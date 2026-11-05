@@ -16,6 +16,8 @@ final class IOSFrameSampler {
     private let startTime: TimeInterval
     private var initial: IOSWorkflowTab.Viewport?
     private var initialDocument: String?
+    private var firstSceneGeneration: String?
+    private var firstSceneDeadline: TimeInterval = 0
     private var busy = false
     private var stopping = false
     private var stepPending = false
@@ -240,8 +242,12 @@ final class IOSFrameSampler {
             }
         }
         #endif
+        if firstSceneGeneration != generation {
+            firstSceneGeneration = generation
+            firstSceneDeadline = ProcessInfo.processInfo.systemUptime + 2
+        }
         let viewport = try await IOSCaptureViewportStability.wait(
-            deadline: ProcessInfo.processInfo.systemUptime + 2,
+            deadline: firstSceneDeadline,
             check: { [self] in try await check(); try checkTime() },
             read: { [self] in
                 guard generation == tab.document else { return nil }
@@ -273,6 +279,57 @@ final class IOSFrameSampler {
         return viewport
     }
 
+    private func discardChangedSnapshot(
+        before: IOSWorkflowTab.Viewport,
+        after: IOSWorkflowTab.Viewport,
+        hasBaseline: Bool,
+        expected: String?,
+        reportInsets: () -> Void
+    ) throws -> Bool {
+        guard after != before else { return false }
+        let now = ProcessInfo.processInfo.systemUptime
+        let decision = IOSCaptureViewportStability.snapshotDecision(
+            before: before,
+            after: after,
+            hasBaseline: hasBaseline,
+            targetBound: expected != nil,
+            now: now,
+            deadline: firstSceneDeadline
+        )
+        if decision == .discard {
+            Self.geometryDiagnostic(before: before, after: after)
+            dropped += 1
+            return true
+        }
+        if !hasBaseline && expected == nil && now >= firstSceneDeadline {
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
+        }
+        let scrolled = after.bounds == before.bounds && after.content == before.content &&
+            after.fixtureDocumentID == before.fixtureDocumentID && after.layout == before.layout &&
+            after.visible.size == before.visible.size && after.scale == before.scale && after.pixelRatio == before.pixelRatio
+        guard scrolled else {
+            Self.diagnostic("snapshot-" + Self.resizeReason(initial: before, viewport: after))
+            Self.geometryDiagnostic(before: before, after: after)
+            reportInsets()
+            throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+        }
+        if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }
+        dropped += 1
+        return true
+    }
+
+    private static func composite(source: UIImage, state: IOSWorkflowPresentation.State, output: CGSize) throws -> CGImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: output, format: format).image { render in
+            source.draw(in: CGRect(origin: .zero, size: output))
+            state.draw(in: render.cgContext, size: output)
+        }
+        guard let frame = image.cgImage else { throw IOSWorkflowFailure("CAPTURE_FRAME_FAILED") }
+        return frame
+    }
+
     private func sample(step: Int?, document expected: String?, prepare: (() -> Void)? = nil) async throws -> Bool {
         busy = true
         defer {
@@ -287,7 +344,12 @@ final class IOSFrameSampler {
         let generation = tab.document
         if let expected, expected != generation { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
         guard let viewport = try await viewportForSample(generation: generation, expected: expected) else { return false }
-        try pinViewport(viewport, generation: generation)
+        let hasBaseline = initialDocument == generation
+        if hasBaseline {
+            try pinViewport(viewport, generation: generation)
+        } else {
+            try requirePinnedNativeViewport(viewport)
+        }
         guard generation == tab.document else {
             if expected != nil { throw IOSWorkflowFailure("CAPTURE_TARGET_DOCUMENT_CHANGED") }
             dropped += 1
@@ -317,30 +379,19 @@ final class IOSFrameSampler {
             return false
         }
         let after = try await tab.viewport()
-        if after != viewport {
-            let scrolled = after.bounds == viewport.bounds && after.content == viewport.content &&
-                after.fixtureDocumentID == viewport.fixtureDocumentID && after.layout == viewport.layout &&
-                after.visible.size == viewport.visible.size && after.scale == viewport.scale && after.pixelRatio == viewport.pixelRatio
-            guard scrolled else {
-                Self.diagnostic("snapshot-" + Self.resizeReason(initial: viewport, viewport: after))
-                Self.geometryDiagnostic(before: viewport, after: after)
-                #if DEBUG
-                Self.insetsDiagnostic(before: insetsBefore, after: Self.nativeInsets(view))
-                #endif
-                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_CHANGED")
+        let discarded = try discardChangedSnapshot(before: viewport, after: after, hasBaseline: hasBaseline, expected: expected) {
+            #if DEBUG
+            Self.insetsDiagnostic(before: insetsBefore, after: Self.nativeInsets(view))
+            #endif
+        }
+        if discarded { return false }
+        if !hasBaseline {
+            guard ProcessInfo.processInfo.systemUptime < firstSceneDeadline else {
+                throw IOSWorkflowFailure("CAPTURE_VIEWPORT_UNSTABLE")
             }
-            if expected != nil { throw IOSWorkflowFailure("STALE_TARGET") }
-            dropped += 1
-            return false
+            try pinViewport(viewport, generation: generation)
         }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = true
-        let image = UIGraphicsImageRenderer(size: output, format: format).image { render in
-            source.draw(in: CGRect(origin: .zero, size: output))
-            state.draw(in: render.cgContext, size: output)
-        }
-        guard let frame = image.cgImage else { throw IOSWorkflowFailure("CAPTURE_FRAME_FAILED") }
+        let frame = try Self.composite(source: source, state: state, output: output)
         lastAdmitted = try receive(frame, max(0, state.time - startTime), step, generation, viewport)
         return true
     }

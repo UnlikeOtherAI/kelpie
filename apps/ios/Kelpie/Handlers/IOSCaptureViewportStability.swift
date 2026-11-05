@@ -41,6 +41,20 @@ struct IOSCaptureViewportStability {
         return content.maxY >= viewport.bounds.height - bottom - pixelAllowance
     }
 
+    enum SnapshotDecision { case coherent, discard, fenced }
+
+    static func snapshotDecision(
+        before: IOSWorkflowTab.Viewport,
+        after: IOSWorkflowTab.Viewport,
+        hasBaseline: Bool,
+        targetBound: Bool,
+        now: TimeInterval,
+        deadline: TimeInterval
+    ) -> SnapshotDecision {
+        if before == after { return .coherent }
+        return !hasBaseline && !targetBound && now < deadline ? .discard : .fenced
+    }
+
     mutating func observe(_ viewport: IOSWorkflowTab.Viewport, at time: TimeInterval, admissible: Bool = true) -> Bool {
         if !admissible {
             previous = nil
