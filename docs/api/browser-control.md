@@ -191,7 +191,11 @@ Native workflow bindings use generated shared assets through
 The latter accepts `{target,key,token?,dispatch?,edit?,observe?,policy?}` with mutually exclusive
 operations. Optional private `policy:{refuseSensitive:boolean}` is the seventh fixed
 resolver argument; omitted policy preserves the six-argument behavior. Every explicit
-result carries token-latched `sensitive:boolean`, including failed checks. Capture
+result carries token-latched `sensitive:boolean` and `sensitivityKnown:boolean`,
+including failed checks. Only false sensitivity with known:true proves a
+nonsensitive target; missing token/new realm yields known:false. True sensitivity
+always protects. Old/malformed results missing the known flag are conservative
+after an attempted target evaluation. Capture
 runners set the policy and consume classification before post-evaluation guards,
 register edit text, and latch media discard. See [late sensitivity](../plans/browser-automation-capture/late-sensitive-target.md). These internal APIs do not resolve host secrets or authorize a workflow;
 the runner must enforce session ownership, binding and sensitivity/capture policy.
