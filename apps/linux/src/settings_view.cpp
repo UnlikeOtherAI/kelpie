@@ -58,6 +58,29 @@ void SettingsView::Refresh() {
     static_cast<LinuxApp*>(raw)->SetIsolateNewTabs(gtk_toggle_button_get_active(button));
   }),&app_);
   gtk_box_pack_start(GTK_BOX(content_),isolation,FALSE,FALSE,0);
+  gtk_box_pack_start(GTK_BOX(content_), gtk_label_new("Trusted computers — localhost is always allowed"), FALSE, FALSE, 8);
+  try {
+    for (const auto& computer : app_.ComputerApprovals().store().List()) {
+      const std::string address = computer.at("address");
+      auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+      const auto label = address + "  " + computer.at("name").get<std::string>();
+      gtk_box_pack_start(GTK_BOX(row), gtk_label_new(label.c_str()), TRUE, TRUE, 0);
+      auto* revoke = gtk_button_new_with_label("Revoke");
+      struct Action { SettingsView* self; std::string address; };
+      auto* action = new Action{this, address};
+      g_signal_connect_data(revoke, "clicked", G_CALLBACK(+[](GtkButton*, gpointer raw) {
+        const auto action = *static_cast<Action*>(raw);
+        try { action.self->app_.ComputerApprovals().store().Revoke(action.address); }
+        catch (...) { action.self->app_.ShowToast("Could not revoke this computer."); }
+        action.self->Refresh(); gtk_widget_show_all(action.self->dialog_);
+      }), action, +[](gpointer raw, GClosure*) { delete static_cast<Action*>(raw); }, GConnectFlags(0));
+      gtk_box_pack_start(GTK_BOX(row), revoke, FALSE, FALSE, 0);
+      gtk_box_pack_start(GTK_BOX(content_), row, FALSE, FALSE, 0);
+    }
+  } catch (...) {
+    gtk_box_pack_start(GTK_BOX(content_), gtk_label_new("Could not read trusted computers."), FALSE, FALSE, 0);
+  }
+
 #endif
 }
 

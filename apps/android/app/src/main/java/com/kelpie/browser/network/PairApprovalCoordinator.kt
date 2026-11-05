@@ -15,6 +15,9 @@ class PairApprovalCoordinator(
     private val _currentPrompt = MutableStateFlow<PairingStore.PendingRequest?>(null)
     val currentPrompt: StateFlow<PairingStore.PendingRequest?> = _currentPrompt
 
+    private val _approvalError = MutableStateFlow<String?>(null)
+    val approvalError: StateFlow<String?> = _approvalError
+
     fun refresh() {
         _currentPrompt.value = store.visiblePending().firstOrNull()
     }
@@ -23,12 +26,17 @@ class PairApprovalCoordinator(
         requestId: String,
         persist: Boolean,
     ) {
-        store.approve(requestId, persist)
+        if (store.approve(requestId, persist) == null) {
+            _approvalError.value = "Could not save approval. Check available storage and try again."
+            return
+        }
+        _approvalError.value = null
         refresh()
     }
 
     fun deny(requestId: String) {
         store.deny(requestId)
+        _approvalError.value = null
         refresh()
     }
 }

@@ -1,4 +1,5 @@
 #include "gui_shell.h"
+#include "computer_approval.h"
 #include "browser_chrome.h"
 #include "bookmarks_view.h"
 #include "gtk_browser_view.h"
@@ -50,7 +51,9 @@ int GUIShell::Run() {
     if(action==3)chrome.AccountMenu(url.widget());
     if(action==4) { settings.Refresh(); settings.Show(window); }
   };
-  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; unsigned tick=0; } context{app_,window,url,browser,chrome,toast};
+  gtk_widget_show_all(GTK_WIDGET(window));
+  ComputerApprovalView approvals(app_.ComputerApprovals(),window);
+  struct Context { LinuxApp& app; GtkWindow* window; UrlBar& url; GtkBrowserView& browser; BrowserChrome& chrome; ToastView& toast; ComputerApprovalView& approvals; unsigned tick=0; } context{app_,window,url,browser,chrome,toast,approvals};
   g_signal_connect(window,"delete-event",G_CALLBACK(+[](GtkWidget*,GdkEvent*,gpointer raw)->gboolean {
     static_cast<LinuxApp*>(raw)->RequestShutdown(); return TRUE; // Keep renderer and pump alive until drained.
   }),&app_);
@@ -70,7 +73,7 @@ int GUIShell::Run() {
     static_cast<LinuxApp*>(raw)->ReportFullscreenState(event->new_window_state&GDK_WINDOW_STATE_FULLSCREEN); return FALSE;
   }),&app_);
   const auto timer=g_timeout_add(16,+[](gpointer raw)->gboolean {
-    auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser();
+    auto& c=*static_cast<Context*>(raw); c.app.PumpBrowser(); c.approvals.Poll();
     if(!c.app.IsRunning()) { if(c.app.FinishShutdown())gtk_main_quit(); return G_SOURCE_CONTINUE; }
     if(c.app.WantsFullscreen()!=c.app.IsFullscreen()) { if(c.app.WantsFullscreen())gtk_window_fullscreen(c.window); else gtk_window_unfullscreen(c.window); }
     auto [width,height]=c.app.TakeResizeRequest();

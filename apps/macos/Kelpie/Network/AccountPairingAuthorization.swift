@@ -46,6 +46,7 @@ struct AccountPairingAuthorization {
         switch store.startPairing(
             clientId: clientId, clientName: value["clientName"] as? String ?? "", sourceAddress: sourceAddress, accountSession: current
         ) {
+        case .rateLimited: return error(429, "RATE_LIMITED", "Too many pending pairing requests")
         case .denied: return error(403, "DENIED", "Pair requests from this source are currently suppressed")
         case .created(let pending):
             return (202, ["status": "account_challenge", "requestId": pending.requestId, "expiresAt": pending.expiresAt])

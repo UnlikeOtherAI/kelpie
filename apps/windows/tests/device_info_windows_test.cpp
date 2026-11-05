@@ -20,7 +20,7 @@ int main() {
       device.value("engine", "") != "chromium" || device.value("port", 0) != 8421 ||
       device.value("width", 0) != 1440 || device.value("height", 0) != 900 ||
       device.value("version", "") != "0.1.1-test" || device.value("ip", "") != "127.0.0.1" ||
-      device.value("controlMode", "") != "loopback" || !device.contains("mcp") ||
+      device.value("controlMode", "") != "computer" || !device.contains("mcp") ||
       !device["mcp"].is_object() || device["mcp"].value("endpoint", "") != "/mcp" ||
       device["mcp"].value("stdio", true)) {
     return 2;

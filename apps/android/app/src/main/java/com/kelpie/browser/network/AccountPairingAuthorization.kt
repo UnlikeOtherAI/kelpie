@@ -53,6 +53,7 @@ class AccountPairingAuthorization(
             return PairEndpoints.JsonResult(200, mapOf("status" to "approved", "scope" to "session", "token" to issued.token, "expiresAt" to grantedExpiry))
         }
         val start = store.startPairing(clientId, string(value, "clientName").orEmpty(), sourceAddress, current)
+        if (start.result == PairingStore.PairStartResult.RATE_LIMITED) return error(429, "RATE_LIMITED", "Too many pending pairing requests")
         val pending = start.request ?: return error(403, "DENIED", "Pair requests from this source are currently suppressed")
         return PairEndpoints.JsonResult(202, mapOf("status" to "account_challenge", "requestId" to pending.requestId, "expiresAt" to pending.expiresAt))
     }

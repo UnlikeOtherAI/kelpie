@@ -1,4 +1,6 @@
 #include "windows_app.h"
+#include "computer_approval.h"
+#include "kelpie/desktop_http_server.h"
 #include "inference_view.h"
 
 #include "windows_utf.h"
@@ -106,6 +108,7 @@ int WindowsApp::Run(int show_command) {
       }
     }
     UpdateBrowserStateFromRuntime();
+    if (browser_ready && !close_lifecycle_.requested()) PollComputerApproval(desktop_app_->http_server().approvals(), shell_->hwnd());
     // A forced CEF close can outlive the first WM_CLOSE dispatch. Pump-driven
     // callbacks re-enter this owner loop and complete the same close request.
     TryCompleteClose();

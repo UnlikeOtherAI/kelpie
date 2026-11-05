@@ -24,6 +24,7 @@ import java.util.UUID
  */
 class PairingStore(
     private val file: File,
+    val trustedComputers: ComputerTrust = TrustedComputers(File(file.parentFile, "trusted-computers.json")),
 ) {
     @Serializable
     data class PairingRecord(
@@ -75,7 +76,7 @@ class PairingStore(
         val expiresAt: Long,
     )
 
-    enum class PairStartResult { CREATED, DENIED }
+    enum class PairStartResult { CREATED, DENIED, RATE_LIMITED }
 
     data class PairStart(
         val result: PairStartResult,
@@ -129,7 +130,6 @@ class PairingStore(
     private val sessions: MutableList<SessionApproval> = mutableListOf()
     private val pending: MutableMap<String, PendingRequest> = mutableMapOf()
     private val deniedSources: MutableMap<String, Long> = mutableMapOf()
-    private val pendingBySource: MutableMap<String, String> = mutableMapOf()
     private val pendingIssuances: MutableMap<String, PendingIssuance> = mutableMapOf()
 
     private val json =
@@ -181,24 +181,26 @@ class PairingStore(
     ): PairStart {
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
+            val canonical = trustedComputers.canonicalAddress(sourceAddress) ?: return PairStart(PairStartResult.DENIED)
+            val sources = pending.values.map { it.sourceAddress }.toSet()
+            if (pending.values.count { it.sourceAddress == canonical } >= 32 || (canonical !in sources && sources.size >= 8)) {
+                return PairStart(PairStartResult.RATE_LIMITED)
+            }
             val now = System.currentTimeMillis()
-            val expiresAt = deniedSources[sourceAddress] ?: 0
-            if (expiresAt > now) return PairStart(PairStartResult.DENIED)
-
-            pendingBySource[sourceAddress]?.let { existing -> pending.remove(existing) }
+            val expiresAt = deniedSources[canonical] ?: 0
+            if (expiresAt > now && trustedComputers.clientId(canonical) == null) return PairStart(PairStartResult.DENIED)
 
             val req =
                 PendingRequest(
                     requestId = generateRequestId(),
                     clientId = clientId,
                     clientName = sanitizeClientName(clientName),
-                    sourceAddress = sourceAddress,
+                    sourceAddress = canonical,
                     createdAt = now,
                     expiresAt = now + if (accountSession == null) PENDING_TTL_MS else 120_000,
                     accountSession = accountSession,
                 )
             pending[req.requestId] = req
-            pendingBySource[sourceAddress] = req.requestId
             return PairStart(PairStartResult.CREATED, req)
         }
     }
@@ -206,7 +208,11 @@ class PairingStore(
     fun visiblePending(): List<PendingRequest> =
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
-            pending.values.filter { it.accountSession == null }.sortedBy { it.createdAt }
+            pending.values
+                .filter { it.accountSession == null }
+                .sortedBy { it.createdAt }
+                .distinctBy { it.sourceAddress }
+                .filter { trustedComputers.clientId(it.sourceAddress) == null }
         }
 
     fun pendingRequest(requestId: String): PendingRequest? =
@@ -234,39 +240,27 @@ class PairingStore(
             ) {
                 return null
             }
+            if (persist && accountGrant == null) {
+                if (!trustedComputers.approve(entry.sourceAddress, entry.clientName)) return null
+                var result: Pair<String, String>? = null
+                val waiters = pending.values.filter { it.accountSession == null && it.sourceAddress == entry.sourceAddress }
+                for (waiter in waiters) {
+                    val token = generateToken()
+                    val now = System.currentTimeMillis()
+                    pendingIssuances[waiter.requestId] = PendingIssuance(token, "persistent", waiter.sourceAddress, now, now + PENDING_TTL_MS)
+                    pending.remove(waiter.requestId)
+                    if (waiter.requestId == requestId) result = token to "persistent"
+                }
+                return result
+            }
             pending.remove(requestId)
-            pendingBySource.remove(entry.sourceAddress)
 
             val token = generateToken()
             val hash = hashToken(token)
             val now = System.currentTimeMillis()
-            val scope: String
-            if (persist) {
-                persistent.removeAll { it.clientId == entry.clientId }
-                persistent.add(
-                    PairingRecord(
-                        clientId = entry.clientId,
-                        clientName = entry.clientName,
-                        tokenHashSha256 = hash,
-                        approvedAt = now,
-                        lastSeenAt = now,
-                    ),
-                )
-                persistLocked()
-                scope = "persistent"
-            } else {
-                sessions.removeAll { it.clientId == entry.clientId }
-                sessions.add(
-                    SessionApproval(
-                        clientId = entry.clientId,
-                        clientName = entry.clientName,
-                        tokenHashSha256 = hash,
-                        approvedAt = now,
-                        accountGrant = accountGrant,
-                    ),
-                )
-                scope = "session"
-            }
+            val scope = "session"
+            sessions.removeAll { it.clientId == entry.clientId }
+            sessions.add(SessionApproval(entry.clientId, entry.clientName, hash, now, accountGrant))
             pendingIssuances[requestId] =
                 PendingIssuance(
                     token = token,
@@ -286,8 +280,9 @@ class PairingStore(
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
             val issuance = pendingIssuances[requestId] ?: return null
-            if (issuance.sourceAddress != sourceAddress) return null
+            if (issuance.sourceAddress != trustedComputers.canonicalAddress(sourceAddress)) return null
             pendingIssuances.remove(requestId)
+            if (issuance.scope == "persistent" && trustedComputers.clientId(issuance.sourceAddress) == null) return null
             return issuance
         }
     }
@@ -295,14 +290,14 @@ class PairingStore(
     fun wasRecentlyDenied(sourceAddress: String): Boolean =
         synchronized(lock) {
             gcLocked(System.currentTimeMillis())
-            val expiresAt = deniedSources[sourceAddress] ?: 0
-            expiresAt > System.currentTimeMillis()
+            val canonical = trustedComputers.canonicalAddress(sourceAddress) ?: return@synchronized false
+            (deniedSources[canonical] ?: 0) > System.currentTimeMillis()
         }
 
     fun deny(requestId: String) {
         synchronized(lock) {
             val entry = pending.remove(requestId) ?: return
-            pendingBySource.remove(entry.sourceAddress)
+            if (entry.accountSession == null) pending.entries.removeAll { it.value.accountSession == null && it.value.sourceAddress == entry.sourceAddress }
             deniedSources[entry.sourceAddress] = System.currentTimeMillis() + DENY_TTL_MS
         }
     }
@@ -341,6 +336,16 @@ class PairingStore(
         }
     }
 
+    fun revokeComputer(address: String): Boolean {
+        val canonical = trustedComputers.canonicalAddress(address) ?: return false
+        if (!trustedComputers.revoke(canonical)) return false
+        synchronized(lock) {
+            pending.entries.removeAll { it.value.sourceAddress == canonical && it.value.accountSession == null }
+            pendingIssuances.entries.removeAll { it.value.sourceAddress == canonical && it.value.scope == "persistent" }
+        }
+        return true
+    }
+
     fun listPersistent(): List<PairingRecord> = synchronized(lock) { persistent.toList() }
 
     fun listSessions(): List<SessionApproval> =
@@ -358,8 +363,7 @@ class PairingStore(
     private fun gcLocked(now: Long) {
         val expired = pending.values.filter { it.expiresAt <= now }.map { it.requestId }
         for (id in expired) {
-            val entry = pending.remove(id) ?: continue
-            if (pendingBySource[entry.sourceAddress] == id) pendingBySource.remove(entry.sourceAddress)
+            pending.remove(id)
         }
         deniedSources.entries.removeAll { it.value <= now }
         pendingIssuances.entries.removeAll { it.value.expiresAt <= now }

@@ -42,11 +42,13 @@ class PairEndpoints(
 
         val start = store.startPairing(clientId, clientName, sourceAddress)
         return when (start.result) {
+            PairingStore.PairStartResult.RATE_LIMITED -> errorResult(429, "RATE_LIMITED", "Too many pending pairing requests")
             PairingStore.PairStartResult.DENIED ->
                 errorResult(403, "DENIED", "Pair requests from this source are currently suppressed")
             PairingStore.PairStartResult.CREATED -> {
                 val req = start.request ?: return errorResult(500, "INTERNAL", "Failed to create pending request")
-                onPendingChanged()
+                val approvalRequired = store.trustedComputers.clientId(req.sourceAddress) == null
+                if (approvalRequired) onPendingChanged() else store.approve(req.requestId, persist = true)
                 JsonResult(
                     status = 202,
                     json =
@@ -55,6 +57,7 @@ class PairEndpoints(
                             "requestId" to req.requestId,
                             "expiresAt" to req.expiresAt,
                             "sourceAddress" to req.sourceAddress,
+                            "approvalRequired" to approvalRequired,
                         ),
                 )
             }
@@ -65,15 +68,21 @@ class PairEndpoints(
         requestId: String?,
         sourceAddress: String,
     ): JsonResult {
+        onPendingChanged()
         if (requestId.isNullOrEmpty()) {
             return errorResult(400, "MISSING_PARAM", "requestId is required")
         }
         val pending = store.pendingRequest(requestId)
         if (pending != null) {
-            if (pending.sourceAddress != sourceAddress) {
+            if (pending.sourceAddress != store.trustedComputers.canonicalAddress(sourceAddress)) {
                 return JsonResult(200, mapOf("status" to "not_found"))
             }
-            return JsonResult(200, mapOf("status" to "pending"))
+            if (pending.accountSession == null && store.trustedComputers.clientId(pending.sourceAddress) != null) {
+                store.approve(requestId, persist = true)
+                onPendingChanged()
+            } else {
+                return JsonResult(200, mapOf("status" to "pending"))
+            }
         }
         val issuance = store.takeIssuance(requestId, sourceAddress)
         if (issuance != null) {
@@ -92,8 +101,11 @@ class PairEndpoints(
         return JsonResult(200, mapOf("status" to "not_found"))
     }
 
-    fun handlePairDelete(authenticatedClientId: String): JsonResult {
-        val removed = store.revoke(authenticatedClientId)
+    fun handlePairDelete(
+        authenticatedClientId: String,
+        computerAddress: String? = null,
+    ): JsonResult {
+        val removed = computerAddress?.let { store.revokeComputer(it) } ?: store.revoke(authenticatedClientId)
         return JsonResult(200, mapOf("success" to removed))
     }
 
@@ -101,6 +113,7 @@ class PairEndpoints(
         name: String,
         platform: String,
         version: String,
+        sourceAddress: String? = null,
     ): JsonResult =
         JsonResult(
             200,
@@ -108,7 +121,9 @@ class PairEndpoints(
                 "name" to name,
                 "platform" to platform,
                 "version" to version,
-                "requiresPairing" to true,
+                "requiresPairing" to (sourceAddress?.let { store.trustedComputers.clientId(it) } == null),
+                "approvalMode" to "computer",
+                "localhostTrusted" to true,
             ),
         )
 

@@ -81,4 +81,29 @@ describe("same-account pairing", () => {
     expect(result.status).toBe("error");
     expect(JSON.stringify(result)).not.toContain("credential-secret");
   });
+
+  it("uses explicit computer approval when the target has no account pairing protocol", async () => {
+    const calls = responses([
+      { status: 409, body: { error: { code: "ACCOUNT_PAIRING_UNAVAILABLE" } } },
+      { status: 202, body: { status: "pending", requestId: "manual", expiresAt: Date.now() + 300_000 } },
+      { status: 200, body: { status: "approved", scope: "persistent", token } },
+    ]);
+    const prompt = vi.fn();
+    expect((await pair({ ...ctx, onApprovalRequired: prompt })).status).toBe("approved");
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(calls).toHaveLength(3);
+    expect(calls.every(call => !JSON.stringify(call.init).includes("UOA-spendable-credential"))).toBe(true);
+    expect(JSON.parse(calls[1].init.body as string)).not.toHaveProperty("account");
+  });
+
+  it("does not announce another prompt for an already approved computer", async () => {
+    vi.stubEnv("KELPIE_UOA_ACCESS_TOKEN", "");
+    responses([
+      { status: 202, body: { status: "pending", requestId: "manual", approvalRequired: false } },
+      { status: 200, body: { status: "approved", scope: "persistent", token } },
+    ]);
+    const prompt = vi.fn();
+    expect((await pair({ ...ctx, accountAccessToken: async () => undefined, onApprovalRequired: prompt })).status).toBe("approved");
+    expect(prompt).not.toHaveBeenCalled();
+  });
 });

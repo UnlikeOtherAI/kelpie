@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(kelpie_windows VERSION 0.1.15 LANGUAGES CXX RC)
+project(kelpie_windows VERSION 0.1.16 LANGUAGES CXX RC)
 
 include(CTest)
 
@@ -122,6 +122,7 @@ set(WINDOWS_APP_SOURCES
   src/favicon_cache.cpp
   src/letter_avatar.cpp
   src/settings_view.cpp
+  src/computer_approval.cpp
   ${WINDOWS_INFERENCE_SOURCES}
   src/bookmarks_view.cpp
   src/history_view.cpp

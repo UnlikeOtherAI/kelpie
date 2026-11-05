@@ -1,4 +1,5 @@
 #include "kelpie/desktop_http_server.h"
+#include "control_http_server.h"
 
 #include <algorithm>
 #include <atomic>
@@ -28,12 +29,6 @@ void Draining(httplib::Response& response) {
       {"message", "The desktop runtime is shutting down"}}}});
 }
 
-bool IsLoopbackHost(const std::string& host) {
-  const std::size_t separator = host.rfind(':');
-  const std::string name = separator == std::string::npos ? host : host.substr(0, separator);
-  return name == "127.0.0.1" || name == "localhost" || name == "[::1]";
-}
-
 bool HasJsonContentType(const httplib::Request& request) {
   const std::string content_type = request.get_header_value("Content-Type");
   const std::size_t separator = content_type.find(';');
@@ -46,26 +41,25 @@ bool HasMcpAccept(const httplib::Request& request) {
          accept.find("text/event-stream") != std::string::npos;
 }
 
-bool ConstantTimeEqual(const std::string& left, const std::string& right) {
-  std::size_t difference = left.size() ^ right.size();
-  const std::size_t length = std::max(left.size(), right.size());
-  for (std::size_t index = 0; index < length; ++index) {
-    const unsigned char a = index < left.size() ? static_cast<unsigned char>(left[index]) : 0;
-    const unsigned char b = index < right.size() ? static_cast<unsigned char>(right[index]) : 0;
-    difference |= static_cast<std::size_t>(a ^ b);
-  }
-  return difference == 0;
-}
-
 }  // namespace
 
 class DesktopHttpServer::Impl {
  public:
   const DesktopRouter* router = nullptr;
   const DesktopMcpServer* mcp_server = nullptr;
-  httplib::Server server;
+  ControlHttpServer server;
   std::thread server_thread;
   Config config;
+  PeerApprovalQueue approvals;
+  RequestHandler request_handler;
+  explicit Impl(std::filesystem::path trust_path) : approvals(std::move(trust_path)) {}
+  DesktopRouter::Result Dispatch(std::string_view method, const nlohmann::json& body) const {
+    if (request_handler) {
+      auto result = request_handler(method, body);
+      return {result.first, std::move(result.second)};
+    }
+    return router->Dispatch(method, body);
+  }
   int bound_port = 0;
   bool running = false;
   mutable std::mutex admission_mutex;
@@ -122,18 +116,27 @@ class DesktopHttpServer::Impl {
     return active_requests == 0 && server_thread_finished.load();
   }
 
-  bool IsAuthorizedControlRequest(const httplib::Request& request, httplib::Response& response) const {
-    if (request.has_header("Origin") || !IsLoopbackHost(request.get_header_value("Host"))) {
-      Json(response, 403, {{"success", false}, {"error", {{"code", "FORBIDDEN"},
-          {"message", "Control requests must be a same-host local client request"}}}});
+  bool IsSafeControlRequest(const httplib::Request& request, httplib::Response& response) const {
+    const std::string site = request.get_header_value("Sec-Fetch-Site");
+    if (request.has_header("Transfer-Encoding") || request.get_header_value_count("Authorization") > 1 ||
+        request.get_header_value_count("Content-Length") > 1) {
+      Json(response, 400, {{"success", false}, {"error", {{"code", "BAD_REQUEST"}, {"message", "Ambiguous control headers"}}}});
       return false;
     }
-    const std::string expected = "Bearer " + config.control_token;
-    if (request.get_header_value_count("Authorization") != 1 ||
-        request.get_header_value("Authorization").size() > 1024 || config.control_token.empty() ||
-        !ConstantTimeEqual(request.get_header_value("Authorization"), expected)) {
+    if (request.has_header("Origin") || (!site.empty() && site != "none" && site != "same-origin") ||
+        request.get_header_value_count("Host") != 1 || !IsSafeControlHost(request.get_header_value("Host"))) {
+      Json(response, 403, {{"success", false}, {"error", {{"code", "FORBIDDEN"},
+          {"message", "Browser requests cannot use computer approval"}}}});
+      return false;
+    }
+    return true;
+  }
+
+  bool IsAuthorizedControlRequest(const httplib::Request& request, httplib::Response& response) const {
+    if (!IsSafeControlRequest(request, response)) return false;
+    if (!approvals.IsTrusted(request.remote_addr)) {
       Json(response, 401, {{"success", false}, {"error", {{"code", "UNAUTHORIZED"},
-          {"message", "A local control capability is required"}}}});
+          {"message", "Approve this computer on Kelpie"}}}});
       return false;
     }
     return true;
@@ -149,18 +152,25 @@ class DesktopHttpServer::Impl {
   }
 };
 
-DesktopHttpServer::DesktopHttpServer() : impl_(std::make_unique<Impl>()) {}
+DesktopHttpServer::DesktopHttpServer(std::filesystem::path trust_path) : impl_(std::make_unique<Impl>(std::move(trust_path))) {}
 
 DesktopHttpServer::~DesktopHttpServer() { Stop(); }
 
 void DesktopHttpServer::SetRouter(const DesktopRouter* router) { impl_->router = router; }
 
 void DesktopHttpServer::SetMcpServer(const DesktopMcpServer* server) { impl_->mcp_server = server; }
+void DesktopHttpServer::SetRequestHandler(RequestHandler handler) { impl_->request_handler = std::move(handler); }
 
 bool DesktopHttpServer::Start(const Config& config) {
-  if (impl_->router == nullptr || impl_->mcp_server == nullptr || impl_->running ||
-      config.control_token.empty() || !IsLoopbackHost(config.bind_host)) return false;
+  if (((impl_->router == nullptr || impl_->mcp_server == nullptr) && !impl_->request_handler) || impl_->running ||
+      (!CanonicalPeerAddress(config.bind_host) && config.bind_host != "localhost")) return false;
   impl_->config = config;
+  impl_->approvals.SetAvailable(config.approval_available);
+  impl_->server.request_read_budget = std::chrono::seconds(config.read_timeout_seconds);
+  impl_->server.new_task_queue = [] { return new httplib::ThreadPool(8, 32); };
+  impl_->server.set_exception_handler([](const httplib::Request&, httplib::Response& response, std::exception_ptr) {
+    Json(response, 500, {{"success", false}, {"error", {{"code", "INTERNAL_ERROR"}, {"message", "Request could not be completed"}}}});
+  });
   {
     std::lock_guard<std::mutex> lock(impl_->admission_mutex);
     impl_->accepting_requests = true;
@@ -171,17 +181,52 @@ bool DesktopHttpServer::Start(const Config& config) {
   impl_->server.Get("/health", [](const httplib::Request&, httplib::Response& response) {
     Json(response, 200, {{"status", "ok"}});
   });
-  impl_->server.Post("/v1/get-device-info", [this](const httplib::Request& request,
-                                                     httplib::Response& response) {
+  auto discovery = [this](const httplib::Request& request, httplib::Response& response) {
     auto lease = impl_->AcquireRequest();
     if (!lease) { Draining(response); return; }
+    auto result = impl_->Dispatch("get-device-info", nlohmann::json::object());
+    result.body["approvalMode"] = "computer";
+    result.body["localhostTrusted"] = true;
+    result.body["requiresPairing"] = !impl_->approvals.IsTrusted(request.remote_addr);
+    Json(response, result.status_code, result.body);
+  };
+  impl_->server.Post("/v1/get-device-info", discovery);
+  impl_->server.Get("/v1/get-device-info", discovery);
+  impl_->server.Post("/v1/pair", [this](const httplib::Request& request, httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
+    if (!impl_->IsSafeControlRequest(request, response)) return;
+    response.set_header("Cache-Control", "no-store");
     if (!HasJsonContentType(request)) {
-      Json(response, 415, {{"success", false}, {"error", {{"code", "INVALID_CONTENT_TYPE"},
-          {"message", "Discovery requests must use application/json"}}}});
+      Json(response, 415, {{"success", false}, {"error", {{"code", "UNSUPPORTED_MEDIA_TYPE"}, {"message", "JSON is required"}}}});
       return;
     }
-    const DesktopRouter::Result result = impl_->router->Dispatch("get-device-info", nlohmann::json::object());
-    Json(response, result.status_code, result.body);
+    try {
+      const auto result = impl_->approvals.Start(request.remote_addr, nlohmann::json::parse(request.body));
+      Json(response, result.status, result.body);
+    } catch (...) { Json(response, 400, {{"success", false}, {"error", {{"code", "INVALID_JSON"}, {"message", "Invalid pair request"}}}}); }
+  });
+  impl_->server.Get("/v1/pair/status", [this](const httplib::Request& request, httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
+    if (!impl_->IsSafeControlRequest(request, response)) return;
+    response.set_header("Cache-Control", "no-store");
+    Json(response, 200, impl_->approvals.Status(request.remote_addr, request.get_param_value("requestId")));
+  });
+  impl_->server.Delete("/v1/pair", [this](const httplib::Request& request, httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
+    if (!impl_->IsAuthorizedControlRequest(request, response)) return;
+    try { impl_->approvals.store().Revoke(request.remote_addr); Json(response, 200, {{"success", true}}); }
+    catch (...) { Json(response, 500, {{"success", false}, {"error", {{"code", "STORAGE_ERROR"}, {"message", "Could not revoke computer"}}}}); }
+  });
+  if (config.debug_page) impl_->server.Get("/debug/coordinate-calibration", [this](const httplib::Request& request, httplib::Response& response) {
+    auto lease = impl_->AcquireRequest();
+    if (!lease) { Draining(response); return; }
+    if (!impl_->IsAuthorizedControlRequest(request, response)) return;
+    const auto page = impl_->config.debug_page();
+    if (page.empty()) { Json(response, 404, {{"success", false}}); return; }
+    response.set_content(page, "text/html; charset=utf-8");
   });
   impl_->server.Get("/mcp", [](const httplib::Request&, httplib::Response& response) {
     response.status = 405;
@@ -208,9 +253,10 @@ bool DesktopHttpServer::Start(const Config& config) {
           {"error", {{"code", -32700}, {"message", "Invalid JSON"}}}});
       return;
     }
-    const nlohmann::json result = impl_->mcp_server->HandleRequest(body, impl_->McpConfig());
-    if (result.is_null()) { response.status = 202; return; }
-    Json(response, 200, result);
+    auto result = impl_->request_handler ? impl_->request_handler("mcp", body)
+        : std::make_pair(200, impl_->mcp_server->HandleRequest(body, impl_->McpConfig()));
+    if (result.second.is_null()) { response.status = 202; return; }
+    Json(response, result.first, result.second);
   });
   impl_->server.Post(R"(/v1/(.+))", [this](const httplib::Request& request,
                                             httplib::Response& response) {
@@ -235,19 +281,36 @@ bool DesktopHttpServer::Start(const Config& config) {
           {"message", "Request body must be a JSON object"}}}});
       return;
     }
-    const DesktopRouter::Result result = impl_->router->Dispatch(request.matches[1].str(), body);
+    const DesktopRouter::Result result = impl_->Dispatch(request.matches[1].str(), body);
     Json(response, result.status_code, result.body);
   });
 
   impl_->server.set_read_timeout(config.read_timeout_seconds, 0);
   impl_->server.set_write_timeout(config.write_timeout_seconds, 0);
-  if (config.port == 0) {
-    impl_->bound_port = impl_->server.bind_to_any_port(config.bind_host.c_str());
-    if (impl_->bound_port <= 0) return false;
-  } else {
-    if (!impl_->server.bind_to_port(config.bind_host.c_str(), config.port)) return false;
-    impl_->bound_port = config.port;
-  }
+  bool ipv6 = false;
+  bool socket_option_failed = false;
+  impl_->server.set_ipv6_v6only(false);
+  impl_->server.set_socket_options([&](socket_t socket) {
+    httplib::default_socket_options(socket);
+    if (ipv6) {
+      const int disabled = 0;
+      socket_option_failed = setsockopt(socket, IPPROTO_IPV6, IPV6_V6ONLY,
+          reinterpret_cast<const char*>(&disabled), sizeof(disabled)) != 0;
+    }
+  });
+  const auto bind = [&](const std::string& host) {
+    ipv6 = host == "::";
+    socket_option_failed = false;
+    const int port = config.port == 0 ? impl_->server.bind_to_any_port(host.c_str())
+        : (impl_->server.bind_to_port(host.c_str(), config.port) ? config.port : -1);
+    if (socket_option_failed && port > 0) { impl_->server.CloseUnstartedListener(); return -1; }
+    return port;
+  };
+  impl_->bound_port = bind(config.bind_host);
+  if (impl_->bound_port <= 0 && config.bind_host == "::") impl_->bound_port = bind("0.0.0.0");
+  // Socket options are needed only during bind; never retain stack references.
+  impl_->server.set_socket_options(httplib::default_socket_options);
+  if (impl_->bound_port <= 0) return false;
   impl_->server_thread_finished.store(false);
   impl_->server_thread = std::thread([this]() {
     impl_->server.listen_after_bind();
@@ -285,5 +348,6 @@ void DesktopHttpServer::Stop() {
 }
 bool DesktopHttpServer::IsRunning() const { return impl_->running; }
 int DesktopHttpServer::bound_port() const { return impl_->bound_port; }
+PeerApprovalQueue& DesktopHttpServer::approvals() { return impl_->approvals; }
 
 }  // namespace kelpie

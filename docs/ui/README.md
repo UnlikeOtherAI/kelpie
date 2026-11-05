@@ -127,3 +127,18 @@ Shutdown drains account and browser work before removing readiness and GTK views
 
 For VNC verification on a host running both Wayland and X11, launch with
 `GDK_BACKEND=x11 DISPLAY=:2` to select the VNC desktop explicitly.
+
+## Computer approval
+
+All platforms allow localhost automatically. A new remote socket IP shows one
+approval dialog with its address and a self-reported client label. **Allow computer**
+persists permission for every client and browser profile at that IP; **No/Deny**
+suppresses it for ten minutes. Multiple waiting callers share the decision.
+A save error leaves the dialog open and does not grant access.
+
+Settings shows **Trusted computers** with addresses, labels and individual
+**Revoke** actions. Windows opens this list from its Settings button; Linux lists
+it directly in Settings. Apple/Android retain separate earlier client approvals
+and account/temporary grants. Removing a computer applies to subsequent operations
+across profiles; localhost stays allowed. Headless desktops can reuse existing
+permissions but cannot show a new approval dialog.

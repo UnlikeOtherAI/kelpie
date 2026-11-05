@@ -9,8 +9,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 /**
- * "Always allow" must survive an app restart and later approvals: the next
- * store instance reads the same file and still accepts the issued bearer.
+ * Model approvals survive store replacement and are independent of client tokens.
  */
 class PairingPersistenceTest {
     @get:Rule
@@ -38,14 +37,14 @@ class PairingPersistenceTest {
     @Test
     fun alwaysAllowSurvivesRestartAndLaterApprovals() {
         val file = folder.root.resolve("pairings.json")
-        val first = PairingStore(file)
-        val minis = approveAlways(first, "minis", "192.168.1.215")
-        // A second approval replaces the existing file rather than appending.
-        val umac = approveAlways(first, "umac", "192.168.1.192")
+        val first = testPairingStore(file)
+        approveAlways(first, "minis", "192.168.1.215")
+        // A second computer preserves the first computer's permission.
+        approveAlways(first, "umac", "192.168.1.192")
 
-        val restarted = PairingStore(file)
-        assertEquals("minis", restarted.validateBearer(minis))
-        assertEquals("umac", restarted.validateBearer(umac))
-        assertEquals(2, restarted.listPersistent().size)
+        val restarted = testPairingStore(file)
+        assertEquals("host:192.168.1.215", restarted.trustedComputers.clientId("192.168.1.215"))
+        assertEquals("host:192.168.1.192", restarted.trustedComputers.clientId("192.168.1.192"))
+        assertEquals(2, restarted.trustedComputers.list().size)
     }
 }

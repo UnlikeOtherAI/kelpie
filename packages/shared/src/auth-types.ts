@@ -19,6 +19,8 @@ export interface PairRequest {
 /** Initial response from `POST /v1/pair`. */
 export interface PairResponse {
   status: "pending";
+  /** False when the socket peer is already trusted and no dialog is needed. */
+  approvalRequired?: boolean;
   /** Server-issued 32-byte CSPRNG nonce used to poll status. */
   requestId: string;
   /** Unix epoch ms when the pending request expires. */
@@ -58,5 +60,7 @@ export interface DeviceInfoPairing {
   name: string;
   platform: string;
   version: string;
-  requiresPairing: true;
+  requiresPairing: boolean;
+  approvalMode?: "computer";
+  localhostTrusted?: boolean;
 }

@@ -98,6 +98,7 @@ add_executable(kelpie-linux
   src/url_bar.cpp
   src/ui_theme.cpp
   src/settings_view.cpp
+  src/computer_approval.cpp
   src/bookmarks_view.cpp
   src/history_view.cpp
   src/network_inspector.cpp
@@ -115,7 +116,7 @@ target_compile_definitions(kelpie-linux
     KELPIE_LINUX_HAS_GTK=${KELPIE_LINUX_HAS_GTK}
     KELPIE_LINUX_HAS_FONTCONFIG=${KELPIE_LINUX_HAS_FONTCONFIG}
     KELPIE_LINUX_HAS_CEF=${KELPIE_LINUX_HAS_CEF}
-    KELPIE_LINUX_VERSION="0.1.15"
+    KELPIE_LINUX_VERSION="0.1.16"
 )
 
 if(KELPIE_LINUX_HAS_CEF)
@@ -223,12 +224,12 @@ endif()
 if(KELPIE_LINUX_HAS_CEF)
   target_sources(kelpie-linux PRIVATE src/linux_desktop_app.cpp src/linux_desktop_actions.cpp)
 else()
-  target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_app_api.cpp src/linux_browser_gateway.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)
+  target_sources(kelpie-linux PRIVATE src/http_server.cpp src/linux_app.cpp src/linux_stub_input.cpp src/linux_app_api.cpp src/linux_browser_gateway.cpp src/linux_stub_chrome.cpp src/tap_runtime_utils.cpp src/web_runtime_utils.cpp src/stub_renderer.cpp)
   if(BUILD_TESTING)
     add_executable(linux_http_server_test tests/http_server_test.cpp src/http_server.cpp)
     target_include_directories(linux_http_server_test PRIVATE src)
     target_compile_options(linux_http_server_test PRIVATE -UNDEBUG)
-    target_link_libraries(linux_http_server_test PRIVATE nlohmann_json::nlohmann_json Threads::Threads)
+    target_link_libraries(linux_http_server_test PRIVATE kelpie_engine_chromium_desktop nlohmann_json::nlohmann_json Threads::Threads)
     add_test(NAME linux_http_server_test COMMAND linux_http_server_test)
   endif()
 endif()

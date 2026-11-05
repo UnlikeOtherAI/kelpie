@@ -148,11 +148,12 @@ bool WindowsApp::InitializeDesktopRuntime() {
   runtime.engine_name = "chromium";
   runtime.port = config_.port;
   runtime.app_name = "kelpie";
-  runtime.app_version = "0.1.15";
+  runtime.app_version = "0.1.16";
   runtime.bookmark_action = [this](const std::string& action, const json& params) { return account_->BookmarkAction(action, params); };
   runtime.bookmarks_supplier = [this] { return account_->Bookmarks(); };
   runtime.start_stdio_mcp = config_.mcp_stdio;
-  runtime.bind_host = "127.0.0.1";
+  runtime.bind_host = "::";
+  runtime.approval_available = IsWindowVisible(shell_->hwnd());
   runtime.control_token = profile_session_.token();
   device_info_provider_.Configure(config_.port, config_.width, config_.height, runtime.app_version);
   runtime.device_info_provider = &device_info_provider_;

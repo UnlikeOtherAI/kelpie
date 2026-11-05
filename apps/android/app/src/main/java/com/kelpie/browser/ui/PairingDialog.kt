@@ -26,17 +26,18 @@ import com.kelpie.browser.network.PairApprovalCoordinator
  *
  * Per the design (Codex finding #24): "No" is the default button — first in
  * stacking order, prominent. Back-press / outside-tap is treated as denial.
- * "Always allow" is visually distinct (orange-tinted) and never the default.
+ * "Allow computer" is visually distinct (orange-tinted) and never the default.
  */
 @Composable
 fun PairingDialog(coordinator: PairApprovalCoordinator) {
     val prompt by coordinator.currentPrompt.collectAsState()
     val current = prompt ?: return
+    val approvalError by coordinator.approvalError.collectAsState()
 
     AlertDialog(
         onDismissRequest = { coordinator.deny(current.requestId) },
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false),
-        title = { Text("Allow this client to control this browser?") },
+        title = { Text("Allow this computer to control Kelpie?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Name (self-reported):", style = MaterialTheme.typography.labelSmall)
@@ -50,9 +51,10 @@ fun PairingDialog(coordinator: PairApprovalCoordinator) {
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    "This client will be able to navigate, type, screenshot, run JavaScript, and read cookies.",
+                    "Allow all clients at this IP to control Kelpie. This stays allowed until you revoke it in Settings.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                approvalError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
@@ -68,17 +70,11 @@ fun PairingDialog(coordinator: PairApprovalCoordinator) {
         dismissButton = {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { coordinator.approve(current.requestId, persist = false) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Yes, once")
-                }
-                OutlinedButton(
                     onClick = { coordinator.approve(current.requestId, persist = true) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF6C00)),
                 ) {
-                    Text("Always allow")
+                    Text("Allow computer")
                 }
             }
         },

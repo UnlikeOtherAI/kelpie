@@ -13,6 +13,10 @@ typedef struct KelpieConsoleStore* KelpieConsoleStoreRef;
 
 void kelpie_free_string(char* str);
 
+// JSON operations: normalize, safe-host, check, list, approve, revoke. Caller frees
+// the result with kelpie_free_string. Failure is {success:false,error:string}.
+char* kelpie_peer_trust_request(const char* path, const char* operation, const char* body);
+
 KelpieBookmarkStoreRef kelpie_bookmark_store_create(void);
 void kelpie_bookmark_store_destroy(KelpieBookmarkStoreRef store);
 void kelpie_bookmark_store_add(KelpieBookmarkStoreRef store, const char* title, const char* url);

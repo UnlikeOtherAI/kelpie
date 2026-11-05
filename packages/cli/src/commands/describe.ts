@@ -34,8 +34,20 @@ async function defaultIsPaired(device: DiscoveredDevice): Promise<boolean> {
   if (getSessionCache().get(device.id, device.ip, device.port)) return true;
   if ((await getTokenStore().get(device.id, device.ip, device.port)) !== undefined) return true;
   // An approval pinned to another of this device's sockets is reused too.
-  return getSessionCache().pinnedHosts(device.id, device.port).length > 0 ||
-    (await getTokenStore().pinnedHosts(device.id, device.port)).length > 0;
+  if (getSessionCache().pinnedHosts(device.id, device.port).length > 0 ||
+    (await getTokenStore().pinnedHosts(device.id, device.port)).length > 0) return true;
+  // IP permission requires no client token. This public probe never starts pairing
+  // or forwards a credential, and older servers retain their existing behavior.
+  const host = device.ip.includes(":") && !device.ip.startsWith("[") ? `[${device.ip}]` : device.ip;
+  try {
+    const response = await fetch(`http://${host}:${device.port}/v1/get-device-info`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+      redirect: "error", signal: AbortSignal.timeout(1500),
+    });
+    if (!response.ok) return false;
+    const info = await response.json() as { approvalMode?: string; requiresPairing?: boolean };
+    return info.approvalMode === "computer" && info.requiresPairing === false;
+  } catch { return false; }
 }
 
 function answeringBinaryPath(): string {

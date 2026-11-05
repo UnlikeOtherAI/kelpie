@@ -231,7 +231,7 @@ export async function pair(ctx: PairContext): Promise<PairResult> {
   if (!initial.ok) {
     return { status: "error", code: initial.code, message: initial.message };
   }
-  ctx.onApprovalRequired?.();
+  if (initial.pending.approvalRequired !== false) ctx.onApprovalRequired?.();
   return pollPairStatus(ctx, initial.pending.requestId);
 }
 

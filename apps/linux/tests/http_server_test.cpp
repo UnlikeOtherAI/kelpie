@@ -9,7 +9,7 @@
 #include <string>
 
 // The fallback (non-CEF) Linux server must follow the desktop control
-// contract: loopback only, bearer token on every /v1/* call, no CORS grant.
+// contract: localhost needs no token; LAN peers need approval; browsers get no CORS grant.
 namespace {
 std::string Send(int port, const std::string& request) {
   const int fd=socket(AF_INET,SOCK_STREAM,0); assert(fd>=0);
@@ -35,14 +35,13 @@ int main() {
   std::atomic<int> handled{0};
   kelpie::linuxapp::HttpServer server;
   std::string error;
-  assert(!server.Start(18420,"",[](std::string_view,const nlohmann::json&,int*) { return nlohmann::json::object(); },&error));
   assert(server.Start(18420,"secret-token",[&handled](std::string_view endpoint,const nlohmann::json& body,int*) {
     ++handled;
     if (endpoint == "mcp" && !body.contains("id")) return nlohmann::json(nullptr); return nlohmann::json{{"success",true},{"endpoint",std::string(endpoint)}};
   },&error));
   const int port=server.port();
 
-  // Bound to loopback only: the host's own LAN addresses refuse the port.
+  // A same-machine LAN connection is still a remote socket address and needs approval.
   ifaddrs* interfaces=nullptr;
   assert(getifaddrs(&interfaces)==0);
   for(const ifaddrs* entry=interfaces;entry!=nullptr;entry=entry->ifa_next) {
@@ -51,24 +50,23 @@ int main() {
     if(ntohl(address.sin_addr.s_addr)>>24==127) continue;
     address.sin_port=htons(static_cast<uint16_t>(port));
     const int fd=socket(AF_INET,SOCK_STREAM,0);
-    assert(connect(fd,reinterpret_cast<sockaddr*>(&address),sizeof(address))!=0);
-    close(fd);
+    assert(connect(fd,reinterpret_cast<sockaddr*>(&address),sizeof(address))==0);
+    const std::string request="POST /v1/get-url HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}";
+    assert(send(fd,request.data(),request.size(),0)>0);
+    char response[4096]{}; assert(recv(fd,response,sizeof(response)-1,0)>0);
+    assert(StatusIs(response,401)); close(fd);
   }
   freeifaddrs(interfaces);
-
-  assert(StatusIs(Post(port,""),401));
-  assert(StatusIs(Post(port,"Authorization: Bearer wrong-token\r\n"),401));
-  assert(StatusIs(Post(port,"Authorization: Bearer secret-token\r\nAuthorization: Bearer secret-token\r\n"),401));
-  assert(handled==0);
-
-  const std::string accepted=Post(port,"authorization: bearer secret-token\r\n");
+  assert(StatusIs(Post(port,""),200));
+  assert(StatusIs(Post(port,"Authorization: Bearer wrong-token\r\n"),200));
+  assert(StatusIs(Post(port,"Origin: https://evil.test\r\n"),403));
+  const std::string accepted=Post(port,"");
   assert(StatusIs(accepted,200));
   assert(accepted.find("\"endpoint\":\"get-url\"")!=std::string::npos);
-  assert(handled==1);
 
   const std::string rpc="{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}";
   const auto mcp_request = [&](const std::string& header) { return "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\n"+header+"Content-Length: "+std::to_string(rpc.size())+"\r\n\r\n"+rpc; };
-  assert(StatusIs(Send(port,mcp_request("")),401));
+  assert(StatusIs(Send(port,mcp_request("")),200));
   const auto mcp=Send(port,mcp_request("Authorization: Bearer secret-token\r\n"));
   assert(StatusIs(mcp,200));
   assert(mcp.find("\"endpoint\":\"mcp\"")!=std::string::npos);

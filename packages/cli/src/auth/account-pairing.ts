@@ -45,6 +45,8 @@ export async function pairAccount(ctx: AccountPairContext): Promise<AccountPairR
   const identity = { clientId: ctx.clientId, clientName: ctx.clientName, account: true };
   try {
     const challenge = await post(target, identity, timeout);
+    if (challenge.status === 409 && challenge.data.error && typeof challenge.data.error === "object"
+      && (challenge.data.error as { code?: unknown }).code === "ACCOUNT_PAIRING_UNAVAILABLE") return undefined;
     if (challenge.status !== 202 || challenge.data.status !== "account_challenge"
       || typeof challenge.data.requestId !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(challenge.data.requestId)
       || typeof challenge.data.expiresAt !== "number" || challenge.data.expiresAt <= Date.now()

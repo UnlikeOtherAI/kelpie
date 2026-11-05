@@ -1,4 +1,5 @@
 #include "settings_view.h"
+#include "computer_approval.h"
 
 #include <commdlg.h>
 #include <shlobj.h>
@@ -90,6 +91,8 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
                       16, 168, 100, 28, hwnd, reinterpret_cast<HMENU>(3250), nullptr, nullptr);
       CreateWindowExW(0, L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                       344, 168, 88, 28, hwnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
+      CreateWindowExW(0, L"BUTTON", L"Trusted computers", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
+                      16, 208, 160, 28, hwnd, reinterpret_cast<HMENU>(3251), nullptr, nullptr);
       return 0;
     }
     case WM_CTLCOLORSTATIC:
@@ -118,6 +121,9 @@ LRESULT CALLBACK SettingsProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
     }
     case WM_COMMAND:
       switch (LOWORD(wparam)) {
+        case 3251:
+          ShowTrustedComputers(hwnd);
+          return 0;
         case 3250:
           if (state->show_ai) state->show_ai(hwnd);
           return 0;
@@ -183,7 +189,7 @@ bool SettingsView::ShowModal(HINSTANCE instance,
   state.show_ai = std::move(show_ai);
   HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, kClassName, L"Settings",
                                 WS_POPUP | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT,
-                                456, 250, owner, nullptr, instance, &state);
+                                456, 290, owner, nullptr, instance, &state);
   if (dialog == nullptr) {
     return false;
   }

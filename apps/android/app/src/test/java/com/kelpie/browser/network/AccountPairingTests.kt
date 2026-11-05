@@ -13,7 +13,7 @@ import org.junit.rules.TemporaryFolder
 class AccountPairingTests {
     @get:Rule val folder = TemporaryFolder()
 
-    private fun store() = PairingStore(java.io.File(folder.newFolder(), "pairing.json"))
+    private fun store() = testPairingStore(java.io.File(folder.newFolder(), "pairing.json"))
 
     private fun body(challenge: String? = null) =
         buildJsonObject {
@@ -29,7 +29,7 @@ class AccountPairingTests {
     private fun request(
         token: String,
         duplicate: Boolean = false,
-        source: String = "peer",
+        source: String = "192.0.2.10",
     ) = ParsedRequest(
         "POST",
         "/v1/browser-control",
@@ -39,10 +39,10 @@ class AccountPairingTests {
     )
 
     private suspend fun connect(auth: AccountPairingAuthorization): Pair<String, String> {
-        val challenge = auth.handlePost(body(), "peer")
+        val challenge = auth.handlePost(body(), "192.0.2.10")
         assertEquals(202, challenge.status)
         val id = challenge.json["requestId"] as String
-        val approved = auth.handlePost(body(id), "peer")
+        val approved = auth.handlePost(body(id), "192.0.2.10")
         assertEquals(200, approved.status)
         assertEquals("session", approved.json["scope"])
         return id to approved.json["token"] as String
@@ -64,7 +64,7 @@ class AccountPairingTests {
             assertNull(store.validateBearer(token))
             assertEquals(AuthDecision.Authenticated("client"), auth.evaluate(request(token)))
             assertEquals(AuthDecision.Authenticated("client"), auth.evaluate(request(token)))
-            assertEquals(401, (auth.evaluate(request(token, source = "another-peer")) as AuthDecision.Reject).status)
+            assertEquals(401, (auth.evaluate(request(token, source = "192.0.2.11")) as AuthDecision.Reject).status)
             assertEquals(3, checks)
             assertNull(store().accountApproval(token))
         }
@@ -92,15 +92,15 @@ class AccountPairingTests {
         runBlocking {
             val store = store()
             val auth = AccountPairingAuthorization(store, { "session" }, { _, _, _, _ -> System.currentTimeMillis() + 60_000 })
-            val challenge = auth.handlePost(body(), "peer").json["requestId"] as String
+            val challenge = auth.handlePost(body(), "192.0.2.10").json["requestId"] as String
             assertTrue(store.visiblePending().isEmpty())
             assertNull(store.approve(challenge, true))
             assertEquals(403, auth.handlePost(body(challenge), "other-peer").status)
-            assertEquals(200, auth.handlePost(body(challenge), "peer").status)
-            assertEquals(403, auth.handlePost(body(challenge), "peer").status)
-            assertNull(store.takeIssuance(challenge, "peer"))
+            assertEquals(200, auth.handlePost(body(challenge), "192.0.2.10").status)
+            assertEquals(403, auth.handlePost(body(challenge), "192.0.2.10").status)
+            assertNull(store.takeIssuance(challenge, "192.0.2.10"))
             assertTrue(store.revoke("client"))
-            assertEquals(403, auth.handlePost(body(), "peer").status)
+            assertEquals(403, auth.handlePost(body(), "192.0.2.10").status)
         }
 
     @Test fun signOutDuringVerificationCannotIssueAccess() =
@@ -112,8 +112,8 @@ class AccountPairingTests {
                     session = null
                     System.currentTimeMillis() + 60_000
                 })
-            val challenge = auth.handlePost(body(), "peer").json["requestId"] as String
-            assertEquals(403, auth.handlePost(body(challenge), "peer").status)
+            val challenge = auth.handlePost(body(), "192.0.2.10").json["requestId"] as String
+            assertEquals(403, auth.handlePost(body(challenge), "192.0.2.10").status)
             assertTrue(store.listSessions().isEmpty())
         }
 
@@ -122,8 +122,8 @@ class AccountPairingTests {
             for (offset in listOf(-1L, 121_000L)) {
                 val store = store()
                 val auth = AccountPairingAuthorization(store, { "session" }, { _, _, _, _ -> System.currentTimeMillis() + offset })
-                val challenge = auth.handlePost(body(), "peer").json["requestId"] as String
-                assertEquals(403, auth.handlePost(body(challenge), "peer").status)
+                val challenge = auth.handlePost(body(), "192.0.2.10").json["requestId"] as String
+                assertEquals(403, auth.handlePost(body(challenge), "192.0.2.10").status)
                 assertTrue(store.listSessions().isEmpty())
             }
         }

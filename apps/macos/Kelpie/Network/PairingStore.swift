@@ -59,6 +59,7 @@ final class PairingStore: @unchecked Sendable {
 
     private let lock = NSLock()
     private let storeURL: URL?
+    let trustedComputers: TrustedComputers
 
     /// Persistent pairings (token hashes only).
     private var persistent: [PairingRecord] = []
@@ -68,8 +69,6 @@ final class PairingStore: @unchecked Sendable {
     private var pending: [String: PendingRequest] = [:]
     /// Source-address suppression: addr → expiresAt (ms).
     private var deniedSources: [String: Double] = [:]
-    /// One visible pending request per source address. addr → requestId.
-    private var pendingBySource: [String: String] = [:]
     /// Pending issuances: an approved pairing has produced a token; the next
     /// status poll for that requestId from the originating source receives it
     /// exactly once and the entry is deleted.
@@ -85,6 +84,7 @@ final class PairingStore: @unchecked Sendable {
 
     init(storeURL: URL? = PairingStore.defaultStoreURL()) {
         self.storeURL = storeURL
+        trustedComputers = TrustedComputers(pairingStoreURL: storeURL)
         load()
     }
 
@@ -199,25 +199,27 @@ final class PairingStore: @unchecked Sendable {
     enum PairStartResult {
         case created(PendingRequest)
         case denied  // source address in suppression window
+        case rateLimited
     }
 
     /// Returns a fresh pending entry, or `denied` if this source address is in
-    /// the current 10-minute denial window. Same source + same clientId is
-    /// idempotent (replaces the prior pending entry).
+    /// the current 10-minute denial window. Each caller keeps an independent
+    /// challenge, while the approval UI groups requests by source address.
     func startPairing(clientId: String, clientName: String, sourceAddress: String, accountSession: String? = nil) -> PairStartResult {
         lock.lock()
         defer { lock.unlock() }
 
         gcLocked(now: nowMs())
-
-        if let expiresAt = deniedSources[sourceAddress], expiresAt > nowMs() {
-            return .denied
+        guard let sourceAddress = TrustedComputers.canonicalAddress(sourceAddress) else { return .denied }
+        let sources = Set(pending.values.map(\.sourceAddress))
+        if pending.values.filter({ $0.sourceAddress == sourceAddress }).count >= 32 ||
+            (!sources.contains(sourceAddress) && sources.count >= 8) {
+            return .rateLimited
         }
 
-        // Coalesce: if this source already has a visible pending prompt,
-        // replace it. Spammers from one source cannot accumulate.
-        if let existingId = pendingBySource[sourceAddress] {
-            pending.removeValue(forKey: existingId)
+        if trustedComputers.clientId(for: sourceAddress) == nil,
+           let expiresAt = deniedSources[sourceAddress], expiresAt > nowMs() {
+            return .denied
         }
 
         let req = PendingRequest(
@@ -230,7 +232,6 @@ final class PairingStore: @unchecked Sendable {
             accountSession: accountSession
         )
         pending[req.requestId] = req
-        pendingBySource[sourceAddress] = req.requestId
         return .created(req)
     }
 
@@ -239,7 +240,11 @@ final class PairingStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         gcLocked(now: nowMs())
-        return pending.values.filter { $0.accountSession == nil }.sorted { $0.createdAt < $1.createdAt }
+        var sources = Set<String>()
+        return pending.values.filter { $0.accountSession == nil }
+            .sorted { $0.createdAt < $1.createdAt }
+            .filter { sources.insert($0.sourceAddress).inserted }
+            .filter { trustedComputers.clientId(for: $0.sourceAddress) == nil }
     }
 
     func pendingRequest(requestId: String) -> PendingRequest? {
@@ -263,39 +268,38 @@ final class PairingStore: @unchecked Sendable {
             guard !persist, accountGrant.expiresAt > nowMs(), accountGrant.challenge == requestId,
                   accountGrant.sourceAddress == entry.sourceAddress else { return nil }
         }
+        if persist, accountGrant == nil {
+            guard trustedComputers.approve(address: entry.sourceAddress, name: entry.clientName) else { return nil }
+            var result: (token: String, scope: String)?
+            let waiters = pending.values.filter { $0.accountSession == nil && $0.sourceAddress == entry.sourceAddress }
+            for waiter in waiters {
+                let token = Self.generateToken()
+                pendingIssuances[waiter.requestId] = PendingIssuance(
+                    token: token,
+                    scope: "persistent",
+                    sourceAddress: waiter.sourceAddress,
+                    createdAt: nowMs(),
+                    expiresAt: nowMs() + Self.pendingTTLSeconds * 1_000
+                )
+                pending.removeValue(forKey: waiter.requestId)
+                if waiter.requestId == requestId { result = (token, "persistent") }
+            }
+            return result
+        }
         pending.removeValue(forKey: requestId)
-        pendingBySource.removeValue(forKey: entry.sourceAddress)
 
         let token = Self.generateToken()
         let hash = Self.hashToken(token)
         let now = nowMs()
-        let scope: String
-        if persist {
-            persistent.removeAll { $0.clientId == entry.clientId }
-            persistent.append(
-                PairingRecord(
-                    clientId: entry.clientId,
-                    clientName: entry.clientName,
-                    tokenHashSha256: hash,
-                    approvedAt: now,
-                    lastSeenAt: now
-                )
-            )
-            persistLocked()
-            scope = "persistent"
-        } else {
-            sessions.removeAll { $0.clientId == entry.clientId }
-            sessions.append(
-                SessionApproval(
-                    clientId: entry.clientId,
-                    clientName: entry.clientName,
-                    tokenHashSha256: hash,
-                    approvedAt: now,
-                    accountGrant: accountGrant
-                )
-            )
-            scope = "session"
-        }
+        let scope = "session"
+        sessions.removeAll { $0.clientId == entry.clientId }
+        sessions.append(SessionApproval(
+            clientId: entry.clientId,
+            clientName: entry.clientName,
+            tokenHashSha256: hash,
+            approvedAt: now,
+            accountGrant: accountGrant
+        ))
         pendingIssuances[requestId] = PendingIssuance(
             token: token,
             scope: scope,
@@ -313,15 +317,17 @@ final class PairingStore: @unchecked Sendable {
         defer { lock.unlock() }
         gcLocked(now: nowMs())
         guard let issuance = pendingIssuances[requestId] else { return nil }
-        guard issuance.sourceAddress == sourceAddress else { return nil }
+        guard issuance.sourceAddress == TrustedComputers.canonicalAddress(sourceAddress) else { return nil }
         pendingIssuances.removeValue(forKey: requestId)
+        if issuance.scope == "persistent", trustedComputers.clientId(for: issuance.sourceAddress) == nil { return nil }
         return issuance
     }
 
     func wasRecentlyDenied(sourceAddress: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
         gcLocked(now: nowMs())
-        if let exp = deniedSources[sourceAddress], exp > nowMs() { return true }
+        guard let address = TrustedComputers.canonicalAddress(sourceAddress) else { return false }
+        if let exp = deniedSources[address], exp > nowMs() { return true }
         return false
     }
 
@@ -331,7 +337,9 @@ final class PairingStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard let entry = pending.removeValue(forKey: requestId) else { return }
-        pendingBySource.removeValue(forKey: entry.sourceAddress)
+        if entry.accountSession == nil {
+            pending = pending.filter { $0.value.accountSession != nil || $0.value.sourceAddress != entry.sourceAddress }
+        }
         deniedSources[entry.sourceAddress] = nowMs() + Self.denyTTLSeconds * 1_000
     }
 
@@ -386,6 +394,16 @@ final class PairingStore: @unchecked Sendable {
         return false
     }
 
+    /// Computer authority is never inferred from a caller-selected client id.
+    @discardableResult
+    func revokeComputer(address input: String) -> Bool {
+        guard let address = TrustedComputers.canonicalAddress(input), trustedComputers.revoke(address: address) else { return false }
+        lock.lock(); defer { lock.unlock() }
+        pending = pending.filter { $0.value.sourceAddress != address || $0.value.accountSession != nil }
+        pendingIssuances = pendingIssuances.filter { $0.value.sourceAddress != address || $0.value.scope != "persistent" }
+        return true
+    }
+
     // MARK: - Settings UI queries
 
     func listPersistent() -> [PairingRecord] {
@@ -411,11 +429,7 @@ final class PairingStore: @unchecked Sendable {
         // Drop expired pending requests + their source mapping.
         let expiredIds = pending.values.filter { $0.expiresAt <= now }.map(\.requestId)
         for id in expiredIds {
-            if let entry = pending.removeValue(forKey: id) {
-                if pendingBySource[entry.sourceAddress] == id {
-                    pendingBySource.removeValue(forKey: entry.sourceAddress)
-                }
-            }
+            pending.removeValue(forKey: id)
         }
         // Drop expired denial entries + stale issuances.
         deniedSources = deniedSources.filter { $0.value > now }

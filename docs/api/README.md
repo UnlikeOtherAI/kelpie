@@ -24,7 +24,7 @@ All methods are available via three interfaces:
 
 - Base URL: `http://{device-ip}:{port}/v1/`
 - Content-Type: `application/json`
-- Auth: bearer token via `Authorization: Bearer <token>`. `POST /v1/pair` accepts a verified shared-account proof or on-device approval (see [Pairing & Auth](#pairing--auth) below). Deny-by-default — only `/v1/pair`, `/v1/pair/status`, `/v1/get-device-info`, and `/health` are reachable without a token.
+- Auth: actual loopback socket peers and approved remote IPs need no bearer. Unknown remote clients use `POST /v1/pair` and one on-device computer approval. Legacy bearer tokens and narrow shared-account grants remain supported on Apple/Android. See [Pairing & Auth](#pairing--auth).
 - Default Port: `8420`
 - Port fallback: if `8420` is already occupied, the app binds the next available local port and advertises that port via mDNS and `get-device-info`
 - Concurrency: The common native gateway and legacy browser mutations share one admission lease. A competing operation returns `BUSY`; it is never replayed automatically. A timed-out renderer operation retains the lease until its callback retires; later explicit requests can then reconcile or continue without restarting.
@@ -33,25 +33,29 @@ All methods are available via three interfaces:
 
 ## Pairing & Auth
 
-The HTTP server denies every `/v1/*` and `/mcp` call by default. The CLI obtains a bearer through verified same-account access or manual on-device approval. The same-account [challenge contract](account-pairing.md) uses the existing pair endpoint and never opens the approval prompt.
+Actual loopback peers (`127/8`, `::1`, IPv4-mapped loopback) are allowed automatically. Other socket IPs require one persistent computer approval, a retained legacy bearer, or verified account authority. The [account challenge contract](account-pairing.md) never creates persistent computer permission.
 
 ### Endpoints
 
 | Method | Auth | Body | Response |
 |---|---|---|---|
-| `POST /v1/pair` | none + CSRF gate | `{clientId, clientName}` | `202 {status: "pending", requestId, expiresAt, sourceAddress}` |
-| `GET /v1/pair/status?requestId=…` | none | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?, token?}` |
-| `DELETE /v1/pair` | bearer | — | `200 {success: true}` — revokes the caller's own pairing |
-| `GET or POST /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing: true}` |
+| `POST /v1/pair` | none + request safety gate | `{clientId, clientName}` | `202 {status: "pending", requestId, expiresAt, sourceAddress, approvalRequired}` |
+| `GET /v1/pair/status?requestId=…` | source-bound | — | `200 {status: "pending"\|"approved"\|"denied"\|"expired"\|"not_found", scope?, token?}` |
+| `DELETE /v1/pair` | approved peer or legacy bearer | — | `200 {success: boolean}` — revokes the caller's computer permission, or the authenticated legacy client |
+| `GET or POST /v1/get-device-info` | none | — | `200 {name, platform, version, requiresPairing, approvalMode: "computer", localhostTrusted: true}` |
 
-The CSRF gate on `POST /v1/pair` requires `Content-Type: application/json`, an absent `Origin` header, single `Authorization` / `Content-Length` headers, and no `Transfer-Encoding`. Browsers cannot satisfy these constraints; the CLI's plain `fetch` does.
+`requiresPairing` describes the calling socket. `approvalRequired: false` means explicit pairing can finish without a dialog. Clients must tolerate the field being absent on older servers. Each caller receives its own random challenge and exactly-once opaque token; concurrent requests share a visible prompt, not a challenge. A new computer-issued token is compatibility material and never grants another IP permission. The durable authority is the approved source address.
 
-### Token lifecycle
+### Request safety and permission lifecycle
 
-1. CLI generates a stable `clientId` (per-install UUID) and sends `POST /v1/pair` with a self-reported `clientName`.
-2. Device displays a modal showing `clientName` (labeled self-reported) and the socket peer address (authoritative).
-3. User picks one of `Yes once` (in-memory session), `Always allow` (persistent), or `No` (suppresses re-prompts from that source for 10 minutes).
-4. CLI polls `GET /v1/pair/status?requestId=…`. On approval, the plaintext bearer is returned **exactly once**, and the device persists only the SHA-256 hash. Token comparison on subsequent requests is constant-time over the 32-byte digest.
+1. CLI sends a stable client id and self-reported display label. Neither is authority.
+2. Unknown remote IPs show **Allow this computer to control Kelpie?** with the socket address. **Allow computer** persists address permission; **No/Deny** suppresses the source for ten minutes.
+3. Already approved IPs and loopback skip the dialog. All browser-control and MCP capabilities use that permission across clients and profiles, including after restart.
+4. Settings **Revoke** removes address permission for subsequent operations across running processes. Already dispatched effects are not undone. Legacy client and account permissions remain independently revocable on Apple/Android.
+
+IP permission is not host-key pinning: an IP change requires approval, IP reuse inherits approval, and a local proxy/tunnel has loopback permission. Numeric socket addresses are normalized in the shared native core; forwarded headers are ignored as identity. IPv6 interface scopes remain part of the address.
+
+Computer-authorized control requests require no browser `Origin`, no cross-site fetch metadata, one safe numeric/local Host, unambiguous framing and JSON for POST. The pairing endpoints enforce the same gate. Public discovery is read-only. Windows/Linux listen on IPv4 and IPv6 and deny unknown remote control before dispatch. Headless instances return `409 APPROVAL_UNAVAILABLE` for a new remote address.
 
 ### Source-address binding
 
@@ -61,13 +65,16 @@ The server records the socket peer when `POST /v1/pair` is received. If a later 
 
 | Code | HTTP Status | When |
 |---|---|---|
-| `UNAUTHORIZED` | 401 | Missing/invalid/expired bearer token |
+| `UNAUTHORIZED` | 401 | Socket IP is unapproved and no valid legacy/account authority is supplied |
 | `DENIED` | 403 | Pair requests from this source are currently suppressed |
 | `MISSING_PARAM` | 400 | `POST /v1/pair` missing `clientId` or status poll missing `requestId` |
 | `INVALID_JSON` | 400 | `POST /v1/pair` body was not valid JSON |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | `POST /v1/pair` did not use `Content-Type: application/json` |
 | `FORBIDDEN` | 403 | `POST /v1/pair` included a browser `Origin` header |
 | `BAD_REQUEST` | 400 | Duplicate `Authorization` / `Content-Length` or any `Transfer-Encoding` header |
+| `APPROVAL_UNAVAILABLE` | 409 | New remote IP cannot be approved by a headless Windows/Linux instance |
+| `ACCOUNT_PAIRING_UNAVAILABLE` | 409 | Target does not offer account pairing; ordinary `kelpie pair` can request computer approval |
+| `RATE_LIMITED` | 429 | Desktop pending challenge limit reached |
 
 ---
 

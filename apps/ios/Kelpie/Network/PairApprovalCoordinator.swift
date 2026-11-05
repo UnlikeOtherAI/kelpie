@@ -10,6 +10,8 @@ final class PairApprovalCoordinator: ObservableObject {
     /// Last decision the user took, used by the prompt sheet to dismiss itself.
     @Published private(set) var lastResolvedRequestId: String?
 
+    @Published private(set) var approvalError: String?
+
     let store: PairingStore
 
     init(store: PairingStore) {
@@ -23,13 +25,18 @@ final class PairApprovalCoordinator: ObservableObject {
     }
 
     func approve(requestId: String, persist: Bool) {
-        _ = store.approve(requestId: requestId, persist: persist)
+        guard store.approve(requestId: requestId, persist: persist) != nil else {
+            approvalError = "Could not save approval. Check available storage and try again."
+            return
+        }
+        approvalError = nil
         lastResolvedRequestId = requestId
         refresh()
     }
 
     func deny(requestId: String) {
         store.deny(requestId: requestId)
+        approvalError = nil
         lastResolvedRequestId = requestId
         refresh()
     }

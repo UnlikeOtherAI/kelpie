@@ -8,6 +8,9 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #include <httplib.h>
 
@@ -17,7 +20,9 @@
 
 int main() {
   kelpie::DesktopRouter router;
-  router.Register("navigate", [](const nlohmann::json& params) {
+  std::atomic<int> navigations{0};
+  router.Register("navigate", [&](const nlohmann::json& params) {
+    ++navigations;
     return nlohmann::json{{"success", true}, {"url", params.value("url", std::string())}};
   });
   std::mutex mutation_mutex;
@@ -39,11 +44,14 @@ int main() {
   mcp.SetRegistry(&registry);
   const kelpie::DesktopMcpServer::Config gateway_config;
   router.Register("browser-control", [&](const nlohmann::json& request) { return mcp.HandleBrowserRequest(request, gateway_config); });
-  kelpie::DesktopHttpServer server;
+  const auto fixture_root = std::filesystem::temp_directory_path() / ("kelpie-http-trust-" + kelpie::PeerRequestNonce());
+  const auto trust_file = fixture_root / "trusted-computers.json";
+  kelpie::DesktopHttpServer server(trust_file);
   server.SetRouter(&router);
   server.SetMcpServer(&mcp);
   kelpie::DesktopHttpServer::Config config;
   config.port = 0;
+  config.read_timeout_seconds = 1;
   config.control_token = "test-capability";
   assert(server.Start(config));
 
@@ -54,15 +62,65 @@ int main() {
     if (!health) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   assert(health && health->status == 200);
+  // Slow headers and bodies expire on a total budget even while bytes arrive.
+  // Another worker must continue serving ordinary local requests meanwhile.
+  for (const bool partial_body : {false, true}) {
+    const socket_t slow = socket(AF_INET, SOCK_STREAM, 0);
+    assert(slow != INVALID_SOCKET);
+#ifdef SO_NOSIGPIPE
+    const int suppress_sigpipe = 1;
+    setsockopt(slow, SOL_SOCKET, SO_NOSIGPIPE, &suppress_sigpipe, sizeof(suppress_sigpipe));
+#endif
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(static_cast<std::uint16_t>(server.bound_port()));
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    assert(connect(slow, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0);
+#ifdef _WIN32
+    const DWORD receive_timeout = 4000;
+#else
+    const timeval receive_timeout{4, 0};
+#endif
+    setsockopt(slow, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&receive_timeout), sizeof(receive_timeout));
+    const std::string prefix = partial_body
+        ? "POST /v1/navigate HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 300\r\n\r\n{"
+        : "POST /v1/navigate HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Slow: ";
+    assert(send(slow, prefix.data(), static_cast<int>(prefix.size()), 0) > 0);
+    std::atomic<bool> finished{false};
+    std::thread writer([&] {
+      while (!finished) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+#ifdef MSG_NOSIGNAL
+        const int flags = MSG_NOSIGNAL;
+#else
+        const int flags = 0;
+#endif
+        if (send(slow, " ", 1, flags) <= 0) break;
+      }
+    });
+    const auto concurrent_health = client.Get("/health");
+    assert(concurrent_health && concurrent_health->status == 200);
+    char response[4096]{};
+    const auto count = recv(slow, response, sizeof(response), 0);
+    finished = true;
+    writer.join();
+    assert(count >= 0);  // a timeout (-1) would mean the drip kept the worker alive
+    assert(navigations == 0);
+#ifdef _WIN32
+    closesocket(slow);
+#else
+    close(slow);
+#endif
+  }
   const auto no_token = client.Post("/v1/navigate", "{}", "application/json");
-  assert(no_token && no_token->status == 401);
+  assert(no_token && no_token->status == 200);
 
   const httplib::Headers control_headers = {{"Authorization", "Bearer test-capability"}};
   const auto navigate = client.Post("/v1/navigate", control_headers,
                                     R"({"url":"https://example.com"})", "application/json");
   assert(navigate && navigate->status == 200);
   const auto core_denied = client.Post("/v1/browser-control", "{}", "application/json");
-  assert(core_denied && core_denied->status == 401);
+  assert(core_denied && core_denied->status == 200);
   const auto core = client.Post("/v1/browser-control", control_headers,
     R"({"version":1,"method":"tab.goto","tabId":"a","params":{"url":"https://example.com"}})", "application/json");
   assert(core && core->status == 200 && nlohmann::json::parse(core->body)["ok"] == true);
@@ -85,6 +143,65 @@ int main() {
   const auto notification = client.Post("/mcp", mcp_headers,
       R"({"jsonrpc":"2.0","method":"tools/list"})", "application/json");
   assert(notification && notification->status == 202 && notification->body.empty());
+
+  // Use the machine's real LAN source address when one is available. The UDP
+  // connect only selects a route; it sends no datagram to the documentation IP.
+  const socket_t route = socket(AF_INET, SOCK_DGRAM, 0);
+  sockaddr_in destination{};
+  destination.sin_family = AF_INET; destination.sin_port = htons(9);
+  destination.sin_addr.s_addr = htonl(0xc0000201);
+  sockaddr_in local{};
+  socklen_t local_size = sizeof(local);
+  if (route != INVALID_SOCKET && connect(route, reinterpret_cast<sockaddr*>(&destination), sizeof(destination)) == 0 &&
+      getsockname(route, reinterpret_cast<sockaddr*>(&local), &local_size) == 0 && ntohl(local.sin_addr.s_addr) >> 24 != 127) {
+    char host[INET_ADDRSTRLEN]{};
+    assert(inet_ntop(AF_INET, &local.sin_addr, host, sizeof(host)));
+    httplib::Client remote(host, server.bound_port());
+    remote.set_connection_timeout(2);
+    const auto denied = remote.Post("/v1/navigate", {{"X-Forwarded-For", "127.0.0.1"}}, "{}", "application/json");
+    assert(denied && denied->status == 401);
+    const auto unavailable = remote.Post("/v1/pair", R"({"clientId":"remote"})", "application/json");
+    assert(unavailable && unavailable->status == 409);
+    server.approvals().SetAvailable(true);
+    const auto first = remote.Post("/v1/pair", R"({"clientId":"remote-a","clientName":"Fixture A"})", "application/json");
+    const auto second = remote.Post("/v1/pair", R"({"clientId":"remote-b","clientName":"Fixture B"})", "application/json");
+    assert(first && first->status == 202 && second && second->status == 202);
+    const auto first_id = nlohmann::json::parse(first->body).at("requestId").get<std::string>();
+    const auto second_id = nlohmann::json::parse(second->body).at("requestId").get<std::string>();
+    assert(first_id != second_id);
+    const auto stolen = client.Get("/v1/pair/status?requestId=" + first_id);
+    assert(stolen && nlohmann::json::parse(stolen->body)["status"] == "not_found");
+    assert(server.approvals().Approve(first_id));
+    for (const auto& id : {first_id, second_id}) {
+      const auto approved = remote.Get("/v1/pair/status?requestId=" + id);
+      assert(approved && nlohmann::json::parse(approved->body)["status"] == "approved");
+    }
+    assert(server.approvals().Pending().is_null());
+    const auto permitted = remote.Post("/v1/navigate", "{}", "application/json");
+    assert(permitted && permitted->status == 200);
+    const httplib::Headers remote_mcp = {{"Accept", "application/json, text/event-stream"}};
+    const auto mcp_allowed = remote.Post("/mcp", remote_mcp, R"({"jsonrpc":"2.0","id":4,"method":"initialize"})", "application/json");
+    assert(mcp_allowed && mcp_allowed->status == 200);
+    kelpie::DesktopHttpServer restarted(trust_file);
+    restarted.SetRouter(&router); restarted.SetMcpServer(&mcp);
+    assert(restarted.Start(config));
+    httplib::Client after_restart(host, restarted.bound_port());
+    const auto reused = after_restart.Post("/v1/navigate", "{}", "application/json");
+    assert(reused && reused->status == 200 && restarted.approvals().Pending().is_null());
+    server.approvals().store().Revoke(host);
+    const auto revoked = after_restart.Post("/v1/navigate", "{}", "application/json");
+    assert(revoked && revoked->status == 401);
+    const auto mcp_revoked = remote.Post("/mcp", remote_mcp, R"({"jsonrpc":"2.0","id":5,"method":"initialize"})", "application/json");
+    assert(mcp_revoked && mcp_revoked->status == 401);
+    restarted.Stop();
+  }
+  if (route != INVALID_SOCKET) {
+#ifdef _WIN32
+    closesocket(route);
+#else
+    close(route);
+#endif
+  }
 
   // A close gate must allow work admitted before listener shutdown to finish,
   // but it must not admit a later durable-state mutation before persistence.
@@ -171,5 +288,7 @@ int main() {
   destroy.join();
   assert(destructor_result && *destructor_result && (*destructor_result)->status == 200);
   assert(destructor_finished.load());
+
+  std::filesystem::remove_all(fixture_root);
   return 0;
 }

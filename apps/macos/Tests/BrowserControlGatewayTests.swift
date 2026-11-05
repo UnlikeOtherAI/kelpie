@@ -30,7 +30,7 @@ final class BrowserControlGatewayTests: XCTestCase {
         }
         for path in ["/v1/browser-control", "/mcp"] {
             let denied = try await fetch(port: port, path: path, body: [:], token: nil)
-            XCTAssertEqual(denied.0, 401)
+            XCTAssertEqual(denied.0, 200, "Localhost must not need pairing")
         }
         let unsupportedGet = try await fetch(port: port, path: "/mcp", body: [:], token: token, method: "GET")
         XCTAssertEqual(unsupportedGet.0, 405)
@@ -62,11 +62,11 @@ final class BrowserControlGatewayTests: XCTestCase {
         let internalRoute = try await fetch(port: port, path: "/v1/browser-control-evaluate", body: ["expression": "alert(1)"], token: token)
         XCTAssertEqual(internalRoute.0, 404)
         let unauthenticatedDelete = try await fetch(port: port, path: "/v1/pair", body: [:], token: nil, method: "DELETE")
-        XCTAssertEqual(unauthenticatedDelete.0, 401)
+        XCTAssertEqual(unauthenticatedDelete.0, 200)
         let revoked = try await fetch(port: port, path: "/v1/pair", body: [:], token: token, method: "DELETE")
         XCTAssertEqual(revoked.0, 200)
         let oldBearer = try await fetch(port: port, path: "/v1/browser-control", body: ["version": 1, "method": "tabs.list", "params": [:]], token: token)
-        XCTAssertEqual(oldBearer.0, 401, "Authenticated DELETE must revoke only its own pairing")
+        XCTAssertEqual(oldBearer.0, 200, "Localhost remains trusted after client-token revocation")
     }
 
     func testReadonlyCannotSwitchOrWriteAndSelectedReaderDoesNotRetarget() async {

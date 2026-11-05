@@ -39,10 +39,10 @@ describe("browser store", () => {
     token: "a".repeat(32), controlMode: "loopback",
     mcp: { http: true, stdio: false, endpoint: "/mcp" },
   };
-  it("reads a private regular readiness file", async () => {
+  it.each(["loopback", "computer"])("reads a private regular %s readiness file", async (controlMode) => {
     const file = path.join(homeDir, "readiness.json");
-    await writeFile(file, JSON.stringify(capability), { mode: 0o600 });
-    await expect(readLocalReadiness(file)).resolves.toEqual(capability);
+    await writeFile(file, JSON.stringify({ ...capability, controlMode }), { mode: 0o600 });
+    await expect(readLocalReadiness(file)).resolves.toEqual({ ...capability, controlMode });
     await expect(readLocalReadiness(homeDir)).resolves.toBeUndefined();
   });
   it.skipIf(process.platform === "win32")("rejects shared POSIX permissions and symlinks", async () => {

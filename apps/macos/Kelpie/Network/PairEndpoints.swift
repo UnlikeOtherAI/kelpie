@@ -20,33 +20,45 @@ struct PairEndpoints {
         let clientName = (parsed["clientName"] as? String) ?? ""
 
         switch store.startPairing(clientId: clientId, clientName: clientName, sourceAddress: sourceAddress) {
+        case .rateLimited:
+            return (429, errorBody(code: "RATE_LIMITED", message: "Too many pending pairing requests"))
         case .denied:
             return (403, errorBody(code: "DENIED", message: "Pair requests from this source are currently suppressed"))
         case .created(let req):
-            if let hook = onPendingChanged {
+            let approvalRequired = store.trustedComputers.clientId(for: req.sourceAddress) == nil
+            if !approvalRequired { _ = store.approve(requestId: req.requestId, persist: true) }
+            if approvalRequired, let hook = onPendingChanged {
                 Task { @MainActor in hook() }
             }
             return (202, [
                 "status": "pending",
                 "requestId": req.requestId,
                 "expiresAt": Int(req.expiresAt),
-                "sourceAddress": req.sourceAddress
+                "sourceAddress": req.sourceAddress,
+                "approvalRequired": approvalRequired
             ])
         }
     }
 
     /// GET /v1/pair/status?requestId=…
     func handlePairStatus(query: String, sourceAddress: String) -> (status: Int, json: [String: Any]) {
+        defer {
+            if let hook = onPendingChanged { Task { @MainActor in hook() } }
+        }
         guard let requestId = HTTPRequestParser.queryValue("requestId", in: query), !requestId.isEmpty else {
             return (400, errorBody(code: "MISSING_PARAM", message: "requestId is required"))
         }
         // Source-address binding: if the pending request exists but the
         // socket peer differs, do not leak status at all.
         if let pending = store.pendingRequest(requestId: requestId) {
-            if pending.sourceAddress != sourceAddress {
+            if pending.sourceAddress != TrustedComputers.canonicalAddress(sourceAddress) {
                 return (200, ["status": "not_found"])
             }
-            return (200, ["status": "pending"])
+            if pending.accountSession == nil, store.trustedComputers.clientId(for: pending.sourceAddress) != nil {
+                _ = store.approve(requestId: requestId, persist: true)
+            } else {
+                return (200, ["status": "pending"])
+            }
         }
         // The pending entry might have been consumed by approval; check both
         // session and persistent stores for the issuance side-channel.
@@ -67,18 +79,20 @@ struct PairEndpoints {
 
     /// DELETE /v1/pair (authenticated). Revokes the pairing identified by the
     /// validated bearer token. Any `clientId` query parameter is ignored.
-    func handlePairDelete(authenticatedClientId: String) -> (status: Int, json: [String: Any]) {
-        let removed = store.revoke(clientId: authenticatedClientId)
+    func handlePairDelete(authenticatedClientId: String, computerAddress: String? = nil) -> (status: Int, json: [String: Any]) {
+        let removed = computerAddress.map { store.revokeComputer(address: $0) } ?? store.revoke(clientId: authenticatedClientId)
         return (200, ["success": removed])
     }
 
     /// GET or POST /v1/get-device-info (unauthenticated, public capability advert).
-    func handleGetDeviceInfo(name: String, platform: String, version: String) -> (status: Int, json: [String: Any]) {
+    func handleGetDeviceInfo(name: String, platform: String, version: String, sourceAddress: String? = nil) -> (status: Int, json: [String: Any]) {
         (200, [
             "name": name,
             "platform": platform,
             "version": version,
-            "requiresPairing": true
+            "requiresPairing": sourceAddress.flatMap { store.trustedComputers.clientId(for: $0) } == nil,
+            "approvalMode": "computer",
+            "localhostTrusted": true
         ])
     }
 

@@ -7,17 +7,17 @@ final class AccountPairingTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: ["account": true, "clientId": "client", "clientName": "Client"].merging(fields) { _, new in new })
     }
 
-    private func request(_ token: String, duplicate: Bool = false, source: String = "peer") -> ParsedHTTPRequest {
+    private func request(_ token: String, duplicate: Bool = false, source: String = "192.0.2.10") -> ParsedHTTPRequest {
         ParsedHTTPRequest(method: "POST", path: "/v1/browser-control", query: "",
                           headers: ["authorization": duplicate ? ["Bearer \(token)", "Bearer other"] : ["Bearer \(token)"]],
                           body: Data(), sourceAddress: source, hasTransferEncoding: false)
     }
 
     private func connect(_ auth: AccountPairingAuthorization) async throws -> (challenge: String, token: String) {
-        let started = await auth.handlePost(body: try body(), sourceAddress: "peer")
+        let started = await auth.handlePost(body: try body(), sourceAddress: "192.0.2.10")
         XCTAssertEqual(started.status, 202)
         let challenge = try XCTUnwrap(started.json["requestId"] as? String)
-        let approved = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "peer")
+        let approved = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "192.0.2.10")
         XCTAssertEqual(approved.status, 200)
         XCTAssertEqual(approved.json["scope"] as? String, "session")
         return (challenge, try XCTUnwrap(approved.json["token"] as? String))
@@ -39,7 +39,7 @@ final class AccountPairingTests: XCTestCase {
         let second = await auth.evaluate(request(connected.token))
         XCTAssertEqual(first, .authenticated(clientId: "client"))
         XCTAssertEqual(second, first)
-        let otherPeer = await auth.evaluate(request(connected.token, source: "another-peer"))
+        let otherPeer = await auth.evaluate(request(connected.token, source: "192.0.2.11"))
         guard case .reject(401, _, _) = otherPeer else { return XCTFail("Account bearer must stay source-bound") }
         XCTAssertEqual(checks, 3)
         XCTAssertNil(PairingStore(storeURL: nil).accountApproval(connected.token))
@@ -69,20 +69,21 @@ final class AccountPairingTests: XCTestCase {
         let auth = AccountPairingAuthorization(store: store, session: { "session" }, verify: { _, _, _, _ in
             Date().timeIntervalSince1970 * 1_000 + 60_000
         })
-        let started = await auth.handlePost(body: try body(), sourceAddress: "peer")
+        let started = await auth.handlePost(body: try body(), sourceAddress: "192.0.2.10")
         let challenge = try XCTUnwrap(started.json["requestId"] as? String)
         XCTAssertTrue(store.visiblePending().isEmpty)
         XCTAssertNil(store.approve(requestId: challenge, persist: true))
+        XCTAssertTrue(store.trustedComputers.list().isEmpty, "A UOA challenge cannot create computer permission")
         let proof = try body(["requestId": challenge, "accountTicket": "proof"])
-        let stolen = await auth.handlePost(body: proof, sourceAddress: "another-peer")
+        let stolen = await auth.handlePost(body: proof, sourceAddress: "192.0.2.11")
         XCTAssertEqual(stolen.status, 403)
-        let accepted = await auth.handlePost(body: proof, sourceAddress: "peer")
+        let accepted = await auth.handlePost(body: proof, sourceAddress: "192.0.2.10")
         XCTAssertEqual(accepted.status, 200)
-        let replay = await auth.handlePost(body: proof, sourceAddress: "peer")
+        let replay = await auth.handlePost(body: proof, sourceAddress: "192.0.2.10")
         XCTAssertEqual(replay.status, 403)
-        XCTAssertNil(store.takeIssuance(for: challenge, sourceAddress: "peer"))
+        XCTAssertNil(store.takeIssuance(for: challenge, sourceAddress: "192.0.2.10"))
         XCTAssertTrue(store.revoke(clientId: "client"))
-        let suppressed = await auth.handlePost(body: try body(), sourceAddress: "peer")
+        let suppressed = await auth.handlePost(body: try body(), sourceAddress: "192.0.2.10")
         XCTAssertEqual(suppressed.status, 403)
     }
 
@@ -93,9 +94,9 @@ final class AccountPairingTests: XCTestCase {
             session = nil
             return Date().timeIntervalSince1970 * 1_000 + 60_000
         })
-        let started = await auth.handlePost(body: try body(), sourceAddress: "peer")
+        let started = await auth.handlePost(body: try body(), sourceAddress: "192.0.2.10")
         let challenge = try XCTUnwrap(started.json["requestId"] as? String)
-        let result = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "peer")
+        let result = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "192.0.2.10")
         XCTAssertEqual(result.status, 403)
         XCTAssertTrue(store.listSessions().isEmpty)
     }
@@ -106,9 +107,9 @@ final class AccountPairingTests: XCTestCase {
             let auth = AccountPairingAuthorization(store: store, session: { "session" }, verify: { _, _, _, _ in
                 Date().timeIntervalSince1970 * 1_000 + offset
             })
-            let started = await auth.handlePost(body: try body(), sourceAddress: "peer")
+            let started = await auth.handlePost(body: try body(), sourceAddress: "192.0.2.10")
             let challenge = try XCTUnwrap(started.json["requestId"] as? String)
-            let result = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "peer")
+            let result = await auth.handlePost(body: try body(["requestId": challenge, "accountTicket": "proof"]), sourceAddress: "192.0.2.10")
             XCTAssertEqual(result.status, 403)
             XCTAssertTrue(store.listSessions().isEmpty)
         }

@@ -1,8 +1,7 @@
 import XCTest
 @testable import Kelpie
 
-/// "Always allow" must survive an app restart and later approvals: the next
-/// store instance reads the same file and still accepts the issued bearer.
+/// Computer permissions survive app restarts and later approvals without client tokens.
 final class PairingPersistenceTests: XCTestCase {
     private var storeURL: URL!
 
@@ -26,15 +25,16 @@ final class PairingPersistenceTests: XCTestCase {
 
     func testAlwaysAllowSurvivesRestartAndLaterApprovals() throws {
         let first = PairingStore(storeURL: storeURL)
-        let mini = try approveAlways(first, clientId: "minis", source: "192.168.1.215")
-        // A second approval replaces the existing file rather than appending.
-        let umac = try approveAlways(first, clientId: "umac", source: "192.168.1.192")
+        _ = try approveAlways(first, clientId: "minis", source: "192.168.1.215")
+        // A second computer must preserve the first computer's permission.
+        _ = try approveAlways(first, clientId: "umac", source: "192.168.1.192")
 
         let restarted = PairingStore(storeURL: storeURL)
-        XCTAssertEqual(restarted.validateBearer(mini), "minis")
-        XCTAssertEqual(restarted.validateBearer(umac), "umac")
-        XCTAssertEqual(restarted.listPersistent().count, 2)
-        let mode = try FileManager.default.attributesOfItem(atPath: storeURL.path)[.posixPermissions] as? Int
+        XCTAssertEqual(restarted.trustedComputers.clientId(for: "192.168.1.215"), "host:192.168.1.215")
+        XCTAssertEqual(restarted.trustedComputers.clientId(for: "192.168.1.192"), "host:192.168.1.192")
+        XCTAssertEqual(restarted.trustedComputers.list().count, 2)
+        let trustURL = storeURL.deletingLastPathComponent().appendingPathComponent("trusted-computers.json")
+        let mode = try FileManager.default.attributesOfItem(atPath: trustURL.path)[.posixPermissions] as? Int
         XCTAssertEqual(mode, 0o600)
     }
 }

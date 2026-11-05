@@ -84,12 +84,12 @@ class BrowserGatewayTests {
     }
 
     @Test fun deniesBothUnauthenticatedRoutesAndAcceptsOnlyIssuedBearer() {
-        val store = PairingStore(folder.root.resolve("pairings.json"))
+        val store = testPairingStore(folder.root.resolve("pairings.json"))
         val auth = AuthMiddleware(store)
         for (path in listOf("/v1/browser-control", "/mcp")) {
-            val request = ParsedRequest("POST", path, emptyMap(), false, "127.0.0.1")
+            val request = ParsedRequest("POST", path, emptyMap(), false, "192.0.2.10")
             assertEquals(401, (auth.evaluate(request) as AuthDecision.Reject).status)
-            val pending = store.startPairing("gateway-$path", "Gateway test", "127.0.0.1").request!!
+            val pending = store.startPairing("gateway-$path", "Gateway test", "192.0.2.10").request!!
             val token = store.approve(pending.requestId, persist = false)!!.first
             assertTrue(auth.evaluate(request.copy(headers = mapOf("authorization" to listOf("Bearer $token")))) is AuthDecision.Authenticated)
             assertEquals(400, (auth.evaluate(request.copy(headers = mapOf("authorization" to listOf("Bearer $token", "Bearer $token")))) as AuthDecision.Reject).status)
@@ -117,11 +117,11 @@ class BrowserGatewayTests {
     }
 
     @Test fun disposablePairingRevocationRequiresIssuedBearer() {
-        val store = PairingStore(folder.root.resolve("revoke-pairings.json"))
+        val store = testPairingStore(folder.root.resolve("revoke-pairings.json"))
         val auth = AuthMiddleware(store)
-        val pending = store.startPairing("gateway-revoke", "Disposable gateway test", "127.0.0.1").request!!
+        val pending = store.startPairing("gateway-revoke", "Disposable gateway test", "192.0.2.10").request!!
         val token = store.approve(pending.requestId, persist = false)!!.first
-        val request = ParsedRequest("DELETE", "/v1/pair", emptyMap(), false, "127.0.0.1")
+        val request = ParsedRequest("DELETE", "/v1/pair", emptyMap(), false, "192.0.2.10")
         assertEquals(401, (auth.evaluate(request) as AuthDecision.Reject).status)
         val authorized = request.copy(headers = mapOf("authorization" to listOf("Bearer $token")))
         val admitted = auth.evaluate(authorized) as AuthDecision.Authenticated

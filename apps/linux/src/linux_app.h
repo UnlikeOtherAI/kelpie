@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 #include "kelpie/desktop_engine.h"
+#include "kelpie/peer_approval.h"
 #include "account_state.h"
 
 namespace kelpie::linuxapp {
@@ -35,6 +36,7 @@ class LinuxApp {
   void RequestShutdown();
   bool IsRunning() const;
   void PumpBrowser();
+  PeerApprovalQueue& ComputerApprovals();
   bool FinishShutdown();
   std::vector<TabSnapshot> Tabs() const;
   void NewTab(bool isolated=false);
