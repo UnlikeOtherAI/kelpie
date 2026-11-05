@@ -346,6 +346,12 @@ struct ScriptCodecAcceptance {
         try require(chunk["runId"] as? String == "run" && chunk["artifactId"] as? String == artifact, "Chunk identity")
         try require(store.read(["runId": "run", "artifactId": artifact, "offset": true], owner: "owner")["error"] != nil, "Boolean offset rejected")
         try require(store.read(["runId": "run", "artifactId": artifact], owner: "other")["error"] != nil, "Foreign owner rejected")
+        let active = store.read(["runId": "run", "artifactId": artifact], owner: "owner", blockedRunID: "run")
+        try require((active["error"] as? [String: Any])?["code"] as? String == "ARTIFACT_NOT_READY" && active["data"] == nil, "Active run bytes withheld")
+        let prior = store.read(["runId": "run", "artifactId": artifact], owner: "owner", blockedRunID: "other-current-run")
+        try require(prior["data"] != nil, "Prior terminal bytes remain readable")
+        let malformed = store.read(["runId": "run", "artifactId": artifact, "offset": true], owner: "owner", blockedRunID: "run")
+        try require((malformed["error"] as? [String: Any])?["code"] as? String == "INVALID_PARAM", "Strict validation before active gate")
         print("PASS Apple codec: GIF400 full decode and palette/timing, partial budget, exclusive files, MP4 decode/timestamps, chunks")
         print("GIF resident bytes before=\(before) after=\(after), partialFrames=\(partial.frameCount), videoFrames=\(accepted)")
     }
