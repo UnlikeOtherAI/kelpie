@@ -16,7 +16,7 @@ export async function runEngine(client,fixture,engine,report) {
  async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
  catch(error){
   const diagnostic=name==="semantic-label-export"?{stage:semanticStage,...errorFacts(error),
-   tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null}:undefined;
+   tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null,protocols:client.protocolFacts??null}:undefined;
   checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");

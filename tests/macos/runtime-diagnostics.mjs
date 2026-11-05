@@ -3,6 +3,8 @@ const sourceFiles=new Set(["runtime-client.mjs","runtime-cases.mjs","runtime-med
 const issueCodes=new Set(["invalid_type","invalid_value","invalid_format","too_small","too_big","unrecognized_keys","invalid_union","custom","invalid_string","invalid_enum_value"]);
 const fields=new Set(["id","runId","artifactId","mimeType","byteLength","sha256","partial","width","height","durationMs","frameCount","droppedFrames","viewport","documentId","actionIndex","success","data","offset","nextOffset","eof"]);
 const kinds=new Set(["image/png","image/gif","video/mp4"]);
+const readErrors=new Set(["ARTIFACT_NOT_FOUND","ARTIFACT_NOT_READY","ARTIFACT_READ_FAILED","INVALID_PARAM",
+ "UNAUTHORIZED","NOT_FOUND","BUSY","SCRIPT_UNAVAILABLE","RECORDING_IN_PROGRESS","RUN_NOT_FOUND"]);
 const kind=value=>value===null?"null":Array.isArray(value)?"array":typeof value;
 const finite=value=>typeof value==="number"&&Number.isFinite(value)&&value>=0&&value<=1_000_000_000?value:null;
 export function errorFacts(error){
@@ -45,7 +47,8 @@ export function playFacts(value){
 export function artifactFacts(value){
  if(!value||typeof value!=="object"||Array.isArray(value))return {type:kind(value)};
  const types={};for(const key of fields)if(Object.hasOwn(value,key))types[key]=kind(value[key]);
- return {type:"object",types,mimeType:kinds.has(value.mimeType)?value.mimeType:"OTHER",
+ return {type:"object",types,success:value.success===true?true:value.success===false?false:null,
+  errorCode:readErrors.has(value.error?.code)?value.error.code:"OTHER",mimeType:kinds.has(value.mimeType)?value.mimeType:"OTHER",
   byteLength:finite(value.byteLength),width:finite(value.width),height:finite(value.height),
   frameCount:finite(value.frameCount),droppedFrames:finite(value.droppedFrames),
   unknownKeyCount:Object.keys(value).filter(key=>!fields.has(key)).length};

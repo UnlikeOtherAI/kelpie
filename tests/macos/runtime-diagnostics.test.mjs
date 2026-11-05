@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {errorFacts,playFacts,toolEnvelopeFacts} from "./runtime-diagnostics.mjs";
+import {artifactFacts,errorFacts,playFacts,toolEnvelopeFacts} from "./runtime-diagnostics.mjs";
 
 test("diagnostics retain bounded failure structure without page values",()=>{
  const secret="SECRET-PAGE-VALUE";
@@ -15,6 +15,8 @@ test("diagnostics retain bounded failure structure without page values",()=>{
   artifacts:[{id:secret,mimeType:"image/gif",width:10,height:10,byteLength:20,[secret]:secret}]});
  assert.equal(response.artifactCount,1);assert.equal(response.extraction.valueCount,1);
  assert.equal(response.artifacts[0].unknownKeyCount,1);
+ const failure=artifactFacts({success:false,error:{code:"ARTIFACT_NOT_FOUND",message:secret}});
+ assert.equal(failure.success,false);assert.equal(failure.errorCode,"ARTIFACT_NOT_FOUND");
  const tool=toolEnvelopeFacts({result:{content:[{type:"text",text:secret}]}});
- assert.ok(!JSON.stringify({facts,response,tool}).includes(secret));
+ assert.ok(!JSON.stringify({facts,response,tool,failure}).includes(secret));
 });
