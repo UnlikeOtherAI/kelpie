@@ -4,7 +4,7 @@ import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {resolve} from "node:path";
-import {startG08Fixture,g08Workflow} from "../capture/g08-fixture.mjs";
+import {startG08Fixture,g08Workflow,mapG08Scene} from "../capture/g08-fixture.mjs";
 import {scriptArtifactSchema,scriptArtifactChunkSchema} from "../../packages/shared/dist/index.js";
 const [readinessFile,outputPath,identityFile]=process.argv.slice(2);
 assert.ok(readinessFile&&outputPath&&identityFile);
@@ -45,13 +45,13 @@ try{
   const eventResponse=await fetch(new URL("/events",fixture.url),{signal:AbortSignal.timeout(10000)});
   assert.ok(eventResponse.ok);const {events,dropped}=await eventResponse.json();
   await writeFile(resolve(output,curve+"-events.json"),JSON.stringify({events,dropped},null,2),{flag:"wx"});
-  assert.equal(dropped,0);assert.equal(events.length,3);assert.deepEqual(events.map(event=>event.target),["finish","start","finish"]);
-  assert.ok(events.every(event=>event.trusted));assert.equal(events[0].documentId,events[1].documentId);assert.equal(events[1].documentId,events[2].documentId);
-  assert.ok(events[0].timeMs<events[1].timeMs&&events[1].timeMs<events[2].timeMs);assert.deepEqual(events[0].center,events[2].center);
+  assert.equal(dropped,0);const scene=mapG08Scene(events);
+  assert.ok(events.every(event=>event.trusted));
+
   const items=(run.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));
   assert.deepEqual(items.map(item=>item.mimeType).sort(),["image/gif","video/mp4"]);
   const artifacts=[];for(const item of items)artifacts.push(await download(run,item));
-  cases.push({curve,scene:{calibration:events[0],start:events[1],finish:events[2]},artifacts});
+  cases.push({curve,scene,artifacts});
   await fixture.close();fixture=null;
  }
  await writeFile(resolve(output,"oracle-input.json"),JSON.stringify({source:identity.source,binarySHA256:identity.hashes.dllSha256,runtime:"windows-cef",eventsDropped:0,cases},null,2),{flag:"wx"});

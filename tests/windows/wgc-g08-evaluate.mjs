@@ -10,7 +10,7 @@ import {createG08Retention} from "./wgc-g08-retention.mjs";
 export async function evaluateWgcFrames(stream,config){
  assert.ok(config&&["c","s"].includes(config.curve));
  assert.ok(Number.isFinite(config.viewport?.width)&&config.viewport.width>0&&Number.isFinite(config.viewport?.height)&&config.viewport.height>0);
- const retention=createG08Retention(),samples=retention.samples;let origin,shape;
+ const retention=createG08Retention({warmupCalibration:true,pointerMs:config.pointerMs,markerMs:config.markerMs}),samples=retention.samples;let origin,shape;
  const count=await consumeWgcFrames(stream,(bgra,meta)=>{
   if(origin===undefined)origin=meta.tick100ns;
   const dimensions=meta.width+":"+meta.height;
@@ -26,7 +26,7 @@ export async function evaluateWgcFrames(stream,config){
  if(count===0)return {samples,analysis:null,oracleError:"INSUFFICIENT_EVIDENCE no frames",frameCount:0};
  if(config.pointerMs<1000)return {samples,analysis:null,oracleError:"FAST_PROFILE_NOT_DENSE",frameCount:count};
  try{
-  const analysis=evaluateG08(samples,{...config,scale:{x:Number(shape.split(":")[0])/config.viewport.width,y:Number(shape.split(":")[1])/config.viewport.height}});
+  const analysis=evaluateG08(samples,{...config,warmupCalibration:true,scale:{x:Number(shape.split(":")[0])/config.viewport.width,y:Number(shape.split(":")[1])/config.viewport.height}});
   return {samples,analysis,oracleError:null,frameCount:count};
  }catch(error){
   const message=String(error.message??"");

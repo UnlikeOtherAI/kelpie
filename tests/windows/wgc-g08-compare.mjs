@@ -14,7 +14,7 @@ function interpolate(samples,time,maxGap,read){
 }
 function ensure(result){
  assert.equal(result?.analysis?.passed,true,"G08_INDEPENDENT_PASS_REQUIRED");
- assert.ok(Array.isArray(result.samples)&&result.samples.length>0&&result.samples.length<=600);
+ assert.ok(Array.isArray(result.samples)&&result.samples.length>0&&result.samples.length<=800);
  assert.ok(result.samples.every((s,i)=>Number.isFinite(s.timeMs)&&(i===0||s.timeMs>result.samples[i-1].timeMs)),"G08_CLOCK");
  for(const key of ["pointerStartMs","markerStartMs","radiusBiasPx"])assert.ok(Number.isFinite(result.analysis[key]));
  assert.ok(Number.isFinite(result.analysis.endpointOffset?.x)&&Number.isFinite(result.analysis.endpointOffset?.y));

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-const MAX_HEADER=4096,MAX_PIXELS=640*1600,MAX_PAYLOAD=MAX_PIXELS*4,MAX_FRAMES=520;
+const MAX_HEADER=4096,MAX_PIXELS=640*1600,MAX_PAYLOAD=MAX_PIXELS*4,MAX_FRAMES=800;
 export function expectedAnalysisSize(sourceWidth,sourceHeight){
  assert.ok(Number.isInteger(sourceWidth)&&sourceWidth>0&&Number.isInteger(sourceHeight)&&sourceHeight>0,"WGC_ANALYSIS_SIZE");
  const scale=Math.min(1,640/sourceWidth,1920/sourceHeight);
@@ -24,7 +24,7 @@ export async function consumeWgcFrames(stream,onFrame){
     assert.ok(Number.isSafeInteger(metadata.sequence)&&metadata.sequence===count,"WGC_SEQUENCE");
     assert.ok(Number.isSafeInteger(metadata.tick100ns)&&metadata.tick100ns>lastTick,"WGC_CLOCK");
     if(firstTick<0)firstTick=metadata.tick100ns;
-    assert.ok(metadata.tick100ns-firstTick<=260000000,"WGC_DURATION_BOUND");
+    assert.ok(metadata.tick100ns-firstTick<=330000000,"WGC_DURATION_BOUND");
     assert.ok(Number.isSafeInteger(metadata.receiptMs)&&metadata.receiptMs>=lastReceipt,"WGC_RECEIPT_CLOCK");
     assert.ok(Number.isInteger(metadata.sourceWidth)&&metadata.sourceWidth>0&&metadata.sourceWidth<=4096);
     assert.ok(Number.isInteger(metadata.sourceHeight)&&metadata.sourceHeight>0&&metadata.sourceHeight<=4096&&metadata.sourceWidth*metadata.sourceHeight<=2097152);

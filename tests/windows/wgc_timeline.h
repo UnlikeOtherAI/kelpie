@@ -116,7 +116,7 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   owner.Verify();
   if(!GraphicsCaptureSession::IsSupported())throw std::runtime_error("WGC_UNSUPPORTED");
   if(std::filesystem::exists(output)||!std::filesystem::create_directory(output))throw std::runtime_error("WGC_FRESH_DIRECTORY_REQUIRED");
-  const auto began=Clock::now(),captureEnd=began+std::chrono::seconds(26),teardownEnd=began+std::chrono::seconds(35);
+  const auto began=Clock::now(),captureEnd=began+std::chrono::seconds(33),teardownEnd=began+std::chrono::seconds(42);
   auto captureFence=[owner,captureEnd]{Deadline(captureEnd);owner.Verify();};
   auto teardownFence=[teardownEnd]{Deadline(teardownEnd);};
   winrt::com_ptr<ID3D11Device> device;winrt::com_ptr<ID3D11DeviceContext> context;D3D_FEATURE_LEVEL level{};
@@ -145,8 +145,8 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
   });
   capture.closedEvent=capture.item.Closed([state](auto const&,auto const&){std::lock_guard lock(state->mutex);if(!state->cancelled){state->closed=true;state->changed.notify_one();}});
   std::vector<TimelineSnapshot> snapshots;std::string alpha;std::uint64_t lastTick=0,accepted=0,rateSkipped=0;int nextSnapshot=0;bool windowHidden=false;
-  const double sampleTimes[3]={5.0,13.0,21.0};captureFence();const auto sessionBegan=Clock::now();capture.session.StartCapture();TimelineDeadline deadlineGuard(capture,captureEnd);
-  while(Clock::now()<captureEnd&&accepted<520){
+  const double sampleTimes[3]={5.0,16.0,29.0};captureFence();const auto sessionBegan=Clock::now();capture.session.StartCapture();TimelineDeadline deadlineGuard(capture,captureEnd);
+  while(Clock::now()<captureEnd&&accepted<800){
     Direct3D11CaptureFrame frame{nullptr};std::uint64_t receipt=0;
     {std::unique_lock lock(state->mutex);state->changed.wait_until(lock,captureEnd,[&]{return state->latest||state->error||state->closed;});
      if(state->error)std::rethrow_exception(state->error);if(state->closed){if(state->latest)state->latest.Close();state->latest=nullptr;break;}
@@ -182,10 +182,10 @@ Json RunTimeline(Owner const& owner,std::filesystem::path const& output){
     if(nextSnapshot<3&&elapsed>=sampleTimes[nextSnapshot]){snapshots.push_back({std::move(pixels),tick});++nextSnapshot;}
   }
   bool naturalClosure=false;{std::lock_guard lock(state->mutex);naturalClosure=state->closed;}
-  const std::string endReason=naturalClosure?"item-closed":windowHidden?"window-hidden":accepted>=520?"frame-limit":"capture-deadline";
+  const std::string endReason=naturalClosure?"item-closed":windowHidden?"window-hidden":accepted>=800?"frame-limit":"capture-deadline";
   capture.Stop();const auto sessionEnded=Clock::now();deadlineGuard.Cancel();writer.Stop();teardownFence();
   const auto sessionMs=std::chrono::duration_cast<std::chrono::milliseconds>(sessionEnded-sessionBegan).count();
-  if(sessionMs>26000)throw std::runtime_error("WGC_SESSION_DURATION_BOUND");
+  if(sessionMs>33000)throw std::runtime_error("WGC_SESSION_DURATION_BOUND");
   if(writer.failed)throw std::runtime_error("WGC_STREAM_FAILED");
   Json saved=Json::array();std::uint64_t persisted=0;
   for(std::size_t index=0;index<snapshots.size();++index){

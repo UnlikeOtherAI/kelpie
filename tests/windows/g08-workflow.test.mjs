@@ -8,7 +8,7 @@ test("shared G08 Windows requests pass the production workflow schema",()=>{
   const result=scriptV1Schema.parse(g08Workflow("owned-tab",curve));
   assert.equal(result.pointer.curve,curve);
   assert.deepEqual(result.capture.formats,["gif","video"]);
-  assert.deepEqual(result.actions.filter(action=>action.action==="click").map(action=>action.target.name),["G08 Finish","G08 Start","G08 Finish"]);
+  assert.deepEqual(result.actions.filter(action=>action.action==="click").map(action=>action.target.name),["G08 Finish","G08 Finish","G08 Start","G08 Finish"]);
  }
 });
 
