@@ -87,6 +87,9 @@ final class HTTPServer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         bonjourService = NWListener.Service(name: name, type: type, txtRecord: txtRecord)
+        #if DEBUG
+        print("[WorkflowListener] event=service-update")
+        #endif
         listener?.service = bonjourService
     }
 
@@ -143,6 +146,10 @@ final class HTTPServer: @unchecked Sendable {
                 self.onStateChange?(true)
                 self.onReady?()
             case .failed(let error):
+                #if DEBUG
+                let facts = Self.listenerErrorFacts(error)
+                print("[WorkflowListener] event=failed domain=\(facts.domain) code=\(facts.code)")
+                #endif
                 self.scriptListener.stop(incarnation)
                 print("[HTTPServer] Listener failed: \(error)")
                 self.onBonjourStateChange?(false)
@@ -157,6 +164,18 @@ final class HTTPServer: @unchecked Sendable {
         }
         newListener.start(queue: .global(qos: .userInitiated))
     }
+
+    #if DEBUG
+    private static func listenerErrorFacts(_ error: NWError) -> (domain: String, code: Int) {
+        switch error {
+        case .posix(let code): return ("posix", Int(code.rawValue))
+        case .dns(let code): return ("dns", Int(code))
+        case .tls(let code): return ("tls", Int(code))
+        case .wifiAware: return ("other", 0)
+        @unknown default: return ("other", 0)
+        }
+    }
+    #endif
 
     func stop() {
         scriptListener.stop()

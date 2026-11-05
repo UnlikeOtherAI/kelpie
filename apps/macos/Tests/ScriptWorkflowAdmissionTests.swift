@@ -1,3 +1,4 @@
+import Network
 import WebKit
 import XCTest
 @testable import Kelpie
@@ -5,6 +6,36 @@ import XCTest
 final class ScriptWorkflowAdmissionTests: XCTestCase {
     typealias Body = [String: Any]
     private let tap: Body = ["action": "tap", "target": ["role": "button", "name": "Submit"]]
+
+    @MainActor
+    func testBonjourTXTReplacementKeepsSameHTTPListenerReachable() async throws {
+        let port: UInt16 = 28421
+        let router = Router()
+        let server = try HTTPServer(port: port, router: router, pairingStore: PairingStore(),
+                                    deviceInfo: DeviceInfo.current(port: Int(port)))
+        let ready = expectation(description: "owned listener ready")
+        server.onReady = { ready.fulfill() }
+        server.start()
+        defer { server.stop() }
+        await fulfillment(of: [ready], timeout: 10)
+        let serviceName = "Kelpie CI " + UUID().uuidString
+        server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "webkit"]))
+        let first = try await Self.probeHTTP(port: port)
+        server.configureBonjourService(name: serviceName, type: "_kelpie._tcp", txtRecord: NWTXTRecord(["engine": "chromium"]))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let second = try await Self.probeHTTP(port: port)
+        XCTAssertEqual(first, second)
+    }
+
+    private static func probeHTTP(port: UInt16) async throws -> Int {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)/health")))
+        request.timeoutInterval = 3
+        request.setValue("close", forHTTPHeaderField: "Connection")
+        let (_, response) = try await session.data(for: request)
+        return try XCTUnwrap((response as? HTTPURLResponse)?.statusCode)
+    }
 
     @MainActor
     func testEmptyPacedTypeRequiresEditableTarget() throws {

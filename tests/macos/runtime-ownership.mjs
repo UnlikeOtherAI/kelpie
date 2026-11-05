@@ -63,3 +63,12 @@ export function serverLifecycleSignal(line){
  if(line.startsWith("[HTTPServer] Failed to create listener:"))return {state:"create-failed"};
  return null;
 }
+
+export function listenerTransitionSignal(line){
+ const update=/^\[WorkflowListener\] event=service-update$/.exec(line);
+ if(update)return {event:"service-update"};
+ const failure=/^\[WorkflowListener\] event=failed domain=(posix|dns|tls|other) code=(-?\d{1,9})$/.exec(line);
+ if(failure)return {event:"failed",domain:failure[1],code:Number(failure[2])};
+ const renderer=/^\[WorkflowRenderer\] event=(begin|created|active|service-update) engine=(webkit|chromium)$/.exec(line);
+ return renderer?{event:renderer[1],engine:renderer[2]}:null;
+}
