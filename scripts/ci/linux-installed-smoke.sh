@@ -113,7 +113,15 @@ stage=native-http-mcp
 run tests/linux/run-native-capture-acceptance.mjs /usr/bin/kelpie-linux "$output/capture" \
   > "$output/native-corpus.log" 2>&1
 stage=independent-media
-run tests/linux/verify-native-replay.mjs "$output/capture" > "$output/native-media.log" 2>&1
+if run tests/linux/verify-native-replay.mjs "$output/capture" > "$output/native-media.log" 2>&1; then
+  :
+else
+  media_status=$?
+  if [[ "${KELPIE_LINUX_RESOURCE_DIAGNOSTIC:-}" == 1 ]]; then
+    run tests/linux/diagnose-media-count.mjs "$output/capture" > "$output/media-diagnostic.log" 2>&1 || true
+  fi
+  exit "$media_status"
+fi
 stage=public-cli
 run tests/linux/run-native-alias-acceptance.mjs /usr/bin/kelpie-linux \
   "$home/client/package/bin/kelpie.js" "$output/alias" offscreen > "$output/public-cli.log" 2>&1
