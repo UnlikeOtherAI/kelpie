@@ -4,8 +4,9 @@ import XCTest
 extension WorkflowCaptureUITests {
     @MainActor
     func testNativePinchClipsTapCenterAndRotationInvalidatesPointerTarget() async throws {
+        let initialOrientation = XCUIDevice.shared.orientation
         XCUIDevice.shared.orientation = .portrait
-        defer { XCUIDevice.shared.orientation = .portrait }
+        defer { XCUIDevice.shared.orientation = initialOrientation }
         let (fixture, tab) = try await ready()
         defer { fixture.listener.cancel() }
         let origin = "http://127.0.0.1:" + String(try XCTUnwrap(fixture.listener.port?.rawValue))
