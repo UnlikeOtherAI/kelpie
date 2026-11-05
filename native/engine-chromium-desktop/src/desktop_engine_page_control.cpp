@@ -1,6 +1,7 @@
 // DesktopEngine page operations that go through the tab's DevTools session:
 // JavaScript evaluation, screenshots, cookies and the raw passthrough.
 #include "desktop_engine_control_support.h"
+#include "desktop_capture_receipt.h"
 
 #include <chrono>
 #include <memory>
@@ -101,6 +102,55 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease lease, BrowserScreenshot
   if (result.ok) {
     image->mime_type = parsed.value.value("mimeType", "image/png");
     image->base64_data = parsed.value.value("data", "");
+  }
+  return result;
+}
+BrowserControlResult DesktopEngine::CaptureScreenshot(TabLease lease, BrowserScreenshot* image,
+                                                       NavigationState* after, Timeout timeout) {
+  if(!image || !after) return BrowserControlResult::Failure("INTERNAL","Capture output is required");
+  Json options={{"format",image->format}};
+  if(image->quality) options["quality"]=*image->quality;
+  const auto params=DesktopDevToolsSession::ScreenshotParams(options);
+  if(!params) return BrowserControlResult::Failure("INVALID_PARAMS","Screenshot format or quality is invalid");
+  const auto started_at=std::chrono::steady_clock::now();
+  const auto deadline=started_at+timeout;
+  const auto impl=impl_;
+  const std::weak_ptr<Impl> weak=impl;
+  auto pending=std::make_shared<PendingDevTools>();
+  auto receipt=std::make_shared<NavigationState>();
+  const auto started=impl->RunOnUi([impl,weak,lease,pending,params,receipt,deadline] {
+    auto* tab=impl->FindTab(lease);
+    if(!tab) return BrowserControlResult::Failure("TAB_NOT_FOUND","The tab does not exist or is stale");
+    pending->session=tab->devtools;
+    pending->operation=pending->session->Begin(tab->browser,"Page.captureScreenshot",*params,true,
+      [weak,lease,receipt,deadline](CefRefPtr<CefBrowser> browser) {
+        auto owner=weak.lock();
+        if(!owner) return false;
+        auto* current=owner->FindTab(lease);
+        if(!CaptureReceiptEligible(std::chrono::steady_clock::now(),deadline,
+             lease.cancelled && lease.cancelled->load(),current!=nullptr,
+             current && current->browser && browser && current->browser->IsSame(browser))) return false;
+        receipt->tab=owner->Snapshot(*current);
+        receipt->requested=current->navigation_requested;
+        receipt->completed=current->navigation_completed;
+        receipt->error=current->navigation_error;
+        return true;
+      });
+    return BrowserControlResult::Success(impl->Snapshot(*tab));
+  },timeout);
+  if(!started.ok) return started;
+  const auto parsed=DesktopDevToolsSession::ParseScreenshotResult(
+      pending->session->Wait(pending->operation,RemainingTimeout(started_at,timeout),
+        [cancelled=lease.cancelled] { return cancelled && cancelled->load(); }),
+      params->at("format").get<std::string>());
+  const auto result=DevToolsResult(parsed);
+  if(result.ok && ((lease.cancelled && lease.cancelled->load()) ||
+                    std::chrono::steady_clock::now()>=deadline))
+    return BrowserControlResult::Failure("INTERRUPTED","Capture no longer owns its deadline");
+  if(result.ok) {
+    image->mime_type=parsed.value.value("mimeType","image/png");
+    image->base64_data=parsed.value.value("data","");
+    *after=std::move(*receipt);
   }
   return result;
 }

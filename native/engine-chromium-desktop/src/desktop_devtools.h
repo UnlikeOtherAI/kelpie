@@ -74,13 +74,15 @@ class DesktopDevToolsSession final : public CefDevToolsMessageObserver {
     bool done_ = false;
     RendererOperationOwnership ownership_;
     Result result_;
+    std::function<bool(CefRefPtr<CefBrowser>)> capture_completion_;
   };
 
   explicit DesktopDevToolsSession(std::shared_ptr<std::atomic<std::size_t>> unknown_operations = std::make_shared<std::atomic<std::size_t>>(0));
   void Attach(CefRefPtr<CefBrowser> browser, NetworkEventSink network_sink);
   std::shared_ptr<Operation> Begin(CefRefPtr<CefBrowser> browser,
                                    const std::string& method,
-                                   const Json& params, bool fences_actions = true);
+                                   const Json& params, bool fences_actions = true,
+                                   std::function<bool(CefRefPtr<CefBrowser>)> capture_completion = {});
   // `interrupted` is polled while the reply is outstanding; when it returns
   // true the caller returns INTERRUPTED; ownership remains until the late result. It runs without any
   // session lock held, so it may hop to the CEF UI thread.

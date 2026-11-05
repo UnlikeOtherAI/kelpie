@@ -1,4 +1,5 @@
 #include "desktop_devtools.h"
+#include "desktop_capture_receipt.h"
 
 #include <algorithm>
 #include <cctype>
@@ -157,13 +158,15 @@ void DesktopDevToolsSession::Attach(CefRefPtr<CefBrowser> browser, NetworkEventS
 }
 
 std::shared_ptr<DesktopDevToolsSession::Operation> DesktopDevToolsSession::Begin(
-    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params, bool fences_actions) {
+    CefRefPtr<CefBrowser> browser, const std::string& method, const Json& params, bool fences_actions,
+    std::function<bool(CefRefPtr<CefBrowser>)> capture_completion) {
   int message_id = 0;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     message_id = next_message_id_++;
   }
   auto operation = std::shared_ptr<Operation>(new Operation(message_id, unknown_operations_, fences_actions));
+  operation->capture_completion_=std::move(capture_completion);
   if (!browser || method.empty() || !CefCurrentlyOn(TID_UI)) {
     Complete(operation, Failure("INTERNAL", "DevTools methods must begin on the CEF UI thread"));
     return operation;
@@ -340,7 +343,7 @@ DesktopDevToolsSession::Json DesktopDevToolsSession::TrustedKeyParams(const Json
   return params;
 }
 
-void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser>, int message_id, bool success,
+void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser> browser, int message_id, bool success,
                                                     const void* result, size_t result_size) {
   std::shared_ptr<Operation> operation;
   {
@@ -350,7 +353,11 @@ void DesktopDevToolsSession::OnDevToolsMethodResult(CefRefPtr<CefBrowser>, int m
     operation = it->second;
     pending_.erase(it);
   }
-  Complete(operation, ParseProtocolResult(success, result, result_size));
+  auto parsed=ParseProtocolResult(success, result, result_size);
+  if(operation->capture_completion_ &&
+     !CaptureCompletionApproved(parsed.ok,[&] { return operation->capture_completion_(browser); }))
+    parsed=Failure("CAPTURE_DOCUMENT_UNAVAILABLE","Capture completion identity is unavailable");
+  Complete(operation, std::move(parsed));
 }
 
 void DesktopDevToolsSession::OnDevToolsEvent(CefRefPtr<CefBrowser> browser, const CefString& method,

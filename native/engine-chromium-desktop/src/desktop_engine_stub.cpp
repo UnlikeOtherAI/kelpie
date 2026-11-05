@@ -185,6 +185,10 @@ BrowserControlResult DesktopEngine::Screenshot(TabLease, BrowserScreenshot*, Tim
   return UnsupportedControl();
 }
 
+BrowserControlResult DesktopEngine::CaptureScreenshot(TabLease, BrowserScreenshot*, NavigationState*, Timeout) {
+  return UnsupportedControl();
+}
+
 BrowserControlResult DesktopEngine::GetCookies(TabLease, const Json&, Json*, Timeout) {
   return UnsupportedControl();
 }

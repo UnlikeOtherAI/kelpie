@@ -1,4 +1,5 @@
 #include "desktop_script_capture_state.h"
+#include "desktop_capture_receipt.h"
 #include "desktop_presentation_validity.h"
 #include <stdexcept>
 #include "kelpie/desktop_presentation_order.h"
@@ -9,6 +10,23 @@
 
 int main() {
   using nlohmann::json;
+  using Clock=std::chrono::steady_clock;
+  const auto now=Clock::now(),deadline=now+std::chrono::seconds(1);
+  assert(kelpie::CaptureReceiptEligible(now,deadline,false,true,true));
+  assert(!kelpie::CaptureReceiptEligible(deadline,deadline,false,true,true));
+  assert(!kelpie::CaptureReceiptEligible(now,deadline,true,true,true));
+  assert(!kelpie::CaptureReceiptEligible(now,deadline,false,false,true));
+  assert(!kelpie::CaptureReceiptEligible(now,deadline,false,true,false));
+  int calls=0;
+  assert(kelpie::CaptureCompletionApproved(false,[&] { ++calls; return false; }));
+  assert(calls==0); // Protocol failure remains the original failure.
+  assert(kelpie::CaptureCompletionApproved(true,[&] { ++calls; return true; }));
+  assert(!kelpie::CaptureCompletionApproved(true,[] { return false; }));
+  assert(!kelpie::CaptureCompletionApproved(true,[]()->bool { throw std::runtime_error("failure"); }));
+  using Failure=kelpie::CaptureViewportFailure;
+  assert(kelpie::ClassifyCaptureViewportFailure(false,"old","new")==Failure::DocumentUnavailable);
+  assert(kelpie::ClassifyCaptureViewportFailure(true,"old","new")==Failure::TornFrame);
+  assert(kelpie::ClassifyCaptureViewportFailure(true,"same","same")==Failure::ViewportChanged);
   assert(kelpie::DesktopPresentationIsPlaying(json::object(),true));
   assert(!kelpie::DesktopPresentationIsPlaying({{"playing",false}},true));
   assert(!kelpie::DesktopPresentationIsPlaying(json::object(),false));
