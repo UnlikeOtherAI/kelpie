@@ -49,13 +49,17 @@ final class WorkflowCaptureProbe {
         return try XCTUnwrap(value as? Body)
     }
 
-    func toolValue(_ name: String, _ arguments: Body) async throws -> Any {
+    func toolEnvelope(_ name: String, _ arguments: Body) async throws -> Body {
         let response = try await request("/mcp", ["jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": [
             "name": name, "arguments": arguments
         ]])
         let result = try XCTUnwrap(response["result"] as? Body)
         let text = try XCTUnwrap((result["content"] as? [Body])?.first(where: { $0["type"] as? String == "text" })?["text"] as? String)
-        let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? Body)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? Body)
+    }
+
+    func toolValue(_ name: String, _ arguments: Body) async throws -> Any {
+        let envelope = try await toolEnvelope(name, arguments)
         XCTAssertEqual(envelope["ok"] as? Bool, true, "\(envelope["error"] ?? "")")
         return try XCTUnwrap(envelope["value"])
     }

@@ -31,8 +31,19 @@ extension WorkflowCaptureUITests {
                 ["action": "fill", "target": ["selector": selector], "text": canary]
             ]
         ]
-        let failed = throughMCP ? try await probe.call("kelpie_play_script", workflow) :
-            try await probe.request("/v1/play-script", workflow)
+        if throughMCP {
+            let envelope = try await probe.toolEnvelope("kelpie_extension", ["name": "kelpie_play_script", "arguments": workflow])
+            XCTAssertEqual(envelope["ok"] as? Bool, false)
+            XCTAssertEqual((envelope["error"] as? Body)?["code"] as? String, "COMMAND_FAILED")
+            let metadata = try await probe.call("kelpie_get_script_status", [:])
+            XCTAssertEqual(metadata["runSuccess"] as? Bool, false)
+            XCTAssertEqual((metadata["runError"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
+            XCTAssertTrue((metadata["artifacts"] as? [Body])?.isEmpty == true)
+            XCTAssertNil(metadata["outputs"])
+            let exposed = String(decoding: try JSONSerialization.data(withJSONObject: [envelope, metadata]), as: UTF8.self)
+            XCTAssertTrue(variants.allSatisfy { !exposed.contains($0) })
+        }
+        let failed = try await probe.request("/v1/play-script", workflow)
         XCTAssertEqual((failed["error"] as? Body)?["code"] as? String, "SENSITIVE_CAPTURE_REFUSED")
         XCTAssertEqual(failed["actionsExecuted"] as? Int, 2)
         if focused { XCTAssertEqual(failed["mayHaveCompleted"] as? Bool, true) }
