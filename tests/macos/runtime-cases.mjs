@@ -5,17 +5,18 @@ import {verifyArtifactProtocols} from "../capture/artifact-protocol.mjs";
 import {runPrivacy} from "./runtime-privacy.mjs";
 import {runSafety} from "./runtime-safety.mjs";
 import {runG08} from "./runtime-g08.mjs";
+import {errorFacts,playFacts} from "./runtime-diagnostics.mjs";
 import {canary} from "./runtime-fixture.mjs";
 import {delay,requireTrue,waitFor} from "./runtime-client.mjs";
 import {inspectMedia,centerPixel,inspectCurve} from "./runtime-media.mjs";
 const capture={formats:["gif","video","screenshots"],fps:5,maxWidth:640,maxBytes:33554432,maxDurationMs:20000};
 export async function runEngine(client,fixture,engine,report) {
- let authorityRun,foreignToken,semanticStage="not-started";
+ let authorityRun,foreignToken,semanticStage="not-started",semanticPlay=null;
  const checks=[];report.engines.push({engine,checks});
  async function check(name,run){try{const detail=await run();checks.push({name,passed:true,detail});}
  catch(error){
-  const types=new Set(["TypeError","SyntaxError","ZodError","Error"]);
-  const diagnostic=name==="semantic-label-export"?{stage:semanticStage,type:types.has(error?.name)?error.name:"OTHER"}:undefined;
+  const diagnostic=name==="semantic-label-export"?{stage:semanticStage,...errorFacts(error),
+   tool:client.toolFacts??null,play:semanticPlay,artifact:client.artifactFacts??null,chunk:client.chunkFacts??null}:undefined;
   checks.push({name,passed:false,code:error.code??"CHECK_FAILED",...(diagnostic?{diagnostic}:{})});throw error;}}
  await check("native-renderer-control",async()=>{
   const more=await client.find("browser.action.more");requireTrue(more,"NATIVE_MORE_MISSING");
@@ -59,6 +60,7 @@ export async function runEngine(client,fixture,engine,report) {
    {action:"click",target:{role:"button",name:"Submit"}},
    {action:"output",name:"title",source:"title"},
    {action:"extract",name:"catalogue",params:{scope:"#catalogue",fields:[{name:"tea",selector:"h3",source:"text",multiple:true}],metadata:true}}]});
+  semanticPlay=playFacts(result);
   semanticStage="validate-output";
   requireTrue(result.success,"SEMANTIC_WORKFLOW");
   const field=result.outputs?.catalogue?.fields?.[0];
