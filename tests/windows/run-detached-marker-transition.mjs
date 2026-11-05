@@ -36,7 +36,11 @@ const api=async(method,body={})=>{
  const response=await fetch("http://127.0.0.1:28420/v1/"+method,{method:"POST",
   headers:{authorization:"Bearer "+readiness.token,"content-type":"application/json"},body:JSON.stringify(body),
   signal:AbortSignal.timeout(method==="play-script"?60000:10000)});
- const value=await response.json();if(method==="play-script")report.playHttpStatus=response.status;else assert.ok(response.ok,"HTTP_"+response.status);return value;
+ const value=await response.json();if(method==="play-script"){
+  report.playHttpStatus=response.status;
+  const code=value?.error?.code;
+  report.playErrorCode=typeof code==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code)?code:null;
+ }else assert.ok(response.ok,"HTTP_"+response.status);return value;
 };
 const tabFact=async tabId=>{
  const value=await api("get-tabs"),tab=value.tabs.find(item=>item.id===tabId);
