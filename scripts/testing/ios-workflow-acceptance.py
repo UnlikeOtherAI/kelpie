@@ -40,7 +40,10 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
-                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
+                "testPacedUnknownPostMutationSensitivityStops",
+                "testPacedEditsArePlannedBeforeAnyEarlierAction",
+                "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
+                "testPacedExecutorStopsWithoutReplayAndPreservesUncertainty",
             ])
             methods.extend([
                 "testHostedCLIUsesPairedWorkflowAndDownloadsEveryFormat",
@@ -53,6 +56,10 @@ def selection(scope):
                 "testPairedMCPClickShowsNativeMarkerAndDownloadsDecodedMedia",
                 "testPrivateObservationTypedExtractionAndSensitiveTargetRecovery",
                 "testPostInputAutocompleteCaptureStopsLaterActionsAndDiscardsMedia",
+                "testPacedFillUsesUnicodeScalarsAndRetainsMedia",
+                "testPacedFocusLossStopsWithoutRetargeting",
+                "testPacedLateSensitivityDiscardsCaptureAndRedactsFullLiteral",
+                "testPacedEmptyTypeDoesNotInputAndEmptyFillClears",
             ])
         targets.extend("KelpieUITests/WorkflowCaptureUITests/" + method for method in methods)
     required = {method for file in files for method in re.findall(r"func (test\w+)\(", file.read_text())}
@@ -66,7 +73,10 @@ def selection(scope):
                 "testFirstCaptureStabilityHonorsTimeoutStopAndDocumentReplacement",
                 "testPointerDefaultAndExplicitDurationUseSharedContract",
                 "testDeviceCapabilitiesAdvertiseOnlySupportedMobileActions",
-                "testPacedEditingIsRejectedBeforeAnyEarlierActionUntilImplemented",
+                "testPacedUnknownPostMutationSensitivityStops",
+                "testPacedEditsArePlannedBeforeAnyEarlierAction",
+                "testPacedExecutorClearsOnceAndWaitsOnlyBetweenUnicodeScalars",
+                "testPacedExecutorStopsWithoutReplayAndPreservesUncertainty",
             ])
     return targets, required
 

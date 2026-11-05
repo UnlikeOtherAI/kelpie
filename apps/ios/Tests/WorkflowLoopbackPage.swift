@@ -62,6 +62,17 @@ final class WorkflowLoopbackPage {
             button.onclick=()=>{later++;report()};
           }
         }
+        if(location.pathname.startsWith('/paced')){
+          const field=document.querySelector('#entry'), events=[];
+          field.value='seed';
+          const report=()=>{document.title=JSON.stringify(events)};
+          field.oninput=e=>{
+            events.push({data:e.data,value:field.value,at:performance.now()});
+            report();
+            if(location.pathname==='/paced-focus' && events.length===1)button.focus();
+          };
+          button.onclick=()=>{events.push({data:'LATER'});report()};
+        }
         if(location.pathname==='/scroll'){
           document.documentElement.style.background='#D0D0D0';document.body.style='margin:0;background:#D0D0D0;height:300vh;position:relative';
           document.body.innerHTML='<button id="bottom" style="position:absolute;bottom:12px;left:12px;margin:0">Bottom</button>'
