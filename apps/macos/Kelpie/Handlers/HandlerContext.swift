@@ -21,6 +21,7 @@ final class HandlerContext {
     var consoleMessages: [[String: Any]] = []
     var isIn3DInspector = false
     var scriptPlaybackState: ScriptPlaybackState?
+    var scriptWorkflowRunner: ScriptWorkflowRunner?
     var annotationSessionId: String?
     var annotationPageURL: String?
     var annotationElementCount: Int?
