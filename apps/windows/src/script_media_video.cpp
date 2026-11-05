@@ -116,6 +116,8 @@ class MfVideo final : public VideoWriter {
 
   ~MfVideo() override { Discard(); }
 
+  std::size_t CommittedFrames() const override { return output_.frame_count; }
+
   bool Write(const ScriptMediaFrame& frame, double start_ms, double end_ms) override {
     if (budget_.exceeded) return false;
     const auto start = static_cast<LONGLONG>(std::llround(start_ms * 10000));

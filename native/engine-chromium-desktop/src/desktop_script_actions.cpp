@@ -68,18 +68,27 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
     } while (true);
     resolved = Target(lease, action.at("target"), resolved.at("token"));
     if (!resolved.value("ok", false)) return failed_target(resolved);
+    bool sampling=false;
     {
       std::lock_guard lock(mutex);
+      sampling=sampler_ready && !sampler_done;
       presentation["marker"] = script.value("tapIndicator", Json::object());
       presentation["marker"]["x"] = x; presentation["marker"]["y"] = y;
-      presentation["marker"]["startedMs"] = Elapsed(); presentation["elapsedMs"] = Elapsed();
+      presentation["marker"]["actionIndex"]=action_index;
+      // A future planned start clamps progress to zero until capture supplies
+      // real encoded evidence. It cannot expire before the 300s run deadline.
+      presentation["marker"]["startedMs"] = Elapsed()+(sampling?300001.0:0.0);
+      presentation["elapsedMs"] = Elapsed();
     }
     Present();
-    bool sampling=false;
-    { std::lock_guard lock(mutex); sampling=sampler_ready && !sampler_done; }
     if(sampling) {
       const bool png=script.contains("capture") && std::any_of(script["capture"]["formats"].begin(),script["capture"]["formats"].end(),[](const Json& format){return format=="screenshots";});
       StepScreenshot(action_index,png,navigation.tab.document_version);
+      {
+        std::lock_guard lock(mutex);
+        if(presentation.contains("marker")) presentation["marker"]["startedMs"]=Elapsed();
+      }
+      Present();
     }
     if(Cancelled()) throw std::runtime_error("SCRIPT_STOPPED");
     Json options = {{"target", action.at("target")}, {"key", target_key}, {"token", resolved.at("token")}, {"dispatch", false}};
@@ -129,13 +138,12 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Perform(
             (desired == "enabled" && visible && target.value("enabled", false))) return SuccessResponse();
         if (!visible && !hidden) return failed_target(target);
       } else {
-        Json state;
-        const auto result = engine.Evaluate(lease, "document.readyState", &state, std::chrono::seconds(2));
-        const std::string desired = action.value("state", std::string("interactive"));
-        if (result.ok && (state == desired || (desired == "interactive" && state == "complete"))) {
-          if (!action.contains("selector") || Target(lease, {{"selector", action.at("selector")}}, "", true).value("ok", false))
-            return SuccessResponse();
-        }
+        Json params={{"state",action.value("state",std::string("interactive"))}};
+        if(action.contains("selector")) params["selector"]=action.at("selector");
+        const auto observed=router.Dispatch("browser-control",{{"version",1},{"method","tab.ready"},
+          {"tabId",lease.id},{"params",params}}).body;
+        if(!observed.value("ok",false)) return ErrorResponse("READINESS_FAILED","Canonical readiness observation failed");
+        if(observed.at("value").value("ready",false)) return SuccessResponse();
       }
       if (Clock::now() - started >= std::chrono::milliseconds(timeout)) break;
       Pause(50);

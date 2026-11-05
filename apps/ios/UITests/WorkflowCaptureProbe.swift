@@ -101,8 +101,9 @@ final class WorkflowLoopbackPage {
         <style>body{background:white;color:black}button{display:block;margin:25vh auto;width:150px;height:80px}</style>
         <meta property="og:site_name" content="Fixture Press">
         <script type="application/ld+json">{"@type":"Article","headline":"Public headline","password":"PRIVATE_LD"}</script>
-        <main><article><h2>Alpha</h2><a href="/alpha">Read</a></article><article><h2>Beta</h2></article>
-        <input type="password" aria-label="Private input" value="PRIVATE_INPUT">
+        <a id="continue" href="/landed">Continue</a><main><article><h2>Alpha</h2><a href="/alpha">Read</a></article><article><h2>Beta</h2></article>
+        <input type="password" aria-label="Private input" value="PRIVATE_INPUT" oninput="document.title=this.value">
+        <label>Entry <input id="entry" oninput="document.querySelector('#length').textContent=this.value.length"></label><output id="length"></output>
         <div contenteditable>PRIVATE_EDITOR</div></main>
         <button>Submit</button><output id="geometry"></output><script>
         window.count=0;document.querySelector('button').onclick=e=>{
@@ -110,7 +111,21 @@ final class WorkflowLoopbackPage {
           const y=(Math.max(0,r.top)+Math.min(innerHeight,r.bottom))/2;
           document.querySelector('#geometry').textContent=Math.abs(x-e.clientX)<=1&&Math.abs(y-e.clientY)<=1?'center':'missed';
           document.title='Count '+(++window.count)
-        }</script>
+        }
+        const button=document.querySelector('button');
+        if(location.pathname==='/landed'){
+          document.body.style.background='#1848D8';document.body.innerHTML='<h1 id="landed">Landed</h1>';document.title='Landed'
+        }
+        if(location.pathname==='/duplicates'){
+          const copy=button.cloneNode(true);copy.style='position:fixed;left:8px;top:8px;margin:0';document.body.append(copy)
+        }
+        if(location.pathname==='/covered'){
+          const cover=document.createElement('div');cover.style='position:fixed;inset:0;z-index:2';document.body.append(cover)
+        }
+        if(location.pathname==='/replace'){
+          button.onpointerdown=()=>{document.title='Pointerdown 1';button.replaceWith(button.cloneNode(true))}
+        }
+        </script>
         """
         let data = Data("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)".utf8)
         listener.newConnectionHandler = { connection in

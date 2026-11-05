@@ -55,7 +55,7 @@ final class IOSWorkflowMedia {
         return directory
     }
 
-    func receive(_ image: CGImage, seconds: Double, step: Int?, document: String, viewport: IOSWorkflowTab.Viewport) throws {
+    func receive(_ image: CGImage, seconds: Double, step: Int?, document: String, viewport: IOSWorkflowTab.Viewport) throws -> Bool {
         let stamp: Body = ["width": image.width, "height": image.height, "documentId": document, "viewport": viewport.metadata]
         if first.isEmpty { first = stamp; firstTime = seconds }
         let time = max(0, seconds - (firstTime ?? seconds))
@@ -70,6 +70,7 @@ final class IOSWorkflowMedia {
                 try ScriptImageEncoder.png(image, to: url, budget: scratch)
                 frames.append((url, time))
             }
+            var admitted = true
             if formats.contains("video") {
                 try output.check()
                 if video == nil {
@@ -80,10 +81,12 @@ final class IOSWorkflowMedia {
                         budget: output
                     )
                 }
-                if try video?.append(image, seconds: time) != true { videoDrops += 1 }
+                admitted = try video?.append(image, seconds: time) == true
+                if !admitted { videoDrops += 1 }
                 if video?.budgetExceeded == true { throw IOSWorkflowFailure("CAPTURE_BUDGET_EXCEEDED") }
                 try output.check()
             }
+            return admitted
         } catch let failure as IOSWorkflowFailure { throw failure } catch ScriptCaptureError.budget {
             throw IOSWorkflowFailure("CAPTURE_BUDGET_EXCEEDED")
         } catch { throw IOSWorkflowFailure("CAPTURE_FAILED") }

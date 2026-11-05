@@ -136,10 +136,17 @@ extension Router {
     @MainActor
     func browserMCP(_ body: [String: Any]) async -> [String: Any] {
         let persistent = directGateway()
-        if let method = persistent.extensionMethod(body), ["ai-infer", "ai-record"].contains(method) {
-            // Long-running product inference/recording gets its own coordinator;
-            // the persistent browser handle remains available for explicit calls.
-            let gateway = makeBrowserGateway(allowActions: true, pinnedTabId: nil, agent: false)
+        let method = persistent.extensionMethod(body)
+        let productScript = ScriptGatewayPolicy.independentMCPMethod(body, resolvedMethod: method)
+        if productScript != nil || ["ai-infer", "ai-record"].contains(method ?? "") {
+            // Native run admission owns the script gate. Its inner extraction/readiness
+            // calls acquire the persistent lease briefly; controls remain available.
+            let gateway = makeBrowserGateway(
+                allowActions: true,
+                pinnedTabId: nil,
+                agent: false,
+                productScriptMethod: productScript
+            )
             return await gateway.request(body, mcp: true)
         }
         return await persistent.request(body, mcp: true)
@@ -155,7 +162,7 @@ extension Router {
     }
 
     @MainActor
-    func makeBrowserGateway(allowActions: Bool, pinnedTabId: String?, agent: Bool, admission: BrowserAgentAdmission = .remote) -> BrowserControlGateway {
+    func makeBrowserGateway(allowActions: Bool, pinnedTabId: String?, agent: Bool, admission: BrowserAgentAdmission = .remote, productScriptMethod: String? = nil) -> BrowserControlGateway {
         #if os(iOS)
         let platform: Int32 = 0
         let targeting = "selected"
@@ -178,7 +185,8 @@ extension Router {
             extensions: extensions,
             targeting: targeting,
             allowActions: allowActions,
-            lease: browserLease,
+            lease: productScriptMethod == nil ? browserLease : nil,
+            timeoutNanoseconds: productScriptMethod.map { ScriptGatewayPolicy.timeoutNanoseconds(method: $0) } ?? 30_000_000_000,
             dispatch: { [weak self] method, params, mutates in
                 guard let self, self.browserProfile == profile else { return errorResponse(code: "RENDERER_CHANGED", message: "Renderer changed") }
                 if agent && !self.agentTargetAllowed(tabId: pinnedTabId) {
@@ -187,6 +195,7 @@ extension Router {
                 #if os(iOS)
                 let selectedView = self.handlerContext?.webView
                 #endif
+                if let failure = self.scriptMutationFailure(method: method, params: params, mutates: mutates) { return failure }
                 if mutates { self.invalidateAllBrowserReferences() }
                 let result = await self.browserDispatch(method: method, params: params, pinnedTabId: agent ? pinnedTabId : nil)
                 guard self.browserProfile == profile else { return errorResponse(code: "RENDERER_CHANGED", message: "Renderer changed") }
@@ -215,6 +224,16 @@ extension Router {
         browserGateways.removeAll { $0.gateway == nil }
         browserGateways.append(WeakBrowserGateway(gateway))
         return gateway
+    }
+
+    @MainActor
+    private func scriptMutationFailure(method: String, params: [String: Any], mutates: Bool) -> [String: Any]? {
+        ScriptGatewayPolicy.mutationFailure(
+            method: method,
+            mutates: mutates,
+            recordingError: { self.scriptPlaybackState?.recordingError(for: method) },
+            rendererAllowed: { self.browserMutationAllowed?(params["tabId"] as? String) != false }
+        )
     }
 
     @MainActor

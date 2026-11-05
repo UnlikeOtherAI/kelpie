@@ -57,6 +57,11 @@ Validate a report using:
 node tests/capture/evidence.mjs /absolute/path/report.json
 ```
 
+For native protocol ingestion and scoped differential comparison, see
+[differential-evidence.md](../../docs/plans/browser-automation-capture/differential-evidence.md).
+The native matrix separates all48 IDs across nine runtime cells, including
+Linux GTK and OSR; ingestion never certifies acceptance.
+
 Reports contain `version:1` and `records`. Each record identifies requirement,
 host, platform, renderer, full exercised source SHA, reviewer, UTC observation
 time, status, evidence kind and observed result. Passed records require source

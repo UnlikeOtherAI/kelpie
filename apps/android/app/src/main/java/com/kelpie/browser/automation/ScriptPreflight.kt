@@ -21,7 +21,7 @@ object ScriptPreflight {
 
     fun admit(normalized: Map<String, Any?>): Map<String, Any?> {
         if (normalized.containsKey("sessionId")) throw ScriptFailure("SESSION_UNSUPPORTED")
-        if (normalized.containsKey("inputs")) throw ScriptFailure("UNRESOLVED_SCRIPT_INPUT")
+        if ((normalized["inputs"] as? Map<*, *>)?.isNotEmpty() == true) throw ScriptFailure("UNRESOLVED_SCRIPT_INPUT")
         val actions = actions(normalized)
         if (actions.any { it["action"] !in supportedActions }) {
             throw ScriptFailure("UNSUPPORTED_SCRIPT_ACTION")

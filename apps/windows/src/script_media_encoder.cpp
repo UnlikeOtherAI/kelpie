@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <limits>
 #include <set>
 #include <thread>
 
@@ -182,6 +183,15 @@ std::size_t ScriptMediaEncoder::bytes_written() const {
     if (!error) total += static_cast<std::size_t>(bytes);
   }
   return total;
+}
+
+std::size_t ScriptMediaEncoder::committed_movie_frames() const {
+  impl_->CheckOwner();
+  if(impl_->formats.empty() || impl_->width==0 || impl_->finished) return 0;
+  std::size_t committed=std::numeric_limits<std::size_t>::max();
+  if(impl_->gif) committed=std::min(committed,impl_->gif->CommittedFrames());
+  if(impl_->video) committed=std::min(committed,impl_->video->CommittedFrames());
+  return committed;
 }
 
 bool ScriptMediaEncoder::budget_exceeded() const {

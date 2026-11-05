@@ -1,9 +1,11 @@
 #include "script_capture_service.h"
 #include "script_capture_cadence.h"
+#include "kelpie/script_presentation.h"
 #include "script_media_encoder.h"
 #include "script_frame_compositor.h"
 #include "script_native_overlay.h"
 #include <set>
+#include <deque>
 #include <algorithm>
 
 namespace kelpie::windows {
@@ -18,6 +20,7 @@ class Capture final : public DesktopScriptCapture {
       const auto name=format.get<std::string>();
       if(name=="screenshots") screenshots_=true; else codecs.push_back(name=="video"?"mp4":name);
     }
+    movies_=!codecs.empty();
     try { encoder_=ScriptMediaEncoder::Create(directory_,codecs,options_.value("fps",15),options_.value("maxBytes",std::size_t(67108864))); }
     catch(...) { std::error_code ignored; std::filesystem::remove(directory_,ignored); throw; }
   }
@@ -27,13 +30,37 @@ class Capture final : public DesktopScriptCapture {
       std::filesystem::remove(entry.path(),ignored);
     std::filesystem::remove(directory_,ignored);
   }
-  void AddFrame(const BrowserScreenshot& image,const Json& presentation,double elapsed_ms,int index,bool step) override {
+  DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image,const Json& presentation,double elapsed_ms,int index,bool step) override {
     auto frame=DecodeScriptFrame(image.base64_data,options_.value("maxWidth",1280),elapsed_ms);
     if(width_&& (frame.width!=width_||frame.height!=height_)) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
     width_=frame.width; height_=frame.height; last_elapsed_=elapsed_ms;
     DrawScriptOverlay(frame,presentation);
+    DesktopScriptFrameAdmission committed;
     if(ScriptMovieFrameDue(last_movie_frame_,elapsed_ms,options_.value("fps",15))) {
+      // AddFrame emits the prior pending frame to GIF and MP4 before accepting
+      // this new pending frame. False/throw never acknowledges either format.
       if(!encoder_->AddFrame(frame)) throw std::runtime_error("CAPTURE_BUDGET_EXCEEDED");
+      DesktopScriptFrameAdmission queued;
+      if(movies_ && presentation.contains("marker")) {
+        const auto& marker=presentation.at("marker");
+        const auto progress=kelpie_script_progress(elapsed_ms-marker.value("startedMs",0.0),marker.value("durationMs",700.0));
+        if(kelpie_script_tap_presentation(progress,marker.value("wobble",true),marker.value("fade",true)).alpha>0) {
+          queued.committed_marker_action=marker.value("actionIndex",-1);
+          queued.committed_marker_document=presentation.value("documentVersion",std::string());
+        }
+      }
+      if(movies_) {
+        movie_markers_.push_back(std::move(queued));
+        // Runtime cadence is <=30 FPS, so every GIF source interval is above
+        // its 10ms minimum; H.264 baseline output is FIFO. Count only samples
+        // actually retained by BOTH writers, never raw/MFT input acceptance.
+        const auto prefix=encoder_->committed_movie_frames();
+        while(committed_marker_frames_<prefix && !movie_markers_.empty()) {
+          committed=std::move(movie_markers_.front()); movie_markers_.pop_front();
+          ++committed_marker_frames_;
+        }
+        if(movie_markers_.size()>18) throw std::runtime_error("CAPTURE_ENCODER_BACKPRESSURE");
+      }
       last_movie_frame_=elapsed_ms;
     }
     if(step&&screenshots_) {
@@ -42,6 +69,7 @@ class Capture final : public DesktopScriptCapture {
       manifests_.push_back(service_->Publish(path,"image/png",{{"width",frame.width},{"height",frame.height},{"actionIndex",index},{"documentId",presentation.value("documentVersion",std::string())}},run_,owner_));
       retained_.insert(path);
     }
+    return committed;
   }
   Json Finish(bool partial,const std::string&,double terminal_elapsed_ms) override {
     std::string failure;
@@ -68,7 +96,9 @@ class Capture final : public DesktopScriptCapture {
   std::filesystem::path directory_;
   std::unique_ptr<ScriptMediaEncoder> encoder_;
   std::set<std::filesystem::path> retained_;
-  bool screenshots_=false;
+  bool screenshots_=false,movies_=false;
+  std::deque<DesktopScriptFrameAdmission> movie_markers_;
+  std::size_t committed_marker_frames_=0;
   int width_=0,height_=0;
   double last_elapsed_=0,last_movie_frame_=-1;
 };

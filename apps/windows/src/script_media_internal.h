@@ -53,6 +53,7 @@ class GifWriter {
   virtual bool Write(const ScriptMediaFrame&, double start_ms, double end_ms) = 0;
   virtual ScriptMediaOutput Finish() = 0;
   virtual std::size_t BytesWritten() const = 0;
+  virtual std::size_t CommittedFrames() const = 0;
 };
 class VideoWriter {
  public:
@@ -60,6 +61,7 @@ class VideoWriter {
   virtual bool Write(const ScriptMediaFrame&, double start_ms, double end_ms) = 0;
   virtual ScriptMediaOutput Finish() = 0;
   virtual std::size_t BytesWritten() const = 0;
+  virtual std::size_t CommittedFrames() const = 0;
 };
 
 std::unique_ptr<GifWriter> CreateGif(const std::filesystem::path&, Budget&);

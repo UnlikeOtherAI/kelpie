@@ -16,12 +16,20 @@ enum class Platform {
   kWindows,
 };
 
+struct ToolRuntimeProfile {
+  Platform platform;
+  std::vector<std::string> engines;
+  bool requires_ui = true;
+  bool allowed_headless = false;
+};
+
 struct ToolAvailability {
   std::vector<Platform> platforms;
   std::vector<std::string> engines;
   bool requires_ui = false;
   bool allowed_headless = false;
   std::vector<std::string> required_capabilities;
+  std::vector<ToolRuntimeProfile> runtime_profiles = {};
 };
 
 const char* PlatformToString(Platform platform);

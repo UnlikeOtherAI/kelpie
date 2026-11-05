@@ -31,6 +31,7 @@ class ScriptOverlay {
         val color: Int,
         val wobble: Boolean,
         val fade: Boolean,
+        val held: Boolean = false,
     )
 
     data class Commentary(
@@ -144,7 +145,7 @@ class ScriptOverlay {
             animate = true
         }
         tap?.let { indicator ->
-            val elapsed = (now - indicator.start) / 1_000_000.0
+            val elapsed = if (indicator.held) 0.0 else (now - indicator.start) / 1_000_000.0
             if (elapsed < indicator.durationMs) {
                 val state = ScriptNative.tapPresentation(elapsed, indicator.durationMs, indicator.wobble, indicator.fade)
                 paint.style = Paint.Style.FILL

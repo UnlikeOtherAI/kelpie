@@ -9,6 +9,7 @@ final class Router: @unchecked Sendable {
     private var routes: [String: RouteHandler] = [:]
     var handlerContext: HandlerContext?
     var scriptPlaybackState: ScriptPlaybackState?
+    @MainActor var browserMutationAllowed: ((String?) -> Bool)?
     @MainActor var browserGateway: BrowserControlGateway?
     @MainActor var browserGatewayProfile: String?
     let browserLease = BrowserControlLease()
@@ -26,7 +27,8 @@ final class Router: @unchecked Sendable {
         bypassRecordingGate: Bool = false,
         browserGatewayDispatch: Bool = false
     ) async -> (statusCode: Int, json: [String: Any]) {
-        if let owner = browserReferenceOwner, !browserGatewayDispatch {
+        let productScript = ScriptGatewayPolicy.independent(method: method, body: body)
+        if let owner = browserReferenceOwner, !browserGatewayDispatch, !productScript {
             guard owner.browserLease.begin() else {
                 return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
             }
@@ -38,7 +40,7 @@ final class Router: @unchecked Sendable {
             return (200, await browserControl(body))
         }
         let mutatingMethod = isBrowserMutation(method: method)
-        let legacyMutation = !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod
+        let legacyMutation = !browserGatewayDispatch && !bypassRecordingGate && mutatingMethod && !productScript
         if legacyMutation, browserLease.begin() == false {
             return (409, errorResponse(code: "BUSY", message: "A browser operation is pending"))
         }

@@ -17,6 +17,8 @@ struct McpTool {
 
 bool SupportsPlatform(const ToolAvailability& availability, Platform platform);
 bool SupportsEngine(const ToolAvailability& availability, std::string_view engine);
+ToolAvailability AvailabilityForPlatform(const ToolAvailability& availability, Platform platform);
+bool SupportsRuntime(const ToolAvailability& availability, Platform platform, std::string_view engine);
 bool HasRuntimeCaveat(const ToolAvailability& availability);
 std::vector<McpTool> CreateDefaultMcpTools();
 

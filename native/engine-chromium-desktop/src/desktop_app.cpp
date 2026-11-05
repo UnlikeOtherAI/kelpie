@@ -174,8 +174,7 @@ class DesktopApp::Impl {
     runtime.capabilities_supplier = [this]() {
       McpCapabilities capabilities;
       for (const McpTool& tool : mcp_registry.all_tools()) {
-        if (SupportsPlatform(tool.availability, config.platform) &&
-            SupportsEngine(tool.availability, config.engine_name) && router.IsCallable(tool.http_endpoint)) {
+        if (SupportsRuntime(tool.availability, config.platform, config.engine_name) && router.IsCallable(tool.http_endpoint)) {
           capabilities.supported.push_back(tool.http_endpoint);
         } else {
           capabilities.unsupported.push_back(tool.http_endpoint);

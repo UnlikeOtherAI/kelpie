@@ -136,9 +136,11 @@ final class IOSWorkflowActions {
         let settings = workflow.settings["tapIndicator"] as? Body ?? [:]
         let radius = CGFloat(settings["radius"] as? Double ?? 20) * viewport.bounds.width / viewport.visible.width
         try requireOK(try await tab.target(target, token: token))
-        let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings) }
+        let hold = sampler?.recordsMotion == true
+        let mark = { [presentation] in presentation.mark(at: point, radius: radius, settings: settings, held: hold) }
         if let sampler {
-            try await sampler.step(workflow.stepScreenshots ? index : nil, document: document, prepare: mark)
+            try await sampler.markBeforeInput(workflow.stepScreenshots ? index : nil, document: document, prepare: mark)
+            if hold { presentation.beginMarkerAnimation() }
         } else { mark() }
         try await check()
         let current = try await tab.viewport()

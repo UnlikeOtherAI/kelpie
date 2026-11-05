@@ -84,7 +84,13 @@ void TestInputPlanner() {
   assert(typed.ok && typed.commands.size() == 1 && typed.expected["value"] == "before-after");
   auto readonly_textarea = Target("textarea"); readonly_textarea["editable"] = false;
   assert(kelpie::desktop_input::PlanTrustedInput({{"type", "fill"}, {"value", "x"}}, kelpie::desktop_input::ParseTarget(readonly_textarea, &error)).error_code == "UNSUPPORTED");
-  assert(kelpie::desktop_input::PlanTrustedInput({{"type", "key"}, {"key", "Enter"}}, std::nullopt).ok);
+  const auto enter=kelpie::desktop_input::PlanTrustedInput({{"type","key"},{"key","Enter"}},std::nullopt);
+  assert(enter.ok && enter.commands[0]["params"]["text"]=="\r");
+  assert(!enter.commands[1]["params"].contains("text"));
+  const auto letter=kelpie::desktop_input::PlanTrustedInput({{"type","key"},{"key","a"}},std::nullopt);
+  assert(letter.commands[0]["params"]["text"]=="a");
+  const auto chord=kelpie::desktop_input::PlanTrustedInput({{"type","key"},{"key","a"},{"modifiers",nlohmann::json::array({"Control"})}},std::nullopt);
+  assert(!chord.commands[0]["params"].contains("text"));
   assert(!kelpie::desktop_input::PlanTrustedInput({{"type", "key"}, {"key", "UnmappedKey"}}, std::nullopt).ok);
 }
 

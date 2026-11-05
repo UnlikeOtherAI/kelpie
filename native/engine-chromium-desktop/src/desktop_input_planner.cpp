@@ -22,8 +22,17 @@ Json KeyEvent(const char* type, const char* key, const char* code, int virtual_k
 }
 
 void AddKeyPair(std::vector<Json>* commands, const char* key, const char* code, int virtual_key, int modifiers = 0) {
-  commands->push_back(KeyEvent("keyDown", key, code, virtual_key, modifiers));
-  commands->push_back(KeyEvent("keyUp", key, code, virtual_key, modifiers));
+  auto down=KeyEvent("keyDown",key,code,virtual_key,modifiers);
+  // CDP text defaults empty. Enter and printable keys need layout text;
+  // accelerator chords must remain free of character insertion.
+  if((modifiers&7)==0) {
+    const std::string logical=key;
+    const std::string text=logical=="Enter"?"\r":
+      logical.size()==1 && static_cast<unsigned char>(logical[0])>=32?logical:std::string();
+    if(!text.empty()) { down["params"]["text"]=text; down["params"]["unmodifiedText"]=text; }
+  }
+  commands->push_back(std::move(down));
+  commands->push_back(KeyEvent("keyUp",key,code,virtual_key,modifiers));
 }
 
 void AddMouseClick(std::vector<Json>* commands, const Target& target) {

@@ -662,4 +662,7 @@ The matching iOS binding belongs to the same integrated PR. Native relink and re
 HTTP/MCP phone/tablet acceptance remain pending; the
 [Android ledger](plans/browser-automation-capture/android.md) records exact results.
 
+<<<<<<< HEAD
 Linux CEF adds native capture adapters for the shared typed-workflow coordinator: Cairo presentation/PNG, giflib GIF, system GStreamer/OpenH264 MP4, owner-bound private artifacts and GTK Stop. The Linux native candidate requires actual build/API/codec and flavor verification before capability claims; headless and no-CEF availability remain explicit. See [Linux capture contract](api/linux-script-media.md).
+=======
+Apple workflow gateway admission keeps long strict scripts separate from the persistent browser lease while preserving authoritative recording, retirement and owner checks. Nested extraction/readiness and run controls use the same protected native methods; unversioned scripts keep their existing path. See [shared Apple gateway admission](api/apple-script-media.md#shared-apple-gateway-admission) for verification scope.

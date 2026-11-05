@@ -185,7 +185,11 @@ class ScriptRuntime(
                         false
                     }
                 }
-            runner = ScriptActions(run, ctx, router, view, checkNotNull(observer))
+            runner =
+                ScriptActions(run, ctx, router, view, checkNotNull(observer)) { index, markerMs, documentId ->
+                    capture?.holdMarker(markerMs, documentId)
+                    capture?.step(index)
+                }
             actions = runner
             runner.guard()
             watchdog =
@@ -214,8 +218,10 @@ class ScriptRuntime(
             for ((index, action) in steps.withIndex()) {
                 runner.guard()
                 run.step(index, action["action"] as String)
-                runner.execute(action)
-                capture?.step(index, action["action"] == "screenshot")
+                runner.execute(action, index)
+                if (action["action"] !in setOf("click", "tap", "fill", "type")) {
+                    capture?.step(index, action["action"] == "screenshot")
+                }
                 runner.guard()
                 run.succeeded()
                 if (index < steps.lastIndex) {

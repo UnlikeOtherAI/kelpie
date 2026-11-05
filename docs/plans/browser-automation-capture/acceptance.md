@@ -7,6 +7,7 @@ Owner: common contracts/CLI and acceptance (/observations).
 Source worktree: Maxis `D:/Worktrees/kelpie/capture-observations-20261104`.
 The former QA worktree remains read-only; iOS implementation now belongs to /acceptance.
 See [architecture review](architecture-review.md), [resource ledger](resources.md),
+[independent mobile source review](mobile-source-review.md),
 and [fixture instructions](../../../tests/capture/README.md).
 
 ## Gates and evidence
@@ -18,7 +19,11 @@ VNC, custom desktop-input helpers and native UI driving remain explicitly off.
 Machine-interface evidence and native UI evidence must remain distinct.
 Each renderer must be named: macOS WebKit and Chromium are
 separate cells; iPhone/iPad, Android phone/tablet, Windows CEF and Linux CEF are
-separate cells. A platform without the capability must return a documented
+separate cells. Linux GTK and Linux CEF offscreen/OSR are distinct runtime cells;
+noCEF stub and external workers remain separate evidence. See
+[differential ingestion](differential-evidence.md) and
+[critical movie admission review](movie-admission-review.md).
+A platform without the capability must return a documented
 unsupported response; that refusal does not satisfy required native parity.
 
 Every row below starts **pending**. To close it, append an evidence record to the
@@ -115,6 +120,14 @@ and symbols exist. Every implementation owner must replace this with landed path
 8. Run the exact corpus independently on each native renderer under its assigned
    coordinator resource slot; other platforms do not wait for Windows acceptance.
    Restricted Lightpanda refusal evidence remains distinct from native support.
+
+VIS-01/VIS-02/CAP-01/CAP-02/CAP-03 additionally require a movies-only low-FPS
+navigation flow (including fps1) with every GIF/MP4 frame decoded. A tap marker
+must appear on the correct pre-navigation document in each requested movie
+format; a correct step PNG alone cannot close this gate. Pre-input held-marker
+dwell is separately recorded from configured animation duration. Preserve the
+FPS cap, cancellable bounds and final exact-target recheck; screenshots-only/no
+capture must not inherit an unnecessary movie-admission delay.
 
 The initial ledger author ran no flows at creation. Later source/core/headless and exported-media results are recorded in the linked implementation/review/platform ledgers; they do not automatically promote any native cell to passed. UI/Stop verification remains blocked by the user hold.
 

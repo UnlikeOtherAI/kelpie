@@ -1,5 +1,6 @@
 #include "desktop_script_runtime.h"
 #include <stdexcept>
+#include <algorithm>
 
 namespace kelpie {
 void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::string& document) {
@@ -10,7 +11,10 @@ void DesktopScriptHandler::Impl::StepScreenshot(int index, bool png, const std::
   changed.wait_for(lock, std::chrono::seconds(10), [this, ticket] {
     return completed_ticket >= ticket || sampler_done || !capture_error.empty() || abort->load();
   });
-  if (completed_ticket < ticket && !abort->load()) throw std::runtime_error("CAPTURE_STEP_FAILED");
+  if (completed_ticket < ticket && !abort->load()) {
+    if(capture_error.empty()) capture_error=document.empty()?"CAPTURE_STEP_FAILED":"CAPTURE_EVIDENCE_TIMEOUT";
+    throw std::runtime_error("CAPTURE_STEP_FAILED");
+  }
 }
 void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
   std::unique_ptr<DesktopScriptCapture> encoder;
@@ -26,6 +30,7 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
     }
     encoder = config.capture(options, run_id, owner);
     if (!encoder) throw std::runtime_error("CAPTURE_UNAVAILABLE");
+    const bool movies=std::any_of(options["formats"].begin(),options["formats"].end(),[](const Json& format){return format=="gif" || format=="video";});
     const int fps = options.value("fps", 15);
     const int duration = options.value("maxDurationMs", 60000);
     auto next = Clock::now();
@@ -76,14 +81,19 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
       Json after_viewport;
       result = engine.EvaluateBrowserControl(lease, "({width:innerWidth,height:innerHeight})", &after_viewport, std::chrono::seconds(2));
       if (!result.ok || after_viewport != viewport) throw std::runtime_error("CAPTURE_VIEWPORT_CHANGED");
-      encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      const auto admitted=encoder->AddFrame(image, shown, frame_time, step >= 0 ? step : index, step >= 0 && png);
+      const bool proof=!movies || expected_document.empty() ||
+        (admitted.committed_marker_action==step && admitted.committed_marker_document==expected_document);
       { std::lock_guard lock(mutex); presentation_latched=false; }
       Present();
       { std::lock_guard lock(mutex); if(!sampler_ready) { sampler_ready=true; changed.notify_all(); } }
       if (step >= 0) {
         std::lock_guard lock(mutex);
-        completed_step = step; completed_ticket=std::max(completed_ticket,ticket);
-        if (requested_ticket == ticket) requested_step = -1;
+        if(requested_ticket==ticket) requested_step_png=false; // Exclusive PNG path is written once.
+        if(proof) {
+          completed_step = step; completed_ticket=std::max(completed_ticket,ticket);
+          if (requested_ticket == ticket) requested_step = -1;
+        }
         changed.notify_all();
       }
       // An early milestone request does not consume a future cadence slot.
@@ -94,7 +104,10 @@ void DesktopScriptHandler::Impl::Sample(TabLease lease, Json options) {
         dropped+=skipped; next+=interval*skipped;
       }
       std::unique_lock lock(mutex);
-      changed.wait_until(lock, next, [this] { return requested_step >= 0 || stop_sampler.load() || abort->load(); });
+      const auto capture_deadline=began+std::chrono::milliseconds(duration);
+      changed.wait_until(lock, std::min(next,capture_deadline), [this,ticket] {
+        return (requested_step>=0 && requested_ticket!=ticket) || stop_sampler.load() || abort->load();
+      });
     }
   } catch (const std::exception& error) {
     // Only fixed native codes cross this boundary. Never return codec exception text or page data.
