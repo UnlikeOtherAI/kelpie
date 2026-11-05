@@ -10,8 +10,8 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { runGtkStop } from "./gtk-stop.mjs";
 import { captureIsolatedWayland } from "./wayland-capture.mjs";
 import { captureIsolatedTimeline } from "./wayland-timeline.mjs";
-import { capturePrivateWestonStream } from "./wayland-stream.mjs";
 import { readNativeIdentity, waitForNativeRetirement, verifyClosedSocket } from "./native-lifecycle.mjs";
+if (process.env.KELPIE_WESTON_STREAM) throw new Error("UNSUPPORTED_PRIVATE_WESTON_STREAM");
 const execute = promisify(execFile);
 const [binaryArg, cliArg, outputArg, mode = "offscreen"] = process.argv.slice(2);
 assert.equal(process.platform, "linux");
@@ -86,8 +86,7 @@ try {
       ? () => captureIsolatedWayland({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
       : undefined;
     const captureTimeline = captureShown && env.KELPIE_GTK_TIMELINE === "1"
-      ? () => (env.KELPIE_WESTON_STREAM ? capturePrivateWestonStream : captureIsolatedTimeline)
-        ({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
+      ? () => captureIsolatedTimeline({ identity, binary, hash: report.binarySHA256, output, env, signal: deadline.signal })
       : undefined;
     report.gtkStop = await runGtkStop({ readiness: ready, identity, binary, hash: report.binarySHA256,
       output, env, signal: deadline.signal, captureShown, captureTimeline });
