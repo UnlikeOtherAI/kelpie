@@ -152,6 +152,9 @@ abstract class ScriptPublicFixture {
         client: ScriptHttpFixture,
         geometry: JSONObject,
     ): Bitmap {
+        // Recording can resize the WebView; measure the same fixture after admission.
+        val currentGeometry = readSubmitGeometry(client)
+        assertEquals(geometry.getString("href"), currentGeometry.getString("href"))
         val owned = ScriptPinchProbe(instrumentation, ui.activity.window.decorView).view
         val deadline = System.nanoTime() + 10_000_000_000L
         var rejected: Bitmap? = null
@@ -174,7 +177,7 @@ abstract class ScriptPublicFixture {
                 }
             }
             val projection = JSONObject()
-            val target = submitTargetBounds(owned, geometry, projection)
+            val target = submitTargetBounds(owned, currentGeometry, projection)
             val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
             val marker = target?.let { ScriptMarkerPixels.locate(bitmap, it) }
             val now = System.nanoTime()
