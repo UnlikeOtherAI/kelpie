@@ -114,6 +114,7 @@ test("validated model reference substitutes only exact tail pixels",()=>{
   assert.throws(()=>evaluateG08(unstable,config),/unstable pre-dispatch baseline/);
   const result=evaluateG08(unstable,config,reference);
   assert.match(result.confidence,/ENCODED-VISIBLE only/);
+  assert.equal(result.referenceKind,"production-model-gif");
   for(const mode of ["overlapSmall","overlapFaint","stuck"]){
     assert.throws(()=>evaluateG08(render(config,mode),config,reference),/INSUFFICIENT|G08_/);
   }

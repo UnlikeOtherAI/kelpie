@@ -122,5 +122,6 @@ export function evaluateG08(samples,config,modelReference){
     dwellAfterMotionMs:markerStart-(best.start+pointerMs),alphaRms:alphaError,
     radiusBiasPx:bias,wobbleRmsPx:wobbleError,staticRadiusRmsPx:staticError,markerSamples:marker.length,
     calibrationFrames:calibration.length,calibrationStartMs:calibration[0]?.timeMs??null,
+    referenceKind:modelReference===undefined?"same-run-calibration":"production-model-gif",
     baselineRGBSha256:createHash("sha256").update(reference).digest("hex"),finalClearFrames:tail.length};
 }
