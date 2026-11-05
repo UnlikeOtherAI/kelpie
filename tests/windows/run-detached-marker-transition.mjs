@@ -13,8 +13,9 @@ import {safeWgcDiagnostic} from "./wgc-safe-diagnostic.mjs";
 import {waitForOwnedExit} from "./wait-for-owned-exit.mjs";
 import {observeInFlight,awaitBounded} from "./interactive-stop-lifecycle.mjs";
 
-const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,expectedUiaHash,expectedWgcHash,expectedRevision]=process.argv.slice(2);
+const [exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath,expectedUiaHash,expectedWgcHash,expectedRevision,mode="screenshots-only"]=process.argv.slice(2);
 assert.ok([exe,cli,uia,wgc,privateRoot,outputRoot,manifestPath].every(p=>p&&isAbsolute(p)));
+assert.ok(["screenshots-only","no-capture"].includes(mode));
 assert.match(expectedUiaHash??"",/^[a-f0-9]{64}$/);assert.match(expectedWgcHash??"",/^[a-f0-9]{64}$/);assert.match(expectedRevision??"",/^[a-f0-9]{40}$/);
 const exec=promisify(execFile),manifest=JSON.parse(await readFile(manifestPath,"utf8"));
 assert.match(manifest.source??"",/^[a-f0-9]{40}$/);
@@ -28,7 +29,7 @@ const run=async(command,args,timeout=15000)=>exec(command,args,{env,windowsHide:
 const cliRun=async args=>{try{return JSON.parse((await run(process.execPath,[cli,...args],args[1]==="launch"?30000:20000)).stdout);}catch(error){error.safeDetails=safeCliFailure(error);throw error;}};
 const uiaRun=async args=>{try{return JSON.parse((await run(uia,args,10000)).stdout);}catch(error){error.safeDetails=safeUiaFailure(error);throw error;}};
 const alias="capture-detached-marker-"+manifest.source.slice(0,8);
-const report={source:manifest.source,profile:"screenshots-only",phase:"session",checks:[],cleanup:"not-started"};
+const report={source:manifest.source,profile:mode,phase:"session",checks:[],cleanup:"not-started"};
 let fixture,registered=false,launched=false,running,readiness,identity,pending,pendingDone=false,capturePromise;
 const save=()=>writeFile(join(outputRoot,"report.json"),JSON.stringify(report,null,2));
 const api=async(method,body={})=>{
@@ -95,6 +96,7 @@ try{
   capture:{formats:["screenshots"],fps:15,maxWidth:640,maxDurationMs:30000,maxBytes:16777216},
   actions:[{action:"click",target:{role:"button",name:"G08 Finish",exact:true}},
    {action:"wait",ms:3000},{action:"click",target:{role:"button",name:"G08 Finish",exact:true}}]};
+ if(mode==="no-capture") delete workflow.capture;
  scriptV1Schema.parse(workflow);
  pending=observeInFlight(api("play-script",workflow).finally(()=>{pendingDone=true;}));
  let active,window;
@@ -124,6 +126,8 @@ try{
  assert.ok(fixtureFacts.events.every(event=>event.target==="finish"&&event.trusted===true));
  report.fixture={trustedClicks:fixtureFacts.events.length,pageRequests:fixture.pageRequests};
  const items=(terminal.artifacts??[]).map(item=>scriptArtifactSchema.parse(item));
+ if(mode==="no-capture") assert.equal(items.length,0);
+ else {
  assert.ok(items.some(item=>item.mimeType==="image/png" && item.actionIndex===2),"PNG_ARTIFACT_MISSING");
  const png=items.find(item=>item.mimeType==="image/png" && item.actionIndex===2),chunks=[];let offset=0;
  assert.ok(png.byteLength<=16777216,"OUTPUT_BUDGET");
@@ -134,6 +138,7 @@ try{
  }
  const pngBytes=Buffer.concat(chunks);assert.equal(createHash("sha256").update(pngBytes).digest("hex"),png.sha256);
  await writeFile(join(outputRoot,"terminal.png"),pngBytes,{flag:"wx"});
+ }
  const stopState=await stopPromise;
  report.stopState={visibleInvokableButtons:stopState?.visibleInvokableButtons??null};
  assert.equal(stopState?.visibleInvokableButtons,0);
@@ -153,6 +158,17 @@ try{
  report.native={width:captured.width,height:captured.height,redPixels,maxAlpha,rawSha256:captured.raw.sha256,pngSha256:captured.png.sha256};
  report.checks.push({name:"post-response owned marker",passed:redPixels>0,redPixels});
  assert.ok(redPixels>0,"POST_RESPONSE_MARKER_NOT_OBSERVED");
+ if(mode==="no-capture"){
+  // This delay starts after the response; it exceeds the requested 5 s marker lifetime.
+  await new Promise(done=>setTimeout(done,5500));
+  let hidden=false;
+  try{await uiaRun(["presentation",String(running.pid),exe,identity.startTime]);}
+  catch(error){if(!presentationNotVisible(error))throw error;hidden=true;}
+  const expiredStop=await uiaRun(["inspect",String(running.pid),exe,identity.startTime]);
+  report.expiry={presentationHidden:hidden,visibleInvokableButtons:expiredStop.visibleInvokableButtons};
+  assert.ok(hidden,"MARKER_DID_NOT_EXPIRE");
+  assert.equal(expiredStop.visibleInvokableButtons,0);
+ }
  report.phase="complete";
  }
 }catch(error){
