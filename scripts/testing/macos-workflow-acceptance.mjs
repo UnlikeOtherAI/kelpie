@@ -26,6 +26,7 @@ const report={source,platform:process.platform,
  engines:[],gaps:[],corpusPassed:false,completePlatformAcceptance:false,release:false,signing:"ad-hoc hosted test only"};
 let appLogBytes=0,fixture,client;
 const child=spawn(executable,["--port","28420"],{detached:true,stdio:["ignore","pipe","pipe"]});
+let childExited=false;child.once("exit",()=>{childExited=true;});
 for(const stream of [child.stdout,child.stderr])stream.on("data",bytes=>{appLogBytes+=bytes.length;});
 try{
  await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",()=>reject(new Failure("APP_SPAWN")));});
@@ -46,9 +47,11 @@ finally{
   if(pgid===child.pid)process.kill(-pgid,"SIGTERM");else report.cleanup="OWNED_PROCESS_GROUP_MISMATCH";
  }catch{report.cleanup="OWNED_CHILD_ALREADY_EXITED";}
  const end=Date.now()+10000;
- while(Date.now()<end&&(listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
- if(listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_LISTENER_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
- else report.ownedListenersReleased=true;
+ while(Date.now()<end&&(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)))await delay(100);
+ if(!childExited||listeners(28420).includes(child.pid)||listeners(8421).includes(child.pid)){report.cleanup="OWNED_CHILD_TEARDOWN_TIMEOUT";report.corpusPassed=false;process.exitCode=1;}
+ else {report.ownedListenersReleased=true;report.ownedChildExited=true;}
+ // A failed teardown must not leave the test driver waiting forever on inherited pipes.
+ child.stdout.destroy();child.stderr.destroy();child.unref();
  // Raw app logs, pairing grants, private model/recipes and token stores are never artifacts.
  report.appLogBytes=appLogBytes;
  await writeFile(path.join(out,"report.json"),JSON.stringify(report,null,2));
