@@ -136,3 +136,12 @@ Raw sensitive text stays case-sensitive. Only hex digits inside encoded URI/form
 
 ### Movie cadence follow-up
 Mandatory action PNGs may sample between nominal movie slots. Movie admission coalesces those milestones to at most the requested FPS; the nominal sampler deadline is not advanced for an early milestone wake. A1000-event burst cadence test passes at15FPS, and the affected sampler/service translation units compile on Maxis. Actual post-relink burst media evidence remains pending.
+
+### Encoded navigation evidence and terminal status
+A navigation tap with GIF or MP4 holds marker progress at zero until every requested movie encoder has retained the matching prior-document frame. The acknowledgment counts complete GIF source images and retained H.264 samples, not raw frame/MFT input acceptance. A bounded 18-record FIFO maps the common committed prefix to marker action/document identity. PNG-only workflows complete their sampled step without a movie acknowledgment. Each step PNG is written once.
+
+This pre-input dwell is additional to the configured wobble/fade duration, which begins after acknowledgment. Sampling continues at the configured FPS; a10s evidence deadline, capture duration/byte limit, cancellation or grant revocation can refuse input and finalize partial media. Exact target/document/geometry is checked again before trusted input, whose CDP sequence still has an asynchronous gap.
+
+Authorized v1 status queries always return success:true and strict metadata, including supportedVersions:[1], state and terminal runSuccess/runError. They never return action literals or outputs. Enter/printable trusted keydown carries CDP text; Control/Alt/Meta combinations do not insert text.
+
+Maxis shipping LOCAL_LLM=ON/staticCRT/pinned sandbox CEF build and six focused native tests passed on 5 November 2026: media full decode/faults, compositor, encoded-prefix decode/budget/finalization, owner HTTP/MCP, redaction and key planner. Normal prefix test observed retained output before Finish and compared all acknowledged counts to native decoded media. Actual low-FPS movie pixel and final public-flow rerun remain pending at this checkpoint. Native overlay/Stop/foreground UI remains unverified under the explicit Computer Use hold.

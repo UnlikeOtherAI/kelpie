@@ -5,12 +5,18 @@
 #include <nlohmann/json.hpp>
 #include "kelpie/desktop_browser_control.h"
 namespace kelpie {
+// A marker is acknowledged only after every requested movie encoder commits its frame.
+// PNG-only/no-movie adapters return the default and never fabricate movie evidence.
+struct DesktopScriptFrameAdmission {
+  int committed_marker_action=-1;
+  std::string committed_marker_document;
+};
 // All encoder methods run on one capture worker; native UI delivery must be marshalled.
 class DesktopScriptCapture {
  public:
   using Json = nlohmann::json;
   virtual ~DesktopScriptCapture() = default;
-  virtual void AddFrame(const BrowserScreenshot& image, const Json& presentation,
+  virtual DesktopScriptFrameAdmission AddFrame(const BrowserScreenshot& image, const Json& presentation,
                         double elapsed_ms, int action_index, bool step) = 0;
   virtual Json Finish(bool partial, const std::string& reason, double terminal_elapsed_ms) = 0;
 };

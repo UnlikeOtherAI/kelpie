@@ -71,13 +71,35 @@ bool DesktopScriptHandler::Impl::Authorized(const Json& body) const {
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Status(const Json& body) {
   std::lock_guard lock(mutex);
-  if (!running && !body.contains("runId"))
-    return SuccessResponse({{"playing", false}, {"supportedVersions", Json::array({1})}});
-  if (!Authorized(body)) return ErrorResponse("SCRIPT_OWNER_REQUIRED", "Run owner is required");
-  Json result = running ? status : terminal;
-  result["supportedVersions"] = Json::array({1});
-  result.erase("outputs");
-  if (running) { result["elapsedMs"] = Elapsed(); result["abortRequested"] = abort->load(); }
+  if (!Authorized(body)) {
+    if (!body.contains("runId"))
+      return SuccessResponse({{"playing", false}, {"state", "idle"}, {"supportedVersions", Json::array({1})}});
+    return ErrorResponse("SCRIPT_OWNER_REQUIRED", "Run owner is required");
+  }
+  Json result=SuccessResponse({{"playing",running},{"runId",run_id},
+    {"supportedVersions",Json::array({1})},{"totalActions",status.value("totalActions",0)}});
+  if(action_index>=0) result["actionIndex"]=action_index;
+  if (running) {
+    result["state"]=stop_sampler.load()?"finalizing":"running";
+    result["elapsedMs"]=Elapsed(); result["abortRequested"]=abort->load();
+    result["artifacts"]=artifacts;
+  } else {
+    const bool succeeded=terminal.value("success",false);
+    const bool aborted=terminal.value("aborted",false);
+    result["runSuccess"]=succeeded;
+    result["state"]=aborted?"aborted":succeeded?"completed":"failed";
+    for(const char* key:{"totalDurationMs","mayHaveCompleted","inputGuarantee","targetGuarantee","artifacts"})
+      if(terminal.contains(key)) result[key]=terminal.at(key);
+    if(!succeeded) {
+      std::string code=aborted?"SCRIPT_ABORTED":"SCRIPT_FAILED";
+      if(terminal.contains("error")) code=terminal["error"].value("code",code);
+      if(code.empty() || code.size()>80 || code.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")!=std::string::npos)
+        code="SCRIPT_FAILED";
+      result["runError"]={{"code",code},{"message","Workflow did not complete successfully"}};
+    }
+  }
+  // Query success is independent from historical run success. Project only the
+  // public metadata schema so no authored action or terminal output can escape.
   return result;
 }
 DesktopScriptHandler::Json DesktopScriptHandler::Impl::Abort(const Json& body) {
@@ -149,7 +171,7 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   {
     std::lock_guard lock(mutex);
     if (running) return ErrorResponse("BUSY", "A script owns the browser");
-    running = true; owner = admitted_owner; run_id = NewDesktopScriptId(); target_key = "__kelpie_script_" + run_id;
+    running = true; action_index=-1; owner = admitted_owner; run_id = NewDesktopScriptId(); target_key = "__kelpie_script_" + run_id;
     run_thread = std::this_thread::get_id(); abort = std::make_shared<std::atomic<bool>>(false); stop_sampler.store(false);
     began = Clock::now(); deadline = began + std::chrono::milliseconds(300000);
     capture_error.clear(); artifacts = Json::array(); terminal = Json::object(); presentation = Json::object();
@@ -169,7 +191,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
     const bool auto_png=script.contains("capture") && std::any_of(script["capture"]["formats"].begin(),script["capture"]["formats"].end(),[](const Json& format){return format=="screenshots";});
     if (script.contains("capture") || screenshot) {
       Json options=script.value("capture",Json{{"formats",Json::array({"screenshots"})},{"fps",15},{"maxWidth",1280},{"maxBytes",67108864},{"maxDurationMs",60000}});
-      if(screenshot && !std::any_of(options["formats"].begin(),options["formats"].end(),[](const Json& format){return format=="screenshots";})) options["formats"].push_back("screenshots");
+      if(screenshot && std::none_of(options["formats"].begin(),options["formats"].end(),[](const Json& format){return format=="screenshots";}))
+        options["formats"].push_back("screenshots");
       sampler = std::thread([this, lease, options] { Sample(lease, options); });
       std::unique_lock lock(mutex);
       changed.wait_for(lock, std::chrono::seconds(10), [this] { return sampler_ready || sampler_done; });
@@ -207,6 +230,8 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
         remaining=marker.value("startedMs",0.0)+marker.value("durationMs",700.0)-Elapsed();
       } }
       if(remaining>0) Pause(static_cast<int>(std::ceil(remaining)));
+      // Admit a fully faded movie endpoint without exceeding configured FPS.
+      Pause(static_cast<int>(std::ceil(1000.0/script.value("capture",Json::object()).value("fps",15))));
       StepScreenshot(action_index,false);
     }
     // Only explicitly requested terminal outputs are returned. Sensitive values never enter status.
@@ -247,6 +272,10 @@ DesktopScriptHandler::Json DesktopScriptHandler::Impl::Play(const Json& body) {
   }
   {
     std::lock_guard lock(mutex);
+    if(abort->load()) {
+      result["success"]=false; result["aborted"]=true;
+      for(auto& artifact:result["artifacts"]) artifact["partial"]=true;
+    }
     terminal = result; terminal["playing"] = false; running = false; run_thread = {};
   }
   return result;
