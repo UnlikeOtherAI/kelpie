@@ -187,8 +187,8 @@ Capture checks scene generation, focus, full visibility, geometry, document and
 authority around a WebView visual-state and compositor-frame fence. A timed-out
 or cancelled PixelCopy cannot publish; its one bounded bitmap
 remains quarantined until the native callback recycles it. Subsequent copies
-fail closed until that callback retires. API28 fails closed because it does not
-have this verified frame fence.
+fail closed until that callback retires. Android 10 (API 29) is the minimum
+supported OS, providing the frame-commit API used by this path.
 A staged tablet viewport temporarily removes its rounded clipping during capture
 to provide the complete rectangular WebView scene. Native device replay is pending.
 

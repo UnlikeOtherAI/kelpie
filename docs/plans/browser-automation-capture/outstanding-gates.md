@@ -67,8 +67,9 @@ No row grants a whole-platform or 432-cell pass.
   separately reviewed outcomes.
 - **iOS:** diagnostic run `42006716721` remains a gate; iPhone and iPad
   need separately reviewed outcomes.
-- **Android:** full run `42006190219`, API 28 behavior and native scene proof
-  remain gates; earlier partial phone/tablet results are not full acceptance.
+- **Android:** final-source native scene, privacy and full phone/tablet acceptance
+  remain gates; earlier partial results are not full acceptance. The user approved
+  Android 10 (API 29) as the minimum supported OS on 5 November 2026.
 - **Shared and delivery:** five persistent-token CLI tests timed out in the
   full run and again in an initial serial three-file retry. A later unchanged
   serial rerun passed all 12 cases; instrumented copies also passed, so the

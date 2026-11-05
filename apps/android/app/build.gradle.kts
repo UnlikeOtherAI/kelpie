@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.kelpie.browser"
-        minSdk = 28
+        minSdk = 29
         targetSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 19

@@ -66,7 +66,7 @@ Without these entries, iOS will silently block local network access and mDNS adv
 | **HTTP Server** | [Ktor](https://ktor.io/) (embedded server) or [NanoHTTPD](https://github.com/NanoHttpd/nanohttpd) | Ktor preferred — Kotlin-native, coroutine-based |
 | **mDNS** | `NsdManager` (Network Service Discovery) | Built into Android — zero dependencies |
 | **MCP Server** | Custom implementation over HTTP transport | MCP protocol over the same Ktor server |
-| **Min Target** | Android API 28+ (Android 9) | CDP support in WebView |
+| **Min Target** | Android API 29+ (Android 10) | CDP support in WebView |
 
 ### Android — Key APIs
 

@@ -581,3 +581,8 @@ Focus fixture follow-up records only focus/active-element booleans, event
 count, bounded type/autocomplete categories and a fixed JNI expression hash
 before existing assertions. It does not record input values. These authored
 diagnostics have not run on a device.
+
+
+The user approved Android 10 (API 29) as the minimum supported OS on 5 November
+2026. Earlier API 28 refusal records remain historical; final-source phone and
+tablet acceptance, including privacy and scene evidence, remains open.
