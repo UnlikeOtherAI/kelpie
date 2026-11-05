@@ -180,7 +180,8 @@ abstract class ScriptPublicFixture {
                         .put("actionIndex", status?.optInt("actionIndex", -1) ?: -1)
                         .put("playing", status?.optBoolean("playing") ?: false)
                         .put("targetVisible", target != null)
-                        .put("markerFound", marker != null),
+                        .put("markerFound", marker != null)
+                        .put("accessibility", diagnoseSubmitWindows()),
                 )
                 nextStatus = now + 1_000_000_000L
             }
@@ -222,6 +223,50 @@ abstract class ScriptPublicFixture {
         }
         saveObservations()
         throw AssertionError("Scene-centered native Submit marker never appeared")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun diagnoseSubmitWindows(): JSONObject {
+        val automation = instrumentation.uiAutomation
+        val info = automation.serviceInfo
+        val previousFlags = info.flags
+        val windows = org.json.JSONArray()
+        val active = automation.rootInActiveWindow
+        val activePresent = active != null
+        active?.recycle()
+        try {
+            info.flags = previousFlags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            automation.serviceInfo = info
+            for (window in automation.windows.take(16)) {
+                val root = window.root
+                try {
+                    val owned = root?.packageName?.toString() == "com.kelpie.browser"
+                    val submit = if (owned) root?.findAccessibilityNodeInfosByText("Submit").orEmpty() else emptyList()
+                    val stop = if (owned) root?.findAccessibilityNodeInfosByText("Stop").orEmpty() else emptyList()
+                    try {
+                        windows.put(
+                            JSONObject()
+                                .put("type", window.type)
+                                .put("active", window.isActive)
+                                .put("owned", owned)
+                                .put("submitCount", submit.size)
+                                .put("strictSubmitCount", submit.count { it.isVisibleToUser && it.isClickable && it.text?.toString() == "Submit" })
+                                .put("stopCount", stop.size),
+                        )
+                    } finally {
+                        submit.forEach { it.recycle() }
+                        stop.forEach { it.recycle() }
+                    }
+                } finally {
+                    root?.recycle()
+                    window.recycle()
+                }
+            }
+        } finally {
+            info.flags = previousFlags
+            automation.serviceInfo = info
+        }
+        return JSONObject().put("activeRootPresent", activePresent).put("windows", windows)
     }
 
     @Suppress("DEPRECATION")

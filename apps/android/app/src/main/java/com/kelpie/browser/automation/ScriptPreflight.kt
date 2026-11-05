@@ -23,7 +23,7 @@ object ScriptPreflight {
         if (normalized.containsKey("sessionId")) throw ScriptFailure("SESSION_UNSUPPORTED")
         if ((normalized["inputs"] as? Map<*, *>)?.isNotEmpty() == true) throw ScriptFailure("UNRESOLVED_INPUT")
         val actions = actions(normalized)
-        if (actions.any { it["action"] !in supportedActions }) {
+        if (actions.any { it["action"] !in supportedActions || it.containsKey("typingDelayMs") }) {
             throw ScriptFailure("UNSUPPORTED_SCRIPT_ACTION")
         }
         val names = mutableSetOf<String>()
