@@ -63,6 +63,9 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
+            providers.environmentVariable("KELPIE_ANDROID_BUILD_ROOT").orNull?.let {
+                buildStagingDirectory = file(it + "/cxx")
+            }
         }
     }
 

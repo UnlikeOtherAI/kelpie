@@ -40,7 +40,11 @@ class Router {
         fromGateway: Boolean = false,
     ): Pair<Int, Map<String, Any?>> {
         val gateway = browserGateway
-        if (gateway != null && !fromGateway && !bypassRecordingGate && method !in setOf("browser-control", "mcp", "ai-infer", "ai-record", "ai-cancel", "abort-script", "get-script-status")) {
+        if (gateway != null &&
+            !fromGateway &&
+            !bypassRecordingGate &&
+            method !in setOf("browser-control", "mcp", "ai-infer", "ai-record", "ai-cancel", "play-script", "abort-script", "get-script-status", "get-script-artifact")
+        ) {
             return gateway.legacy(method) { handle(method, body, bypassRecordingGate, fromGateway = true) }
         }
         val handler =

@@ -2,6 +2,7 @@ package com.kelpie.browser.network
 
 import android.content.Context
 import android.util.Log
+import com.kelpie.browser.automation.scriptHttpAuthority
 import com.kelpie.browser.device.DeviceInfo
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -25,6 +26,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -39,6 +41,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import java.net.URLDecoder
+import java.util.UUID
 
 private val json =
     Json {
@@ -83,10 +86,13 @@ class HTTPServer(
 
     private val appContext: Context = appContext.applicationContext
     private var engine: NettyApplicationEngine? = null
+
+    @Volatile private var incarnation: String? = null
     var isRunning = false
         private set
 
     fun start() {
+        incarnation = UUID.randomUUID().toString()
         val middleware = AccountPairingAuthorization(pairingStore)
         val pairEndpoints =
             PairEndpoints(pairingStore) { onPendingPairChanged() }
@@ -112,7 +118,7 @@ class HTTPServer(
                         when (val decision = middleware.evaluate(parsed)) {
                             is AuthDecision.Reject -> respondReject(call, decision)
                             AuthDecision.Unauthenticated -> respondReject(call, AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required"))
-                            is AuthDecision.Authenticated -> handleAuthenticatedPost(call, "mcp")
+                            is AuthDecision.Authenticated -> handleAuthenticatedPost(call, "mcp", decision.clientId)
                         }
                     }
                     get("/mcp") {
@@ -225,7 +231,7 @@ class HTTPServer(
                                         call,
                                         AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required"),
                                     )
-                                is AuthDecision.Authenticated -> handleAuthenticatedPost(call)
+                                is AuthDecision.Authenticated -> handleAuthenticatedPost(call, clientId = decision.clientId)
                             }
                         }
                     }
@@ -238,6 +244,7 @@ class HTTPServer(
     }
 
     fun stop() {
+        incarnation = null
         engine?.stop(1000, 2000)
         engine = null
         isRunning = false
@@ -266,6 +273,7 @@ class HTTPServer(
     private suspend fun handleAuthenticatedPost(
         call: ApplicationCall,
         overrideMethod: String? = null,
+        clientId: String,
     ) {
         // Validate Content-Length BEFORE reading the body to ensure a single
         // malicious multi-GB POST never gets buffered. Missing Content-Length
@@ -323,7 +331,23 @@ class HTTPServer(
             )
             return
         }
-        val (status, result) = router.handle(method, body)
+        val admittedListener = incarnation
+        val parsed = parsedRequest(call)
+        val bearer =
+            parsed.headers["authorization"]
+                ?.singleOrNull()
+                ?.drop(7)
+                ?.trim()
+                .orEmpty()
+        if (admittedListener == null || bearer.isEmpty()) {
+            respondReject(call, AuthDecision.Reject(401, "UNAUTHORIZED", "Authentication required"))
+            return
+        }
+        val authority =
+            scriptHttpAuthority(clientId, parsed, pairingStore, admittedListener) {
+                incarnation.takeIf { isRunning }
+            }
+        val (status, result) = withContext(authority) { router.handle(method, body) }
         if (method == "mcp" && status == 200 && result.isEmpty()) {
             call.respondText("", status = HttpStatusCode.Accepted)
             return

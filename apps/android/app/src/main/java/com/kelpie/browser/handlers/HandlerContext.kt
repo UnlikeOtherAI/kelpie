@@ -40,6 +40,11 @@ class HandlerContext(
         const val DEFAULT_OVERLAY_RGB = "59,130,246"
     }
 
+    @Volatile var scriptForeground = true
+    val scriptOverlay =
+        com.kelpie.browser.automation
+            .ScriptOverlay()
+    var scriptRuntime: com.kelpie.browser.automation.ScriptRuntime? = null
     var remoteDocumentGuard: (() -> Boolean)? = null
     var remoteNavigationStart: (() -> Boolean)? = null
     var remoteNavigationReadGuard: (() -> Boolean)? = null
@@ -120,6 +125,12 @@ class HandlerContext(
         }
 
     suspend fun evaluateJS(script: String): String = evaluateGuardedJS(script, remoteDocumentGuard)
+
+    /** Fixed automation expression with a private owner/tab callback fence. */
+    suspend fun evaluateAutomationJSON(
+        script: String,
+        guard: () -> Boolean,
+    ): Map<String, Any?> = parseObject(evaluateGuardedJS("JSON.stringify(($script))", guard))
 
     private suspend fun evaluateGuardedJS(
         script: String,

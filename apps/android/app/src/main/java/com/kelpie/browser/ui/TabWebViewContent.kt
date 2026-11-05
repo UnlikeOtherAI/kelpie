@@ -54,6 +54,15 @@ fun TabWebViewContent(
                 ),
             )
 
+            container.addView(
+                com.kelpie.browser.automation.ScriptOverlayView(
+                    container.context,
+                    handlerContext.scriptOverlay,
+                    { tab.documentVersion },
+                    { handlerContext.scriptPlaybackState?.isRecording?.value == true },
+                ),
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+            )
             val policy = ChromeScrollPolicy()
             var dragging = false
             var translation = 0f

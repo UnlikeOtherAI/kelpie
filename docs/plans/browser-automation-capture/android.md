@@ -1,0 +1,139 @@
+# Android automation and capture
+
+Source base: 9f752a56335a15e1662016dc6db934a79adba7b5.
+Implementation owner: Android. Worktree: D:/Worktrees/kelpie/capture-android-20261104.
+This is an implementation checklist, not a release or device-verification claim.
+
+## Boundaries and dependencies
+
+Strict v1 reuses the generated core-mcp validator, fixed semantic target reader,
+canonical observation/extraction/readiness gateway and core-automation numerical
+presentation model through JNI. Legacy scripts retain their own handler and lease.
+No second schema, interpolation engine, identity store or native session allocator
+is introduced.
+
+The existing HTTP authorization decision supplies an immutable client/grant/listener
+reference and a current authorization closure in private coroutine context. Actions,
+frames, status, abort and chunks revalidate it. Callback/main-thread checks use the
+current local pairing/account grant and listener. Body sessionId never authorizes
+anything. Android has no native managed-session resolver: supplied sessionId fails
+full preflight with SESSION_UNSUPPORTED. Inference/Nessie outbound calls without an
+explicit recording authority cannot inherit recording permission from a connection.
+
+Mobile press-key refuses in full preflight: Android has no existing verified
+WebView key route, and iOS lacks equivalent supported defaults. A synthetic
+KeyboardEvent is not substituted for browser keyboard behavior. Other input uses
+the generated atomic synthetic-coordinate path and reports that guarantee. Android
+WebView's page-realm object registry is a correctness fence, not hostile-page
+isolation.
+
+The native overlay renders one shared numerical timeline into both live View Canvas
+and captured bitmap Canvas. There is no OS cursor control or persistent content
+script. GIF uses an original bounded RGB332/LZW encoder with the requested marker
+color reserved in its palette; GIF color quantization differs from lossless PNG.
+Video uses Android MediaCodec H.264 and MediaMuxer, with encoded-sample admission
+and reserved footer space. A terminal empty EOS sample supplies the final MP4
+duration. The worker queue is bounded; rejected continuous frames are counted.
+
+Only direct play replies contain bounded redacted named outputs. Status is
+metadata-only: success describes the query, runSuccess describes terminal outcome,
+and runError carries a fixed safe code. Opaque artifacts are current-owner/grant/
+listener-bound; arbitrary files/URLs cannot be downloaded. Terminal private
+workflow literals, output payloads and redactor values are cleared after the
+direct response is built.
+
+The shared native redactor C ABI has a thin JNI adapter; Android relink remains
+pending. The four script descriptors still require common registry enablement.
+Do not fork descriptors in Kotlin. Native route and supportedVersions checks remain
+authoritative while the registry change is pending.
+
+## Canonical 48-requirement checklist
+
+Every evidence cell is pending unless an exact-revision result is appended below.
+Shared implementation alone does not establish Android phone/tablet acceptance.
+
+| ID | Android implementation or policy | Evidence |
+| --- | --- | --- |
+| OBS-01 | Canonical fixed value-free reader via BrowserGatewayBinding | Pending native canaries |
+| OBS-02 | Canonical scope/priority reader | Pending scoped fixture |
+| OBS-03 | Canonical bounded text/elements/metadata | Pending truncation fixture |
+| EXT-01 | Canonical deterministic extraction sources/status | Pending missing/duplicate cases |
+| EXT-02 | Canonical nested/repeated extraction | Pending ordered record cases |
+| EXT-03 | Canonical bounded publisher metadata/JSON-LD | Pending private canary cases |
+| EXT-04 | Canonical source/document provenance | Pending navigation comparison |
+| RDY-01 | Canonical immediate page status | Pending actual DOM/diagnostics |
+| RDY-02 | ScriptActions polls canonical tab.ready explicitly | Pending delayed/duplicate/hidden cases |
+| OWN-01 | Managed allocation stays CLI/desktop; supplied native session refused | Pending no/unknown/foreign session cases |
+| OWN-02 | Existing coroutine lease/retirement plus pinned WebView | Pending stale/late callback cases |
+| WFL-01 | Core C ABI schema then native capability preflight | Pending public malformed admission |
+| WFL-02 | Host bindings; unresolved refs refused; private redactor provenance | Pending native redactor ABI |
+| WFL-03 | Ordered assert/readiness/extract/output actions | Pending actual ordered workflow |
+| WFL-04 | Separate unversioned legacy handler; mixed v1 cannot fall back | Pending both public routes |
+| WFL-05 | Mutation-in-flight plus fixed target uncertainty; never replay | Pending actual uncertain action |
+| TGT-01 | Generated unique semantic target resolver | Pending unique/duplicate/disabled |
+| TGT-02 | Generated visible center and hit testing | Pending obscuration and scroll |
+| TGT-03 | CSS/bitmap scaling and native viewport checks | Pending phone/tablet DPR/zoom |
+| TGT-04 | Generated object/document/token/geometry recheck after motion | Pending move/replace/navigation |
+| TGT-05 | Explicit synthetic-coordinate input guarantee | Pending event.isTrusted oracle |
+| PTR-01 | JNI core-automation S/C eased path | Pending displayed/decoded samples |
+| PTR-02 | Same native overlay renderer and numerical ABI | Pending pixel/time comparison |
+| VIS-01 | Native circle color/radius/alpha compositing | Pending PNG/GIF/MP4 pixels |
+| VIS-02 | JNI wobble/fade state; clear at terminal cleanup | Pending early/middle/late frames |
+| CAP-01 | ScriptCapture with GIF, MP4 and step PNG | Pending real decoded exports |
+| CAP-02 | GIF LZW/loop/cumulative delays | JVM independent decoder passed; device pending |
+| CAP-03 | Native H.264/Muxer timestamps and EOS duration | Pending Android decoder |
+| CAP-04 | Every-step/explicit screenshot commands share native overlay | Pending manifest and pixels |
+| CAP-05 | Captured native document/viewport/scale fences | Pending navigation/resize |
+| CAP-06 | Shared schema bounds and shared media-byte budget | Pending native runtime bounds |
+| CAP-07 | One queued command and bounded native codec input | Pending throttled encoder |
+| CAP-08 | Stop/error finalizes each codec and preserves siblings | Pending partial + next run |
+| ART-01 | Opaque registered files; bounded authenticated chunks | Pending cross-process/host reconstruction |
+| ART-02 | Existing current authority plus immutable owner/grant/listener | Pending second/revoked owner |
+| ART-03 | Strict integer/range/key limits and private file membership | JVM bounds passed; native pending |
+| ART-04 | SHA-256/bytes/MIME/partial/timing/document manifest | Pending independent hashes |
+| SEC-01 | No raw provider errors; shared redactor C ABI adapter | Pending encoded-secret vectors |
+| SEC-02 | Fixed readers only; no arbitrary authored evaluation | Pending hostile page cases |
+| DIF-01 | Same shared fixture and normalized mobile semantics | Pending iOS/Android comparison |
+| LP-01 | Explicit unavailable on phone; optional desktop backend retained | Pending public capability refusal |
+| LP-02 | No phone layout/input/capture promises for LP | Pending public refusal boundary |
+| WEB-01 | Unavailable without real API and explicit host grant | Pending public unavailable response |
+| WEB-02 | No page polyfill or page-declared authority expansion | Pending hostile declarations |
+| DOC-01 | Android API/feature docs accompany implementation | Pending final implementation audit |
+| UI-01 | Only requested overlay/recording changes; no new product panels | Pending supported native screenshots |
+| REL-01 | Coordinator owns integrated PR/version/release | Pending coordinator |
+| REL-02 | Coordinator publishes; Android owner verifies installed artifact | Pending signed published artifact |
+
+## Verification environment and actual status
+
+Maxis inventory is available: Android SDK platforms34/35/36, build tools34..36.1,
+CMake3.22.1 and NDK25.1.8937393. AGP8.3's documented default NDK25.1 is installed,
+so no host-only NDK pin or CI toolchain drift is needed. Java21 and Gradle8.6 are
+used by the task. Task cache/output relocation uses KELPIE_ANDROID_BUILD_ROOT;
+unset builds retain ordinary repository paths.
+
+Existing Fermenta phone/tablet AVDs and the running emulator belong to other work
+and have not been used, stopped or overwritten. A task-owned headless device may
+be created only in the approved emulator slot, using the installed API35 image,
+at most two cores and four GiB RAM. No image download is assumed authorized.
+Phone and tablet evidence are separate. No physical Android hardware has been
+inventoried or verified.
+
+ANDROID-COMPILE-1 is running only formatting/JVM compilation/tests with one worker,
+in-process Kotlin and2GiB Gradle heap. TEMP/TMP are D:/Temp/capture-android-20261104;
+builds, project cache, Gradle home and logs are under
+D:/BuildArtifacts/kelpie/capture-android-20261104. No emulator, native app launch,
+Computer Use, VNC or custom OS input has run.
+
+Initial Gradle invocation downloaded/configured8.6 but rejected a PowerShell-split
+-D argument as a task name. It ran no formatter or tests. The corrected invocation
+quotes native arguments and logs stdout/stderr directly; its results are pending.
+ANDROID-COMPILE-1 final checkpoint: ktlintFormat, main Kotlin/Java compilation and
+all173 JVM tests passed on Maxis with one worker/in-process Kotlin (1m15s,
+compile-1-checkpoint.log). Added cases cover independent GIF decoding across LZW
+width/reset boundaries, exact colors, cumulative duration/long holds and bounded
+partial output; immutable owner/grant/listener scope; strict chunks/hash/ownership;
+preflight session/keyboard/input refusals; redactor ABI envelope/fail-closed adapter;
+and metadata-only finalizing/terminal status. One intermediate173-test run failed
+because its test fixture precreated an exclusively owned directory; corrected
+fixture passed. No actual JNI link, AVC decoder, HTTP/MCP script flow, emulator,
+physical device, screenshot or installed release was exercised by this checkpoint.

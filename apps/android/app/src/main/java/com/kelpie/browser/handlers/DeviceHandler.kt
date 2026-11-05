@@ -126,6 +126,7 @@ class DeviceHandler(
                 "supported" to supported,
                 "partial" to emptyList<String>(),
                 "unsupported" to unsupported.toList().sorted(),
+                "scriptWorkflow" to ctx.scriptRuntime?.capabilities(),
             ),
         )
     }

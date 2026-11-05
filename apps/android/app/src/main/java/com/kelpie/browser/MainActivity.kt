@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        handlerContext.scriptForeground = true
         com.kelpie.browser.browser.BookmarkStore
             .refreshAccountBookmarks()
         com.kelpie.browser.connect.NessieConnection
@@ -129,6 +130,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        handlerContext.scriptForeground = false
+        handlerContext.scriptRuntime?.stop()
+        scriptPlaybackState.requestAbort()
         com.kelpie.browser.connect.NessieConnection
             .setForeground(false)
         super.onPause()
@@ -160,6 +164,9 @@ class MainActivity : ComponentActivity() {
         CommentaryHandler(handlerContext).register(router)
         HighlightHandler(handlerContext).register(router)
         SwipeHandler(handlerContext).register(router)
+        handlerContext.scriptRuntime =
+            com.kelpie.browser.automation
+                .ScriptRuntime(applicationContext, handlerContext, router, scriptPlaybackState)
         ScriptHandler(handlerContext, router, scriptPlaybackState).register(router)
         BookmarkHandler(handlerContext).register(router)
         HistoryHandler(handlerContext).register(router)
@@ -253,6 +260,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        handlerContext.scriptRuntime?.close()
         com.kelpie.browser.connect.NessieConnection
             .detach(handlerContext)
         com.kelpie.browser.account.UOAAccount

@@ -650,3 +650,14 @@ Windows Chromium supports strict script version1 through the existing authentica
 ### Apple script media
 
 Apple script capture uses [shared bounded media helpers](api/apple-script-media.md) for GIF/PNG/H.264, sRGB overlays, byte caps and authenticated chunk retrieval. Native adapter and installed-app acceptance are tracked separately from the standalone codec checks.
+
+### Android typed script capture implementation
+
+Android's version1 binding reuses shared semantic targeting, observation,
+extraction, readiness and native presentation/redaction. It adds the requested
+pointer/tap overlay, GIF, H.264 MP4 and step PNG capture, with owner-bound status,
+abort and artifact chunks. Input reports synthetic-coordinate. Supplied native
+session IDs and unsupported mobile keyboard defaults fail before actions.
+The matching iOS binding belongs to the same integrated PR. Native relink and real
+HTTP/MCP phone/tablet acceptance remain pending; the
+[Android ledger](plans/browser-automation-capture/android.md) records exact results.
